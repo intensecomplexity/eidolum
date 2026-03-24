@@ -11,7 +11,7 @@ PLATFORM_META = {
     "youtube": {
         "id": "youtube",
         "name": "YouTube",
-        "icon": "\ud83d\udcfa",
+        "icon": "\U0001f4fa",
         "color": "#ff0000",
         "tagline": "Finance creators ranked by prediction accuracy",
         "note": None,
@@ -19,7 +19,7 @@ PLATFORM_META = {
     "twitter": {
         "id": "twitter",
         "name": "Twitter/X",
-        "icon": "\ud83d\udc26",
+        "icon": "\U0001f426",
         "color": "#1d9bf0",
         "tagline": "Twitter/X finance accounts ranked by accuracy",
         "note": "Twitter predictions are tracked from public posts. Retweets not counted as predictions.",
@@ -27,7 +27,7 @@ PLATFORM_META = {
     "congress": {
         "id": "congress",
         "name": "Congressional Trades",
-        "icon": "\ud83c\udfdb\ufe0f",
+        "icon": "\U0001f3db\ufe0f",
         "color": "#FFD700",
         "tagline": "Congressional trade trackers \u2014 following the money in Washington",
         "note": "Congressional trades are legally required to be disclosed within 45 days. These trackers follow those disclosures in real time.",
@@ -35,7 +35,7 @@ PLATFORM_META = {
     "reddit": {
         "id": "reddit",
         "name": "Reddit/WSB",
-        "icon": "\ud83e\udd16",
+        "icon": "\U0001f916",
         "color": "#ff4500",
         "tagline": "Reddit community predictions from r/wallstreetbets, r/investing and more",
         "note": "Reddit predictions are aggregated from top-voted DD (Due Diligence) posts. Higher volume, lower accuracy.",
@@ -43,7 +43,7 @@ PLATFORM_META = {
     "institutional": {
         "id": "institutional",
         "name": "Wall Street / Institutional",
-        "icon": "\ud83c\udfe6",
+        "icon": "\U0001f3e6",
         "color": "#0ea5e9",
         "tagline": "Wall Street analysts and institutional research calls",
         "note": "Institutional calls sourced from public research reports, CNBC appearances, and earnings calls.",
@@ -267,17 +267,17 @@ def _generate_insight(platform_id, meta, pstats, results, db):
         lead = round(top["accuracy_rate"] - pstats["avg_accuracy"], 1)
         if lead > 0:
             insight = (
-                f"\ud83d\udcca {top['name']} leads {meta['name']} investors with "
+                f"\U0001f4ca {top['name']} leads {meta['name']} investors with "
                 f"{top['accuracy_rate']:.1f}% accuracy \u2014 {lead} points above the "
                 f"platform average of {pstats['avg_accuracy']:.1f}%"
             )
         else:
             insight = (
-                f"\ud83d\udcca {meta['name']} investors average {pstats['avg_accuracy']:.1f}% accuracy "
+                f"\U0001f4ca {meta['name']} investors average {pstats['avg_accuracy']:.1f}% accuracy "
                 f"across {pstats['total_predictions']} tracked predictions."
             )
     else:
-        insight = f"\ud83d\udcca {meta['name']} investors average {pstats['avg_accuracy']:.1f}% accuracy."
+        insight = f"\U0001f4ca {meta['name']} investors average {pstats['avg_accuracy']:.1f}% accuracy."
 
     # Add cross-platform context
     if len(sorted_platforms) > 1 and platform_rank == 1:
