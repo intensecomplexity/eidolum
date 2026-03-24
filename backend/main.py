@@ -1,35 +1,57 @@
 import os
 import sys
 import subprocess
+import time
+from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from database import engine, Base, SessionLocal
 from models import Forecaster
 from routers import leaderboard, forecasters, assets, sync, activity, admin, platforms, follows, newsletter, saved
 
-# Create all tables
-Base.metadata.create_all(bind=engine)
 
-# Auto-seed on first deploy if SEED_DATA=true and DB is empty
-if os.getenv("SEED_DATA", "").lower() in ("true", "1", "yes"):
-    try:
-        db = SessionLocal()
-        count = db.query(Forecaster).count()
-        db.close()
-        if count == 0:
-            print("[Eidolum] Database empty — running seed.py...")
-            subprocess.run(
-                [sys.executable, "seed.py"],
-                check=True,
-                cwd=os.path.dirname(os.path.abspath(__file__)),
-            )
-            print("[Eidolum] Seed complete.")
-        else:
-            print(f"[Eidolum] Database already has {count} forecasters, skipping seed.")
-    except Exception as e:
-        print(f"[Eidolum] Seed error (non-fatal): {e}")
+def init_db():
+    """Create tables and optionally seed — with retry for Postgres startup delay."""
+    for attempt in range(5):
+        try:
+            Base.metadata.create_all(bind=engine)
+            print(f"[Eidolum] Database tables created (attempt {attempt + 1}).")
+            break
+        except Exception as e:
+            print(f"[Eidolum] DB connect attempt {attempt + 1} failed: {e}")
+            if attempt < 4:
+                time.sleep(2)
+            else:
+                print("[Eidolum] WARNING: Could not connect to database after 5 attempts.")
+                return
 
-app = FastAPI(title="Eidolum API", version="1.0.0")
+    # Auto-seed if SEED_DATA=true and DB is empty
+    if os.getenv("SEED_DATA", "").lower() in ("true", "1", "yes"):
+        try:
+            db = SessionLocal()
+            count = db.query(Forecaster).count()
+            db.close()
+            if count == 0:
+                print("[Eidolum] Database empty — running seed.py...")
+                subprocess.run(
+                    [sys.executable, "seed.py"],
+                    check=True,
+                    cwd=os.path.dirname(os.path.abspath(__file__)),
+                )
+                print("[Eidolum] Seed complete.")
+            else:
+                print(f"[Eidolum] Database has {count} forecasters, skipping seed.")
+        except Exception as e:
+            print(f"[Eidolum] Seed error (non-fatal): {e}")
+
+
+@asynccontextmanager
+async def lifespan(app):
+    init_db()
+    yield
+
+
+app = FastAPI(title="Eidolum API", version="1.0.0", lifespan=lifespan)
 
 origins = [
     "http://localhost:5173",
