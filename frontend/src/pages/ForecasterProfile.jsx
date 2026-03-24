@@ -282,10 +282,10 @@ export default function ForecasterProfile() {
                   <th className="px-6 py-3">Date</th>
                   <th className="px-6 py-3">Ticker</th>
                   <th className="px-6 py-3">Call</th>
-                  <th className="px-6 py-3 text-right">Target</th>
+                  <th className="px-6 py-3 text-right">Entry</th>
                   <th className="px-6 py-3 text-center">Outcome</th>
                   <th className="px-6 py-3 text-right">Return</th>
-                  <th className="px-6 py-3 text-right hidden md:table-cell">Alpha</th>
+                  <th className="px-6 py-3 text-center hidden md:table-cell">Eval Date</th>
                   <th className="px-6 py-3 hidden lg:table-cell">Context</th>
                 </tr>
               </thead>
@@ -304,8 +304,11 @@ export default function ForecasterProfile() {
   );
 }
 
+const HORIZON_LABELS = { short: '30d', medium: '90d', long: '1y', custom: 'Custom' };
+
 function PredictionRow({ p }) {
   const [expanded, setExpanded] = useState(false);
+  const evalDate = p.evaluation_date || p.resolution_date;
   return (
     <>
       <tr
@@ -313,19 +316,26 @@ function PredictionRow({ p }) {
         onClick={() => setExpanded(!expanded)}
       >
         <td className="px-2 py-3"><BookmarkButton predictionId={p.id} /></td>
-        <td className="px-6 py-3 text-sm text-text-secondary font-mono whitespace-nowrap">{p.prediction_date?.slice(0, 10)}</td>
+        <td className="px-6 py-3">
+          <div className="text-sm text-text-secondary font-mono whitespace-nowrap">{p.prediction_date?.slice(0, 10)}</div>
+          {p.time_horizon && (
+            <span className="text-muted text-[10px] font-mono">{HORIZON_LABELS[p.time_horizon] || `${p.window_days}d`}</span>
+          )}
+        </td>
         <td className="px-6 py-3"><Link to={`/asset/${p.ticker}`} className="ticker-mono text-accent hover:underline" onClick={e => e.stopPropagation()}>{p.ticker}</Link></td>
         <td className="px-6 py-3"><PredictionBadge direction={p.direction} /></td>
-        <td className="px-6 py-3 text-right font-mono text-sm text-text-secondary">{p.target_price ? `$${p.target_price.toFixed(0)}` : '-'}</td>
+        <td className="px-6 py-3 text-right font-mono text-sm text-text-secondary">{p.entry_price ? `$${p.entry_price.toFixed(2)}` : '-'}</td>
         <td className="px-6 py-3 text-center"><PredictionBadge outcome={p.outcome} /></td>
         <td className="px-6 py-3 text-right font-mono text-sm">
           {p.actual_return !== null ? (
             <span className={p.actual_return >= 0 ? 'text-positive' : 'text-negative'}>{p.actual_return >= 0 ? '+' : ''}{p.actual_return.toFixed(1)}%</span>
           ) : <span className="text-muted">-</span>}
         </td>
-        <td className="px-6 py-3 text-right font-mono text-sm hidden md:table-cell">
-          {p.alpha !== null ? (
-            <span className={p.alpha >= 0 ? 'text-positive' : 'text-negative'}>{p.alpha >= 0 ? '+' : ''}{p.alpha.toFixed(1)}%</span>
+        <td className="px-6 py-3 text-center font-mono text-sm hidden md:table-cell">
+          {evalDate ? (
+            <span className={`text-xs ${p.outcome === 'pending' ? 'text-warning' : 'text-text-secondary'}`}>
+              {evalDate.slice(0, 10)}
+            </span>
           ) : <span className="text-muted">-</span>}
         </td>
         <td className="px-6 py-3 hidden lg:table-cell">
@@ -340,6 +350,12 @@ function PredictionRow({ p }) {
         <tr className="bg-surface-2/30">
           <td colSpan={9} className="px-6 py-2 pb-4">
             <EvidenceCard prediction={p} expandable={false} />
+            <p className="text-[10px] text-muted italic mt-2">
+              {p.outcome === 'pending'
+                ? `Evaluates on ${evalDate?.slice(0, 10)} \u2014 the date ${p.time_horizon === 'custom' ? 'specified' : 'defaulted'} at time of prediction`
+                : `Evaluated at ${evalDate?.slice(0, 10)} \u2014 the date ${p.time_horizon === 'custom' ? 'specified' : 'defaulted'} at time of prediction`
+              }
+            </p>
           </td>
         </tr>
       )}

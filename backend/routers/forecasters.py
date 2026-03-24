@@ -78,8 +78,16 @@ def get_forecaster(forecaster_id: int, db: Session = Depends(get_db)):
                 "target_price": p.target_price,
                 "entry_price": p.entry_price,
                 "prediction_date": p.prediction_date.isoformat(),
-                "evaluation_date": p.evaluation_date.isoformat() if p.evaluation_date else None,
+                "evaluation_date": (
+                    p.evaluation_date.isoformat() if p.evaluation_date
+                    else (p.prediction_date + datetime.timedelta(days=p.window_days)).isoformat()
+                ),
                 "window_days": p.window_days,
+                "time_horizon": getattr(p, "time_horizon", None) or (
+                    "short" if p.window_days <= 30
+                    else "long" if p.window_days >= 365
+                    else "medium"
+                ),
                 "outcome": p.outcome,
                 "actual_return": p.actual_return,
                 "sp500_return": p.sp500_return,

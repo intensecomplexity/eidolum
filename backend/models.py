@@ -64,6 +64,7 @@ class Prediction(Base):
     prediction_date = Column(DateTime, nullable=False)
     evaluation_date = Column(DateTime, nullable=True)
     window_days = Column(Integer, default=30)
+    time_horizon = Column(String, nullable=True)  # "short" | "medium" | "long" | "custom"
 
     # "correct" | "incorrect" | "pending"
     outcome = Column(String, default="pending")

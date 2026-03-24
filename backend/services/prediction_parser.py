@@ -39,6 +39,8 @@ class ParsedPrediction:
     direction: str          # "bullish" | "bearish"
     target_price: Optional[float]
     context: str
+    window_days: int = 30
+    time_horizon: str = "short"  # "short" | "medium" | "long" | "custom"
 
 
 def parse_predictions(title: str, description: str = "") -> list[ParsedPrediction]:
@@ -59,6 +61,8 @@ def parse_predictions(title: str, description: str = "") -> list[ParsedPredictio
 
     target_price = _extract_price_target(text)
 
+    window_days, time_horizon = _infer_time_horizon(text_lower, direction)
+
     results = []
     for ticker in tickers:
         results.append(ParsedPrediction(
@@ -66,6 +70,8 @@ def parse_predictions(title: str, description: str = "") -> list[ParsedPredictio
             direction=direction,
             target_price=target_price,
             context=title[:200],
+            window_days=window_days,
+            time_horizon=time_horizon,
         ))
     return results
 
@@ -93,3 +99,62 @@ def _extract_price_target(text: str) -> Optional[float]:
         except ValueError:
             pass
     return None
+
+
+# Patterns for explicit time frames: "within 30 days", "in 6 months", "by end of year"
+_DAYS_PATTERN = re.compile(r'(?:within|in|next)\s+(\d+)\s*days?', re.IGNORECASE)
+_WEEKS_PATTERN = re.compile(r'(?:within|in|next)\s+(\d+)\s*weeks?', re.IGNORECASE)
+_MONTHS_PATTERN = re.compile(r'(?:within|in|next)\s+(\d+)\s*months?', re.IGNORECASE)
+_YEARS_PATTERN = re.compile(r'(?:within|in|next)\s+(\d+)\s*years?', re.IGNORECASE)
+
+SHORT_TERM_KEYWORDS = [
+    "sell now", "avoid", "get out", "take profit", "sell immediately",
+    "this week", "right now", "today", "tomorrow", "dump now",
+    "buy now", "buy today", "buy immediately",
+]
+
+LONG_TERM_KEYWORDS = [
+    "long term", "long-term", "next year", "years from now",
+    "decade", "hold forever", "generational", "retirement",
+    "5 year", "10 year", "multi-year",
+]
+
+
+def _infer_time_horizon(text_lower: str, direction: str) -> tuple[int, str]:
+    """
+    Infer window_days and time_horizon from prediction text.
+    Returns (window_days, time_horizon).
+
+    Rules:
+    - Explicit "within X days/weeks/months" → use that, "custom"
+    - Short-term language → 30 days, "short"
+    - Long-term language → 365 days, "long"
+    - Default → 90 days, "medium"
+    """
+    # Check for explicit time frames first
+    m = _DAYS_PATTERN.search(text_lower)
+    if m:
+        return int(m.group(1)), "custom"
+
+    m = _WEEKS_PATTERN.search(text_lower)
+    if m:
+        return int(m.group(1)) * 7, "custom"
+
+    m = _MONTHS_PATTERN.search(text_lower)
+    if m:
+        return int(m.group(1)) * 30, "custom"
+
+    m = _YEARS_PATTERN.search(text_lower)
+    if m:
+        return int(m.group(1)) * 365, "custom"
+
+    # Check for short-term language
+    if any(kw in text_lower for kw in SHORT_TERM_KEYWORDS):
+        return 30, "short"
+
+    # Check for long-term language
+    if any(kw in text_lower for kw in LONG_TERM_KEYWORDS):
+        return 365, "long"
+
+    # Default: medium-term
+    return 90, "medium"
