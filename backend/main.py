@@ -1,4 +1,5 @@
 import os
+import sys
 import subprocess
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -11,15 +12,22 @@ Base.metadata.create_all(bind=engine)
 
 # Auto-seed on first deploy if SEED_DATA=true and DB is empty
 if os.getenv("SEED_DATA", "").lower() in ("true", "1", "yes"):
-    db = SessionLocal()
     try:
-        if db.query(Forecaster).count() == 0:
-            db.close()
-            subprocess.run(["python", "seed.py"], check=True)
-        else:
-            db.close()
-    except Exception:
+        db = SessionLocal()
+        count = db.query(Forecaster).count()
         db.close()
+        if count == 0:
+            print("[Eidolum] Database empty — running seed.py...")
+            subprocess.run(
+                [sys.executable, "seed.py"],
+                check=True,
+                cwd=os.path.dirname(os.path.abspath(__file__)),
+            )
+            print("[Eidolum] Seed complete.")
+        else:
+            print(f"[Eidolum] Database already has {count} forecasters, skipping seed.")
+    except Exception as e:
+        print(f"[Eidolum] Seed error (non-fatal): {e}")
 
 app = FastAPI(title="Eidolum API", version="1.0.0")
 
