@@ -1,0 +1,237 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-bg text-text-primary font-sans;
+    -webkit-font-smoothing: antialiased;
+    touch-action: manipulation;
+  }
+
+  /* Prevent iOS zoom on inputs */
+  input, select, textarea {
+    font-size: 16px !important;
+  }
+
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: #1e2d45 #0b1120;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  *::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  *::-webkit-scrollbar-track {
+    background: #0b1120;
+  }
+  *::-webkit-scrollbar-thumb {
+    background: #1e2d45;
+    border-radius: 3px;
+  }
+
+  /* All clickable elements — remove 300ms delay */
+  a, button, [role="button"], input, select {
+    touch-action: manipulation;
+  }
+}
+
+@layer components {
+  .ticker-mono {
+    @apply font-mono text-sm tracking-wider;
+  }
+
+  .card {
+    @apply bg-surface border border-border rounded-xl p-4 sm:p-6;
+  }
+
+  .badge-bull {
+    @apply inline-flex items-center px-2 py-0.5 rounded text-xs font-mono font-semibold bg-positive/10 text-positive border border-positive/20;
+  }
+
+  .badge-bear {
+    @apply inline-flex items-center px-2 py-0.5 rounded text-xs font-mono font-semibold bg-negative/10 text-negative border border-negative/20;
+  }
+
+  .badge-pending {
+    @apply inline-flex items-center px-2 py-0.5 rounded text-xs font-mono font-semibold bg-warning/10 text-warning border border-warning/20;
+  }
+
+  .btn-primary {
+    @apply inline-flex items-center justify-center gap-2 px-6 py-3.5 bg-accent text-bg font-semibold rounded-lg
+           active:bg-accent-dim transition-colors duration-150 min-h-[44px];
+  }
+
+  .btn-secondary {
+    @apply inline-flex items-center justify-center gap-2 px-6 py-3.5 bg-surface-2 text-text-primary font-medium rounded-lg border border-border
+           active:border-accent/50 active:text-accent transition-colors duration-150 min-h-[44px];
+  }
+
+  /* Desktop hover styles */
+  @media (hover: hover) {
+    .btn-primary:hover { @apply bg-accent-dim; }
+    .btn-secondary:hover { @apply border-accent/50 text-accent; }
+  }
+
+  .stat-number {
+    @apply font-mono text-accent;
+  }
+}
+
+/* Ticker scroll animation */
+@keyframes ticker-scroll {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+
+.ticker-scroll {
+  animation: ticker-scroll 40s linear infinite;
+  will-change: transform;
+}
+
+@media (max-width: 640px) {
+  .ticker-scroll {
+    animation-duration: 60s; /* slower on mobile — battery */
+  }
+}
+
+.ticker-scroll:hover {
+  animation-play-state: paused;
+}
+
+/* Glow effects */
+.glow-accent {
+  box-shadow: 0 0 20px rgba(0, 229, 160, 0.15);
+}
+
+.glow-blue {
+  box-shadow: 0 0 20px rgba(14, 165, 233, 0.15);
+}
+
+/* Pulse animation for live items */
+@keyframes pulse-live {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+
+.pulse-live {
+  animation: pulse-live 2s ease-in-out infinite;
+}
+
+/* Fire pulse */
+@keyframes fire-pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.15); }
+}
+
+.fire-pulse {
+  animation: fire-pulse 1.5s ease-in-out infinite;
+  display: inline-block;
+}
+
+/* Fade in for feed items */
+@keyframes fade-slide-in {
+  from { opacity: 0; transform: translateY(-8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.feed-item-enter {
+  animation: fade-slide-in 0.3s ease-out;
+}
+
+/* Rank medal colors */
+.rank-gold { color: #fbbf24; }
+.rank-silver { color: #94a3b8; }
+.rank-bronze { color: #d97706; }
+
+/* Grid background pattern — disabled on mobile for perf */
+.grid-bg {
+  background-image:
+    linear-gradient(rgba(30, 45, 69, 0.3) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(30, 45, 69, 0.3) 1px, transparent 1px);
+  background-size: 48px 48px;
+}
+
+@media (max-width: 640px) {
+  .grid-bg {
+    background-image: none;
+  }
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  .ticker-scroll,
+  .pulse-live,
+  .fire-pulse,
+  .feed-item-enter,
+  .animate-spin,
+  .bookmark-pulse,
+  .toast-slide-up {
+    animation: none !important;
+  }
+  * {
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Mobile bottom nav safe area */
+.pb-bottom-nav {
+  padding-bottom: calc(60px + env(safe-area-inset-bottom, 0px));
+}
+
+/* Hamburger menu slide */
+@keyframes slide-down {
+  from { opacity: 0; transform: translateY(-8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.menu-slide-down {
+  animation: slide-down 0.2s ease-out;
+}
+
+/* Bookmark pulse animation */
+@keyframes bookmark-pulse {
+  0% { transform: scale(1); }
+  40% { transform: scale(1.3); }
+  100% { transform: scale(1); }
+}
+
+.bookmark-pulse {
+  animation: bookmark-pulse 0.3s ease-out;
+}
+
+/* Rare signal pulsing border */
+@keyframes pulse-border {
+  0%, 100% { border-color: rgba(245, 158, 11, 0.3); }
+  50% { border-color: rgba(245, 158, 11, 0.6); }
+}
+
+/* Horizontal scroll pills — hide scrollbar */
+.pills-scroll {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.pills-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+/* Toast slide up */
+@keyframes toast-slide-up {
+  from { opacity: 0; transform: translate(-50%, 12px); }
+  to { opacity: 1; transform: translate(-50%, 0); }
+}
+
+.toast-slide-up {
+  animation: toast-slide-up 0.25s ease-out;
+}
+
+/* Horizontal scroll pills — hide scrollbar */
+.pills-scroll {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.pills-scroll::-webkit-scrollbar {
+  display: none;
+}

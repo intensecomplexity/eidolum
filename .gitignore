@@ -1,0 +1,20 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.env
+*.db
+*.sqlite3
+venv/
+.venv/
+
+# Node
+node_modules/
+dist/
+.env.local
+.env.production.local
+
+# General
+.DS_Store
+*.log
+.vercel
