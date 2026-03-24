@@ -1,11 +1,25 @@
 import os
+import subprocess
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from database import engine, Base
+from database import engine, Base, SessionLocal
+from models import Forecaster
 from routers import leaderboard, forecasters, assets, sync, activity, admin, platforms, follows, newsletter, saved
 
 # Create all tables
 Base.metadata.create_all(bind=engine)
+
+# Auto-seed on first deploy if SEED_DATA=true and DB is empty
+if os.getenv("SEED_DATA", "").lower() in ("true", "1", "yes"):
+    db = SessionLocal()
+    try:
+        if db.query(Forecaster).count() == 0:
+            db.close()
+            subprocess.run(["python", "seed.py"], check=True)
+        else:
+            db.close()
+    except Exception:
+        db.close()
 
 app = FastAPI(title="Eidolum API", version="1.0.0")
 
