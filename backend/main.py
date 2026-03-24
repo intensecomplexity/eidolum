@@ -59,11 +59,13 @@ origins = [
     "https://www.eidolum.com",
     "https://eidolum.com",
     "https://eidolum.vercel.app",
+    "https://eidolum-production.up.railway.app",
 ]
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
+    allow_origin_regex=r"https://.*\.(vercel\.app|railway\.app)",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -85,3 +87,24 @@ app.include_router(saved.router, prefix="/api")
 @app.get("/api/health")
 def health():
     return {"status": "ok", "app": "Eidolum API"}
+
+
+@app.get("/api/debug")
+def debug():
+    """Temporary debug endpoint — remove after deployment is stable."""
+    info = {
+        "database_url_set": bool(os.getenv("DATABASE_URL")),
+        "database_url_prefix": (os.getenv("DATABASE_URL", "not-set"))[:25] + "...",
+        "seed_data": os.getenv("SEED_DATA", "not-set"),
+        "port": os.getenv("PORT", "not-set"),
+    }
+    try:
+        db = SessionLocal()
+        count = db.query(Forecaster).count()
+        db.close()
+        info["db_connected"] = True
+        info["forecaster_count"] = count
+    except Exception as e:
+        info["db_connected"] = False
+        info["db_error"] = str(e)
+    return info
