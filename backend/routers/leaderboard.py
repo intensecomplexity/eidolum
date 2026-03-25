@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from database import get_db
-from models import Forecaster, Prediction, format_timestamp
+from models import Forecaster, Prediction, format_timestamp, DisclosedPosition
 from utils import compute_forecaster_stats, compute_streak, compute_rank_movement
 
 router = APIRouter()
@@ -16,6 +16,7 @@ def get_leaderboard(
     period_days: int = Query(None),
     direction: str = Query(None),
     tab: str = Query(None),  # "week" | "sector" | None (all-time)
+    filter: str = Query(None),
 ):
     forecasters = db.query(Forecaster).all()
 
@@ -51,6 +52,24 @@ def get_leaderboard(
     for r in results:
         f = next(fc for fc in forecasters if fc.id == r["id"])
         r["rank_movement"] = compute_rank_movement(f, r["rank"])
+
+    # Add conflict data
+    for r in results:
+        conflict_count = db.query(Prediction).filter(
+            Prediction.forecaster_id == r["id"],
+            Prediction.has_conflict == 1
+        ).count()
+        has_positions = db.query(DisclosedPosition).filter(
+            DisclosedPosition.forecaster_id == r["id"],
+            DisclosedPosition.position_type != 'sold'
+        ).count() > 0
+        r["has_disclosed_positions"] = has_positions
+        r["conflict_count"] = conflict_count
+        r["conflict_rate"] = round(conflict_count / r["total_predictions"] * 100, 1) if r["total_predictions"] > 0 else 0
+
+    # Apply conflict filter
+    if filter == "no_conflicts":
+        results = [r for r in results if r["conflict_count"] == 0]
 
     return results
 
@@ -119,12 +138,16 @@ def get_homepage_stats(db: Session = Depends(get_db)):
     evaluated = db.query(Prediction).filter(Prediction.outcome != "pending").all()
     correct = [p for p in evaluated if p.outcome == "correct"]
     avg_accuracy = round(len(correct) / len(evaluated) * 100, 1) if evaluated else 0
+    conflict_flags = db.query(Prediction).filter(Prediction.has_conflict == 1).count()
+    forecasters_with_positions = db.query(DisclosedPosition.forecaster_id).distinct().count()
     return {
         "forecasters_tracked": total_forecasters,
         "verified_predictions": len(evaluated),
         "total_predictions": total_predictions,
         "avg_accuracy": avg_accuracy,
         "months_of_data": 18,
+        "conflict_flags": conflict_flags,
+        "transparency_tracked": forecasters_with_positions,
     }
 
 

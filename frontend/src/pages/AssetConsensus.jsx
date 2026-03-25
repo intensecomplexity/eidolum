@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { Search, TrendingUp, TrendingDown, ArrowLeft } from 'lucide-react';
 import PredictionBadge from '../components/PredictionBadge';
+import ConflictBadge from '../components/ConflictBadge';
 import PredictionCard from '../components/PredictionCard';
 import EvidenceCard from '../components/EvidenceCard';
 import BookmarkButton from '../components/BookmarkButton';
@@ -267,7 +268,10 @@ function AssetPredictionRow({ p }) {
             <div className="text-muted text-xs">{p.forecaster.accuracy_rate.toFixed(1)}% overall</div>
           </Link>
         </td>
-        <td className="px-6 py-3"><PredictionBadge direction={p.direction} /></td>
+        <td className="px-6 py-3">
+          <PredictionBadge direction={p.direction} />
+          {p.has_conflict && <ConflictBadge note={p.conflict_note} size="small" />}
+        </td>
         <td className="px-6 py-3 text-right font-mono text-sm text-text-secondary">{p.entry_price ? `$${p.entry_price.toFixed(2)}` : '-'}</td>
         <td className="px-6 py-3 text-center"><PredictionBadge outcome={p.outcome} /></td>
         <td className="px-6 py-3 text-right font-mono text-sm">

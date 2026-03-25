@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import PredictionBadge from './PredictionBadge';
+import ConflictBadge from './ConflictBadge';
 import BookmarkButton from './BookmarkButton';
 
 const HORIZON_LABELS = { short: '30d', medium: '90d', long: '1y', custom: 'Custom' };
@@ -24,6 +25,7 @@ export default function PredictionCard({ prediction: p, showForecaster = false }
             {p.ticker}
           </Link>
           <PredictionBadge direction={p.direction} />
+          {p.has_conflict && <ConflictBadge note={p.conflict_note} size="small" />}
           <span className="text-muted text-[10px] font-mono border border-border rounded px-1 py-0.5">
             {horizonLabel}
           </span>
@@ -79,6 +81,19 @@ export default function PredictionCard({ prediction: p, showForecaster = false }
           }
         </div>
       )}
+
+      {/* Conflict detail */}
+      {p.has_conflict && p.conflict_note && (
+        <div className="flex items-start gap-1.5 mt-2 pt-2 border-t border-border/30">
+          <span className="text-warning text-xs">⚠️</span>
+          <span className="text-warning/80 text-[11px]">{p.conflict_note}</span>
+        </div>
+      )}
+
+      {/* Disclaimer */}
+      <p className="text-muted text-[10px] italic mt-2">
+        Eidolum does not provide investment advice. Verify all positions before acting.
+      </p>
     </div>
   );
 }

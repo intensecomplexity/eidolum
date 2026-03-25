@@ -11,7 +11,7 @@ import os
 sys.path.insert(0, os.path.dirname(__file__))
 
 from database import SessionLocal, engine, Base
-from models import Forecaster, Video, Prediction, ActivityFeedItem
+from models import Forecaster, Video, Prediction, ActivityFeedItem, DisclosedPosition
 
 Base.metadata.create_all(bind=engine)
 
@@ -275,7 +275,7 @@ FORECASTERS = [
     {
         "name": "Nancy Pelosi Tracker",
         "handle": "@PelosiTracker_",
-        "platform": "x",
+        "platform": "congress",
         "channel_id": None,
         "channel_url": "https://x.com/PelosiTracker_",
         "subscriber_count": 680_000,
@@ -286,7 +286,7 @@ FORECASTERS = [
     {
         "name": "Unusual Whales",
         "handle": "@unusual_whales",
-        "platform": "x",
+        "platform": "congress",
         "channel_id": None,
         "channel_url": "https://x.com/unusual_whales",
         "subscriber_count": 950_000,
@@ -319,7 +319,7 @@ FORECASTERS = [
     {
         "name": "Jim Cramer",
         "handle": "@jimcramer",
-        "platform": "x",
+        "platform": "institutional",
         "channel_id": None,
         "channel_url": "https://x.com/jimcramer",
         "subscriber_count": 2_100_000,
@@ -341,7 +341,7 @@ FORECASTERS = [
     {
         "name": "Bill Ackman",
         "handle": "@BillAckman",
-        "platform": "x",
+        "platform": "institutional",
         "channel_id": None,
         "channel_url": "https://x.com/BillAckman",
         "subscriber_count": 1_100_000,
@@ -352,7 +352,7 @@ FORECASTERS = [
     {
         "name": "Dan Ives",
         "handle": "@DanIves",
-        "platform": "x",
+        "platform": "institutional",
         "channel_id": None,
         "channel_url": "https://x.com/DanIves",
         "subscriber_count": 350_000,
@@ -363,7 +363,7 @@ FORECASTERS = [
     {
         "name": "Tom Lee",
         "handle": "@fundstrat",
-        "platform": "x",
+        "platform": "institutional",
         "channel_id": None,
         "channel_url": "https://x.com/fundstrat",
         "subscriber_count": 420_000,
@@ -374,7 +374,7 @@ FORECASTERS = [
     {
         "name": "Liz Ann Sonders",
         "handle": "@LizAnnSonders",
-        "platform": "x",
+        "platform": "institutional",
         "channel_id": None,
         "channel_url": "https://x.com/LizAnnSonders",
         "subscriber_count": 310_000,
@@ -476,7 +476,7 @@ FORECASTERS = [
     {
         "name": "Congress Trades Tracker",
         "handle": "u/CongressTracker",
-        "platform": "reddit",
+        "platform": "congress",
         "channel_id": None,
         "channel_url": "https://www.reddit.com/user/CongressTracker",
         "subscriber_count": 0,
@@ -520,7 +520,7 @@ FORECASTERS = [
     {
         "name": "Quiver Quantitative",
         "handle": "u/QuiverQuant",
-        "platform": "reddit",
+        "platform": "congress",
         "channel_id": None,
         "channel_url": "https://www.reddit.com/user/QuiverQuant",
         "subscriber_count": 0,
@@ -534,7 +534,7 @@ FORECASTERS = [
     {
         "name": "ARK Invest",
         "handle": "@ARKInvest",
-        "platform": "x",
+        "platform": "institutional",
         "channel_id": None,
         "channel_url": "https://x.com/ARKInvest",
         "subscriber_count": 1_200_000,
@@ -545,7 +545,7 @@ FORECASTERS = [
     {
         "name": "JPMorgan Research",
         "handle": "@JPMorganResearch",
-        "platform": "x",
+        "platform": "institutional",
         "channel_id": None,
         "channel_url": "https://x.com/JPMorganResearch",
         "subscriber_count": 850_000,
@@ -556,7 +556,7 @@ FORECASTERS = [
     {
         "name": "Goldman Sachs",
         "handle": "@GoldmanSachs",
-        "platform": "x",
+        "platform": "institutional",
         "channel_id": None,
         "channel_url": "https://x.com/GoldmanSachs",
         "subscriber_count": 2_400_000,
@@ -567,7 +567,7 @@ FORECASTERS = [
     {
         "name": "Morgan Stanley",
         "handle": "@MorganStanley",
-        "platform": "x",
+        "platform": "institutional",
         "channel_id": None,
         "channel_url": "https://x.com/MorganStanley",
         "subscriber_count": 1_800_000,
@@ -578,7 +578,7 @@ FORECASTERS = [
     {
         "name": "Citron Research",
         "handle": "@CitronResearch",
-        "platform": "x",
+        "platform": "institutional",
         "channel_id": None,
         "channel_url": "https://x.com/CitronResearch",
         "subscriber_count": 380_000,
@@ -589,7 +589,7 @@ FORECASTERS = [
     {
         "name": "Hindenburg Research",
         "handle": "@HindenburgRes",
-        "platform": "x",
+        "platform": "institutional",
         "channel_id": None,
         "channel_url": "https://x.com/HindenburgRes",
         "subscriber_count": 620_000,
@@ -600,7 +600,7 @@ FORECASTERS = [
     {
         "name": "Motley Fool",
         "handle": "@MotleyFool",
-        "platform": "x",
+        "platform": "institutional",
         "channel_id": None,
         "channel_url": "https://x.com/MotleyFool",
         "subscriber_count": 2_800_000,
@@ -1409,6 +1409,100 @@ def seed():
     for item in feed_items:
         db.add(item)
     db.commit()
+
+    # -----------------------------------------------------------------------
+    # Disclosed positions & conflict flags
+    # -----------------------------------------------------------------------
+    print("Seeding disclosed positions...")
+
+    DISCLOSED_POSITIONS = {
+        "Graham Stephan": [
+            ("AAPL", "long", "Mentioned owning Apple in multiple portfolio videos"),
+            ("TSLA", "long", "Disclosed Tesla position in portfolio review"),
+        ],
+        "Meet Kevin": [
+            ("TSLA", "long", "Heavily discussed owning Tesla shares"),
+            ("NVDA", "long", "Disclosed NVIDIA position in 2024 videos"),
+        ],
+        "Cathie Wood": [
+            ("TSLA", "long", "Largest ARK holding — publicly filed 13F"),
+            ("COIN", "long", "Publicly filed 13F holding"),
+            ("PLTR", "long", "Publicly filed 13F holding"),
+            ("RBLX", "long", "Publicly filed 13F holding"),
+        ],
+        "ARK Invest": [
+            ("TSLA", "long", "Largest holding — publicly filed 13F"),
+            ("COIN", "long", "Publicly filed 13F holding"),
+            ("PLTR", "long", "Publicly filed 13F holding"),
+        ],
+        "Jim Cramer": [
+            ("AAPL", "long", "Charitable trust holdings"),
+            ("MSFT", "long", "Charitable trust holdings"),
+        ],
+        "Michael Saylor": [
+            ("COIN", "long", "MicroStrategy's BTC-adjacent holdings"),
+        ],
+        "Elon Musk": [
+            ("TSLA", "long", "CEO and largest shareholder of Tesla"),
+        ],
+        "Kevin O'Leary": [
+            ("AAPL", "long", "Publicly disclosed portfolio holding"),
+        ],
+        "Peter Schiff": [
+            ("GS", "short", "Known gold bug, vocal bear on financials"),
+        ],
+    }
+
+    forecaster_map = {f.name: f for f, _, _ in created_forecasters}
+
+    for name, positions in DISCLOSED_POSITIONS.items():
+        f = forecaster_map.get(name)
+        if not f:
+            continue
+        for ticker, pos_type, notes in positions:
+            dp = DisclosedPosition(
+                forecaster_id=f.id,
+                ticker=ticker,
+                position_type=pos_type,
+                disclosed_at=NOW - datetime.timedelta(days=random.randint(30, 365)),
+                notes=notes,
+            )
+            db.add(dp)
+
+    db.commit()
+
+    # Flag congress forecasters — all their predictions are disclosures
+    congress_names = ["Nancy Pelosi Tracker", "Congress Trades Tracker", "Quiver Quantitative"]
+    for name in congress_names:
+        f = forecaster_map.get(name)
+        if not f:
+            continue
+        preds = db.query(Prediction).filter(Prediction.forecaster_id == f.id).all()
+        for p in preds:
+            p.has_conflict = 1
+            p.conflict_note = "Congressional trade — legally required disclosure"
+
+    # Flag predictions matching disclosed positions
+    all_positions = db.query(DisclosedPosition).filter(
+        DisclosedPosition.position_type != 'sold'
+    ).all()
+    for pos in all_positions:
+        matching = db.query(Prediction).filter(
+            Prediction.forecaster_id == pos.forecaster_id,
+            Prediction.ticker == pos.ticker,
+        ).all()
+        for p in matching:
+            if not p.has_conflict:
+                p.has_conflict = 1
+                p.conflict_note = f"Disclosed {pos.position_type} position in {pos.ticker}"
+
+    db.commit()
+
+    # Print conflict stats
+    total_conflicts = db.query(Prediction).filter(Prediction.has_conflict == 1).count()
+    total_preds = db.query(Prediction).count()
+    print(f"  Conflict flags: {total_conflicts} / {total_preds} predictions")
+
     db.close()
 
     # Print summary

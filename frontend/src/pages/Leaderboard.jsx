@@ -13,6 +13,7 @@ import { getLeaderboard } from '../api';
 
 const SECTORS = ['All', 'Technology', 'Finance', 'Energy', 'Healthcare', 'Consumer', 'Index'];
 const DIRECTIONS = ['All', 'bullish', 'bearish'];
+const CONFLICT_FILTERS = ['All', 'No Conflicts', 'Has Disclosures'];
 
 const TABS = [
   { key: 'alltime', label: 'All Time', mobileLabel: 'All', icon: Trophy },
@@ -29,6 +30,7 @@ export default function Leaderboard() {
   const [activeTab, setActiveTab] = useState('alltime');
   const [sector, setSector] = useState('All');
   const [direction, setDirection] = useState('All');
+  const [conflictFilter, setConflictFilter] = useState('All');
 
   function handleTabClick(key) {
     if (key === 'report') {
@@ -45,11 +47,12 @@ export default function Leaderboard() {
     if (activeTab === 'week') params.tab = 'week';
     if (sector !== 'All') params.sector = sector;
     if (direction !== 'All') params.direction = direction;
+    if (conflictFilter === 'No Conflicts') params.filter = 'no_conflicts';
     getLeaderboard(params)
       .then(setData)
       .catch(() => {})
       .finally(() => setLoading(false));
-  }, [activeTab, sector, direction]);
+  }, [activeTab, sector, direction, conflictFilter]);
 
   return (
     <div>
@@ -166,6 +169,20 @@ export default function Leaderboard() {
                 <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-muted pointer-events-none" />
               </div>
 
+              {/* Conflict filter (desktop) */}
+              <div className="relative hidden sm:block">
+                <select
+                  value={conflictFilter}
+                  onChange={(e) => setConflictFilter(e.target.value)}
+                  className="appearance-none bg-surface border border-border rounded-lg px-3 py-1.5 pr-8 text-sm text-text-primary focus:outline-none focus:border-accent/50 cursor-pointer"
+                >
+                  {CONFLICT_FILTERS.map((cf) => (
+                    <option key={cf} value={cf}>{cf}</option>
+                  ))}
+                </select>
+                <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-muted pointer-events-none" />
+              </div>
+
               {activeTab === 'week' && (
                 <span className="text-muted text-xs font-mono ml-1 sm:ml-2 shrink-0">
                   Resets Monday
@@ -212,6 +229,9 @@ export default function Leaderboard() {
                                 <div className="flex items-center gap-2">
                                   <span className="font-medium">{f.name}</span>
                                   <PlatformBadge platform={f.platform} />
+                                  {f.has_disclosed_positions && (
+                                    <span className="text-warning text-xs" title="Has disclosed positions">💼</span>
+                                  )}
                                 </div>
                                 <div className="text-muted text-xs font-mono">{f.handle}</div>
                               </Link>

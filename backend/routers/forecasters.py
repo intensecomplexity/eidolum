@@ -2,7 +2,7 @@ import datetime
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from database import get_db
-from models import Forecaster, Prediction, format_timestamp, get_youtube_timestamp_url
+from models import Forecaster, Prediction, format_timestamp, get_youtube_timestamp_url, DisclosedPosition
 from utils import compute_forecaster_stats, compute_streak
 
 router = APIRouter()
@@ -103,8 +103,27 @@ def get_forecaster(forecaster_id: int, db: Session = Depends(get_db)):
                 "verified_by": p.verified_by,
                 "timestamp_display": format_timestamp(p.video_timestamp_sec),
                 "timestamp_url": get_youtube_timestamp_url(p.source_platform_id, p.video_timestamp_sec),
+                "has_conflict": bool(p.has_conflict),
+                "conflict_note": p.conflict_note,
             }
             for p in predictions
         ],
         "accuracy_over_time": accuracy_over_time,
+        "disclosed_positions": [
+            {
+                "ticker": pos.ticker,
+                "position_type": pos.position_type,
+                "disclosed_at": pos.disclosed_at.isoformat() if pos.disclosed_at else None,
+                "source_url": pos.source_url,
+                "notes": pos.notes,
+            }
+            for pos in db.query(DisclosedPosition).filter(
+                DisclosedPosition.forecaster_id == f.id
+            ).all()
+        ],
+        "conflict_stats": {
+            "total": len(predictions),
+            "conflicts": sum(1 for p in predictions if p.has_conflict),
+            "rate": round(sum(1 for p in predictions if p.has_conflict) / len(predictions) * 100, 1) if predictions else 0,
+        },
     }

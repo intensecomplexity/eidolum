@@ -7,7 +7,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from database import engine, Base, SessionLocal
 from models import Forecaster
-from routers import leaderboard, forecasters, assets, sync, activity, admin, platforms, follows, newsletter, saved
+from routers import leaderboard, forecasters, assets, sync, activity, admin, platforms, follows, newsletter, saved, positions, contrarian, power_rankings, inverse
 
 
 def init_db():
@@ -45,9 +45,57 @@ def init_db():
             print(f"[Eidolum] Seed error (non-fatal): {e}")
 
 
+def migrate_platform_types():
+    """Fix platform field for congress/institutional forecasters. Safe to run every boot."""
+    CONGRESS_NAMES = [
+        "Nancy Pelosi Tracker",
+        "Congress Trades Tracker",
+        "Unusual Whales",
+        "Quiver Quantitative",
+    ]
+    INSTITUTIONAL_NAMES = [
+        "Goldman Sachs",
+        "JPMorgan Research",
+        "Morgan Stanley",
+        "Jim Cramer",
+        "Liz Ann Sonders",
+        "Dan Ives",
+        "Tom Lee",
+        "Bill Ackman",
+        "ARK Invest",
+        "Motley Fool",
+        "Hindenburg Research",
+        "Citron Research",
+    ]
+    try:
+        db = SessionLocal()
+        updated = 0
+        for name in CONGRESS_NAMES:
+            f = db.query(Forecaster).filter(Forecaster.name == name).first()
+            if f and f.platform != "congress":
+                f.platform = "congress"
+                updated += 1
+                print(f"[Eidolum] Migration: {f.name} -> congress")
+        for name in INSTITUTIONAL_NAMES:
+            f = db.query(Forecaster).filter(Forecaster.name == name).first()
+            if f and f.platform != "institutional":
+                f.platform = "institutional"
+                updated += 1
+                print(f"[Eidolum] Migration: {f.name} -> institutional")
+        if updated:
+            db.commit()
+            print(f"[Eidolum] Platform migration: {updated} forecasters updated.")
+        else:
+            print("[Eidolum] Platform migration: already up to date.")
+        db.close()
+    except Exception as e:
+        print(f"[Eidolum] Platform migration error (non-fatal): {e}")
+
+
 @asynccontextmanager
 async def lifespan(app):
     init_db()
+    migrate_platform_types()
     yield
 
 
@@ -81,6 +129,10 @@ app.include_router(platforms.router, prefix="/api")
 app.include_router(follows.router, prefix="/api")
 app.include_router(newsletter.router, prefix="/api")
 app.include_router(saved.router, prefix="/api")
+app.include_router(positions.router, prefix="/api")
+app.include_router(contrarian.router, prefix="/api")
+app.include_router(power_rankings.router, prefix="/api")
+app.include_router(inverse.router, prefix="/api")
 
 
 @app.get("/health")

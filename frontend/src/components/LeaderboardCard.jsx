@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { ChevronRight } from 'lucide-react';
+import { ChevronRight, Briefcase } from 'lucide-react';
 import PlatformBadge from './PlatformBadge';
 import RankBadge from './RankBadge';
 import StreakBadge from './StreakBadge';
@@ -18,6 +18,9 @@ export default function LeaderboardCard({ forecaster: f }) {
             <div className="flex items-center gap-1.5 flex-wrap">
               <span className="font-medium text-[15px]">{f.name}</span>
               <PlatformBadge platform={f.platform} />
+              {f.has_disclosed_positions && (
+                <span className="text-warning text-xs" title="Has disclosed personal positions in some predicted stocks">💼</span>
+              )}
             </div>
             <div className="text-muted text-xs font-mono">{f.handle}</div>
           </div>

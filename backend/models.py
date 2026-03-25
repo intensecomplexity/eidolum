@@ -75,6 +75,10 @@ class Prediction(Base):
     # Simulated current movement for pending predictions (demo)
     current_return = Column(Float, nullable=True)
 
+    # Conflict of interest
+    has_conflict = Column(Integer, default=0)  # 0 or 1 (SQLite boolean)
+    conflict_note = Column(Text, nullable=True)
+
     sector = Column(String, nullable=True)
     context = Column(Text, nullable=True)            # snippet from title/desc
 
@@ -159,6 +163,17 @@ class SavedPrediction(Base):
     prediction_id = Column(Integer, ForeignKey("predictions.id"), nullable=False)
     personal_note = Column(Text, nullable=True)
     saved_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+
+class DisclosedPosition(Base):
+    __tablename__ = "disclosed_positions"
+    id = Column(Integer, primary_key=True, index=True)
+    forecaster_id = Column(Integer, ForeignKey("forecasters.id"), nullable=False)
+    ticker = Column(String, nullable=False, index=True)
+    position_type = Column(String, nullable=False)  # 'long' | 'short' | 'sold'
+    disclosed_at = Column(DateTime, nullable=True)
+    source_url = Column(Text, nullable=True)
+    notes = Column(Text, nullable=True)
 
 
 def get_youtube_timestamp_url(video_id, seconds):

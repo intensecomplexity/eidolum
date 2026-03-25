@@ -108,4 +108,12 @@ export function getSaveCount(predictionId) {
   return api.get(`/saved-predictions/count/${predictionId}`).then(r => r.data);
 }
 
+export function getForecasterPositions(forecasterId) {
+  return api.get(`/forecaster/${forecasterId}/positions`).then(r => r.data);
+}
+
+export function getConflictPredictions() {
+  return api.get('/predictions/conflicts').then(r => r.data);
+}
+
 export default api;

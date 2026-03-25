@@ -3,6 +3,8 @@ import { useParams, Link } from 'react-router-dom';
 import { ExternalLink, ArrowLeft } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 import PredictionBadge from '../components/PredictionBadge';
+import ConflictBadge from '../components/ConflictBadge';
+import DisclosedPositions from '../components/DisclosedPositions';
 import PlatformBadge from '../components/PlatformBadge';
 import StreakBadge from '../components/StreakBadge';
 import PredictionCard from '../components/PredictionCard';
@@ -196,6 +198,9 @@ export default function ForecasterProfile() {
           </div>
         </div>
 
+        {/* Disclosed Positions */}
+        <DisclosedPositions forecasterId={parseInt(id)} platform={data.platform} />
+
         {/* Monthly Report Card */}
         {reportCard && (
           <div className="card mb-6 sm:mb-8">
@@ -323,7 +328,10 @@ function PredictionRow({ p }) {
           )}
         </td>
         <td className="px-6 py-3"><Link to={`/asset/${p.ticker}`} className="ticker-mono text-accent hover:underline" onClick={e => e.stopPropagation()}>{p.ticker}</Link></td>
-        <td className="px-6 py-3"><PredictionBadge direction={p.direction} /></td>
+        <td className="px-6 py-3">
+          <PredictionBadge direction={p.direction} />
+          {p.has_conflict && <ConflictBadge note={p.conflict_note} size="small" />}
+        </td>
         <td className="px-6 py-3 text-right font-mono text-sm text-text-secondary">{p.entry_price ? `$${p.entry_price.toFixed(2)}` : '-'}</td>
         <td className="px-6 py-3 text-center"><PredictionBadge outcome={p.outcome} /></td>
         <td className="px-6 py-3 text-right font-mono text-sm">

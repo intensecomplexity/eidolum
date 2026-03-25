@@ -87,7 +87,7 @@ export default function Landing() {
 
       {/* Dynamic Stats */}
       <section className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 -mt-2 sm:-mt-4">
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 sm:gap-4">
           <StatCard
             label="Tracked Forecasters"
             value={stats ? stats.forecasters_tracked : '—'}
@@ -107,6 +107,11 @@ export default function Landing() {
             label="Avg Accuracy"
             value={stats ? `${stats.avg_accuracy}%` : '—'}
             sub="Across all forecasters"
+          />
+          <StatCard
+            label="Conflict Flags"
+            value={stats ? stats.conflict_flags?.toLocaleString() || '0' : '—'}
+            sub={`Across ${stats?.transparency_tracked || 0} investors`}
           />
         </div>
       </section>
