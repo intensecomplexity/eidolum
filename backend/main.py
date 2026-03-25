@@ -164,15 +164,19 @@ def migrate_platform_types():
 
 
 def wipe_all_fake_data(db):
-    """Delete predictions without real source URLs. Runs once — skips if already clean."""
+    """Delete predictions without real source URLs. Always runs — idempotent."""
     try:
         from sqlalchemy import text
-        total = db.query(Prediction).count()
-        verified = db.query(Prediction).filter(
-            Prediction.source_url.isnot(None)
-        ).count()
-        if total == verified and total <= 20:
-            print(f"[Eidolum] Data already clean: {total} verified predictions")
+        total = db.execute(text("SELECT COUNT(*) FROM predictions")).scalar()
+        real = db.execute(text("""
+            SELECT COUNT(*) FROM predictions
+            WHERE source_url LIKE '%/status/%'
+               OR source_url LIKE '%/watch?v=%'
+               OR source_url LIKE '%/comments/%'
+        """)).scalar()
+        fake = total - real
+        if fake == 0:
+            print(f"[Eidolum] Data clean: {total} total, {real} verified, 0 fake")
             return
         result = db.execute(text("""
             DELETE FROM predictions
@@ -182,7 +186,7 @@ def wipe_all_fake_data(db):
                 AND source_url NOT LIKE '%/comments/%')
         """))
         db.commit()
-        print(f"[Eidolum] Wiped {result.rowcount} fake predictions")
+        print(f"[Eidolum] Wiped {result.rowcount} fake predictions (kept {real} verified)")
     except Exception as e:
         db.rollback()
         print(f"[Eidolum] wipe_all_fake_data error: {e}")
@@ -287,12 +291,6 @@ async def lifespan(app):
     init_db()
     migrate_platform_types()
     migrate_profile_urls()
-    # Replace seed data with verified predictions (runs once, checks flag)
-    try:
-        from seed_verified import seed_verified
-        seed_verified()
-    except Exception as e:
-        print(f"[Eidolum] Verified reseed error (non-fatal): {e}")
     # Wipe fake predictions (keeps only those with real source URLs)
     try:
         db = SessionLocal()
@@ -300,6 +298,21 @@ async def lifespan(app):
         db.close()
     except Exception as e:
         print(f"[Eidolum] Fake data wipe error (non-fatal): {e}")
+    # Clear old config flag if it exists
+    try:
+        from sqlalchemy import text as _text
+        db = SessionLocal()
+        db.execute(_text("DELETE FROM config WHERE key = 'verified_reseed_done'"))
+        db.commit()
+        db.close()
+    except Exception:
+        pass  # config table may not exist
+    # Seed verified predictions (only if fewer than 5 real ones exist)
+    try:
+        from seed_verified import seed_verified
+        seed_verified()
+    except Exception as e:
+        print(f"[Eidolum] Verified reseed error (non-fatal): {e}")
     # Add archive_url column if missing
     try:
         db = SessionLocal()

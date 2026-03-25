@@ -142,19 +142,16 @@ def seed_verified():
     """Insert verified predictions. Reseeds if fewer than 5 have real source URLs."""
     db = SessionLocal()
     try:
-        verified_count = db.query(Prediction).filter(
-            Prediction.source_url.isnot(None)
-        ).count()
+        from sqlalchemy import text
+        verified_count = db.execute(text("""
+            SELECT COUNT(*) FROM predictions
+            WHERE source_url LIKE '%/status/%'
+               OR source_url LIKE '%/watch?v=%'
+               OR source_url LIKE '%/comments/%'
+        """)).scalar()
         if verified_count >= 5:
             print(f"[Eidolum] {verified_count} verified predictions exist, skipping reseed")
             return
-
-        # Wipe all predictions so we start clean
-        total = db.query(Prediction).count()
-        if total > 0:
-            db.query(Prediction).delete()
-            db.commit()
-            print(f"[Eidolum] Wiped {total} old predictions for verified reseed")
 
         # Build name -> forecaster_id map
         forecasters = db.query(Forecaster).all()
