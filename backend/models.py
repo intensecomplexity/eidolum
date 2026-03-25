@@ -19,6 +19,12 @@ class Forecaster(Base):
     rank_last_week = Column(Integer, nullable=True)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
 
+    # Cached stats (auto-updated by recalculate_forecaster_stats)
+    accuracy_score = Column(Float, nullable=True)
+    total_predictions = Column(Integer, default=0)
+    correct_predictions = Column(Integer, default=0)
+    streak = Column(Integer, default=0)
+
     # Quota-safe sync fields
     uploads_playlist_id = Column(String, nullable=True)
     last_synced_at = Column(DateTime, nullable=True)

@@ -307,6 +307,24 @@ async def lifespan(app):
         db.close()
     except Exception:
         pass  # config table may not exist
+    # Add cached stats columns to forecasters if missing
+    try:
+        db = SessionLocal()
+        from sqlalchemy import text as _t
+        for col, defn in [
+            ("accuracy_score", "FLOAT"),
+            ("total_predictions", "INTEGER DEFAULT 0"),
+            ("correct_predictions", "INTEGER DEFAULT 0"),
+            ("streak", "INTEGER DEFAULT 0"),
+        ]:
+            try:
+                db.execute(_t(f"ALTER TABLE forecasters ADD COLUMN {col} {defn}"))
+            except Exception:
+                pass  # column already exists
+        db.commit()
+        db.close()
+    except Exception as e:
+        print(f"[Eidolum] Stats column migration error (non-fatal): {e}")
     # Seed verified predictions (only if fewer than 5 real ones exist)
     try:
         from seed_verified import seed_verified

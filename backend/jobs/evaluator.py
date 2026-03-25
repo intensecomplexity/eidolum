@@ -104,4 +104,11 @@ def run_evaluator(db: Session):
 
     db.commit()
     print(f"[Evaluator] Evaluated {count}/{len(overdue)} predictions")
+
+    # Recalculate stats for all affected forecasters
+    from utils import recalculate_forecaster_stats
+    affected_ids = set(p.forecaster_id for p in overdue if p.outcome in ("correct", "incorrect"))
+    for fid in affected_ids:
+        recalculate_forecaster_stats(fid, db)
+
     db.close()

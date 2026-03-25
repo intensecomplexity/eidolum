@@ -99,6 +99,45 @@ def compute_streak(forecaster_id: int, db: Session) -> dict:
     return {"type": "none", "count": 0}
 
 
+def recalculate_forecaster_stats(forecaster_id: int, db: Session):
+    """Recalculate and persist a forecaster's cached stats from their predictions."""
+    forecaster = db.query(Forecaster).filter(Forecaster.id == forecaster_id).first()
+    if not forecaster:
+        return
+
+    evaluated = (
+        db.query(Prediction)
+        .filter(
+            Prediction.forecaster_id == forecaster_id,
+            Prediction.outcome.in_(["correct", "incorrect"]),
+        )
+        .order_by(Prediction.prediction_date.desc())
+        .all()
+    )
+
+    total = len(evaluated)
+    correct = sum(1 for p in evaluated if p.outcome == "correct")
+
+    # Streak: count consecutive same-outcome from most recent
+    streak_count = 0
+    streak_type = None
+    for p in evaluated:
+        if streak_type is None:
+            streak_type = p.outcome
+        if p.outcome == streak_type:
+            streak_count += 1
+        else:
+            break
+
+    forecaster.total_predictions = total
+    forecaster.correct_predictions = correct
+    forecaster.accuracy_score = round((correct / total) * 100, 1) if total > 0 else None
+    forecaster.streak = streak_count if streak_type == "correct" else -streak_count
+
+    db.commit()
+    print(f"[Stats] {forecaster.name}: {correct}/{total}, streak {forecaster.streak}")
+
+
 def compute_rank_movement(forecaster: Forecaster, current_rank: int) -> dict:
     """Compute rank change vs last week."""
     if forecaster.rank_last_week is None:

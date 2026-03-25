@@ -188,6 +188,8 @@ def approve_prediction(request: Request, prediction_id: int, admin: bool = Depen
         return {"status": "skipped", "message": f"Prediction {prediction_id} is not pending review (outcome={p.outcome})"}
     p.outcome = "pending"
     db.commit()
+    from utils import recalculate_forecaster_stats
+    recalculate_forecaster_stats(p.forecaster_id, db)
     return {"status": "approved", "prediction_id": prediction_id}
 
 
@@ -200,9 +202,23 @@ def reject_prediction(request: Request, prediction_id: int, admin: bool = Depend
         raise HTTPException(status_code=404, detail="Prediction not found")
     if p.outcome != "pending_review":
         return {"status": "skipped", "message": f"Prediction {prediction_id} is not pending review (outcome={p.outcome})"}
+    forecaster_id = p.forecaster_id
     db.delete(p)
     db.commit()
+    from utils import recalculate_forecaster_stats
+    recalculate_forecaster_stats(forecaster_id, db)
     return {"status": "rejected", "prediction_id": prediction_id}
+
+
+@router.post("/admin/refresh-stats")
+@limiter.limit("10/minute")
+def refresh_all_stats(request: Request, admin: bool = Depends(require_admin), db: Session = Depends(get_db)):
+    """Recalculate cached stats for every forecaster."""
+    from utils import recalculate_forecaster_stats
+    forecasters = db.query(Forecaster).all()
+    for f in forecasters:
+        recalculate_forecaster_stats(f.id, db)
+    return {"status": "done", "count": len(forecasters)}
 
 
 @router.get("/health/detailed")
