@@ -9,7 +9,7 @@
 
   body {
     @apply bg-bg text-text-primary;
-    font-family: 'Space Grotesk', system-ui, sans-serif;
+    font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
     font-optical-sizing: auto;
     -webkit-font-smoothing: antialiased;
     touch-action: manipulation;
