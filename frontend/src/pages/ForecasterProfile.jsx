@@ -368,11 +368,18 @@ function PredictionRow({ p }) {
           <td colSpan={9} className="px-6 py-4">
             {/* Full quote */}
             {quoteText && (
-              <div className="border-l-[3px] border-accent/60 rounded-r-lg px-4 py-3 bg-accent/[0.04] mb-3">
-                <p className="text-text-primary text-sm italic leading-relaxed font-serif">
-                  &ldquo;{quoteText}&rdquo;
-                </p>
-              </div>
+              <blockquote style={{
+                borderLeft: '3px solid #00c896',
+                background: 'rgba(255,255,255,0.03)',
+                padding: '12px 16px',
+                margin: '0 0 12px 0',
+                fontStyle: 'italic',
+                fontSize: '0.95rem',
+                borderRadius: '0 6px 6px 0',
+                lineHeight: 1.6,
+              }}>
+                &ldquo;{quoteText}&rdquo;
+              </blockquote>
             )}
 
             {/* Source buttons */}
