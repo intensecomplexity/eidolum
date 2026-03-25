@@ -43,13 +43,6 @@ export default function Platforms() {
               to={`/platforms/${p.id}`}
               className="group relative bg-surface border border-border rounded-xl p-5 sm:p-6 hover:border-accent/40 hover:-translate-y-0.5 transition-all duration-200 active:bg-surface-2"
             >
-              {/* Gold crown for #1 */}
-              {i === 0 && (
-                <span className="absolute top-3 right-3 text-lg" title="Top platform">
-                  \ud83d\udc51
-                </span>
-              )}
-
               {/* Icon + name */}
               <div className="flex items-center gap-3 mb-4">
                 <PlatformBadge platform={p.id} size={28} />

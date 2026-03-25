@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Search, BarChart3, CheckCircle, ArrowRight } from 'lucide-react';
+import { Search, BarChart3, CheckCircle, ArrowRight, TrendingUp, TrendingDown } from 'lucide-react';
 import TickerBar from '../components/TickerBar';
 import StatCard from '../components/StatCard';
 import PlatformBadge from '../components/PlatformBadge';
@@ -11,15 +11,19 @@ import ActivityFeed from '../components/ActivityFeed';
 import Footer from '../components/Footer';
 import RareSignalBanner from '../components/RareSignalBanner';
 import NewsletterSignup from '../components/NewsletterSignup';
-import { getLeaderboard, getHomepageStats } from '../api';
+import { getLeaderboard, getHomepageStats, getControversial, getHotStreaks } from '../api';
 
 export default function Landing() {
   const [forecasters, setForecasters] = useState([]);
   const [stats, setStats] = useState(null);
+  const [controversial, setControversial] = useState([]);
+  const [hotStreaks, setHotStreaks] = useState([]);
 
   useEffect(() => {
     getLeaderboard().then(setForecasters).catch(() => {});
     getHomepageStats().then(setStats).catch(() => {});
+    getControversial().then(setControversial).catch(() => {});
+    getHotStreaks().then(setHotStreaks).catch(() => {});
   }, []);
 
   const top5 = forecasters.slice(0, 5);
@@ -80,7 +84,77 @@ export default function Landing() {
         <RareSignalBanner />
       </section>
 
-      {/* 5. TOP FORECASTERS */}
+      {/* 5. HOT STREAKS */}
+      {hotStreaks.length > 0 && (
+        <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-10 sm:pb-16">
+          <h2 className="headline-serif mb-4 sm:mb-6" style={{ fontSize: 'clamp(20px, 4vw, 28px)' }}>
+            Hot Streaks
+          </h2>
+          <div className="flex gap-3 overflow-x-auto pills-scroll pb-2">
+            {hotStreaks.map((s) => (
+              <Link
+                key={s.id}
+                to={`/forecaster/${s.id}`}
+                className="shrink-0 bg-surface border border-border rounded-xl p-4 active:border-accent/30 transition-colors min-w-[180px]"
+              >
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="font-medium text-sm">{s.name}</span>
+                  <PlatformBadge platform={s.platform} />
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="font-mono text-accent font-bold">{s.streak_count} in a row</span>
+                </div>
+                <div className="text-muted text-xs mt-1 font-mono">{s.accuracy_rate.toFixed(1)}% overall</div>
+              </Link>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* 6. CONTROVERSIAL CALLS */}
+      {controversial.length > 0 && (
+        <section className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 pb-10 sm:pb-16">
+          <h2 className="headline-serif mb-4 sm:mb-6" style={{ fontSize: 'clamp(20px, 4vw, 28px)' }}>
+            Most Controversial Calls
+          </h2>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {controversial.map((c) => (
+              <Link key={c.ticker} to={`/asset/${c.ticker}`} className="card p-0 overflow-hidden active:border-accent/30 transition-colors">
+                <div className="px-4 py-3 border-b border-border">
+                  <span className="font-mono text-accent text-lg font-bold">{c.ticker}</span>
+                  <span className="text-muted text-xs ml-2">{c.bull_count + c.bear_count} forecasters split</span>
+                </div>
+                <div className="flex">
+                  <div className="flex-1 p-3 bg-positive/[0.03] border-r border-border">
+                    <div className="flex items-center gap-1 mb-2">
+                      <TrendingUp className="w-3.5 h-3.5 text-positive" />
+                      <span className="text-positive text-xs font-semibold">{c.bull_count} Bulls</span>
+                    </div>
+                    {c.bulls.slice(0, 3).map((f) => (
+                      <div key={f.id} className="text-xs text-text-secondary mb-1 truncate">
+                        {f.name} <span className="font-mono text-positive">{f.accuracy.toFixed(0)}%</span>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="flex-1 p-3 bg-negative/[0.03]">
+                    <div className="flex items-center gap-1 mb-2">
+                      <TrendingDown className="w-3.5 h-3.5 text-negative" />
+                      <span className="text-negative text-xs font-semibold">{c.bear_count} Bears</span>
+                    </div>
+                    {c.bears.slice(0, 3).map((f) => (
+                      <div key={f.id} className="text-xs text-text-secondary mb-1 truncate">
+                        {f.name} <span className="font-mono text-negative">{f.accuracy.toFixed(0)}%</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </Link>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* 7. TOP FORECASTERS */}
       {top5.length > 0 && (
         <section className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-10 sm:py-16">
           <div className="flex items-center justify-between mb-4 sm:mb-6">
