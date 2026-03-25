@@ -55,26 +55,30 @@ export default function Platforms() {
               </p>
 
               {/* 3 stats row */}
-              <div className="flex items-end gap-4 mb-4">
-                <div>
-                  <div className={`font-mono text-xl font-bold ${p.avg_accuracy >= 60 ? 'text-positive' : p.avg_accuracy > 0 ? 'text-negative' : 'text-muted'}`}>
-                    {p.avg_accuracy > 0 ? `${p.avg_accuracy.toFixed(1)}%` : '\u2014'}
+              {p.total_predictions > 0 ? (
+                <div className="flex items-end gap-4 mb-4">
+                  <div>
+                    <div className={`font-mono text-xl font-bold ${p.avg_accuracy >= 60 ? 'text-positive' : p.avg_accuracy > 0 ? 'text-negative' : 'text-muted'}`}>
+                      {p.avg_accuracy > 0 ? `${p.avg_accuracy.toFixed(1)}%` : '\u2014'}
+                    </div>
+                    <div className="text-muted text-[11px]">avg accuracy</div>
                   </div>
-                  <div className="text-muted text-[11px]">avg accuracy</div>
-                </div>
-                <div>
-                  <div className={`font-mono text-sm font-semibold ${p.avg_alpha >= 0 ? 'text-positive' : 'text-negative'}`}>
-                    {p.avg_alpha > 0 ? '+' : ''}{p.avg_alpha !== 0 ? `${p.avg_alpha.toFixed(1)}%` : '\u2014'}
+                  <div>
+                    <div className={`font-mono text-sm font-semibold ${p.avg_alpha >= 0 ? 'text-positive' : 'text-negative'}`}>
+                      {p.avg_alpha > 0 ? '+' : ''}{p.avg_alpha !== 0 ? `${p.avg_alpha.toFixed(1)}%` : '\u2014'}
+                    </div>
+                    <div className="text-muted text-[11px]">avg alpha</div>
                   </div>
-                  <div className="text-muted text-[11px]">avg alpha</div>
-                </div>
-                <div>
-                  <div className="font-mono text-sm font-semibold text-text-secondary">
-                    {p.total_predictions || '\u2014'}
+                  <div>
+                    <div className="font-mono text-sm font-semibold text-text-secondary">
+                      {p.total_predictions}
+                    </div>
+                    <div className="text-muted text-[11px]">predictions</div>
                   </div>
-                  <div className="text-muted text-[11px]">predictions</div>
                 </div>
-              </div>
+              ) : (
+                <p className="text-muted text-xs mb-4">No verified data yet</p>
+              )}
 
               {/* Top performer */}
               {p.top_performer && (

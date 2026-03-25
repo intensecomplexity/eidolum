@@ -163,6 +163,31 @@ def migrate_platform_types():
         print(f"[Eidolum] Platform migration error (non-fatal): {e}")
 
 
+def wipe_all_fake_data(db):
+    """Delete predictions without real source URLs. Runs once — skips if already clean."""
+    try:
+        from sqlalchemy import text
+        total = db.query(Prediction).count()
+        verified = db.query(Prediction).filter(
+            Prediction.source_url.isnot(None)
+        ).count()
+        if total == verified and total <= 20:
+            print(f"[Eidolum] Data already clean: {total} verified predictions")
+            return
+        result = db.execute(text("""
+            DELETE FROM predictions
+            WHERE source_url IS NULL
+            OR (source_url NOT LIKE '%/status/%'
+                AND source_url NOT LIKE '%/watch?v=%'
+                AND source_url NOT LIKE '%/comments/%')
+        """))
+        db.commit()
+        print(f"[Eidolum] Wiped {result.rowcount} fake predictions")
+    except Exception as e:
+        db.rollback()
+        print(f"[Eidolum] wipe_all_fake_data error: {e}")
+
+
 def migrate_add_archive_url(db):
     """Add archive_url column if it doesn't exist."""
     try:
@@ -268,6 +293,13 @@ async def lifespan(app):
         seed_verified()
     except Exception as e:
         print(f"[Eidolum] Verified reseed error (non-fatal): {e}")
+    # Wipe fake predictions (keeps only those with real source URLs)
+    try:
+        db = SessionLocal()
+        wipe_all_fake_data(db)
+        db.close()
+    except Exception as e:
+        print(f"[Eidolum] Fake data wipe error (non-fatal): {e}")
     # Add archive_url column if missing
     try:
         db = SessionLocal()

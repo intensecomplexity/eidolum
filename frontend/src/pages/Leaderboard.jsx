@@ -241,14 +241,14 @@ export default function Leaderboard() {
                                 <div className="w-16 h-1 bg-surface-2 rounded-full overflow-hidden hidden lg:block">
                                   <div className={`h-full rounded-full ${f.accuracy_rate >= 60 ? 'bg-positive' : 'bg-negative'}`} style={{ width: `${Math.min(f.accuracy_rate, 100)}%` }} />
                                 </div>
-                                <span className={`font-mono font-medium ${f.accuracy_rate >= 60 ? 'text-positive' : 'text-negative'}`} style={{ letterSpacing: '-0.01em' }}>
-                                  {f.accuracy_rate.toFixed(1)}%
+                                <span className={`font-mono font-medium ${f.total_predictions === 0 ? 'text-muted' : f.accuracy_rate >= 60 ? 'text-positive' : 'text-negative'}`} style={{ letterSpacing: '-0.01em' }}>
+                                  {f.total_predictions === 0 ? '—' : `${f.accuracy_rate.toFixed(1)}%`}
                                 </span>
                               </div>
                             </td>
                             <td className="px-6 py-4 text-right">
-                              <span className={`font-mono ${f.alpha >= 0 ? 'text-positive' : 'text-negative'}`}>
-                                {f.alpha >= 0 ? '+' : ''}{f.alpha.toFixed(2)}%
+                              <span className={`font-mono ${f.total_predictions === 0 ? 'text-muted' : f.alpha >= 0 ? 'text-positive' : 'text-negative'}`}>
+                                {f.total_predictions === 0 ? '—' : `${f.alpha >= 0 ? '+' : ''}${f.alpha.toFixed(2)}%`}
                               </span>
                             </td>
                             <td className="px-6 py-4 text-right">
