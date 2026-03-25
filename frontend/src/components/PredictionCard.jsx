@@ -2,9 +2,44 @@ import { Link } from 'react-router-dom';
 import PredictionBadge from './PredictionBadge';
 import ConflictBadge from './ConflictBadge';
 import BookmarkButton from './BookmarkButton';
-import getSourceUrl from '../utils/getSourceUrl';
 
 const HORIZON_LABELS = { short: '30d', medium: '90d', long: '1y', custom: 'Custom' };
+
+function getSmartUrl(prediction, forecaster) {
+  const ticker = prediction.ticker;
+  const handle = (forecaster?.handle || '').replace('@', '').replace('u/', '');
+  const channelUrl = forecaster?.channel_url || '';
+  const platform = forecaster?.platform || '';
+
+  if (prediction.source_url && (
+    prediction.source_url.includes('/watch?v=') ||
+    prediction.source_url.includes('/status/') ||
+    prediction.source_url.includes('/comments/')
+  )) return { url: prediction.source_url, label: null };
+
+  if (platform === 'youtube' || channelUrl.includes('youtube.com')) {
+    const ch = channelUrl.split('@')[1]?.split('/')[0] || handle;
+    return { url: `https://www.youtube.com/@${ch}/search?query=${ticker}`, label: `\uD83D\uDD0D Search ${ticker} videos` };
+  }
+
+  if (platform === 'x' || platform === 'twitter' || platform === 'congress' || platform === 'institutional') {
+    const xh = handle || channelUrl.split('x.com/')[1]?.split('/')[0] || '';
+    if (xh) return { url: `https://x.com/search?q=from%3A${xh}+%24${ticker}&f=live`, label: `\uD83D\uDD0D Search $${ticker} tweets` };
+  }
+
+  if (platform === 'reddit' || channelUrl.includes('reddit.com')) {
+    if (channelUrl.includes('/r/')) {
+      const sub = channelUrl.split('/r/')[1]?.split('/')[0];
+      return { url: `https://www.reddit.com/r/${sub}/search/?q=${ticker}&restrict_sr=1&sort=new`, label: `\uD83D\uDD0D Search ${ticker} posts` };
+    }
+    if (channelUrl.includes('/user/')) {
+      const u = channelUrl.split('/user/')[1]?.split('/')[0];
+      return { url: `https://www.reddit.com/user/${u}/submitted/?q=${ticker}`, label: `\uD83D\uDD0D Search ${ticker} posts` };
+    }
+  }
+
+  return channelUrl ? { url: channelUrl, label: '\uD83D\uDD17 View Profile' } : null;
+}
 
 function formatDate(iso) {
   if (!iso) return null;
@@ -82,43 +117,27 @@ export default function PredictionCard({ prediction: p, showForecaster = false, 
       {/* Source link */}
       {(() => {
         const fc = forecaster || p.forecaster || null;
-        const isValidYTId = p.source_platform_id && p.source_platform_id.length === 11
-          && !p.source_platform_id.includes('_') && !p.source_platform_id.includes(' ');
-        const isYT = p.source_type === 'youtube' || isValidYTId;
-        const isX = p.source_type === 'twitter' || p.source_type === 'x'
-          || (p.source_url && (p.source_url.includes('twitter.com') || p.source_url.includes('x.com')));
-        const isRD = p.source_type === 'reddit' || (p.source_url && p.source_url.includes('reddit.com'));
-        const fmtTs = (s) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+        const smart = getSmartUrl(p, fc);
+        if (!smart) return null;
 
-        let href = null, label = null, bg = '#555';
-
-        if (isYT && isValidYTId) {
-          href = p.video_timestamp_sec ? `https://youtube.com/watch?v=${p.source_platform_id}&t=${p.video_timestamp_sec}` : p.source_url;
-          label = p.video_timestamp_sec ? `\u25B6 Watch at ${fmtTs(p.video_timestamp_sec)}` : '\u25B6 Watch on YouTube';
-          bg = '#00c896';
-        } else if (isYT && p.source_url) {
-          href = p.source_url; label = '\u25B6 Watch on YouTube'; bg = '#00c896';
-        } else if (isX && p.source_url) {
-          href = p.source_url; label = '\uD835\uDD4F View on X'; bg = '#000';
-        } else if (isRD && p.source_url) {
-          href = p.source_url; label = '\uD83D\uDD34 View on Reddit'; bg = '#ff4500';
-        } else if (p.source_url) {
-          href = p.source_url; label = '\uD83D\uDD17 View Source'; bg = '#444';
-        }
-
-        if (!href || !label) {
-          const ctx = getSourceUrl(p, fc);
-          if (ctx?.url) {
-            href = ctx.url;
-            label = `\uD83D\uDD0D ${ctx.label || 'Search source'}`;
-            bg = '#00e5a0';
+        let label = smart.label;
+        let bg = '#00e5a0';
+        if (!label) {
+          const fmtTs = (s) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+          if (smart.url.includes('youtube.com/watch')) {
+            label = p.video_timestamp_sec ? `\u25B6 Watch at ${fmtTs(p.video_timestamp_sec)}` : '\u25B6 Watch on YouTube';
+            bg = '#00c896';
+          } else if (smart.url.includes('x.com/') || smart.url.includes('twitter.com/')) {
+            label = '\uD835\uDD4F View on X'; bg = '#000';
+          } else if (smart.url.includes('reddit.com/')) {
+            label = '\uD83D\uDD34 View on Reddit'; bg = '#ff4500';
           } else {
-            return null;
+            label = '\uD83D\uDD17 View Source'; bg = '#444';
           }
         }
 
         return (
-          <a href={href} target="_blank" rel="noopener noreferrer"
+          <a href={smart.url} target="_blank" rel="noopener noreferrer"
             onClick={e => e.stopPropagation()}
             style={{
               display: 'inline-flex', alignItems: 'center', gap: '6px',

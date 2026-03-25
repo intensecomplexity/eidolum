@@ -312,9 +312,44 @@ export default function ForecasterProfile() {
 
 const HORIZON_LABELS = { short: '30d', medium: '90d', long: '1y', custom: 'Custom' };
 
-function isRealYouTubeId(id) {
-  if (!id || typeof id !== 'string') return false;
-  return id.length === 11 && !id.includes('_') && !id.includes(' ') && /^[a-zA-Z0-9\-]+$/.test(id);
+function getSmartUrl(prediction, forecaster) {
+  const ticker = prediction.ticker;
+  const handle = (forecaster?.handle || '').replace('@', '').replace('u/', '');
+  const channelUrl = forecaster?.channel_url || '';
+  const platform = forecaster?.platform || '';
+
+  // Real specific post — use as-is
+  if (prediction.source_url && (
+    prediction.source_url.includes('/watch?v=') ||
+    prediction.source_url.includes('/status/') ||
+    prediction.source_url.includes('/comments/')
+  )) return { url: prediction.source_url, label: null };
+
+  // YouTube — search their channel for the ticker
+  if (platform === 'youtube' || channelUrl.includes('youtube.com')) {
+    const ch = channelUrl.split('@')[1]?.split('/')[0] || handle;
+    return { url: `https://www.youtube.com/@${ch}/search?query=${ticker}`, label: `\uD83D\uDD0D Search ${ticker} videos` };
+  }
+
+  // Twitter/X
+  if (platform === 'x' || platform === 'twitter' || platform === 'congress' || platform === 'institutional') {
+    const xh = handle || channelUrl.split('x.com/')[1]?.split('/')[0] || '';
+    if (xh) return { url: `https://x.com/search?q=from%3A${xh}+%24${ticker}&f=live`, label: `\uD83D\uDD0D Search $${ticker} tweets` };
+  }
+
+  // Reddit
+  if (platform === 'reddit' || channelUrl.includes('reddit.com')) {
+    if (channelUrl.includes('/r/')) {
+      const sub = channelUrl.split('/r/')[1]?.split('/')[0];
+      return { url: `https://www.reddit.com/r/${sub}/search/?q=${ticker}&restrict_sr=1&sort=new`, label: `\uD83D\uDD0D Search ${ticker} posts` };
+    }
+    if (channelUrl.includes('/user/')) {
+      const u = channelUrl.split('/user/')[1]?.split('/')[0];
+      return { url: `https://www.reddit.com/user/${u}/submitted/?q=${ticker}`, label: `\uD83D\uDD0D Search ${ticker} posts` };
+    }
+  }
+
+  return channelUrl ? { url: channelUrl, label: '\uD83D\uDD17 View Profile' } : null;
 }
 
 function PredictionRow({ p, forecaster: fc }) {
@@ -388,65 +423,34 @@ function PredictionRow({ p, forecaster: fc }) {
 
             {/* Source button */}
             {(() => {
-              const isValidYouTubeId = p.source_platform_id &&
-                p.source_platform_id.length === 11 &&
-                !p.source_platform_id.includes('_') &&
-                !p.source_platform_id.includes(' ');
-              const isYoutube = p.source_type === 'youtube' || isValidYouTubeId;
-              const isTwitter = p.source_type === 'twitter' || p.source_type === 'x' ||
-                (p.source_url && (p.source_url.includes('twitter.com') || p.source_url.includes('x.com')));
-              const isReddit = p.source_type === 'reddit' ||
-                (p.source_url && p.source_url.includes('reddit.com'));
-              const fmtTs = (sec) => `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}`;
+              const smart = getSmartUrl(p, fc);
+              if (!smart) return null;
 
-              let href = null;
-              let label = null;
-              let bg = '#555';
-
-              if (isYoutube && isValidYouTubeId) {
-                href = p.video_timestamp_sec
-                  ? `https://youtube.com/watch?v=${p.source_platform_id}&t=${p.video_timestamp_sec}`
-                  : p.source_url;
-                label = p.video_timestamp_sec
-                  ? `\u25B6 Watch at ${fmtTs(p.video_timestamp_sec)}`
-                  : '\u25B6 Watch on YouTube';
-                bg = '#00c896';
-              } else if (isYoutube && p.source_url) {
-                href = p.source_url;
-                label = '\u25B6 Watch on YouTube';
-                bg = '#00c896';
-              } else if (isTwitter && p.source_url) {
-                href = p.source_url;
-                label = '\uD835\uDD4F View on X';
-                bg = '#000';
-              } else if (isReddit && p.source_url) {
-                href = p.source_url;
-                label = '\uD83D\uDD34 View on Reddit';
-                bg = '#ff4500';
-              } else if (p.source_url) {
-                href = p.source_url;
-                label = '\uD83D\uDD17 View Source';
-                bg = '#444';
-              }
-
-              // Fallback: contextual search link
-              if (!href || !label) {
-                const ctx = getSourceUrl(p, fc);
-                if (ctx?.url) {
-                  href = ctx.url;
-                  label = `\uD83D\uDD0D ${ctx.label || 'Search source'}`;
-                  bg = '#00e5a0';
+              // If smart.label is null, it's a real specific URL — use platform-based label
+              let label = smart.label;
+              let bg = '#00e5a0';
+              if (!label) {
+                const fmtTs = (s) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+                if (smart.url.includes('youtube.com/watch')) {
+                  label = p.video_timestamp_sec ? `\u25B6 Watch at ${fmtTs(p.video_timestamp_sec)}` : '\u25B6 Watch on YouTube';
+                  bg = '#00c896';
+                } else if (smart.url.includes('x.com/') || smart.url.includes('twitter.com/')) {
+                  label = '\uD835\uDD4F View on X';
+                  bg = '#000';
+                } else if (smart.url.includes('reddit.com/')) {
+                  label = '\uD83D\uDD34 View on Reddit';
+                  bg = '#ff4500';
                 } else {
-                  return null;
+                  label = '\uD83D\uDD17 View Source';
+                  bg = '#444';
                 }
               }
 
               return (
                 <a
-                  href={href}
+                  href={smart.url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  title={(() => { const ctx = getSourceUrl(p, fc); return ctx?.tooltip; })()}
                   onClick={e => e.stopPropagation()}
                   style={{
                     display: 'inline-flex', alignItems: 'center', gap: '6px',
