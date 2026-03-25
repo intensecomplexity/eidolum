@@ -2,6 +2,7 @@
 Scraper job — fetches new predictions from Twitter/X and YouTube.
 Runs every hour via APScheduler.
 """
+import re
 import httpx
 import os
 from datetime import datetime
@@ -11,9 +12,13 @@ from models import Prediction, Forecaster
 TWITTER_BEARER = os.getenv("TWITTER_BEARER_TOKEN", "")
 YOUTUBE_API_KEY = os.getenv("YOUTUBE_API_KEY", "")
 
+PREDICTION_KEYWORDS = re.compile(
+    r"predict|will|target|expect|price|\$|forecast|bull|bear", re.IGNORECASE
+)
+
 
 def scrape_twitter(db: Session):
-    """Fetch recent prediction-related tweets from tracked forecasters."""
+    """Fetch recent prediction-related tweets using the free v2 user timeline."""
     if not TWITTER_BEARER:
         print("[Scraper] No TWITTER_BEARER_TOKEN, skipping X scrape")
         return
@@ -27,21 +32,40 @@ def scrape_twitter(db: Session):
     for f in forecasters:
         handle = f.channel_url.rstrip("/").split("/")[-1]
         try:
-            r = httpx.get(
-                "https://api.twitter.com/2/tweets/search/recent",
+            # Step 1: Resolve handle → user ID
+            user_r = httpx.get(
+                f"https://api.twitter.com/2/users/by/username/{handle}",
+                headers=headers,
+                timeout=10,
+            )
+            if user_r.status_code != 200:
+                print(f"[Scraper] Twitter user lookup {user_r.status_code} for {handle}")
+                continue
+            user_id = user_r.json().get("data", {}).get("id")
+            if not user_id:
+                print(f"[Scraper] No user ID found for {handle}")
+                continue
+
+            # Step 2: Fetch recent tweets from user timeline
+            tweets_r = httpx.get(
+                f"https://api.twitter.com/2/users/{user_id}/tweets",
                 headers=headers,
                 params={
-                    "query": f"from:{handle} (predict OR will OR target OR expect) -is:retweet",
                     "max_results": 10,
                     "tweet.fields": "created_at,text",
+                    "exclude": "retweets",
                 },
                 timeout=10,
             )
-            if r.status_code != 200:
-                print(f"[Scraper] Twitter API {r.status_code} for {handle}")
+            if tweets_r.status_code != 200:
+                print(f"[Scraper] Twitter timeline {tweets_r.status_code} for {handle}")
                 continue
 
-            for tweet in r.json().get("data", []):
+            for tweet in tweets_r.json().get("data", []):
+                # Step 3: Filter for prediction-related content
+                if not PREDICTION_KEYWORDS.search(tweet["text"]):
+                    continue
+
                 # Skip if we already have this tweet
                 if db.query(Prediction).filter(
                     Prediction.source_platform_id == tweet["id"]
