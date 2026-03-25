@@ -342,7 +342,7 @@ async def lifespan(app):
     scheduler.add_job(lambda: run_leaderboard_refresh(SessionLocal()), "interval", hours=1, id="leaderboard")
     scheduler.add_job(lambda: run_newsletter(SessionLocal()), "cron", hour=8, minute=0, id="newsletter")
     scheduler.start()
-    print("[Eidolum] Scheduler started — scraper(1h), evaluator(15m), leaderboard(1h), newsletter(8am daily)")
+    print("[Eidolum] Starting — clean verified data only. Scheduler: scraper(1h), evaluator(15m), leaderboard(1h), newsletter(8am daily)")
     yield
     scheduler.shutdown()
 
