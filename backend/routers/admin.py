@@ -33,3 +33,37 @@ def quota_status(db: Session = Depends(get_db)):
     status["channels"] = channel_sync_info
 
     return status
+
+
+@router.get("/admin/reseed")
+def reseed(db: Session = Depends(get_db)):
+    """Emergency reseed — repopulate predictions if they're missing."""
+    from models import Prediction
+    pred_count = db.query(Prediction).count()
+    forecaster_count = db.query(Forecaster).count()
+
+    if pred_count > 100:
+        return {
+            "status": "skipped",
+            "message": f"DB already has {pred_count} predictions. Use /admin/reseed?force=true to force.",
+            "forecasters": forecaster_count,
+            "predictions": pred_count,
+        }
+
+    import subprocess, sys, os
+    try:
+        subprocess.run(
+            [sys.executable, "seed.py"],
+            check=True,
+            cwd=os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+        )
+        # Recount
+        new_pred = db.query(Prediction).count()
+        new_fc = db.query(Forecaster).count()
+        return {
+            "status": "reseeded",
+            "forecasters": new_fc,
+            "predictions": new_pred,
+        }
+    except Exception as e:
+        return {"status": "error", "message": str(e)}

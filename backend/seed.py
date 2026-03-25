@@ -1151,10 +1151,27 @@ def add_noise(base, sigma=8.0):
     return round(base + random.gauss(0, sigma), 2)
 
 
-def seed():
+def seed(force=False):
     db = SessionLocal()
 
-    # Wipe existing data
+    forecaster_count = db.query(Forecaster).count()
+    prediction_count = db.query(Prediction).count()
+
+    # If data already exists and not forcing, skip
+    if forecaster_count > 0 and prediction_count > 0 and not force:
+        print(f"Seed: DB already has {forecaster_count} forecasters and {prediction_count} predictions. Skipping. Use force=True to reseed.")
+        db.close()
+        return
+
+    # If forecasters exist but predictions are missing, only reseed predictions
+    if forecaster_count > 0 and prediction_count == 0 and not force:
+        print(f"Seed: {forecaster_count} forecasters but 0 predictions — reseeding predictions only.")
+        _seed_predictions_only(db)
+        db.close()
+        return
+
+    # Full wipe and reseed
+    print("Seed: Full wipe and reseed...")
     db.query(ActivityFeedItem).delete()
     db.query(Prediction).delete()
     db.query(Video).delete()
@@ -1515,6 +1532,99 @@ def seed():
     db2.close()
     print(f"Seeded {n_forecasters} forecasters, {n_predictions} predictions "
           f"({n_evaluated} evaluated, {n_pending} pending), {n_feed} activity feed items.")
+
+
+def _seed_predictions_only(db):
+    """Reseed predictions for existing forecasters. Used when forecasters exist but predictions are missing."""
+    forecasters = db.query(Forecaster).all()
+    forecaster_by_name = {f.name: f for f in forecasters}
+
+    # Clear any partial prediction data
+    db.query(ActivityFeedItem).delete()
+    db.query(Prediction).delete()
+    db.commit()
+
+    all_predictions = []
+    for f in forecasters:
+        # Find matching FORECASTERS definition
+        fdata = next((fd for fd in FORECASTERS if fd["name"] == f.name), None)
+        if not fdata:
+            continue
+
+        accuracy_profile = fdata["accuracy_profile"]
+        alpha_bias = fdata["alpha_bias"]
+        num_predictions = random.randint(35, 50)
+        templates = random.choices(PREDICTION_TEMPLATES, k=num_predictions)
+        days_spread = 540
+
+        for ticker, sector, base_direction, context_tpl in templates:
+            days_ago = random.randint(7, days_spread)
+            pred_date = make_prediction_date(days_ago)
+            direction = base_direction
+            if random.random() < 0.20:
+                direction = "bearish" if base_direction == "bullish" else "bullish"
+
+            entry = ENTRY_PRICES.get(ticker, 100.0) * random.uniform(0.85, 1.15)
+            entry = round(entry, 2)
+            target = round(entry * (random.uniform(1.10, 1.50) if direction == "bullish" else random.uniform(0.60, 0.90)), 2)
+            context = context_tpl.replace("${target}", f"${target:.0f}")
+
+            window = random.choice([30, 60, 90])
+            eval_date = pred_date + datetime.timedelta(days=window)
+
+            if eval_date > NOW:
+                outcome = "pending"
+                actual_return = None
+                sp500_return = None
+                alpha = None
+                eval_date = None
+                base_ret = SIMULATED_RETURNS.get(ticker, 0.0)
+                elapsed_frac = min(1.0, days_ago / window) if window else 0
+                current_return = round(base_ret * elapsed_frac + random.gauss(0, 5), 2)
+            else:
+                current_return = None
+                base_return = SIMULATED_RETURNS.get(ticker, 0.0)
+                noisy_return = add_noise(base_return, sigma=12.0)
+                if random.random() < accuracy_profile:
+                    if direction == "bullish" and noisy_return < 0:
+                        noisy_return = abs(noisy_return) + random.uniform(1, 8)
+                    elif direction == "bearish" and noisy_return > 0:
+                        noisy_return = -(abs(noisy_return) + random.uniform(1, 8))
+                else:
+                    if direction == "bullish" and noisy_return > 0:
+                        noisy_return = -(abs(noisy_return))
+                    elif direction == "bearish" and noisy_return < 0:
+                        noisy_return = abs(noisy_return)
+                actual_return = round(noisy_return, 2)
+                sp500 = round(SP500_90D_RETURN + random.gauss(0, 3), 2)
+                sp500_return = sp500
+                alpha = round(actual_return - sp500 + alpha_bias, 2)
+                outcome = is_correct(direction, actual_return)
+
+            pred = Prediction(
+                forecaster_id=f.id,
+                ticker=ticker,
+                direction=direction,
+                target_price=target,
+                entry_price=entry,
+                prediction_date=pred_date,
+                evaluation_date=eval_date,
+                window_days=window,
+                outcome=outcome,
+                actual_return=actual_return,
+                sp500_return=sp500_return,
+                alpha=alpha,
+                current_return=current_return,
+                sector=sector,
+                context=context,
+                verified_by="auto_title",
+            )
+            db.add(pred)
+            all_predictions.append((pred, f))
+
+    db.commit()
+    n = db.query(Prediction).count()
+    print(f"Seed: Re-inserted {n} predictions for {len(forecasters)} forecasters.")
 
 
 if __name__ == "__main__":

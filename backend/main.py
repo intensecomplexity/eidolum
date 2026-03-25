@@ -25,14 +25,16 @@ def init_db():
                 print("[Eidolum] WARNING: Could not connect to database after 5 attempts.")
                 return
 
-    # Auto-seed if SEED_DATA=true and DB is empty
+    # Auto-seed if SEED_DATA=true and DB is empty or missing predictions
     if os.getenv("SEED_DATA", "").lower() in ("true", "1", "yes"):
         try:
+            from models import Prediction
             db = SessionLocal()
-            count = db.query(Forecaster).count()
+            fc_count = db.query(Forecaster).count()
+            pred_count = db.query(Prediction).count()
             db.close()
-            if count == 0:
-                print("[Eidolum] Database empty — running seed.py...")
+            if fc_count == 0 or pred_count == 0:
+                print(f"[Eidolum] DB has {fc_count} forecasters, {pred_count} predictions — running seed.py...")
                 subprocess.run(
                     [sys.executable, "seed.py"],
                     check=True,
@@ -40,7 +42,7 @@ def init_db():
                 )
                 print("[Eidolum] Seed complete.")
             else:
-                print(f"[Eidolum] Database has {count} forecasters, skipping seed.")
+                print(f"[Eidolum] Database has {fc_count} forecasters, {pred_count} predictions. Skipping seed.")
         except Exception as e:
             print(f"[Eidolum] Seed error (non-fatal): {e}")
 
