@@ -22,8 +22,6 @@ export default function ForecasterProfile() {
   const [loading, setLoading] = useState(true);
   const [platformInfo, setPlatformInfo] = useState(null);
   const [reportCard, setReportCard] = useState(null);
-  const [verifiedOnly, setVerifiedOnly] = useState(false);
-
   // Map forecaster platform to platformId for routing
   const PLATFORM_ID_MAP = { youtube: 'youtube', x: 'twitter', reddit: 'reddit', congress: 'congress', institutional: 'institutional' };
 
@@ -81,16 +79,7 @@ export default function ForecasterProfile() {
   const chartData = data.accuracy_over_time || [];
   const platformLabel = { youtube: 'YouTube', reddit: 'Reddit', x: 'X' }[data.platform] || 'Profile';
 
-  const isVerifiedSource = (p) =>
-    p.source_url && (
-      p.source_url.includes('/status/') ||
-      p.source_url.includes('/watch?v=') ||
-      p.source_url.includes('/comments/')
-    );
-
-  const displayedPredictions = verifiedOnly
-    ? (data.predictions || []).filter(isVerifiedSource)
-    : (data.predictions || []);
+  const displayedPredictions = data.predictions || [];
 
   return (
     <div>
@@ -274,27 +263,7 @@ export default function ForecasterProfile() {
 
         {/* Predictions — cards on mobile with evidence */}
         <div className="sm:hidden space-y-3 mb-6">
-          <div className="flex items-center justify-between mb-2">
-            <h2 className="text-base font-semibold">Prediction History</h2>
-            <button
-              onClick={() => setVerifiedOnly(!verifiedOnly)}
-              style={{
-                background: verifiedOnly ? '#00c896' : 'transparent',
-                border: '1px solid #00c896',
-                color: verifiedOnly ? '#000' : '#00c896',
-                borderRadius: '6px',
-                padding: '4px 12px',
-                fontSize: '0.8rem',
-                fontWeight: 600,
-                cursor: 'pointer',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '5px',
-              }}
-            >
-              {verifiedOnly ? '\u2713 Verified Only' : 'Show Verified Only'}
-            </button>
-          </div>
+          <h2 className="text-base font-semibold mb-2">Prediction History</h2>
           {displayedPredictions.map((p) => (
             <div key={p.id}>
               <PredictionCard prediction={p} forecaster={data} />
@@ -303,32 +272,11 @@ export default function ForecasterProfile() {
               </div>
             </div>
           ))}
-          {verifiedOnly && displayedPredictions.length === 0 && (
-            <p className="text-muted text-sm text-center py-6">No verified predictions with provable source URLs.</p>
-          )}
         </div>
 
         <div className="hidden sm:block card overflow-hidden p-0">
-          <div className="px-6 py-4 border-b border-border flex items-center justify-between">
+          <div className="px-6 py-4 border-b border-border">
             <h2 className="text-lg font-semibold">Prediction History</h2>
-            <button
-              onClick={() => setVerifiedOnly(!verifiedOnly)}
-              style={{
-                background: verifiedOnly ? '#00c896' : 'transparent',
-                border: '1px solid #00c896',
-                color: verifiedOnly ? '#000' : '#00c896',
-                borderRadius: '6px',
-                padding: '4px 12px',
-                fontSize: '0.8rem',
-                fontWeight: 600,
-                cursor: 'pointer',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '5px',
-              }}
-            >
-              {verifiedOnly ? '\u2713 Verified Only' : 'Show Verified Only'}
-            </button>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full">
@@ -349,13 +297,6 @@ export default function ForecasterProfile() {
                 {displayedPredictions.map((p) => (
                   <PredictionRow key={p.id} p={p} forecaster={data} />
                 ))}
-                {verifiedOnly && displayedPredictions.length === 0 && (
-                  <tr>
-                    <td colSpan={9} className="text-center text-muted text-sm py-10">
-                      No verified predictions with provable source URLs.
-                    </td>
-                  </tr>
-                )}
               </tbody>
             </table>
           </div>

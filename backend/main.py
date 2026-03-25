@@ -17,7 +17,7 @@ from starlette.requests import Request
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from database import engine, Base, SessionLocal
-from models import Forecaster, Prediction
+from models import Forecaster, Prediction, Config
 from rate_limit import limiter
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from routers import leaderboard, forecasters, assets, sync, activity, admin, platforms, follows, newsletter, saved, positions, contrarian, power_rankings, inverse, subscribers
@@ -87,14 +87,8 @@ def init_db():
                 print("[Eidolum] Full seed complete.")
 
             elif prediction_count == 0 and forecaster_count > 0:
-                # Forecasters exist but predictions got wiped
-                print(f"[Eidolum] {forecaster_count} forecasters but 0 predictions — reseeding predictions only...")
-                subprocess.run(
-                    [sys.executable, "seed.py", "--predictions-only"],
-                    check=True,
-                    cwd=os.path.dirname(os.path.abspath(__file__)),
-                )
-                print("[Eidolum] Predictions re-seeded.")
+                # Forecasters exist but predictions missing — verified reseed handles this
+                print(f"[Eidolum] {forecaster_count} forecasters but 0 predictions — verified reseed will handle this.")
 
             else:
                 print(f"[Eidolum] DB healthy: {forecaster_count} forecasters, "
@@ -104,20 +98,10 @@ def init_db():
         finally:
             db.close()
 
-    # Run safety check regardless of SEED_DATA setting
+    # Run safety check (informational only — verified reseed handles data)
     db = SessionLocal()
     try:
-        if not safety_check(db):
-            # Attempt recovery seed
-            try:
-                subprocess.run(
-                    [sys.executable, "seed.py", "--predictions-only"],
-                    check=True,
-                    cwd=os.path.dirname(os.path.abspath(__file__)),
-                )
-                print("[Eidolum Safety] Recovery seed complete.")
-            except Exception as e:
-                print(f"[Eidolum Safety] Recovery seed failed: {e}")
+        safety_check(db)
     finally:
         db.close()
 
@@ -278,18 +262,12 @@ async def lifespan(app):
     init_db()
     migrate_platform_types()
     migrate_profile_urls()
-    # Clean fake video IDs from seed data
+    # Replace seed data with verified predictions (runs once, checks flag)
     try:
-        from setup_db import clean_fake_video_ids
-        clean_fake_video_ids()
+        from seed_verified import seed_verified
+        seed_verified()
     except Exception as e:
-        print(f"[Eidolum] Video ID cleanup error (non-fatal): {e}")
-    # Populate source URLs for predictions missing them
-    try:
-        from setup_db import populate_source_urls
-        populate_source_urls()
-    except Exception as e:
-        print(f"[Eidolum] Source URL population error (non-fatal): {e}")
+        print(f"[Eidolum] Verified reseed error (non-fatal): {e}")
     # Add archive_url column if missing
     try:
         db = SessionLocal()
@@ -297,26 +275,6 @@ async def lifespan(app):
         db.close()
     except Exception as e:
         print(f"[Eidolum] archive_url migration error (non-fatal): {e}")
-    # Populate missing exact_quote from context field
-    try:
-        db = SessionLocal()
-        migrate_populate_quotes(db)
-        db.close()
-    except Exception as e:
-        print(f"[Eidolum] Quote population error (non-fatal): {e}")
-    # Clear fake source URLs from seed data
-    try:
-        db = SessionLocal()
-        migrate_clear_fake_source_urls(db)
-        db.close()
-    except Exception as e:
-        print(f"[Eidolum] Fake URL cleanup error (non-fatal): {e}")
-    # Seed crypto predictions (safe — checks for existing data before inserting)
-    try:
-        from seed_crypto import seed_crypto
-        seed_crypto()
-    except Exception as e:
-        print(f"[Eidolum] Crypto seed error (non-fatal): {e}")
     # Safety check — scan for dangerous patterns
     try:
         from safety_check import check_safety

@@ -177,6 +177,12 @@ class DisclosedPosition(Base):
     notes = Column(Text, nullable=True)
 
 
+class Config(Base):
+    __tablename__ = "config"
+    key = Column(String, primary_key=True)
+    value = Column(String)
+
+
 def get_youtube_timestamp_url(video_id, seconds):
     if not video_id:
         return None
