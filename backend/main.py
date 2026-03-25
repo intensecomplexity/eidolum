@@ -14,7 +14,12 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from database import engine, Base, SessionLocal
 from models import Forecaster, Prediction
-from routers import leaderboard, forecasters, assets, sync, activity, admin, platforms, follows, newsletter, saved, positions, contrarian, power_rankings, inverse
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from routers import leaderboard, forecasters, assets, sync, activity, admin, platforms, follows, newsletter, saved, positions, contrarian, power_rankings, inverse, subscribers
+from jobs.scraper import run_scraper
+from jobs.evaluator import run_evaluator
+from jobs.leaderboard_refresh import run_leaderboard_refresh
+from jobs.newsletter import run_newsletter
 
 
 def safety_check(db):
@@ -234,7 +239,16 @@ async def lifespan(app):
             print("[Eidolum] Safety check passed.")
     except Exception as e:
         print(f"[Eidolum] Safety check error (non-fatal): {e}")
+    # Start background job scheduler
+    scheduler = AsyncIOScheduler()
+    scheduler.add_job(lambda: run_scraper(SessionLocal()), "interval", hours=1, id="scraper")
+    scheduler.add_job(lambda: run_evaluator(SessionLocal()), "interval", minutes=15, id="evaluator")
+    scheduler.add_job(lambda: run_leaderboard_refresh(SessionLocal()), "interval", hours=1, id="leaderboard")
+    scheduler.add_job(lambda: run_newsletter(SessionLocal()), "cron", hour=8, minute=0, id="newsletter")
+    scheduler.start()
+    print("[Eidolum] Scheduler started — scraper(1h), evaluator(15m), leaderboard(1h), newsletter(8am daily)")
     yield
+    scheduler.shutdown()
 
 
 app = FastAPI(title="Eidolum API", version="1.0.0", lifespan=lifespan)
@@ -271,6 +285,7 @@ app.include_router(positions.router, prefix="/api")
 app.include_router(contrarian.router, prefix="/api")
 app.include_router(power_rankings.router, prefix="/api")
 app.include_router(inverse.router, prefix="/api")
+app.include_router(subscribers.router, prefix="/api")
 
 
 @app.get("/health")
