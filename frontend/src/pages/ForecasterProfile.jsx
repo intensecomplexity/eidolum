@@ -311,9 +311,19 @@ export default function ForecasterProfile() {
 
 const HORIZON_LABELS = { short: '30d', medium: '90d', long: '1y', custom: 'Custom' };
 
+function isRealYouTubeId(id) {
+  if (!id || typeof id !== 'string') return false;
+  return id.length === 11 && !id.includes('_') && !id.includes(' ') && /^[a-zA-Z0-9\-]+$/.test(id);
+}
+
 function PredictionRow({ p }) {
   const [expanded, setExpanded] = useState(false);
+  const [showVideo, setShowVideo] = useState(false);
   const evalDate = p.evaluation_date || p.resolution_date;
+  const quoteText = p.exact_quote || p.context || '';
+  const horizonLabel = HORIZON_LABELS[p.time_horizon] || `${p.window_days}d`;
+  const hasRealVideo = isRealYouTubeId(p.source_platform_id);
+
   return (
     <>
       <tr
@@ -323,9 +333,7 @@ function PredictionRow({ p }) {
         <td className="px-2 py-3"><BookmarkButton predictionId={p.id} /></td>
         <td className="px-6 py-3">
           <div className="text-sm text-text-secondary font-mono whitespace-nowrap">{p.prediction_date?.slice(0, 10)}</div>
-          {p.time_horizon && (
-            <span className="text-muted text-[10px] font-mono">{HORIZON_LABELS[p.time_horizon] || `${p.window_days}d`}</span>
-          )}
+          <span className="text-muted text-[10px] font-mono">{horizonLabel}</span>
         </td>
         <td className="px-6 py-3"><Link to={`/asset/${p.ticker}`} className="ticker-mono text-accent hover:underline" onClick={e => e.stopPropagation()}>{p.ticker}</Link></td>
         <td className="px-6 py-3">
@@ -347,22 +355,94 @@ function PredictionRow({ p }) {
           ) : <span className="text-muted">-</span>}
         </td>
         <td className="px-6 py-3 hidden lg:table-cell">
-          {p.exact_quote ? (
-            <span className="text-text-secondary text-xs italic truncate block max-w-xs">&ldquo;{p.exact_quote.slice(0, 50)}...&rdquo;</span>
-          ) : (
-            <span className="text-text-secondary text-xs truncate block max-w-xs">{p.context}</span>
-          )}
+          <div className="flex items-center gap-1 max-w-xs" title={quoteText}>
+            <span className="text-text-secondary text-xs italic truncate">
+              {quoteText.length > 60 ? quoteText.slice(0, 60) + '...' : quoteText}
+            </span>
+            <span className="text-muted text-xs shrink-0">{expanded ? '\u25BC' : '\u203A'}</span>
+          </div>
         </td>
       </tr>
       {expanded && (
         <tr className="bg-surface-2/30">
-          <td colSpan={9} className="px-6 py-2 pb-4">
-            <EvidenceCard prediction={p} expandable={false} />
-            <p className="text-[10px] text-muted italic mt-2">
-              {p.outcome === 'pending'
-                ? `Evaluates on ${evalDate?.slice(0, 10)} \u2014 the date ${p.time_horizon === 'custom' ? 'specified' : 'defaulted'} at time of prediction`
-                : `Evaluated at ${evalDate?.slice(0, 10)} \u2014 the date ${p.time_horizon === 'custom' ? 'specified' : 'defaulted'} at time of prediction`
-              }
+          <td colSpan={9} className="px-6 py-4">
+            {/* Full quote */}
+            {quoteText && (
+              <div className="border-l-[3px] border-accent/60 rounded-r-lg px-4 py-3 bg-accent/[0.04] mb-3">
+                <p className="text-text-primary text-sm italic leading-relaxed font-serif">
+                  &ldquo;{quoteText}&rdquo;
+                </p>
+              </div>
+            )}
+
+            {/* Source info */}
+            <div className="flex flex-wrap items-center gap-2 mb-3">
+              {p.source_type && (
+                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-mono font-semibold bg-positive/10 text-positive border border-positive/20">
+                  {p.source_type === 'youtube' ? '\u25B6' : p.source_type === 'twitter' ? '\uD835\uDD4F' : '\uD83D\uDD17'}
+                  {' '}{(p.source_type || '').toUpperCase()}
+                </span>
+              )}
+              {p.source_title && (
+                <span className="text-text-secondary text-xs truncate max-w-xs">{p.source_title}</span>
+              )}
+              {p.source_url && (
+                <a
+                  href={p.source_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={e => e.stopPropagation()}
+                  className="inline-flex items-center gap-1 text-xs text-accent hover:underline min-h-[28px]"
+                >
+                  &#x1F517; View Source
+                </a>
+              )}
+              {hasRealVideo && (
+                <button
+                  onClick={(e) => { e.stopPropagation(); setShowVideo(!showVideo); }}
+                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-positive/10 text-positive border border-positive/20 active:bg-positive/20 min-h-[28px]"
+                >
+                  &#x25B6; {p.timestamp_display ? `Watch at ${p.timestamp_display}` : 'Watch'}
+                </button>
+              )}
+            </div>
+
+            {/* Inline video player */}
+            {showVideo && hasRealVideo && (
+              <div className="mb-3 rounded-lg overflow-hidden bg-bg border border-border" onClick={e => e.stopPropagation()}>
+                <div className="flex items-center justify-between px-3 py-1.5 bg-surface-2 border-b border-border">
+                  <span className="text-muted text-[10px] font-mono">YouTube Player</span>
+                  <button onClick={() => setShowVideo(false)} className="text-muted hover:text-text-secondary text-xs min-h-[28px]">
+                    &#x2715; Close
+                  </button>
+                </div>
+                <div className="relative w-full" style={{ paddingBottom: '56.25%' }}>
+                  <iframe
+                    className="absolute inset-0 w-full h-full"
+                    src={`https://www.youtube-nocookie.com/embed/${p.source_platform_id}?autoplay=1&rel=0${p.video_timestamp_sec ? `&start=${p.video_timestamp_sec}` : ''}`}
+                    title="YouTube video player"
+                    frameBorder="0"
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                    allowFullScreen
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Time horizon note */}
+            {evalDate && (
+              <p className="text-xs text-muted mb-2">
+                <span className="mr-1">&#x23F1;</span>
+                {p.outcome === 'pending'
+                  ? `Evaluates on ${evalDate.slice(0, 10)} \u2014 ${horizonLabel} horizon`
+                  : `Evaluated at ${evalDate.slice(0, 10)} \u2014 ${horizonLabel} horizon`
+                }
+              </p>
+            )}
+
+            {/* Disclaimer */}
+            <p className="text-[10px] text-muted italic">
+              Quote sourced from public statement. Eidolum does not provide investment advice.
             </p>
           </td>
         </tr>
