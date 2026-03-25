@@ -174,6 +174,12 @@ async def lifespan(app):
         populate_source_urls()
     except Exception as e:
         print(f"[Eidolum] Source URL population error (non-fatal): {e}")
+    # Seed crypto predictions (safe — checks for existing data before inserting)
+    try:
+        from seed_crypto import seed_crypto
+        seed_crypto()
+    except Exception as e:
+        print(f"[Eidolum] Crypto seed error (non-fatal): {e}")
     # Safety check — scan for dangerous patterns
     try:
         from safety_check import check_safety

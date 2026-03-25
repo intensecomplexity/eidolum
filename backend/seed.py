@@ -713,6 +713,24 @@ PREDICTION_TEMPLATES = [
     # Index
     ("SPY", "Index", "bullish", "S&P 500 going to ${target} by year end — buy the dip"),
     ("SPY", "Index", "bearish", "SPY is due for a 10% correction — raising cash here"),
+    # Crypto — bullish
+    ("BTC", "Crypto", "bullish", "Bitcoin to ${target} — digital gold thesis is playing out as the Fed prints money"),
+    ("BTC", "Crypto", "bullish", "BTC is the hardest money ever created — target ${target} this cycle"),
+    ("ETH", "Crypto", "bullish", "Ethereum staking yields + L2 growth make ETH a buy to ${target}"),
+    ("ETH", "Crypto", "bullish", "ETH is the settlement layer for Web3 — going to ${target}"),
+    ("SOL", "Crypto", "bullish", "Solana is the fastest L1 — massive developer growth, target ${target}"),
+    ("SOL", "Crypto", "bullish", "SOL ecosystem is exploding — DeFi + NFTs + memecoins driving adoption"),
+    ("DOGE", "Crypto", "bullish", "Dogecoin to ${target} — community + Elon backing makes this the people's crypto"),
+    ("XRP", "Crypto", "bullish", "XRP post-SEC clarity is a buy — institutional adoption coming, target ${target}"),
+    ("MSTR", "Crypto", "bullish", "MicroStrategy is leveraged BTC — if BTC rallies, MSTR goes to ${target}"),
+    # Crypto — bearish
+    ("BTC", "Crypto", "bearish", "Bitcoin is a speculative bubble with no intrinsic value — heading to ${target}"),
+    ("BTC", "Crypto", "bearish", "BTC is digital nothing — regulatory crackdown will crush this"),
+    ("ETH", "Crypto", "bearish", "Ethereum gas fees and competition from Solana make ETH a sell"),
+    ("ETH", "Crypto", "bearish", "ETH merge didn't fix scaling — L2 fragmentation is a disaster"),
+    ("SOL", "Crypto", "bearish", "Solana keeps going down — centralization risk and outages make this uninvestable"),
+    ("DOGE", "Crypto", "bearish", "DOGE is a literal joke coin with no utility — sell"),
+    ("XRP", "Crypto", "bearish", "XRP is a security and Ripple's legal battles aren't over — avoid"),
 ]
 
 # ---------------------------------------------------------------------------
@@ -1024,6 +1042,109 @@ QUOTES = {
         "timestamp": 256,
         "source_type": "youtube",
     },
+    # --- Crypto-specific forecaster quotes ---
+    # Michael Saylor — BTC maximalist
+    ("@saborayl", "BTC", "bullish"): {
+        "quote": "Bitcoin is the apex property of the human race. It's digital energy. Every corporation should put their treasury in BTC.",
+        "source_title": "Tweet — @saborayl",
+        "video_id": None,
+        "timestamp": None,
+        "source_type": "twitter",
+        "source_url": "https://twitter.com/saborayl/status/1834567890123456789",
+    },
+    ("@saborayl", "MSTR", "bullish"): {
+        "quote": "MicroStrategy is a Bitcoin development company. We will continue to acquire Bitcoin. There is no second best.",
+        "source_title": "Tweet — @saborayl",
+        "video_id": None,
+        "timestamp": None,
+        "source_type": "twitter",
+        "source_url": "https://twitter.com/saborayl/status/1834567890123456790",
+    },
+    # Cathie Wood — bullish BTC/ETH
+    ("@CathieDWood", "BTC", "bullish"): {
+        "quote": "Our updated research suggests Bitcoin could reach $1.5 million by 2030. Institutional adoption is still in the first inning.",
+        "source_title": "ARK Big Ideas 2025 — Bitcoin",
+        "video_id": None,
+        "timestamp": None,
+        "source_type": "article",
+        "source_url": "https://ark-invest.com/big-ideas-2025",
+    },
+    ("@CathieDWood", "ETH", "bullish"): {
+        "quote": "Ethereum is the decentralized app store. The staking yield alone makes it attractive. We're adding to our position.",
+        "source_title": "Tweet — @CathieDWood",
+        "video_id": None,
+        "timestamp": None,
+        "source_type": "twitter",
+        "source_url": "https://twitter.com/CathieDWood/status/1834567890123456791",
+    },
+    # Raoul Pal — macro crypto bull
+    ("@RaoulGMI", "BTC", "bullish"): {
+        "quote": "We're in the banana zone. Global liquidity is surging and Bitcoin is the highest-beta asset on the planet. This goes to $150K+.",
+        "source_title": "Tweet — @RaoulGMI",
+        "video_id": None,
+        "timestamp": None,
+        "source_type": "twitter",
+        "source_url": "https://twitter.com/RaoulGMI/status/1834567890123456792",
+    },
+    ("@RaoulGMI", "SOL", "bullish"): {
+        "quote": "Solana is the Nasdaq of crypto. Fastest, cheapest, and the developer ecosystem is exploding. SOL to $500.",
+        "source_title": "Tweet — @RaoulGMI",
+        "video_id": None,
+        "timestamp": None,
+        "source_type": "twitter",
+        "source_url": "https://twitter.com/RaoulGMI/status/1834567890123456793",
+    },
+    ("@RaoulGMI", "ETH", "bullish"): {
+        "quote": "ETH is the collateral layer of DeFi. When the liquidity cycle turns, ETH outperforms everything. Targeting $10K this cycle.",
+        "source_title": "Tweet — @RaoulGMI",
+        "video_id": None,
+        "timestamp": None,
+        "source_type": "twitter",
+        "source_url": "https://twitter.com/RaoulGMI/status/1834567890123456794",
+    },
+    # Peter Schiff — crypto hater
+    ("@PeterSchiff", "BTC", "bearish"): {
+        "quote": "Bitcoin is fool's gold. It has no intrinsic value, produces no income, and is only worth what the next sucker will pay. Buy real gold.",
+        "source_title": "Tweet — @PeterSchiff",
+        "video_id": None,
+        "timestamp": None,
+        "source_type": "twitter",
+        "source_url": "https://twitter.com/PeterSchiff/status/1834567890123456795",
+    },
+    ("@PeterSchiff", "ETH", "bearish"): {
+        "quote": "Ethereum is even worse than Bitcoin. At least Bitcoin pretends to be money. ETH is just a speculative casino chip.",
+        "source_title": "Tweet — @PeterSchiff",
+        "video_id": None,
+        "timestamp": None,
+        "source_type": "twitter",
+        "source_url": "https://twitter.com/PeterSchiff/status/1834567890123456796",
+    },
+    # Michael Burry — crypto skeptic
+    ("@michaeljburry", "BTC", "bearish"): {
+        "quote": "Speculative bubbles always end the same way. Bitcoin, meme stocks, NFTs — the narrative changes but the math doesn't.",
+        "source_title": "Tweet — @michaeljburry",
+        "video_id": None,
+        "timestamp": None,
+        "source_type": "twitter",
+        "source_url": "https://twitter.com/michaeljburry/status/1834567890123456797",
+    },
+    # Elon Musk — DOGE champion
+    ("@elonmusk", "DOGE", "bullish"): {
+        "quote": "Dogecoin is the people's crypto. It's the most fun and the most useful for transactions. To the moon!",
+        "source_title": "Tweet — @elonmusk",
+        "video_id": None,
+        "timestamp": None,
+        "source_type": "twitter",
+        "source_url": "https://twitter.com/elonmusk/status/1834567890123456798",
+    },
+    ("@elonmusk", "BTC", "bullish"): {
+        "quote": "I think Bitcoin is a good thing. I am a supporter of Bitcoin. I think it is on the verge of getting broad acceptance.",
+        "source_title": "Tweet — @elonmusk",
+        "video_id": None,
+        "timestamp": None,
+        "source_type": "twitter",
+        "source_url": "https://twitter.com/elonmusk/status/1834567890123456799",
+    },
 }
 
 GENERIC_QUOTES = {
@@ -1119,6 +1240,46 @@ GENERIC_QUOTES = {
     ("ARM", "bullish"): [
         "ARM architecture is in every smartphone and increasingly in data centers. This is a royalty business with massive scale.",
     ],
+    # Crypto
+    ("BTC", "bullish"): [
+        "Bitcoin is digital gold. Every sovereign wealth fund will own it within 10 years. This is the biggest asymmetric bet of our lifetime.",
+        "BTC supply is fixed at 21 million. Demand from ETFs alone will send this to six figures.",
+        "The halving cycle has been perfect every time. We're in the sweet spot right now.",
+    ],
+    ("BTC", "bearish"): [
+        "Bitcoin has no cash flows, no earnings, and no intrinsic value. It's the greater fool theory in action.",
+        "BTC is an environmental disaster and regulators are coming for it. Get out now.",
+    ],
+    ("ETH", "bullish"): [
+        "Ethereum is the world computer. Smart contracts, DeFi, NFTs — all built on ETH. This is still early.",
+        "ETH staking yield plus deflationary tokenomics post-merge make this the best risk-adjusted crypto bet.",
+    ],
+    ("ETH", "bearish"): [
+        "Ethereum fees are insane and Solana is eating its lunch. The flippening is dead.",
+        "ETH is losing developers to faster chains. The moat is eroding.",
+    ],
+    ("SOL", "bullish"): [
+        "Solana processes 65,000 TPS at near-zero cost. This is what crypto was supposed to be.",
+        "SOL's developer ecosystem is growing faster than any other L1. DeFi TVL is surging.",
+    ],
+    ("SOL", "bearish"): [
+        "Solana has gone down multiple times. You can't build financial infrastructure on a chain that stops.",
+    ],
+    ("DOGE", "bullish"): [
+        "Dogecoin is the most recognized crypto brand after Bitcoin. Community is everything in crypto.",
+    ],
+    ("DOGE", "bearish"): [
+        "DOGE has infinite supply and zero utility. It's a meme, not an investment.",
+    ],
+    ("XRP", "bullish"): [
+        "XRP just won the biggest crypto lawsuit in history. Institutional adoption is next.",
+    ],
+    ("XRP", "bearish"): [
+        "Ripple still controls most of the XRP supply. This is centralized garbage.",
+    ],
+    ("MSTR", "bullish"): [
+        "MicroStrategy is the purest leveraged Bitcoin play in public markets. Saylor is a genius or insane — either way, it's going up with BTC.",
+    ],
 }
 
 
@@ -1135,6 +1296,8 @@ ENTRY_PRICES = {
     "DIS": 108.0, "BA": 180.0, "F": 12.0, "GM": 42.0,
     "MU": 120.0, "SMCI": 750.0, "ARM": 130.0, "ASML": 900.0,
     "SHOP": 65.0, "SQ": 75.0, "RBLX": 38.0, "HOOD": 18.0, "LCID": 3.0,
+    # Crypto
+    "BTC": 62000.0, "ETH": 3200.0, "SOL": 120.0, "DOGE": 0.15, "XRP": 1.10, "MSTR": 1500.0,
 }
 
 SIMULATED_RETURNS = {
@@ -1150,6 +1313,8 @@ SIMULATED_RETURNS = {
     "DIS": 8.0, "BA": -15.0, "F": 5.0, "GM": 3.0,
     "MU": 25.0, "SMCI": 45.0, "ARM": 30.0, "ASML": 12.0,
     "SHOP": 22.0, "SQ": 10.0, "RBLX": -10.0, "HOOD": 35.0, "LCID": -40.0,
+    # Crypto
+    "BTC": 55.0, "ETH": 30.0, "SOL": 80.0, "DOGE": 25.0, "XRP": 40.0, "MSTR": 60.0,
 }
 
 SP500_90D_RETURN = 11.0

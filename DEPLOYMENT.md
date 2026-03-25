@@ -122,6 +122,39 @@ After the first successful seed, set `SEED_DATA=false` in Railway environment va
 
 ---
 
+## Enabling Automatic Backups on Railway
+
+1. Go to Railway dashboard → your project
+2. Click the **Postgres** service (not eidolum, the database)
+3. Go to **Settings** tab
+4. Find **Backups** section
+5. Enable automatic backups
+6. Railway keeps 7 days of backups for free
+
+### How to restore from backup if data is lost
+
+1. Go to Postgres service → **Backups** tab
+2. Find the backup from before the data loss
+3. Click **Restore** → confirm
+4. The database is restored to that point in time
+5. Redeploy the eidolum service to reconnect
+
+### Quick data health check
+
+Hit this endpoint to verify data integrity at any time:
+
+```
+GET https://api.eidolum.com/api/admin/check-data
+```
+
+If predictions are missing, trigger a safe recovery:
+
+```
+GET https://api.eidolum.com/api/admin/reseed
+```
+
+---
+
 ## Troubleshooting
 
 - **CORS errors**: Make sure `api.eidolum.com` DNS is pointing to Railway and the backend CORS config includes `https://www.eidolum.com`

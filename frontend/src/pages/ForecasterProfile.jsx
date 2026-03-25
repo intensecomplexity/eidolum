@@ -333,7 +333,12 @@ function PredictionRow({ p }) {
           <div className="text-sm text-text-secondary font-mono whitespace-nowrap">{p.prediction_date?.slice(0, 10)}</div>
           <span className="text-muted text-[10px] font-mono">{horizonLabel}</span>
         </td>
-        <td className="px-6 py-3"><Link to={`/asset/${p.ticker}`} className="ticker-mono text-accent hover:underline" onClick={e => e.stopPropagation()}>{p.ticker}</Link></td>
+        <td className="px-6 py-3">
+          <Link to={`/asset/${p.ticker}`} className="ticker-mono text-accent hover:underline" onClick={e => e.stopPropagation()}>{p.ticker}</Link>
+          {p.sector === 'Crypto' && (
+            <span className="ml-1 text-[9px] font-bold tracking-wide px-1 py-0.5 rounded-full" style={{ backgroundColor: 'rgba(247, 147, 26, 0.15)', color: '#f7931a' }}>CRYPTO</span>
+          )}
+        </td>
         <td className="px-6 py-3">
           <PredictionBadge direction={p.direction} />
           {p.has_conflict && <ConflictBadge note={p.conflict_note} size="small" />}

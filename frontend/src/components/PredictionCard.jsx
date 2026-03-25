@@ -24,6 +24,12 @@ export default function PredictionCard({ prediction: p, showForecaster = false }
           <Link to={`/asset/${p.ticker}`} className="font-mono text-accent text-base font-bold active:underline">
             {p.ticker}
           </Link>
+          {p.sector === 'Crypto' && (
+            <span className="text-[9px] font-bold tracking-wide px-1.5 py-0.5 rounded-full"
+              style={{ backgroundColor: 'rgba(247, 147, 26, 0.15)', color: '#f7931a' }}>
+              CRYPTO
+            </span>
+          )}
           <PredictionBadge direction={p.direction} />
           {p.has_conflict && <ConflictBadge note={p.conflict_note} size="small" />}
           <span className="text-muted text-[10px] font-mono border border-border rounded px-1 py-0.5">

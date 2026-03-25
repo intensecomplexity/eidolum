@@ -11,7 +11,7 @@ import NotificationBanner from '../components/NotificationBanner';
 import FollowButton from '../components/FollowButton';
 import { getLeaderboard } from '../api';
 
-const SECTORS = ['All', 'Technology', 'Finance', 'Energy', 'Healthcare', 'Consumer', 'Index'];
+const SECTORS = ['All', 'Technology', 'Finance', 'Energy', 'Healthcare', 'Consumer', 'Index', 'Crypto'];
 const DIRECTIONS = ['All', 'bullish', 'bearish'];
 const CONFLICT_FILTERS = ['All', 'No Conflicts', 'Has Disclosures'];
 

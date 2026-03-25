@@ -52,6 +52,7 @@ def get_asset_consensus(
             "prediction_date": p.prediction_date.isoformat(),
             "outcome": p.outcome,
             "actual_return": p.actual_return,
+            "sector": p.sector,
             "context": p.context,
             "exact_quote": p.exact_quote,
             "source_url": p.source_url,
