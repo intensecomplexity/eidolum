@@ -1,8 +1,12 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Search, BarChart3, CheckCircle } from 'lucide-react';
+import { Search, BarChart3, CheckCircle, ArrowRight } from 'lucide-react';
 import TickerBar from '../components/TickerBar';
 import StatCard from '../components/StatCard';
+import PlatformBadge from '../components/PlatformBadge';
+import RankBadge from '../components/RankBadge';
+import StreakBadge from '../components/StreakBadge';
+import LeaderboardCard from '../components/LeaderboardCard';
 import ActivityFeed from '../components/ActivityFeed';
 import Footer from '../components/Footer';
 import RareSignalBanner from '../components/RareSignalBanner';
@@ -17,6 +21,8 @@ export default function Landing() {
     getLeaderboard().then(setForecasters).catch(() => {});
     getHomepageStats().then(setStats).catch(() => {});
   }, []);
+
+  const top5 = forecasters.slice(0, 5);
 
   return (
     <div>
@@ -74,7 +80,58 @@ export default function Landing() {
         <RareSignalBanner />
       </section>
 
-      {/* 5. HOW IT WORKS */}
+      {/* 5. TOP FORECASTERS */}
+      {top5.length > 0 && (
+        <section className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-10 sm:py-16">
+          <div className="flex items-center justify-between mb-4 sm:mb-6">
+            <h2 className="headline-serif" style={{ fontSize: 'clamp(20px, 4vw, 28px)' }}>Top Forecasters</h2>
+            <Link to="/leaderboard" className="text-accent text-sm font-medium active:underline flex items-center gap-1 min-h-[44px]">
+              View all {forecasters.length} <ArrowRight className="w-3 h-3" />
+            </Link>
+          </div>
+          <div className="sm:hidden space-y-3">
+            {top5.map((f) => <LeaderboardCard key={f.id} forecaster={f} />)}
+          </div>
+          <div className="hidden sm:block card overflow-hidden p-0">
+            <table className="w-full">
+              <thead>
+                <tr className="text-left text-muted uppercase border-b border-border" style={{ fontSize: '0.7rem', letterSpacing: '0.08em' }}>
+                  <th className="px-6 py-3">#</th>
+                  <th className="px-6 py-3">Forecaster</th>
+                  <th className="px-6 py-3 text-right">Accuracy</th>
+                  <th className="px-6 py-3 text-right">Alpha</th>
+                  <th className="px-6 py-3 text-right hidden lg:table-cell">Streak</th>
+                </tr>
+              </thead>
+              <tbody>
+                {top5.map((f) => (
+                  <tr key={f.id} className="border-b border-border/50 hover:bg-surface-2/50 transition-colors">
+                    <td className="px-6 py-4"><RankBadge rank={f.rank} movement={f.rank_movement} /></td>
+                    <td className="px-6 py-4">
+                      <Link to={`/forecaster/${f.id}`} className="hover:text-accent transition-colors">
+                        <div className="flex items-center gap-2">
+                          <span style={{ fontWeight: 600, fontSize: '0.95rem' }}>{f.name}</span>
+                          <PlatformBadge platform={f.platform} />
+                        </div>
+                        <div className="text-muted text-xs">{f.handle}</div>
+                      </Link>
+                    </td>
+                    <td className="px-6 py-4 text-right">
+                      <span className={`font-mono font-semibold ${f.accuracy_rate >= 60 ? 'text-positive' : 'text-negative'}`}>{f.accuracy_rate.toFixed(1)}%</span>
+                    </td>
+                    <td className="px-6 py-4 text-right">
+                      <span className={`font-mono ${f.alpha >= 0 ? 'text-positive' : 'text-negative'}`}>{f.alpha >= 0 ? '+' : ''}{f.alpha.toFixed(2)}%</span>
+                    </td>
+                    <td className="px-6 py-4 text-right hidden lg:table-cell"><StreakBadge streak={f.streak} /></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      )}
+
+      {/* 6. HOW IT WORKS */}
       <section id="how-it-works" style={{ padding: '72px 24px', maxWidth: '900px', margin: '0 auto' }}>
         <h2 style={{ textAlign: 'center', fontFamily: "'Instrument Serif', serif", fontWeight: 400, fontSize: 'clamp(1.8rem, 4vw, 2.8rem)', marginBottom: '12px' }}>
           How It Works
