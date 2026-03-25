@@ -229,4 +229,14 @@ def run_scraper(db: Session):
         run_youtube_history(db)
     except Exception as e:
         print(f"[Scraper] YouTube history error (non-fatal): {e}")
+    try:
+        from jobs.twitter_history import scrape_twitter_history
+        scrape_twitter_history(db)
+    except Exception as e:
+        print(f"[Scraper] Twitter history error (non-fatal): {e}")
+    try:
+        from jobs.reddit_history import scrape_reddit_history
+        scrape_reddit_history(db)
+    except Exception as e:
+        print(f"[Scraper] Reddit history error (non-fatal): {e}")
     print("[Scraper] All done")

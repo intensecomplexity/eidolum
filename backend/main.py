@@ -340,10 +340,11 @@ async def lifespan(app):
             print("[Eidolum] Running full historical import (YouTube + Twitter + Reddit)...")
             db = SessionLocal()
             from jobs.youtube_history import run_youtube_history
-            from jobs.twitter_history import scrape_twitter_history
+            from jobs.twitter_history import scrape_twitter_history, scrape_via_nitter_all
             from jobs.reddit_history import scrape_reddit_history
             run_youtube_history(db)
             scrape_twitter_history(db)
+            scrape_via_nitter_all(db)
             scrape_reddit_history(db)
             db.close()
             print("[Eidolum] Historical import complete")

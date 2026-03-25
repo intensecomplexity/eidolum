@@ -20,6 +20,8 @@ REDDIT_SOURCES = [
     {"name": "r/investing",      "url": "https://www.reddit.com/r/investing/top.json?t=year&limit=100"},
     {"name": "r/stocks",         "url": "https://www.reddit.com/r/stocks/top.json?t=year&limit=100"},
     {"name": "DeepFuckingValue", "url": "https://www.reddit.com/user/DeepFuckingValue/submitted.json?limit=100"},
+    {"name": "WSB Consensus",    "url": "https://www.reddit.com/r/wallstreetbets/search.json?q=prediction+target&sort=top&t=year&limit=100"},
+    {"name": "r/stocks",         "url": "https://www.reddit.com/r/stocks/search.json?q=price+target+buy+sell&sort=top&t=year&limit=100"},
 ]
 
 
