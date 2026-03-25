@@ -375,37 +375,8 @@ function PredictionRow({ p }) {
               </div>
             )}
 
-            {/* Source info */}
-            <div className="flex flex-wrap items-center gap-2 mb-3">
-              {p.source_type && (
-                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-mono font-semibold bg-positive/10 text-positive border border-positive/20">
-                  {p.source_type === 'youtube' ? '\u25B6' : p.source_type === 'twitter' ? '\uD835\uDD4F' : '\uD83D\uDD17'}
-                  {' '}{(p.source_type || '').toUpperCase()}
-                </span>
-              )}
-              {p.source_title && (
-                <span className="text-text-secondary text-xs truncate max-w-xs">{p.source_title}</span>
-              )}
-              {p.source_url && (
-                <a
-                  href={p.source_url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  onClick={e => e.stopPropagation()}
-                  className="inline-flex items-center gap-1 text-xs text-accent hover:underline min-h-[28px]"
-                >
-                  &#x1F517; View Source
-                </a>
-              )}
-              {hasRealVideo && (
-                <button
-                  onClick={(e) => { e.stopPropagation(); setShowVideo(!showVideo); }}
-                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-positive/10 text-positive border border-positive/20 active:bg-positive/20 min-h-[28px]"
-                >
-                  &#x25B6; {p.timestamp_display ? `Watch at ${p.timestamp_display}` : 'Watch'}
-                </button>
-              )}
-            </div>
+            {/* Source buttons */}
+            <SourceButtons p={p} hasRealVideo={hasRealVideo} showVideo={showVideo} setShowVideo={setShowVideo} />
 
             {/* Inline video player */}
             {showVideo && hasRealVideo && (
@@ -448,5 +419,100 @@ function PredictionRow({ p }) {
         </tr>
       )}
     </>
+  );
+}
+
+function SourceButtons({ p, hasRealVideo, showVideo, setShowVideo }) {
+  const url = p.source_url;
+  const st = p.source_type || '';
+  const isYouTube = st === 'youtube' || (url && (url.includes('youtube.com') || url.includes('youtu.be')));
+  const isTwitter = st === 'twitter' || st === 'x' || (url && (url.includes('twitter.com') || url.includes('x.com')));
+  const isReddit = st === 'reddit' || (url && url.includes('reddit.com'));
+
+  const btnBase = "inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-md text-[13px] font-medium min-h-[32px] transition-colors";
+
+  // Build the YouTube URL with timestamp if available
+  let ytUrl = url;
+  if (hasRealVideo) {
+    ytUrl = `https://youtube.com/watch?v=${p.source_platform_id}`;
+    if (p.video_timestamp_sec) ytUrl += `&t=${p.video_timestamp_sec}`;
+  }
+
+  const tsLabel = p.video_timestamp_sec
+    ? `${Math.floor(p.video_timestamp_sec / 60)}:${String(p.video_timestamp_sec % 60).padStart(2, '0')}`
+    : null;
+
+  const hasAnyButton = (isYouTube && (hasRealVideo || url)) || (isTwitter && url) || (isReddit && url) || (!isYouTube && !isTwitter && !isReddit && url);
+
+  if (!hasAnyButton) return null;
+
+  return (
+    <div className="flex flex-wrap items-center gap-2 mb-3">
+      {/* YouTube */}
+      {isYouTube && (hasRealVideo || url) && (
+        <>
+          <a
+            href={ytUrl || url}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={e => e.stopPropagation()}
+            className={`${btnBase} bg-[#ff0000] text-white hover:bg-[#cc0000]`}
+          >
+            <span>&#x25B6;</span>
+            {tsLabel ? `Watch at ${tsLabel}` : 'Watch on YouTube'}
+          </a>
+          {hasRealVideo && (
+            <button
+              onClick={(e) => { e.stopPropagation(); setShowVideo(!showVideo); }}
+              className={`${btnBase} bg-surface-2 text-text-secondary border border-border hover:border-accent/50 hover:text-accent`}
+            >
+              {showVideo ? '\u2715 Close Player' : '\u25B6 Inline Player'}
+            </button>
+          )}
+        </>
+      )}
+
+      {/* Twitter/X */}
+      {isTwitter && url && (
+        <a
+          href={url}
+          target="_blank"
+          rel="noopener noreferrer"
+          onClick={e => e.stopPropagation()}
+          className={`${btnBase} bg-[#14171a] text-white border border-[#333] hover:bg-[#1a1f25]`}
+        >
+          <span style={{ fontFamily: 'serif' }}>{'\uD835\uDD4F'}</span>
+          View on X
+        </a>
+      )}
+
+      {/* Reddit */}
+      {isReddit && url && (
+        <a
+          href={url}
+          target="_blank"
+          rel="noopener noreferrer"
+          onClick={e => e.stopPropagation()}
+          className={`${btnBase} bg-[#ff4500] text-white hover:bg-[#e03d00]`}
+        >
+          <span>{'\uD83D\uDD34'}</span>
+          View on Reddit
+        </a>
+      )}
+
+      {/* Generic source */}
+      {!isYouTube && !isTwitter && !isReddit && url && (
+        <a
+          href={url}
+          target="_blank"
+          rel="noopener noreferrer"
+          onClick={e => e.stopPropagation()}
+          className={`${btnBase} bg-surface-2 text-text-secondary border border-border hover:border-accent/50 hover:text-accent`}
+        >
+          <span>{'\uD83D\uDD17'}</span>
+          View Source
+        </a>
+      )}
+    </div>
   );
 }

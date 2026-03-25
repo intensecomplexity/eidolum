@@ -92,6 +92,58 @@ def migrate_platform_types():
         db.close()
 
 
+def populate_source_urls():
+    """Fill in source_url for predictions that have NULL source_url.
+    Uses the forecaster's channel_url or a generated profile URL based on platform."""
+    db = SessionLocal()
+    try:
+        from models import Prediction
+        preds_without_url = db.query(Prediction).filter(Prediction.source_url.is_(None)).all()
+        if not preds_without_url:
+            print("[Eidolum] All predictions already have source_url.")
+            return 0
+
+        # Build forecaster lookup
+        forecaster_map = {f.id: f for f in db.query(Forecaster).all()}
+        updated = 0
+
+        for p in preds_without_url:
+            f = forecaster_map.get(p.forecaster_id)
+            if not f:
+                continue
+
+            url = None
+            if f.platform in ("youtube",) and f.channel_url:
+                url = f.channel_url
+            elif f.platform in ("x", "twitter"):
+                handle = (f.handle or "").lstrip("@")
+                if handle:
+                    url = f"https://x.com/{handle}"
+            elif f.platform == "reddit" and f.channel_url:
+                url = f.channel_url
+            elif f.channel_url:
+                url = f.channel_url
+
+            # Also set source_type from platform if missing
+            if url:
+                p.source_url = url
+                if not p.source_type:
+                    platform_to_source = {"youtube": "youtube", "x": "twitter", "reddit": "reddit"}
+                    p.source_type = platform_to_source.get(f.platform)
+                updated += 1
+
+        if updated:
+            db.commit()
+            print(f"[Eidolum] Populated source_url for {updated} predictions.")
+        return updated
+    except Exception as e:
+        print(f"[Eidolum] populate_source_urls error: {e}")
+        db.rollback()
+        return 0
+    finally:
+        db.close()
+
+
 def setup():
     print("Creating tables...")
     Base.metadata.create_all(bind=engine)
@@ -110,6 +162,9 @@ def setup():
 
     # Always run platform migration
     migrate_platform_types()
+
+    # Populate source URLs for predictions missing them
+    populate_source_urls()
 
     print("Setup complete.")
 

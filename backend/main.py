@@ -168,6 +168,12 @@ async def lifespan(app):
         clean_fake_video_ids()
     except Exception as e:
         print(f"[Eidolum] Video ID cleanup error (non-fatal): {e}")
+    # Populate source URLs for predictions missing them
+    try:
+        from setup_db import populate_source_urls
+        populate_source_urls()
+    except Exception as e:
+        print(f"[Eidolum] Source URL population error (non-fatal): {e}")
     # Safety check — scan for dangerous patterns
     try:
         from safety_check import check_safety
