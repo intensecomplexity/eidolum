@@ -56,7 +56,7 @@ def get_leaderboard(
         f = next(fc for fc in forecasters if fc.id == r["id"])
         r["rank_movement"] = compute_rank_movement(f, r["rank"])
 
-    # Add conflict data
+    # Add conflict data and verified prediction counts
     for r in results:
         conflict_count = db.query(Prediction).filter(
             Prediction.forecaster_id == r["id"],
@@ -69,6 +69,18 @@ def get_leaderboard(
         r["has_disclosed_positions"] = has_positions
         r["conflict_count"] = conflict_count
         r["conflict_rate"] = round(conflict_count / r["total_predictions"] * 100, 1) if r["total_predictions"] > 0 else 0
+
+        # Count predictions with real provable source URLs
+        verified = db.query(Prediction).filter(
+            Prediction.forecaster_id == r["id"],
+            Prediction.source_url.isnot(None),
+            (
+                Prediction.source_url.contains('/status/')
+                | Prediction.source_url.contains('/watch?v=')
+                | Prediction.source_url.contains('/comments/')
+            ),
+        ).count()
+        r["verified_predictions"] = verified
 
     # Apply conflict filter
     if filter == "no_conflicts":

@@ -48,6 +48,12 @@ export default function LeaderboardCard({ forecaster: f }) {
               {f.evaluated_predictions}/{f.total_predictions}
             </div>
             <div className="text-muted text-[11px]">predictions</div>
+            {f.verified_predictions > 0 && (
+              <div className="text-[10px] font-semibold mt-0.5"
+                style={{ color: '#00c896' }}>
+                {f.verified_predictions} verified
+              </div>
+            )}
           </div>
         </div>
         <StreakBadge streak={f.streak} />

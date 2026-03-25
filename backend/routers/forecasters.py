@@ -109,6 +109,13 @@ def get_forecaster(request: Request, forecaster_id: int, db: Session = Depends(g
                 "timestamp_url": get_youtube_timestamp_url(p.source_platform_id, p.video_timestamp_sec),
                 "has_conflict": bool(p.has_conflict),
                 "conflict_note": p.conflict_note,
+                "has_source": bool(
+                    p.source_url and (
+                        '/status/' in p.source_url
+                        or '/watch?v=' in p.source_url
+                        or '/comments/' in p.source_url
+                    )
+                ),
             }
             for p in predictions
         ],

@@ -6,48 +6,22 @@ import PlatformBadge from './PlatformBadge';
 
 const HORIZON_LABELS = { short: '30d', medium: '90d', long: '1y', custom: 'Custom' };
 
-function getSourceButton(p, forecaster) {
+function getSourceButton(p) {
   const url = p.source_url;
-  const channelUrl = forecaster?.channel_url || '';
-  const ticker = p.ticker || '';
+  if (!url) return null;
 
-  // Real specific URL — use it directly
-  if (url) {
-    if (url.includes('youtube.com/watch') || url.includes('youtu.be')) {
-      const label = p.video_timestamp_sec
-        ? `▶ Watch at ${formatTimestamp(p.video_timestamp_sec)}`
-        : '▶ Watch on YouTube';
-      return { url, label, bg: '#00c896', color: '#000' };
-    }
-    if ((url.includes('x.com') || url.includes('twitter.com')) && url.includes('/status/')) {
-      return { url, label: '𝕏 View on X', bg: '#000', color: '#fff' };
-    }
-    if (url.includes('reddit.com') && url.includes('/comments/')) {
-      return { url, label: '🔴 View on Reddit', bg: '#ff4500', color: '#fff' };
-    }
+  // Only show buttons for real, specific source URLs
+  if (url.includes('youtube.com/watch') || url.includes('youtu.be')) {
+    const label = p.video_timestamp_sec
+      ? `▶ Watch at ${formatTimestamp(p.video_timestamp_sec)}`
+      : '▶ Watch on YouTube';
+    return { url, label, bg: '#00c896', color: '#000' };
   }
-
-  // No exact URL — fall back to best contextual search link
-  if (channelUrl.includes('youtube.com')) {
-    const handle = channelUrl.split('@')[1]?.split('/')[0] || '';
-    const searchUrl = handle
-      ? `https://www.youtube.com/@${handle}/search?query=${ticker}`
-      : `https://www.youtube.com/results?search_query=${ticker}`;
-    return { url: searchUrl, label: `🔍 Search ${ticker} on YouTube`, bg: '#00c896', color: '#000' };
+  if ((url.includes('x.com') || url.includes('twitter.com')) && url.includes('/status/')) {
+    return { url, label: '𝕏 View on X', bg: '#000', color: '#fff' };
   }
-  if (channelUrl.includes('x.com')) {
-    const handle = channelUrl.split('x.com/')[1]?.split('/')[0] || '';
-    const searchUrl = handle
-      ? `https://x.com/search?q=from%3A${handle}+%24${ticker}&f=live`
-      : `https://x.com/search?q=%24${ticker}&f=live`;
-    return { url: searchUrl, label: `🔍 Search $${ticker} on X`, bg: '#111', color: '#fff' };
-  }
-  if (channelUrl.includes('reddit.com')) {
-    const sub = channelUrl.includes('/r/') ? channelUrl.split('/r/')[1]?.split('/')[0] : null;
-    const searchUrl = sub
-      ? `https://www.reddit.com/r/${sub}/search/?q=${ticker}&restrict_sr=1&sort=new`
-      : `https://www.reddit.com/search/?q=${ticker}&sort=new`;
-    return { url: searchUrl, label: `🔍 Search ${ticker} on Reddit`, bg: '#ff4500', color: '#fff' };
+  if (url.includes('reddit.com') && url.includes('/comments/')) {
+    return { url, label: '🔴 View on Reddit', bg: '#ff4500', color: '#fff' };
   }
 
   return null;
@@ -136,8 +110,7 @@ export default function PredictionCard({ prediction: p, showForecaster = false, 
 
       {/* Source link */}
       {(() => {
-        const fc = forecaster || p.forecaster || null;
-        const btn = getSourceButton(p, fc);
+        const btn = getSourceButton(p);
         if (!btn) return null;
         return (
           <a href={btn.url} target="_blank" rel="noopener noreferrer"

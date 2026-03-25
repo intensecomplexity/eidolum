@@ -22,6 +22,7 @@ export default function ForecasterProfile() {
   const [loading, setLoading] = useState(true);
   const [platformInfo, setPlatformInfo] = useState(null);
   const [reportCard, setReportCard] = useState(null);
+  const [verifiedOnly, setVerifiedOnly] = useState(false);
 
   // Map forecaster platform to platformId for routing
   const PLATFORM_ID_MAP = { youtube: 'youtube', x: 'twitter', reddit: 'reddit', congress: 'congress', institutional: 'institutional' };
@@ -81,6 +82,17 @@ export default function ForecasterProfile() {
 
   const chartData = data.accuracy_over_time || [];
   const platformLabel = { youtube: 'YouTube', reddit: 'Reddit', x: 'X' }[data.platform] || 'Profile';
+
+  const isVerifiedSource = (p) =>
+    p.source_url && (
+      p.source_url.includes('/status/') ||
+      p.source_url.includes('/watch?v=') ||
+      p.source_url.includes('/comments/')
+    );
+
+  const displayedPredictions = verifiedOnly
+    ? (data.predictions || []).filter(isVerifiedSource)
+    : (data.predictions || []);
 
   return (
     <div>
@@ -264,8 +276,28 @@ export default function ForecasterProfile() {
 
         {/* Predictions — cards on mobile with evidence */}
         <div className="sm:hidden space-y-3 mb-6">
-          <h2 className="text-base font-semibold mb-2">Prediction History</h2>
-          {(data.predictions || []).map((p) => (
+          <div className="flex items-center justify-between mb-2">
+            <h2 className="text-base font-semibold">Prediction History</h2>
+            <button
+              onClick={() => setVerifiedOnly(!verifiedOnly)}
+              style={{
+                background: verifiedOnly ? '#00c896' : 'transparent',
+                border: '1px solid #00c896',
+                color: verifiedOnly ? '#000' : '#00c896',
+                borderRadius: '6px',
+                padding: '4px 12px',
+                fontSize: '0.8rem',
+                fontWeight: 600,
+                cursor: 'pointer',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '5px',
+              }}
+            >
+              {verifiedOnly ? '\u2713 Verified Only' : 'Show Verified Only'}
+            </button>
+          </div>
+          {displayedPredictions.map((p) => (
             <div key={p.id}>
               <PredictionCard prediction={p} forecaster={data} />
               <div className="px-4 -mt-3 pb-3">
@@ -273,11 +305,32 @@ export default function ForecasterProfile() {
               </div>
             </div>
           ))}
+          {verifiedOnly && displayedPredictions.length === 0 && (
+            <p className="text-muted text-sm text-center py-6">No verified predictions with provable source URLs.</p>
+          )}
         </div>
 
         <div className="hidden sm:block card overflow-hidden p-0">
-          <div className="px-6 py-4 border-b border-border">
+          <div className="px-6 py-4 border-b border-border flex items-center justify-between">
             <h2 className="text-lg font-semibold">Prediction History</h2>
+            <button
+              onClick={() => setVerifiedOnly(!verifiedOnly)}
+              style={{
+                background: verifiedOnly ? '#00c896' : 'transparent',
+                border: '1px solid #00c896',
+                color: verifiedOnly ? '#000' : '#00c896',
+                borderRadius: '6px',
+                padding: '4px 12px',
+                fontSize: '0.8rem',
+                fontWeight: 600,
+                cursor: 'pointer',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '5px',
+              }}
+            >
+              {verifiedOnly ? '\u2713 Verified Only' : 'Show Verified Only'}
+            </button>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full">
@@ -295,9 +348,16 @@ export default function ForecasterProfile() {
                 </tr>
               </thead>
               <tbody>
-                {(data.predictions || []).map((p) => (
+                {displayedPredictions.map((p) => (
                   <PredictionRow key={p.id} p={p} forecaster={data} />
                 ))}
+                {verifiedOnly && displayedPredictions.length === 0 && (
+                  <tr>
+                    <td colSpan={9} className="text-center text-muted text-sm py-10">
+                      No verified predictions with provable source URLs.
+                    </td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>
@@ -311,48 +371,22 @@ export default function ForecasterProfile() {
 
 const HORIZON_LABELS = { short: '30d', medium: '90d', long: '1y', custom: 'Custom' };
 
-function getSourceButton(p, forecaster) {
+function getSourceButton(p) {
   const url = p.source_url;
-  const channelUrl = forecaster?.channel_url || '';
-  const ticker = p.ticker || '';
+  if (!url) return null;
 
-  // Real specific URL — use it directly
-  if (url) {
-    if (url.includes('youtube.com/watch') || url.includes('youtu.be')) {
-      const label = p.video_timestamp_sec
-        ? `▶ Watch at ${formatTimestamp(p.video_timestamp_sec)}`
-        : '▶ Watch on YouTube';
-      return { url, label, bg: '#00c896', color: '#000' };
-    }
-    if ((url.includes('x.com') || url.includes('twitter.com')) && url.includes('/status/')) {
-      return { url, label: '𝕏 View on X', bg: '#000', color: '#fff' };
-    }
-    if (url.includes('reddit.com') && url.includes('/comments/')) {
-      return { url, label: '🔴 View on Reddit', bg: '#ff4500', color: '#fff' };
-    }
+  // Only show buttons for real, specific source URLs
+  if (url.includes('youtube.com/watch') || url.includes('youtu.be')) {
+    const label = p.video_timestamp_sec
+      ? `▶ Watch at ${formatTimestamp(p.video_timestamp_sec)}`
+      : '▶ Watch on YouTube';
+    return { url, label, bg: '#00c896', color: '#000' };
   }
-
-  // No exact URL — fall back to best contextual search link
-  if (channelUrl.includes('youtube.com')) {
-    const handle = channelUrl.split('@')[1]?.split('/')[0] || '';
-    const searchUrl = handle
-      ? `https://www.youtube.com/@${handle}/search?query=${ticker}`
-      : `https://www.youtube.com/results?search_query=${ticker}`;
-    return { url: searchUrl, label: `🔍 Search ${ticker} on YouTube`, bg: '#00c896', color: '#000' };
+  if ((url.includes('x.com') || url.includes('twitter.com')) && url.includes('/status/')) {
+    return { url, label: '𝕏 View on X', bg: '#000', color: '#fff' };
   }
-  if (channelUrl.includes('x.com')) {
-    const handle = channelUrl.split('x.com/')[1]?.split('/')[0] || '';
-    const searchUrl = handle
-      ? `https://x.com/search?q=from%3A${handle}+%24${ticker}&f=live`
-      : `https://x.com/search?q=%24${ticker}&f=live`;
-    return { url: searchUrl, label: `🔍 Search $${ticker} on X`, bg: '#111', color: '#fff' };
-  }
-  if (channelUrl.includes('reddit.com')) {
-    const sub = channelUrl.includes('/r/') ? channelUrl.split('/r/')[1]?.split('/')[0] : null;
-    const searchUrl = sub
-      ? `https://www.reddit.com/r/${sub}/search/?q=${ticker}&restrict_sr=1&sort=new`
-      : `https://www.reddit.com/search/?q=${ticker}&sort=new`;
-    return { url: searchUrl, label: `🔍 Search ${ticker} on Reddit`, bg: '#ff4500', color: '#fff' };
+  if (url.includes('reddit.com') && url.includes('/comments/')) {
+    return { url, label: '🔴 View on Reddit', bg: '#ff4500', color: '#fff' };
   }
 
   return null;
@@ -434,7 +468,7 @@ function PredictionRow({ p, forecaster: fc }) {
 
             {/* Source button */}
             {(() => {
-              const btn = getSourceButton(p, fc);
+              const btn = getSourceButton(p);
               if (!btn) return null;
               return (
                 <a
