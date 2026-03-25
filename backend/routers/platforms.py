@@ -1,9 +1,10 @@
 import datetime
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy.orm import Session
 from database import get_db
 from models import Forecaster, Prediction
 from utils import compute_forecaster_stats, compute_streak, compute_rank_movement
+from rate_limit import limiter
 
 router = APIRouter()
 
@@ -133,7 +134,8 @@ def _compute_platform_stats(forecasters, db: Session):
 
 
 @router.get("/platforms")
-def get_platforms(db: Session = Depends(get_db)):
+@limiter.limit("60/minute")
+def get_platforms(request: Request, db: Session = Depends(get_db)):
     """Return overview stats for all platforms."""
     platforms = []
 
@@ -153,7 +155,9 @@ def get_platforms(db: Session = Depends(get_db)):
 
 
 @router.get("/platforms/{platform_id}")
+@limiter.limit("60/minute")
 def get_platform_detail(
+    request: Request,
     platform_id: str,
     db: Session = Depends(get_db),
     sector: str = Query(None),

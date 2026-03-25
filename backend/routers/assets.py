@@ -1,14 +1,17 @@
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Request
 from sqlalchemy.orm import Session
 from database import get_db
 from models import Prediction, Forecaster, format_timestamp, get_youtube_timestamp_url
 from utils import compute_forecaster_stats
+from rate_limit import limiter
 
 router = APIRouter()
 
 
 @router.get("/asset/{ticker}/consensus")
+@limiter.limit("60/minute")
 def get_asset_consensus(
+    request: Request,
     ticker: str,
     db: Session = Depends(get_db),
     days: int = Query(90, description="Look-back window in days"),

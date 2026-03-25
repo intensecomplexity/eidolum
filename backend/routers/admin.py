@@ -12,7 +12,8 @@ router = APIRouter()
 
 
 @router.get("/admin/quota-status")
-def quota_status(db: Session = Depends(get_db)):
+@limiter.limit("60/minute")
+def quota_status(request: Request, db: Session = Depends(get_db)):
     """Return current YouTube API quota usage and sync timing info."""
     from services.youtube_quota import quota, SYNC_INTERVAL_HOURS
     from services.youtube import get_next_sync_allowed
@@ -40,7 +41,8 @@ def quota_status(db: Session = Depends(get_db)):
 
 
 @router.get("/admin/check-data")
-def check_data(db: Session = Depends(get_db)):
+@limiter.limit("60/minute")
+def check_data(request: Request, db: Session = Depends(get_db)):
     """Data integrity check — shows DB health at a glance."""
     forecasters = db.query(Forecaster).count()
     predictions = db.query(Prediction).count()
@@ -136,7 +138,8 @@ def restore(request: Request, admin: bool = Depends(require_admin)):
 
 
 @router.get("/health/detailed")
-def health_detailed(db: Session = Depends(get_db)):
+@limiter.limit("60/minute")
+def health_detailed(request: Request, db: Session = Depends(get_db)):
     """Detailed health check with anomaly detection."""
     fc_count = db.query(Forecaster).count()
     pred_count = db.query(Prediction).count()

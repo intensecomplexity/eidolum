@@ -1,10 +1,12 @@
 import datetime
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Request
 from pydantic import BaseModel
 from typing import Optional
 from sqlalchemy.orm import Session
 from database import get_db
 from models import DisclosedPosition, Forecaster, Prediction
+from rate_limit import limiter
+from middleware.auth import require_admin
 
 router = APIRouter()
 
@@ -31,7 +33,8 @@ def check_conflict(db: Session, forecaster_id: int, ticker: str):
 
 
 @router.get("/forecaster/{forecaster_id}/positions")
-def get_positions(forecaster_id: int, db: Session = Depends(get_db)):
+@limiter.limit("60/minute")
+def get_positions(request: Request, forecaster_id: int, db: Session = Depends(get_db)):
     """Get all disclosed positions for a forecaster."""
     positions = db.query(DisclosedPosition).filter(
         DisclosedPosition.forecaster_id == forecaster_id
@@ -68,7 +71,8 @@ def get_positions(forecaster_id: int, db: Session = Depends(get_db)):
 
 
 @router.post("/positions")
-def create_position(req: PositionCreate, db: Session = Depends(get_db)):
+@limiter.limit("10/minute")
+def create_position(request: Request, req: PositionCreate, admin: bool = Depends(require_admin), db: Session = Depends(get_db)):
     """Admin: Add a new disclosed position."""
     pos = DisclosedPosition(
         forecaster_id=req.forecaster_id,
@@ -95,7 +99,8 @@ def create_position(req: PositionCreate, db: Session = Depends(get_db)):
 
 
 @router.get("/predictions/conflicts")
-def get_conflict_predictions(db: Session = Depends(get_db)):
+@limiter.limit("60/minute")
+def get_conflict_predictions(request: Request, db: Session = Depends(get_db)):
     """Get all predictions flagged with conflicts."""
     preds = db.query(Prediction).filter(
         Prediction.has_conflict == 1

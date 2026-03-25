@@ -1,9 +1,10 @@
 import datetime
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Request
 from sqlalchemy.orm import Session
 from database import get_db
 from models import Forecaster, Prediction
 from utils import compute_forecaster_stats, compute_streak
+from rate_limit import limiter
 
 router = APIRouter()
 
@@ -100,7 +101,9 @@ def _compute_rankings(db: Session, period_days: int = 30):
 
 
 @router.get("/power-rankings")
+@limiter.limit("60/minute")
 def get_power_rankings(
+    request: Request,
     db: Session = Depends(get_db),
     period_days: int = Query(30),
 ):

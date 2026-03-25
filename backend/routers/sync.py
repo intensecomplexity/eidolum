@@ -1,5 +1,5 @@
 import datetime
-from fastapi import APIRouter, Depends, BackgroundTasks
+from fastapi import APIRouter, Depends, BackgroundTasks, Request
 from sqlalchemy.orm import Session
 from database import get_db
 from models import Forecaster, Video, Prediction
@@ -7,6 +7,8 @@ from services.youtube import fetch_channel_videos, can_sync_channel
 from services.youtube_quota import quota, SYNC_INTERVAL_HOURS
 from services.stock_data import get_price_at_date, get_return_pct, get_sp500_return, evaluate_prediction
 from services.prediction_parser import parse_predictions
+from rate_limit import limiter
+from middleware.auth import require_admin
 
 router = APIRouter()
 
@@ -116,7 +118,8 @@ def _evaluate_pending(db: Session):
 
 
 @router.post("/sync")
-def sync_youtube(background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
+@limiter.limit("10/minute")
+def sync_youtube(request: Request, background_tasks: BackgroundTasks, admin: bool = Depends(require_admin), db: Session = Depends(get_db)):
     """
     Sync all YouTube channels. Quota-safe:
     - Stagger channels: skip those synced within the last SYNC_INTERVAL_HOURS

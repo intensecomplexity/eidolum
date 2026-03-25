@@ -27,7 +27,7 @@ def list_forecasters(request: Request, db: Session = Depends(get_db)):
 
 
 @router.get("/forecaster/{forecaster_id}")
-@limiter.limit("60/minute")
+@limiter.limit("30/minute")
 def get_forecaster(request: Request, forecaster_id: int, db: Session = Depends(get_db)):
     f = db.query(Forecaster).filter(Forecaster.id == forecaster_id).first()
     if not f:

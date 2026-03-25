@@ -1,15 +1,18 @@
 import datetime
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy.orm import Session
 from database import get_db
 from models import Forecaster, Prediction
 from utils import compute_forecaster_stats
+from rate_limit import limiter
 
 router = APIRouter()
 
 
 @router.get("/inverse-portfolio/{forecaster_id}")
+@limiter.limit("60/minute")
 def get_inverse_portfolio(
+    request: Request,
     forecaster_id: int,
     starting_amount: float = Query(10000),
     db: Session = Depends(get_db),

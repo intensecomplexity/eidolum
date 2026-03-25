@@ -125,7 +125,9 @@ def unsave_prediction(
 
 
 @router.get("/saved-predictions")
+@limiter.limit("60/minute")
 def get_saved_predictions(
+    request: Request,
     user_identifier: str = Query(...),
     db: Session = Depends(get_db),
 ):
@@ -177,7 +179,8 @@ def update_note(
 
 
 @router.get("/saved-predictions/count/{prediction_id}")
-def get_save_count(prediction_id: int, db: Session = Depends(get_db)):
+@limiter.limit("60/minute")
+def get_save_count(request: Request, prediction_id: int, db: Session = Depends(get_db)):
     """Get how many users have saved a prediction (social proof)."""
     count = (
         db.query(func.count(SavedPrediction.id))
@@ -203,7 +206,9 @@ def get_save_count(prediction_id: int, db: Session = Depends(get_db)):
 
 
 @router.get("/saved-predictions/ids")
+@limiter.limit("60/minute")
 def get_saved_ids(
+    request: Request,
     user_identifier: str = Query(...),
     db: Session = Depends(get_db),
 ):

@@ -78,7 +78,8 @@ def get_leaderboard(
 
 
 @router.get("/pending-predictions")
-def get_pending_predictions(db: Session = Depends(get_db)):
+@limiter.limit("60/minute")
+def get_pending_predictions(request: Request, db: Session = Depends(get_db)):
     """Return all pending predictions with countdown info."""
     now = datetime.datetime.utcnow()
     pending = (
@@ -135,7 +136,8 @@ def get_pending_predictions(db: Session = Depends(get_db)):
 
 
 @router.get("/homepage-stats")
-def get_homepage_stats(db: Session = Depends(get_db)):
+@limiter.limit("60/minute")
+def get_homepage_stats(request: Request, db: Session = Depends(get_db)):
     total_forecasters = db.query(Forecaster).count()
     total_predictions = db.query(Prediction).count()
     evaluated = db.query(Prediction).filter(Prediction.outcome != "pending").all()
@@ -155,7 +157,8 @@ def get_homepage_stats(db: Session = Depends(get_db)):
 
 
 @router.get("/trending-tickers")
-def get_trending_tickers(db: Session = Depends(get_db)):
+@limiter.limit("60/minute")
+def get_trending_tickers(request: Request, db: Session = Depends(get_db)):
     recent = db.query(Prediction).all()
     ticker_map = {}
     for p in recent:
@@ -207,7 +210,8 @@ def get_trending_tickers(db: Session = Depends(get_db)):
 
 
 @router.get("/controversial")
-def get_controversial(db: Session = Depends(get_db)):
+@limiter.limit("60/minute")
+def get_controversial(request: Request, db: Session = Depends(get_db)):
     predictions = db.query(Prediction).all()
     forecasters_map = {f.id: f for f in db.query(Forecaster).all()}
     acc_cache = {}
@@ -249,7 +253,8 @@ def get_controversial(db: Session = Depends(get_db)):
 
 
 @router.get("/hot-streaks")
-def get_hot_streaks(db: Session = Depends(get_db)):
+@limiter.limit("60/minute")
+def get_hot_streaks(request: Request, db: Session = Depends(get_db)):
     forecasters = db.query(Forecaster).all()
     streaks = []
     for f in forecasters:
@@ -267,7 +272,8 @@ def get_hot_streaks(db: Session = Depends(get_db)):
 
 
 @router.get("/forecaster/{forecaster_id}/latest-quote")
-def get_latest_quote(forecaster_id: int, db: Session = Depends(get_db)):
+@limiter.limit("60/minute")
+def get_latest_quote(request: Request, forecaster_id: int, db: Session = Depends(get_db)):
     """Get the most recent prediction with a quote for tooltip preview."""
     pred = (
         db.query(Prediction)
@@ -290,7 +296,8 @@ def get_latest_quote(forecaster_id: int, db: Session = Depends(get_db)):
 
 
 @router.get("/prediction-of-the-day")
-def get_prediction_of_the_day(db: Session = Depends(get_db)):
+@limiter.limit("60/minute")
+def get_prediction_of_the_day(request: Request, db: Session = Depends(get_db)):
     """Get the most dramatic resolved prediction from the last 24h (fallback to 7 days)."""
     now = datetime.datetime.utcnow()
 
@@ -338,7 +345,9 @@ def get_prediction_of_the_day(db: Session = Depends(get_db)):
 
 
 @router.get("/report-cards")
+@limiter.limit("60/minute")
 def get_report_cards(
+    request: Request,
     db: Session = Depends(get_db),
     month: int = Query(None),
     year: int = Query(None),
@@ -461,7 +470,8 @@ def get_report_cards(
 
 
 @router.get("/rare-signals")
-def get_rare_signals(db: Session = Depends(get_db)):
+@limiter.limit("60/minute")
+def get_rare_signals(request: Request, db: Session = Depends(get_db)):
     """Find tickers where 7+ of top 10 most accurate investors agree."""
     forecasters = db.query(Forecaster).all()
 

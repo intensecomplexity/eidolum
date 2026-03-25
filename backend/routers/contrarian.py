@@ -1,10 +1,11 @@
 import datetime
 from collections import defaultdict
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 from database import get_db
 from models import Forecaster, Prediction
 from utils import compute_forecaster_stats
+from rate_limit import limiter
 
 router = APIRouter()
 
@@ -80,13 +81,15 @@ def _build_signals(db: Session, ticker_filter: str = None):
 
 
 @router.get("/contrarian-signals")
-def get_contrarian_signals(db: Session = Depends(get_db)):
+@limiter.limit("60/minute")
+def get_contrarian_signals(request: Request, db: Session = Depends(get_db)):
     """Return top contrarian signals — tickers with 75%+ consensus."""
     return _build_signals(db)[:5]
 
 
 @router.get("/contrarian-signals/{ticker}")
-def get_contrarian_signal_for_ticker(ticker: str, db: Session = Depends(get_db)):
+@limiter.limit("60/minute")
+def get_contrarian_signal_for_ticker(request: Request, ticker: str, db: Session = Depends(get_db)):
     """Return contrarian signal for a specific ticker."""
     signals = _build_signals(db, ticker_filter=ticker.upper())
     if not signals:

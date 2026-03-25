@@ -1,13 +1,16 @@
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Request
 from sqlalchemy.orm import Session
 from database import get_db
 from models import ActivityFeedItem
+from rate_limit import limiter
 
 router = APIRouter()
 
 
 @router.get("/activity-feed")
+@limiter.limit("60/minute")
 def get_activity_feed(
+    request: Request,
     db: Session = Depends(get_db),
     limit: int = Query(30, le=100),
 ):

@@ -78,7 +78,8 @@ def unfollow(request: Request, req: UnfollowRequest, db: Session = Depends(get_d
     return {"status": "unfollowed"}
 
 @router.get("/follows/count/{forecaster_id}")
-def get_follower_count(forecaster_id: int, db: Session = Depends(get_db)):
+@limiter.limit("60/minute")
+def get_follower_count(request: Request, forecaster_id: int, db: Session = Depends(get_db)):
     count = db.query(UserFollow).filter(UserFollow.forecaster_id == forecaster_id).count()
     return {"forecaster_id": forecaster_id, "count": count}
 
@@ -134,7 +135,8 @@ def trigger_alerts(request: Request, db: Session = Depends(get_db)):
     return {"queued": queued}
 
 @router.get("/alerts/unsubscribe")
-def unsubscribe(token: str, db: Session = Depends(get_db)):
+@limiter.limit("60/minute")
+def unsubscribe(request: Request, token: str, db: Session = Depends(get_db)):
     """One-click unsubscribe. Token is email hashed."""
     # For simplicity, token = email
     follows = db.query(UserFollow).filter(UserFollow.user_email == token).all()

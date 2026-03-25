@@ -31,7 +31,7 @@ def subscribe(request: Request, req: SubscriberRequest, db: Session = Depends(ge
 
 
 @router.delete("/subscribers")
-@limiter.limit("10/minute")
+@limiter.limit("5/minute")
 def unsubscribe(request: Request, req: SubscriberRequest, db: Session = Depends(get_db)):
     """Unsubscribe an email from the daily newsletter."""
     import datetime

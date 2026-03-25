@@ -7,6 +7,7 @@ from database import get_db
 from models import NewsletterSubscriber, Prediction, Forecaster
 from utils import compute_forecaster_stats
 from rate_limit import limiter
+from middleware.auth import require_admin
 
 router = APIRouter()
 
@@ -41,7 +42,8 @@ def unsubscribe(request: Request, req: SubscribeRequest, db: Session = Depends(g
     return {"status": "unsubscribed"}
 
 @router.get("/newsletter/generate")
-def generate_newsletter(db: Session = Depends(get_db)):
+@limiter.limit("10/minute")
+def generate_newsletter(request: Request, admin: bool = Depends(require_admin), db: Session = Depends(get_db)):
     """Generate this week's newsletter content."""
     now = datetime.datetime.utcnow()
     week_ago = now - datetime.timedelta(days=7)
