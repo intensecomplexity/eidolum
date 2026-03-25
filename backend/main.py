@@ -96,6 +96,12 @@ def migrate_platform_types():
 async def lifespan(app):
     init_db()
     migrate_platform_types()
+    # Clean fake video IDs from seed data
+    try:
+        from setup_db import clean_fake_video_ids
+        clean_fake_video_ids()
+    except Exception as e:
+        print(f"[Eidolum] Video ID cleanup error (non-fatal): {e}")
     yield
 
 

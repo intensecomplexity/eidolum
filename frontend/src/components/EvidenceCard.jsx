@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Play, ExternalLink, Share2, Copy, Download } from 'lucide-react';
-import PredictionBadge from './PredictionBadge';
+import { Play, ExternalLink, X as XIcon } from 'lucide-react';
 
 const SOURCE_BADGES = {
   youtube: { label: 'VIDEO', extra: null, color: 'text-positive', bg: 'bg-positive/10', border: 'border-positive/20' },
@@ -28,13 +27,30 @@ function SourceIcon({ type }) {
   return <span className="text-sm">&#x1F517;</span>;
 }
 
+/** Check if a source_platform_id is a real YouTube video ID (11 alphanumeric chars, no underscores/spaces) */
+function isRealYouTubeId(id) {
+  if (!id || typeof id !== 'string') return false;
+  if (id.length !== 11) return false;
+  if (id.includes('_') || id.includes(' ')) return false;
+  return /^[a-zA-Z0-9\-]+$/.test(id);
+}
+
+/** Build YouTube embed URL with optional timestamp */
+function getEmbedUrl(videoId, timestampSec) {
+  let url = `https://www.youtube-nocookie.com/embed/${videoId}?autoplay=1&rel=0`;
+  if (timestampSec) url += `&start=${timestampSec}`;
+  return url;
+}
+
 export default function EvidenceCard({ prediction: p, expandable = true, compact = false }) {
   const [expanded, setExpanded] = useState(!expandable);
+  const [showVideo, setShowVideo] = useState(false);
 
   if (!p) return null;
 
   const hasQuote = p.exact_quote && p.exact_quote.length > 0;
   const hasSource = p.source_url && p.source_url.length > 0;
+  const hasRealVideo = isRealYouTubeId(p.source_platform_id);
   const badge = getSourceBadge(p.source_type, p.verified_by, !!p.video_timestamp_sec);
 
   // Compact mode: just the quote and source link inline
@@ -46,12 +62,24 @@ export default function EvidenceCard({ prediction: p, expandable = true, compact
             &ldquo;{p.exact_quote.slice(0, 100)}{p.exact_quote.length > 100 ? '...' : ''}&rdquo;
           </p>
         )}
-        {hasSource && (
+        {hasRealVideo && p.source_type === 'youtube' && (
+          <button
+            onClick={(e) => { e.stopPropagation(); setShowVideo(!showVideo); }}
+            className="inline-flex items-center gap-1 text-[11px] text-accent active:underline mt-0.5 min-h-[28px]"
+          >
+            <SourceIcon type="youtube" />
+            {p.timestamp_display ? `Watch at ${p.timestamp_display}` : 'Watch'}
+          </button>
+        )}
+        {hasSource && !hasRealVideo && p.source_type !== 'youtube' && (
           <a href={p.source_url} target="_blank" rel="noopener noreferrer"
              className="inline-flex items-center gap-1 text-[11px] text-accent active:underline mt-0.5">
             <SourceIcon type={p.source_type} />
-            {p.timestamp_display ? `Watch at ${p.timestamp_display}` : 'Source'}
+            Source
           </a>
+        )}
+        {showVideo && hasRealVideo && (
+          <InlinePlayer videoId={p.source_platform_id} timestamp={p.video_timestamp_sec} onClose={() => setShowVideo(false)} />
         )}
       </div>
     );
@@ -62,7 +90,7 @@ export default function EvidenceCard({ prediction: p, expandable = true, compact
       className={`${expandable ? 'cursor-pointer' : ''}`}
       onClick={expandable ? () => setExpanded(!expanded) : undefined}
     >
-      {/* Collapsed: quote preview + source */}
+      {/* Quote */}
       {hasQuote && (
         <div className="mt-3 bg-warning/[0.06] border-l-[3px] border-warning/60 rounded-r-lg px-4 py-3 relative">
           <span className="absolute top-1 left-2 text-warning/30 text-3xl font-serif leading-none select-none">&ldquo;</span>
@@ -82,7 +110,6 @@ export default function EvidenceCard({ prediction: p, expandable = true, compact
       {/* Source line */}
       {(hasSource || p.source_title) && (
         <div className="mt-2 flex flex-wrap items-center gap-2">
-          {/* Source badge */}
           <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-mono font-semibold ${badge.bg} ${badge.color} border ${badge.border}`}>
             <SourceIcon type={p.source_type} />
             {badge.label}
@@ -94,18 +121,15 @@ export default function EvidenceCard({ prediction: p, expandable = true, compact
             </span>
           )}
 
-          {/* Watch button */}
-          {hasSource && p.source_type === 'youtube' && (
-            <a
-              href={p.timestamp_url || p.source_url}
-              target="_blank"
-              rel="noopener noreferrer"
-              onClick={(e) => e.stopPropagation()}
+          {/* YouTube Watch button — only if real video ID */}
+          {hasRealVideo && p.source_type === 'youtube' && (
+            <button
+              onClick={(e) => { e.stopPropagation(); setShowVideo(!showVideo); }}
               className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-positive/10 text-positive border border-positive/20 active:bg-positive/20 min-h-[28px]"
             >
               <Play className="w-3 h-3" fill="currentColor" />
               {p.timestamp_display ? `Watch at ${p.timestamp_display}` : 'Watch'}
-            </a>
+            </button>
           )}
 
           {/* Non-YouTube source link */}
@@ -124,21 +148,26 @@ export default function EvidenceCard({ prediction: p, expandable = true, compact
         </div>
       )}
 
-      {/* Expanded: full details */}
-      {expanded && hasSource && p.source_type === 'youtube' && (
+      {/* Inline video player */}
+      {showVideo && hasRealVideo && (
+        <div onClick={(e) => e.stopPropagation()}>
+          <InlinePlayer videoId={p.source_platform_id} timestamp={p.video_timestamp_sec} onClose={() => setShowVideo(false)} />
+        </div>
+      )}
+
+      {/* Expanded: full video link */}
+      {expanded && hasRealVideo && p.source_type === 'youtube' && !showVideo && (
         <div className="mt-2 flex items-center gap-2 flex-wrap">
-          {p.source_url && p.timestamp_url !== p.source_url && (
-            <a
-              href={p.source_url.split('&t=')[0]}
-              target="_blank"
-              rel="noopener noreferrer"
-              onClick={(e) => e.stopPropagation()}
-              className="inline-flex items-center gap-1 text-xs text-muted active:text-text-primary min-h-[28px]"
-            >
-              <ExternalLink className="w-3 h-3" />
-              Full Video
-            </a>
-          )}
+          <a
+            href={`https://youtube.com/watch?v=${p.source_platform_id}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={(e) => e.stopPropagation()}
+            className="inline-flex items-center gap-1 text-xs text-muted active:text-text-primary min-h-[28px]"
+          >
+            <ExternalLink className="w-3 h-3" />
+            Open on YouTube
+          </a>
         </div>
       )}
 
@@ -171,20 +200,55 @@ export default function EvidenceCard({ prediction: p, expandable = true, compact
   );
 }
 
+/** Inline YouTube player component */
+function InlinePlayer({ videoId, timestamp, onClose }) {
+  return (
+    <div className="mt-3 rounded-lg overflow-hidden bg-bg border border-border">
+      <div className="flex items-center justify-between px-3 py-1.5 bg-surface-2 border-b border-border">
+        <span className="text-muted text-[10px] font-mono">YouTube Player</span>
+        <button
+          onClick={onClose}
+          className="flex items-center gap-1 text-muted hover:text-text-secondary text-xs min-h-[28px]"
+        >
+          <XIcon className="w-3 h-3" /> Close video
+        </button>
+      </div>
+      <div className="relative w-full" style={{ paddingBottom: '56.25%' }}>
+        <iframe
+          className="absolute inset-0 w-full h-full"
+          src={getEmbedUrl(videoId, timestamp)}
+          title="YouTube video player"
+          frameBorder="0"
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+          allowFullScreen
+        />
+      </div>
+    </div>
+  );
+}
+
 // Mini version for activity feed
-export function MiniQuote({ quote, sourceUrl, sourceType, timestampDisplay }) {
+export function MiniQuote({ quote, sourceUrl, sourceType, timestampDisplay, sourcePlatformId }) {
   if (!quote) return null;
+  const hasRealVideo = isRealYouTubeId(sourcePlatformId);
   return (
     <div className="mt-1">
       <p className="text-text-secondary text-xs italic truncate">
         &ldquo;{quote.slice(0, 80)}{quote.length > 80 ? '...' : ''}&rdquo;
       </p>
-      {sourceUrl && (
-        <a href={sourceUrl} target="_blank" rel="noopener noreferrer"
+      {hasRealVideo && sourceType === 'youtube' && (
+        <a href={`https://youtube.com/watch?v=${sourcePlatformId}`} target="_blank" rel="noopener noreferrer"
            className="inline-flex items-center gap-1 text-[10px] text-accent active:underline mt-0.5"
            onClick={(e) => e.stopPropagation()}>
           <Play className="w-2.5 h-2.5" fill="currentColor" />
-          {timestampDisplay ? `${timestampDisplay}` : 'Source'}
+          {timestampDisplay ? `${timestampDisplay}` : 'Watch'}
+        </a>
+      )}
+      {sourceUrl && !hasRealVideo && sourceType !== 'youtube' && (
+        <a href={sourceUrl} target="_blank" rel="noopener noreferrer"
+           className="inline-flex items-center gap-1 text-[10px] text-accent active:underline mt-0.5"
+           onClick={(e) => e.stopPropagation()}>
+          Source
         </a>
       )}
     </div>
