@@ -204,7 +204,7 @@ export default function AssetConsensus() {
             {/* Recent predictions — cards on mobile with evidence */}
             <div className="sm:hidden space-y-3 mb-6">
               <h2 className="text-base font-semibold mb-2">Recent Predictions</h2>
-              {(data.recent_predictions || []).map((p) => (
+              {(data.recent_predictions || []).filter(p => p.source_url).map((p) => (
                 <div key={p.prediction_id}>
                   <PredictionCard prediction={p} showForecaster />
                   <div className="px-4 -mt-3 pb-3">
@@ -234,7 +234,7 @@ export default function AssetConsensus() {
                     </tr>
                   </thead>
                   <tbody>
-                    {(data.recent_predictions || []).map((p) => (
+                    {(data.recent_predictions || []).filter(p => p.source_url).map((p) => (
                       <AssetPredictionRow key={p.prediction_id} p={p} />
                     ))}
                   </tbody>
