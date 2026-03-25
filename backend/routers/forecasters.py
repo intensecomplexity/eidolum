@@ -1,15 +1,17 @@
 import datetime
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 from database import get_db
 from models import Forecaster, Prediction, format_timestamp, get_youtube_timestamp_url, DisclosedPosition
 from utils import compute_forecaster_stats, compute_streak
+from rate_limit import limiter
 
 router = APIRouter()
 
 
 @router.get("/forecasters")
-def list_forecasters(db: Session = Depends(get_db)):
+@limiter.limit("60/minute")
+def list_forecasters(request: Request, db: Session = Depends(get_db)):
     forecasters = db.query(Forecaster).order_by(Forecaster.name).all()
     return [
         {
@@ -25,7 +27,8 @@ def list_forecasters(db: Session = Depends(get_db)):
 
 
 @router.get("/forecaster/{forecaster_id}")
-def get_forecaster(forecaster_id: int, db: Session = Depends(get_db)):
+@limiter.limit("60/minute")
+def get_forecaster(request: Request, forecaster_id: int, db: Session = Depends(get_db)):
     f = db.query(Forecaster).filter(Forecaster.id == forecaster_id).first()
     if not f:
         raise HTTPException(status_code=404, detail="Forecaster not found")

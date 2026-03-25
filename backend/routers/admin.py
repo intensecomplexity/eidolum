@@ -1,10 +1,12 @@
 import datetime
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from database import get_db
 from models import Forecaster, Prediction
+from middleware.auth import require_admin
+from rate_limit import limiter
 
 router = APIRouter()
 
@@ -64,7 +66,8 @@ def check_data(db: Session = Depends(get_db)):
 
 
 @router.get("/admin/reseed")
-def reseed(db: Session = Depends(get_db)):
+@limiter.limit("10/minute")
+def reseed(request: Request, admin: bool = Depends(require_admin), db: Session = Depends(get_db)):
     """Emergency reseed — safely repopulate predictions if they're missing.
     Uses --predictions-only mode: never touches existing forecasters or predictions."""
     pred_count = db.query(Prediction).count()
@@ -99,7 +102,8 @@ def reseed(db: Session = Depends(get_db)):
 
 
 @router.get("/admin/backup")
-def backup(db: Session = Depends(get_db)):
+@limiter.limit("10/minute")
+def backup(request: Request, admin: bool = Depends(require_admin), db: Session = Depends(get_db)):
     """Export full database as JSON — downloadable backup."""
     from backup import export_backup
     data = export_backup()
@@ -107,7 +111,8 @@ def backup(db: Session = Depends(get_db)):
 
 
 @router.get("/admin/snapshot")
-def snapshot():
+@limiter.limit("10/minute")
+def snapshot(request: Request, admin: bool = Depends(require_admin)):
     """Save data snapshot to backend/data_snapshot.json (for GitHub backup)."""
     from backup import save_snapshot
     data = save_snapshot()
@@ -120,7 +125,8 @@ def snapshot():
 
 
 @router.get("/admin/restore")
-def restore():
+@limiter.limit("10/minute")
+def restore(request: Request, admin: bool = Depends(require_admin)):
     """Restore from data_snapshot.json if DB is empty."""
     from backup import restore_from_snapshot
     success = restore_from_snapshot()
@@ -178,7 +184,8 @@ def health_detailed(db: Session = Depends(get_db)):
 
 
 @router.get("/admin/safety-check")
-def run_safety_check():
+@limiter.limit("10/minute")
+def run_safety_check(request: Request, admin: bool = Depends(require_admin)):
     """Scan codebase for dangerous DB patterns."""
     from safety_check import check_safety
     violations = check_safety()

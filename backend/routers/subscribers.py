@@ -1,8 +1,9 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from database import get_db
 from models import NewsletterSubscriber
+from rate_limit import limiter
 
 router = APIRouter()
 
@@ -12,7 +13,8 @@ class SubscriberRequest(BaseModel):
 
 
 @router.post("/subscribers")
-def subscribe(req: SubscriberRequest, db: Session = Depends(get_db)):
+@limiter.limit("5/minute")
+def subscribe(request: Request, req: SubscriberRequest, db: Session = Depends(get_db)):
     """Subscribe an email to the daily newsletter."""
     existing = db.query(NewsletterSubscriber).filter(
         NewsletterSubscriber.email == req.email
@@ -29,7 +31,8 @@ def subscribe(req: SubscriberRequest, db: Session = Depends(get_db)):
 
 
 @router.delete("/subscribers")
-def unsubscribe(req: SubscriberRequest, db: Session = Depends(get_db)):
+@limiter.limit("10/minute")
+def unsubscribe(request: Request, req: SubscriberRequest, db: Session = Depends(get_db)):
     """Unsubscribe an email from the daily newsletter."""
     import datetime
     sub = db.query(NewsletterSubscriber).filter(

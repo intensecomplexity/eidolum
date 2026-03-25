@@ -12,14 +12,30 @@ import time
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.requests import Request
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
 from database import engine, Base, SessionLocal
 from models import Forecaster, Prediction
+from rate_limit import limiter
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from routers import leaderboard, forecasters, assets, sync, activity, admin, platforms, follows, newsletter, saved, positions, contrarian, power_rankings, inverse, subscribers
 from jobs.scraper import run_scraper
 from jobs.evaluator import run_evaluator
 from jobs.leaderboard_refresh import run_leaderboard_refresh
 from jobs.newsletter import run_newsletter
+
+
+class SecurityHeadersMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        response = await call_next(request)
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["X-Frame-Options"] = "DENY"
+        response.headers["X-XSS-Protection"] = "1; mode=block"
+        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+        response.headers["Permissions-Policy"] = "geolocation=(), microphone=(), camera=()"
+        return response
 
 
 def safety_check(db):
@@ -266,6 +282,9 @@ async def lifespan(app):
             print("[Eidolum] Safety check passed.")
     except Exception as e:
         print(f"[Eidolum] Safety check error (non-fatal): {e}")
+    # Security warning
+    if not os.getenv("ADMIN_SECRET"):
+        print("[WARNING] ADMIN_SECRET not set — admin routes are unprotected!")
     # Start background job scheduler
     scheduler = AsyncIOScheduler()
     scheduler.add_job(lambda: run_scraper(SessionLocal()), "interval", hours=1, id="scraper")
@@ -280,21 +299,24 @@ async def lifespan(app):
 
 app = FastAPI(title="Eidolum API", version="1.0.0", lifespan=lifespan)
 
-origins = [
-    "http://localhost:5173",
-    "http://localhost:3000",
-    "https://www.eidolum.com",
-    "https://eidolum.com",
-    "https://eidolum.vercel.app",
-    "https://eidolum-production.up.railway.app",
-]
+# Rate limiting
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
+# Security headers
+app.add_middleware(SecurityHeadersMiddleware)
+
+# CORS — strict origin whitelist
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,
-    allow_origin_regex=r"https://.*\.(vercel\.app|railway\.app)",
+    allow_origins=[
+        "https://www.eidolum.com",
+        "https://eidolum.com",
+        "http://localhost:5173",
+        "http://localhost:3000",
+    ],
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "DELETE", "PUT", "PATCH"],
     allow_headers=["*"],
 )
 

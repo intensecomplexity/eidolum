@@ -1,16 +1,19 @@
 import datetime
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Request
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from database import get_db
 from models import Forecaster, Prediction, format_timestamp, DisclosedPosition
 from utils import compute_forecaster_stats, compute_streak, compute_rank_movement
+from rate_limit import limiter
 
 router = APIRouter()
 
 
 @router.get("/leaderboard")
+@limiter.limit("60/minute")
 def get_leaderboard(
+    request: Request,
     db: Session = Depends(get_db),
     sector: str = Query(None),
     period_days: int = Query(None),

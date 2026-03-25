@@ -1,13 +1,14 @@
 import datetime
 import hashlib
 import os
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel
 from typing import Optional
 from sqlalchemy.orm import Session
 from database import get_db
 from models import UserFollow, AlertPreference, AlertQueue, Forecaster, Prediction
 from utils import compute_forecaster_stats
+from rate_limit import limiter
 
 router = APIRouter()
 
@@ -21,7 +22,8 @@ class UnfollowRequest(BaseModel):
     forecaster_id: int
 
 @router.post("/follows")
-def create_follow(req: FollowRequest, db: Session = Depends(get_db)):
+@limiter.limit("10/minute")
+def create_follow(request: Request, req: FollowRequest, db: Session = Depends(get_db)):
     # Check if already following
     existing = db.query(UserFollow).filter(
         UserFollow.user_email == req.user_email,
@@ -64,7 +66,8 @@ def create_follow(req: FollowRequest, db: Session = Depends(get_db)):
     return {"status": "created", "follow_id": follow.id}
 
 @router.post("/follows/unfollow")
-def unfollow(req: UnfollowRequest, db: Session = Depends(get_db)):
+@limiter.limit("10/minute")
+def unfollow(request: Request, req: UnfollowRequest, db: Session = Depends(get_db)):
     follow = db.query(UserFollow).filter(
         UserFollow.user_email == req.user_email,
         UserFollow.forecaster_id == req.forecaster_id
@@ -80,7 +83,8 @@ def get_follower_count(forecaster_id: int, db: Session = Depends(get_db)):
     return {"forecaster_id": forecaster_id, "count": count}
 
 @router.post("/alerts/trigger")
-def trigger_alerts(db: Session = Depends(get_db)):
+@limiter.limit("10/minute")
+def trigger_alerts(request: Request, db: Session = Depends(get_db)):
     """Queue alert emails for recent events. Called after sync."""
     # Find recently resolved predictions (last 24h)
     cutoff = datetime.datetime.utcnow() - datetime.timedelta(hours=24)

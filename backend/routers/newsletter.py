@@ -1,11 +1,12 @@
 import datetime
 import os
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from database import get_db
 from models import NewsletterSubscriber, Prediction, Forecaster
 from utils import compute_forecaster_stats
+from rate_limit import limiter
 
 router = APIRouter()
 
@@ -13,7 +14,8 @@ class SubscribeRequest(BaseModel):
     email: str
 
 @router.post("/newsletter/subscribe")
-def subscribe(req: SubscribeRequest, db: Session = Depends(get_db)):
+@limiter.limit("5/minute")
+def subscribe(request: Request, req: SubscribeRequest, db: Session = Depends(get_db)):
     existing = db.query(NewsletterSubscriber).filter(
         NewsletterSubscriber.email == req.email
     ).first()
@@ -28,7 +30,8 @@ def subscribe(req: SubscribeRequest, db: Session = Depends(get_db)):
     return {"status": "subscribed"}
 
 @router.post("/newsletter/unsubscribe")
-def unsubscribe(req: SubscribeRequest, db: Session = Depends(get_db)):
+@limiter.limit("10/minute")
+def unsubscribe(request: Request, req: SubscribeRequest, db: Session = Depends(get_db)):
     sub = db.query(NewsletterSubscriber).filter(
         NewsletterSubscriber.email == req.email
     ).first()

@@ -1,10 +1,11 @@
 import datetime
 import hashlib
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from database import get_db
 from models import SavedPrediction, Prediction, Forecaster
+from rate_limit import limiter
 
 router = APIRouter()
 
@@ -63,7 +64,9 @@ def _prediction_to_dict(p, f, save_record=None):
 
 
 @router.post("/saved-predictions")
+@limiter.limit("10/minute")
 def save_prediction(
+    request: Request,
     data: dict,
     db: Session = Depends(get_db),
 ):
@@ -99,7 +102,9 @@ def save_prediction(
 
 
 @router.delete("/saved-predictions/{prediction_id}")
+@limiter.limit("10/minute")
 def unsave_prediction(
+    request: Request,
     prediction_id: int,
     user_identifier: str = Query(...),
     db: Session = Depends(get_db),
@@ -146,7 +151,9 @@ def get_saved_predictions(
 
 
 @router.patch("/saved-predictions/{prediction_id}/note")
+@limiter.limit("10/minute")
 def update_note(
+    request: Request,
     prediction_id: int,
     data: dict,
     db: Session = Depends(get_db),
