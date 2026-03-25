@@ -405,46 +405,51 @@ function PredictionRow({ p, forecaster: fc }) {
               &ldquo;{quoteText}&rdquo;
             </blockquote>
 
-            {/* Source button */}
-            {(() => {
-              const btn = getSourceButton(p);
-              if (!btn) return null;
-              return (
+            {/* Source + archive buttons */}
+            <div style={{ display: 'flex', gap: '8px', marginBottom: '12px', flexWrap: 'wrap' }}>
+              {(() => {
+                const btn = getSourceButton(p);
+                if (!btn) return null;
+                return (
+                  <a
+                    href={btn.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={e => e.stopPropagation()}
+                    style={{
+                      display: 'inline-flex', alignItems: 'center', gap: '6px',
+                      padding: '6px 14px', borderRadius: '6px',
+                      fontSize: '0.85rem', fontWeight: 500,
+                      background: btn.bg, color: btn.color,
+                      textDecoration: 'none',
+                    }}
+                  >
+                    {btn.label}
+                  </a>
+                );
+              })()}
+
+              {p.archive_url && (
                 <a
-                  href={btn.url}
+                  href={p.archive_url}
                   target="_blank"
                   rel="noopener noreferrer"
                   onClick={e => e.stopPropagation()}
                   style={{
-                    display: 'inline-flex', alignItems: 'center', gap: '6px',
-                    padding: '6px 14px', borderRadius: '6px',
-                    fontSize: '0.85rem', fontWeight: 500,
-                    background: btn.bg, color: btn.color,
-                    textDecoration: 'none', marginBottom: '12px',
+                    display: 'inline-flex', alignItems: 'center', gap: '5px',
+                    padding: '6px 12px', borderRadius: '6px',
+                    fontSize: '0.82rem', fontWeight: 500,
+                    background: 'rgba(255,255,255,0.05)',
+                    border: '1px solid rgba(255,255,255,0.12)',
+                    color: '#9ca3af',
+                    textDecoration: 'none',
                   }}
+                  title="Archived copy — proof this was said even if deleted"
                 >
-                  {btn.label}
+                  🗂 Archived proof
                 </a>
-              );
-            })()}
-
-            {/* Archived proof link */}
-            {p.archive_url && (
-              <a
-                href={p.archive_url}
-                target="_blank"
-                rel="noopener noreferrer"
-                onClick={e => e.stopPropagation()}
-                style={{
-                  display: 'inline-flex', alignItems: 'center', gap: '4px',
-                  fontSize: '0.75rem', color: '#888',
-                  textDecoration: 'none', marginLeft: '8px',
-                }}
-                title="Archived copy — proof this was said even if deleted"
-              >
-                🗄 Archived proof
-              </a>
-            )}
+              )}
+            </div>
 
             {/* Time horizon note */}
             {evalDate && (

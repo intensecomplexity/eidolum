@@ -192,20 +192,20 @@ def wipe_all_fake_data(db):
         print(f"[Eidolum] wipe_all_fake_data error: {e}")
 
 
-def migrate_add_archive_url(db):
-    """Add archive_url column if it doesn't exist."""
-    try:
-        from sqlalchemy import text
-        db.execute(text("ALTER TABLE predictions ADD COLUMN archive_url VARCHAR"))
-        db.commit()
-        print("[Eidolum] archive_url column added")
-    except Exception as e:
-        db.rollback()
-        # Column already exists — expected on subsequent boots
-        if "duplicate column" in str(e).lower() or "already exists" in str(e).lower():
-            print("[Eidolum] archive_url column already exists")
-        else:
-            print(f"[Eidolum] migrate_add_archive_url: {e}")
+def migrate_add_archive_columns(db):
+    """Add archive_url and archived_at columns if they don't exist."""
+    from sqlalchemy import text
+    for col, defn in [("archive_url", "VARCHAR"), ("archived_at", "TIMESTAMP")]:
+        try:
+            db.execute(text(f"ALTER TABLE predictions ADD COLUMN {col} {defn}"))
+            db.commit()
+            print(f"[Eidolum] {col} column added")
+        except Exception as e:
+            db.rollback()
+            if "duplicate column" in str(e).lower() or "already exists" in str(e).lower():
+                pass  # expected on subsequent boots
+            else:
+                print(f"[Eidolum] migrate {col}: {e}")
 
 
 def migrate_populate_quotes(db):
@@ -331,13 +331,13 @@ async def lifespan(app):
         seed_verified()
     except Exception as e:
         print(f"[Eidolum] Verified reseed error (non-fatal): {e}")
-    # Add archive_url column if missing
+    # Add archive columns if missing
     try:
         db = SessionLocal()
-        migrate_add_archive_url(db)
+        migrate_add_archive_columns(db)
         db.close()
     except Exception as e:
-        print(f"[Eidolum] archive_url migration error (non-fatal): {e}")
+        print(f"[Eidolum] Archive column migration error (non-fatal): {e}")
     # Safety check — scan for dangerous patterns
     try:
         from safety_check import check_safety
@@ -387,6 +387,12 @@ app.add_middleware(
     allow_methods=["GET", "POST", "DELETE", "PUT", "PATCH"],
     allow_headers=["*"],
 )
+
+# Serve archived screenshots
+from fastapi.staticfiles import StaticFiles
+_archive_dir = os.getenv("ARCHIVE_DIR", "/app/archive")
+os.makedirs(_archive_dir, exist_ok=True)
+app.mount("/archive", StaticFiles(directory=_archive_dir), name="archive")
 
 app.include_router(leaderboard.router, prefix="/api")
 app.include_router(forecasters.router, prefix="/api")

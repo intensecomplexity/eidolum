@@ -2,10 +2,11 @@
 Scraper job — fetches new predictions from Twitter/X, YouTube, and Reddit.
 Runs every hour via APScheduler.
 """
-import httpx, os, re
+import httpx, os, re, threading, asyncio
 from datetime import datetime
 from sqlalchemy.orm import Session
 from models import Prediction, Forecaster
+from database import SessionLocal
 
 TWITTER_BEARER = os.getenv("TWITTER_BEARER_TOKEN", "")
 YOUTUBE_API_KEY = os.getenv("YOUTUBE_API_KEY", "")
@@ -27,6 +28,29 @@ def archive_url(url: str) -> str | None:
         return match.group(0) if match else None
     except Exception:
         return None
+
+
+def archive_after_save(prediction_id: int, source_url: str):
+    """Run Playwright screenshot archiver in background thread."""
+    def run():
+        try:
+            from archiver.screenshot import archive_prediction as do_archive
+            loop = asyncio.new_event_loop()
+            screenshot_path = loop.run_until_complete(do_archive(source_url, prediction_id))
+            if screenshot_path:
+                from sqlalchemy import text
+                db2 = SessionLocal()
+                db2.execute(
+                    text("UPDATE predictions SET archived_at=:ts WHERE id=:id AND archived_at IS NULL"),
+                    {"ts": datetime.utcnow(), "id": prediction_id},
+                )
+                db2.commit()
+                db2.close()
+                print(f"[Archive] Screenshot saved for prediction {prediction_id}")
+            loop.close()
+        except Exception as e:
+            print(f"[Archive] Background error for prediction {prediction_id}: {e}")
+    threading.Thread(target=run, daemon=True).start()
 
 # ── YouTube ──────────────────────────────────────────────────────────────────
 
@@ -69,7 +93,7 @@ def scrape_youtube(db: Session):
                 if timestamp:
                     source_url = f"https://youtube.com/watch?v={vid_id}&t={timestamp}s"
                 full_quote = f"{title}\n\n{description}".strip() if description else title
-                db.add(Prediction(
+                pred = Prediction(
                     forecaster_id=f.id, ticker="UNKNOWN",
                     context=title[:200], exact_quote=full_quote,
                     source_type="youtube", source_platform_id=vid_id,
@@ -78,7 +102,10 @@ def scrape_youtube(db: Session):
                     prediction_date=datetime.utcnow(), window_days=30,
                     direction="bullish", outcome="pending_review",
                     verified_by="ai_parsed",
-                ))
+                )
+                db.add(pred)
+                db.flush()
+                archive_after_save(pred.id, source_url)
         except Exception as e:
             print(f"[Scraper] YouTube error for {handle}: {e}")
     db.commit()
@@ -114,7 +141,7 @@ def scrape_twitter(db: Session):
                     continue
                 tweet_url = f"https://x.com/{handle}/status/{tweet['id']}"
                 archive = archive_url(tweet_url)
-                db.add(Prediction(
+                pred = Prediction(
                     forecaster_id=f.id, ticker="UNKNOWN",
                     context=tweet["text"][:200],
                     exact_quote=tweet["text"], source_type="twitter",
@@ -124,7 +151,10 @@ def scrape_twitter(db: Session):
                     prediction_date=datetime.utcnow(), window_days=30,
                     direction="bullish", outcome="pending_review",
                     verified_by="ai_parsed",
-                ))
+                )
+                db.add(pred)
+                db.flush()
+                archive_after_save(pred.id, tweet_url)
         except Exception as e:
             print(f"[Scraper] Twitter error for {handle}: {e}")
     db.commit()
@@ -161,21 +191,24 @@ def scrape_reddit(db: Session):
                     continue
                 if not post_id or db.query(Prediction).filter(Prediction.source_platform_id == post_id).first():
                     continue
-                source_url = f"https://reddit.com{permalink}"
+                post_url = f"https://reddit.com{permalink}"
                 full_quote = f"{title}\n\n{selftext}".strip() if selftext else title
-                archive = archive_url(source_url)
-                db.add(Prediction(
+                archive = archive_url(post_url)
+                pred = Prediction(
                     forecaster_id=f.id, ticker="UNKNOWN",
                     context=title[:200],
                     exact_quote=full_quote,
                     source_type="reddit",
                     source_platform_id=post_id,
-                    source_url=source_url,
+                    source_url=post_url,
                     archive_url=archive,
                     prediction_date=datetime.utcnow(), window_days=30,
                     direction="bullish", outcome="pending_review",
                     verified_by="ai_parsed",
-                ))
+                )
+                db.add(pred)
+                db.flush()
+                archive_after_save(pred.id, post_url)
         except Exception as e:
             print(f"[Scraper] Reddit error for {f.channel_url}: {e}")
     db.commit()
@@ -186,4 +219,9 @@ def run_scraper(db: Session):
     scrape_twitter(db)
     scrape_youtube(db)
     scrape_reddit(db)
+    try:
+        from jobs.quiver_scraper import scrape_congress_trades
+        scrape_congress_trades(db)
+    except Exception as e:
+        print(f"[Scraper] Quiver error (non-fatal): {e}")
     print("[Scraper] All done")
