@@ -368,7 +368,7 @@ function formatTimestamp(sec) {
 function PredictionRow({ p, forecaster: fc }) {
   const [expanded, setExpanded] = useState(false);
   const evalDate = p.evaluation_date || p.resolution_date;
-  const quoteText = p.exact_quote || p.context || '';
+  const quoteText = p.exact_quote || p.context || p.statement || 'No quote available';
   const horizonLabel = HORIZON_LABELS[p.time_horizon] || `${p.window_days}d`;
 
   return (
@@ -429,7 +429,7 @@ function PredictionRow({ p, forecaster: fc }) {
               borderRadius: '0 6px 6px 0',
               lineHeight: 1.6,
             }}>
-              &ldquo;{quoteText || 'No quote available'}&rdquo;
+              &ldquo;{quoteText}&rdquo;
             </blockquote>
 
             {/* Source button */}

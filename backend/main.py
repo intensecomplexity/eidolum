@@ -179,6 +179,23 @@ def migrate_platform_types():
         print(f"[Eidolum] Platform migration error (non-fatal): {e}")
 
 
+def migrate_populate_quotes(db):
+    """Copy context into exact_quote where quote is missing. Safe/idempotent."""
+    try:
+        from sqlalchemy import text
+        result = db.execute(text("""
+            UPDATE predictions
+            SET exact_quote = context
+            WHERE exact_quote IS NULL
+            AND context IS NOT NULL
+        """))
+        db.commit()
+        print(f"[Eidolum] Populated exact_quote for {result.rowcount} predictions")
+    except Exception as e:
+        db.rollback()
+        print(f"[Eidolum] migrate_populate_quotes error: {e}")
+
+
 def migrate_clear_fake_source_urls(db):
     """Clear source URLs that aren't real post/video/tweet links. Safe/idempotent."""
     try:
@@ -257,6 +274,13 @@ async def lifespan(app):
         populate_source_urls()
     except Exception as e:
         print(f"[Eidolum] Source URL population error (non-fatal): {e}")
+    # Populate missing exact_quote from context field
+    try:
+        db = SessionLocal()
+        migrate_populate_quotes(db)
+        db.close()
+    except Exception as e:
+        print(f"[Eidolum] Quote population error (non-fatal): {e}")
     # Clear fake source URLs from seed data
     try:
         db = SessionLocal()
