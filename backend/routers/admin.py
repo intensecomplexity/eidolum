@@ -1,5 +1,5 @@
 import datetime
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import func
@@ -48,10 +48,13 @@ def check_data(request: Request, db: Session = Depends(get_db)):
     predictions = db.query(Prediction).count()
     evaluated = db.query(Prediction).filter(
         Prediction.outcome.isnot(None),
-        Prediction.outcome != "pending",
+        Prediction.outcome.notin_(["pending", "pending_review"]),
     ).count()
     pending = db.query(Prediction).filter(
         Prediction.outcome == "pending",
+    ).count()
+    pending_review = db.query(Prediction).filter(
+        Prediction.outcome == "pending_review",
     ).count()
 
     healthy = predictions > 0 and forecasters > 0
@@ -62,6 +65,7 @@ def check_data(request: Request, db: Session = Depends(get_db)):
         "predictions": predictions,
         "evaluated": evaluated,
         "pending": pending,
+        "pending_review": pending_review,
         "predictions_per_forecaster": round(predictions / forecasters, 1) if forecasters > 0 else 0,
         "action_needed": None if healthy else "Hit /admin/reseed to recover predictions",
     }
@@ -137,6 +141,70 @@ def restore(request: Request, admin: bool = Depends(require_admin)):
     return {"status": "skipped", "message": "DB already has data or snapshot not found."}
 
 
+@router.get("/admin/pending-review")
+@limiter.limit("60/minute")
+def list_pending_review(request: Request, admin: bool = Depends(require_admin), db: Session = Depends(get_db)):
+    """List all scraped predictions awaiting manual approval."""
+    predictions = (
+        db.query(Prediction)
+        .filter(Prediction.outcome == "pending_review")
+        .order_by(Prediction.prediction_date.desc())
+        .all()
+    )
+    results = []
+    forecaster_cache = {}
+    for p in predictions:
+        if p.forecaster_id not in forecaster_cache:
+            f = db.query(Forecaster).filter(Forecaster.id == p.forecaster_id).first()
+            forecaster_cache[p.forecaster_id] = f
+        f = forecaster_cache[p.forecaster_id]
+        results.append({
+            "id": p.id,
+            "ticker": p.ticker,
+            "direction": p.direction,
+            "context": p.context,
+            "exact_quote": p.exact_quote,
+            "source_url": p.source_url,
+            "source_type": p.source_type,
+            "prediction_date": p.prediction_date.isoformat() if p.prediction_date else None,
+            "verified_by": p.verified_by,
+            "forecaster": {
+                "id": f.id,
+                "name": f.name,
+                "handle": f.handle,
+            } if f else None,
+        })
+    return {"count": len(results), "predictions": results}
+
+
+@router.post("/admin/approve/{prediction_id}")
+@limiter.limit("60/minute")
+def approve_prediction(request: Request, prediction_id: int, admin: bool = Depends(require_admin), db: Session = Depends(get_db)):
+    """Approve a scraped prediction — sets outcome to 'pending' so it appears on the site."""
+    p = db.query(Prediction).filter(Prediction.id == prediction_id).first()
+    if not p:
+        raise HTTPException(status_code=404, detail="Prediction not found")
+    if p.outcome != "pending_review":
+        return {"status": "skipped", "message": f"Prediction {prediction_id} is not pending review (outcome={p.outcome})"}
+    p.outcome = "pending"
+    db.commit()
+    return {"status": "approved", "prediction_id": prediction_id}
+
+
+@router.post("/admin/reject/{prediction_id}")
+@limiter.limit("60/minute")
+def reject_prediction(request: Request, prediction_id: int, admin: bool = Depends(require_admin), db: Session = Depends(get_db)):
+    """Reject a scraped prediction — deletes it from the database."""
+    p = db.query(Prediction).filter(Prediction.id == prediction_id).first()
+    if not p:
+        raise HTTPException(status_code=404, detail="Prediction not found")
+    if p.outcome != "pending_review":
+        return {"status": "skipped", "message": f"Prediction {prediction_id} is not pending review (outcome={p.outcome})"}
+    db.delete(p)
+    db.commit()
+    return {"status": "rejected", "prediction_id": prediction_id}
+
+
 @router.get("/health/detailed")
 @limiter.limit("60/minute")
 def health_detailed(request: Request, db: Session = Depends(get_db)):
@@ -145,9 +213,10 @@ def health_detailed(request: Request, db: Session = Depends(get_db)):
     pred_count = db.query(Prediction).count()
     evaluated = db.query(Prediction).filter(
         Prediction.outcome.isnot(None),
-        Prediction.outcome != "pending",
+        Prediction.outcome.notin_(["pending", "pending_review"]),
     ).count()
     pending = db.query(Prediction).filter(Prediction.outcome == "pending").count()
+    pending_review_count = db.query(Prediction).filter(Prediction.outcome == "pending_review").count()
 
     # Last prediction date
     last_pred = db.query(func.max(Prediction.prediction_date)).scalar()
@@ -180,6 +249,7 @@ def health_detailed(request: Request, db: Session = Depends(get_db)):
         "predictions": pred_count,
         "evaluated": evaluated,
         "pending": pending,
+        "pending_review": pending_review_count,
         "last_prediction_date": last_pred_str,
         "predictions_per_forecaster": round(pred_count / fc_count, 1) if fc_count > 0 else 0,
         "warnings": warnings,

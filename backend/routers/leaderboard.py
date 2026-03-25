@@ -96,7 +96,7 @@ def get_pending_predictions(request: Request, db: Session = Depends(get_db)):
     now = datetime.datetime.utcnow()
     pending = (
         db.query(Prediction)
-        .filter(Prediction.outcome == "pending")
+        .filter(Prediction.outcome == "pending")  # excludes pending_review
         .order_by(Prediction.prediction_date.desc())
         .all()
     )
@@ -151,11 +151,15 @@ def get_pending_predictions(request: Request, db: Session = Depends(get_db)):
 @limiter.limit("60/minute")
 def get_homepage_stats(request: Request, db: Session = Depends(get_db)):
     total_forecasters = db.query(Forecaster).count()
-    total_predictions = db.query(Prediction).count()
-    evaluated = db.query(Prediction).filter(Prediction.outcome != "pending").all()
+    total_predictions = db.query(Prediction).filter(Prediction.outcome != "pending_review").count()
+    evaluated = db.query(Prediction).filter(
+        Prediction.outcome.notin_(["pending", "pending_review"])
+    ).all()
     correct = [p for p in evaluated if p.outcome == "correct"]
     avg_accuracy = round(len(correct) / len(evaluated) * 100, 1) if evaluated else 0
-    conflict_flags = db.query(Prediction).filter(Prediction.has_conflict == 1).count()
+    conflict_flags = db.query(Prediction).filter(
+        Prediction.has_conflict == 1, Prediction.outcome != "pending_review"
+    ).count()
     forecasters_with_positions = db.query(DisclosedPosition.forecaster_id).distinct().count()
     return {
         "forecasters_tracked": total_forecasters,
@@ -171,7 +175,7 @@ def get_homepage_stats(request: Request, db: Session = Depends(get_db)):
 @router.get("/trending-tickers")
 @limiter.limit("60/minute")
 def get_trending_tickers(request: Request, db: Session = Depends(get_db)):
-    recent = db.query(Prediction).all()
+    recent = db.query(Prediction).filter(Prediction.outcome != "pending_review").all()
     ticker_map = {}
     for p in recent:
         t = p.ticker
@@ -224,7 +228,7 @@ def get_trending_tickers(request: Request, db: Session = Depends(get_db)):
 @router.get("/controversial")
 @limiter.limit("60/minute")
 def get_controversial(request: Request, db: Session = Depends(get_db)):
-    predictions = db.query(Prediction).all()
+    predictions = db.query(Prediction).filter(Prediction.outcome != "pending_review").all()
     forecasters_map = {f.id: f for f in db.query(Forecaster).all()}
     acc_cache = {}
 
@@ -317,7 +321,7 @@ def get_prediction_of_the_day(request: Request, db: Session = Depends(get_db)):
         cutoff = now - datetime.timedelta(days=lookback_days)
         resolved = (
             db.query(Prediction)
-            .filter(Prediction.outcome != "pending")
+            .filter(Prediction.outcome.notin_(["pending", "pending_review"]))
             .filter(Prediction.evaluation_date >= cutoff)
             .filter(Prediction.actual_return.isnot(None))
             .all()
@@ -382,7 +386,7 @@ def get_report_cards(
         # This month's predictions
         month_preds = db.query(Prediction).filter(
             Prediction.forecaster_id == f.id,
-            Prediction.outcome != "pending",
+            Prediction.outcome.notin_(["pending", "pending_review"]),
             func.extract('month', Prediction.evaluation_date) == target_month,
             func.extract('year', Prediction.evaluation_date) == target_year,
         ).all()
@@ -417,7 +421,7 @@ def get_report_cards(
         # Previous month accuracy for comparison
         prev_preds = db.query(Prediction).filter(
             Prediction.forecaster_id == f.id,
-            Prediction.outcome != "pending",
+            Prediction.outcome.notin_(["pending", "pending_review"]),
             func.extract('month', Prediction.evaluation_date) == prev_month,
             func.extract('year', Prediction.evaluation_date) == prev_year,
         ).all()

@@ -72,7 +72,7 @@ def _sync_channel(forecaster: Forecaster, db: Session) -> dict:
                 prediction_date=v["published_at"] or datetime.datetime.utcnow(),
                 window_days=30,
                 context=p.context,
-                outcome="pending",
+                outcome="pending_review",
             )
             db.add(pred)
             predictions_parsed += 1

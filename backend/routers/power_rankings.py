@@ -22,7 +22,7 @@ def _compute_rankings(db: Session, period_days: int = 30):
             db.query(Prediction)
             .filter(
                 Prediction.forecaster_id == f.id,
-                Prediction.outcome != "pending",
+                Prediction.outcome.notin_(["pending", "pending_review"]),
                 Prediction.evaluation_date >= cutoff,
             )
             .all()
@@ -33,7 +33,7 @@ def _compute_rankings(db: Session, period_days: int = 30):
                 db.query(Prediction)
                 .filter(
                     Prediction.forecaster_id == f.id,
-                    Prediction.outcome != "pending",
+                    Prediction.outcome.notin_(["pending", "pending_review"]),
                 )
                 .all()
             )

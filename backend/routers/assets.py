@@ -20,6 +20,7 @@ def get_asset_consensus(
     predictions = (
         db.query(Prediction)
         .filter(Prediction.ticker == ticker)
+        .filter(Prediction.outcome != "pending_review")
         .order_by(Prediction.prediction_date.desc())
         .all()
     )
