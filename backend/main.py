@@ -1,3 +1,10 @@
+# ⚠️ DATA SAFETY RULES — DO NOT REMOVE:
+# 1. NEVER call Base.metadata.drop_all()
+# 2. NEVER call db.query(X).delete() without a WHERE clause
+# 3. NEVER truncate tables
+# 4. NEVER use --reset or --force flags in production
+# 5. ALL seed inserts must use on_conflict_do_nothing()
+
 import os
 import sys
 import subprocess
@@ -6,12 +13,28 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from database import engine, Base, SessionLocal
-from models import Forecaster
+from models import Forecaster, Prediction
 from routers import leaderboard, forecasters, assets, sync, activity, admin, platforms, follows, newsletter, saved, positions, contrarian, power_rankings, inverse
+
+
+def safety_check(db):
+    """Verify data integrity before startup completes."""
+    fc = db.query(Forecaster).count()
+    preds = db.query(Prediction).count()
+
+    print(f"[Eidolum Safety] Forecasters: {fc}")
+    print(f"[Eidolum Safety] Predictions: {preds}")
+
+    if fc > 0 and preds == 0:
+        print("[Eidolum Safety] ⚠️ WARNING: Predictions missing! Triggering recovery seed...")
+        return False  # Trigger re-seed
+
+    return True  # All good
 
 
 def init_db():
     """Create tables and optionally seed — with retry for Postgres startup delay."""
+    # NEVER drop or truncate any table — ONLY create tables that don't exist yet
     for attempt in range(5):
         try:
             Base.metadata.create_all(bind=engine)
@@ -25,26 +48,57 @@ def init_db():
                 print("[Eidolum] WARNING: Could not connect to database after 5 attempts.")
                 return
 
-    # Auto-seed if SEED_DATA=true and DB is empty or missing predictions
+    # Auto-seed if SEED_DATA=true
     if os.getenv("SEED_DATA", "").lower() in ("true", "1", "yes"):
+        db = SessionLocal()
         try:
-            from models import Prediction
-            db = SessionLocal()
-            fc_count = db.query(Forecaster).count()
-            pred_count = db.query(Prediction).count()
-            db.close()
-            if fc_count == 0 or pred_count == 0:
-                print(f"[Eidolum] DB has {fc_count} forecasters, {pred_count} predictions — running seed.py...")
+            forecaster_count = db.query(Forecaster).count()
+            prediction_count = db.query(Prediction).count()
+
+            if forecaster_count == 0:
+                # Fresh DB — seed everything
+                print(f"[Eidolum] DB empty — running full seed...")
                 subprocess.run(
                     [sys.executable, "seed.py"],
                     check=True,
                     cwd=os.path.dirname(os.path.abspath(__file__)),
                 )
-                print("[Eidolum] Seed complete.")
+                print("[Eidolum] Full seed complete.")
+
+            elif prediction_count == 0 and forecaster_count > 0:
+                # Forecasters exist but predictions got wiped
+                print(f"[Eidolum] {forecaster_count} forecasters but 0 predictions — reseeding predictions only...")
+                subprocess.run(
+                    [sys.executable, "seed.py", "--predictions-only"],
+                    check=True,
+                    cwd=os.path.dirname(os.path.abspath(__file__)),
+                )
+                print("[Eidolum] Predictions re-seeded.")
+
             else:
-                print(f"[Eidolum] Database has {fc_count} forecasters, {pred_count} predictions. Skipping seed.")
+                print(f"[Eidolum] DB healthy: {forecaster_count} forecasters, "
+                      f"{prediction_count} predictions — skipping seed.")
         except Exception as e:
             print(f"[Eidolum] Seed error (non-fatal): {e}")
+        finally:
+            db.close()
+
+    # Run safety check regardless of SEED_DATA setting
+    db = SessionLocal()
+    try:
+        if not safety_check(db):
+            # Attempt recovery seed
+            try:
+                subprocess.run(
+                    [sys.executable, "seed.py", "--predictions-only"],
+                    check=True,
+                    cwd=os.path.dirname(os.path.abspath(__file__)),
+                )
+                print("[Eidolum Safety] Recovery seed complete.")
+            except Exception as e:
+                print(f"[Eidolum Safety] Recovery seed failed: {e}")
+    finally:
+        db.close()
 
 
 def migrate_platform_types():
@@ -114,6 +168,18 @@ async def lifespan(app):
         clean_fake_video_ids()
     except Exception as e:
         print(f"[Eidolum] Video ID cleanup error (non-fatal): {e}")
+    # Safety check — scan for dangerous patterns
+    try:
+        from safety_check import check_safety
+        violations = check_safety()
+        if violations:
+            print(f"[SAFETY WARNING] {len(violations)} dangerous pattern(s) found in codebase:")
+            for v in violations:
+                print(f"  {v['file']}: '{v['pattern']}' — {v['reason']}")
+        else:
+            print("[Eidolum] Safety check passed.")
+    except Exception as e:
+        print(f"[Eidolum] Safety check error (non-fatal): {e}")
     yield
 
 
@@ -162,14 +228,17 @@ def health():
 @app.get("/api/debug")
 def debug():
     """Temporary debug endpoint — remove after deployment is stable."""
+    from database import DATABASE_URL as RESOLVED_URL
+    raw_url = os.getenv("DATABASE_URL", "not-set")
     info = {
         "database_url_set": bool(os.getenv("DATABASE_URL")),
-        "database_url_prefix": (os.getenv("DATABASE_URL", "not-set"))[:25] + "...",
+        "database_url_prefix": raw_url[:25] + "..." if raw_url != "not-set" else "not-set",
+        "engine_url_prefix": str(engine.url)[:30] + "...",
+        "engine_dialect": engine.dialect.name,
         "seed_data": os.getenv("SEED_DATA", "not-set"),
         "port": os.getenv("PORT", "not-set"),
     }
     try:
-        from models import Prediction
         from sqlalchemy import func
         db = SessionLocal()
         count = db.query(Forecaster).count()

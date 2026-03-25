@@ -1,10 +1,10 @@
 import datetime
 from fastapi import APIRouter, Depends
+from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
+from sqlalchemy import func
 from database import get_db
-from models import Forecaster
-from services.youtube_quota import quota, SYNC_INTERVAL_HOURS
-from services.youtube import get_next_sync_allowed
+from models import Forecaster, Prediction
 
 router = APIRouter()
 
@@ -12,6 +12,8 @@ router = APIRouter()
 @router.get("/admin/quota-status")
 def quota_status(db: Session = Depends(get_db)):
     """Return current YouTube API quota usage and sync timing info."""
+    from services.youtube_quota import quota, SYNC_INTERVAL_HOURS
+    from services.youtube import get_next_sync_allowed
     status = quota.get_status()
 
     # Gather per-channel sync timing
@@ -35,25 +37,52 @@ def quota_status(db: Session = Depends(get_db)):
     return status
 
 
+@router.get("/admin/check-data")
+def check_data(db: Session = Depends(get_db)):
+    """Data integrity check — shows DB health at a glance."""
+    forecasters = db.query(Forecaster).count()
+    predictions = db.query(Prediction).count()
+    evaluated = db.query(Prediction).filter(
+        Prediction.outcome.isnot(None),
+        Prediction.outcome != "pending",
+    ).count()
+    pending = db.query(Prediction).filter(
+        Prediction.outcome == "pending",
+    ).count()
+
+    healthy = predictions > 0 and forecasters > 0
+
+    return {
+        "status": "healthy" if healthy else "CRITICAL — predictions missing!",
+        "forecasters": forecasters,
+        "predictions": predictions,
+        "evaluated": evaluated,
+        "pending": pending,
+        "predictions_per_forecaster": round(predictions / forecasters, 1) if forecasters > 0 else 0,
+        "action_needed": None if healthy else "Hit /admin/reseed to recover predictions",
+    }
+
+
 @router.get("/admin/reseed")
 def reseed(db: Session = Depends(get_db)):
-    """Emergency reseed — repopulate predictions if they're missing."""
-    from models import Prediction
+    """Emergency reseed — safely repopulate predictions if they're missing.
+    Uses --predictions-only mode: never touches existing forecasters or predictions."""
     pred_count = db.query(Prediction).count()
     forecaster_count = db.query(Forecaster).count()
 
     if pred_count > 100:
         return {
             "status": "skipped",
-            "message": f"DB already has {pred_count} predictions. Use /admin/reseed?force=true to force.",
+            "message": f"DB already has {pred_count} predictions. Data looks healthy.",
             "forecasters": forecaster_count,
             "predictions": pred_count,
         }
 
     import subprocess, sys, os
     try:
+        # Always use --predictions-only for safety — never wipe forecasters
         subprocess.run(
-            [sys.executable, "seed.py"],
+            [sys.executable, "seed.py", "--predictions-only"],
             check=True,
             cwd=os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
         )
@@ -67,3 +96,93 @@ def reseed(db: Session = Depends(get_db)):
         }
     except Exception as e:
         return {"status": "error", "message": str(e)}
+
+
+@router.get("/admin/backup")
+def backup(db: Session = Depends(get_db)):
+    """Export full database as JSON — downloadable backup."""
+    from backup import export_backup
+    data = export_backup()
+    return JSONResponse(content=data)
+
+
+@router.get("/admin/snapshot")
+def snapshot():
+    """Save data snapshot to backend/data_snapshot.json (for GitHub backup)."""
+    from backup import save_snapshot
+    data = save_snapshot()
+    return {
+        "status": "saved",
+        "forecasters": data["forecaster_count"],
+        "predictions": data["prediction_count"],
+        "exported_at": data["exported_at"],
+    }
+
+
+@router.get("/admin/restore")
+def restore():
+    """Restore from data_snapshot.json if DB is empty."""
+    from backup import restore_from_snapshot
+    success = restore_from_snapshot()
+    if success:
+        return {"status": "restored"}
+    return {"status": "skipped", "message": "DB already has data or snapshot not found."}
+
+
+@router.get("/health/detailed")
+def health_detailed(db: Session = Depends(get_db)):
+    """Detailed health check with anomaly detection."""
+    fc_count = db.query(Forecaster).count()
+    pred_count = db.query(Prediction).count()
+    evaluated = db.query(Prediction).filter(
+        Prediction.outcome.isnot(None),
+        Prediction.outcome != "pending",
+    ).count()
+    pending = db.query(Prediction).filter(Prediction.outcome == "pending").count()
+
+    # Last prediction date
+    last_pred = db.query(func.max(Prediction.prediction_date)).scalar()
+    last_pred_str = last_pred.isoformat() if last_pred else None
+
+    # Anomaly detection
+    warnings = []
+    status = "healthy"
+
+    if pred_count < 1000:
+        status = "critical"
+        warnings.append(f"Only {pred_count} predictions — expected 2000+. Data may have been wiped.")
+    if fc_count < 40:
+        if status != "critical":
+            status = "warning"
+        warnings.append(f"Only {fc_count} forecasters — expected 50+.")
+    if last_pred:
+        days_since = (datetime.datetime.utcnow() - last_pred).days
+        if days_since > 30:
+            if status == "healthy":
+                status = "warning"
+            warnings.append(f"No predictions in {days_since} days. Sync may be broken.")
+    if fc_count > 0 and pred_count == 0:
+        status = "critical"
+        warnings.append("Forecasters exist but predictions table is empty!")
+
+    return {
+        "status": status,
+        "forecasters": fc_count,
+        "predictions": pred_count,
+        "evaluated": evaluated,
+        "pending": pending,
+        "last_prediction_date": last_pred_str,
+        "predictions_per_forecaster": round(pred_count / fc_count, 1) if fc_count > 0 else 0,
+        "warnings": warnings,
+    }
+
+
+@router.get("/admin/safety-check")
+def run_safety_check():
+    """Scan codebase for dangerous DB patterns."""
+    from safety_check import check_safety
+    violations = check_safety()
+    return {
+        "status": "clean" if not violations else "warnings",
+        "violations": violations,
+    }

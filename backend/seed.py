@@ -1,6 +1,14 @@
+# ⚠️ DATA SAFETY RULES — DO NOT REMOVE:
+# 1. NEVER call Base.metadata.drop_all()
+# 2. NEVER call db.query(X).delete() without a WHERE clause
+# 3. NEVER truncate tables
+# 4. NEVER use --reset or --force flags in production
+# 5. ALL seed inserts must use on_conflict_do_nothing()
+
 """
 Seed script — populates the database with realistic demo data.
 Run: python seed.py
+      python seed.py --predictions-only   (reseed predictions without touching forecasters)
 """
 import datetime
 import random
@@ -12,8 +20,18 @@ sys.path.insert(0, os.path.dirname(__file__))
 
 from database import SessionLocal, engine, Base
 from models import Forecaster, Video, Prediction, ActivityFeedItem, DisclosedPosition
+from sqlalchemy.dialects.sqlite import insert as sqlite_insert
+from sqlalchemy.dialects.postgresql import insert as pg_insert
+from sqlalchemy import inspect as sa_inspect
 
 Base.metadata.create_all(bind=engine)
+
+def _get_insert_func():
+    """Return the correct dialect insert for on_conflict_do_nothing support."""
+    dialect = engine.dialect.name
+    if dialect == "postgresql":
+        return pg_insert
+    return sqlite_insert
 
 random.seed(42)
 
@@ -1151,35 +1169,36 @@ def add_noise(base, sigma=8.0):
     return round(base + random.gauss(0, sigma), 2)
 
 
-def seed(force=False):
+def seed(force=False, predictions_only=False):
     db = SessionLocal()
 
     forecaster_count = db.query(Forecaster).count()
     prediction_count = db.query(Prediction).count()
 
     # If data already exists and not forcing, skip
-    if forecaster_count > 0 and prediction_count > 0 and not force:
-        print(f"Seed: DB already has {forecaster_count} forecasters and {prediction_count} predictions. Skipping. Use force=True to reseed.")
+    if forecaster_count > 0 and prediction_count > 0 and not force and not predictions_only:
+        print(f"Seed: DB already has {forecaster_count} forecasters and {prediction_count} predictions. Skipping.")
         db.close()
         return
 
-    # If forecasters exist but predictions are missing, only reseed predictions
-    if forecaster_count > 0 and prediction_count == 0 and not force:
-        print(f"Seed: {forecaster_count} forecasters but 0 predictions — reseeding predictions only.")
-        _seed_predictions_only(db)
+    # predictions-only mode: reseed predictions for forecasters that have 0 predictions
+    if predictions_only or (forecaster_count > 0 and prediction_count == 0 and not force):
+        print(f"Seed: {forecaster_count} forecasters, {prediction_count} predictions — reseeding predictions only (safe mode).")
+        _seed_predictions_safe(db)
         db.close()
         return
 
-    # Full wipe and reseed
-    print("Seed: Full wipe and reseed...")
-    db.query(ActivityFeedItem).delete()
-    db.query(Prediction).delete()
-    db.query(Video).delete()
-    db.query(Forecaster).delete()
-    db.commit()
+    # Full seed — insert forecasters with on_conflict_do_nothing, never wipe
+    print("Seed: Full seed (safe insert, no wipe)...")
 
     created_forecasters = []
     for idx, fdata in enumerate(FORECASTERS):
+        # Check if forecaster already exists by handle
+        existing = db.query(Forecaster).filter(Forecaster.handle == fdata["handle"]).first()
+        if existing:
+            print(f"  Forecaster '{fdata['name']}' already exists (id={existing.id}), skipping.")
+            created_forecasters.append((existing, fdata, idx))
+            continue
         f = Forecaster(
             name=fdata["name"],
             handle=fdata["handle"],
@@ -1533,19 +1552,29 @@ def seed(force=False):
     print(f"Seeded {n_forecasters} forecasters, {n_predictions} predictions "
           f"({n_evaluated} evaluated, {n_pending} pending), {n_feed} activity feed items.")
 
+    # Save snapshot to data_snapshot.json for GitHub backup
+    try:
+        from backup import save_snapshot
+        save_snapshot()
+    except Exception as e:
+        print(f"[Seed] Snapshot save error (non-fatal): {e}")
 
-def _seed_predictions_only(db):
-    """Reseed predictions for existing forecasters. Used when forecasters exist but predictions are missing."""
+
+def _seed_predictions_safe(db):
+    """Safely reseed predictions — only for forecasters that have 0 predictions.
+    Never deletes existing data. Uses INSERT only for forecasters missing predictions."""
     forecasters = db.query(Forecaster).all()
-    forecaster_by_name = {f.name: f for f in forecasters}
-
-    # Clear any partial prediction data
-    db.query(ActivityFeedItem).delete()
-    db.query(Prediction).delete()
-    db.commit()
+    seeded_count = 0
+    skipped_count = 0
 
     all_predictions = []
     for f in forecasters:
+        # Check if this forecaster already has predictions — if so, SKIP
+        existing_pred_count = db.query(Prediction).filter(Prediction.forecaster_id == f.id).count()
+        if existing_pred_count > 0:
+            skipped_count += 1
+            continue
+
         # Find matching FORECASTERS definition
         fdata = next((fd for fd in FORECASTERS if fd["name"] == f.name), None)
         if not fdata:
@@ -1621,11 +1650,14 @@ def _seed_predictions_only(db):
             )
             db.add(pred)
             all_predictions.append((pred, f))
+        seeded_count += 1
 
     db.commit()
     n = db.query(Prediction).count()
-    print(f"Seed: Re-inserted {n} predictions for {len(forecasters)} forecasters.")
+    print(f"Seed (safe): Inserted predictions for {seeded_count} forecasters "
+          f"(skipped {skipped_count} with existing data). Total predictions: {n}.")
 
 
 if __name__ == "__main__":
-    seed()
+    predictions_only = "--predictions-only" in sys.argv
+    seed(predictions_only=predictions_only)
