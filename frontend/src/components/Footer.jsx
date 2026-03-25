@@ -12,9 +12,10 @@ export default function Footer() {
               <span className="text-muted">lum</span>
             </span>
           </div>
-          <p className="text-muted text-xs sm:text-sm text-center">
-            Tracking predictions. Measuring accuracy. Building accountability.
-          </p>
+          <div className="text-muted text-xs sm:text-sm text-center">
+            <p>Tracking predictions. Measuring accuracy. Building accountability.</p>
+            <p>Growing database of verified predictions — updated hourly.</p>
+          </div>
           <p className="text-muted text-xs">
             &copy; {new Date().getFullYear()} Eidolum. For informational purposes only.
           </p>
