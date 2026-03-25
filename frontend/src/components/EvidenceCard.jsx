@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Play, ExternalLink, X as XIcon } from 'lucide-react';
+import { Play, ExternalLink, X as XIcon, Search } from 'lucide-react';
+import getSourceUrl from '../utils/getSourceUrl';
 
 const SOURCE_BADGES = {
   youtube: { label: 'VIDEO', extra: null, color: 'text-positive', bg: 'bg-positive/10', border: 'border-positive/20' },
@@ -42,7 +43,7 @@ function getEmbedUrl(videoId, timestampSec) {
   return url;
 }
 
-export default function EvidenceCard({ prediction: p, expandable = true, compact = false }) {
+export default function EvidenceCard({ prediction: p, forecaster = null, expandable = true, compact = false }) {
   const [expanded, setExpanded] = useState(!expandable);
   const [showVideo, setShowVideo] = useState(false);
 
@@ -52,6 +53,10 @@ export default function EvidenceCard({ prediction: p, expandable = true, compact
   const hasSource = p.source_url && p.source_url.length > 0;
   const hasRealVideo = isRealYouTubeId(p.source_platform_id);
   const badge = getSourceBadge(p.source_type, p.verified_by, !!p.video_timestamp_sec);
+
+  // Build contextual search link as fallback
+  const fc = forecaster || p.forecaster || null;
+  const ctxSource = getSourceUrl(p, fc);
 
   // Compact mode: just the quote and source link inline
   if (compact) {
@@ -76,6 +81,14 @@ export default function EvidenceCard({ prediction: p, expandable = true, compact
              className="inline-flex items-center gap-1 text-[11px] text-accent active:underline mt-0.5">
             <SourceIcon type={p.source_type} />
             Source
+          </a>
+        )}
+        {!hasSource && !hasRealVideo && ctxSource?.url && (
+          <a href={ctxSource.url} target="_blank" rel="noopener noreferrer"
+             title={ctxSource.tooltip}
+             className="inline-flex items-center gap-1 text-[11px] text-accent active:underline mt-0.5">
+            <Search className="w-2.5 h-2.5" />
+            {ctxSource.label || 'Search source'}
           </a>
         )}
         {showVideo && hasRealVideo && (
@@ -108,7 +121,7 @@ export default function EvidenceCard({ prediction: p, expandable = true, compact
       )}
 
       {/* Source line */}
-      {(hasSource || p.source_title) && (
+      {(hasSource || p.source_title || ctxSource?.url) && (
         <div className="mt-2 flex flex-wrap items-center gap-2">
           <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-mono font-semibold ${badge.bg} ${badge.color} border ${badge.border}`}>
             <SourceIcon type={p.source_type} />
@@ -143,6 +156,21 @@ export default function EvidenceCard({ prediction: p, expandable = true, compact
             >
               <ExternalLink className="w-3 h-3" />
               Source
+            </a>
+          )}
+
+          {/* Contextual search link when no direct source */}
+          {!hasSource && !hasRealVideo && ctxSource?.url && (
+            <a
+              href={ctxSource.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              title={ctxSource.tooltip}
+              onClick={(e) => e.stopPropagation()}
+              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-accent/10 text-accent border border-accent/20 active:bg-accent/20 min-h-[28px]"
+            >
+              <Search className="w-3 h-3" />
+              {ctxSource.label || 'Search source'}
             </a>
           )}
         </div>

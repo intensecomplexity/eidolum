@@ -208,7 +208,7 @@ export default function AssetConsensus() {
                 <div key={p.prediction_id}>
                   <PredictionCard prediction={p} showForecaster />
                   <div className="px-4 -mt-3 pb-3">
-                    <EvidenceCard prediction={p} compact />
+                    <EvidenceCard prediction={p} forecaster={p.forecaster} compact />
                   </div>
                 </div>
               ))}
@@ -295,7 +295,7 @@ function AssetPredictionRow({ p }) {
       {expanded && (
         <tr className="bg-surface-2/30">
           <td colSpan={9} className="px-6 py-2 pb-4">
-            <EvidenceCard prediction={p} expandable={false} />
+            <EvidenceCard prediction={p} forecaster={p.forecaster} expandable={false} />
             <p className="text-[10px] text-muted italic mt-2">
               {p.outcome === 'pending'
                 ? `Evaluates on ${evalDate?.slice(0, 10)} \u2014 the date ${p.time_horizon === 'custom' ? 'specified' : 'defaulted'} at time of prediction`

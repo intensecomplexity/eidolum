@@ -9,6 +9,7 @@ import PlatformBadge from '../components/PlatformBadge';
 import StreakBadge from '../components/StreakBadge';
 import PredictionCard from '../components/PredictionCard';
 import EvidenceCard from '../components/EvidenceCard';
+import getSourceUrl from '../utils/getSourceUrl';
 import BookmarkButton from '../components/BookmarkButton';
 import NotificationBanner from '../components/NotificationBanner';
 import FollowButton from '../components/FollowButton';
@@ -269,7 +270,7 @@ export default function ForecasterProfile() {
             <div key={p.id}>
               <PredictionCard prediction={p} />
               <div className="px-4 -mt-3 pb-3">
-                <EvidenceCard prediction={p} compact />
+                <EvidenceCard prediction={p} forecaster={data} compact />
               </div>
             </div>
           ))}
@@ -296,7 +297,7 @@ export default function ForecasterProfile() {
               </thead>
               <tbody>
                 {(data.predictions || []).map((p) => (
-                  <PredictionRow key={p.id} p={p} />
+                  <PredictionRow key={p.id} p={p} forecaster={data} />
                 ))}
               </tbody>
             </table>
@@ -316,7 +317,7 @@ function isRealYouTubeId(id) {
   return id.length === 11 && !id.includes('_') && !id.includes(' ') && /^[a-zA-Z0-9\-]+$/.test(id);
 }
 
-function PredictionRow({ p }) {
+function PredictionRow({ p, forecaster: fc }) {
   const [expanded, setExpanded] = useState(false);
   const evalDate = p.evaluation_date || p.resolution_date;
   const quoteText = p.exact_quote || p.context || '';
@@ -428,13 +429,24 @@ function PredictionRow({ p }) {
                 bg = '#444';
               }
 
-              if (!href || !label) return null;
+              // Fallback: contextual search link
+              if (!href || !label) {
+                const ctx = getSourceUrl(p, fc);
+                if (ctx?.url) {
+                  href = ctx.url;
+                  label = `\uD83D\uDD0D ${ctx.label || 'Search source'}`;
+                  bg = '#00e5a0';
+                } else {
+                  return null;
+                }
+              }
 
               return (
                 <a
                   href={href}
                   target="_blank"
                   rel="noopener noreferrer"
+                  title={(() => { const ctx = getSourceUrl(p, fc); return ctx?.tooltip; })()}
                   onClick={e => e.stopPropagation()}
                   style={{
                     display: 'inline-flex', alignItems: 'center', gap: '6px',
