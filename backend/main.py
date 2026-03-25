@@ -169,12 +169,15 @@ def debug():
         "port": os.getenv("PORT", "not-set"),
     }
     try:
+        from models import Prediction
+        from sqlalchemy import func
         db = SessionLocal()
         count = db.query(Forecaster).count()
+        pred_count = db.query(Prediction).count()
         info["db_connected"] = True
         info["forecaster_count"] = count
+        info["prediction_count"] = pred_count
         # Platform breakdown
-        from sqlalchemy import func
         platform_counts = db.query(
             Forecaster.platform, func.count(Forecaster.id)
         ).group_by(Forecaster.platform).all()
