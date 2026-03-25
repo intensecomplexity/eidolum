@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom';
 import PredictionBadge from './PredictionBadge';
 import ConflictBadge from './ConflictBadge';
 import BookmarkButton from './BookmarkButton';
+import getSourceUrl from '../utils/getSourceUrl';
 
 const HORIZON_LABELS = { short: '30d', medium: '90d', long: '1y', custom: 'Custom' };
 
@@ -10,7 +11,7 @@ function formatDate(iso) {
   return iso.slice(0, 10);
 }
 
-export default function PredictionCard({ prediction: p, showForecaster = false }) {
+export default function PredictionCard({ prediction: p, showForecaster = false, forecaster = null }) {
   const predId = p.id || p.prediction_id;
   const evalDate = p.evaluation_date || p.resolution_date;
   const horizonLabel = HORIZON_LABELS[p.time_horizon] || `${p.window_days}d`;
@@ -77,6 +78,57 @@ export default function PredictionCard({ prediction: p, showForecaster = false }
           <span className="text-muted text-xs">Pending</span>
         )}
       </div>
+
+      {/* Source link */}
+      {(() => {
+        const fc = forecaster || p.forecaster || null;
+        const isValidYTId = p.source_platform_id && p.source_platform_id.length === 11
+          && !p.source_platform_id.includes('_') && !p.source_platform_id.includes(' ');
+        const isYT = p.source_type === 'youtube' || isValidYTId;
+        const isX = p.source_type === 'twitter' || p.source_type === 'x'
+          || (p.source_url && (p.source_url.includes('twitter.com') || p.source_url.includes('x.com')));
+        const isRD = p.source_type === 'reddit' || (p.source_url && p.source_url.includes('reddit.com'));
+        const fmtTs = (s) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+
+        let href = null, label = null, bg = '#555';
+
+        if (isYT && isValidYTId) {
+          href = p.video_timestamp_sec ? `https://youtube.com/watch?v=${p.source_platform_id}&t=${p.video_timestamp_sec}` : p.source_url;
+          label = p.video_timestamp_sec ? `\u25B6 Watch at ${fmtTs(p.video_timestamp_sec)}` : '\u25B6 Watch on YouTube';
+          bg = '#00c896';
+        } else if (isYT && p.source_url) {
+          href = p.source_url; label = '\u25B6 Watch on YouTube'; bg = '#00c896';
+        } else if (isX && p.source_url) {
+          href = p.source_url; label = '\uD835\uDD4F View on X'; bg = '#000';
+        } else if (isRD && p.source_url) {
+          href = p.source_url; label = '\uD83D\uDD34 View on Reddit'; bg = '#ff4500';
+        } else if (p.source_url) {
+          href = p.source_url; label = '\uD83D\uDD17 View Source'; bg = '#444';
+        }
+
+        if (!href || !label) {
+          const ctx = getSourceUrl(p, fc);
+          if (ctx?.url) {
+            href = ctx.url;
+            label = `\uD83D\uDD0D ${ctx.label || 'Search source'}`;
+            bg = '#00e5a0';
+          } else {
+            return null;
+          }
+        }
+
+        return (
+          <a href={href} target="_blank" rel="noopener noreferrer"
+            onClick={e => e.stopPropagation()}
+            style={{
+              display: 'inline-flex', alignItems: 'center', gap: '6px',
+              padding: '4px 10px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: 500,
+              background: bg, color: 'white', textDecoration: 'none', marginTop: '8px',
+              border: 'none', cursor: 'pointer',
+            }}
+          >{label}</a>
+        );
+      })()}
 
       {/* Evaluation date note */}
       {evalDate && (

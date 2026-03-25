@@ -268,7 +268,7 @@ export default function ForecasterProfile() {
           <h2 className="text-base font-semibold mb-2">Prediction History</h2>
           {(data.predictions || []).map((p) => (
             <div key={p.id}>
-              <PredictionCard prediction={p} />
+              <PredictionCard prediction={p} forecaster={data} />
               <div className="px-4 -mt-3 pb-3">
                 <EvidenceCard prediction={p} forecaster={data} compact />
               </div>
