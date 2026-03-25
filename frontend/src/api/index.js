@@ -116,4 +116,20 @@ export function getConflictPredictions() {
   return api.get('/predictions/conflicts').then(r => r.data);
 }
 
+export function getContrarianSignals() {
+  return api.get('/contrarian-signals').then(r => r.data);
+}
+
+export function getContrarianSignal(ticker) {
+  return api.get(`/contrarian-signals/${ticker}`).then(r => r.data);
+}
+
+export function getPowerRankings(periodDays = 30) {
+  return api.get('/power-rankings', { params: { period_days: periodDays } }).then(r => r.data);
+}
+
+export function getInversePortfolio(forecasterId, startingAmount = 10000) {
+  return api.get(`/inverse-portfolio/${forecasterId}`, { params: { starting_amount: startingAmount } }).then(r => r.data);
+}
+
 export default api;

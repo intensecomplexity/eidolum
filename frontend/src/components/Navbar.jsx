@@ -70,6 +70,9 @@ export default function Navbar() {
             <Link to="/platforms" className={linkClass('/platforms')}>
               Platforms
             </Link>
+            <Link to="/power-rankings" className={linkClass('/power-rankings')}>
+              Rankings
+            </Link>
             <Link to="/saved" className={`${linkClass('/saved')} gap-1.5`}>
               <Bookmark className="w-3.5 h-3.5" />
               Saved
@@ -121,6 +124,12 @@ export default function Navbar() {
               className="flex items-center px-3 py-3 rounded-lg text-text-primary font-medium active:bg-surface-2 min-h-[44px]"
             >
               Platforms
+            </Link>
+            <Link
+              to="/power-rankings"
+              className="flex items-center px-3 py-3 rounded-lg text-text-primary font-medium active:bg-surface-2 min-h-[44px]"
+            >
+              Power Rankings
             </Link>
             <Link
               to="/saved"
