@@ -209,7 +209,7 @@ export default function Leaderboard() {
                   <div className="overflow-x-auto">
                     <table className="w-full">
                       <thead>
-                        <tr className="text-left text-muted uppercase border-b border-border" style={{ fontSize: '0.7rem', letterSpacing: '0.08em' }}>
+                        <tr className="text-left text-muted uppercase border-b border-border" style={{ fontSize: '0.72rem', letterSpacing: '0.06em', fontWeight: 500 }}>
                           <th className="px-6 py-3 w-24">Rank</th>
                           <th className="px-6 py-3">Forecaster</th>
                           <th className="px-6 py-3 text-right">Accuracy</th>
@@ -241,7 +241,7 @@ export default function Leaderboard() {
                                 <div className="w-16 h-1 bg-surface-2 rounded-full overflow-hidden hidden lg:block">
                                   <div className={`h-full rounded-full ${f.accuracy_rate >= 60 ? 'bg-positive' : 'bg-negative'}`} style={{ width: `${Math.min(f.accuracy_rate, 100)}%` }} />
                                 </div>
-                                <span className={`font-mono font-semibold ${f.accuracy_rate >= 60 ? 'text-positive' : 'text-negative'}`} style={{ letterSpacing: '-0.01em' }}>
+                                <span className={`font-mono font-medium ${f.accuracy_rate >= 60 ? 'text-positive' : 'text-negative'}`} style={{ letterSpacing: '-0.01em' }}>
                                   {f.accuracy_rate.toFixed(1)}%
                                 </span>
                               </div>

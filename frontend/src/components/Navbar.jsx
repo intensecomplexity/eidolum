@@ -44,7 +44,7 @@ export default function Navbar() {
 
   const linkClass = (path) => {
     const isActive = location.pathname === path || location.pathname.startsWith(path + '/');
-    return `text-sm font-medium transition-colors min-h-[44px] flex items-center ${
+    return `text-sm font-normal transition-colors min-h-[44px] flex items-center ${
       isActive ? 'text-accent' : 'text-text-secondary active:text-text-primary'
     }`;
   };

@@ -58,7 +58,7 @@ export default function PredictionOfTheDay() {
       {dateStr && <div className="text-muted text-xs mb-2">on {dateStr}</div>}
 
       {data.exact_quote && (
-        <blockquote className="font-serif italic text-text-secondary text-base sm:text-lg mb-4" style={{ lineHeight: 1.5, borderLeft: '2px solid rgba(255,255,255,0.1)', paddingLeft: '16px' }}>
+        <blockquote className="italic text-text-secondary text-base sm:text-lg mb-4" style={{ lineHeight: 1.5, borderLeft: '2px solid rgba(255,255,255,0.1)', paddingLeft: '16px' }}>
           &ldquo;{data.exact_quote}&rdquo;
         </blockquote>
       )}
