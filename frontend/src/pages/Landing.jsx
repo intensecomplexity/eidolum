@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Search, CheckCircle, ArrowRight, BarChart3, Shield, Eye, TrendingUp, TrendingDown, Zap, Flame } from 'lucide-react';
+import { Search, CheckCircle, ArrowRight, BarChart3, Shield, Eye, TrendingUp, TrendingDown, Flame } from 'lucide-react';
 import TickerBar from '../components/TickerBar';
 import StatCard from '../components/StatCard';
 import PlatformBadge from '../components/PlatformBadge';
@@ -149,7 +149,7 @@ export default function Landing() {
       {/* Trending Tickers */}
       {trending.length > 0 && (
         <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 sm:py-16">
-          <h2 className="font-bold mb-4 sm:mb-6" style={{ fontSize: 'clamp(20px, 4vw, 28px)' }}>
+          <h2 className="headline-serif mb-4 sm:mb-6" style={{ fontSize: 'clamp(20px, 4vw, 28px)' }}>
             Most Predicted Tickers
           </h2>
           <div className="flex gap-3 overflow-x-auto pills-scroll pb-2">
@@ -184,12 +184,9 @@ export default function Landing() {
       {/* Controversial Calls */}
       {controversial.length > 0 && (
         <section className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 pb-10 sm:pb-16">
-          <div className="flex items-center gap-2 mb-4 sm:mb-6">
-            <Zap className="w-5 h-5 text-warning" />
-            <h2 className="font-bold" style={{ fontSize: 'clamp(20px, 4vw, 28px)' }}>
-              Most Controversial Calls
-            </h2>
-          </div>
+          <h2 className="headline-serif mb-4 sm:mb-6" style={{ fontSize: 'clamp(20px, 4vw, 28px)' }}>
+            Most Controversial Calls
+          </h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {controversial.map((c) => (
               <Link key={c.ticker} to={`/asset/${c.ticker}`} className="card p-0 overflow-hidden active:border-accent/30 transition-colors">
@@ -232,12 +229,9 @@ export default function Landing() {
       {/* Hot Streaks */}
       {hotStreaks.length > 0 && (
         <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-10 sm:pb-16">
-          <div className="flex items-center gap-2 mb-4 sm:mb-6">
-            <Flame className="w-5 h-5 text-orange-400" />
-            <h2 className="font-bold" style={{ fontSize: 'clamp(20px, 4vw, 28px)' }}>
-              This Week's Hot Streaks
-            </h2>
-          </div>
+          <h2 className="headline-serif mb-4 sm:mb-6" style={{ fontSize: 'clamp(20px, 4vw, 28px)' }}>
+            Hot Streaks
+          </h2>
           <div className="flex gap-3 overflow-x-auto pills-scroll pb-2">
             {hotStreaks.map((s) => (
               <Link
@@ -263,7 +257,7 @@ export default function Landing() {
       {/* Recently Resolved */}
       {recentResolved.length > 0 && (
         <section className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 pb-10 sm:pb-16">
-          <h2 className="font-bold mb-4 sm:mb-6" style={{ fontSize: 'clamp(20px, 4vw, 28px)' }}>
+          <h2 className="headline-serif mb-4 sm:mb-6" style={{ fontSize: 'clamp(20px, 4vw, 28px)' }}>
             Recently Resolved
           </h2>
           <div className="card p-0 overflow-hidden">
@@ -295,7 +289,7 @@ export default function Landing() {
 
       {/* How it works */}
       <section id="how-it-works" className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-10 sm:py-20">
-        <h2 className="font-bold text-center mb-3 sm:mb-4" style={{ fontSize: 'clamp(22px, 5vw, 36px)' }}>
+        <h2 className="headline-serif text-center mb-3 sm:mb-4" style={{ fontSize: 'clamp(22px, 5vw, 36px)' }}>
           How It Works
         </h2>
         <p className="text-text-secondary text-center mb-8 sm:mb-12 max-w-xl mx-auto text-sm sm:text-base">
@@ -323,7 +317,7 @@ export default function Landing() {
       {top5.length > 0 && (
         <section className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 pb-10 sm:pb-20">
           <div className="flex items-center justify-between mb-4 sm:mb-6">
-            <h2 className="font-bold" style={{ fontSize: 'clamp(20px, 4vw, 28px)' }}>Top Forecasters</h2>
+            <h2 className="headline-serif" style={{ fontSize: 'clamp(20px, 4vw, 28px)' }}>Top Forecasters</h2>
             <Link to="/leaderboard" className="text-accent text-sm font-medium active:underline flex items-center gap-1 min-h-[44px]">
               View all {forecasters.length} <ArrowRight className="w-3 h-3" />
             </Link>

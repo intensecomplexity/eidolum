@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Zap, X } from 'lucide-react';
+import { X } from 'lucide-react';
 import { getRareSignals } from '../api';
 
 export default function RareSignalBanner({ ticker = null }) {
@@ -27,8 +27,7 @@ export default function RareSignalBanner({ ticker = null }) {
         return (
           <div
             key={signal.ticker}
-            className="relative border border-warning/30 bg-warning/[0.04] rounded-xl p-4 sm:p-5"
-            style={{ animation: 'pulse-border 3s ease-in-out infinite' }}
+            className="relative border border-warning/20 bg-warning/[0.03] rounded-xl p-4 sm:p-5"
           >
             <button
               onClick={() => setDismissed(prev => ({ ...prev, [signal.ticker]: true }))}
@@ -37,9 +36,8 @@ export default function RareSignalBanner({ ticker = null }) {
               <X className="w-4 h-4" />
             </button>
 
-            <div className="flex items-center gap-2 mb-2">
-              <Zap className="w-5 h-5 text-warning" />
-              <span className="text-warning text-sm font-bold uppercase tracking-wider">Rare Signal</span>
+            <div className="mb-2">
+              <span className="text-warning text-xs font-semibold uppercase" style={{ letterSpacing: '0.1em' }}>Rare Signal</span>
             </div>
 
             <p className="text-text-primary text-sm sm:text-base mb-2">

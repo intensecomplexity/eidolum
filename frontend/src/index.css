@@ -17,7 +17,7 @@
 
   * {
     scrollbar-width: thin;
-    scrollbar-color: rgba(255,255,255,0.1) #080c08;
+    scrollbar-color: rgba(255,255,255,0.08) #07090a;
     -webkit-tap-highlight-color: transparent;
   }
 
@@ -26,10 +26,10 @@
     height: 6px;
   }
   *::-webkit-scrollbar-track {
-    background: #080c08;
+    background: #07090a;
   }
   *::-webkit-scrollbar-thumb {
-    background: rgba(255,255,255,0.1);
+    background: rgba(255,255,255,0.08);
     border-radius: 3px;
   }
 
@@ -45,10 +45,9 @@
   }
 
   .card {
-    background: #0d1208;
-    border: 1px solid rgba(255,255,255,0.07);
-    border-radius: 12px;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.4);
+    background: #0e1212;
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 10px;
     @apply p-5 sm:p-6;
   }
 
@@ -61,21 +60,26 @@
   }
 
   .badge-pending {
-    @apply inline-flex items-center px-2 py-0.5 rounded text-xs font-mono font-semibold bg-warning/10 text-warning border border-warning/20;
+    @apply inline-flex items-center px-2 py-0.5 rounded text-xs font-mono font-semibold;
+    background: rgba(255,255,255,0.04);
+    color: #6b7280;
+    border: 1px solid rgba(255,255,255,0.08);
   }
 
   .btn-primary {
-    @apply inline-flex items-center justify-center gap-2 px-6 py-3.5 bg-accent text-bg rounded-lg min-h-[44px];
+    @apply inline-flex items-center justify-center gap-2 px-6 py-3.5 bg-accent text-bg min-h-[44px];
     font-weight: 600;
-    border-radius: 8px;
+    font-size: 0.875rem;
+    border-radius: 7px;
+    border: none;
     transition: opacity 0.15s ease;
   }
 
   .btn-secondary {
-    @apply inline-flex items-center justify-center gap-2 px-6 py-3.5 text-text-primary rounded-lg min-h-[44px];
+    @apply inline-flex items-center justify-center gap-2 px-6 py-3.5 text-text-primary min-h-[44px];
     font-weight: 500;
-    border: 1px solid rgba(255,255,255,0.2);
-    border-radius: 8px;
+    border: 1px solid rgba(255,255,255,0.15);
+    border-radius: 7px;
     background: transparent;
     transition: opacity 0.15s ease;
   }
@@ -83,7 +87,7 @@
   /* Desktop hover styles */
   @media (hover: hover) {
     .btn-primary:hover { opacity: 0.85; }
-    .btn-secondary:hover { opacity: 0.85; border-color: rgba(255,255,255,0.35); }
+    .btn-secondary:hover { opacity: 0.85; border-color: rgba(255,255,255,0.25); }
   }
 
   .stat-number {
@@ -104,7 +108,7 @@
 
 @media (max-width: 640px) {
   .ticker-scroll {
-    animation-duration: 60s; /* slower on mobile — battery */
+    animation-duration: 60s;
   }
 }
 
@@ -112,33 +116,24 @@
   animation-play-state: paused;
 }
 
-/* Glow effects — intentionally subtle */
-.glow-accent {
-  box-shadow: none;
-}
-
+/* Glow effects — disabled */
+.glow-accent,
 .glow-blue {
   box-shadow: none;
 }
 
-/* Pulse animation for live items */
+/* Subtle pulse for live indicators — toned down */
 @keyframes pulse-live {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.6; }
+  0%, 100% { opacity: 0.6; }
+  50% { opacity: 0.3; }
 }
 
 .pulse-live {
-  animation: pulse-live 2s ease-in-out infinite;
+  animation: pulse-live 2.5s ease-in-out infinite;
 }
 
-/* Fire pulse */
-@keyframes fire-pulse {
-  0%, 100% { transform: scale(1); }
-  50% { transform: scale(1.15); }
-}
-
+/* Fire pulse — static, no animation */
 .fire-pulse {
-  animation: fire-pulse 1.5s ease-in-out infinite;
   display: inline-block;
 }
 
@@ -157,11 +152,11 @@
 .rank-silver { color: #94a3b8; }
 .rank-bronze { color: #d97706; }
 
-/* Grid background pattern — disabled on mobile for perf */
+/* Grid background pattern — very subtle */
 .grid-bg {
   background-image:
-    linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+    linear-gradient(rgba(255, 255, 255, 0.015) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.015) 1px, transparent 1px);
   background-size: 48px 48px;
 }
 
@@ -213,12 +208,6 @@
   animation: bookmark-pulse 0.3s ease-out;
 }
 
-/* Rare signal pulsing border */
-@keyframes pulse-border {
-  0%, 100% { border-color: rgba(245, 158, 11, 0.3); }
-  50% { border-color: rgba(245, 158, 11, 0.6); }
-}
-
 /* Horizontal scroll pills — hide scrollbar */
 .pills-scroll {
   -ms-overflow-style: none;
@@ -248,4 +237,16 @@
 /* Tabular numbers for financial data */
 .font-mono, .font-tabular {
   font-variant-numeric: tabular-nums;
+}
+
+/* Table styling — subtle hover, refined borders */
+tbody tr { border-bottom: 1px solid rgba(255,255,255,0.08); }
+
+/* Ticker tape — financial terminal feel */
+.ticker-tape {
+  background: #090c09;
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+  font-size: 0.8rem;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
 }

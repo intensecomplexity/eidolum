@@ -4,7 +4,7 @@ export default function TickerBar({ forecasters }) {
   const items = [...forecasters, ...forecasters];
 
   return (
-    <div className="w-full overflow-hidden bg-surface border-y border-border py-2 sm:py-3">
+    <div className="w-full overflow-hidden ticker-tape py-2 sm:py-3">
       <div className="ticker-scroll flex gap-5 sm:gap-8 whitespace-nowrap">
         {items.map((f, i) => (
           <div key={i} className="flex items-center gap-2 sm:gap-3 text-xs sm:text-sm">

@@ -29,12 +29,10 @@ export default function PredictionOfTheDay() {
 
   return (
     <div className="bg-surface" style={{
-      borderLeft: '3px solid #00b37d',
-      borderRadius: '12px',
-      border: '1px solid rgba(255,255,255,0.07)',
+      borderRadius: '10px',
+      border: '1px solid rgba(255,255,255,0.08)',
       borderLeftWidth: '3px',
-      borderLeftColor: '#00b37d',
-      boxShadow: '0 1px 3px rgba(0,0,0,0.4)',
+      borderLeftColor: '#00a878',
       padding: '20px 24px',
     }}>
       <div className="flex items-center justify-between mb-3">

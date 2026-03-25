@@ -58,7 +58,7 @@ export default function Leaderboard() {
     <div>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-10">
         <div className="mb-5 sm:mb-8">
-          <h1 className="font-bold mb-1 sm:mb-2" style={{ fontSize: 'clamp(24px, 5vw, 36px)' }}>
+          <h1 className="headline-serif mb-1 sm:mb-2" style={{ fontSize: 'clamp(24px, 5vw, 36px)' }}>
             Forecaster Leaderboard
           </h1>
           <p className="text-text-secondary text-sm sm:text-base">
@@ -82,7 +82,7 @@ export default function Leaderboard() {
               <span className="sm:hidden">{mobileLabel}</span>
               <span className="hidden sm:inline">{label}</span>
               {key === 'pending' && (
-                <span className="pulse-live w-1.5 h-1.5 rounded-full bg-warning inline-block" />
+                <span className="pulse-live w-1.5 h-1.5 rounded-full bg-muted inline-block" />
               )}
             </button>
           ))}
@@ -209,7 +209,7 @@ export default function Leaderboard() {
                   <div className="overflow-x-auto">
                     <table className="w-full">
                       <thead>
-                        <tr className="text-left text-muted text-xs uppercase tracking-wider border-b border-border">
+                        <tr className="text-left text-muted uppercase border-b border-border" style={{ fontSize: '0.7rem', letterSpacing: '0.08em' }}>
                           <th className="px-6 py-3 w-24">Rank</th>
                           <th className="px-6 py-3">Forecaster</th>
                           <th className="px-6 py-3 text-right">Accuracy</th>
@@ -227,7 +227,7 @@ export default function Leaderboard() {
                             <td className="px-6 py-4">
                               <Link to={`/forecaster/${f.id}`} className="hover:text-accent transition-colors">
                                 <div className="flex items-center gap-2">
-                                  <span className="font-semibold">{f.name}</span>
+                                  <span style={{ fontWeight: 600, fontSize: '0.95rem' }}>{f.name}</span>
                                   <PlatformBadge platform={f.platform} />
                                   {f.has_disclosed_positions && (
                                     <span className="text-warning text-xs" title="Has disclosed positions">💼</span>
@@ -241,7 +241,7 @@ export default function Leaderboard() {
                                 <div className="w-16 h-1 bg-surface-2 rounded-full overflow-hidden hidden lg:block">
                                   <div className={`h-full rounded-full ${f.accuracy_rate >= 60 ? 'bg-positive' : 'bg-negative'}`} style={{ width: `${Math.min(f.accuracy_rate, 100)}%` }} />
                                 </div>
-                                <span className={`font-mono font-semibold ${f.accuracy_rate >= 60 ? 'text-positive' : 'text-negative'}`}>
+                                <span className={`font-mono font-semibold ${f.accuracy_rate >= 60 ? 'text-positive' : 'text-negative'}`} style={{ letterSpacing: '-0.01em' }}>
                                   {f.accuracy_rate.toFixed(1)}%
                                 </span>
                               </div>
