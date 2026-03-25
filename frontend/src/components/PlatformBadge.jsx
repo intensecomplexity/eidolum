@@ -1,16 +1,45 @@
-const PLATFORM_STYLES = {
-  youtube: { label: 'YouTube', bg: 'bg-red-500/10', text: 'text-red-400', border: 'border-red-500/20' },
-  reddit: { label: 'Reddit', bg: 'bg-orange-500/10', text: 'text-orange-400', border: 'border-orange-500/20' },
-  x: { label: 'X', bg: 'bg-sky-500/10', text: 'text-sky-400', border: 'border-sky-500/20' },
-  congress: { label: 'Congress', bg: 'bg-yellow-500/10', text: 'text-yellow-400', border: 'border-yellow-500/20' },
-  institutional: { label: 'Wall St', bg: 'bg-blue-500/10', text: 'text-blue-400', border: 'border-blue-500/20' },
+import { FaYoutube, FaReddit } from 'react-icons/fa';
+import { FaXTwitter } from 'react-icons/fa6';
+
+const PLATFORM_CONFIG = {
+  youtube:       { icon: FaYoutube,  color: '#FF0000', label: 'YouTube' },
+  twitter:       { icon: FaXTwitter, color: '#fff',    label: 'X', bg: '#000' },
+  x:             { icon: FaXTwitter, color: '#fff',    label: 'X', bg: '#000' },
+  reddit:        { icon: FaReddit,   color: '#FF4500', label: 'Reddit' },
+  congress:      { icon: null,       color: '#3b82f6', label: 'Congress' },
+  institutional: { icon: null,       color: '#a78bfa', label: 'Institution' },
 };
 
-export default function PlatformBadge({ platform }) {
-  const style = PLATFORM_STYLES[platform] || PLATFORM_STYLES.youtube;
+export default function PlatformBadge({ platform, size = 16, showLabel = false }) {
+  const config = PLATFORM_CONFIG[platform?.toLowerCase()] || null;
+  if (!config) return null;
+
+  const Icon = config.icon;
+
   return (
-    <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-mono font-semibold uppercase ${style.bg} ${style.text} border ${style.border}`}>
-      {style.label}
+    <span style={{
+      display: 'inline-flex', alignItems: 'center', gap: '4px',
+      background: config.bg || 'transparent',
+      borderRadius: '4px',
+      padding: config.bg ? '2px 5px' : '0',
+    }}>
+      {Icon
+        ? <Icon size={size} color={config.color} title={config.label} />
+        : <span style={{
+            fontSize: size * 0.7 + 'px',
+            color: config.color,
+            fontWeight: 700,
+            border: `1px solid ${config.color}`,
+            borderRadius: '3px',
+            padding: '0 3px',
+            lineHeight: 1.4,
+          }}>{config.label}</span>
+      }
+      {showLabel && (
+        <span style={{ color: config.color, fontSize: size * 0.85 + 'px', fontWeight: 500 }}>
+          {config.label}
+        </span>
+      )}
     </span>
   );
 }

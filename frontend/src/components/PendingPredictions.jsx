@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Clock, Bell } from 'lucide-react';
 import BookmarkButton from './BookmarkButton';
+import PlatformBadge from './PlatformBadge';
 import { getPendingPredictions } from '../api';
 
 export default function PendingPredictions() {
@@ -77,9 +78,10 @@ function PendingCard({ prediction: p }) {
       </div>
 
       {/* Forecaster */}
-      <Link to={`/forecaster/${p.forecaster.id}`} className="text-sm text-text-secondary hover:text-accent transition-colors">
+      <Link to={`/forecaster/${p.forecaster.id}`} className="flex items-center gap-1.5 text-sm text-text-secondary hover:text-accent transition-colors">
+        <PlatformBadge platform={p.forecaster.platform} size={14} />
         {p.forecaster.name}
-        <span className="text-muted text-xs ml-1">({p.forecaster.handle})</span>
+        <span className="text-muted text-xs">({p.forecaster.handle})</span>
       </Link>
 
       {/* Current movement */}

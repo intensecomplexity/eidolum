@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Zap, Share2, ArrowRight } from 'lucide-react';
+import PlatformBadge from './PlatformBadge';
 import { getPredictionOfTheDay } from '../api';
 
 export default function PredictionOfTheDay() {

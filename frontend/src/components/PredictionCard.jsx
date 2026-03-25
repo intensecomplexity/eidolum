@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom';
 import PredictionBadge from './PredictionBadge';
 import ConflictBadge from './ConflictBadge';
 import BookmarkButton from './BookmarkButton';
+import PlatformBadge from './PlatformBadge';
 
 const HORIZON_LABELS = { short: '30d', medium: '90d', long: '1y', custom: 'Custom' };
 
@@ -99,8 +100,9 @@ export default function PredictionCard({ prediction: p, showForecaster = false, 
       {showForecaster && p.forecaster && (
         <Link
           to={`/forecaster/${p.forecaster.id}`}
-          className="text-sm text-text-secondary active:text-accent block mb-2"
+          className="flex items-center gap-1.5 text-sm text-text-secondary active:text-accent mb-2"
         >
+          <PlatformBadge platform={p.forecaster?.platform || p.source_type} size={14} />
           {p.forecaster.name}
           <span className="text-muted text-xs ml-1">
             {p.forecaster.accuracy_rate?.toFixed(1)}%
