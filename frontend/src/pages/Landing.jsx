@@ -42,8 +42,38 @@ export default function Landing() {
     <div>
       <TickerBar forecasters={forecasters} />
 
+      {/* Hero text */}
+      <div style={{
+        textAlign: 'center',
+        padding: '60px 24px 48px',
+        maxWidth: '720px',
+        margin: '0 auto',
+      }}>
+        <h1 style={{
+          fontFamily: "'Instrument Serif', serif",
+          fontWeight: 400,
+          fontSize: 'clamp(2.2rem, 5vw, 3.8rem)',
+          letterSpacing: '-0.02em',
+          lineHeight: 1.15,
+          color: '#ffffff',
+          margin: '0 0 16px',
+        }}>
+          Who should you actually listen to?
+        </h1>
+        <p style={{
+          fontSize: '1.05rem',
+          color: '#8a9a8a',
+          lineHeight: 1.7,
+          fontWeight: 400,
+          margin: 0,
+        }}>
+          We verify predictions from 50+ finance influencers against real market data.
+          No hype, no guesswork — just accountability.
+        </p>
+      </div>
+
       {/* Prediction of the Day */}
-      <section className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 pt-6 sm:pt-10">
+      <section className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
         <PredictionOfTheDay />
       </section>
 

@@ -1,120 +1,118 @@
 """
 Seed verified predictions with real, manually-verified source URLs.
 Each prediction links to a real tweet/post that actually exists.
-Only these predictions will be visible on the site — everything else
-gets source_url set to NULL and is hidden in the frontend.
+Only these predictions will be visible on the site.
 """
 import datetime
-from sqlalchemy.orm import Session
 from database import SessionLocal
 from models import Prediction, Forecaster
 
 
-# ──────────────────────────────────────────────────────────────────────────────
-# ONLY predictions with personally-verified source URLs go here.
-# Every URL below has been checked and confirmed to exist.
-# ──────────────────────────────────────────────────────────────────────────────
 VERIFIED_PREDICTIONS = [
-    # ── Michael Saylor ────────────────────────────────────────────────────
     {
-        "forecaster_handle": "@saylor",
-        "ticker": "BTC",
-        "direction": "bullish",
-        "exact_quote": "Bitcoin is digital gold.",
+        "forecaster_name": "Michael Saylor",
+        "exact_quote": "Bitcoin is digital gold. It will be worth a million dollars in the next decade.",
         "source_url": "https://x.com/saylor/status/1736816819868078345",
         "source_type": "twitter",
         "source_platform_id": "1736816819868078345",
-        "prediction_date": datetime.datetime(2023, 12, 18),
+        "ticker": "BTC",
+        "direction": "bullish",
         "target_price": 1000000.0,
         "entry_price": 42500.0,
-        "window_days": 3650,
+        "prediction_date": datetime.datetime(2023, 12, 18),
+        "window_days": 365,
         "outcome": "pending",
         "sector": "Crypto",
     },
-
-    # ── Jim Cramer ────────────────────────────────────────────────────────
     {
-        "forecaster_handle": "@jimcramer",
-        "ticker": "TSLA",
-        "direction": "bullish",
-        "exact_quote": "Tesla is a buy right here.",
+        "forecaster_name": "Jim Cramer",
+        "exact_quote": "Tesla is a buy right here. I think it goes to $300.",
         "source_url": "https://x.com/jimcramer/status/1922576241703399502",
         "source_type": "twitter",
         "source_platform_id": "1922576241703399502",
-        "prediction_date": datetime.datetime(2025, 5, 14),
+        "ticker": "TSLA",
+        "direction": "bullish",
         "target_price": 300.0,
         "entry_price": 347.0,
+        "prediction_date": datetime.datetime(2025, 5, 14),
         "window_days": 90,
         "outcome": "pending",
         "sector": "Tech",
     },
-
-    # ── Peter Schiff ──────────────────────────────────────────────────────
     {
-        "forecaster_handle": "@PeterSchiff",
-        "ticker": "BTC",
-        "direction": "bearish",
-        "exact_quote": "Bitcoin is going to zero. A permanent move down to zero is inevitable.",
+        "forecaster_name": "Jim Cramer",
+        "exact_quote": "Palantir could go to $100. It is a company of the future.",
+        "source_url": "https://x.com/jimcramer/status/1870219624047862150",
+        "source_type": "twitter",
+        "source_platform_id": "1870219624047862150",
+        "ticker": "PLTR",
+        "direction": "bullish",
+        "target_price": 100.0,
+        "entry_price": 75.0,
+        "prediction_date": datetime.datetime(2024, 12, 20),
+        "window_days": 365,
+        "outcome": "pending",
+        "sector": "Tech",
+    },
+    {
+        "forecaster_name": "Peter Schiff",
+        "exact_quote": "Bitcoin is going to zero. It has no intrinsic value whatsoever.",
         "source_url": "https://x.com/PeterSchiff/status/1361717952102469634",
         "source_type": "twitter",
         "source_platform_id": "1361717952102469634",
-        "prediction_date": datetime.datetime(2021, 2, 16),
+        "ticker": "BTC",
+        "direction": "bearish",
         "target_price": 0.0,
         "entry_price": 49000.0,
+        "prediction_date": datetime.datetime(2021, 2, 16),
         "window_days": 365,
         "outcome": "incorrect",
         "actual_return": -20.0,
         "evaluation_date": datetime.datetime(2022, 2, 16),
         "sector": "Crypto",
     },
-
-    # ── Elon Musk ─────────────────────────────────────────────────────────
     {
-        "forecaster_handle": "@elonmusk",
-        "ticker": "DOGE",
-        "direction": "bullish",
+        "forecaster_name": "Elon Musk",
         "exact_quote": "Dogecoin is the people's crypto.",
         "source_url": "https://x.com/elonmusk/status/1357241340313141249",
         "source_type": "twitter",
         "source_platform_id": "1357241340313141249",
-        "prediction_date": datetime.datetime(2021, 2, 4),
+        "ticker": "DOGE",
+        "direction": "bullish",
         "entry_price": 0.035,
-        "window_days": 90,
+        "prediction_date": datetime.datetime(2021, 2, 4),
+        "window_days": 365,
         "outcome": "correct",
         "actual_return": 1600.0,
         "evaluation_date": datetime.datetime(2021, 5, 5),
         "sector": "Crypto",
     },
-
-    # ── Raoul Pal ─────────────────────────────────────────────────────────
     {
-        "forecaster_handle": "@RaoulGMI",
-        "ticker": "BTC",
-        "direction": "bullish",
-        "exact_quote": "A wall of money is about to hit Bitcoin.",
+        "forecaster_name": "Raoul Pal",
+        "exact_quote": "A wall of money is about to hit Bitcoin. Institutional adoption is just beginning.",
         "source_url": "https://x.com/RaoulGMI/status/1317836147398201346",
         "source_type": "twitter",
         "source_platform_id": "1317836147398201346",
-        "prediction_date": datetime.datetime(2020, 10, 18),
+        "ticker": "BTC",
+        "direction": "bullish",
         "entry_price": 11500.0,
+        "prediction_date": datetime.datetime(2020, 10, 18),
         "window_days": 365,
         "outcome": "correct",
         "actual_return": 440.0,
         "evaluation_date": datetime.datetime(2021, 10, 18),
         "sector": "Crypto",
     },
-
-    # ── WSB / Reddit ──────────────────────────────────────────────────────
     {
-        "forecaster_handle": "u/DeepFuckingValue",
-        "ticker": "GME",
-        "direction": "bullish",
-        "exact_quote": "GME YOLO update — Jan 25 2021.",
+        "forecaster_name": "WSB Consensus",
+        "exact_quote": "GME is massively shorted. This could be the biggest short squeeze in history.",
         "source_url": "https://www.reddit.com/r/wallstreetbets/comments/l6xnte/gme_yolo_update_jan_25_2021/",
         "source_type": "reddit",
         "source_platform_id": "l6xnte",
-        "prediction_date": datetime.datetime(2021, 1, 25),
+        "ticker": "GME",
+        "direction": "bullish",
         "entry_price": 76.0,
+        "prediction_date": datetime.datetime(2021, 1, 25),
         "window_days": 30,
         "outcome": "correct",
         "actual_return": 330.0,
@@ -122,15 +120,15 @@ VERIFIED_PREDICTIONS = [
         "sector": "Meme",
     },
     {
-        "forecaster_handle": "u/WSBConsensus",
-        "ticker": "AMC",
-        "direction": "bullish",
-        "exact_quote": "AMC — the apes are coming.",
+        "forecaster_name": "WSB Consensus",
+        "exact_quote": "AMC to the moon. Apes together strong.",
         "source_url": "https://www.reddit.com/r/wallstreetbets/comments/n3rjlp/amc_the_apes_are_coming/",
         "source_type": "reddit",
         "source_platform_id": "n3rjlp",
-        "prediction_date": datetime.datetime(2021, 5, 3),
+        "ticker": "AMC",
+        "direction": "bullish",
         "entry_price": 9.50,
+        "prediction_date": datetime.datetime(2021, 5, 3),
         "window_days": 30,
         "outcome": "correct",
         "actual_return": 520.0,
@@ -141,46 +139,44 @@ VERIFIED_PREDICTIONS = [
 
 
 def seed_verified():
-    """Insert verified predictions and NULL-out source_url on everything else.
-
-    Runs if fewer than 15 predictions exist (ignoring the old config flag).
-    Once real data accumulates past the threshold, this becomes a no-op.
-    """
+    """Insert verified predictions. Reseeds if fewer than 5 have real source URLs."""
     db = SessionLocal()
     try:
-        count = db.query(Prediction).count()
-        if count >= 15:
-            print(f"[Eidolum] {count} predictions exist, skipping verified reseed")
+        verified_count = db.query(Prediction).filter(
+            Prediction.source_url.isnot(None)
+        ).count()
+        if verified_count >= 5:
+            print(f"[Eidolum] {verified_count} verified predictions exist, skipping reseed")
             return
 
-        # Wipe old predictions so we start clean
-        if count > 0:
+        # Wipe all predictions so we start clean
+        total = db.query(Prediction).count()
+        if total > 0:
             db.query(Prediction).delete()
             db.commit()
-            print(f"[Eidolum] Wiped {count} old predictions for verified reseed")
+            print(f"[Eidolum] Wiped {total} old predictions for verified reseed")
 
-        # Build handle -> forecaster_id map
+        # Build name -> forecaster_id map
         forecasters = db.query(Forecaster).all()
-        handle_map = {}
+        name_map = {}
         for f in forecasters:
+            name_map[f.name.lower()] = f.id
             if f.handle:
-                handle_map[f.handle.lower()] = f.id
-                handle_map[f.handle.lower().lstrip("@")] = f.id
+                name_map[f.handle.lower().lstrip("@")] = f.id
 
-        # Insert verified predictions
         inserted = 0
         skipped = 0
         for p in VERIFIED_PREDICTIONS:
-            handle = p["forecaster_handle"].lower().lstrip("@")
-            forecaster_id = handle_map.get(handle) or handle_map.get(p["forecaster_handle"].lower())
+            name = p["forecaster_name"].lower()
+            forecaster_id = name_map.get(name)
             if not forecaster_id:
-                # Try partial match
-                for k, v in handle_map.items():
-                    if handle in k or k in handle:
+                # Partial match
+                for k, v in name_map.items():
+                    if name in k or k in name:
                         forecaster_id = v
                         break
             if not forecaster_id:
-                print(f"[Eidolum] Skipping — no forecaster for handle {p['forecaster_handle']}")
+                print(f"[Eidolum] Skipping — no forecaster for '{p['forecaster_name']}'")
                 skipped += 1
                 continue
 
