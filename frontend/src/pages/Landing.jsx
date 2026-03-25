@@ -40,50 +40,69 @@ export default function Landing() {
 
   return (
     <div>
-      {/* 1. HERO */}
+      {/* 1. TICKER TAPE */}
+      <TickerBar forecasters={forecasters} />
+
+      {/* 2. HERO */}
       <div style={{
         textAlign: 'center',
-        padding: '64px 24px 48px',
-        maxWidth: '700px',
+        padding: '56px 24px 40px',
+        maxWidth: '680px',
         margin: '0 auto',
       }}>
         <h1 style={{
           fontFamily: "'Instrument Serif', serif",
           fontWeight: 400,
-          fontSize: 'clamp(2.2rem, 5vw, 3.8rem)',
+          fontSize: 'clamp(2rem, 5vw, 3.6rem)',
           letterSpacing: '-0.02em',
           lineHeight: 1.15,
           color: '#ffffff',
-          margin: '0 0 16px',
+          margin: '0 0 14px',
         }}>
           Who should you actually listen to?
         </h1>
         <p style={{
-          fontSize: '1.05rem',
+          fontSize: '1rem',
           color: '#7a8a7a',
           lineHeight: 1.7,
-          margin: '0 0 28px',
+          fontWeight: 400,
+          margin: 0,
         }}>
           We verify predictions from 50+ finance influencers against real market data.
           No hype, no guesswork — just accountability.
         </p>
-        <div style={{ display: 'flex', gap: '12px', justifyContent: 'center', flexWrap: 'wrap' }}>
-          <Link to="/leaderboard" style={{
-            background: '#00a878', color: '#000', fontWeight: 600,
-            padding: '10px 22px', borderRadius: '8px', textDecoration: 'none', fontSize: '0.9rem',
-          }}>View Leaderboard</Link>
-          <a href="#how-it-works" style={{
-            background: 'transparent', color: '#fff', fontWeight: 500,
-            padding: '10px 22px', borderRadius: '8px', textDecoration: 'none', fontSize: '0.9rem',
-            border: '1px solid rgba(255,255,255,0.15)',
-          }}>How it works</a>
-        </div>
       </div>
 
-      {/* 2. TICKER TAPE */}
-      <TickerBar forecasters={forecasters} />
+      {/* 3. LIVE LABEL */}
+      <div style={{ textAlign: 'center', marginBottom: '8px' }}>
+        <span style={{
+          fontSize: '0.75rem',
+          fontWeight: 600,
+          letterSpacing: '0.1em',
+          textTransform: 'uppercase',
+          color: '#00c896',
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: '6px',
+        }}>
+          <span style={{
+            width: '6px',
+            height: '6px',
+            borderRadius: '50%',
+            background: '#00c896',
+            display: 'inline-block',
+            animation: 'pulse 2s infinite',
+          }} />
+          Live
+        </span>
+      </div>
 
-      {/* 3. TOP FORECASTERS */}
+      {/* 4. TODAY'S CALL */}
+      <section className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 pb-6">
+        <PredictionOfTheDay />
+      </section>
+
+      {/* 5. TOP FORECASTERS */}
       {top5.length > 0 && (
         <section className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-10 sm:py-16">
           <div className="flex items-center justify-between mb-4 sm:mb-6">
@@ -255,12 +274,7 @@ export default function Landing() {
         </div>
       </section>
 
-      {/* 9. TODAY'S CALL */}
-      <section className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 pb-6">
-        <PredictionOfTheDay />
-      </section>
-
-      {/* 10. RARE SIGNAL */}
+      {/* 9. RARE SIGNAL */}
       <section className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 pb-8">
         <RareSignalBanner />
       </section>
