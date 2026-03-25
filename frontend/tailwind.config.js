@@ -4,12 +4,12 @@ export default {
   theme: {
     extend: {
       colors: {
-        bg: '#05080f',
-        surface: '#0b1120',
-        'surface-2': '#111827',
-        border: '#1e2d45',
-        accent: '#00e5a0',
-        'accent-dim': '#00b37e',
+        bg: '#080c08',
+        surface: '#0d1208',
+        'surface-2': '#141a10',
+        border: 'rgba(255,255,255,0.07)',
+        accent: '#00b37d',
+        'accent-dim': '#009968',
         blue: '#0ea5e9',
         'blue-dim': '#0284c7',
         muted: '#64748b',
@@ -22,6 +22,7 @@ export default {
       fontFamily: {
         mono: ['JetBrains Mono', 'Fira Code', 'Consolas', 'monospace'],
         sans: ['Inter', 'system-ui', 'sans-serif'],
+        serif: ['Instrument Serif', 'Georgia', 'serif'],
       },
     },
   },

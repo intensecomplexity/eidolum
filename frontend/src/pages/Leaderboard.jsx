@@ -227,7 +227,7 @@ export default function Leaderboard() {
                             <td className="px-6 py-4">
                               <Link to={`/forecaster/${f.id}`} className="hover:text-accent transition-colors">
                                 <div className="flex items-center gap-2">
-                                  <span className="font-medium">{f.name}</span>
+                                  <span className="font-semibold">{f.name}</span>
                                   <PlatformBadge platform={f.platform} />
                                   {f.has_disclosed_positions && (
                                     <span className="text-warning text-xs" title="Has disclosed positions">💼</span>
@@ -238,7 +238,7 @@ export default function Leaderboard() {
                             </td>
                             <td className="px-6 py-4 text-right">
                               <div className="flex items-center justify-end gap-2">
-                                <div className="w-16 h-1.5 bg-surface-2 rounded-full overflow-hidden hidden lg:block">
+                                <div className="w-16 h-1 bg-surface-2 rounded-full overflow-hidden hidden lg:block">
                                   <div className={`h-full rounded-full ${f.accuracy_rate >= 60 ? 'bg-positive' : 'bg-negative'}`} style={{ width: `${Math.min(f.accuracy_rate, 100)}%` }} />
                                 </div>
                                 <span className={`font-mono font-semibold ${f.accuracy_rate >= 60 ? 'text-positive' : 'text-negative'}`}>

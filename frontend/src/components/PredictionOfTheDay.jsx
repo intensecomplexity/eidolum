@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Zap, Share2, ArrowRight } from 'lucide-react';
+import { Share2, ArrowRight } from 'lucide-react';
 import PlatformBadge from './PlatformBadge';
 import { getPredictionOfTheDay } from '../api';
 
@@ -28,14 +28,17 @@ export default function PredictionOfTheDay() {
   }
 
   return (
-    <div className={`border-l-4 rounded-xl p-4 sm:p-6 ${
-      isCorrect ? 'border-l-positive bg-positive/[0.04]' : 'border-l-negative bg-negative/[0.04]'
-    } bg-surface`}>
+    <div className="bg-surface" style={{
+      borderLeft: '3px solid #00b37d',
+      borderRadius: '12px',
+      border: '1px solid rgba(255,255,255,0.07)',
+      borderLeftWidth: '3px',
+      borderLeftColor: '#00b37d',
+      boxShadow: '0 1px 3px rgba(0,0,0,0.4)',
+      padding: '20px 24px',
+    }}>
       <div className="flex items-center justify-between mb-3">
-        <div className="flex items-center gap-2">
-          <Zap className="w-4 h-4 sm:w-5 sm:h-5 text-warning" />
-          <span className="text-warning text-xs sm:text-sm font-bold uppercase tracking-wider">Prediction of the Day</span>
-        </div>
+        <span className="text-muted text-[11px] font-semibold uppercase tracking-[0.15em]">Today&apos;s Call</span>
         <button onClick={handleShare} className="text-muted active:text-accent p-1.5" title="Share this call">
           <Share2 className="w-4 h-4" />
         </button>
@@ -57,18 +60,20 @@ export default function PredictionOfTheDay() {
       {dateStr && <div className="text-muted text-xs mb-2">on {dateStr}</div>}
 
       {data.exact_quote && (
-        <blockquote className="text-text-secondary text-sm italic border-l-2 border-border pl-3 mb-3">
+        <blockquote className="font-serif italic text-text-secondary text-base sm:text-lg mb-4" style={{ lineHeight: 1.5, borderLeft: '2px solid rgba(255,255,255,0.1)', paddingLeft: '16px' }}>
           &ldquo;{data.exact_quote}&rdquo;
         </blockquote>
       )}
 
       <div className="flex items-center gap-3 mb-3">
         <span className={`font-mono text-2xl sm:text-3xl font-bold ${isCorrect ? 'text-positive' : 'text-negative'}`}>
-          {isCorrect ? '\u2713' : '\u2717'} {returnStr}
+          {returnStr}
         </span>
-        <span className={`text-xs font-medium px-2 py-0.5 rounded ${
-          isCorrect ? 'bg-positive/10 text-positive' : 'bg-negative/10 text-negative'
-        }`}>
+        <span className={`text-xs font-medium px-2.5 py-1 rounded-md ${
+          isCorrect
+            ? 'text-positive border border-positive/30'
+            : 'text-negative border border-negative/30'
+        }`} style={{ background: 'transparent' }}>
           {isCorrect ? 'CORRECT' : 'WRONG'}
         </span>
       </div>
@@ -81,7 +86,7 @@ export default function PredictionOfTheDay() {
           to={`/forecaster/${data.forecaster.id}`}
           className="text-accent text-xs font-medium flex items-center gap-1 active:underline min-h-[44px] sm:min-h-0"
         >
-          View full prediction <ArrowRight className="w-3 h-3" />
+          View profile <ArrowRight className="w-3 h-3" />
         </Link>
       </div>
     </div>

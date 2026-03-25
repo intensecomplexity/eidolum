@@ -7,6 +7,7 @@
     @apply bg-bg text-text-primary font-sans;
     -webkit-font-smoothing: antialiased;
     touch-action: manipulation;
+    line-height: 1.6;
   }
 
   /* Prevent iOS zoom on inputs */
@@ -16,7 +17,7 @@
 
   * {
     scrollbar-width: thin;
-    scrollbar-color: #1e2d45 #0b1120;
+    scrollbar-color: rgba(255,255,255,0.1) #080c08;
     -webkit-tap-highlight-color: transparent;
   }
 
@@ -25,10 +26,10 @@
     height: 6px;
   }
   *::-webkit-scrollbar-track {
-    background: #0b1120;
+    background: #080c08;
   }
   *::-webkit-scrollbar-thumb {
-    background: #1e2d45;
+    background: rgba(255,255,255,0.1);
     border-radius: 3px;
   }
 
@@ -44,7 +45,11 @@
   }
 
   .card {
-    @apply bg-surface border border-border rounded-xl p-4 sm:p-6;
+    background: #0d1208;
+    border: 1px solid rgba(255,255,255,0.07);
+    border-radius: 12px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.4);
+    @apply p-5 sm:p-6;
   }
 
   .badge-bull {
@@ -60,19 +65,25 @@
   }
 
   .btn-primary {
-    @apply inline-flex items-center justify-center gap-2 px-6 py-3.5 bg-accent text-bg font-semibold rounded-lg
-           active:bg-accent-dim transition-colors duration-150 min-h-[44px];
+    @apply inline-flex items-center justify-center gap-2 px-6 py-3.5 bg-accent text-bg rounded-lg min-h-[44px];
+    font-weight: 600;
+    border-radius: 8px;
+    transition: opacity 0.15s ease;
   }
 
   .btn-secondary {
-    @apply inline-flex items-center justify-center gap-2 px-6 py-3.5 bg-surface-2 text-text-primary font-medium rounded-lg border border-border
-           active:border-accent/50 active:text-accent transition-colors duration-150 min-h-[44px];
+    @apply inline-flex items-center justify-center gap-2 px-6 py-3.5 text-text-primary rounded-lg min-h-[44px];
+    font-weight: 500;
+    border: 1px solid rgba(255,255,255,0.2);
+    border-radius: 8px;
+    background: transparent;
+    transition: opacity 0.15s ease;
   }
 
   /* Desktop hover styles */
   @media (hover: hover) {
-    .btn-primary:hover { @apply bg-accent-dim; }
-    .btn-secondary:hover { @apply border-accent/50 text-accent; }
+    .btn-primary:hover { opacity: 0.85; }
+    .btn-secondary:hover { opacity: 0.85; border-color: rgba(255,255,255,0.35); }
   }
 
   .stat-number {
@@ -101,13 +112,13 @@
   animation-play-state: paused;
 }
 
-/* Glow effects */
+/* Glow effects — intentionally subtle */
 .glow-accent {
-  box-shadow: 0 0 20px rgba(0, 229, 160, 0.15);
+  box-shadow: none;
 }
 
 .glow-blue {
-  box-shadow: 0 0 20px rgba(14, 165, 233, 0.15);
+  box-shadow: none;
 }
 
 /* Pulse animation for live items */
@@ -149,8 +160,8 @@
 /* Grid background pattern — disabled on mobile for perf */
 .grid-bg {
   background-image:
-    linear-gradient(rgba(30, 45, 69, 0.3) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(30, 45, 69, 0.3) 1px, transparent 1px);
+    linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
   background-size: 48px 48px;
 }
 
@@ -227,11 +238,14 @@
   animation: toast-slide-up 0.25s ease-out;
 }
 
-/* Horizontal scroll pills — hide scrollbar */
-.pills-scroll {
-  -ms-overflow-style: none;
-  scrollbar-width: none;
+/* Editorial headline style */
+.headline-serif {
+  font-family: 'Instrument Serif', Georgia, serif;
+  font-weight: 400;
+  letter-spacing: -0.02em;
 }
-.pills-scroll::-webkit-scrollbar {
-  display: none;
+
+/* Tabular numbers for financial data */
+.font-mono, .font-tabular {
+  font-variant-numeric: tabular-nums;
 }

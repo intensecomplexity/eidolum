@@ -50,13 +50,13 @@ export default function Navbar() {
   };
 
   return (
-    <nav className="sticky top-0 z-50 bg-bg/80 backdrop-blur-md border-b border-border" ref={menuRef}>
+    <nav className="sticky top-0 z-50 bg-bg/80 backdrop-blur-md" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }} ref={menuRef}>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-14 sm:h-16">
           {/* Logo */}
           <Link to="/" className="flex items-center gap-2 min-h-[44px]">
             <BarChart3 className="w-5 h-5 sm:w-6 sm:h-6 text-accent" />
-            <span className="font-mono font-semibold text-base sm:text-lg">
+            <span className="font-serif text-lg sm:text-xl" style={{ letterSpacing: '-0.01em' }}>
               <span className="text-accent">eido</span>
               <span className="text-muted">lum</span>
             </span>

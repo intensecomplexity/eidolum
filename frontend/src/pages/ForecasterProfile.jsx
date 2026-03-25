@@ -97,7 +97,7 @@ export default function ForecasterProfile() {
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 sm:gap-6">
             <div>
               <div className="flex items-center gap-2 sm:gap-3 mb-1 flex-wrap">
-                <h1 className="font-bold" style={{ fontSize: 'clamp(22px, 5vw, 32px)' }}>{data.name}</h1>
+                <h1 className="headline-serif" style={{ fontSize: 'clamp(24px, 5vw, 36px)' }}>{data.name}</h1>
                 <PlatformBadge platform={data.platform} size={20} showLabel />
                 <StreakBadge streak={data.streak} />
                 <FollowButton forecaster={data} />

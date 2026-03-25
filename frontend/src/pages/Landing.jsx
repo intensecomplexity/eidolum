@@ -61,13 +61,13 @@ export default function Landing() {
                 <Eye className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                 Investor Intelligence Platform
               </div>
-              <h1 className="font-bold tracking-tight mb-4 sm:mb-5" style={{ fontSize: 'clamp(28px, 7vw, 64px)', lineHeight: 1.1 }}>
+              <h1 className="headline-serif mb-4 sm:mb-5" style={{ fontSize: 'clamp(2.5rem, 6vw, 4.5rem)', lineHeight: 1.08 }}>
                 Who should you<br />
                 <span className="text-accent">actually listen to?</span>
               </h1>
-              <p className="text-text-secondary text-base sm:text-lg max-w-xl mx-auto lg:mx-0 mb-6 sm:mb-8" style={{ lineHeight: 1.6 }}>
-                We track predictions from finance YouTubers, Reddit analysts, and X influencers,
-                verify them against real market outcomes, and rank forecasters by accuracy.
+              <p className="text-text-secondary text-base sm:text-lg max-w-xl mx-auto lg:mx-0 mb-6 sm:mb-8" style={{ lineHeight: 1.7 }}>
+                We verify predictions from 50+ finance influencers against real market data.
+                No hype, no guesswork — just accountability.
               </p>
               <div className="flex flex-col sm:flex-row items-stretch sm:items-center lg:items-start justify-center lg:justify-start gap-3 sm:gap-4">
                 <Link to="/leaderboard" className="btn-primary text-base w-full sm:w-auto">
