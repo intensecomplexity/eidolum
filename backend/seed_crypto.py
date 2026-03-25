@@ -50,14 +50,14 @@ SP500_90D_RETURN = 11.0
 # (handle, ticker, direction, context, count)
 CRYPTO_ASSIGNMENTS = [
     # Michael Saylor — BTC obsessive, always bullish
-    ("@saborayl", "BTC", "bullish", "Bitcoin is the apex property of the human race — buying more at ${entry}", 0.85, 7.0),
-    ("@saborayl", "BTC", "bullish", "There is no second best. BTC to ${target} — digital scarcity wins", 0.85, 7.0),
-    ("@saborayl", "BTC", "bullish", "Every company should hold BTC on their balance sheet — next stop ${target}", 0.85, 7.0),
-    ("@saborayl", "MSTR", "bullish", "MicroStrategy is the purest BTC play in equities — target ${target}", 0.80, 7.0),
-    ("@saborayl", "MSTR", "bullish", "MSTR premium to NAV is justified by our BTC acquisition strategy", 0.80, 7.0),
-    ("@saborayl", "BTC", "bullish", "Bitcoin fixes this. The fiat money printer is broken. Target ${target}", 0.85, 7.0),
-    ("@saborayl", "BTC", "bullish", "21 million. That's it. That's the bull case. BTC to ${target}", 0.85, 7.0),
-    ("@saborayl", "BTC", "bullish", "Buying another $500M in Bitcoin this quarter. HODL to ${target}", 0.85, 7.0),
+    ("@saylor", "BTC", "bullish", "Bitcoin is the apex property of the human race — buying more at ${entry}", 0.85, 7.0),
+    ("@saylor", "BTC", "bullish", "There is no second best. BTC to ${target} — digital scarcity wins", 0.85, 7.0),
+    ("@saylor", "BTC", "bullish", "Every company should hold BTC on their balance sheet — next stop ${target}", 0.85, 7.0),
+    ("@saylor", "MSTR", "bullish", "MicroStrategy is the purest BTC play in equities — target ${target}", 0.80, 7.0),
+    ("@saylor", "MSTR", "bullish", "MSTR premium to NAV is justified by our BTC acquisition strategy", 0.80, 7.0),
+    ("@saylor", "BTC", "bullish", "Bitcoin fixes this. The fiat money printer is broken. Target ${target}", 0.85, 7.0),
+    ("@saylor", "BTC", "bullish", "21 million. That's it. That's the bull case. BTC to ${target}", 0.85, 7.0),
+    ("@saylor", "BTC", "bullish", "Buying another $500M in Bitcoin this quarter. HODL to ${target}", 0.85, 7.0),
 
     # Cathie Wood — bullish BTC and ETH
     ("@CathieDWood", "BTC", "bullish", "Our research shows BTC reaching ${target} by end of cycle — institutional inflows accelerating", 0.60, -1.0),

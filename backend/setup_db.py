@@ -144,6 +144,65 @@ def populate_source_urls():
         db.close()
 
 
+def migrate_real_source_urls():
+    """Update existing predictions with real source_urls from the QUOTES dict in seed.py.
+    Matches on (forecaster_handle, ticker, direction) and overwrites fake placeholder URLs."""
+    db = SessionLocal()
+    try:
+        from seed import QUOTES
+        from models import Prediction
+
+        # Build forecaster lookup by handle
+        forecaster_by_handle = {f.handle: f for f in db.query(Forecaster).all()}
+        updated = 0
+
+        for (handle, ticker, direction), quote_data in QUOTES.items():
+            source_url = quote_data.get("source_url")
+            if not source_url:
+                continue
+
+            f = forecaster_by_handle.get(handle)
+            if not f:
+                continue
+
+            # Find matching predictions
+            preds = db.query(Prediction).filter(
+                Prediction.forecaster_id == f.id,
+                Prediction.ticker == ticker,
+                Prediction.direction == direction,
+            ).all()
+
+            for p in preds:
+                changed = False
+                if p.source_url != source_url:
+                    p.source_url = source_url
+                    changed = True
+                if quote_data.get("quote") and p.exact_quote != quote_data["quote"]:
+                    p.exact_quote = quote_data["quote"]
+                    changed = True
+                if quote_data.get("source_title") and p.source_title != quote_data["source_title"]:
+                    p.source_title = quote_data["source_title"]
+                    changed = True
+                if quote_data.get("source_type") and p.source_type != quote_data["source_type"]:
+                    p.source_type = quote_data["source_type"]
+                    changed = True
+                if changed:
+                    updated += 1
+
+        if updated:
+            db.commit()
+            print(f"[Eidolum] Migrated real source_urls for {updated} predictions.")
+        else:
+            print("[Eidolum] No predictions needed source_url migration.")
+        return updated
+    except Exception as e:
+        print(f"[Eidolum] migrate_real_source_urls error: {e}")
+        db.rollback()
+        return 0
+    finally:
+        db.close()
+
+
 def setup():
     print("Creating tables...")
     Base.metadata.create_all(bind=engine)
@@ -165,6 +224,9 @@ def setup():
 
     # Populate source URLs for predictions missing them
     populate_source_urls()
+
+    # Migrate predictions to use real source URLs from QUOTES
+    migrate_real_source_urls()
 
     print("Setup complete.")
 
