@@ -158,10 +158,52 @@ def migrate_platform_types():
         print(f"[Eidolum] Platform migration error (non-fatal): {e}")
 
 
+def migrate_profile_urls():
+    """Fix broken social media profile links. Safe to run every boot."""
+    URL_FIXES = {
+        "Nancy Pelosi Tracker": ("@PelosiTracker", "https://x.com/PelosiTracker"),
+        "Congress Trades Tracker": ("@CongressTrading", "https://x.com/CongressTrading"),
+        "Quiver Quantitative": ("@QuiverQuant", "https://x.com/QuiverQuant"),
+        "Elon Musk": ("@elonmusk", "https://x.com/elonmusk"),
+        "Michael Saylor": ("@saylor", "https://x.com/saylor"),
+        "Patrick Boyle": (None, "https://youtube.com/@PBoyle"),
+        "Mark Moss": (None, "https://youtube.com/@1MarkMoss"),
+        "Humphrey Yang": (None, "https://youtube.com/@humphreytalks"),
+        "JPMorgan Research": (None, "https://x.com/jpmorgan"),
+        "Motley Fool": (None, "https://x.com/TheMotleyFool"),
+    }
+    try:
+        db = SessionLocal()
+        updated = 0
+        for name, (handle, url) in URL_FIXES.items():
+            f = db.query(Forecaster).filter(Forecaster.name == name).first()
+            if not f:
+                continue
+            changed = False
+            if url and f.channel_url != url:
+                f.channel_url = url
+                changed = True
+            if handle and f.handle != handle:
+                f.handle = handle
+                changed = True
+            if changed:
+                updated += 1
+                print(f"[Eidolum] URL fix: {f.name} -> {url}")
+        if updated:
+            db.commit()
+            print(f"[Eidolum] URL migration: {updated} forecasters updated.")
+        else:
+            print("[Eidolum] URL migration: already up to date.")
+        db.close()
+    except Exception as e:
+        print(f"[Eidolum] URL migration error (non-fatal): {e}")
+
+
 @asynccontextmanager
 async def lifespan(app):
     init_db()
     migrate_platform_types()
+    migrate_profile_urls()
     # Clean fake video IDs from seed data
     try:
         from setup_db import clean_fake_video_ids
