@@ -21,7 +21,13 @@ def get_leaderboard(
     tab: str = Query(None),  # "week" | "sector" | None (all-time)
     filter: str = Query(None),
 ):
-    forecasters = db.query(Forecaster).all()
+    # Only show forecasters with at least 1 verified prediction
+    forecasters_with_predictions = db.query(Prediction.forecaster_id).filter(
+        Prediction.source_url.isnot(None)
+    ).distinct().subquery()
+    forecasters = db.query(Forecaster).filter(
+        Forecaster.id.in_(forecasters_with_predictions)
+    ).all()
 
     # For weekly tab, override period_days to 7
     effective_period = period_days

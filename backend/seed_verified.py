@@ -149,7 +149,7 @@ def seed_verified():
                OR source_url LIKE '%/watch?v=%'
                OR source_url LIKE '%/comments/%'
         """)).scalar()
-        if verified_count >= 5:
+        if verified_count >= 1:
             print(f"[Eidolum] {verified_count} verified predictions exist, skipping reseed")
             return
 
