@@ -91,6 +91,7 @@ class Prediction(Base):
     source_platform_id = Column(String, nullable=True)
     video_timestamp_sec = Column(Integer, nullable=True)
     verified_by = Column(String, nullable=True)  # 'ai_parsed'|'manual'|'auto_title'
+    archive_url = Column(Text, nullable=True)
 
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
 

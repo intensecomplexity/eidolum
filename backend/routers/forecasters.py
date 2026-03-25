@@ -99,6 +99,7 @@ def get_forecaster(request: Request, forecaster_id: int, db: Session = Depends(g
                 "context": p.context,
                 "exact_quote": p.exact_quote,
                 "source_url": p.source_url,
+                "archive_url": p.archive_url,
                 "source_type": p.source_type,
                 "source_title": p.source_title,
                 "source_platform_id": p.source_platform_id,

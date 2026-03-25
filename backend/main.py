@@ -179,6 +179,22 @@ def migrate_platform_types():
         print(f"[Eidolum] Platform migration error (non-fatal): {e}")
 
 
+def migrate_add_archive_url(db):
+    """Add archive_url column if it doesn't exist."""
+    try:
+        from sqlalchemy import text
+        db.execute(text("ALTER TABLE predictions ADD COLUMN archive_url VARCHAR"))
+        db.commit()
+        print("[Eidolum] archive_url column added")
+    except Exception as e:
+        db.rollback()
+        # Column already exists — expected on subsequent boots
+        if "duplicate column" in str(e).lower() or "already exists" in str(e).lower():
+            print("[Eidolum] archive_url column already exists")
+        else:
+            print(f"[Eidolum] migrate_add_archive_url: {e}")
+
+
 def migrate_populate_quotes(db):
     """Copy context into exact_quote where quote is missing. Safe/idempotent."""
     try:
@@ -274,6 +290,13 @@ async def lifespan(app):
         populate_source_urls()
     except Exception as e:
         print(f"[Eidolum] Source URL population error (non-fatal): {e}")
+    # Add archive_url column if missing
+    try:
+        db = SessionLocal()
+        migrate_add_archive_url(db)
+        db.close()
+    except Exception as e:
+        print(f"[Eidolum] archive_url migration error (non-fatal): {e}")
     # Populate missing exact_quote from context field
     try:
         db = SessionLocal()

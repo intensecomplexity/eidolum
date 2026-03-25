@@ -455,6 +455,24 @@ function PredictionRow({ p, forecaster: fc }) {
               );
             })()}
 
+            {/* Archived proof link */}
+            {p.archive_url && (
+              <a
+                href={p.archive_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={e => e.stopPropagation()}
+                style={{
+                  display: 'inline-flex', alignItems: 'center', gap: '4px',
+                  fontSize: '0.75rem', color: '#888',
+                  textDecoration: 'none', marginLeft: '8px',
+                }}
+                title="Archived copy — proof this was said even if deleted"
+              >
+                🗄 Archived proof
+              </a>
+            )}
+
             {/* Time horizon note */}
             {evalDate && (
               <p className="text-xs text-muted mb-2">

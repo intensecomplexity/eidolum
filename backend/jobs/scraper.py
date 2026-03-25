@@ -10,6 +10,24 @@ from models import Prediction, Forecaster
 TWITTER_BEARER = os.getenv("TWITTER_BEARER_TOKEN", "")
 YOUTUBE_API_KEY = os.getenv("YOUTUBE_API_KEY", "")
 
+
+def archive_url(url: str) -> str | None:
+    """Submit URL to archive.ph and return the archived URL."""
+    try:
+        r = httpx.post(
+            "https://archive.ph/submit/",
+            data={"url": url},
+            headers={"User-Agent": "Mozilla/5.0"},
+            follow_redirects=True,
+            timeout=15,
+        )
+        if r.url and "archive.ph/" in str(r.url):
+            return str(r.url)
+        match = re.search(r'https://archive\.ph/\w+', r.text)
+        return match.group(0) if match else None
+    except Exception:
+        return None
+
 # ── YouTube ──────────────────────────────────────────────────────────────────
 
 def get_prediction_timestamp(video_id: str, statement: str):
@@ -45,13 +63,15 @@ def scrape_youtube(db: Session):
                 if not vid_id or db.query(Prediction).filter(Prediction.source_platform_id == vid_id).first():
                     continue
                 title = item["snippet"]["title"]
+                description = item["snippet"].get("description", "")
                 timestamp = get_prediction_timestamp(vid_id, title)
                 source_url = f"https://youtube.com/watch?v={vid_id}"
                 if timestamp:
                     source_url = f"https://youtube.com/watch?v={vid_id}&t={timestamp}s"
+                full_quote = f"{title}\n\n{description}".strip() if description else title
                 db.add(Prediction(
                     forecaster_id=f.id, ticker="UNKNOWN",
-                    context=title[:200], exact_quote=title,
+                    context=title[:200], exact_quote=full_quote,
                     source_type="youtube", source_platform_id=vid_id,
                     source_url=source_url, source_title=title[:500],
                     video_timestamp_sec=timestamp,
@@ -92,12 +112,15 @@ def scrape_twitter(db: Session):
                     continue
                 if db.query(Prediction).filter(Prediction.source_platform_id == tweet["id"]).first():
                     continue
+                tweet_url = f"https://x.com/{handle}/status/{tweet['id']}"
+                archive = archive_url(tweet_url)
                 db.add(Prediction(
                     forecaster_id=f.id, ticker="UNKNOWN",
                     context=tweet["text"][:200],
                     exact_quote=tweet["text"], source_type="twitter",
                     source_platform_id=tweet["id"],
-                    source_url=f"https://x.com/{handle}/status/{tweet['id']}",
+                    source_url=tweet_url,
+                    archive_url=archive,
                     prediction_date=datetime.utcnow(), window_days=30,
                     direction="bullish", outcome="pending",
                     verified_by="ai_parsed",
@@ -139,13 +162,16 @@ def scrape_reddit(db: Session):
                 if not post_id or db.query(Prediction).filter(Prediction.source_platform_id == post_id).first():
                     continue
                 source_url = f"https://reddit.com{permalink}"
+                full_quote = f"{title}\n\n{selftext}".strip() if selftext else title
+                archive = archive_url(source_url)
                 db.add(Prediction(
                     forecaster_id=f.id, ticker="UNKNOWN",
                     context=title[:200],
-                    exact_quote=(selftext[:500] if selftext else title),
+                    exact_quote=full_quote,
                     source_type="reddit",
                     source_platform_id=post_id,
                     source_url=source_url,
+                    archive_url=archive,
                     prediction_date=datetime.utcnow(), window_days=30,
                     direction="bullish", outcome="pending",
                     verified_by="ai_parsed",

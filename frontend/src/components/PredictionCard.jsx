@@ -154,6 +154,24 @@ export default function PredictionCard({ prediction: p, showForecaster = false, 
         );
       })()}
 
+      {/* Archived proof link */}
+      {p.archive_url && (
+        <a
+          href={p.archive_url}
+          target="_blank"
+          rel="noopener noreferrer"
+          onClick={e => e.stopPropagation()}
+          style={{
+            display: 'inline-flex', alignItems: 'center', gap: '4px',
+            fontSize: '0.75rem', color: '#888',
+            textDecoration: 'none', marginLeft: '8px',
+          }}
+          title="Archived copy — proof this was said even if deleted"
+        >
+          🗄 Archived proof
+        </a>
+      )}
+
       {/* Evaluation date note */}
       {evalDate && (
         <div className="text-[10px] text-muted mt-1.5 italic">
