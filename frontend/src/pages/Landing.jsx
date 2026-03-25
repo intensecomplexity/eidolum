@@ -73,31 +73,7 @@ export default function Landing() {
         </p>
       </div>
 
-      {/* 3. LIVE LABEL */}
-      <div style={{ textAlign: 'center', marginBottom: '8px' }}>
-        <span style={{
-          fontSize: '0.75rem',
-          fontWeight: 600,
-          letterSpacing: '0.1em',
-          textTransform: 'uppercase',
-          color: '#00c896',
-          display: 'inline-flex',
-          alignItems: 'center',
-          gap: '6px',
-        }}>
-          <span style={{
-            width: '6px',
-            height: '6px',
-            borderRadius: '50%',
-            background: '#00c896',
-            display: 'inline-block',
-            animation: 'pulse 2s infinite',
-          }} />
-          Live
-        </span>
-      </div>
-
-      {/* 4. TODAY'S CALL */}
+      {/* 3. TODAY'S CALL */}
       <section className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 pb-6">
         <PredictionOfTheDay />
       </section>
