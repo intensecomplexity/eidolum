@@ -227,7 +227,7 @@ export default function Leaderboard() {
                             <td className="px-6 py-4">
                               <Link to={`/forecaster/${f.id}`} className="hover:text-accent transition-colors">
                                 <div className="flex items-center gap-2">
-                                  <span style={{ fontWeight: 600, fontSize: '0.95rem' }}>{f.name}</span>
+                                  <span style={{ fontWeight: 500, fontSize: '0.95rem' }}>{f.name}</span>
                                   <PlatformBadge platform={f.platform} />
                                   {f.has_disclosed_positions && (
                                     <span className="text-warning text-xs" title="Has disclosed positions">💼</span>

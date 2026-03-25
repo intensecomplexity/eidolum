@@ -3,8 +3,13 @@
 @tailwind utilities;
 
 @layer base {
+  *, *::before, *::after {
+    font-family: inherit;
+  }
+
   body {
-    @apply bg-bg text-text-primary font-sans;
+    @apply bg-bg text-text-primary;
+    font-family: 'Space Grotesk', system-ui, sans-serif;
     font-optical-sizing: auto;
     -webkit-font-smoothing: antialiased;
     touch-action: manipulation;
@@ -14,6 +19,19 @@
   /* Prevent iOS zoom on inputs */
   input, select, textarea {
     font-size: 16px !important;
+  }
+
+  /* Nav links */
+  nav a, nav button {
+    font-weight: 400;
+  }
+
+  /* Table column headers */
+  thead th {
+    font-weight: 500;
+    letter-spacing: 0.04em;
+    font-size: 0.72rem;
+    text-transform: uppercase;
   }
 
   * {
@@ -243,6 +261,7 @@
 /* Tabular numbers for financial data */
 .font-mono, .font-tabular {
   font-variant-numeric: tabular-nums;
+  font-weight: 600;
 }
 
 /* Table styling — subtle hover, refined borders */
