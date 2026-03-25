@@ -331,6 +331,19 @@ async def lifespan(app):
         seed_verified()
     except Exception as e:
         print(f"[Eidolum] Verified reseed error (non-fatal): {e}")
+    # Run YouTube historical import once if fewer than 100 predictions exist
+    try:
+        db = SessionLocal()
+        _pred_count = db.query(Prediction).count()
+        db.close()
+        if _pred_count < 100:
+            print("[Eidolum] Running YouTube 1-year historical import...")
+            db = SessionLocal()
+            from jobs.youtube_history import run_youtube_history
+            run_youtube_history(db)
+            db.close()
+    except Exception as e:
+        print(f"[Eidolum] YouTube history import error (non-fatal): {e}")
     # Add archive columns if missing
     try:
         db = SessionLocal()

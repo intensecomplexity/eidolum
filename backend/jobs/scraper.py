@@ -224,4 +224,9 @@ def run_scraper(db: Session):
         scrape_congress_trades(db)
     except Exception as e:
         print(f"[Scraper] Quiver error (non-fatal): {e}")
+    try:
+        from jobs.youtube_history import run_youtube_history
+        run_youtube_history(db)
+    except Exception as e:
+        print(f"[Scraper] YouTube history error (non-fatal): {e}")
     print("[Scraper] All done")
