@@ -21,7 +21,7 @@ export default {
       },
       fontFamily: {
         mono: ['JetBrains Mono', 'Fira Code', 'Consolas', 'monospace'],
-        sans: ['Plus Jakarta Sans', 'system-ui', 'sans-serif'],
+        sans: ['Sora', 'sans-serif'],
         serif: ['Instrument Serif', 'Georgia', 'serif'],
       },
     },
