@@ -127,12 +127,7 @@ export default function Landing() {
         </section>
       )}
 
-      {/* 5. RARE SIGNAL */}
-      <section className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 pb-10 sm:pb-16">
-        <RareSignalBanner />
-      </section>
-
-      {/* 6. HOT STREAKS */}
+      {/* 5. HOT STREAKS */}
       {hotStreaks.length > 0 && (
         <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-10 sm:pb-16">
           <h2 className="headline-serif mb-4 sm:mb-6" style={{ fontSize: 'clamp(20px, 4vw, 28px)' }}>
@@ -201,6 +196,11 @@ export default function Landing() {
           </div>
         </section>
       )}
+
+      {/* 7. RARE SIGNAL */}
+      <section className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 pb-10 sm:pb-16">
+        <RareSignalBanner />
+      </section>
 
       {/* 8. HOW IT WORKS */}
       <section id="how-it-works" style={{ padding: '72px 24px', maxWidth: '900px', margin: '0 auto' }}>
