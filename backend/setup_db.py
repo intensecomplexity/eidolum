@@ -52,6 +52,46 @@ def clean_fake_video_ids():
         db.close()
 
 
+def migrate_platform_types():
+    """Fix platform field for congress/institutional forecasters."""
+    CONGRESS = ["Nancy Pelosi Tracker", "Congress Trades Tracker", "Unusual Whales", "Quiver Quantitative"]
+    INSTITUTIONAL = [
+        "Goldman Sachs", "JPMorgan Research", "Morgan Stanley", "Jim Cramer",
+        "Liz Ann Sonders", "Dan Ives", "Tom Lee", "Bill Ackman",
+        "ARK Invest", "Motley Fool", "Hindenburg Research", "Citron Research",
+    ]
+    db = SessionLocal()
+    try:
+        updated = 0
+        for name in CONGRESS:
+            f = db.query(Forecaster).filter(Forecaster.name == name).first()
+            if f and f.platform != "congress":
+                print(f"  {f.name}: {f.platform!r} -> 'congress'")
+                f.platform = "congress"
+                updated += 1
+        for name in INSTITUTIONAL:
+            f = db.query(Forecaster).filter(Forecaster.name == name).first()
+            if f and f.platform != "institutional":
+                print(f"  {f.name}: {f.platform!r} -> 'institutional'")
+                f.platform = "institutional"
+                updated += 1
+        if updated:
+            db.commit()
+            print(f"[Eidolum] Platform migration: {updated} forecasters updated.")
+        else:
+            print("[Eidolum] Platform migration: already up to date.")
+
+        # Verify
+        congress_count = db.query(Forecaster).filter(Forecaster.platform == "congress").count()
+        institutional_count = db.query(Forecaster).filter(Forecaster.platform == "institutional").count()
+        print(f"[Eidolum] Verify: congress={congress_count}, institutional={institutional_count}")
+    except Exception as e:
+        print(f"[Eidolum] Platform migration error: {e}")
+        db.rollback()
+    finally:
+        db.close()
+
+
 def setup():
     print("Creating tables...")
     Base.metadata.create_all(bind=engine)
@@ -67,6 +107,9 @@ def setup():
         print("Data seeded.")
         # Clean fake IDs from freshly seeded data too
         clean_fake_video_ids()
+
+    # Always run platform migration
+    migrate_platform_types()
 
     print("Setup complete.")
 

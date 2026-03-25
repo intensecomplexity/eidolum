@@ -72,21 +72,31 @@ def migrate_platform_types():
         updated = 0
         for name in CONGRESS_NAMES:
             f = db.query(Forecaster).filter(Forecaster.name == name).first()
-            if f and f.platform != "congress":
-                f.platform = "congress"
-                updated += 1
-                print(f"[Eidolum] Migration: {f.name} -> congress")
+            if f:
+                if f.platform != "congress":
+                    print(f"[Eidolum] Migration: {f.name} ({f.platform!r}) -> congress")
+                    f.platform = "congress"
+                    updated += 1
+            else:
+                print(f"[Eidolum] Migration: '{name}' not found in DB")
         for name in INSTITUTIONAL_NAMES:
             f = db.query(Forecaster).filter(Forecaster.name == name).first()
-            if f and f.platform != "institutional":
-                f.platform = "institutional"
-                updated += 1
-                print(f"[Eidolum] Migration: {f.name} -> institutional")
+            if f:
+                if f.platform != "institutional":
+                    print(f"[Eidolum] Migration: {f.name} ({f.platform!r}) -> institutional")
+                    f.platform = "institutional"
+                    updated += 1
+            else:
+                print(f"[Eidolum] Migration: '{name}' not found in DB")
         if updated:
             db.commit()
             print(f"[Eidolum] Platform migration: {updated} forecasters updated.")
         else:
             print("[Eidolum] Platform migration: already up to date.")
+        # Verify counts
+        congress_n = db.query(Forecaster).filter(Forecaster.platform == "congress").count()
+        institutional_n = db.query(Forecaster).filter(Forecaster.platform == "institutional").count()
+        print(f"[Eidolum] Platform counts: congress={congress_n}, institutional={institutional_n}")
         db.close()
     except Exception as e:
         print(f"[Eidolum] Platform migration error (non-fatal): {e}")
@@ -159,9 +169,15 @@ def debug():
     try:
         db = SessionLocal()
         count = db.query(Forecaster).count()
-        db.close()
         info["db_connected"] = True
         info["forecaster_count"] = count
+        # Platform breakdown
+        from sqlalchemy import func
+        platform_counts = db.query(
+            Forecaster.platform, func.count(Forecaster.id)
+        ).group_by(Forecaster.platform).all()
+        info["platform_breakdown"] = {p: c for p, c in platform_counts}
+        db.close()
     except Exception as e:
         info["db_connected"] = False
         info["db_error"] = str(e)
