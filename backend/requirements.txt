@@ -11,3 +11,4 @@ psycopg2-binary==2.9.9
 requests==2.32.3
 resend==2.0.0
 apscheduler==3.10.4
+youtube-transcript-api==0.6.2

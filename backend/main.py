@@ -163,6 +163,26 @@ def migrate_platform_types():
         print(f"[Eidolum] Platform migration error (non-fatal): {e}")
 
 
+def migrate_clear_fake_source_urls(db):
+    """Clear source URLs that aren't real post/video/tweet links. Safe/idempotent."""
+    try:
+        from sqlalchemy import text
+        result = db.execute(text("""
+            UPDATE predictions
+            SET source_url = NULL
+            WHERE source_url IS NOT NULL
+            AND source_url NOT LIKE '%/watch?v=%'
+            AND source_url NOT LIKE '%/status/%'
+            AND source_url NOT LIKE '%/comments/%'
+            AND source_url NOT LIKE '%reddit.com/r/%'
+        """))
+        db.commit()
+        print(f"[Eidolum] Cleared {result.rowcount} fake source URLs")
+    except Exception as e:
+        db.rollback()
+        print(f"[Eidolum] migrate_clear_fake_source_urls error: {e}")
+
+
 def migrate_profile_urls():
     """Fix broken social media profile links. Safe to run every boot."""
     URL_FIXES = {
@@ -221,6 +241,13 @@ async def lifespan(app):
         populate_source_urls()
     except Exception as e:
         print(f"[Eidolum] Source URL population error (non-fatal): {e}")
+    # Clear fake source URLs from seed data
+    try:
+        db = SessionLocal()
+        migrate_clear_fake_source_urls(db)
+        db.close()
+    except Exception as e:
+        print(f"[Eidolum] Fake URL cleanup error (non-fatal): {e}")
     # Seed crypto predictions (safe — checks for existing data before inserting)
     try:
         from seed_crypto import seed_crypto

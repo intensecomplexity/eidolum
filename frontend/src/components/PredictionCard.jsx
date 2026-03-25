@@ -5,40 +5,41 @@ import BookmarkButton from './BookmarkButton';
 
 const HORIZON_LABELS = { short: '30d', medium: '90d', long: '1y', custom: 'Custom' };
 
-function getSmartUrl(prediction, forecaster) {
-  const ticker = prediction.ticker;
-  const handle = (forecaster?.handle || '').replace('@', '').replace('u/', '');
-  const channelUrl = forecaster?.channel_url || '';
-  const platform = forecaster?.platform || '';
+function getSourceButton(p) {
+  const url = p.source_url;
+  if (!url) return null;
 
-  if (prediction.source_url && (
-    prediction.source_url.includes('/watch?v=') ||
-    prediction.source_url.includes('/status/') ||
-    prediction.source_url.includes('/comments/')
-  )) return { url: prediction.source_url, label: null };
-
-  if (platform === 'youtube' || channelUrl.includes('youtube.com')) {
-    const ch = channelUrl.split('@')[1]?.split('/')[0] || handle;
-    return { url: `https://www.youtube.com/@${ch}/search?query=${ticker}`, label: `\uD83D\uDD0D Search ${ticker} videos` };
+  // YouTube with timestamp
+  if ((url.includes('youtube.com') || url.includes('youtu.be')) && url.includes('watch?v=')) {
+    const hasTimestamp = url.includes('&t=');
+    const label = hasTimestamp
+      ? `▶ Watch at ${formatTimestamp(p.video_timestamp_sec)}`
+      : '▶ Watch on YouTube';
+    return { url, label, bg: '#00c896', color: '#000' };
   }
 
-  if (platform === 'x' || platform === 'twitter' || platform === 'congress' || platform === 'institutional') {
-    const xh = handle || channelUrl.split('x.com/')[1]?.split('/')[0] || '';
-    if (xh) return { url: `https://x.com/search?q=from%3A${xh}+%24${ticker}&f=live`, label: `\uD83D\uDD0D Search $${ticker} tweets` };
+  // Twitter/X — exact tweet
+  if (url.includes('x.com') && url.includes('/status/')) {
+    return { url, label: '𝕏 View on X', bg: '#000', color: '#fff' };
+  }
+  if (url.includes('twitter.com') && url.includes('/status/')) {
+    return { url, label: '𝕏 View on X', bg: '#000', color: '#fff' };
   }
 
-  if (platform === 'reddit' || channelUrl.includes('reddit.com')) {
-    if (channelUrl.includes('/r/')) {
-      const sub = channelUrl.split('/r/')[1]?.split('/')[0];
-      return { url: `https://www.reddit.com/r/${sub}/search/?q=${ticker}&restrict_sr=1&sort=new`, label: `\uD83D\uDD0D Search ${ticker} posts` };
-    }
-    if (channelUrl.includes('/user/')) {
-      const u = channelUrl.split('/user/')[1]?.split('/')[0];
-      return { url: `https://www.reddit.com/user/${u}/submitted/?q=${ticker}`, label: `\uD83D\uDD0D Search ${ticker} posts` };
-    }
+  // Reddit — exact post
+  if (url.includes('reddit.com') && (url.includes('/comments/') || url.includes('/r/'))) {
+    return { url, label: '🔴 View on Reddit', bg: '#ff4500', color: '#fff' };
   }
 
-  return channelUrl ? { url: channelUrl, label: '\uD83D\uDD17 View Profile' } : null;
+  // Fallback — no button for anything else (profile links, channel links etc)
+  return null;
+}
+
+function formatTimestamp(sec) {
+  if (!sec) return '';
+  const m = Math.floor(sec / 60);
+  const s = sec % 60;
+  return `${m}:${String(s).padStart(2, '0')}`;
 }
 
 function formatDate(iso) {
@@ -116,36 +117,20 @@ export default function PredictionCard({ prediction: p, showForecaster = false, 
 
       {/* Source link */}
       {(() => {
-        const fc = forecaster || p.forecaster || null;
-        const smart = getSmartUrl(p, fc);
-        if (!smart) return null;
-
-        let label = smart.label;
-        let bg = '#00e5a0';
-        if (!label) {
-          const fmtTs = (s) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
-          if (smart.url.includes('youtube.com/watch')) {
-            label = p.video_timestamp_sec ? `\u25B6 Watch at ${fmtTs(p.video_timestamp_sec)}` : '\u25B6 Watch on YouTube';
-            bg = '#00c896';
-          } else if (smart.url.includes('x.com/') || smart.url.includes('twitter.com/')) {
-            label = '\uD835\uDD4F View on X'; bg = '#000';
-          } else if (smart.url.includes('reddit.com/')) {
-            label = '\uD83D\uDD34 View on Reddit'; bg = '#ff4500';
-          } else {
-            label = '\uD83D\uDD17 View Source'; bg = '#444';
-          }
-        }
-
+        const btn = getSourceButton(p);
+        if (!btn) return null;
         return (
-          <a href={smart.url} target="_blank" rel="noopener noreferrer"
+          <a href={btn.url} target="_blank" rel="noopener noreferrer"
             onClick={e => e.stopPropagation()}
             style={{
               display: 'inline-flex', alignItems: 'center', gap: '6px',
-              padding: '4px 10px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: 500,
-              background: bg, color: 'white', textDecoration: 'none', marginTop: '8px',
-              border: 'none', cursor: 'pointer',
-            }}
-          >{label}</a>
+              padding: '6px 14px', borderRadius: '6px',
+              fontSize: '0.85rem', fontWeight: 500,
+              background: btn.bg, color: btn.color,
+              textDecoration: 'none', marginBottom: '12px'
+            }}>
+            {btn.label}
+          </a>
         );
       })()}
 

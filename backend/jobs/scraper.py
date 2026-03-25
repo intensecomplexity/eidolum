@@ -1,10 +1,8 @@
 """
-Scraper job — fetches new predictions from Twitter/X and YouTube.
+Scraper job — fetches new predictions from Twitter/X, YouTube, and Reddit.
 Runs every hour via APScheduler.
 """
-import re
-import httpx
-import os
+import httpx, os, re
 from datetime import datetime
 from sqlalchemy.orm import Session
 from models import Prediction, Forecaster
@@ -12,162 +10,154 @@ from models import Prediction, Forecaster
 TWITTER_BEARER = os.getenv("TWITTER_BEARER_TOKEN", "")
 YOUTUBE_API_KEY = os.getenv("YOUTUBE_API_KEY", "")
 
-PREDICTION_KEYWORDS = re.compile(
-    r"predict|will|target|expect|price|\$|forecast|bull|bear", re.IGNORECASE
-)
+# ── YouTube ──────────────────────────────────────────────────────────────────
 
-
-def scrape_twitter(db: Session):
-    """Fetch recent prediction-related tweets using the free v2 user timeline."""
-    if not TWITTER_BEARER:
-        print("[Scraper] No TWITTER_BEARER_TOKEN, skipping X scrape")
-        return
-
-    headers = {"Authorization": f"Bearer {TWITTER_BEARER}"}
-    forecasters = db.query(Forecaster).filter(
-        Forecaster.channel_url.contains("x.com")
-    ).all()
-
-    new_count = 0
-    for f in forecasters:
-        handle = f.channel_url.rstrip("/").split("/")[-1]
-        try:
-            # Step 1: Resolve handle → user ID
-            user_r = httpx.get(
-                f"https://api.twitter.com/2/users/by/username/{handle}",
-                headers=headers,
-                timeout=10,
-            )
-            if user_r.status_code != 200:
-                print(f"[Scraper] Twitter user lookup {user_r.status_code} for {handle}")
-                continue
-            user_id = user_r.json().get("data", {}).get("id")
-            if not user_id:
-                print(f"[Scraper] No user ID found for {handle}")
-                continue
-
-            # Step 2: Fetch recent tweets from user timeline
-            tweets_r = httpx.get(
-                f"https://api.twitter.com/2/users/{user_id}/tweets",
-                headers=headers,
-                params={
-                    "max_results": 10,
-                    "tweet.fields": "created_at,text",
-                    "exclude": "retweets",
-                },
-                timeout=10,
-            )
-            if tweets_r.status_code != 200:
-                print(f"[Scraper] Twitter timeline {tweets_r.status_code} for {handle}")
-                continue
-
-            for tweet in tweets_r.json().get("data", []):
-                # Step 3: Filter for prediction-related content
-                if not PREDICTION_KEYWORDS.search(tweet["text"]):
-                    continue
-
-                # Skip if we already have this tweet
-                if db.query(Prediction).filter(
-                    Prediction.source_platform_id == tweet["id"]
-                ).first():
-                    continue
-
-                db.add(Prediction(
-                    forecaster_id=f.id,
-                    ticker="UNKNOWN",  # Will be parsed by AI later
-                    direction="bullish",  # Will be classified later
-                    prediction_date=datetime.utcnow(),
-                    window_days=30,
-                    outcome="pending",
-                    exact_quote=tweet["text"][:500],
-                    context=tweet["text"][:200],
-                    source_type="twitter",
-                    source_platform_id=tweet["id"],
-                    source_url=f"https://x.com/{handle}/status/{tweet['id']}",
-                    verified_by="ai_parsed",
-                ))
-                new_count += 1
-        except Exception as e:
-            print(f"[Scraper] Twitter error for {handle}: {e}")
-
-    db.commit()
-    if new_count:
-        print(f"[Scraper] Found {new_count} new tweets")
-
+def get_prediction_timestamp(video_id: str, statement: str):
+    try:
+        from youtube_transcript_api import YouTubeTranscriptApi
+        transcript = YouTubeTranscriptApi.get_transcript(video_id)
+        keywords = [w.lower() for w in statement.split() if len(w) > 4]
+        best_match, best_score = None, 0
+        for entry in transcript:
+            score = sum(1 for kw in keywords if kw in entry['text'].lower())
+            if score > best_score:
+                best_score, best_match = score, entry
+        return int(best_match['start']) if best_match and best_score >= 2 else None
+    except:
+        return None
 
 def scrape_youtube(db: Session):
-    """Fetch recent prediction videos from tracked YouTube forecasters."""
     if not YOUTUBE_API_KEY:
-        print("[Scraper] No YOUTUBE_API_KEY, skipping YouTube scrape")
+        print("[Scraper] No YOUTUBE_API_KEY, skipping")
         return
-
-    forecasters = db.query(Forecaster).filter(
-        Forecaster.channel_url.contains("youtube.com")
-    ).all()
-
-    new_count = 0
+    forecasters = db.query(Forecaster).filter(Forecaster.channel_url.contains("youtube.com")).all()
     for f in forecasters:
-        handle = f.channel_url.rstrip("/").split("/@")[-1] if "/@" in (f.channel_url or "") else f.handle
+        handle = f.channel_url.rstrip("/").split("/@")[-1]
         try:
             r = httpx.get(
                 "https://www.googleapis.com/youtube/v3/search",
-                params={
-                    "key": YOUTUBE_API_KEY,
-                    "q": f"{handle} prediction forecast",
-                    "type": "video",
-                    "maxResults": 5,
-                    "order": "date",
-                    "part": "snippet",
-                },
-                timeout=10,
+                params={"key": YOUTUBE_API_KEY, "q": f"{handle} prediction forecast", "type": "video",
+                        "maxResults": 5, "order": "date", "part": "snippet"},
+                timeout=10
             )
-            if r.status_code != 200:
-                print(f"[Scraper] YouTube API {r.status_code} for {handle}")
-                continue
-
             for item in r.json().get("items", []):
                 vid_id = item["id"].get("videoId")
-                if not vid_id:
+                if not vid_id or db.query(Prediction).filter(Prediction.source_platform_id == vid_id).first():
                     continue
-                # Skip if we already have this video
-                if db.query(Prediction).filter(
-                    Prediction.source_platform_id == vid_id
-                ).first():
-                    continue
-
-                title = item["snippet"]["title"][:500]
+                title = item["snippet"]["title"]
+                timestamp = get_prediction_timestamp(vid_id, title)
+                source_url = f"https://youtube.com/watch?v={vid_id}"
+                if timestamp:
+                    source_url = f"https://youtube.com/watch?v={vid_id}&t={timestamp}s"
                 db.add(Prediction(
-                    forecaster_id=f.id,
-                    ticker="UNKNOWN",  # Will be parsed by AI later
-                    direction="bullish",  # Will be classified later
-                    prediction_date=datetime.utcnow(),
-                    window_days=30,
-                    outcome="pending",
-                    exact_quote=title,
-                    context=title[:200],
-                    source_type="youtube",
-                    source_platform_id=vid_id,
-                    source_url=f"https://youtube.com/watch?v={vid_id}",
-                    source_title=title,
+                    forecaster_id=f.id, ticker="UNKNOWN",
+                    context=title[:200], exact_quote=title,
+                    source_type="youtube", source_platform_id=vid_id,
+                    source_url=source_url, source_title=title[:500],
+                    video_timestamp_sec=timestamp,
+                    prediction_date=datetime.utcnow(), window_days=30,
+                    direction="bullish", outcome="pending",
                     verified_by="ai_parsed",
                 ))
-                new_count += 1
         except Exception as e:
             print(f"[Scraper] YouTube error for {handle}: {e}")
-
     db.commit()
-    if new_count:
-        print(f"[Scraper] Found {new_count} new YouTube videos")
+    print("[Scraper] YouTube done")
 
+# ── Twitter/X ─────────────────────────────────────────────────────────────────
+
+def scrape_twitter(db: Session):
+    if not TWITTER_BEARER:
+        print("[Scraper] No TWITTER_BEARER_TOKEN, skipping")
+        return
+    headers = {"Authorization": f"Bearer {TWITTER_BEARER}"}
+    forecasters = db.query(Forecaster).filter(Forecaster.channel_url.contains("x.com")).all()
+    KEYWORDS = re.compile(r'predict|will|target|expect|price|\$|forecast|bull|bear', re.I)
+    for f in forecasters:
+        handle = f.channel_url.rstrip("/").split("/")[-1]
+        try:
+            # Get user ID
+            r = httpx.get(f"https://api.twitter.com/2/users/by/username/{handle}",
+                          headers=headers, timeout=10)
+            user_id = r.json().get("data", {}).get("id")
+            if not user_id:
+                continue
+            # Get timeline
+            r = httpx.get(f"https://api.twitter.com/2/users/{user_id}/tweets",
+                          headers=headers,
+                          params={"max_results": 10, "tweet.fields": "created_at,text", "exclude": "retweets"},
+                          timeout=10)
+            for tweet in r.json().get("data", []):
+                if not KEYWORDS.search(tweet["text"]):
+                    continue
+                if db.query(Prediction).filter(Prediction.source_platform_id == tweet["id"]).first():
+                    continue
+                db.add(Prediction(
+                    forecaster_id=f.id, ticker="UNKNOWN",
+                    context=tweet["text"][:200],
+                    exact_quote=tweet["text"], source_type="twitter",
+                    source_platform_id=tweet["id"],
+                    source_url=f"https://x.com/{handle}/status/{tweet['id']}",
+                    prediction_date=datetime.utcnow(), window_days=30,
+                    direction="bullish", outcome="pending",
+                    verified_by="ai_parsed",
+                ))
+        except Exception as e:
+            print(f"[Scraper] Twitter error for {handle}: {e}")
+    db.commit()
+    print("[Scraper] Twitter done")
+
+# ── Reddit / WallStreetBets ───────────────────────────────────────────────────
+
+def scrape_reddit(db: Session):
+    forecasters = db.query(Forecaster).filter(Forecaster.channel_url.contains("reddit.com")).all()
+    KEYWORDS = re.compile(r'predict|will|target|expect|price|\$|forecast|bull|bear|moon|calls|puts', re.I)
+    headers = {"User-Agent": "eidolum-scraper/1.0"}
+    for f in forecasters:
+        # support both /r/subreddit and /user/username
+        channel = f.channel_url.rstrip("/")
+        if "/r/" in channel:
+            subreddit = channel.split("/r/")[1].split("/")[0]
+            url = f"https://www.reddit.com/r/{subreddit}/new.json?limit=25"
+        elif "/user/" in channel:
+            username = channel.split("/user/")[1].split("/")[0]
+            url = f"https://www.reddit.com/user/{username}/submitted.json?limit=25"
+        else:
+            continue
+        try:
+            r = httpx.get(url, headers=headers, timeout=10)
+            posts = r.json().get("data", {}).get("children", [])
+            for post in posts:
+                data = post.get("data", {})
+                post_id = data.get("id")
+                title = data.get("title", "")
+                selftext = data.get("selftext", "")
+                permalink = data.get("permalink", "")
+                full_text = f"{title} {selftext}"
+                if not KEYWORDS.search(full_text):
+                    continue
+                if not post_id or db.query(Prediction).filter(Prediction.source_platform_id == post_id).first():
+                    continue
+                source_url = f"https://reddit.com{permalink}"
+                db.add(Prediction(
+                    forecaster_id=f.id, ticker="UNKNOWN",
+                    context=title[:200],
+                    exact_quote=(selftext[:500] if selftext else title),
+                    source_type="reddit",
+                    source_platform_id=post_id,
+                    source_url=source_url,
+                    prediction_date=datetime.utcnow(), window_days=30,
+                    direction="bullish", outcome="pending",
+                    verified_by="ai_parsed",
+                ))
+        except Exception as e:
+            print(f"[Scraper] Reddit error for {f.channel_url}: {e}")
+    db.commit()
+    print("[Scraper] Reddit done")
 
 def run_scraper(db: Session):
-    """Main entry point — scrape all platforms."""
-    print(f"[Scraper] Starting at {datetime.utcnow().isoformat()}")
-    try:
-        scrape_twitter(db)
-        scrape_youtube(db)
-        print("[Scraper] Done")
-    except Exception as e:
-        print(f"[Scraper] Fatal error: {e}")
-    finally:
-        db.close()
+    print("[Scraper] Starting...")
+    scrape_twitter(db)
+    scrape_youtube(db)
+    scrape_reddit(db)
+    print("[Scraper] All done")
