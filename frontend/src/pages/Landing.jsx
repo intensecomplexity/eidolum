@@ -2,17 +2,20 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Search, BarChart3, CheckCircle } from 'lucide-react';
 import TickerBar from '../components/TickerBar';
+import StatCard from '../components/StatCard';
 import ActivityFeed from '../components/ActivityFeed';
 import Footer from '../components/Footer';
 import RareSignalBanner from '../components/RareSignalBanner';
 import NewsletterSignup from '../components/NewsletterSignup';
-import { getLeaderboard } from '../api';
+import { getLeaderboard, getHomepageStats } from '../api';
 
 export default function Landing() {
   const [forecasters, setForecasters] = useState([]);
+  const [stats, setStats] = useState(null);
 
   useEffect(() => {
     getLeaderboard().then(setForecasters).catch(() => {});
+    getHomepageStats().then(setStats).catch(() => {});
   }, []);
 
   return (
@@ -94,7 +97,38 @@ export default function Landing() {
         </div>
       </section>
 
-      {/* 6. NEWSLETTER */}
+      {/* 6. STATS */}
+      <section className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12">
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 sm:gap-4">
+          <StatCard
+            label="Tracked Forecasters"
+            value={stats ? stats.forecasters_tracked : '—'}
+            sub="YouTube, Reddit, X"
+          />
+          <StatCard
+            label="Verified Predictions"
+            value={stats ? stats.verified_predictions.toLocaleString() : '—'}
+            sub="Scored against market data"
+          />
+          <StatCard
+            label="Months of Data"
+            value={stats ? stats.months_of_data : '—'}
+            sub="Historical tracking"
+          />
+          <StatCard
+            label="Avg Accuracy"
+            value={stats ? `${stats.avg_accuracy}%` : '—'}
+            sub="Across all forecasters"
+          />
+          <StatCard
+            label="Conflict Flags"
+            value={stats ? stats.conflict_flags?.toLocaleString() || '0' : '—'}
+            sub={`Across ${stats?.transparency_tracked || 0} investors`}
+          />
+        </div>
+      </section>
+
+      {/* 7. NEWSLETTER */}
       <section style={{ padding: '72px 24px', textAlign: 'center', borderTop: '1px solid rgba(255,255,255,0.07)' }}>
         <h2 style={{ fontFamily: "'Instrument Serif', serif", fontWeight: 400, fontSize: 'clamp(1.6rem, 3vw, 2.4rem)', marginBottom: '12px' }}>
           Stay ahead of the market
