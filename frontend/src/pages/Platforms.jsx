@@ -2,15 +2,8 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowRight } from 'lucide-react';
 import Footer from '../components/Footer';
+import PlatformBadge from '../components/PlatformBadge';
 import { getPlatforms } from '../api';
-
-const PLATFORM_ICONS = {
-  youtube: '\ud83d\udcfa',
-  twitter: '\ud83d\udc26',
-  congress: '\ud83c\udfdb\ufe0f',
-  reddit: '\ud83e\udd16',
-  institutional: '\ud83c\udfe6',
-};
 
 export default function Platforms() {
   const [platforms, setPlatforms] = useState([]);
@@ -59,7 +52,7 @@ export default function Platforms() {
 
               {/* Icon + name */}
               <div className="flex items-center gap-3 mb-4">
-                <span className="text-[32px] leading-none">{PLATFORM_ICONS[p.id] || p.icon}</span>
+                <PlatformBadge platform={p.id} size={28} />
                 <span className="text-lg font-bold text-text-primary">{p.name}</span>
               </div>
 

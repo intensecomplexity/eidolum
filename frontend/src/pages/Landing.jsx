@@ -132,7 +132,7 @@ export default function Landing() {
                   className="shrink-0 bg-surface border border-border rounded-xl px-4 py-3 active:border-accent/30 hover:border-accent/30 transition-colors text-center min-w-[120px]"
                 >
                   <div className="flex items-center justify-center gap-1 mb-1">
-                    <span className="text-lg">{p.icon}</span>
+                    <PlatformBadge platform={p.id} size={20} />
                     {isBest && <span className="text-sm" title="Top platform">{'\ud83d\udc51'}</span>}
                   </div>
                   <div className="text-text-primary text-xs font-medium mb-1 whitespace-nowrap">{p.name}</div>

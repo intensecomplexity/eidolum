@@ -26,7 +26,6 @@ export default function ForecasterProfile() {
 
   // Map forecaster platform to platformId for routing
   const PLATFORM_ID_MAP = { youtube: 'youtube', x: 'twitter', reddit: 'reddit', congress: 'congress', institutional: 'institutional' };
-  const PLATFORM_ICONS = { youtube: '\ud83d\udcfa', x: '\ud83d\udc26', reddit: '\ud83e\udd16', congress: '\ud83c\udfdb\ufe0f', institutional: '\ud83c\udfe6' };
 
   useEffect(() => {
     setLoading(true);
@@ -42,7 +41,6 @@ export default function ForecasterProfile() {
               setPlatformInfo({
                 platformId: pid,
                 platformName: pd.name,
-                platformIcon: PLATFORM_ICONS[d.platform] || pd.icon,
                 platformRank: entry.platform_rank,
                 totalOnPlatform: pd.forecaster_count,
               });
@@ -133,7 +131,7 @@ export default function ForecasterProfile() {
                   to={`/platforms/${platformInfo.platformId}`}
                   className="inline-flex items-center gap-1.5 text-sm text-text-secondary hover:text-accent transition-colors mt-2"
                 >
-                  <span>{platformInfo.platformIcon}</span>
+                  <PlatformBadge platform={platformInfo.platformId} size={16} />
                   <span>
                     <span className="font-mono font-semibold text-accent">#{platformInfo.platformRank}</span>
                     {' '}on {platformInfo.platformName} out of {platformInfo.totalOnPlatform} tracked
