@@ -277,34 +277,6 @@ async def lifespan(app):
         db.close()
     except Exception as e:
         print(f"[Eidolum] Fake data wipe error (non-fatal): {e}")
-    # Enforce prediction quality — delete vague predictions on every boot
-    try:
-        from sqlalchemy import text as _vt
-        db = SessionLocal()
-        before = db.execute(_vt("SELECT COUNT(*) FROM predictions")).scalar()
-        # Keep predictions that have specific falsifiable language, OR are whitelisted source URLs
-        db.execute(_vt("""
-            DELETE FROM predictions
-            WHERE id NOT IN (
-                SELECT id FROM predictions WHERE
-                exact_quote ~* '(will reach|will hit|price target|to \\$[0-9]|going to [0-9]|target of|buy |sell |bullish on|bearish on|overvalued|undervalued|calls |puts |forecast|by 20[0-9]{2}|crash|bottom|top at|i expect|i predict)'
-                OR context ~* '(will reach|will hit|price target|to \\$[0-9]|going to [0-9]|target of|buy |sell |bullish on|bearish on|overvalued|undervalued|calls |puts |forecast|by 20[0-9]{2}|crash|bottom|top at|i expect|i predict)'
-            )
-            AND source_url NOT IN (
-                'https://www.reddit.com/r/wallstreetbets/comments/l6xnte/gme_yolo_update_jan_25_2021/',
-                'https://www.reddit.com/r/wallstreetbets/comments/n3rjlp/amc_the_apes_are_coming/'
-            )
-        """))
-        db.commit()
-        after = db.execute(_vt("SELECT COUNT(*) FROM predictions")).scalar()
-        deleted = before - after
-        if deleted > 0:
-            print(f"[Eidolum] Wiped {deleted} vague predictions (kept {after} with falsifiable claims)")
-        else:
-            print(f"[Eidolum] No vague predictions to wipe ({after} total)")
-        db.close()
-    except Exception as e:
-        print(f"[Quality] enforce_prediction_quality error (non-fatal): {e}")
     # Clear old config flag if it exists
     try:
         from sqlalchemy import text as _text
@@ -370,11 +342,12 @@ async def lifespan(app):
             print(f"[Eidolum] Background import starting — {pred_count} predictions exist")
             if pred_count < 5000:
                 from jobs.youtube_history import run_youtube_history
-                from jobs.twitter_history import scrape_twitter_history, scrape_via_nitter_all
+                from jobs.twitter_history import scrape_twitter_history, scrape_via_nitter_all, scrape_nitter_rss
                 from jobs.reddit_history import scrape_reddit_history
                 run_youtube_history(db)
                 scrape_twitter_history(db)
                 scrape_via_nitter_all(db)
+                scrape_nitter_rss(db)
                 scrape_reddit_history(db)
                 # New expanded sources
                 try:

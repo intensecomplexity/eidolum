@@ -10,15 +10,20 @@ from models import Prediction, Forecaster
 from jobs.prediction_filter import is_valid_prediction
 
 SUBSTACK_FEEDS = [
-    {"name": "Meb Faber",           "handle": "MebFaber",       "url": "https://mebfaber.substack.com/feed"},
-    {"name": "The Kobeissi Letter",  "handle": "KobeissiLetter", "url": "https://kobeissiletter.substack.com/feed"},
-    {"name": "Compounding Quality",  "handle": "QCompounding",   "url": "https://compoundingquality.substack.com/feed"},
-    {"name": "Macro Ops",            "handle": "MacroOps",       "url": "https://macro-ops.substack.com/feed"},
-    {"name": "Brent Donnelly",       "handle": "donnelly_brent", "url": "https://www.spectramarkets.com/feed/"},
-    {"name": "Sven Henrich",         "handle": "NorthmanTrader", "url": "https://northmantrader.com/feed/"},
-    {"name": "Howard Lindzon",       "handle": "howardlindzon",  "url": "https://howardlindzon.substack.com/feed"},
-    {"name": "Litquidity",           "handle": "litcapital",     "url": "https://litquidity.substack.com/feed"},
-    {"name": "Ramp Capital",         "handle": "RampCapitalLLC", "url": "https://rampcapital.substack.com/feed"},
+    {"name": "Meb Faber",            "handle": "MebFaber",       "url": "https://mebfaber.substack.com/feed"},
+    {"name": "The Kobeissi Letter",   "handle": "KobeissiLetter", "url": "https://kobeissiletter.substack.com/feed"},
+    {"name": "The Kobeissi Letter",   "handle": "KobeissiLetter", "url": "https://thekobeissiletter.substack.com/feed"},
+    {"name": "Compounding Quality",   "handle": "QCompounding",   "url": "https://compoundingquality.substack.com/feed"},
+    {"name": "Macro Ops",             "handle": "MacroOps",       "url": "https://macro-ops.substack.com/feed"},
+    {"name": "Brent Donnelly",        "handle": "donnelly_brent", "url": "https://www.spectramarkets.com/feed/"},
+    {"name": "Sven Henrich",          "handle": "NorthmanTrader", "url": "https://northmantrader.com/feed/"},
+    {"name": "Howard Lindzon",        "handle": "howardlindzon",  "url": "https://howardlindzon.substack.com/feed"},
+    {"name": "Litquidity",            "handle": "litcapital",     "url": "https://litquidity.substack.com/feed"},
+    {"name": "Ramp Capital",          "handle": "RampCapitalLLC", "url": "https://rampcapital.substack.com/feed"},
+    {"name": "Charlie Bilello",       "handle": "charliebilello", "url": "https://compoundadvisors.com/feed"},
+    {"name": "Morgan Housel",         "handle": "morganhousel",   "url": "https://collabfund.com/blog/feed.rss"},
+    {"name": "Ben Carlson",           "handle": "awealthofcs",    "url": "https://awealthofcommonsense.com/feed/"},
+    {"name": "Meb Faber",             "handle": "MebFaber",       "url": "https://mebfaber.com/feed/"},
 ]
 
 

@@ -294,3 +294,75 @@ def scrape_via_nitter_all(db: Session):
         total += added
 
     print(f"[Nitter] Done! Total predictions added: {total}")
+
+
+def scrape_nitter_rss(db: Session):
+    """Scrape tweets via Nitter RSS feeds — no API key, no auth."""
+    import feedparser
+    from jobs.prediction_filter import is_valid_prediction
+
+    NITTER_RSS_BASES = [
+        "https://nitter.poast.org",
+        "https://nitter.privacydev.net",
+    ]
+
+    forecasters = db.query(Forecaster).filter(
+        Forecaster.channel_url.contains("x.com")
+    ).all()
+    print(f"[NitterRSS] Trying RSS for {len(forecasters)} accounts...")
+
+    total = 0
+    for forecaster in forecasters:
+        handle = forecaster.channel_url.rstrip("/").split("/")[-1]
+        if not handle:
+            continue
+
+        for base in NITTER_RSS_BASES:
+            try:
+                feed = feedparser.parse(f"{base}/{handle}/rss")
+                if not feed.entries:
+                    continue
+
+                added = 0
+                for entry in feed.entries[:15]:
+                    text = entry.get("title", "") or entry.get("summary", "")
+                    link = entry.get("link", "")
+                    if not text or not is_valid_prediction(text):
+                        continue
+
+                    # Convert nitter link to x.com link
+                    source_url = link.replace(base, "https://x.com") if base in link else link
+                    if db.query(Prediction).filter(Prediction.source_url == source_url).first():
+                        continue
+
+                    try:
+                        pub = entry.get("published_parsed")
+                        pred_date = datetime(*pub[:6]) if pub else datetime.utcnow()
+                    except Exception:
+                        pred_date = datetime.utcnow()
+
+                    p = Prediction(
+                        forecaster_id=forecaster.id,
+                        ticker="UNKNOWN",
+                        direction="bullish",
+                        exact_quote=text[:500],
+                        context=text[:200],
+                        source_url=source_url,
+                        source_type="twitter",
+                        prediction_date=pred_date,
+                        window_days=365,
+                        outcome="pending",
+                        verified_by="ai_parsed",
+                    )
+                    db.add(p)
+                    added += 1
+
+                if added:
+                    db.commit()
+                    total += added
+                    print(f"[NitterRSS] {forecaster.name}: {added} predictions")
+                break  # Got results from this nitter instance, move on
+            except Exception:
+                continue
+
+    print(f"[NitterRSS] Done! Added {total} predictions")

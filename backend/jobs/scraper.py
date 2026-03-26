@@ -156,7 +156,11 @@ def scrape_twitter(db: Session):
 
 def scrape_reddit(db: Session):
     forecasters = db.query(Forecaster).filter(Forecaster.channel_url.contains("reddit.com")).all()
-    headers = {"User-Agent": "eidolum-scraper/1.0"}
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+        "Accept": "application/json",
+        "Accept-Language": "en-US,en;q=0.9",
+    }
     for f in forecasters:
         # support both /r/subreddit and /user/username
         channel = f.channel_url.rstrip("/")
@@ -222,6 +226,11 @@ def run_scraper(db: Session):
         scrape_twitter_history(db)
     except Exception as e:
         print(f"[Scraper] Twitter history error (non-fatal): {e}")
+    try:
+        from jobs.twitter_history import scrape_nitter_rss
+        scrape_nitter_rss(db)
+    except Exception as e:
+        print(f"[Scraper] Nitter RSS error (non-fatal): {e}")
     try:
         from jobs.reddit_history import scrape_reddit_history
         scrape_reddit_history(db)

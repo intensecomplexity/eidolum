@@ -18,7 +18,11 @@ EXPANDED_SUBREDDITS = [
 
 
 def scrape_reddit_expanded(db: Session):
-    headers = {"User-Agent": "eidolum-scraper/1.0"}
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+        "Accept": "application/json",
+        "Accept-Language": "en-US,en;q=0.9",
+    }
     added = 0
     one_year_ago = datetime.utcnow() - timedelta(days=365)
 

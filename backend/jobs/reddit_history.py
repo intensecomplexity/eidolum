@@ -22,7 +22,11 @@ REDDIT_SOURCES = [
 
 def scrape_reddit_history(db: Session):
     """Scrape top posts from the past year across tracked subreddits and users."""
-    headers = {"User-Agent": "eidolum-scraper/1.0"}
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+        "Accept": "application/json",
+        "Accept-Language": "en-US,en;q=0.9",
+    }
     total = 0
 
     for source in REDDIT_SOURCES:
