@@ -361,24 +361,7 @@ async def lifespan(app):
         db.close()
     except Exception as e:
         print(f"[Eidolum] pending_review conversion error (non-fatal): {e}")
-    # Delete predictions without screenshots (no proof = not shown)
-    try:
-        from sqlalchemy import text as _ua
-        db = SessionLocal()
-        result = db.execute(_ua("""
-            DELETE FROM predictions
-            WHERE archive_url IS NULL
-            AND source_url NOT IN (
-                'https://www.reddit.com/r/wallstreetbets/comments/l6xnte/gme_yolo_update_jan_25_2021/',
-                'https://www.reddit.com/r/wallstreetbets/comments/n3rjlp/amc_the_apes_are_coming/'
-            )
-        """))
-        db.commit()
-        if result.rowcount > 0:
-            print(f"[Eidolum] Deleted {result.rowcount} unarchived predictions — no proof = not shown")
-        db.close()
-    except Exception as e:
-        print(f"[Eidolum] delete_unarchived error (non-fatal): {e}")
+    # (Proof cleanup already handled above — deduped)
     # Seed new forecasters (idempotent)
     try:
         db = SessionLocal()
