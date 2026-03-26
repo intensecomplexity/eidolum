@@ -24,6 +24,9 @@ from jobs.prediction_validator import (
 
 FINNHUB_KEY = os.getenv("FINNHUB_KEY", "")
 
+# Track when each ticker last produced a NEW prediction — used by fast scraper to skip cold tickers
+TICKER_LAST_FOUND = {}  # ticker -> datetime of last new prediction found
+
 TICKERS = [
     "AAPL", "MSFT", "GOOGL", "AMZN", "NVDA", "TSLA", "META",
     "AVGO", "CRM", "ADBE", "AMD", "INTC", "QCOM", "NFLX", "ORCL",
@@ -248,6 +251,7 @@ def scrape_news_predictions(db: Session):
                 seen_urls.add(raw_url)
                 seen_urls.add(real_url)
                 added += 1
+                TICKER_LAST_FOUND[ticker] = datetime.utcnow()
 
                 if added % 25 == 0:
                     db.commit()
@@ -268,21 +272,36 @@ def scrape_news_predictions(db: Session):
     print(f"[NewsScraper] DONE: {added} added, {rejected_l1} rejected L1, {rejected_l2} rejected L2")
 
 
-# Top 15 most-watched tickers for the fast 15-minute scraper
+# 30 most-watched tickers for the fast 15-minute scraper
 FAST_TICKERS = [
     "AAPL", "MSFT", "GOOGL", "AMZN", "NVDA", "TSLA", "META",
     "AMD", "NFLX", "JPM", "BA", "NKE", "DIS", "COIN", "PLTR",
+    "CRM", "AVGO", "ADBE", "INTC", "QCOM", "GS", "MS",
+    "UNH", "LLY", "PFE", "XOM", "CRWD", "PANW", "SOFI", "ARM",
 ]
 
 
 def scrape_fast_predictions(db: Session):
-    """Fast scraper — runs every 15 min, checks top 15 tickers, last 2 days only."""
+    """Fast scraper — runs every 15 min. Skips cold tickers to save API calls."""
     if not FINNHUB_KEY:
         return
 
     today = datetime.utcnow()
-    from_date = (today - timedelta(days=2)).strftime("%Y-%m-%d")
+    from_date = (today - timedelta(days=1)).strftime("%Y-%m-%d")
     to_date = today.strftime("%Y-%m-%d")
+    hot_cutoff = today - timedelta(days=3)
+
+    # Filter to hot tickers (had a prediction in last 3 days) + always-check list
+    always_check = set(FAST_TICKERS[:10])  # Top 10 always checked
+    tickers_to_check = []
+    skipped = 0
+    for ticker in FAST_TICKERS:
+        if ticker in always_check:
+            tickers_to_check.append(ticker)
+        elif ticker in TICKER_LAST_FOUND and TICKER_LAST_FOUND[ticker] >= hot_cutoff:
+            tickers_to_check.append(ticker)
+        else:
+            skipped += 1
 
     added = 0
 
@@ -292,7 +311,10 @@ def scrape_fast_predictions(db: Session):
         if row[0]:
             seen_urls.add(row[0])
 
-    for ticker in FAST_TICKERS:
+    if skipped:
+        print(f"[FastScraper] Checking {len(tickers_to_check)} tickers (skipped {skipped} cold)")
+
+    for ticker in tickers_to_check:
         try:
             r = httpx.get(
                 "https://finnhub.io/api/v1/company-news",
@@ -362,6 +384,7 @@ def scrape_fast_predictions(db: Session):
                 seen_urls.add(raw_url)
                 seen_urls.add(real_url)
                 added += 1
+                TICKER_LAST_FOUND[ticker] = datetime.utcnow()
 
             time.sleep(1.1)
 
