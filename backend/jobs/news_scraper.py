@@ -2,12 +2,11 @@
 Financial news scraper — uses Finnhub Company News API to find REAL analyst
 upgrades, downgrades, and price target changes with actual article URLs.
 
-Uses 3-layer defense system:
-  Layer 1: Strict scraper filter (analyst action + rating word, reject patterns)
-  Layer 2: Validation function (all 7 required fields)
-  Layer 3: Hourly cleanup (catch anything that slipped through)
+Uses 3-layer defense + extracts the real forecaster name from headlines
+(never attributes to the platform).
 """
 import os
+import re
 import time
 import httpx
 from datetime import datetime, timedelta
@@ -17,6 +16,7 @@ from models import Prediction, Forecaster
 from jobs.prediction_validator import (
     is_real_prediction,
     get_direction,
+    extract_forecaster_name,
     validate_prediction,
 )
 
@@ -35,51 +35,17 @@ TICKERS = [
     "SPY", "QQQ", "ARKK", "XLF", "XLE", "GLD", "IWM",
 ]
 
-SOURCE_MAP = {
-    "marketwatch": "MarketWatch", "cnbc": "CNBC", "reuters": "Reuters",
-    "bloomberg": "Bloomberg", "barrons": "Barron's", "barron": "Barron's",
-    "seeking alpha": "Seeking Alpha", "seekingalpha": "Seeking Alpha",
-    "motley fool": "Motley Fool", "fool.com": "Motley Fool",
-    "thestreet": "The Street", "benzinga": "Benzinga",
-    "investors.com": "Investor's Business Daily",
-    "yahoo": "Yahoo Finance", "forbes": "Forbes",
-    "zacks": "Zacks Investment Research", "tipranks": "TipRanks",
-    "morningstar": "Morningstar", "business insider": "Business Insider",
-    "insider": "Business Insider", "financial times": "Financial Times",
-    "ft.com": "Financial Times",
-    "goldman": "Goldman Sachs", "jp morgan": "JP Morgan",
-    "jpmorgan": "JP Morgan", "morgan stanley": "Morgan Stanley",
-    "bank of america": "Bank of America", "bofa": "Bank of America",
-    "citi": "Citi Research", "ubs": "UBS", "barclays": "Barclays",
-    "deutsche bank": "Deutsche Bank", "wells fargo": "Wells Fargo",
-    "hsbc": "HSBC", "wedbush": "Wedbush Securities",
-    "dan ives": "Dan Ives", "oppenheimer": "Oppenheimer",
-    "piper": "Piper Sandler", "fundstrat": "Fundstrat Global",
-    "tom lee": "Tom Lee", "cathie wood": "Cathie Wood",
-    "ark invest": "ARK Invest", "jim cramer": "Jim Cramer",
-}
 
-
-def match_forecaster(source, headline, db):
-    text_lower = (source + " " + headline).lower()
-    for kw, name in SOURCE_MAP.items():
-        if kw in text_lower:
-            f = db.query(Forecaster).filter(Forecaster.name == name).first()
-            if f:
-                return f
-    return db.query(Forecaster).filter(Forecaster.handle == "WallStConsensus").first()
-
-
-def resolve_redirect(finnhub_url):
-    """Follow Finnhub redirect to get the real article URL."""
+def resolve_redirect(url):
+    """Follow Finnhub redirect to get real article URL."""
     try:
-        r = httpx.head(finnhub_url, follow_redirects=True, timeout=5)
+        r = httpx.head(url, follow_redirects=True, timeout=5)
         final = str(r.url)
         if final and final.startswith("http") and "finnhub.io" not in final:
             return final
     except Exception:
         pass
-    return finnhub_url
+    return url
 
 
 def archive_url(url):
@@ -100,8 +66,46 @@ def archive_url(url):
     return f"https://web.archive.org/web/{ts}/{url}"
 
 
+def find_or_create_forecaster(name, db):
+    """Find existing forecaster by name, or create a new one."""
+    if not name:
+        return db.query(Forecaster).filter(Forecaster.handle == "WallStConsensus").first()
+
+    name = name.strip()
+    if len(name) < 3:
+        return db.query(Forecaster).filter(Forecaster.handle == "WallStConsensus").first()
+
+    # Try exact match
+    f = db.query(Forecaster).filter(Forecaster.name == name).first()
+    if f:
+        return f
+
+    # Try case-insensitive match
+    f = db.query(Forecaster).filter(Forecaster.name.ilike(name)).first()
+    if f:
+        return f
+
+    # Create new forecaster
+    handle = re.sub(r"[^a-zA-Z0-9]", "", name)[:20]
+    # Ensure handle is unique
+    existing = db.query(Forecaster).filter(Forecaster.handle == handle).first()
+    if existing:
+        return existing
+
+    f = Forecaster(
+        name=name,
+        handle=handle,
+        platform="institutional",
+        channel_url="",
+    )
+    db.add(f)
+    db.flush()
+    print(f"[NewsScraper] Created new forecaster: {name}")
+    return f
+
+
 def scrape_news_predictions(db: Session):
-    """Scrape real prediction articles — with 3-layer defense."""
+    """Scrape real prediction articles with 3-layer defense."""
     if not FINNHUB_KEY:
         print("[NewsScraper] No FINNHUB_KEY")
         return
@@ -111,8 +115,8 @@ def scrape_news_predictions(db: Session):
     to_date = today.strftime("%Y-%m-%d")
 
     added = 0
-    rejected_l1 = 0  # Failed scraper filter
-    rejected_l2 = 0  # Failed validation
+    rejected_l1 = 0
+    rejected_l2 = 0
 
     seen_urls = set()
     existing = db.execute(text("SELECT source_url FROM predictions WHERE source_url IS NOT NULL"))
@@ -120,7 +124,7 @@ def scrape_news_predictions(db: Session):
         if row[0]:
             seen_urls.add(row[0])
 
-    print(f"[NewsScraper] Starting — {len(seen_urls)} existing, {len(TICKERS)} tickers to scan")
+    print(f"[NewsScraper] Starting — {len(seen_urls)} existing, {len(TICKERS)} tickers")
 
     for i, ticker in enumerate(TICKERS):
         try:
@@ -150,7 +154,7 @@ def scrape_news_predictions(db: Session):
                 if not raw_url or raw_url in seen_urls:
                     continue
 
-                # === LAYER 1: Scraper filter ===
+                # === LAYER 1: Strict filter ===
                 if not is_real_prediction(headline, summary):
                     rejected_l1 += 1
                     continue
@@ -160,23 +164,22 @@ def scrape_news_predictions(db: Session):
                     rejected_l1 += 1
                     continue
 
-                forecaster = match_forecaster(source, headline, db)
+                # Extract the REAL forecaster (not the platform)
+                forecaster_name = extract_forecaster_name(headline, source)
+                forecaster = find_or_create_forecaster(forecaster_name, db)
                 if not forecaster:
                     continue
 
-                # Resolve Finnhub redirect to real URL
+                # Resolve URL and archive
                 real_url = resolve_redirect(raw_url)
-
                 if real_url in seen_urls:
                     continue
 
-                # Archive the article
                 arch = archive_url(real_url)
 
-                # Determine eval window
+                # Eval window
                 text_lower = (headline + " " + summary).lower()
                 window_days = 365 if "price target" in text_lower or "target" in text_lower else 90
-
                 pred_date = datetime.fromtimestamp(dt) if dt else today
                 eval_date = pred_date + timedelta(days=window_days)
 
@@ -189,12 +192,11 @@ def scrape_news_predictions(db: Session):
                     context=headline,
                     forecaster_id=forecaster.id,
                 )
-
                 if not is_valid:
                     rejected_l2 += 1
                     continue
 
-                # Passed both layers — save
+                # PASSED — save
                 pred = Prediction(
                     forecaster_id=forecaster.id,
                     ticker=ticker,
@@ -220,13 +222,15 @@ def scrape_news_predictions(db: Session):
                     print(f"[NewsScraper] {added} predictions added...")
 
             time.sleep(1.1)
-
             if (i + 1) % 10 == 0:
-                print(f"[NewsScraper] {i + 1}/{len(TICKERS)} tickers done, {added} added, {rejected_l1} rejected L1, {rejected_l2} rejected L2")
+                print(
+                    f"[NewsScraper] {i + 1}/{len(TICKERS)} tickers, "
+                    f"{added} added, {rejected_l1} rejected L1, {rejected_l2} rejected L2"
+                )
 
         except Exception as e:
             print(f"[NewsScraper] Error for {ticker}: {e}")
             continue
 
     db.commit()
-    print(f"[NewsScraper] DONE: {added} added, {rejected_l1} rejected by filter, {rejected_l2} rejected by validator")
+    print(f"[NewsScraper] DONE: {added} added, {rejected_l1} rejected L1, {rejected_l2} rejected L2")

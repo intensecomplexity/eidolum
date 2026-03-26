@@ -1,93 +1,116 @@
 """
-Eidolum Prediction Validator — Layer 2 Defense
-No prediction enters the database without passing ALL checks.
+Eidolum Prediction Validator — 3-Layer Defense System
 """
 import re
 
+# === LAYER 1: Scraper filter ===
 
-# Valid analyst action phrases — the article must contain one of these
+# Analyst action phrases — article MUST contain one of these
 ANALYST_ACTIONS = [
-    "upgrades", "upgraded", "upgrade",
-    "downgrades", "downgraded", "downgrade",
-    "initiates coverage", "initiated coverage",
+    "upgrades", "upgraded", "upgrade to",
+    "downgrades", "downgraded", "downgrade to",
+    "initiates coverage", "initiated coverage", "initiates with",
     "reiterates", "reiterated", "maintains", "maintained",
-    "raises price target", "raised price target",
-    "raises target", "raised target",
-    "lowers price target", "lowered price target",
-    "lowers target", "lowered target",
-    "cuts price target", "cut price target",
-    "cuts target", "cut target",
+    "raises price target", "raised price target", "raises target", "raised target",
+    "lowers price target", "lowered price target", "lowers target", "lowered target",
+    "cuts price target", "cut price target", "cuts target", "cut target",
     "sets price target", "set price target",
     "boosts price target", "boosted price target",
     "slashes price target", "slashed price target",
     "resumed coverage", "resumes coverage",
     "starts coverage", "started coverage",
+    # Standalone verbs — require a RATING_WORD to also be present (AND logic)
+    "raises", "raised", "lowers", "lowered", "cuts", "cut",
+    "boosts", "boosted", "slashes", "slashed", "sets", "set",
 ]
 
-# Valid rating words — the article must also contain one of these
+# Rating words — article MUST also contain one of these
 RATING_WORDS = [
     "buy", "sell", "hold", "neutral",
-    "overweight", "underweight",
-    "outperform", "underperform",
-    "market perform", "sector perform",
+    "overweight", "underweight", "equal weight", "equal-weight",
+    "outperform", "underperform", "market perform", "sector perform",
     "strong buy", "strong sell",
-    "price target", "target price",
-    "pt of", "pt to", "target of $", "target to $",
-    "fair value", "conviction buy", "top pick",
+    "price target", "target price", "pt of", "pt to",
+    "target of $", "target to $", "fair value",
+    "conviction buy", "top pick",
 ]
 
-# Headlines matching these patterns are NOT predictions — reject immediately
+# Reject patterns — if headline matches, it's NOT a prediction
 REJECT_PATTERNS = [
-    r"\?$",  # Headlines ending with ? are clickbait questions
-    r"signs? agreement", r"framework agreement", r"partnership",
-    r"acquisition", r"acquires", r"merger", r"merges",
-    r"reports? earnings", r"quarterly results", r"revenue (growth|fell|rose)",
+    r"\?$",  # Clickbait questions
+    # Press releases / corporate news
+    r"signs? (agreement|deal|contract)", r"framework agreement",
+    r"partnership", r"acquisition", r"acquires", r"merger", r"merges",
+    r"production capacity", r"manufacturing", r"supply agreement",
+    # Earnings / financial reports
+    r"reports? earnings", r"quarterly results", r"revenue (growth|fell|rose|up|down)",
     r"earnings (beat|miss|call|report)", r"beats? estimates", r"misses? estimates",
+    r"earnings per share", r"EPS of",
+    # Corporate actions
     r"dividend", r"stock split", r"buyback", r"repurchase",
     r"appoints?", r"names? .*(CEO|CFO|CTO|COO)", r"hires?", r"board of directors",
-    r"patent", r"FDA approval", r"FDA clears", r"clinical trial", r"regulatory",
+    # Regulatory / legal
+    r"patent", r"FDA approval", r"clinical trial", r"regulatory",
     r"lawsuit", r"settlement", r"investigation", r"subpoena",
-    r"launches? (new |its )", r"announces? (new |its |a )",
-    r"expands? (into|to|its)", r"opens? (new|its|a)",
-    r"signs? (deal|contract|agreement)",
-    r"(supply|supplier|framework) agreement",
-    r"production capacity", r"manufacturing",
+    # Product / business news
+    r"launches? (new|its|a)\b", r"announces? (new|its|a)\b",
+    r"expands? (into|to|its)", r"opens? (new|its|a)\b",
+    # Past-tense market reports (describe what HAPPENED, not predictions)
+    r"\b(falls?|fell|drops?|dropped|tumbles?|tumbled|plunges?|plunged|slips?|slipped|slides?|slid)\b.*\b(sharply|heavily|significantly|percent|%)",
+    r"\b(spikes?|spiked|surges?|surged|soars?|soared|jumps?|jumped|rallied|rallies)\b.*\b(sharply|heavily|significantly|higher|percent|%)",
+    r"\b(shares?|stock) (rise|rises|rose|fall|falls|fell|drop|drops|dropped|spike|spikes|spiked|surge|surges|surged)\b",
 ]
 
-# Bullish indicators
+# Bullish signals (includes standalone verbs for separated phrases like "Raises NVDA Price Target")
 BULLISH_SIGNALS = [
-    "upgrades", "upgraded", "upgrade",
+    "upgrades", "upgraded", "upgrade to",
     "buy", "overweight", "outperform",
     "raises target", "raised target", "raises price target", "raised price target",
-    "boosts target", "boosted target", "boosts price target",
+    "raises", "raised",  # standalone — for "Raises NVDA Price Target"
+    "boosts target", "boosted target", "boosts", "boosted",
     "strong buy", "top pick", "conviction buy",
-    r"initiates.*buy", r"initiates.*overweight", r"initiates.*outperform",
-    r"reiterates.*buy", r"reiterates.*overweight", r"reiterates.*outperform",
-    r"maintains.*buy", r"maintains.*overweight", r"maintains.*outperform",
-    "bullish",
 ]
 
-# Bearish indicators
+# Bearish signals (includes standalone verbs for separated phrases like "Cuts RIVN Price Target")
 BEARISH_SIGNALS = [
-    "downgrades", "downgraded", "downgrade",
+    "downgrades", "downgraded", "downgrade to",
     "sell", "underweight", "underperform",
     "lowers target", "lowered target", "lowers price target", "lowered price target",
-    "cuts target", "cut target", "cuts price target", "cut price target",
-    "slashes target", "slashed target",
+    "lowers", "lowered",  # standalone
+    "cuts target", "cut target", "cuts price target",
+    "cuts", "cut",  # standalone — for "Cuts RIVN Price Target"
+    "slashes target", "slashed target", "slashes", "slashed",
     "strong sell",
-    r"initiates.*sell", r"initiates.*underweight", r"initiates.*underperform",
-    r"reiterates.*sell", r"reiterates.*underweight", r"reiterates.*underperform",
-    r"maintains.*sell", r"maintains.*underweight", r"maintains.*underperform",
-    "bearish", "reduce",
+]
+
+# Platform names that should NEVER be used as forecaster names
+PLATFORMS = [
+    "yahoo finance", "seeking alpha", "seekingalpha", "marketwatch",
+    "cnbc", "bloomberg", "reuters", "financial times", "ft.com",
+    "business insider", "forbes", "kiplinger", "the economist",
+    "benzinga", "investorplace", "thestreet", "tipranks",
+    "youtube", "twitter", "x.com",
+]
+
+# Known analyst/firm names to extract from headlines
+KNOWN_ANALYSTS = [
+    "goldman sachs", "jp morgan", "jpmorgan", "morgan stanley",
+    "bank of america", "bofa", "citi", "citigroup",
+    "ubs", "barclays", "deutsche bank", "wells fargo", "hsbc",
+    "wedbush", "oppenheimer", "piper sandler", "needham",
+    "bernstein", "cowen", "jefferies", "raymond james",
+    "stifel", "baird", "keybanc", "bmo capital", "rbc capital",
+    "evercore", "wolfe research", "loop capital", "truist",
+    "mizuho", "susquehanna", "rosenblatt",
+    "dan ives", "tom lee", "cathie wood", "jim cramer",
+    "michael burry", "ray dalio", "bill ackman", "warren buffett",
+    "david kostin", "ed yardeni", "liz ann sonders",
+    "ark invest", "fundstrat",
 ]
 
 
 def is_real_prediction(headline, summary=""):
-    """
-    Layer 1 check: Is this article a REAL analyst prediction?
-    Must have BOTH an analyst action AND a rating word.
-    Must NOT match any reject pattern.
-    """
+    """Layer 1: Is this a real analyst prediction?"""
     combined = (headline + " " + summary).lower()
 
     # Check reject patterns first
@@ -95,117 +118,97 @@ def is_real_prediction(headline, summary=""):
         if re.search(pattern, combined, re.IGNORECASE):
             return False
 
-    # Must have at least one analyst action
-    has_action = any(action in combined for action in ANALYST_ACTIONS)
+    # Must have analyst action AND rating word
+    has_action = any(a in combined for a in ANALYST_ACTIONS)
+    has_rating = any(r in combined for r in RATING_WORDS)
 
-    # Must have at least one rating word
-    has_rating = any(rating in combined for rating in RATING_WORDS)
-
-    # BOTH required
     return has_action and has_rating
 
 
 def get_direction(headline, summary=""):
-    """Extract bullish/bearish direction. Returns None if ambiguous."""
+    """Extract direction. Returns None if ambiguous."""
     combined = (headline + " " + summary).lower()
-
-    bull_score = 0
-    bear_score = 0
-
-    for signal in BULLISH_SIGNALS:
-        if re.search(signal, combined):
-            bull_score += 1
-
-    for signal in BEARISH_SIGNALS:
-        if re.search(signal, combined):
-            bear_score += 1
-
-    if bull_score > bear_score:
+    bull = sum(1 for s in BULLISH_SIGNALS if s in combined)
+    bear = sum(1 for s in BEARISH_SIGNALS if s in combined)
+    if bull > bear:
         return "bullish"
-    elif bear_score > bull_score:
+    if bear > bull:
         return "bearish"
-
-    # Ambiguous — reject
     return None
 
 
+def extract_forecaster_name(headline, source=""):
+    """
+    Extract the actual analyst/firm name from the headline.
+    Returns the analyst name, NOT the platform name.
+    """
+    combined = (headline + " " + source).lower()
+
+    # Check known analysts/firms first
+    for name in KNOWN_ANALYSTS:
+        if name in combined:
+            return name.title()
+
+    # Try to extract "{Firm} upgrades/downgrades" pattern from headline
+    match = re.search(
+        r"^([A-Z][A-Za-z\s&.]+?)\s+(upgrades?|downgrades?|initiates?|reiterates?|maintains?|raises?|lowers?|cuts?|sets?|boosts?|slashes?)",
+        headline,
+    )
+    if match:
+        firm = match.group(1).strip()
+        if firm.lower() not in PLATFORMS and len(firm) > 2:
+            return firm
+
+    return None  # Could not extract — will use fallback
+
+
 def validate_prediction(ticker, direction, source_url, archive_url, context, forecaster_id):
-    """
-    Layer 2 check: Does this prediction have ALL required fields?
-    Returns (is_valid, reason) tuple.
-    """
-    # 1. Must have a valid ticker
-    if not ticker or not isinstance(ticker, str):
-        return False, "Missing ticker"
-    ticker = ticker.strip().upper()
-    if len(ticker) > 8 or len(ticker) < 1:
-        return False, f"Invalid ticker length: {ticker}"
-    if not re.match(r"^[A-Z0-9.]{1,8}$", ticker):
-        return False, f"Invalid ticker format: {ticker}"
-
-    # 2. Must have a direction
+    """Layer 2: Check all required fields."""
+    if not ticker or not re.match(r"^[A-Z0-9.]{1,8}$", ticker.strip().upper()):
+        return False, "Invalid ticker"
     if not direction or direction not in ("bullish", "bearish"):
-        return False, f"Invalid direction: {direction}"
-
-    # 3. Must have a real source URL
+        return False, "Invalid direction"
     if not source_url or not source_url.startswith("http"):
-        return False, "Missing or invalid source URL"
-    fake_url_patterns = [
+        return False, "Invalid source URL"
+    fake_urls = [
         "yahoo.com/quote", "stockanalysis.com", "goldmansachs.com/market-data",
         "jpmorgan.com/market-data", "morganstanley.com/market-data",
-        "bankofamerica.com/market-data", "citigroup.com/market-data",
     ]
-    for pattern in fake_url_patterns:
+    for pattern in fake_urls:
         if pattern in source_url:
-            return False, f"Fake URL pattern: {pattern}"
-
-    # 4. Must have an archive URL
+            return False, f"Fake URL: {pattern}"
     if not archive_url or not archive_url.startswith("http"):
         return False, "Missing archive URL"
-
-    # 5. Must have context/headline
     if not context or len(context) < 10:
-        return False, "Missing or too short context"
-
-    # 6. Context must not be fake data
-    fake_context_patterns = [
-        "Analyst consensus:", "Price target for", "Analyst price target:",
-        "<figure>", "<img", "wp-post-image", "<!DOCTYPE",
+        return False, "Missing context"
+    fake_content = [
+        "Analyst consensus:", "Price target for", "<figure>", "<img", "wp-post-image",
     ]
-    for pattern in fake_context_patterns:
+    for pattern in fake_content:
         if pattern in (context or ""):
-            return False, f"Fake context pattern: {pattern}"
-
-    # 7. Must have a forecaster
+            return False, f"Fake content: {pattern}"
     if not forecaster_id:
         return False, "Missing forecaster"
-
     return True, "Valid"
 
 
 def cleanup_invalid_predictions(db):
-    """
-    Layer 3: Hourly cleanup — scan ALL predictions and delete rule violators.
-    """
+    """Layer 3: Hourly cleanup — delete rule violators."""
     from sqlalchemy import text as sql_text
 
     deleted = 0
 
-    # Delete predictions with fake URLs
+    # Fake URLs
     r = db.execute(sql_text("""
         DELETE FROM predictions WHERE
-            source_url IS NULL
-            OR source_url = ''
-            OR source_url NOT LIKE 'http%'
+            source_url IS NULL OR source_url = '' OR source_url NOT LIKE 'http%'
             OR source_url LIKE '%yahoo.com/quote%'
             OR source_url LIKE '%stockanalysis.com%'
             OR source_url LIKE '%goldmansachs.com/market-data%'
-            OR source_url LIKE '%jpmorgan.com/market-data%'
-            OR source_url LIKE '%morganstanley.com/market-data%'
     """))
     deleted += r.rowcount
 
-    # Delete predictions with fake content
+    # Fake content
     r = db.execute(sql_text("""
         DELETE FROM predictions WHERE
             context LIKE 'Analyst consensus:%'
@@ -216,7 +219,7 @@ def cleanup_invalid_predictions(db):
     """))
     deleted += r.rowcount
 
-    # Delete predictions with no ticker or direction
+    # Missing required fields
     r = db.execute(sql_text("""
         DELETE FROM predictions WHERE
             ticker IS NULL OR ticker = '' OR ticker = 'UNKNOWN'
@@ -225,30 +228,24 @@ def cleanup_invalid_predictions(db):
     """))
     deleted += r.rowcount
 
-    # Delete predictions where headline is clearly NOT a prediction
+    # Past-tense market reports and clickbait
     r = db.execute(sql_text("""
         DELETE FROM predictions WHERE
             context LIKE '%?'
-            OR context LIKE '%Signs Agreement%'
-            OR context LIKE '%signs agreement%'
-            OR context LIKE '%Framework Agreement%'
-            OR context LIKE '%Reports Earnings%'
-            OR context LIKE '%reports earnings%'
-            OR context LIKE '%Quarterly Results%'
-            OR context LIKE '%Appoints%'
-            OR context LIKE '%appoints%'
-            OR context LIKE '%Launches New%'
-            OR context LIKE '%launches new%'
-            OR context LIKE '%Announces New%'
-            OR context LIKE '%announces new%'
-            OR context LIKE '%Production Capacity%'
-            OR context LIKE '%production capacity%'
+            OR context LIKE '%Signs Agreement%' OR context LIKE '%signs agreement%'
+            OR context LIKE '%Framework Agreement%' OR context LIKE '%framework agreement%'
+            OR context LIKE '%Reports Earnings%' OR context LIKE '%reports earnings%'
+            OR context LIKE '%Quarterly Results%' OR context LIKE '%quarterly results%'
+            OR context LIKE '%Appoints%' OR context LIKE '%appoints%'
+            OR context LIKE '%Production Capacity%' OR context LIKE '%production capacity%'
+            OR context LIKE '%Falls Sharply%' OR context LIKE '%falls sharply%'
+            OR context LIKE '%Spikes Higher%' OR context LIKE '%spikes higher%'
+            OR context LIKE '%Shares Spike%' OR context LIKE '%shares spike%'
+            OR context LIKE '%Stock Drops%' OR context LIKE '%stock drops%'
     """))
     deleted += r.rowcount
 
     db.commit()
-
     if deleted > 0:
         print(f"[Defense L3] Cleaned up {deleted} invalid predictions")
-
     return deleted

@@ -1,70 +1,57 @@
-# Prediction Rules
+# Eidolum Prediction Rules v2.0
 
 ## Core Principle
-Every prediction in the database MUST link to a real, publicly accessible article where an analyst or firm takes an explicit action (upgrade, downgrade, price target change). No press releases. No corporate news. No clickbait.
+Every prediction must link to a real, publicly accessible article where the prediction was actually made. No generic pages, no aggregated data, no fabricated URLs.
 
-## What Counts as a Valid Prediction
-An article must have BOTH:
-1. **An analyst action**: upgrades, downgrades, initiates coverage, reiterates, maintains, raises/lowers/cuts price target
-2. **A rating or target**: buy, sell, hold, overweight, underweight, outperform, underperform, price target of $X
+## Required fields — ALL 7 must be present:
+1. Specific stock/crypto/ETF ticker (AAPL, BTC, SPY, etc.)
+2. Clear direction (bullish/bearish/buy/sell)
+3. Real source URL to the actual article/video/tweet
+4. Archived proof via Wayback Machine
+5. Named forecaster (the person/firm making the call, NOT the platform)
+6. Date published
+7. Evaluation window (90 days for rating changes, 12 months for price targets)
 
-### Examples that PASS
-- "Goldman Upgrades AAPL to Buy" (action: upgrades, rating: buy)
-- "Needham Raises NVDA Price Target to $200" (action: raises, rating: price target)
-- "Morgan Stanley Downgrades TSLA to Underweight" (action: downgrades, rating: underweight)
-- "Bernstein Initiates Coverage on ARM with Outperform" (action: initiates, rating: outperform)
+## CRITICAL: Platform vs Forecaster
+Yahoo Finance, Seeking Alpha, MarketWatch, CNBC, YouTube, X = PLATFORMS, not forecasters.
+The prediction belongs to whoever made the call:
+- "Goldman Sachs Upgrades AAPL" on Yahoo Finance -> forecaster = Goldman Sachs
+- "Deep Value Investing: Buy NKE" on Seeking Alpha -> forecaster = Deep Value Investing
+- Jim Cramer on CNBC -> forecaster = Jim Cramer
+- @michaelburry on X -> forecaster = Michael Burry
+Always extract the actual analyst/firm name from the headline. Never attribute to the platform.
 
-### Examples that FAIL
-- "Honeywell Signs Supplier Framework Agreement" (no analyst action, no rating)
-- "Can the S&P 500 Outrun a Recession?" (clickbait question)
-- "ACCESS Newswire Upgrades the ACCESS Platform" (product upgrade, not stock)
-- "Waymo Is Scaling Faster Than Expected" (company news, not analyst call)
+## DELETE rules — NOT valid predictions:
+- Blog post summaries, RSS feed content
+- Aggregated data ("35 buy vs 2 sell")
+- Past-tense market reports ("Oil Falls Sharply", "Dell Shares Spike") — these describe what HAPPENED, not predictions
+- Press releases (signs agreement, partnership, acquisition, framework agreement, production capacity)
+- Clickbait questions ending with ?
+- Corporate news (earnings reports, dividends, stock splits, CEO appointments)
+- Any prediction with dead/generic/fabricated URLs
+- Any prediction without a real ticker or clear direction
+- Vague market commentary, sector calls without specific ticker
+- Predictions attributed to a platform (Yahoo Finance, Seeking Alpha) instead of the actual analyst/firm
 
-## What Gets Automatically Rejected
-- Headlines ending with `?` (clickbait questions)
-- Press releases: signs agreement, partnership, acquisition, merger
-- Earnings: reports earnings, quarterly results, beats/misses estimates
-- Corporate: dividend, stock split, buyback, repurchase
-- Personnel: appoints, names CEO, hires, board of directors
-- Regulatory: patent, FDA approval, clinical trial
-- Legal: lawsuit, settlement, investigation
+## Supported assets:
+- US stocks: YES (AAPL, TSLA, NVDA)
+- Crypto: YES (BTC, ETH, SOL)
+- ETFs: YES (SPY, QQQ, ARKK)
+- Options: YES (reference underlying ticker)
+- Sector calls without specific ticker: NO
+- Market-wide calls: NO
 
-## Source Requirements
-Every prediction MUST have:
-1. **`source_url`**: Direct link to the original article (redirect resolved to final URL)
-2. **`archive_url`**: Wayback Machine archived version
+## Proof rules:
+- News articles: Direct link + Wayback archive
+- YouTube: Timestamped link + screenshot
+- Tweets/X: Direct URL + Wayback archive
+- TV clips: Clip URL + Wayback archive
+- SEC filings: EDGAR link (permanent)
 
-## Direction Classification (regex-based, high confidence only)
-- **Bullish**: upgrades, raises/boosts price target, buy, overweight, outperform, strong buy, top pick, conviction buy, initiates/reiterates/maintains with buy/overweight/outperform
-- **Bearish**: downgrades, lowers/cuts/slashes price target, sell, underweight, underperform, strong sell, initiates/reiterates/maintains with sell/underweight/underperform
-- **Skip**: if direction cannot be determined with confidence, the article is not saved
+## Conflict of interest:
+Flag when forecaster has financial interest in the stock.
 
-## Data Pipeline
-1. DELETE all predictions at startup (clean slate)
-2. Seed 50 forecasters
-3. Scrape Finnhub Company News API (60+ tickers, 90-day lookback)
-4. Layer 1 filter: analyst action + rating word, reject patterns, no questions
-5. Direction extraction with regex scoring (skip ambiguous)
-6. Resolve Finnhub redirect URLs to final article URL
-7. Layer 2 validation: all 7 required fields, no fake URLs/content
-8. Match to forecaster by source name + headline
-9. Archive via Wayback Machine
-10. Layer 3 hourly cleanup: scan DB and delete any rule violators
-11. Evaluate predictions against real price data
-
-## 3-Layer Defense System
-
-### Layer 1 — Scraper filter (before saving)
-Only articles with BOTH an analyst action word (upgrades, downgrades, raises target)
-AND a rating word (buy, sell, overweight, price target) pass through.
-Press releases, clickbait questions, and corporate news are rejected via regex patterns.
-
-### Layer 2 — Validation function (before database insert)
-Every prediction is checked for all 7 required fields:
-ticker, direction, source_url, archive_url, context, forecaster_id.
-Fake URL patterns and fake content patterns are rejected.
-
-### Layer 3 — Hourly cleanup job (after saving)
-Scans the entire database every hour and deletes any prediction that
-somehow slipped through layers 1 and 2. Catches fake URLs, fake content,
-missing fields, clickbait headlines, and press releases.
+## 3-Layer Defense System:
+- L1 (scraper): Must have analyst action + rating word. Reject press releases/clickbait/corporate news/past-tense reports.
+- L2 (validator): validate_prediction() checks all 7 fields before DB insert.
+- L3 (hourly cleanup): Scans DB, deletes rule violators.
