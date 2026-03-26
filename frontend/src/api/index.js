@@ -119,6 +119,14 @@ export function getConflictPredictions() {
   return api.get('/predictions/conflicts').then(r => r.data);
 }
 
+export function getTodayPredictions() {
+  return api.get('/predictions/today').then(r => r.data);
+}
+
+export function getRecentPredictions(params = {}) {
+  return api.get('/predictions/recent', { params }).then(r => r.data);
+}
+
 export function getContrarianSignals() {
   return api.get('/contrarian-signals').then(r => r.data);
 }

@@ -21,7 +21,7 @@ from database import engine, Base, SessionLocal
 from models import Forecaster, Prediction, Config
 from rate_limit import limiter
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
-from routers import leaderboard, forecasters, assets, sync, activity, admin, platforms, follows, newsletter, saved, positions, contrarian, power_rankings, inverse, subscribers
+from routers import leaderboard, forecasters, assets, sync, activity, admin, platforms, follows, newsletter, saved, positions, contrarian, power_rankings, inverse, subscribers, predictions
 from jobs.scraper import run_scraper
 from jobs.evaluator import run_evaluator
 from jobs.leaderboard_refresh import run_leaderboard_refresh
@@ -453,13 +453,24 @@ async def lifespan(app):
     if not os.getenv("ADMIN_SECRET"):
         print("[WARNING] ADMIN_SECRET not set — admin routes are unprotected!")
     # Start background job scheduler
+    def run_fast_scraper():
+        from jobs.news_scraper import scrape_fast_predictions
+        db = SessionLocal()
+        try:
+            scrape_fast_predictions(db)
+        except Exception as e:
+            print(f"[FastScraper] Error: {e}")
+        finally:
+            db.close()
+
     scheduler = AsyncIOScheduler()
     scheduler.add_job(lambda: run_scraper(SessionLocal()), "interval", hours=1, id="scraper")
+    scheduler.add_job(run_fast_scraper, "interval", minutes=15, id="fast_scraper")
     scheduler.add_job(lambda: run_evaluator(SessionLocal()), "interval", minutes=15, id="evaluator")
     scheduler.add_job(lambda: run_leaderboard_refresh(SessionLocal()), "interval", hours=1, id="leaderboard")
     scheduler.add_job(lambda: run_newsletter(SessionLocal()), "cron", hour=8, minute=0, id="newsletter")
     scheduler.start()
-    print("[Eidolum] Starting — clean verified data only. Scheduler: scraper(1h), evaluator(15m), leaderboard(1h), newsletter(8am daily)")
+    print("[Eidolum] Scheduler: scraper(1h), fast_scraper(15m), evaluator(15m), leaderboard(1h), newsletter(8am)")
     yield
     scheduler.shutdown()
 
@@ -510,6 +521,7 @@ app.include_router(contrarian.router, prefix="/api")
 app.include_router(power_rankings.router, prefix="/api")
 app.include_router(inverse.router, prefix="/api")
 app.include_router(subscribers.router, prefix="/api")
+app.include_router(predictions.router, prefix="/api")
 app.include_router(admin_panel_router)  # /admin HTML + /api/admin/* endpoints
 
 

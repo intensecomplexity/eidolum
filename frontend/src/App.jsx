@@ -15,6 +15,7 @@ import ReportCards from './pages/ReportCards';
 import ContrarianSignals from './pages/ContrarianSignals';
 import PowerRankings from './pages/PowerRankings';
 import InversePortfolio from './pages/InversePortfolio';
+import RecentPredictions from './pages/RecentPredictions';
 
 export default function App() {
   return (
@@ -34,6 +35,7 @@ export default function App() {
         <Route path="/contrarian" element={<ContrarianSignals />} />
         <Route path="/power-rankings" element={<PowerRankings />} />
         <Route path="/inverse-portfolio" element={<InversePortfolio />} />
+        <Route path="/predictions" element={<RecentPredictions />} />
       </Routes>
       <SaveToast />
       <BottomNav />

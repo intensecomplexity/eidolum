@@ -234,3 +234,107 @@ def scrape_news_predictions(db: Session):
 
     db.commit()
     print(f"[NewsScraper] DONE: {added} added, {rejected_l1} rejected L1, {rejected_l2} rejected L2")
+
+
+# Top 15 most-watched tickers for the fast 15-minute scraper
+FAST_TICKERS = [
+    "AAPL", "MSFT", "GOOGL", "AMZN", "NVDA", "TSLA", "META",
+    "AMD", "NFLX", "JPM", "BA", "NKE", "DIS", "COIN", "PLTR",
+]
+
+
+def scrape_fast_predictions(db: Session):
+    """Fast scraper — runs every 15 min, checks top 15 tickers, last 2 days only."""
+    if not FINNHUB_KEY:
+        return
+
+    today = datetime.utcnow()
+    from_date = (today - timedelta(days=2)).strftime("%Y-%m-%d")
+    to_date = today.strftime("%Y-%m-%d")
+
+    added = 0
+
+    seen_urls = set()
+    existing = db.execute(text("SELECT source_url FROM predictions WHERE source_url IS NOT NULL"))
+    for row in existing:
+        if row[0]:
+            seen_urls.add(row[0])
+
+    for ticker in FAST_TICKERS:
+        try:
+            r = httpx.get(
+                "https://finnhub.io/api/v1/company-news",
+                params={
+                    "symbol": ticker,
+                    "from": from_date,
+                    "to": to_date,
+                    "token": FINNHUB_KEY,
+                },
+                timeout=10,
+            )
+            if r.status_code != 200:
+                continue
+            articles = r.json()
+            if not isinstance(articles, list):
+                continue
+
+            for article in articles[:15]:
+                headline = article.get("headline", "")
+                summary = article.get("summary", "")
+                source = article.get("source", "")
+                raw_url = article.get("url", "")
+                dt = article.get("datetime", 0)
+
+                if not raw_url or raw_url in seen_urls:
+                    continue
+                if not is_real_prediction(headline, summary):
+                    continue
+
+                direction = get_direction(headline, summary)
+                if not direction:
+                    continue
+
+                forecaster_name = extract_forecaster_name(headline, source)
+                forecaster = find_or_create_forecaster(forecaster_name, db)
+                if not forecaster:
+                    continue
+
+                real_url = resolve_redirect(raw_url)
+                if real_url in seen_urls:
+                    continue
+
+                arch = archive_url(real_url)
+
+                text_lower = (headline + " " + summary).lower()
+                window_days = 365 if "price target" in text_lower or "target" in text_lower else 90
+                pred_date = datetime.fromtimestamp(dt) if dt else today
+                eval_date = pred_date + timedelta(days=window_days)
+
+                is_valid, _ = validate_prediction(
+                    ticker=ticker, direction=direction,
+                    source_url=real_url, archive_url=arch,
+                    context=headline, forecaster_id=forecaster.id,
+                )
+                if not is_valid:
+                    continue
+
+                db.add(Prediction(
+                    forecaster_id=forecaster.id, ticker=ticker, direction=direction,
+                    prediction_date=pred_date, evaluation_date=eval_date,
+                    window_days=window_days, source_url=real_url, archive_url=arch,
+                    source_type="article", context=headline[:500], exact_quote=headline,
+                    outcome="pending", verified_by="finnhub_news",
+                ))
+                seen_urls.add(raw_url)
+                seen_urls.add(real_url)
+                added += 1
+
+            time.sleep(1.1)
+
+        except Exception as e:
+            print(f"[FastScraper] Error for {ticker}: {e}")
+            continue
+
+    if added > 0:
+        db.commit()
+        print(f"[FastScraper] Added {added} new predictions")

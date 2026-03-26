@@ -1,18 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Activity } from 'lucide-react';
-import { getActivityFeed } from '../api';
-
-const EVENT_CONFIG = {
-  prediction_resolved: {
-    icon: (outcome) => outcome === 'correct' ? '\u{1F7E2}' : '\u{1F534}',
-  },
-  prediction_new: { icon: () => '\u{1F195}' },
-  rank_change: {
-    icon: (_, rankFrom, rankTo) => (rankTo < rankFrom) ? '\u2B06\uFE0F' : '\u2B07\uFE0F',
-  },
-  forecaster_added: { icon: () => '\u2728' },
-};
+import { Activity, ExternalLink, TrendingUp, TrendingDown } from 'lucide-react';
+import { getTodayPredictions } from '../api';
 
 function timeAgo(ts) {
   const diff = Date.now() - new Date(ts).getTime();
@@ -26,12 +15,12 @@ function timeAgo(ts) {
 }
 
 export default function ActivityFeed() {
-  const [items, setItems] = useState([]);
+  const [predictions, setPredictions] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    getActivityFeed(20)
-      .then(setItems)
+    getTodayPredictions()
+      .then(setPredictions)
       .catch(() => {})
       .finally(() => setLoading(false));
   }, []);
@@ -51,6 +40,19 @@ export default function ActivityFeed() {
     );
   }
 
+  if (!predictions.length) {
+    return (
+      <div className="card">
+        <div className="flex items-center gap-2 mb-4">
+          <Activity className="w-5 h-5 text-accent" />
+          <h2 className="text-base sm:text-lg font-semibold">Live Activity</h2>
+          <span className="pulse-live w-2 h-2 rounded-full bg-accent inline-block" />
+        </div>
+        <p className="text-muted text-sm text-center py-6">No predictions yet today. Check back soon.</p>
+      </div>
+    );
+  }
+
   return (
     <div className="card p-0 overflow-hidden">
       <div className="flex items-center gap-2 px-4 sm:px-6 py-3 sm:py-4 border-b border-border">
@@ -60,56 +62,68 @@ export default function ActivityFeed() {
         <span className="text-muted text-xs ml-auto font-mono">LIVE</span>
       </div>
 
-      <div className="divide-y divide-border/50 max-h-[360px] sm:max-h-[480px] overflow-y-auto">
-        {items.map((item, i) => {
-          const config = EVENT_CONFIG[item.event_type] || { icon: () => '\u{1F4CC}' };
-          const emoji = config.icon(item.outcome, item.rank_from, item.rank_to);
-          const isRecent = (Date.now() - new Date(item.timestamp).getTime()) < 3600000;
+      <div className="divide-y divide-border/50">
+        {predictions.map((p, i) => {
+          const isBull = p.direction === 'bullish';
+          const isRecent = p.prediction_date && (Date.now() - new Date(p.prediction_date).getTime()) < 3600000;
 
           return (
             <div
-              key={item.id}
+              key={p.id}
               className={`px-4 sm:px-6 py-3 active:bg-surface-2/50 transition-colors feed-item-enter ${
                 isRecent ? 'bg-accent/[0.03]' : ''
               }`}
               style={{ animationDelay: `${i * 30}ms` }}
             >
               <div className="flex items-start gap-3">
-                <span className="text-base sm:text-lg mt-0.5 shrink-0">{emoji}</span>
+                <span className="mt-0.5 shrink-0">
+                  {isBull
+                    ? <TrendingUp className="w-4 h-4 text-positive" />
+                    : <TrendingDown className="w-4 h-4 text-negative" />
+                  }
+                </span>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm text-text-primary leading-relaxed">
-                    {renderMessage(item)}
+                    <Link to={`/asset/${p.ticker}`} className="font-mono text-accent font-bold active:underline">
+                      {p.ticker}
+                    </Link>
+                    {' '}
+                    <span className={`text-xs font-semibold uppercase ${isBull ? 'text-positive' : 'text-negative'}`}>
+                      {isBull ? 'BULL' : 'BEAR'}
+                    </span>
+                    {' — '}
+                    <Link to={`/forecaster/${p.forecaster_id}`} className="text-text-secondary active:text-accent">
+                      {p.forecaster_name}
+                    </Link>
+                    {p.context && (
+                      <span className="text-muted"> {p.context.length > 60 ? p.context.slice(0, 60) + '...' : p.context}</span>
+                    )}
                   </p>
-                  <span className="text-muted text-xs font-mono mt-1 block">
-                    {timeAgo(item.timestamp)}
-                  </span>
+                  <div className="flex items-center gap-3 mt-1">
+                    <span className="text-muted text-xs font-mono">
+                      {p.prediction_date ? timeAgo(p.prediction_date) : ''}
+                    </span>
+                    {p.source_url && (
+                      <a href={p.source_url} target="_blank" rel="noopener noreferrer"
+                         onClick={e => e.stopPropagation()}
+                         className="inline-flex items-center gap-1 text-[10px] text-accent active:underline">
+                        <ExternalLink className="w-2.5 h-2.5" /> Source
+                      </a>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
           );
         })}
       </div>
+
+      <Link
+        to="/predictions"
+        className="block text-center text-sm text-accent font-medium py-3 border-t border-border active:bg-surface-2/50 transition-colors"
+      >
+        Show more predictions
+      </Link>
     </div>
   );
-}
-
-function renderMessage(item) {
-  const msg = item.message;
-  const parts = msg.split(/\b([A-Z]{2,5})\b/g);
-  return parts.map((part, i) => {
-    if (/^[A-Z]{2,5}$/.test(part) && !['NEW', 'CORRECT', 'WRONG', 'The'].includes(part)) {
-      return (
-        <Link key={i} to={`/asset/${part}`} className="font-mono text-accent active:underline">
-          {part}
-        </Link>
-      );
-    }
-    if (part === 'CORRECT') {
-      return <span key={i} className="text-positive font-semibold">{part}</span>;
-    }
-    if (part === 'WRONG') {
-      return <span key={i} className="text-negative font-semibold">{part}</span>;
-    }
-    return <span key={i}>{part}</span>;
-  });
 }
