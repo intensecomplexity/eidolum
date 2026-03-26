@@ -336,6 +336,81 @@ KNOWN_ANALYSTS = [
     "s&p global", "fitch", "moody", "capital economics",
 ]
 
+# Canonical name -> all known aliases (lowercase)
+FORECASTER_ALIASES = {
+    "Bernstein": ["bernstein", "sanford bernstein", "sanford c. bernstein", "ab bernstein", "alliance bernstein", "alliancebernstein"],
+    "Goldman Sachs": ["goldman sachs", "goldman"],
+    "JP Morgan": ["jp morgan", "jpmorgan", "j.p. morgan", "j.p.morgan"],
+    "Morgan Stanley": ["morgan stanley"],
+    "Bank Of America": ["bank of america", "bofa", "bofa securities", "merrill lynch", "merrill"],
+    "Citi": ["citi", "citigroup", "citibank", "citi research"],
+    "Deutsche Bank": ["deutsche bank", "db securities"],
+    "UBS": ["ubs", "ubs group", "ubs securities"],
+    "Barclays": ["barclays", "barclays capital"],
+    "Wells Fargo": ["wells fargo", "wells fargo securities"],
+    "HSBC": ["hsbc", "hsbc securities", "hsbc global"],
+    "Credit Suisse": ["credit suisse"],
+    "Jefferies": ["jefferies", "jefferies group"],
+    "Raymond James": ["raymond james", "raymond james financial"],
+    "Needham": ["needham", "needham & company", "needham and company"],
+    "Wedbush": ["wedbush", "wedbush securities", "wedbush morgan"],
+    "Piper Sandler": ["piper sandler", "piper", "piper jaffray"],
+    "Cowen": ["cowen", "cowen and company", "td cowen"],
+    "Oppenheimer": ["oppenheimer", "oppenheimer & co", "oppenheimer holdings"],
+    "Stifel": ["stifel", "stifel nicolaus", "stifel financial"],
+    "Baird": ["baird", "robert w. baird", "robert baird", "rw baird"],
+    "KeyBanc": ["keybanc", "keybanc capital", "keybanc capital markets"],
+    "BMO Capital": ["bmo capital", "bmo", "bmo capital markets"],
+    "RBC Capital": ["rbc capital", "rbc", "rbc capital markets"],
+    "Evercore": ["evercore", "evercore isi"],
+    "Wolfe Research": ["wolfe research", "wolfe"],
+    "Loop Capital": ["loop capital", "loop capital markets"],
+    "Truist": ["truist", "truist securities", "truist financial"],
+    "Mizuho": ["mizuho", "mizuho securities", "mizuho financial"],
+    "Susquehanna": ["susquehanna", "susquehanna financial", "susquehanna international"],
+    "Rosenblatt": ["rosenblatt", "rosenblatt securities"],
+    "Canaccord": ["canaccord", "canaccord genuity"],
+    "Guggenheim": ["guggenheim", "guggenheim securities", "guggenheim partners"],
+    "Macquarie": ["macquarie", "macquarie group", "macquarie capital"],
+    "Scotiabank": ["scotiabank", "scotia capital", "scotia"],
+    "William Blair": ["william blair"],
+    "B. Riley": ["b. riley", "b riley", "b. riley securities", "b riley financial"],
+    "Argus Research": ["argus", "argus research"],
+    "CFRA": ["cfra", "cfra research"],
+    "New Street Research": ["new street", "new street research"],
+    "H.C. Wainwright": ["h.c. wainwright", "hc wainwright", "wainwright"],
+    "Roth Capital": ["roth capital", "roth", "roth mkm", "roth/mkm"],
+    "Lake Street": ["lake street", "lake street capital"],
+    "Craig-Hallum": ["craig-hallum", "craig hallum"],
+    "Benchmark": ["benchmark", "benchmark company"],
+    "D.A. Davidson": ["d.a. davidson", "da davidson"],
+    "Cathie Wood": ["cathie wood", "cathy wood", "cathie woods"],
+    "Jim Cramer": ["jim cramer", "cramer"],
+    "Dan Ives": ["dan ives", "daniel ives"],
+    "Tom Lee": ["tom lee", "thomas lee"],
+    "Michael Burry": ["michael burry", "burry"],
+    "Ray Dalio": ["ray dalio", "dalio"],
+    "Bill Ackman": ["bill ackman", "ackman", "pershing square"],
+    "Warren Buffett": ["warren buffett", "buffett", "berkshire"],
+    "ARK Invest": ["ark invest", "ark innovation", "arkk"],
+    "Fundstrat": ["fundstrat", "fundstrat global", "fundstrat global advisors"],
+    "Morningstar": ["morningstar"],
+    "Zacks": ["zacks", "zacks investment", "zacks investment research"],
+    "S&P Global": ["s&p global", "standard and poor", "standard & poor"],
+}
+
+
+def resolve_forecaster_alias(name):
+    """Given any variation of a firm name, return the canonical name."""
+    if not name:
+        return None
+    name_lower = name.lower().strip()
+    for canonical, aliases in FORECASTER_ALIASES.items():
+        if name_lower in aliases or name_lower == canonical.lower():
+            return canonical
+    return name
+
+
 # Company names that are NOT forecasters
 COMPANY_NAMES = [
     "apple", "microsoft", "google", "alphabet", "amazon", "nvidia", "tesla", "meta",
@@ -388,13 +463,19 @@ def get_direction(headline, summary=""):
 
 
 def extract_forecaster_name(headline, source=""):
-    """Extract REAL analyst/firm name. Returns None if no real analyst found."""
+    """Extract REAL analyst/firm name. Returns canonical name via aliases."""
     combined = (headline + " " + source).lower()
 
-    # Check known analysts first
+    # Check all aliases — return canonical name
+    for canonical, aliases in FORECASTER_ALIASES.items():
+        for alias in aliases:
+            if alias in combined:
+                return canonical
+
+    # Fallback: check KNOWN_ANALYSTS (for names not in aliases)
     for name in KNOWN_ANALYSTS:
         if name in combined:
-            return name.title()
+            return resolve_forecaster_alias(name.title())
 
     # Regex: "{Multi-Word Firm} upgrades/downgrades..."
     match = re.search(
@@ -408,7 +489,7 @@ def extract_forecaster_name(headline, source=""):
                 and firm.lower() not in PLATFORMS
                 and firm.lower() not in COMPANY_NAMES
                 and len(firm) > 4):
-            return firm
+            return resolve_forecaster_alias(firm)
 
     # Passive pattern: "AAPL downgraded at {Firm}" or "AAPL upgraded by {Firm}"
     match2 = re.search(
@@ -421,7 +502,7 @@ def extract_forecaster_name(headline, source=""):
                 and firm.lower() not in PLATFORMS
                 and len(firm) > 3):
             if firm.lower() in KNOWN_ANALYSTS or " " in firm:
-                return firm
+                return resolve_forecaster_alias(firm)
 
     return None
 

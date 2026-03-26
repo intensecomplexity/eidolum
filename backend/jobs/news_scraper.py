@@ -18,6 +18,8 @@ from jobs.prediction_validator import (
     get_direction,
     extract_forecaster_name,
     validate_prediction,
+    resolve_forecaster_alias,
+    FORECASTER_ALIASES,
 )
 
 FINNHUB_KEY = os.getenv("FINNHUB_KEY", "")
@@ -67,41 +69,67 @@ def archive_url(url):
 
 
 def find_forecaster(name, db):
-    """Find existing forecaster by name. Only creates new if name is multi-word (real firm)."""
+    """Find forecaster using alias resolution. Creates new only for known/multi-word firms."""
     if not name or len(name.strip()) < 3:
         return None
 
-    name = name.strip()
+    canonical = resolve_forecaster_alias(name.strip())
 
-    # Try exact match
-    f = db.query(Forecaster).filter(Forecaster.name == name).first()
+    # Try exact match on canonical name
+    f = db.query(Forecaster).filter(Forecaster.name == canonical).first()
     if f:
         return f
 
-    # Try case-insensitive match
-    f = db.query(Forecaster).filter(Forecaster.name.ilike(name)).first()
+    # Try case-insensitive
+    f = db.query(Forecaster).filter(Forecaster.name.ilike(canonical)).first()
     if f:
         return f
 
-    # Only create new forecaster if it's a multi-word name (real firm, not "Job" or "Oil")
-    if " " not in name:
+    # Only create if canonical is a known alias or multi-word
+    if " " not in canonical and canonical not in FORECASTER_ALIASES:
         return None
 
-    handle = re.sub(r"[^a-zA-Z0-9]", "", name)[:20]
+    handle = re.sub(r"[^a-zA-Z0-9]", "", canonical)[:20]
     existing = db.query(Forecaster).filter(Forecaster.handle == handle).first()
     if existing:
         return existing
 
     f = Forecaster(
-        name=name,
+        name=canonical,
         handle=handle,
         platform="institutional",
         channel_url="",
     )
     db.add(f)
     db.flush()
-    print(f"[NewsScraper] Created new forecaster: {name}")
+    print(f"[NewsScraper] Created forecaster: {canonical}")
     return f
+
+
+def merge_duplicate_forecasters(db):
+    """Merge forecasters that are the same firm with different names."""
+    merged = 0
+    for canonical, aliases in FORECASTER_ALIASES.items():
+        main = db.query(Forecaster).filter(Forecaster.name == canonical).first()
+        if not main:
+            continue
+        for alias in aliases:
+            dupes = db.query(Forecaster).filter(
+                Forecaster.name.ilike(alias),
+                Forecaster.id != main.id,
+            ).all()
+            for dupe in dupes:
+                db.execute(
+                    text("UPDATE predictions SET forecaster_id = :main_id WHERE forecaster_id = :dupe_id"),
+                    {"main_id": main.id, "dupe_id": dupe.id},
+                )
+                db.delete(dupe)
+                merged += 1
+                print(f"[Merge] Merged '{dupe.name}' into '{canonical}'")
+    if merged:
+        db.commit()
+        print(f"[Merge] Merged {merged} duplicate forecasters")
+    return merged
 
 
 def scrape_news_predictions(db: Session):

@@ -375,6 +375,14 @@ async def lifespan(app):
         db.close()
     except Exception as e:
         print(f"[Eidolum] Magazine seed error (non-fatal): {e}")
+    # Merge duplicate forecasters (same firm, different names)
+    try:
+        db = SessionLocal()
+        from jobs.news_scraper import merge_duplicate_forecasters
+        merge_duplicate_forecasters(db)
+        db.close()
+    except Exception as e:
+        print(f"[Eidolum] Forecaster merge error (non-fatal): {e}")
     # Add cached stats columns to forecasters if missing
     try:
         from sqlalchemy import text as _t
