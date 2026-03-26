@@ -31,7 +31,27 @@ PREDICTION_KEYWORDS = [
     "raises to", "lowers to", "initiates coverage", "reiterates",
     "top pick", "conviction buy", "conviction list", "strong buy",
     "maintains buy", "maintains sell", "maintains overweight",
-    "bullish", "bearish",
+]
+
+DIRECTION_KEYWORDS = [
+    "buy", "sell", "bull", "bear", "bullish", "bearish",
+    "overweight", "underweight", "outperform", "underperform",
+    "upgrade", "downgrade", "raises", "lowers", "cuts",
+    "strong buy", "strong sell", "top pick", "conviction",
+    "positive", "negative", "reduce",
+]
+
+REJECT_KEYWORDS = [
+    "signs agreement", "framework agreement", "partnership", "acquisition", "merger",
+    "earnings report", "revenue growth", "quarterly results", "reports earnings",
+    "dividend", "stock split", "buyback", "repurchase",
+    "appoints", "names new", "hires", "ceo transition", "cfo transition", "board of directors",
+    "patent", "fda approval", "clinical trial", "regulatory approval",
+    "lawsuit", "settlement", "investigation", "subpoena",
+    "product launch", "announces partnership", "signs deal", "contract win",
+    "supply agreement", "joint venture", "strategic alliance",
+    "quarterly earnings", "beats estimates", "misses estimates",
+    "ipo", "secondary offering", "shelf registration",
 ]
 
 BULLISH_WORDS = [
@@ -67,7 +87,13 @@ PRICE_PATTERN = re.compile(r'\$([0-9,]+(?:\.[0-9]+)?)')
 
 def is_prediction(headline, summary):
     combined = (headline + " " + summary).lower()
-    return any(kw in combined for kw in PREDICTION_KEYWORDS)
+    # Must NOT match any reject keywords
+    if any(rk in combined for rk in REJECT_KEYWORDS):
+        return False
+    # Must have BOTH a prediction keyword AND a direction keyword
+    has_prediction = any(kw in combined for kw in PREDICTION_KEYWORDS)
+    has_direction = any(dw in combined for dw in DIRECTION_KEYWORDS)
+    return has_prediction and has_direction
 
 
 def get_direction(headline, summary):
@@ -212,3 +238,26 @@ def scrape_news_predictions(db: Session):
 
     db.commit()
     print(f"[NewsScraper] Done: {total_added} real article predictions added")
+
+    # Clean up any existing predictions that slipped through without proper keywords
+    cleanup_bad_predictions(db)
+
+
+def cleanup_bad_predictions(db: Session):
+    """Delete predictions that don't have BOTH a prediction keyword AND a direction keyword."""
+    try:
+        all_preds = db.query(Prediction).filter(
+            Prediction.verified_by == "finnhub_news"
+        ).all()
+        deleted = 0
+        for p in all_preds:
+            ctx = (p.context or "") + " " + (p.exact_quote or "")
+            if not is_prediction(ctx, ""):
+                db.delete(p)
+                deleted += 1
+        if deleted:
+            db.commit()
+            print(f"[NewsScraper] Cleaned up {deleted} non-prediction articles from DB")
+    except Exception as e:
+        db.rollback()
+        print(f"[NewsScraper] Cleanup error: {e}")
