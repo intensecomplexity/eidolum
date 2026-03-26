@@ -16,10 +16,33 @@ ARCHIVE_DIR = os.getenv("ARCHIVE_DIR", "/app/archive")
 
 
 def save_with_proof(db: Session, prediction_obj: Prediction, forecaster_name: str = "") -> bool:
-    """Save prediction immediately. Archive proof in background — never blocks saving."""
+    """Save prediction immediately, then archive proof in background (non-blocking)."""
     db.add(prediction_obj)
     db.flush()
-    print(f"[Scraper] Saved prediction {prediction_obj.id}: {prediction_obj.ticker} from {(prediction_obj.source_url or '')[:60]}")
+
+    # Archive proof in background thread — never blocks saving
+    import threading
+    pred_id = prediction_obj.id
+    source_url = prediction_obj.source_url
+    quote = prediction_obj.exact_quote or prediction_obj.context or ""
+    pred_date = str(prediction_obj.prediction_date or "")
+
+    def _archive():
+        try:
+            from archiver.screenshot import archive_proof_sync
+            from database import SessionLocal as _SL
+            from sqlalchemy import text as _t
+            proof_url = archive_proof_sync(source_url, pred_id, quote, forecaster_name, pred_date)
+            if proof_url:
+                db2 = _SL()
+                db2.execute(_t("UPDATE predictions SET archive_url=:url, archived_at=:ts WHERE id=:id"),
+                            {"url": proof_url, "ts": datetime.utcnow(), "id": pred_id})
+                db2.commit()
+                db2.close()
+        except Exception as e:
+            print(f"[Archive] Background error for {pred_id}: {e}")
+
+    threading.Thread(target=_archive, daemon=True).start()
     return True
 
 # ── YouTube ──────────────────────────────────────────────────────────────────
