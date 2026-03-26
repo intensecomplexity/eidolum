@@ -377,15 +377,21 @@ async def lifespan(app):
         db.close()
     except Exception as e:
         print(f"[Eidolum] pending_review conversion error (non-fatal): {e}")
-    # (Proof cleanup already handled above — deduped)
-    # Seed new forecasters (idempotent)
+    # Clean up empty forecasters (0 predictions, not in the new 50-forecaster list)
     try:
+        from sqlalchemy import text as _cl
         db = SessionLocal()
-        from seed_forecasters import seed_new_forecasters
-        seed_new_forecasters(db)
+        r = db.execute(_cl("""
+            DELETE FROM forecasters WHERE id NOT IN (
+                SELECT DISTINCT forecaster_id FROM predictions WHERE forecaster_id IS NOT NULL
+            )
+        """))
+        db.commit()
+        if r.rowcount > 0:
+            print(f"[Cleanup] Removed {r.rowcount} forecasters with 0 predictions")
         db.close()
     except Exception as e:
-        print(f"[Eidolum] Forecaster seed error (non-fatal): {e}")
+        print(f"[Cleanup] Empty forecaster cleanup error (non-fatal): {e}")
     # Seed verified predictions (only if fewer than 5 real ones exist)
     try:
         from seed_verified import seed_verified
