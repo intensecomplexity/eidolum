@@ -203,70 +203,20 @@ def scrape_reddit(db: Session):
     print("[Scraper] Reddit done")
 
 def run_scraper(db: Session):
+    """Hourly scraper: news articles + Layer 3 cleanup + evaluation."""
     print(f"[Scraper] Starting hourly run at {datetime.utcnow()}")
-    scrape_twitter(db)
-    scrape_youtube(db)
-    # scrape_reddit removed — replaced by magazine/Finnhub data
-    try:
-        from jobs.quiver_scraper import scrape_congress_trades
-        scrape_congress_trades(db)
-    except Exception as e:
-        print(f"[Scraper] Quiver error (non-fatal): {e}")
-    try:
-        from jobs.youtube_history import run_youtube_history
-        run_youtube_history(db)
-    except Exception as e:
-        print(f"[Scraper] YouTube history error (non-fatal): {e}")
-    try:
-        from jobs.twitter_history import scrape_twitter_history
-        scrape_twitter_history(db)
-    except Exception as e:
-        print(f"[Scraper] Twitter history error (non-fatal): {e}")
-    # Reddit history removed — replaced by magazine/Finnhub data
-    try:
-        from jobs.analyst_targets import scrape_analyst_targets
-        scrape_analyst_targets(db)
-    except Exception as e:
-        print(f"[Scraper] Analyst targets error (non-fatal): {e}")
-    try:
-        from jobs.kalshi_scraper import scrape_kalshi
-        scrape_kalshi(db)
-    except Exception as e:
-        print(f"[Scraper] Kalshi error (non-fatal): {e}")
-    try:
-        from jobs.earnings_calls import scrape_earnings_calls
-        scrape_earnings_calls(db)
-    except Exception as e:
-        print(f"[Scraper] Earnings calls error (non-fatal): {e}")
-    try:
-        from jobs.tipranks_scraper import scrape_tipranks
-        scrape_tipranks(db)
-    except Exception as e:
-        print(f"[Scraper] TipRanks/Benzinga error (non-fatal): {e}")
-    # seed_finnhub_predictions removed — replaced by real news article scraper
-    try:
-        from jobs.substack_scraper import scrape_substacks
-        scrape_substacks(db)
-    except Exception as e:
-        print(f"[Scraper] Substack error (non-fatal): {e}")
-    try:
-        from jobs.finviz_scraper import scrape_finviz_upgrades
-        scrape_finviz_upgrades(db)
-    except Exception as e:
-        print(f"[Scraper] Finviz error (non-fatal): {e}")
-    # Real news articles from Finnhub company news API
+    # Scrape real news articles (Layer 1 + Layer 2 built in)
     try:
         from jobs.news_scraper import scrape_news_predictions
         scrape_news_predictions(db)
     except Exception as e:
         print(f"[Scraper] News scraper error (non-fatal): {e}")
-    # Archive any predictions missing proof
+    # Layer 3: cleanup anything that slipped through
     try:
-        from main import archive_missing_proofs
-        archive_missing_proofs(db)
+        from jobs.prediction_validator import cleanup_invalid_predictions
+        cleanup_invalid_predictions(db)
     except Exception as e:
-        print(f"[Scraper] Archive missing proofs error (non-fatal): {e}")
-    # scrape_finnhub_analysts removed — aggregate data, no real article URLs
+        print(f"[Scraper] L3 cleanup error (non-fatal): {e}")
     # Evaluate pending predictions against real prices
     try:
         from jobs.evaluate_predictions import evaluate_all_pending

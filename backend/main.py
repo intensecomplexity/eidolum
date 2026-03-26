@@ -403,31 +403,21 @@ async def lifespan(app):
             db = SessionLocal()
             pred_count = db.query(Prediction).count()
             print(f"[Eidolum] Background import starting — {pred_count} predictions exist")
-            # STEP 3: Primary source — real news articles from Finnhub Company News API
+            # Scrape real news articles (Layer 1 + Layer 2 built in)
             try:
                 from jobs.news_scraper import scrape_news_predictions
                 scrape_news_predictions(db)
             except Exception as e:
                 print(f"[Background] News scraper error: {e}")
-            # Secondary sources
+            # Layer 3: cleanup anything that slipped through
             try:
-                from jobs.finviz_scraper import scrape_finviz_upgrades
-                scrape_finviz_upgrades(db)
+                from jobs.prediction_validator import cleanup_invalid_predictions
+                cleanup_invalid_predictions(db)
             except Exception as e:
-                print(f"[Background] Finviz error: {e}")
-            try:
-                from jobs.tipranks_scraper import scrape_tipranks
-                scrape_tipranks(db)
-            except Exception as e:
-                print(f"[Background] TipRanks error: {e}")
-            try:
-                from jobs.substack_scraper import scrape_substacks
-                scrape_substacks(db)
-            except Exception as e:
-                print(f"[Background] Substack error: {e}")
+                print(f"[Background] L3 cleanup error: {e}")
             pred_count = db.query(Prediction).count()
             print(f"[Eidolum] Background import complete — {pred_count} real predictions loaded")
-            # STEP 4: Evaluate pending predictions
+            # Evaluate pending predictions
             try:
                 from jobs.evaluate_predictions import evaluate_all_pending
                 evaluate_all_pending(db)

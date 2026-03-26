@@ -42,10 +42,29 @@ Every prediction MUST have:
 ## Data Pipeline
 1. DELETE all predictions at startup (clean slate)
 2. Seed 50 forecasters
-3. Scrape Finnhub Company News API (60 tickers, 60-day lookback)
-4. Strict filter: analyst action + rating, no reject keywords, no questions
-5. Regex-based direction extraction (skip ambiguous)
-6. Resolve redirect URLs to final article URL
-7. Match to forecaster by source name + headline
-8. Archive via Wayback Machine
-9. Evaluate predictions against real price data
+3. Scrape Finnhub Company News API (60+ tickers, 90-day lookback)
+4. Layer 1 filter: analyst action + rating word, reject patterns, no questions
+5. Direction extraction with regex scoring (skip ambiguous)
+6. Resolve Finnhub redirect URLs to final article URL
+7. Layer 2 validation: all 7 required fields, no fake URLs/content
+8. Match to forecaster by source name + headline
+9. Archive via Wayback Machine
+10. Layer 3 hourly cleanup: scan DB and delete any rule violators
+11. Evaluate predictions against real price data
+
+## 3-Layer Defense System
+
+### Layer 1 — Scraper filter (before saving)
+Only articles with BOTH an analyst action word (upgrades, downgrades, raises target)
+AND a rating word (buy, sell, overweight, price target) pass through.
+Press releases, clickbait questions, and corporate news are rejected via regex patterns.
+
+### Layer 2 — Validation function (before database insert)
+Every prediction is checked for all 7 required fields:
+ticker, direction, source_url, archive_url, context, forecaster_id.
+Fake URL patterns and fake content patterns are rejected.
+
+### Layer 3 — Hourly cleanup job (after saving)
+Scans the entire database every hour and deletes any prediction that
+somehow slipped through layers 1 and 2. Catches fake URLs, fake content,
+missing fields, clickbait headlines, and press releases.
