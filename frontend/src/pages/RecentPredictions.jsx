@@ -102,6 +102,7 @@ export default function RecentPredictions() {
             <div className="space-y-2">
               {data.predictions.map(p => {
                 const isBull = p.direction === 'bullish';
+                const outcomeColor = p.outcome === 'correct' ? 'text-positive' : p.outcome === 'incorrect' ? 'text-negative' : 'text-warning';
                 return (
                   <div key={p.id} className="card p-3 sm:p-4">
                     <div className="flex items-start gap-3">
@@ -112,32 +113,47 @@ export default function RecentPredictions() {
                         }
                       </span>
                       <div className="flex-1 min-w-0">
+                        {/* Row 1: Date + Forecaster + Ticker + Direction + Outcome */}
                         <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-muted text-xs font-mono">{formatDate(p.prediction_date)}</span>
+                          <Link to={`/forecaster/${p.forecaster_id}`} className="font-medium text-sm text-text-primary active:text-accent">
+                            {p.forecaster_name}
+                          </Link>
                           <Link to={`/asset/${p.ticker}`} className="font-mono text-accent font-bold text-sm active:underline">
                             {p.ticker}
                           </Link>
                           <span className={`text-[10px] font-semibold uppercase px-1.5 py-0.5 rounded ${isBull ? 'text-positive bg-positive/10' : 'text-negative bg-negative/10'}`}>
                             {isBull ? 'BULL' : 'BEAR'}
                           </span>
-                          <span className="text-muted text-xs font-mono">{formatDate(p.prediction_date)}</span>
-                          {p.window_days && (
-                            <span className="text-muted text-[10px] font-mono border border-border rounded px-1 py-0.5">{p.window_days}d</span>
+                          {p.outcome && (
+                            <span className={`text-[10px] font-semibold uppercase px-1.5 py-0.5 rounded ${outcomeColor} bg-surface-2`}>
+                              {p.outcome}
+                            </span>
                           )}
                         </div>
 
-                        <p className="text-sm text-text-secondary mt-1 leading-relaxed">
-                          <Link to={`/forecaster/${p.forecaster_id}`} className="font-medium text-text-primary active:text-accent">
-                            {p.forecaster_name}
-                          </Link>
-                          {p.context && <span className="text-muted"> — {p.context}</span>}
-                        </p>
-
-                        {p.target_price && (
-                          <span className="text-xs font-mono text-text-secondary mt-1 block">
-                            Target: ${p.target_price.toFixed(0)}
-                          </span>
+                        {/* Row 2: Headline */}
+                        {p.context && (
+                          <p className="text-sm text-text-secondary mt-1 leading-relaxed">
+                            {p.context}
+                          </p>
                         )}
 
+                        {/* Row 3: Target price + eval window (secondary) */}
+                        <div className="flex items-center gap-3 mt-1">
+                          {p.target_price && (
+                            <span className="text-xs font-mono text-text-secondary">
+                              Target: ${p.target_price.toFixed(0)}
+                            </span>
+                          )}
+                          {p.window_days && (
+                            <span className="text-muted text-[10px] font-mono" title={`Evaluated after ${p.window_days} days`}>
+                              Eval: {p.window_days}d
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Row 4: Source + Archive links */}
                         <div className="flex items-center gap-3 mt-2">
                           {p.source_url && (
                             <a href={p.source_url} target="_blank" rel="noopener noreferrer"

@@ -462,6 +462,8 @@ async def lifespan(app):
         print("[WARNING] ADMIN_SECRET not set — admin routes are unprotected!")
     # Start background job scheduler
     def run_fast_scraper():
+        from datetime import datetime as _dt
+        print(f"[Scheduler] Running fast scraper at {_dt.utcnow()}")
         from jobs.news_scraper import scrape_fast_predictions
         db = SessionLocal()
         try:
@@ -471,10 +473,28 @@ async def lifespan(app):
         finally:
             db.close()
 
+    def run_hourly_scraper():
+        from datetime import datetime as _dt
+        print(f"[Scheduler] Running full scraper at {_dt.utcnow()}")
+        db = SessionLocal()
+        try:
+            run_scraper(db)
+        finally:
+            db.close()
+
+    def run_15min_evaluator():
+        from datetime import datetime as _dt
+        print(f"[Scheduler] Running evaluator at {_dt.utcnow()}")
+        db = SessionLocal()
+        try:
+            run_evaluator(db)
+        finally:
+            db.close()
+
     scheduler = AsyncIOScheduler()
-    scheduler.add_job(lambda: run_scraper(SessionLocal()), "interval", hours=1, id="scraper")
+    scheduler.add_job(run_hourly_scraper, "interval", hours=1, id="scraper")
     scheduler.add_job(run_fast_scraper, "interval", minutes=15, id="fast_scraper")
-    scheduler.add_job(lambda: run_evaluator(SessionLocal()), "interval", minutes=15, id="evaluator")
+    scheduler.add_job(run_15min_evaluator, "interval", minutes=15, id="evaluator")
     scheduler.add_job(lambda: run_leaderboard_refresh(SessionLocal()), "interval", hours=1, id="leaderboard")
     scheduler.add_job(lambda: run_newsletter(SessionLocal()), "cron", hour=8, minute=0, id="newsletter")
     scheduler.start()

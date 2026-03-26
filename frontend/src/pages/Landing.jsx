@@ -55,8 +55,7 @@ export default function Landing() {
           fontWeight: 400,
           margin: 0,
         }}>
-          We verify predictions from 50+ finance influencers against real market data.
-          No hype, no guesswork — just accountability.
+          We track every financial prediction from Wall Street analysts, banks, and research firms — and verify them against real market data.
         </p>
       </div>
 
@@ -212,7 +211,7 @@ export default function Landing() {
         </p>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '32px' }}>
           {[
-            { num: '01', icon: Search, title: 'Collect', desc: 'We pull predictions from 50+ tracked YouTube channels, Reddit posts, and X accounts.' },
+            { num: '01', icon: Search, title: 'Collect', desc: 'We pull analyst predictions from financial news — upgrades, downgrades, and price target changes from real firms.' },
             { num: '02', icon: BarChart3, title: 'Parse', desc: 'NLP and keyword matching extract structured predictions: ticker, direction, and price targets.' },
             { num: '03', icon: CheckCircle, title: 'Verify', desc: 'After 30/60/90 days we compare predictions to actual market data and score each forecaster.' },
           ].map(step => (
