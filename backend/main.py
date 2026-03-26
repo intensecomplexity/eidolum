@@ -271,17 +271,23 @@ async def lifespan(app):
         db.close()
     except Exception as e:
         print(f"[Eidolum] Fake data wipe error (non-fatal): {e}")
-    # Wipe vague predictions that aren't specific falsifiable claims
+    # Enforce prediction quality — delete vague predictions on every boot
     try:
         from sqlalchemy import text as _vt
         db = SessionLocal()
         before = db.execute(_vt("SELECT COUNT(*) FROM predictions")).scalar()
-        # Keep only predictions with specific falsifiable language in exact_quote or context
+        # Keep predictions that have specific falsifiable language, OR are whitelisted source URLs
         db.execute(_vt("""
             DELETE FROM predictions
-            WHERE verified_by != 'manual'
-            AND exact_quote NOT SIMILAR TO '%(will reach|will hit|price target|going to \\$|target of|bullish on|bearish on|overvalued|undervalued|going to [0-9]|to \\$[0-9]|calls on|puts on|going up|going down|i expect|i predict|forecast|by [0-9]{4}|\\$[0-9]+ target|\\$[0-9]+ price|bottom at|top at|crash to|moon to|buy here|sell here|short )%'
-            AND (context IS NULL OR context NOT SIMILAR TO '%(will reach|will hit|price target|going to \\$|target of|bullish on|bearish on|overvalued|undervalued|to \\$[0-9]|calls on|puts on|i expect|i predict|forecast|\\$[0-9]+ target|buy here|sell here|short )%')
+            WHERE id NOT IN (
+                SELECT id FROM predictions WHERE
+                exact_quote ~* '(will reach|will hit|price target|to \\$[0-9]|going to [0-9]|target of|buy |sell |bullish on|bearish on|overvalued|undervalued|calls |puts |forecast|by 20[0-9]{2}|crash|bottom|top at|i expect|i predict)'
+                OR context ~* '(will reach|will hit|price target|to \\$[0-9]|going to [0-9]|target of|buy |sell |bullish on|bearish on|overvalued|undervalued|calls |puts |forecast|by 20[0-9]{2}|crash|bottom|top at|i expect|i predict)'
+            )
+            AND source_url NOT IN (
+                'https://www.reddit.com/r/wallstreetbets/comments/l6xnte/gme_yolo_update_jan_25_2021/',
+                'https://www.reddit.com/r/wallstreetbets/comments/n3rjlp/amc_the_apes_are_coming/'
+            )
         """))
         db.commit()
         after = db.execute(_vt("SELECT COUNT(*) FROM predictions")).scalar()
@@ -292,7 +298,7 @@ async def lifespan(app):
             print(f"[Eidolum] No vague predictions to wipe ({after} total)")
         db.close()
     except Exception as e:
-        print(f"[Eidolum] Vague prediction wipe error (non-fatal): {e}")
+        print(f"[Quality] enforce_prediction_quality error (non-fatal): {e}")
     # Clear old config flag if it exists
     try:
         from sqlalchemy import text as _text
