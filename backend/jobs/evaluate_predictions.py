@@ -29,16 +29,23 @@ def evaluate_all_pending(db):
 
     for p in pending:
         try:
+            if evaluated == 0 and errors == 0:
+                print(f"[Evaluator] First prediction: id={p.id} ticker={p.ticker} direction={p.direction} date={p.prediction_date}")
+
             ticker = (p.ticker or "").upper().strip()
             if not ticker or len(ticker) > 6:
+                print(f"[Evaluator] Skipping bad ticker: '{ticker}' (id={p.id})")
                 continue
 
             if ticker not in ticker_cache:
                 try:
+                    print(f"[Evaluator] Fetching yfinance data for {ticker}...")
                     stock = yf.Ticker(ticker)
                     hist = stock.history(period="3mo")
+                    print(f"[Evaluator] {ticker} 3mo history: {len(hist)} rows")
                     if hist.empty:
                         hist = stock.history(period="6mo")
+                        print(f"[Evaluator] {ticker} 6mo history: {len(hist)} rows")
                     if hist.empty:
                         print(f"[Evaluator] No data at all for {ticker}")
                         ticker_cache[ticker] = None
