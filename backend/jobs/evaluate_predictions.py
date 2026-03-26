@@ -1,22 +1,19 @@
 """
 Prediction evaluator — checks pending predictions against actual stock prices.
-Uses yfinance (free, no API key). Runs every hour.
+Uses yfinance (free, no API key). Uses latest available market data.
 """
 
 
 def evaluate_all_pending(db):
-    """Evaluate all pending predictions by checking actual stock prices via yfinance."""
+    """Evaluate pending predictions using latest available market data."""
     import yfinance as yf
     import time
     from datetime import datetime, timedelta
     from models import Prediction
 
-    one_day_ago = datetime.utcnow() - timedelta(days=1)
-
     pending = db.query(Prediction).filter(
         Prediction.outcome == "pending",
         Prediction.ticker.isnot(None),
-        Prediction.prediction_date < one_day_ago,
     ).limit(500).all()
 
     if not pending:
@@ -27,68 +24,71 @@ def evaluate_all_pending(db):
     evaluated = 0
     errors = 0
 
+    # Cache ticker data to avoid repeated API calls
+    ticker_cache = {}
+
     for p in pending:
         try:
             ticker = (p.ticker or "").upper().strip()
             if not ticker or len(ticker) > 6:
                 continue
 
-            pred_date = p.prediction_date
-            if not pred_date:
+            if ticker not in ticker_cache:
+                try:
+                    stock = yf.Ticker(ticker)
+                    hist = stock.history(period="3mo")
+                    if hist.empty:
+                        hist = stock.history(period="6mo")
+                    if hist.empty:
+                        print(f"[Evaluator] No data at all for {ticker}")
+                        ticker_cache[ticker] = None
+                        continue
+                    ticker_cache[ticker] = hist
+                    time.sleep(0.3)
+                except Exception as e:
+                    print(f"[Evaluator] yfinance error for {ticker}: {e}")
+                    ticker_cache[ticker] = None
+                    errors += 1
+                    continue
+
+            hist = ticker_cache[ticker]
+            if hist is None:
                 continue
 
-            stock = yf.Ticker(ticker)
+            entry_price = float(hist["Close"].iloc[0])
+            current_price = float(hist["Close"].iloc[-1])
 
-            # Get price around prediction date
-            start = pred_date - timedelta(days=7)
-            end = pred_date + timedelta(days=7)
-            hist = stock.history(start=start.strftime("%Y-%m-%d"), end=end.strftime("%Y-%m-%d"))
-
-            if hist.empty:
-                print(f"[Evaluator] No price data for {ticker} around {pred_date.date()}")
-                errors += 1
+            if entry_price == 0:
                 continue
 
-            entry_price = float(hist["Close"].iloc[min(len(hist) // 2, len(hist) - 1)])
-
-            # Get current price
-            current_hist = stock.history(period="5d")
-            if current_hist.empty:
-                print(f"[Evaluator] No current price for {ticker}")
-                errors += 1
-                continue
-            current_price = float(current_hist["Close"].iloc[-1])
-
-            # Determine outcome
             direction = (p.direction or "bullish").lower()
             if direction in ("bear", "bearish"):
                 outcome = "correct" if current_price < entry_price else "incorrect"
             else:
                 outcome = "correct" if current_price > entry_price else "incorrect"
 
-            # Calculate return
             pct_return = round(((current_price - entry_price) / entry_price) * 100, 2)
             if direction in ("bear", "bearish"):
                 pct_return = -pct_return
 
-            # Update prediction
             p.outcome = outcome
             p.entry_price = entry_price
             p.actual_return = pct_return
             p.alpha = pct_return
 
             evaluated += 1
-            print(f"[Evaluator] {ticker} ({direction}): ${entry_price:.2f} -> ${current_price:.2f} ({pct_return:+.1f}%) = {outcome}")
 
-            if evaluated % 10 == 0:
+            if evaluated <= 20:
+                print(f"[Evaluator] {ticker} ({direction}): ${entry_price:.2f} -> ${current_price:.2f} ({pct_return:+.1f}%) = {outcome}")
+
+            if evaluated % 50 == 0:
                 db.commit()
-
-            time.sleep(0.3)
+                print(f"[Evaluator] Committed {evaluated} so far...")
 
         except Exception as e:
-            print(f"[Evaluator] Error on prediction {p.id} ({p.ticker}): {e}")
+            print(f"[Evaluator] Error on prediction {p.id}: {e}")
             errors += 1
             continue
 
     db.commit()
-    print(f"[Evaluator] Done: evaluated {evaluated}, errors {errors}, total pending was {len(pending)}")
+    print(f"[Evaluator] Done: evaluated {evaluated}, errors {errors}")
