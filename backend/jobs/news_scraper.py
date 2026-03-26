@@ -1,8 +1,12 @@
 """
-Financial news scraper — uses Finnhub Company News API to find REAL articles
-with REAL URLs that contain actual stock predictions (upgrades, downgrades,
-price targets, etc.). Each prediction links to the original article.
-Archives via Wayback Machine for permanent proof.
+Financial news scraper — uses Finnhub Company News API to find REAL analyst
+upgrades, downgrades, and price target changes with actual article URLs.
+
+Strict filtering: only articles where an analyst/firm takes an explicit action
+(upgrades, downgrades, initiates, raises/lowers price target) with a clear
+rating (buy, sell, overweight, underperform, etc.) are accepted.
+
+Press releases, corporate news, clickbait, and earnings reports are rejected.
 """
 import os
 import re
@@ -24,44 +28,77 @@ TICKERS = [
     "SMCI", "SQ", "SNOW", "NET", "BLK", "SCHW", "LOW", "SBUX", "TXN", "RIVN",
 ]
 
-PREDICTION_KEYWORDS = [
-    "upgrade", "downgrade", "buy rating", "sell rating", "hold rating",
-    "price target", "raises target", "lowers target", "cuts target",
-    "overweight", "underweight", "outperform", "underperform",
-    "raises to", "lowers to", "initiates coverage", "reiterates",
-    "top pick", "conviction buy", "conviction list", "strong buy",
-    "maintains buy", "maintains sell", "maintains overweight",
+# ── Analyst action words: someone is making a call ──────────────────────────
+ANALYST_ACTIONS = [
+    "upgrades", "upgrade", "downgrades", "downgrade",
+    "initiates", "initiate", "initiates coverage", "initiated",
+    "reiterates", "reiterate", "reiterated",
+    "maintains", "maintain", "maintained",
+    "raises price target", "lowers price target", "cuts price target",
+    "sets price target", "boosts price target", "slashes price target",
+    "raises target", "lowers target", "cuts target", "sets target",
+    "boosts target", "slashes target",
+    "raises pt", "lowers pt", "cuts pt",
+    "price target raised", "price target lowered", "price target cut",
+    "target raised", "target lowered", "target cut",
+    "resumed coverage", "resumes coverage",
+    "starts coverage", "started coverage",
 ]
 
-DIRECTION_KEYWORDS = [
-    "buy", "sell", "bull", "bear", "bullish", "bearish",
+# ── Rating words: the actual rating being assigned ──────────────────────────
+RATING_WORDS = [
+    "buy", "sell", "hold", "neutral", "equal weight", "equal-weight",
     "overweight", "underweight", "outperform", "underperform",
-    "upgrade", "downgrade", "raises", "lowers", "cuts",
-    "strong buy", "strong sell", "top pick", "conviction",
-    "positive", "negative", "reduce",
+    "market perform", "sector perform", "peer perform",
+    "strong buy", "strong sell",
+    "top pick", "conviction buy", "conviction list",
+    "price target", "target of $", "target to $", "pt of $", "pt to $",
+    "target price", "price objective",
 ]
 
+# ── Reject patterns: not predictions, skip immediately ──────────────────────
 REJECT_KEYWORDS = [
     "signs agreement", "framework agreement", "partnership", "acquisition", "merger",
-    "earnings report", "revenue growth", "quarterly results", "reports earnings",
+    "reports earnings", "earnings report", "quarterly results", "revenue growth",
+    "quarterly earnings", "beats estimates", "misses estimates",
+    "earnings call", "earnings beat", "earnings miss", "earnings preview",
     "dividend", "stock split", "buyback", "repurchase",
-    "appoints", "names new", "hires", "ceo transition", "cfo transition", "board of directors",
-    "patent", "fda approval", "clinical trial", "regulatory approval",
-    "lawsuit", "settlement", "investigation", "subpoena",
+    "appoints", "names ceo", "names cfo", "hires", "board of directors",
+    "patent", "fda approval", "fda clears", "clinical trial", "regulatory approval",
+    "lawsuit", "settlement", "investigation", "subpoena", "indictment",
     "product launch", "announces partnership", "signs deal", "contract win",
     "supply agreement", "joint venture", "strategic alliance",
-    "quarterly earnings", "beats estimates", "misses estimates",
     "ipo", "secondary offering", "shelf registration",
+    "stock offering", "share offering", "public offering",
+    "recall", "data breach", "cybersecurity incident",
 ]
 
-BULLISH_WORDS = [
-    "upgrade", "buy", "overweight", "outperform", "raises",
-    "strong buy", "top pick", "conviction", "positive", "bullish",
+# ── Bullish / bearish classification ────────────────────────────────────────
+BULLISH_PATTERNS = [
+    r'\bupgrades?\b', r'\braises?\s+(price\s+)?target', r'\bboosts?\s+(price\s+)?target',
+    r'\bbuy\b', r'\boverweight\b', r'\boutperform\b', r'\bstrong buy\b',
+    r'\btop pick\b', r'\bconviction\s+buy\b', r'\bconviction\s+list\b',
+    r'\btarget\s+(raised|increased)', r'\bprice\s+target\s+raised\b',
+    r'\binitiates?\b.*\b(buy|overweight|outperform)\b',
+    r'\breiterates?\b.*\b(buy|overweight|outperform)\b',
+    r'\bmaintains?\b.*\b(buy|overweight|outperform)\b',
+    r'\bbullish\b',
 ]
-BEARISH_WORDS = [
-    "downgrade", "sell", "underweight", "underperform", "lowers",
-    "cuts", "negative", "bearish", "reduce",
+
+BEARISH_PATTERNS = [
+    r'\bdowngrades?\b', r'\blowers?\s+(price\s+)?target', r'\bcuts?\s+(price\s+)?target',
+    r'\bslash(es)?\s+(price\s+)?target',
+    r'\bsell\b', r'\bunderweight\b', r'\bunderperform\b', r'\bstrong sell\b',
+    r'\btarget\s+(lowered|cut|reduced|slashed)',
+    r'\bprice\s+target\s+(lowered|cut)\b',
+    r'\binitiates?\b.*\b(sell|underweight|underperform)\b',
+    r'\breiterates?\b.*\b(sell|underweight|underperform)\b',
+    r'\bmaintains?\b.*\b(sell|underweight|underperform)\b',
+    r'\bbearish\b', r'\breduce\b',
 ]
+
+_bullish_re = [re.compile(p, re.IGNORECASE) for p in BULLISH_PATTERNS]
+_bearish_re = [re.compile(p, re.IGNORECASE) for p in BEARISH_PATTERNS]
 
 SOURCE_MAP = {
     "marketwatch": "MarketWatch", "cnbc": "CNBC", "reuters": "Reuters",
@@ -86,25 +123,55 @@ PRICE_PATTERN = re.compile(r'\$([0-9,]+(?:\.[0-9]+)?)')
 
 
 def is_prediction(headline, summary):
+    """Strict filter: requires analyst action + rating, rejects corporate news."""
     combined = (headline + " " + summary).lower()
-    # Must NOT match any reject keywords
+
+    # Headlines ending with ? are clickbait questions, not analyst calls
+    if headline.rstrip().endswith("?"):
+        return False
+
+    # Reject corporate news, press releases, earnings, etc.
     if any(rk in combined for rk in REJECT_KEYWORDS):
         return False
-    # Must have BOTH a prediction keyword AND a direction keyword
-    has_prediction = any(kw in combined for kw in PREDICTION_KEYWORDS)
-    has_direction = any(dw in combined for dw in DIRECTION_KEYWORDS)
-    return has_prediction and has_direction
+
+    # Must have an analyst action word (someone is making a call)
+    has_action = any(a in combined for a in ANALYST_ACTIONS)
+    if not has_action:
+        return False
+
+    # Must have a rating word (the actual rating being assigned)
+    has_rating = any(r in combined for r in RATING_WORDS)
+    if not has_rating:
+        return False
+
+    return True
 
 
 def get_direction(headline, summary):
-    combined = (headline + " " + summary).lower()
-    bull = sum(1 for w in BULLISH_WORDS if w in combined)
-    bear = sum(1 for w in BEARISH_WORDS if w in combined)
-    if bull > bear:
+    """Extract direction using regex patterns for high-confidence classification."""
+    combined = headline + " " + summary
+
+    bull_score = sum(1 for rx in _bullish_re if rx.search(combined))
+    bear_score = sum(1 for rx in _bearish_re if rx.search(combined))
+
+    if bull_score > bear_score:
         return "bullish"
-    elif bear > bull:
+    elif bear_score > bull_score:
         return "bearish"
+    # Can't determine direction with confidence — skip
     return None
+
+
+def resolve_url(finnhub_url):
+    """Follow redirects to get the final article URL."""
+    try:
+        r = httpx.head(finnhub_url, follow_redirects=True, timeout=5)
+        final = str(r.url)
+        if final and final.startswith("http"):
+            return final
+    except Exception:
+        pass
+    return finnhub_url
 
 
 def match_forecaster(source, headline, db):
@@ -114,7 +181,6 @@ def match_forecaster(source, headline, db):
             f = db.query(Forecaster).filter(Forecaster.name == name).first()
             if f:
                 return f
-    # Fallback
     return db.query(Forecaster).filter(Forecaster.handle == "WallStConsensus").first()
 
 
@@ -190,10 +256,13 @@ def scrape_news_predictions(db: Session):
                 if not direction:
                     continue
 
+                # Resolve redirect to get final article URL
+                final_url = resolve_url(url)
+
                 # Deduplicate by source_url
                 exists = db.execute(
                     text("SELECT 1 FROM predictions WHERE source_url = :u LIMIT 1"),
-                    {"u": url},
+                    {"u": final_url},
                 ).first()
                 if exists:
                     continue
@@ -203,7 +272,7 @@ def scrape_news_predictions(db: Session):
                     continue
 
                 # Archive the page via Wayback Machine
-                archived = archive_url(url)
+                archived = archive_url(final_url)
 
                 pred_date = datetime.fromtimestamp(dt) if dt else today
                 target_price = extract_target_price(headline, summary)
@@ -213,7 +282,7 @@ def scrape_news_predictions(db: Session):
                     ticker=ticker,
                     direction=direction,
                     prediction_date=pred_date,
-                    source_url=url,
+                    source_url=final_url,
                     archive_url=archived,
                     source_type="article",
                     exact_quote=headline[:500],
@@ -239,20 +308,20 @@ def scrape_news_predictions(db: Session):
     db.commit()
     print(f"[NewsScraper] Done: {total_added} real article predictions added")
 
-    # Clean up any existing predictions that slipped through without proper keywords
+    # Retroactively clean existing predictions that fail the strict filter
     cleanup_bad_predictions(db)
 
 
 def cleanup_bad_predictions(db: Session):
-    """Delete predictions that don't have BOTH a prediction keyword AND a direction keyword."""
+    """Delete predictions that don't pass the strict is_prediction filter."""
     try:
         all_preds = db.query(Prediction).filter(
             Prediction.verified_by == "finnhub_news"
         ).all()
         deleted = 0
         for p in all_preds:
-            ctx = (p.context or "") + " " + (p.exact_quote or "")
-            if not is_prediction(ctx, ""):
+            headline = p.exact_quote or p.context or ""
+            if not is_prediction(headline, ""):
                 db.delete(p)
                 deleted += 1
         if deleted:

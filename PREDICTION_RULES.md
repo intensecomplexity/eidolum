@@ -1,52 +1,51 @@
 # Prediction Rules
 
 ## Core Principle
-Every prediction in the database MUST link to a real, publicly accessible article where the prediction was actually made. No generic pages. No aggregate data. No fake links.
+Every prediction in the database MUST link to a real, publicly accessible article where an analyst or firm takes an explicit action (upgrade, downgrade, price target change). No press releases. No corporate news. No clickbait.
 
 ## What Counts as a Valid Prediction
-- A news article reporting an analyst upgrade/downgrade with a real URL
-- A news article reporting a price target change with a real URL
-- A tweet, YouTube video, or Reddit post with a direct link to the original content
-- Any public statement with a verifiable source link
+An article must have BOTH:
+1. **An analyst action**: upgrades, downgrades, initiates coverage, reiterates, maintains, raises/lowers/cuts price target
+2. **A rating or target**: buy, sell, hold, overweight, underweight, outperform, underperform, price target of $X
 
-## What Does NOT Count
-- Aggregate analyst consensus data (e.g., "15 buy, 3 sell")
-- Generic Yahoo Finance or stockanalysis.com pages
-- Finnhub API endpoint URLs
-- Any prediction where `source_url` doesn't point to the actual article/post
+### Examples that PASS
+- "Goldman Upgrades AAPL to Buy" (action: upgrades, rating: buy)
+- "Needham Raises NVDA Price Target to $200" (action: raises, rating: price target)
+- "Morgan Stanley Downgrades TSLA to Underweight" (action: downgrades, rating: underweight)
+- "Bernstein Initiates Coverage on ARM with Outperform" (action: initiates, rating: outperform)
+
+### Examples that FAIL
+- "Honeywell Signs Supplier Framework Agreement" (no analyst action, no rating)
+- "Can the S&P 500 Outrun a Recession?" (clickbait question)
+- "ACCESS Newswire Upgrades the ACCESS Platform" (product upgrade, not stock)
+- "Waymo Is Scaling Faster Than Expected" (company news, not analyst call)
+
+## What Gets Automatically Rejected
+- Headlines ending with `?` (clickbait questions)
+- Press releases: signs agreement, partnership, acquisition, merger
+- Earnings: reports earnings, quarterly results, beats/misses estimates
+- Corporate: dividend, stock split, buyback, repurchase
+- Personnel: appoints, names CEO, hires, board of directors
+- Regulatory: patent, FDA approval, clinical trial
+- Legal: lawsuit, settlement, investigation
 
 ## Source Requirements
 Every prediction MUST have:
-1. **`source_url`**: Direct link to the original article (e.g., `https://www.marketwatch.com/story/goldman-sachs-upgrades-apple...`)
-2. **`archive_url`**: Wayback Machine archived version (e.g., `https://web.archive.org/web/20260326/https://www.marketwatch.com/story/...`)
+1. **`source_url`**: Direct link to the original article (redirect resolved to final URL)
+2. **`archive_url`**: Wayback Machine archived version
+
+## Direction Classification (regex-based, high confidence only)
+- **Bullish**: upgrades, raises/boosts price target, buy, overweight, outperform, strong buy, top pick, conviction buy, initiates/reiterates/maintains with buy/overweight/outperform
+- **Bearish**: downgrades, lowers/cuts/slashes price target, sell, underweight, underperform, strong sell, initiates/reiterates/maintains with sell/underweight/underperform
+- **Skip**: if direction cannot be determined with confidence, the article is not saved
 
 ## Data Pipeline
-1. **DELETE all predictions** at startup (clean slate)
-2. **Seed 50 forecasters** (institutional analysts, media, famous investors)
-3. **Scrape Finnhub Company News API** for real articles with real URLs
-4. **Filter** articles that contain prediction keywords (upgrade, downgrade, price target, etc.)
-5. **Extract direction** (bullish/bearish) from headline + summary
-6. **Match to forecaster** based on source name and headline content
-7. **Archive via Wayback Machine** for permanent proof
-8. **Evaluate** predictions against real price data
-
-## Prediction Keywords
-Articles must contain at least one of:
-- upgrade, downgrade, buy rating, sell rating, hold rating
-- price target, raises target, lowers target, cuts target
-- overweight, underweight, outperform, underperform
-- initiates coverage, reiterates, maintains
-- top pick, conviction buy, strong buy/sell
-- bullish, bearish
-
-## Direction Classification
-- **Bullish**: upgrade, buy, overweight, outperform, raises, strong buy, top pick, conviction, positive
-- **Bearish**: downgrade, sell, underweight, underperform, lowers, cuts, negative, reduce
-
-## Forecaster Matching
-Articles are matched to forecasters by scanning source name + headline for known keywords (e.g., "Goldman Sachs", "CNBC", "Wedbush"). Unmatched articles fall back to "Wall Street Consensus".
-
-## Archive Strategy
-- Every article URL is submitted to the Wayback Machine Save API (`https://web.archive.org/save/{URL}`)
-- The archive URL is stored as `https://web.archive.org/web/{YYYYMMDD}/{URL}`
-- This ensures proof persists even if the original article is deleted
+1. DELETE all predictions at startup (clean slate)
+2. Seed 50 forecasters
+3. Scrape Finnhub Company News API (60 tickers, 60-day lookback)
+4. Strict filter: analyst action + rating, no reject keywords, no questions
+5. Regex-based direction extraction (skip ambiguous)
+6. Resolve redirect URLs to final article URL
+7. Match to forecaster by source name + headline
+8. Archive via Wayback Machine
+9. Evaluate predictions against real price data
