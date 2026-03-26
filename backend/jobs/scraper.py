@@ -238,4 +238,19 @@ def run_scraper(db: Session):
         scrape_reddit_history(db)
     except Exception as e:
         print(f"[Scraper] Reddit history error (non-fatal): {e}")
+    try:
+        from jobs.analyst_targets import scrape_analyst_targets
+        scrape_analyst_targets(db)
+    except Exception as e:
+        print(f"[Scraper] Analyst targets error (non-fatal): {e}")
+    try:
+        from jobs.kalshi_scraper import scrape_kalshi
+        scrape_kalshi(db)
+    except Exception as e:
+        print(f"[Scraper] Kalshi error (non-fatal): {e}")
+    try:
+        from jobs.earnings_calls import scrape_earnings_calls
+        scrape_earnings_calls(db)
+    except Exception as e:
+        print(f"[Scraper] Earnings calls error (non-fatal): {e}")
     print("[Scraper] All done")

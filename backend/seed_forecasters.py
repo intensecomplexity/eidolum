@@ -87,6 +87,14 @@ NEW_FORECASTERS = [
     {"name": "Graham Stephan",          "handle": "GrahamStephan",       "platform": "twitter", "channel_url": "https://x.com/GrahamStephan"},
     {"name": "Humphrey Yang",           "handle": "humphreytalks",       "platform": "twitter", "channel_url": "https://x.com/humphreytalks"},
     {"name": "Stock Moe",              "handle": "StockMoe",            "platform": "twitter", "channel_url": "https://x.com/StockMoe"},
+    # --- INSTITUTIONAL / ANALYST FIRMS ---
+    {"name": "Bank of America",        "handle": "BankofAmerica",       "platform": "institutional", "channel_url": "https://x.com/BankofAmerica"},
+    {"name": "Wedbush",                "handle": "WedbushSec",          "platform": "institutional", "channel_url": "https://x.com/WedbushSec"},
+    {"name": "Piper Sandler",          "handle": "PiperSandler",        "platform": "institutional", "channel_url": "https://x.com/PiperSandler"},
+    {"name": "Needham",                "handle": "NeedhamCo",           "platform": "institutional", "channel_url": "https://x.com/NeedhamCo"},
+    # --- PREDICTION MARKETS ---
+    {"name": "Kalshi Prediction Markets", "handle": "KalshiMarkets",    "platform": "institutional", "channel_url": "https://kalshi.com"},
+    {"name": "Polymarket",             "handle": "Polymarket",          "platform": "institutional", "channel_url": "https://polymarket.com"},
 ]
 
 
