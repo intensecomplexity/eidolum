@@ -307,21 +307,21 @@ async def lifespan(app):
         db.close()
     except Exception:
         pass  # config table may not exist
-    # Add cached stats columns to forecasters if missing
+    # Add cached stats columns to forecasters if missing — each in its own transaction
     try:
-        db = SessionLocal()
         from sqlalchemy import text as _t
-        for col, defn in [
-            ("accuracy_score", "FLOAT"),
-            ("total_predictions", "INTEGER DEFAULT 0"),
-            ("correct_predictions", "INTEGER DEFAULT 0"),
-            ("streak", "INTEGER DEFAULT 0"),
+        db = SessionLocal()
+        for col_sql in [
+            "ALTER TABLE forecasters ADD COLUMN accuracy_score FLOAT",
+            "ALTER TABLE forecasters ADD COLUMN total_predictions INTEGER DEFAULT 0",
+            "ALTER TABLE forecasters ADD COLUMN correct_predictions INTEGER DEFAULT 0",
+            "ALTER TABLE forecasters ADD COLUMN streak INTEGER DEFAULT 0",
         ]:
             try:
-                db.execute(_t(f"ALTER TABLE forecasters ADD COLUMN {col} {defn}"))
+                db.execute(_t(col_sql))
+                db.commit()
             except Exception:
-                pass  # column already exists
-        db.commit()
+                db.rollback()
         db.close()
     except Exception as e:
         print(f"[Eidolum] Stats column migration error (non-fatal): {e}")

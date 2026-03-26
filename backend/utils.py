@@ -129,13 +129,16 @@ def recalculate_forecaster_stats(forecaster_id: int, db: Session):
         else:
             break
 
-    forecaster.total_predictions = total
-    forecaster.correct_predictions = correct
-    forecaster.accuracy_score = round((correct / total) * 100, 1) if total > 0 else None
-    forecaster.streak = streak_count if streak_type == "correct" else -streak_count
-
-    db.commit()
-    print(f"[Stats] {forecaster.name}: {correct}/{total}, streak {forecaster.streak}")
+    try:
+        forecaster.total_predictions = total
+        forecaster.correct_predictions = correct
+        forecaster.accuracy_score = round((correct / total) * 100, 1) if total > 0 else None
+        forecaster.streak = streak_count if streak_type == "correct" else -streak_count
+        db.commit()
+        print(f"[Stats] {forecaster.name}: {correct}/{total}, streak {forecaster.streak}")
+    except Exception as e:
+        db.rollback()
+        print(f"[Stats] Could not persist stats for {forecaster.name} (columns may not exist yet): {e}")
 
 
 def compute_rank_movement(forecaster: Forecaster, current_rank: int) -> dict:
