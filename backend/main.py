@@ -348,13 +348,7 @@ async def lifespan(app):
         log_archive_status()
     except Exception:
         pass
-    # STEP 1: CLEAN SLATE — delete ALL predictions before anything else
-    try:
-        db = SessionLocal()
-        wipe_all_predictions(db)
-        db.close()
-    except Exception as e:
-        print(f"[Eidolum] Prediction wipe error (non-fatal): {e}")
+    # Predictions persist between deploys — Layer 3 cleanup handles invalid ones hourly
     # Remove Reddit forecasters (replaced by magazines)
     try:
         from sqlalchemy import text as _rd
