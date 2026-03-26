@@ -271,5 +271,11 @@ def run_scraper(db: Session):
         scrape_news_feeds(db)
     except Exception as e:
         print(f"[Scraper] News feeds error (non-fatal): {e}")
+    # Archive any predictions missing proof
+    try:
+        from main import archive_missing_proofs
+        archive_missing_proofs(db)
+    except Exception as e:
+        print(f"[Scraper] Archive missing proofs error (non-fatal): {e}")
     count = db.query(Prediction).count()
     print(f"[Scraper] Hourly run complete. Total predictions in DB: {count}")

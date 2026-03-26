@@ -21,9 +21,9 @@ def get_leaderboard(
     tab: str = Query(None),  # "week" | "sector" | None (all-time)
     filter: str = Query(None),
 ):
-    # Only show forecasters with at least 1 verified prediction
-    forecasters_with_predictions = db.query(Prediction.forecaster_id).filter(
-        Prediction.source_url.isnot(None)
+    # Show all forecasters who have at least 1 prediction
+    forecasters_with_predictions = db.query(
+        Prediction.forecaster_id
     ).distinct().subquery()
     forecasters = db.query(Forecaster).filter(
         Forecaster.id.in_(forecasters_with_predictions)

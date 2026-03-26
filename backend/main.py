@@ -254,6 +254,50 @@ def migrate_profile_urls():
         print(f"[Eidolum] URL migration error (non-fatal): {e}")
 
 
+def archive_missing_proofs(db):
+    """Archive predictions that have source_url but no archive_url."""
+    try:
+        unarchived = db.query(Prediction).filter(
+            Prediction.source_url.isnot(None),
+            Prediction.archive_url.is_(None),
+        ).limit(50).all()
+
+        if not unarchived:
+            return
+
+        print(f"[Archive] Archiving {len(unarchived)} predictions without proof...")
+        import asyncio
+        from archiver.screenshot import take_screenshot
+
+        for p in unarchived:
+            loop = asyncio.new_event_loop()
+            try:
+                f = db.query(Forecaster).filter(Forecaster.id == p.forecaster_id).first()
+                fname = f.name if f else ""
+                archive_url = loop.run_until_complete(
+                    take_screenshot(
+                        p.source_url, p.id,
+                        p.exact_quote or "", fname,
+                        str(p.prediction_date)[:10] if p.prediction_date else "",
+                    )
+                )
+                if archive_url:
+                    from sqlalchemy import text as _ar
+                    db.execute(
+                        _ar("UPDATE predictions SET archive_url=:url, archived_at=:ts WHERE id=:id"),
+                        {"url": archive_url, "ts": datetime.utcnow(), "id": p.id},
+                    )
+                    db.commit()
+            except Exception as e:
+                print(f"[Archive] Failed for prediction {p.id}: {e}")
+            finally:
+                loop.close()
+
+        print("[Archive] Done archiving batch")
+    except Exception as e:
+        print(f"[Archive] archive_missing_proofs error: {e}")
+
+
 @asynccontextmanager
 async def lifespan(app):
     init_db()
@@ -378,30 +422,8 @@ async def lifespan(app):
                 print("[Eidolum] Background historical import complete")
             else:
                 print(f"[Eidolum] Skipping historical import — {pred_count} predictions already exist")
-            # Archive existing predictions that don't have archive_url yet
-            try:
-                from archiver.screenshot import archive_prediction
-                from sqlalchemy import text as _at
-                import asyncio
-                unarchived = db.execute(_at(
-                    "SELECT id, source_url FROM predictions WHERE source_url IS NOT NULL AND archive_url IS NULL"
-                )).fetchall()
-                if unarchived:
-                    print(f"[Archive] Archiving {len(unarchived)} existing predictions...")
-                    loop = asyncio.new_event_loop()
-                    for row in unarchived:
-                        try:
-                            url = loop.run_until_complete(archive_prediction(row[1], row[0]))
-                            if url:
-                                db.execute(_at("UPDATE predictions SET archive_url=:url, archived_at=:ts WHERE id=:id"),
-                                           {"url": url, "ts": datetime.utcnow(), "id": row[0]})
-                                db.commit()
-                        except Exception as e:
-                            print(f"[Archive] Failed for prediction {row[0]}: {e}")
-                    loop.close()
-                    print("[Archive] Background archiving complete")
-            except Exception as e:
-                print(f"[Archive] archive_existing error: {e}")
+            # Archive predictions missing proof
+            archive_missing_proofs(db)
             db.close()
         except Exception as e:
             print(f"[Eidolum] Background import error: {e}")
