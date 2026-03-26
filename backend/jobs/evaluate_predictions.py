@@ -11,13 +11,13 @@ from jobs.price_checker import get_stock_price_on_date, get_current_price
 
 def evaluate_all_pending(db: Session):
     """Evaluate pending predictions by checking actual stock prices."""
-    seven_days_ago = datetime.utcnow() - timedelta(days=7)
+    one_day_ago = datetime.utcnow() - timedelta(days=1)
 
     pending = db.query(Prediction).filter(
         Prediction.outcome == "pending",
         Prediction.ticker.isnot(None),
-        Prediction.prediction_date < seven_days_ago,
-    ).limit(100).all()
+        Prediction.prediction_date < one_day_ago,
+    ).limit(500).all()
 
     if not pending:
         print("[Evaluator] No pending predictions to evaluate")
@@ -25,11 +25,15 @@ def evaluate_all_pending(db: Session):
 
     print(f"[Evaluator] Evaluating {len(pending)} pending predictions...")
     evaluated = 0
+    skipped_no_entry = 0
+    skipped_no_final = 0
+    skipped_unknown = 0
 
     for p in pending:
         try:
             ticker = (p.ticker or "").upper().strip()
             if not ticker or ticker == "UNKNOWN":
+                skipped_unknown += 1
                 continue
 
             pred_date_str = p.prediction_date.strftime("%Y-%m-%d") if p.prediction_date else None
@@ -38,6 +42,8 @@ def evaluate_all_pending(db: Session):
 
             entry_price = p.entry_price or get_stock_price_on_date(ticker, pred_date_str)
             if not entry_price:
+                skipped_no_entry += 1
+                print(f"[Evaluator] No entry price for {ticker} on {pred_date_str}")
                 continue
 
             eval_date = p.prediction_date + timedelta(days=p.window_days or 365)
@@ -46,10 +52,15 @@ def evaluate_all_pending(db: Session):
             if now >= eval_date:
                 eval_date_str = eval_date.strftime("%Y-%m-%d")
                 final_price = get_stock_price_on_date(ticker, eval_date_str)
+                if not final_price:
+                    print(f"[Evaluator] No eval-date price for {ticker} on {eval_date_str}")
             else:
                 final_price = get_current_price(ticker)
+                if not final_price:
+                    print(f"[Evaluator] No current price for {ticker}")
 
             if not final_price:
+                skipped_no_final += 1
                 continue
 
             # Determine outcome
@@ -76,15 +87,15 @@ def evaluate_all_pending(db: Session):
                 p.entry_price = entry_price
             p.actual_return = pct_return
             p.evaluation_date = datetime.utcnow()
-            p.alpha = pct_return  # simplified — no S&P comparison yet
+            p.alpha = pct_return
             db.commit()
             evaluated += 1
 
             print(f"[Evaluator] {ticker} ({direction}): ${entry_price} -> ${final_price} ({pct_return:+.1f}%) = {outcome}")
-            time.sleep(0.5)
+            time.sleep(0.3)
 
         except Exception as e:
-            print(f"[Evaluator] Error for prediction {p.id}: {e}")
+            print(f"[Evaluator] Error for prediction {p.id} ({p.ticker}): {e}")
             db.rollback()
 
-    print(f"[Evaluator] Evaluated {evaluated} predictions")
+    print(f"[Evaluator] Done: {evaluated} evaluated, {skipped_unknown} unknown ticker, {skipped_no_entry} no entry price, {skipped_no_final} no final price")
