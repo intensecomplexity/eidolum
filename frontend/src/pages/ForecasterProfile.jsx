@@ -310,7 +310,7 @@ export default function ForecasterProfile() {
 
 const HORIZON_LABELS = { short: '30d', medium: '90d', long: '1y', custom: 'Custom' };
 
-const FP_API_BASE = import.meta.env.VITE_API_URL || '';
+const FP_API_BASE = import.meta.env.VITE_API_URL || 'https://api.eidolum.com';
 
 function ProofBlock({ p }) {
   const source = p.source_url || '';
