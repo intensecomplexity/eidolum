@@ -32,7 +32,7 @@ def archive_url(url: str) -> str | None:
 
 
 def archive_after_save(prediction_id: int, source_url: str):
-    """Take screenshot immediately after saving — delete prediction if screenshot fails."""
+    """Archive proof after saving. YouTube: keep even without thumbnail. Twitter/Reddit: delete if no screenshot."""
     def run():
         try:
             from archiver.screenshot import take_screenshot
@@ -46,13 +46,17 @@ def archive_after_save(prediction_id: int, source_url: str):
                     {"url": archive_url, "ts": datetime.utcnow(), "id": prediction_id},
                 )
                 db2.commit()
+            elif "youtube.com" in source_url or "youtu.be" in source_url:
+                # YouTube: keep even without thumbnail — timestamp link is proof
+                print(f"[Archive] YouTube prediction {prediction_id} kept without thumbnail")
             else:
+                # Twitter/Reddit: require screenshot — delete if can't get one
                 db2.execute(
                     text("DELETE FROM predictions WHERE id=:id AND archive_url IS NULL"),
                     {"id": prediction_id},
                 )
                 db2.commit()
-                print(f"[Archive] Prediction {prediction_id} DELETED — no screenshot possible")
+                print(f"[Archive] Prediction {prediction_id} DELETED — screenshot failed")
             db2.close()
             loop.close()
         except Exception as e:

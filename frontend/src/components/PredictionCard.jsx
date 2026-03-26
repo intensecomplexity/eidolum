@@ -6,25 +6,59 @@ import PlatformBadge from './PlatformBadge';
 
 const HORIZON_LABELS = { short: '30d', medium: '90d', long: '1y', custom: 'Custom' };
 
-function getSourceButton(p) {
-  const url = p.source_url;
-  if (!url) return null;
+const API_BASE = import.meta.env.VITE_API_URL || '';
 
-  // Only show buttons for real, specific source URLs
-  if (url.includes('youtube.com/watch') || url.includes('youtu.be')) {
-    const label = p.video_timestamp_sec
-      ? `▶ Watch at ${formatTimestamp(p.video_timestamp_sec)}`
-      : '▶ Watch on YouTube';
-    return { url, label, bg: '#00c896', color: '#000' };
-  }
-  if ((url.includes('x.com') || url.includes('twitter.com')) && url.includes('/status/')) {
-    return { url, label: '𝕏 View on X', bg: '#000', color: '#fff' };
-  }
-  if (url.includes('reddit.com') && url.includes('/comments/')) {
-    return { url, label: '🔴 View on Reddit', bg: '#ff4500', color: '#fff' };
+function ProofBlock({ p }) {
+  const source = p.source_url || '';
+  const archive = p.archive_url;
+  const archiveImg = archive && archive.startsWith('/archive/') ? `${API_BASE}${archive}` : null;
+
+  if (!source) return null;
+
+  // YouTube: thumbnail + watch button
+  if (source.includes('youtube.com') || source.includes('youtu.be')) {
+    const ts = p.video_timestamp_sec;
+    const timeStr = ts ? `${Math.floor(ts / 60)}:${String(ts % 60).padStart(2, '0')}` : null;
+    return (
+      <div style={{ marginTop: '8px', marginBottom: '4px' }}>
+        {archiveImg && (
+          <img src={archiveImg} alt="Video proof"
+            style={{ width: '100%', maxWidth: '400px', borderRadius: '8px', marginBottom: '8px',
+              border: '1px solid rgba(255,255,255,0.1)', display: 'block' }} />
+        )}
+        <a href={source} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()}
+          style={{ display: 'inline-flex', alignItems: 'center', gap: '6px',
+            padding: '6px 14px', borderRadius: '6px', background: '#FF0000', color: '#fff',
+            fontSize: '0.85rem', fontWeight: 600, textDecoration: 'none' }}>
+          {timeStr ? `▶ Watch at ${timeStr}` : '▶ Watch on YouTube'}
+        </a>
+      </div>
+    );
   }
 
-  return null;
+  // Twitter / Reddit: screenshot proof + source button
+  const isTwitter = source.includes('x.com') || source.includes('twitter.com');
+  const isReddit = source.includes('reddit.com');
+  const label = isTwitter ? '𝕏 View on X' : isReddit ? '🔴 View on Reddit' : '🔗 View Source';
+  const bg = isTwitter ? '#000' : isReddit ? '#FF4500' : '#333';
+
+  return (
+    <div style={{ marginTop: '8px', marginBottom: '4px' }}>
+      {archiveImg && (
+        <a href={archiveImg} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()}>
+          <img src={archiveImg} alt="Screenshot proof"
+            style={{ width: '100%', maxWidth: '500px', borderRadius: '8px', marginBottom: '8px',
+              border: '1px solid rgba(255,255,255,0.1)', cursor: 'pointer', display: 'block' }} />
+        </a>
+      )}
+      <a href={source} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()}
+        style={{ display: 'inline-flex', alignItems: 'center', gap: '6px',
+          padding: '6px 14px', borderRadius: '6px', background: bg, color: '#fff',
+          fontSize: '0.85rem', fontWeight: 500, textDecoration: 'none' }}>
+        {label}
+      </a>
+    </div>
+  );
 }
 
 function formatTimestamp(sec) {
@@ -108,47 +142,8 @@ export default function PredictionCard({ prediction: p, showForecaster = false, 
         )}
       </div>
 
-      {/* Source + archive buttons */}
-      <div style={{ display: 'flex', gap: '8px', marginTop: '8px', marginBottom: '4px', flexWrap: 'wrap' }}>
-        {(() => {
-          const btn = getSourceButton(p);
-          if (!btn) return null;
-          return (
-            <a href={btn.url} target="_blank" rel="noopener noreferrer"
-              onClick={e => e.stopPropagation()}
-              style={{
-                display: 'inline-flex', alignItems: 'center', gap: '6px',
-                padding: '6px 14px', borderRadius: '6px',
-                fontSize: '0.85rem', fontWeight: 500,
-                background: btn.bg, color: btn.color,
-                textDecoration: 'none',
-              }}>
-              {btn.label}
-            </a>
-          );
-        })()}
-
-        {p.archive_url && p.archive_url.startsWith('/archive/') && (
-          <a
-            href={`${import.meta.env.VITE_API_URL || ''}${p.archive_url}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            onClick={e => e.stopPropagation()}
-            style={{
-              display: 'inline-flex', alignItems: 'center', gap: '5px',
-              padding: '5px 12px', borderRadius: '6px',
-              fontSize: '0.8rem', fontWeight: 500,
-              background: 'rgba(0,200,150,0.1)',
-              border: '1px solid rgba(0,200,150,0.3)',
-              color: '#00c896',
-              textDecoration: 'none',
-            }}
-            title="Screenshot proof — saved on our server"
-          >
-            View Proof
-          </a>
-        )}
-      </div>
+      {/* Platform-specific proof */}
+      <ProofBlock p={p} />
 
       {/* Evaluation date note */}
       {evalDate && (
