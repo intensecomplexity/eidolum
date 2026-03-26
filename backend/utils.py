@@ -16,7 +16,7 @@ def compute_forecaster_stats(
 ) -> dict:
     query = db.query(Prediction).filter(
         Prediction.forecaster_id == forecaster.id,
-        Prediction.outcome != "pending_review",
+        Prediction.outcome != "pending",
     )
 
     if sector:
@@ -74,7 +74,7 @@ def compute_streak(forecaster_id: int, db: Session) -> dict:
     recent = (
         db.query(Prediction)
         .filter(Prediction.forecaster_id == forecaster_id)
-        .filter(Prediction.outcome.notin_(["pending", "pending_review"]))
+        .filter(Prediction.outcome.notin_(["pending"]))
         .order_by(Prediction.prediction_date.desc())
         .limit(20)
         .all()

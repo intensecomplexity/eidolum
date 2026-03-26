@@ -48,7 +48,7 @@ def check_data(request: Request, db: Session = Depends(get_db)):
     predictions = db.query(Prediction).count()
     evaluated = db.query(Prediction).filter(
         Prediction.outcome.isnot(None),
-        Prediction.outcome.notin_(["pending", "pending_review"]),
+        Prediction.outcome.notin_(["pending"]),
     ).count()
     pending = db.query(Prediction).filter(
         Prediction.outcome == "pending",
@@ -229,7 +229,7 @@ def health_detailed(request: Request, db: Session = Depends(get_db)):
     pred_count = db.query(Prediction).count()
     evaluated = db.query(Prediction).filter(
         Prediction.outcome.isnot(None),
-        Prediction.outcome.notin_(["pending", "pending_review"]),
+        Prediction.outcome.notin_(["pending"]),
     ).count()
     pending = db.query(Prediction).filter(Prediction.outcome == "pending").count()
     pending_review_count = db.query(Prediction).filter(Prediction.outcome == "pending_review").count()

@@ -100,7 +100,7 @@ def scrape_youtube(db: Session):
                     source_url=source_url, source_title=title[:500],
                     video_timestamp_sec=timestamp,
                     prediction_date=datetime.utcnow(), window_days=30,
-                    direction="bullish", outcome="pending_review",
+                    direction="bullish", outcome="pending",
                     verified_by="ai_parsed",
                 )
                 db.add(pred)
@@ -149,7 +149,7 @@ def scrape_twitter(db: Session):
                     source_url=tweet_url,
                     archive_url=archive,
                     prediction_date=datetime.utcnow(), window_days=30,
-                    direction="bullish", outcome="pending_review",
+                    direction="bullish", outcome="pending",
                     verified_by="ai_parsed",
                 )
                 db.add(pred)
@@ -203,7 +203,7 @@ def scrape_reddit(db: Session):
                     source_url=post_url,
                     archive_url=archive,
                     prediction_date=datetime.utcnow(), window_days=30,
-                    direction="bullish", outcome="pending_review",
+                    direction="bullish", outcome="pending",
                     verified_by="ai_parsed",
                 )
                 db.add(pred)

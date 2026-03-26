@@ -88,7 +88,7 @@ def scrape_reddit_history(db: Session):
                     source_platform_id=post_id,
                     ticker=ticker,
                     direction=direction,
-                    outcome="pending_review",
+                    outcome="pending",
                     prediction_date=post_date,
                     window_days=365,
                     verified_by="ai_parsed",

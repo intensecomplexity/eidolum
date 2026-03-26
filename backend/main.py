@@ -325,6 +325,17 @@ async def lifespan(app):
         db.close()
     except Exception as e:
         print(f"[Eidolum] Stats column migration error (non-fatal): {e}")
+    # Convert any pending_review predictions to pending
+    try:
+        from sqlalchemy import text as _t2
+        db = SessionLocal()
+        result = db.execute(_t2("UPDATE predictions SET outcome = 'pending' WHERE outcome = 'pending_review'"))
+        db.commit()
+        if result.rowcount > 0:
+            print(f"[Eidolum] Converted {result.rowcount} pending_review predictions to pending")
+        db.close()
+    except Exception as e:
+        print(f"[Eidolum] pending_review conversion error (non-fatal): {e}")
     # Seed verified predictions (only if fewer than 5 real ones exist)
     try:
         from seed_verified import seed_verified
