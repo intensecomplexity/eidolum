@@ -315,40 +315,42 @@ const FP_API_BASE = import.meta.env.VITE_API_URL || '';
 function ProofBlock({ p }) {
   const source = p.source_url || '';
   const archive = p.archive_url;
-  const archiveImg = archive && archive.startsWith('/archive/') ? `${FP_API_BASE}${archive}` : null;
+  const archiveUrl = archive && archive.startsWith('/archive/') ? `${FP_API_BASE}${archive}` : null;
+  const isHtml = archiveUrl && archiveUrl.endsWith('.html');
+  const isImg = archiveUrl && (archiveUrl.endsWith('.jpg') || archiveUrl.endsWith('.png'));
 
   if (!source) return null;
 
-  if (source.includes('youtube.com') || source.includes('youtu.be')) {
-    const ts = p.video_timestamp_sec;
-    const timeStr = ts ? `${Math.floor(ts / 60)}:${String(ts % 60).padStart(2, '0')}` : null;
-    return (
-      <div style={{ marginBottom: '12px' }}>
-        {archiveImg && (
-          <img src={archiveImg} alt="Video proof"
-            style={{ width: '100%', maxWidth: '400px', borderRadius: '8px', marginBottom: '8px',
-              border: '1px solid rgba(255,255,255,0.1)', display: 'block' }} />
-        )}
-        <a href={source} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()}
-          style={{ display: 'inline-flex', alignItems: 'center', gap: '6px',
-            padding: '6px 14px', borderRadius: '6px', background: '#FF0000', color: '#fff',
-            fontSize: '0.85rem', fontWeight: 600, textDecoration: 'none' }}>
-          {timeStr ? `▶ Watch at ${timeStr}` : '▶ Watch on YouTube'}
-        </a>
-      </div>
-    );
-  }
-
+  const isYT = source.includes('youtube.com') || source.includes('youtu.be');
   const isTwitter = source.includes('x.com') || source.includes('twitter.com');
   const isReddit = source.includes('reddit.com');
-  const label = isTwitter ? '𝕏 View on X' : isReddit ? '🔴 View on Reddit' : '🔗 View Source';
-  const bg = isTwitter ? '#000' : isReddit ? '#FF4500' : '#333';
+
+  const ts = p.video_timestamp_sec;
+  const timeStr = ts ? `${Math.floor(ts / 60)}:${String(ts % 60).padStart(2, '0')}` : null;
+
+  const label = isYT ? (timeStr ? `▶ Watch at ${timeStr}` : '▶ Watch on YouTube')
+    : isTwitter ? '𝕏 View on X' : isReddit ? 'View on Reddit' : 'View Source';
+  const bg = isYT ? '#FF0000' : isTwitter ? '#000' : isReddit ? '#FF4500' : '#333';
 
   return (
     <div style={{ marginBottom: '12px' }}>
-      {archiveImg && (
-        <a href={archiveImg} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()}>
-          <img src={archiveImg} alt="Screenshot proof"
+      {isHtml && (
+        <iframe
+          src={archiveUrl}
+          style={{
+            width: '100%', maxWidth: '580px',
+            height: isYT ? '420px' : '260px',
+            border: '1px solid rgba(255,255,255,0.08)',
+            borderRadius: '10px', background: '#000',
+            marginBottom: '8px', display: 'block',
+          }}
+          title="Archived proof"
+          sandbox="allow-same-origin allow-popups"
+        />
+      )}
+      {isImg && (
+        <a href={archiveUrl} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()}>
+          <img src={archiveUrl} alt="Screenshot proof"
             style={{ width: '100%', maxWidth: '500px', borderRadius: '8px', marginBottom: '8px',
               border: '1px solid rgba(255,255,255,0.1)', cursor: 'pointer', display: 'block' }} />
         </a>

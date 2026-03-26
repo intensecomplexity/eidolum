@@ -3,7 +3,7 @@ Scraper job — fetches new predictions from Twitter/X, YouTube, and Reddit.
 Proof-first: screenshot/thumbnail must succeed BEFORE prediction is saved.
 Runs every hour via APScheduler.
 """
-import httpx, os, re, shutil
+import httpx, os, re
 from datetime import datetime
 from sqlalchemy.orm import Session
 from models import Prediction, Forecaster
@@ -15,14 +15,18 @@ YOUTUBE_API_KEY = os.getenv("YOUTUBE_API_KEY", "")
 ARCHIVE_DIR = os.getenv("ARCHIVE_DIR", "/app/archive")
 
 
-def save_with_proof(db: Session, prediction_obj: Prediction) -> bool:
+def save_with_proof(db: Session, prediction_obj: Prediction, forecaster_name: str = "") -> bool:
     """
-    Try to archive proof FIRST. Only save the prediction if proof is obtained.
-    Returns True if saved, False if rejected.
+    Archive proof FIRST, then save. Returns True if saved, False if rejected.
     """
     from archiver.screenshot import archive_proof_sync
 
-    proof_url = archive_proof_sync(prediction_obj.source_url, 0)
+    proof_url = archive_proof_sync(
+        prediction_obj.source_url, 0,
+        exact_quote=prediction_obj.exact_quote or prediction_obj.context or "",
+        forecaster_name=forecaster_name,
+        prediction_date=str(prediction_obj.prediction_date or ""),
+    )
     if not proof_url:
         print(f"[Archive] REJECTED — no proof for: {(prediction_obj.source_url or '')[:80]}")
         return False
@@ -30,7 +34,7 @@ def save_with_proof(db: Session, prediction_obj: Prediction) -> bool:
     prediction_obj.archive_url = proof_url
     prediction_obj.archived_at = datetime.utcnow()
     db.add(prediction_obj)
-    db.flush()  # get real ID
+    db.flush()
 
     # Rename archive file from p0_ to real ID
     if proof_url.startswith("/archive/p0_"):
@@ -39,6 +43,7 @@ def save_with_proof(db: Session, prediction_obj: Prediction) -> bool:
         old_path = os.path.join(ARCHIVE_DIR, old_name)
         new_path = os.path.join(ARCHIVE_DIR, new_name)
         if os.path.exists(old_path) and old_path != new_path:
+            import shutil
             shutil.move(old_path, new_path)
             prediction_obj.archive_url = f"/archive/{new_name}"
 
@@ -95,7 +100,7 @@ def scrape_youtube(db: Session):
                     direction="bullish", outcome="pending",
                     verified_by="ai_parsed",
                 )
-                if not save_with_proof(db, pred):
+                if not save_with_proof(db, pred, forecaster_name=f.name):
                     continue
         except Exception as e:
             print(f"[Scraper] YouTube error for {handle}: {e}")
@@ -140,7 +145,7 @@ def scrape_twitter(db: Session):
                     direction="bullish", outcome="pending",
                     verified_by="ai_parsed",
                 )
-                if not save_with_proof(db, pred):
+                if not save_with_proof(db, pred, forecaster_name=f.name):
                     continue
         except Exception as e:
             print(f"[Scraper] Twitter error for {handle}: {e}")
@@ -190,7 +195,7 @@ def scrape_reddit(db: Session):
                     direction="bullish", outcome="pending",
                     verified_by="ai_parsed",
                 )
-                if not save_with_proof(db, pred):
+                if not save_with_proof(db, pred, forecaster_name=f.name):
                     continue
         except Exception as e:
             print(f"[Scraper] Reddit error for {f.channel_url}: {e}")
