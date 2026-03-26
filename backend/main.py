@@ -277,24 +277,6 @@ async def lifespan(app):
         db.close()
     except Exception as e:
         print(f"[Eidolum] Fake data wipe error (non-fatal): {e}")
-    # Delete predictions without local proof
-    try:
-        from sqlalchemy import text as _proof_t
-        db = SessionLocal()
-        result = db.execute(_proof_t("""
-            DELETE FROM predictions
-            WHERE archive_url IS NULL
-               OR archive_url LIKE '%archive.org%'
-               OR archive_url LIKE '%wayback%'
-               OR archive_url LIKE '%archive.ph%'
-               OR archive_url NOT LIKE '/archive/%'
-        """))
-        db.commit()
-        if result.rowcount > 0:
-            print(f"[Eidolum] Removed {result.rowcount} predictions without local proof")
-        db.close()
-    except Exception as e:
-        print(f"[Eidolum] Proof cleanup error (non-fatal): {e}")
     # Enforce prediction quality — delete vague predictions on every boot
     try:
         from sqlalchemy import text as _vt
