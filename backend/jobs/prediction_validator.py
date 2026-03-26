@@ -1,11 +1,12 @@
 """
 Eidolum Prediction Validator — 3-Layer Defense System
+50 rejection categories + sentiment rule + forecaster extraction
 """
 import re
 
 # === LAYER 1: Scraper filter ===
 
-# Analyst action phrases — multi-word preferred, standalone only when safe with AND rating check
+# Analyst action phrases
 ANALYST_ACTIONS = [
     "upgrades", "upgraded", "upgrades to", "upgraded to",
     "downgrades", "downgraded", "downgrades to", "downgraded to",
@@ -32,6 +33,9 @@ ANALYST_ACTIONS = [
     "pt of $", "pt to $",
     "resumed coverage", "resumes coverage",
     "starts coverage", "started coverage",
+    # Passive patterns: "AAPL upgraded at Goldman"
+    "upgraded at", "downgraded at",
+    "upgraded by", "downgraded by",
 ]
 
 # Rating words — article MUST also contain one of these
@@ -43,49 +47,193 @@ RATING_WORDS = [
     "price target", "target price", "pt of", "pt to",
     "target of $", "target to $", "fair value",
     "conviction buy", "top pick",
+    # Standalone upgrade/downgrade implies a rating change
+    "upgrades", "upgraded", "downgrades", "downgraded",
+    "upgraded at", "downgraded at", "upgraded by", "downgraded by",
 ]
 
-# Reject patterns — if headline matches, it's NOT a prediction
+# === ALL 50 REJECTION CATEGORIES ===
 REJECT_PATTERNS = [
-    r"\?$",  # Clickbait questions
-    # Job/economic news that triggers "cuts"/"raises"
-    r"job cuts?", r"layoffs?", r"workforce reduction",
-    r"rate cuts?", r"tax cuts?", r"cost.?cutting",
-    r"interest rate", r"fed (rate|decision|meeting)",
-    r"unemployment", r"inflation (data|report|rate)",
-    r"GDP (growth|report|data)", r"economic (data|report|growth)",
-    # Commodity / market movement reports
-    r"(oil|crude|gold|silver|copper) (price|falls?|rises?|drops?)",
-    r"shares? (spike|fall|rise|drop|surge|tumble|plunge)",
-    r"stock (spike|fall|rise|drop|surge|tumble|plunge)",
-    r"market (rally|crash|correction|pullback|sell.?off)",
-    # Press releases / corporate news
+    # 1. Press releases / partnerships / M&A
     r"signs? (agreement|deal|contract)", r"framework agreement",
-    r"partnership", r"acquisition", r"acquires", r"merger", r"merges",
-    r"production capacity", r"manufacturing", r"supply agreement",
-    # Earnings / financial reports
-    r"(beats?|misses?) (earnings|estimates|expectations)",
-    r"(reports?|posts?) (earnings|revenue|profit|loss)",
-    r"(Q[1-4]|quarterly|annual) (results|earnings|revenue)",
-    r"reports? earnings", r"quarterly results", r"revenue (growth|fell|rose|up|down)",
-    r"earnings (beat|miss|call|report)", r"earnings per share", r"EPS of",
-    # Corporate actions
-    r"dividend", r"stock split", r"buyback", r"repurchase",
-    r"appoints?", r"names? .*(CEO|CFO|CTO|COO)", r"hires?", r"board of directors",
-    # Regulatory / legal
-    r"patent", r"FDA approval", r"FDA clears", r"clinical trial", r"regulatory",
-    r"lawsuit", r"settlement", r"investigation", r"subpoena",
-    # Product / business news
-    r"launches? (new|its|a)\b", r"announces? (new|its|a)\b",
-    r"expands? (into|to|its)", r"opens? (new|its|a)\b",
-    # Past-tense market reports
-    r"\b(falls?|fell|drops?|dropped|tumbles?|tumbled|plunges?|plunged|slips?|slipped|slides?|slid)\b.*\b(sharply|heavily|significantly|percent|%)",
-    r"\b(spikes?|spiked|surges?|surged|soars?|soared|jumps?|jumped|rallied|rallies)\b.*\b(sharply|heavily|significantly|higher|percent|%)",
-    r"\b(shares?|stock) (rise|rises|rose|fall|falls|fell|drop|drops|dropped|spike|spikes|spiked|surge|surges|surged)\b",
+    r"partnership", r"strategic alliance", r"joint venture",
+    r"acquisition", r"acquires", r"acquired", r"merger", r"merges",
+    r"buyout", r"takeover",
+
+    # 2. Past-tense market reports
+    r"\b(falls?|fell|drops?|dropped|tumbles?|tumbled|plunges?|plunged|slips?|slipped|slides?|slid|declines?|declined)\b",
+    r"\b(spikes?|spiked|surges?|surged|soars?|soared|jumps?|jumped|rallied|rallies|climbs?|climbed)\b",
+    r"shares? (rise|rose|fall|fell|drop|dropped|spike|spiked|surge|surged)",
+    r"stock (rise|rose|fall|fell|drop|dropped|spike|spiked|surge|surged)",
+
+    # 3. Clickbait questions
+    r"\?\s*$",
+
+    # 6. Non-price-target cuts/raises
+    r"job cuts?", r"layoffs?", r"workforce reduction", r"job losses",
+    r"rate cuts?", r"tax cuts?", r"cost.?cutting", r"spending cuts?",
+    r"pay cuts?", r"salary cuts?", r"budget cuts?",
+
+    # 7. Earnings
+    r"reports? earnings", r"quarterly results", r"annual results",
+    r"earnings (beat|miss|call|report|preview|recap|surprise)",
+    r"beats? estimates", r"misses? estimates",
+    r"earnings per share", r"EPS of", r"revenue of \$",
+    r"what to expect.*earnings", r"ahead of earnings", r"after earnings",
+
+    # 8. Corporate actions
+    r"dividend", r"stock split", r"reverse split",
+    r"buyback", r"repurchase", r"share repurchase",
+    r"appoints?", r"appointed", r"names? .*(CEO|CFO|CTO|COO|CIO)",
+    r"hires?", r"hired", r"board of directors",
+    r"steps? down", r"resigns?", r"resigned", r"retires?",
+
+    # 9. Product/service upgrades (not stock upgrades)
+    r"upgrades? (its|the|their|new|software|hardware|platform|app|system|service|feature|lineup|display|iphone|ipad|mac)",
+    r"software update", r"new (version|release|feature|product|model)",
+    r"unveils?", r"introduces?", r"rolls? out",
+
+    # 10. Company targets (not price targets)
+    r"targets? (same.day|carbon|net.zero|neutrality|delivery|market|users?|growth|revenue|production)",
+    r"aims? (to|for)", r"plans? to", r"seeks? to", r"sets? goal",
+
+    # 11. Government/regulatory
+    r"SEC (targets?|charges?|investigat|sues?|fines?)",
+    r"DOJ", r"FTC", r"antitrust",
+    r"FDA (approv|reject|clear|delay)",
+    r"regulatory (approv|clear|delay|hurdle)",
+    r"sanctions?", r"tariffs?", r"trade war",
+    r"clinical trial", r"patent",
+
+    # 12. Credit ratings (not stock ratings)
+    r"moody'?s (upgrades?|downgrades?|affirm)",
+    r"(fitch|s&p) (upgrades?|downgrades?|affirm)",
+    r"credit (rating|outlook)", r"bond (rating|yield)",
+    r"sovereign (debt|rating)",
+
+    # 13. Insider activity
+    r"(CEO|CFO|CTO|insider|director|officer) (sells?|sold|buys?|bought|dumps?)",
+    r"insider (selling|buying|trading)", r"13[FD] filing",
+
+    # 14. Index rebalancing
+    r"(added|removed|included|excluded) (to|from|in) .*(S&P|Nasdaq|Russell|Dow|index)",
+    r"index (rebalance|reconstitution)",
+
+    # 15. Historical comparisons
+    r"last time (this|that)", r"historically",
+
+    # 16. Options activity
+    r"unusual (options?|activity)", r"options? (activity|volume|flow)",
+    r"(call|put) (volume|buying|selling)",
+
+    # 17. Short interest
+    r"short (interest|squeeze|seller)", r"most shorted", r"heavily shorted",
+
+    # 18. Macro/economic
+    r"fed (rate|decision|meeting|minutes|chair)",
+    r"interest rate (decision|hike|cut)",
+    r"inflation (data|report|rate|reading)",
+    r"GDP (growth|report|data)", r"unemployment (rate|claims|data)",
+    r"economic (data|report|growth|recession|outlook)",
+    r"recession (fears?|risk|odds)",
+
+    # 19. Unnamed sources / rumors
+    r"according to sources", r"sources say",
+    r"rumou?rs?", r"reportedly",
+
+    # 20. Listicles
+    r"\d+ (best|top|stocks?|picks?|reasons?) (to|for|why)",
+    r"best stocks? (to|for)", r"stocks? to (buy|sell|watch|avoid)",
+
+    # 21. Price milestones
+    r"(hits?|reaches?|crosses?|breaks?) .*(high|low|record|milestone)",
+    r"all.time (high|low)", r"52.week (high|low)",
+
+    # 22. Comparison articles
+    r"\bvs\.?\b", r"\bversus\b", r"which (is|stock) (better|best)",
+
+    # 24. Earnings previews
+    r"earnings preview", r"what to (watch|expect|know)",
+    r"key (metrics|things|numbers) to watch",
+
+    # 26. Sector rotation
+    r"(investors?|money) (rotating|flowing|moving) (into|out of)",
+    r"sector (rotation|performance)",
+
+    # 28. Social media buzz
+    r"trending on", r"most (discussed|mentioned)",
+    r"(retail|reddit|wallstreetbets) (investors?|traders?)",
+
+    # 30. Management commentary
+    r"(CEO|CFO|CTO|chief|founder|chairman) (says?|said|told|sees?|expects?|believes?)",
+    r"management (says?|sees?|expects?|commentary)",
+
+    # 31. Dividend articles
+    r"(high|best|top).yield", r"dividend (stock|aristocrat)",
+    r"passive income",
+
+    # 32. IPO/SPAC
+    r"\bIPO\b", r"\bSPAC\b", r"goes? public", r"direct listing",
+
+    # 33. Crypto infrastructure
+    r"(bitcoin|btc) (mining|hash.?rate|halving)",
+    r"(blockchain|defi|nft|stablecoin) (launch|update)",
+
+    # 34. Geopolitical
+    r"(war|conflict|invasion) .*(impact|affect)",
+    r"geopolitical (risk|tension)",
+
+    # 36. Buyback programs
+    r"\$[\d.]+ ?(billion|million|B|M) (buyback|repurchase)",
+
+    # 37. Conference/event
+    r"(presents?|speaks?) at .* conference",
+    r"investor (day|conference|presentation)",
+
+    # 39. General advice
+    r"buy the dip", r"time to buy", r"should (you|investors?) (buy|sell)",
+
+    # 40. Estimates without recommendation
+    r"(consensus|analyst) estimate",
+
+    # 41. ETF flows
+    r"(inflows?|outflows?) (into|from|of)", r"fund flows?",
+
+    # 42. M&A rumors
+    r"(could|may|might) (be )?acquired", r"(buyout|takeover) (rumou?r|speculation)",
+
+    # 43. Company guidance
+    r"(guides?|guidance) .*(revenue|earnings|EPS)",
+    r"(full.year|quarterly|annual) (guidance|outlook)",
+
+    # 44. Price reaction
+    r"(rises?|falls?|drops?|gains?|loses?) .*(%|percent) (after|on|following|amid)",
+
+    # 45. Awards
+    r"(named|awarded|recognized) .*(most|best|top|fortune)",
+
+    # 46. Supply chain
+    r"supply chain", r"(shortage|disruption|bottleneck)",
+
+    # 47. Legal
+    r"(lawsuit|sues?|sued|litigation|settlement|settles?)",
+    r"(fined?|penalty|investigation|probe|subpoena)",
+
+    # 48. Technical analysis without analyst
+    r"(golden|death) cross", r"(RSI|MACD|moving average|bollinger)",
+    r"(support|resistance) (level|at)", r"(overbought|oversold)",
+    r"(technical|chart) (analysis|pattern|signal)",
+
+    # 49. Analyst commentary without action
+    r"(sees?|views?) .* as (transformational|disruptive|opportunity|risk)",
+
+    # 50. Hypotheticals
+    r"if .* (hits?|reaches?|falls? to|drops? to)",
+    r"here'?s what (happens|it means)",
+    r"(scenario|case) (analysis|study)",
 ]
 
 # Sentiment-only phrases — opinions, NOT measurable predictions
-# Rejected when they appear WITHOUT a strong measurable action alongside
 SENTIMENT_ONLY = [
     "wary of", "confident of", "cautious on", "optimistic about",
     "pessimistic about", "constructive on", "warming to", "cooling on",
@@ -104,19 +252,17 @@ SENTIMENT_ONLY = [
     "headwinds", "tailwinds",
 ]
 
-# Strong actions that override sentiment — if present, sentiment is OK
+# Strong actions that override sentiment
 STRONG_ACTIONS = [
     "upgrades", "upgraded", "downgrades", "downgraded",
-    "upgrades to", "upgraded to", "downgrades to", "downgraded to",
     "raises price target", "raised price target",
     "lowers price target", "lowered price target",
     "cuts price target", "cut price target",
     "initiates coverage", "initiated coverage",
     "price target of $", "price target to $",
-    "target price of $", "target price to $",
 ]
 
-# Bullish signals — direction scoring (multi-word to avoid false matches)
+# Bullish signals — direction scoring
 BULLISH_SIGNALS = [
     "upgrades", "upgraded",
     "raises price target", "raised price target",
@@ -128,7 +274,6 @@ BULLISH_SIGNALS = [
     "maintains buy", "maintained buy",
     "maintains overweight", "maintained overweight",
     "strong buy", "top pick", "conviction buy",
-    # Standalone verbs — safe here because direction is only checked AFTER is_real_prediction passes
     "raises", "raised", "boosts", "boosted",
     "buy", "overweight", "outperform",
 ]
@@ -141,7 +286,6 @@ BEARISH_SIGNALS = [
     "cuts price target", "cut price target",
     "cuts target to", "cut target to",
     "slashes price target", "slashed price target",
-    # Standalone verbs — safe here because direction is only checked AFTER is_real_prediction passes
     "lowers", "lowered", "cuts", "cut", "slashes", "slashed",
     "reiterates sell", "reiterated sell",
     "reiterates underweight", "reiterated underweight",
@@ -152,7 +296,7 @@ BEARISH_SIGNALS = [
     "sell", "underweight", "underperform",
 ]
 
-# Platform names that should NEVER be used as forecaster names
+# Platform names — NEVER use as forecaster
 PLATFORMS = [
     "yahoo finance", "seeking alpha", "seekingalpha", "marketwatch",
     "cnbc", "bloomberg", "reuters", "financial times", "ft.com",
@@ -162,7 +306,7 @@ PLATFORMS = [
     "globe newswire", "pr newswire", "business wire",
 ]
 
-# Known analyst/firm names to extract from headlines
+# Known analyst/firm names
 KNOWN_ANALYSTS = [
     # Major banks
     "goldman sachs", "jp morgan", "jpmorgan", "morgan stanley",
@@ -192,12 +336,25 @@ KNOWN_ANALYSTS = [
     "s&p global", "fitch", "moody", "capital economics",
 ]
 
+# Company names that are NOT forecasters
+COMPANY_NAMES = [
+    "apple", "microsoft", "google", "alphabet", "amazon", "nvidia", "tesla", "meta",
+    "netflix", "adobe", "salesforce", "amd", "intel", "qualcomm", "broadcom",
+    "walmart", "costco", "disney", "boeing", "caterpillar",
+    "nike", "starbucks", "mcdonalds", "coca-cola", "pepsi", "procter",
+    "exxon", "chevron", "pfizer", "johnson", "merck", "abbvie",
+    "honeywell", "lockheed", "raytheon", "general electric",
+    "palantir", "snowflake", "crowdstrike", "coinbase", "rivian",
+    "uber", "lyft", "airbnb", "doordash", "snap", "pinterest",
+    "moderna", "biontech", "regeneron", "gilead",
+]
+
 
 def is_real_prediction(headline, summary=""):
-    """Layer 1: Is this a real analyst prediction?"""
+    """Layer 1: Is this a REAL analyst prediction with a measurable claim?"""
     combined = (headline + " " + summary).lower()
 
-    # Check reject patterns first
+    # Check all 50 rejection categories
     for pattern in REJECT_PATTERNS:
         if re.search(pattern, combined, re.IGNORECASE):
             return False
@@ -208,12 +365,12 @@ def is_real_prediction(headline, summary=""):
     if not (has_action and has_rating):
         return False
 
-    # Sentiment check: if headline has sentiment phrases, require a STRONG action
+    # Sentiment check: require STRONG action if sentiment detected
     has_sentiment = any(s in combined for s in SENTIMENT_ONLY)
     if has_sentiment:
         has_strong = any(a in combined for a in STRONG_ACTIONS)
         if not has_strong:
-            return False  # Sentiment without strong action = opinion, not prediction
+            return False
 
     return True
 
@@ -231,19 +388,15 @@ def get_direction(headline, summary=""):
 
 
 def extract_forecaster_name(headline, source=""):
-    """
-    Extract REAL analyst/firm name from headline.
-    Returns None if no known analyst found — article should be SKIPPED.
-    """
+    """Extract REAL analyst/firm name. Returns None if no real analyst found."""
     combined = (headline + " " + source).lower()
 
-    # ONLY return a name if it's in KNOWN_ANALYSTS
+    # Check known analysts first
     for name in KNOWN_ANALYSTS:
         if name in combined:
             return name.title()
 
-    # Try regex: "{Multi-Word Firm} upgrades/downgrades..."
-    # Must be at least 2 words to avoid "Job", "Oil", "Stock" etc.
+    # Regex: "{Multi-Word Firm} upgrades/downgrades..."
     match = re.search(
         r"^([A-Z][A-Za-z]+(?:\s+[A-Z][A-Za-z]+)+)\s+"
         r"(?:upgrades?|downgrades?|initiates?|reiterates?|maintains?|raises?|lowers?|cuts?|sets?|boosts?)",
@@ -251,11 +404,25 @@ def extract_forecaster_name(headline, source=""):
     )
     if match:
         firm = match.group(1).strip()
-        # Must be multi-word and not a platform
-        if " " in firm and firm.lower() not in PLATFORMS and len(firm) > 4:
+        if (" " in firm
+                and firm.lower() not in PLATFORMS
+                and firm.lower() not in COMPANY_NAMES
+                and len(firm) > 4):
             return firm
 
-    # No real analyst found → caller should SKIP this article
+    # Passive pattern: "AAPL downgraded at {Firm}" or "AAPL upgraded by {Firm}"
+    match2 = re.search(
+        r"(?:upgraded|downgraded|initiated) (?:at|by) ([A-Z][A-Za-z]+(?:\s+[A-Z][A-Za-z]+)*)",
+        headline,
+    )
+    if match2:
+        firm = match2.group(1).strip()
+        if (firm.lower() not in COMPANY_NAMES
+                and firm.lower() not in PLATFORMS
+                and len(firm) > 3):
+            if firm.lower() in KNOWN_ANALYSTS or " " in firm:
+                return firm
+
     return None
 
 
@@ -295,28 +462,22 @@ def cleanup_invalid_predictions(db):
 
     deleted = 0
 
-    # Fake URLs
     r = db.execute(sql_text("""
         DELETE FROM predictions WHERE
             source_url IS NULL OR source_url = '' OR source_url NOT LIKE 'http%'
             OR source_url LIKE '%yahoo.com/quote%'
             OR source_url LIKE '%stockanalysis.com%'
-            OR source_url LIKE '%goldmansachs.com/market-data%'
     """))
     deleted += r.rowcount
 
-    # Fake content
     r = db.execute(sql_text("""
         DELETE FROM predictions WHERE
             context LIKE 'Analyst consensus:%'
             OR context LIKE 'Price target for%'
             OR exact_quote LIKE '<%'
-            OR exact_quote LIKE '%<figure>%'
-            OR exact_quote LIKE '%<img%'
     """))
     deleted += r.rowcount
 
-    # Missing required fields
     r = db.execute(sql_text("""
         DELETE FROM predictions WHERE
             ticker IS NULL OR ticker = '' OR ticker = 'UNKNOWN'
@@ -325,43 +486,41 @@ def cleanup_invalid_predictions(db):
     """))
     deleted += r.rowcount
 
-    # Non-prediction content that slipped through
     r = db.execute(sql_text("""
         DELETE FROM predictions WHERE
             context LIKE '%?'
-            OR context LIKE '%job cuts%' OR context LIKE '%Job Cuts%'
-            OR context LIKE '%layoff%' OR context LIKE '%Layoff%'
-            OR context LIKE '%Signs Agreement%' OR context LIKE '%signs agreement%'
-            OR context LIKE '%Framework Agreement%' OR context LIKE '%framework agreement%'
-            OR context LIKE '%Reports Earnings%' OR context LIKE '%reports earnings%'
-            OR context LIKE '%Quarterly Results%' OR context LIKE '%quarterly results%'
-            OR context LIKE '%Appoints%' OR context LIKE '%appoints%'
-            OR context LIKE '%Production Capacity%' OR context LIKE '%production capacity%'
-            OR context LIKE '%Falls Sharply%' OR context LIKE '%falls sharply%'
-            OR context LIKE '%Shares Spike%' OR context LIKE '%shares spike%'
-            OR context LIKE '%Stock Drops%' OR context LIKE '%stock drops%'
-            OR context LIKE '%rate cut%' OR context LIKE '%Rate Cut%'
-            OR context LIKE '%tax cut%' OR context LIKE '%Tax Cut%'
+            OR LOWER(context) LIKE '%job cuts%'
+            OR LOWER(context) LIKE '%layoff%'
+            OR LOWER(context) LIKE '%signs agreement%'
+            OR LOWER(context) LIKE '%framework agreement%'
+            OR LOWER(context) LIKE '%reports earnings%'
+            OR LOWER(context) LIKE '%quarterly results%'
+            OR LOWER(context) LIKE '%appoints%'
+            OR LOWER(context) LIKE '%production capacity%'
+            OR LOWER(context) LIKE '%rate cut%'
+            OR LOWER(context) LIKE '%tax cut%'
+            OR LOWER(context) LIKE '%all-time high%'
+            OR LOWER(context) LIKE '%hits record%'
+            OR LOWER(context) LIKE '%ipo%'
+            OR LOWER(context) LIKE '%goes public%'
+            OR LOWER(context) LIKE '%buy the dip%'
+            OR LOWER(context) LIKE '%unusual options%'
+            OR LOWER(context) LIKE '%short interest%'
+            OR LOWER(context) LIKE '%short squeeze%'
     """))
     deleted += r.rowcount
 
-    # Sentiment-only predictions without strong measurable action
+    # Sentiment-only without strong action
     r = db.execute(sql_text("""
         DELETE FROM predictions WHERE
             (LOWER(context) LIKE '%wary of%' OR LOWER(context) LIKE '%confident of%'
              OR LOWER(context) LIKE '%cautious on%' OR LOWER(context) LIKE '%optimistic about%'
              OR LOWER(context) LIKE '%pessimistic about%' OR LOWER(context) LIKE '%skeptical of%'
              OR LOWER(context) LIKE '%concerned about%' OR LOWER(context) LIKE '%warming to%'
-             OR LOWER(context) LIKE '%cooling on%' OR LOWER(context) LIKE '%sees upside%'
-             OR LOWER(context) LIKE '%sees downside%' OR LOWER(context) LIKE '%could rally%'
-             OR LOWER(context) LIKE '%could decline%' OR LOWER(context) LIKE '%looks attractive%'
-             OR LOWER(context) LIKE '%looks expensive%' OR LOWER(context) LIKE '%looks cheap%')
-            AND LOWER(context) NOT LIKE '%upgrades to%'
-            AND LOWER(context) NOT LIKE '%downgrades to%'
+             OR LOWER(context) LIKE '%cooling on%')
+            AND LOWER(context) NOT LIKE '%upgrades%'
+            AND LOWER(context) NOT LIKE '%downgrades%'
             AND LOWER(context) NOT LIKE '%price target%'
-            AND LOWER(context) NOT LIKE '%raises target%'
-            AND LOWER(context) NOT LIKE '%lowers target%'
-            AND LOWER(context) NOT LIKE '%cuts target%'
     """))
     deleted += r.rowcount
 
