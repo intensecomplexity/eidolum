@@ -66,14 +66,12 @@ def archive_url(url):
     return f"https://web.archive.org/web/{ts}/{url}"
 
 
-def find_or_create_forecaster(name, db):
-    """Find existing forecaster by name, or create a new one."""
-    if not name:
-        return db.query(Forecaster).filter(Forecaster.handle == "WallStConsensus").first()
+def find_forecaster(name, db):
+    """Find existing forecaster by name. Only creates new if name is multi-word (real firm)."""
+    if not name or len(name.strip()) < 3:
+        return None
 
     name = name.strip()
-    if len(name) < 3:
-        return db.query(Forecaster).filter(Forecaster.handle == "WallStConsensus").first()
 
     # Try exact match
     f = db.query(Forecaster).filter(Forecaster.name == name).first()
@@ -85,9 +83,11 @@ def find_or_create_forecaster(name, db):
     if f:
         return f
 
-    # Create new forecaster
+    # Only create new forecaster if it's a multi-word name (real firm, not "Job" or "Oil")
+    if " " not in name:
+        return None
+
     handle = re.sub(r"[^a-zA-Z0-9]", "", name)[:20]
-    # Ensure handle is unique
     existing = db.query(Forecaster).filter(Forecaster.handle == handle).first()
     if existing:
         return existing
@@ -164,10 +164,14 @@ def scrape_news_predictions(db: Session):
                     rejected_l1 += 1
                     continue
 
-                # Extract the REAL forecaster (not the platform)
+                # Extract the REAL forecaster — SKIP if no known analyst found
                 forecaster_name = extract_forecaster_name(headline, source)
-                forecaster = find_or_create_forecaster(forecaster_name, db)
+                if not forecaster_name:
+                    rejected_l1 += 1
+                    continue
+                forecaster = find_forecaster(forecaster_name, db)
                 if not forecaster:
+                    rejected_l1 += 1
                     continue
 
                 # Resolve URL and archive
@@ -295,7 +299,9 @@ def scrape_fast_predictions(db: Session):
                     continue
 
                 forecaster_name = extract_forecaster_name(headline, source)
-                forecaster = find_or_create_forecaster(forecaster_name, db)
+                if not forecaster_name:
+                    continue
+                forecaster = find_forecaster(forecaster_name, db)
                 if not forecaster:
                     continue
 
