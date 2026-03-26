@@ -229,27 +229,20 @@ def migrate_clear_fake_source_urls(db):
         print(f"[Eidolum] migrate_clear_fake_source_urls error: {e}")
 
 
-def delete_fake_predictions(db):
-    """Delete predictions that link to generic pages instead of actual articles. Safe/idempotent."""
+def wipe_all_predictions(db):
+    """CLEAN SLATE: Delete ALL predictions. Called once at startup to rebuild from real sources only."""
     try:
         from sqlalchemy import text
-        result = db.execute(text("""
-            DELETE FROM predictions
-            WHERE source_url LIKE '%finance.yahoo.com%'
-               OR source_url LIKE '%stockanalysis.com%'
-               OR source_url LIKE '%finnhub.io/api%'
-               OR context LIKE 'Analyst consensus:%'
-               OR context LIKE 'Price target for %'
-               OR (verified_by = 'finnhub_api' AND source_url NOT LIKE 'http%://%__.%/__%')
-        """))
+        count = db.execute(text("SELECT COUNT(*) FROM predictions")).scalar()
+        if count == 0:
+            print("[Cleanup] Predictions table already empty")
+            return
+        result = db.execute(text("DELETE FROM predictions"))
         db.commit()
-        if result.rowcount > 0:
-            print(f"[Cleanup] Deleted {result.rowcount} fake predictions (generic page links)")
-        else:
-            print("[Cleanup] No fake predictions to delete")
+        print(f"[Cleanup] WIPED {result.rowcount} predictions — clean slate for real articles only")
     except Exception as e:
         db.rollback()
-        print(f"[Cleanup] delete_fake_predictions error: {e}")
+        print(f"[Cleanup] wipe_all_predictions error: {e}")
 
 
 def migrate_profile_urls():
@@ -355,22 +348,26 @@ async def lifespan(app):
         log_archive_status()
     except Exception:
         pass
-    # ONE-TIME: Remove Reddit forecasters and predictions (replaced by magazines)
+    # STEP 1: CLEAN SLATE — delete ALL predictions before anything else
+    try:
+        db = SessionLocal()
+        wipe_all_predictions(db)
+        db.close()
+    except Exception as e:
+        print(f"[Eidolum] Prediction wipe error (non-fatal): {e}")
+    # Remove Reddit forecasters (replaced by magazines)
     try:
         from sqlalchemy import text as _rd
         db = SessionLocal()
         reddit_count = db.execute(_rd("SELECT COUNT(*) FROM forecasters WHERE platform = 'reddit'")).scalar()
         if reddit_count > 0:
-            r1 = db.execute(_rd("DELETE FROM predictions WHERE forecaster_id IN (SELECT id FROM forecasters WHERE platform = 'reddit')"))
-            r2 = db.execute(_rd("DELETE FROM forecasters WHERE platform = 'reddit'"))
-            r3 = db.execute(_rd("DELETE FROM predictions WHERE forecaster_id IN (SELECT id FROM forecasters WHERE name LIKE '%WSB%')"))
-            r4 = db.execute(_rd("DELETE FROM forecasters WHERE name LIKE '%WSB%'"))
+            db.execute(_rd("DELETE FROM forecasters WHERE platform = 'reddit'"))
+            db.execute(_rd("DELETE FROM forecasters WHERE name LIKE '%WSB%'"))
             db.commit()
-            print(f"[Migration] Removed {r1.rowcount} Reddit predictions, {r2.rowcount} Reddit forecasters, WSB entries cleaned")
         db.close()
     except Exception as e:
         print(f"[Migration] Reddit cleanup error (non-fatal): {e}")
-    # Seed magazine forecasters
+    # STEP 2: Seed 50 forecasters (keep existing, add missing)
     try:
         db = SessionLocal()
         from jobs.seed_magazines import seed_magazine_forecasters
@@ -378,16 +375,7 @@ async def lifespan(app):
         db.close()
     except Exception as e:
         print(f"[Eidolum] Magazine seed error (non-fatal): {e}")
-    # Clear old config flag if it exists
-    try:
-        from sqlalchemy import text as _text
-        db = SessionLocal()
-        db.execute(_text("DELETE FROM config WHERE key = 'verified_reseed_done'"))
-        db.commit()
-        db.close()
-    except Exception:
-        pass  # config table may not exist
-    # Add cached stats columns to forecasters if missing — each in its own transaction
+    # Add cached stats columns to forecasters if missing
     try:
         from sqlalchemy import text as _t
         db = SessionLocal()
@@ -405,45 +393,6 @@ async def lifespan(app):
         db.close()
     except Exception as e:
         print(f"[Eidolum] Stats column migration error (non-fatal): {e}")
-    # Convert any pending_review predictions to pending
-    try:
-        from sqlalchemy import text as _t2
-        db = SessionLocal()
-        result = db.execute(_t2("UPDATE predictions SET outcome = 'pending' WHERE outcome = 'pending_review'"))
-        db.commit()
-        if result.rowcount > 0:
-            print(f"[Eidolum] Converted {result.rowcount} pending_review predictions to pending")
-        db.close()
-    except Exception as e:
-        print(f"[Eidolum] pending_review conversion error (non-fatal): {e}")
-    # Clean up empty forecasters (0 predictions, not in the new 50-forecaster list)
-    try:
-        from sqlalchemy import text as _cl
-        db = SessionLocal()
-        r = db.execute(_cl("""
-            DELETE FROM forecasters WHERE id NOT IN (
-                SELECT DISTINCT forecaster_id FROM predictions WHERE forecaster_id IS NOT NULL
-            )
-        """))
-        db.commit()
-        if r.rowcount > 0:
-            print(f"[Cleanup] Removed {r.rowcount} forecasters with 0 predictions")
-        db.close()
-    except Exception as e:
-        print(f"[Cleanup] Empty forecaster cleanup error (non-fatal): {e}")
-    # Seed verified predictions (only if fewer than 5 real ones exist)
-    try:
-        from seed_verified import seed_verified
-        seed_verified()
-    except Exception as e:
-        print(f"[Eidolum] Verified reseed error (non-fatal): {e}")
-    # Delete fake predictions (generic Yahoo/stockanalysis/Finnhub API links)
-    try:
-        db = SessionLocal()
-        delete_fake_predictions(db)
-        db.close()
-    except Exception as e:
-        print(f"[Eidolum] Fake prediction cleanup error (non-fatal): {e}")
     # Run historical import in background thread so server starts immediately
     import threading
 
@@ -454,31 +403,31 @@ async def lifespan(app):
             db = SessionLocal()
             pred_count = db.query(Prediction).count()
             print(f"[Eidolum] Background import starting — {pred_count} predictions exist")
-            if pred_count < 5000:
-                from jobs.youtube_history import run_youtube_history
-                run_youtube_history(db)
-                try:
-                    from jobs.substack_scraper import scrape_substacks
-                    scrape_substacks(db)
-                except Exception as e:
-                    print(f"[Background] Substack error: {e}")
-                try:
-                    from jobs.finviz_scraper import scrape_finviz_upgrades
-                    scrape_finviz_upgrades(db)
-                except Exception as e:
-                    print(f"[Background] Finviz error: {e}")
-                try:
-                    from jobs.news_scraper import scrape_news_predictions
-                    scrape_news_predictions(db)
-                except Exception as e:
-                    print(f"[Background] News scraper error: {e}")
-                try:
-                    from jobs.tipranks_scraper import scrape_tipranks
-                    scrape_tipranks(db)
-                except Exception as e:
-                    print(f"[Background] TipRanks error: {e}")
-                print("[Eidolum] Background historical import complete")
-            # Always evaluate pending predictions (uses yfinance, free)
+            # STEP 3: Primary source — real news articles from Finnhub Company News API
+            try:
+                from jobs.news_scraper import scrape_news_predictions
+                scrape_news_predictions(db)
+            except Exception as e:
+                print(f"[Background] News scraper error: {e}")
+            # Secondary sources
+            try:
+                from jobs.finviz_scraper import scrape_finviz_upgrades
+                scrape_finviz_upgrades(db)
+            except Exception as e:
+                print(f"[Background] Finviz error: {e}")
+            try:
+                from jobs.tipranks_scraper import scrape_tipranks
+                scrape_tipranks(db)
+            except Exception as e:
+                print(f"[Background] TipRanks error: {e}")
+            try:
+                from jobs.substack_scraper import scrape_substacks
+                scrape_substacks(db)
+            except Exception as e:
+                print(f"[Background] Substack error: {e}")
+            pred_count = db.query(Prediction).count()
+            print(f"[Eidolum] Background import complete — {pred_count} real predictions loaded")
+            # STEP 4: Evaluate pending predictions
             try:
                 from jobs.evaluate_predictions import evaluate_all_pending
                 evaluate_all_pending(db)
