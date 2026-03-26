@@ -8,12 +8,7 @@ from datetime import datetime, timedelta
 from sqlalchemy.orm import Session
 from models import Prediction, Forecaster
 
-PREDICTION_PATTERN = re.compile(
-    r'(price target|will reach|going to|could hit|expect|predict|forecast|'
-    r'bull|bear|buy|sell|short|long|target of|I think|overvalued|'
-    r'undervalued|crash|moon|bottom|top|\$[A-Z]{1,5})',
-    re.IGNORECASE
-)
+from jobs.prediction_filter import is_prediction
 
 REDDIT_SOURCES = [
     {"name": "WSB Consensus",    "url": "https://www.reddit.com/r/wallstreetbets/top.json?t=year&limit=100"},
@@ -55,7 +50,7 @@ def scrape_reddit_history(db: Session):
                 created = data.get("created_utc", 0)
                 full_text = f"{title} {selftext}"
 
-                if not PREDICTION_PATTERN.search(full_text):
+                if not is_prediction(full_text):
                     continue
 
                 post_date = datetime.utcfromtimestamp(created)

@@ -7,6 +7,7 @@ from datetime import datetime
 from sqlalchemy.orm import Session
 from models import Prediction, Forecaster
 from database import SessionLocal
+from jobs.prediction_filter import is_prediction
 
 TWITTER_BEARER = os.getenv("TWITTER_BEARER_TOKEN", "")
 YOUTUBE_API_KEY = os.getenv("YOUTUBE_API_KEY", "")
@@ -119,7 +120,6 @@ def scrape_twitter(db: Session):
         return
     headers = {"Authorization": f"Bearer {TWITTER_BEARER}"}
     forecasters = db.query(Forecaster).filter(Forecaster.channel_url.contains("x.com")).all()
-    KEYWORDS = re.compile(r'predict|will|target|expect|price|\$|forecast|bull|bear', re.I)
     for f in forecasters:
         handle = f.channel_url.rstrip("/").split("/")[-1]
         try:
@@ -135,7 +135,7 @@ def scrape_twitter(db: Session):
                           params={"max_results": 10, "tweet.fields": "created_at,text", "exclude": "retweets"},
                           timeout=10)
             for tweet in r.json().get("data", []):
-                if not KEYWORDS.search(tweet["text"]):
+                if not is_prediction(tweet["text"]):
                     continue
                 if db.query(Prediction).filter(Prediction.source_platform_id == tweet["id"]).first():
                     continue
@@ -164,7 +164,6 @@ def scrape_twitter(db: Session):
 
 def scrape_reddit(db: Session):
     forecasters = db.query(Forecaster).filter(Forecaster.channel_url.contains("reddit.com")).all()
-    KEYWORDS = re.compile(r'predict|will|target|expect|price|\$|forecast|bull|bear|moon|calls|puts', re.I)
     headers = {"User-Agent": "eidolum-scraper/1.0"}
     for f in forecasters:
         # support both /r/subreddit and /user/username
@@ -187,7 +186,7 @@ def scrape_reddit(db: Session):
                 selftext = data.get("selftext", "")
                 permalink = data.get("permalink", "")
                 full_text = f"{title} {selftext}"
-                if not KEYWORDS.search(full_text):
+                if not is_prediction(full_text):
                     continue
                 if not post_id or db.query(Prediction).filter(Prediction.source_platform_id == post_id).first():
                     continue

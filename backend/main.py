@@ -211,6 +211,47 @@ def migrate_clear_fake_source_urls(db):
         print(f"[Eidolum] migrate_clear_fake_source_urls error: {e}")
 
 
+def cleanup_vague_predictions(db):
+    """Remove scraped predictions that don't contain a real directional claim."""
+    try:
+        from sqlalchemy import text
+        # Keep only predictions whose exact_quote or context contains directional language
+        result = db.execute(text("""
+            DELETE FROM predictions
+            WHERE id NOT IN (
+                SELECT id FROM predictions
+                WHERE exact_quote LIKE '%will reach%'
+                   OR exact_quote LIKE '%will hit%'
+                   OR exact_quote LIKE '%price target%'
+                   OR exact_quote LIKE '%going to $%'
+                   OR exact_quote LIKE '%target of%'
+                   OR exact_quote LIKE '%bullish on%'
+                   OR exact_quote LIKE '%bearish on%'
+                   OR exact_quote LIKE '%overvalued%'
+                   OR exact_quote LIKE '%undervalued%'
+                   OR exact_quote LIKE '%going up%'
+                   OR exact_quote LIKE '%going down%'
+                   OR exact_quote LIKE '%calls on%'
+                   OR exact_quote LIKE '%puts on%'
+                   OR exact_quote LIKE '%buy here%'
+                   OR exact_quote LIKE '%sell here%'
+                   OR exact_quote LIKE '%short %'
+                   OR exact_quote LIKE '%I think%'
+                   OR exact_quote LIKE '%predict%'
+                   OR exact_quote LIKE '%forecast%'
+                   OR verified_by = 'manual'
+            )
+        """))
+        db.commit()
+        if result.rowcount > 0:
+            print(f"[Eidolum] Removed {result.rowcount} vague non-predictions")
+        else:
+            print("[Eidolum] No vague predictions to clean up")
+    except Exception as e:
+        db.rollback()
+        print(f"[Eidolum] cleanup_vague error: {e}")
+
+
 def migrate_profile_urls():
     """Fix broken social media profile links. Safe to run every boot."""
     URL_FIXES = {
@@ -270,6 +311,13 @@ async def lifespan(app):
         db.close()
     except Exception as e:
         print(f"[Eidolum] Fake data wipe error (non-fatal): {e}")
+    # Remove vague scraped predictions that aren't real directional claims
+    try:
+        db = SessionLocal()
+        cleanup_vague_predictions(db)
+        db.close()
+    except Exception as e:
+        print(f"[Eidolum] Vague prediction cleanup error (non-fatal): {e}")
     # Clear old config flag if it exists
     try:
         from sqlalchemy import text as _text

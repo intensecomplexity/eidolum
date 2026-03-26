@@ -11,12 +11,7 @@ from models import Prediction, Forecaster
 
 YOUTUBE_API_KEY = os.getenv("YOUTUBE_API_KEY", "")
 
-PREDICTION_PATTERN = re.compile(
-    r'(price target|will reach|going to|could hit|expect|predict|forecast|'
-    r'bull|bear|buy|sell|short|long|target of|I think|I believe|overvalued|'
-    r'undervalued|crash|moon|bottom|top|resistance|support|\$[A-Z]{1,5})',
-    re.IGNORECASE
-)
+from jobs.prediction_filter import is_prediction
 
 TICKER_PATTERN = re.compile(r'\b([A-Z]{1,5})\b|\$([A-Z]{1,5})')
 
@@ -161,7 +156,7 @@ def get_transcript_predictions(video_id: str, title: str) -> list:
         context_entries = transcript[start_idx:end_idx]
         context_text = " ".join(e["text"] for e in context_entries)
 
-        if not PREDICTION_PATTERN.search(context_text):
+        if not is_prediction(context_text):
             continue
 
         tickers = set()

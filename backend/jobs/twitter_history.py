@@ -11,12 +11,7 @@ from models import Prediction, Forecaster
 
 TWITTER_BEARER = os.getenv("TWITTER_BEARER_TOKEN", "")
 
-PREDICTION_PATTERN = re.compile(
-    r'(price target|will reach|going to|could hit|expect|predict|forecast|'
-    r'bull|bear|buy|sell|short|long|target of|I think|I believe|overvalued|'
-    r'undervalued|crash|moon|bottom|top|\$[A-Z]{1,5})',
-    re.IGNORECASE
-)
+from jobs.prediction_filter import is_prediction
 
 TWITTER_ACCOUNTS = [
     {"name": "Michael Saylor",       "handle": "saylor"},
@@ -86,7 +81,7 @@ def scrape_twitter_history(db: Session):
 
             added = 0
             for tweet in tweets:
-                if not PREDICTION_PATTERN.search(tweet["text"]):
+                if not is_prediction(tweet["text"]):
                     continue
 
                 source_url = f"https://x.com/{handle}/status/{tweet['id']}"
@@ -213,7 +208,7 @@ def scrape_via_nitter(handle: str, forecaster_id: int, nitter_base: str, db: Ses
             except Exception:
                 continue
 
-            if not PREDICTION_PATTERN.search(tweet_text):
+            if not is_prediction(tweet_text):
                 continue
 
             ticker_match = re.search(r'\$([A-Z]{1,5})', tweet_text)
