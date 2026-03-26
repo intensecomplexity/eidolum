@@ -79,7 +79,7 @@ export default function ForecasterProfile() {
   const chartData = data.accuracy_over_time || [];
   const platformLabel = { youtube: 'YouTube', reddit: 'Reddit', x: 'X' }[data.platform] || 'Profile';
 
-  const displayedPredictions = (data.predictions || []).filter(p => p.source_url);
+  const displayedPredictions = data.predictions || [];
 
   return (
     <div>

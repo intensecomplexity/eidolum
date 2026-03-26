@@ -16,37 +16,10 @@ ARCHIVE_DIR = os.getenv("ARCHIVE_DIR", "/app/archive")
 
 
 def save_with_proof(db: Session, prediction_obj: Prediction, forecaster_name: str = "") -> bool:
-    """
-    Archive proof FIRST, then save. Returns True if saved, False if rejected.
-    """
-    from archiver.screenshot import archive_proof_sync
-
-    proof_url = archive_proof_sync(
-        prediction_obj.source_url, 0,
-        exact_quote=prediction_obj.exact_quote or prediction_obj.context or "",
-        forecaster_name=forecaster_name,
-        prediction_date=str(prediction_obj.prediction_date or ""),
-    )
-    if not proof_url:
-        print(f"[Archive] REJECTED — no proof for: {(prediction_obj.source_url or '')[:80]}")
-        return False
-
-    prediction_obj.archive_url = proof_url
-    prediction_obj.archived_at = datetime.utcnow()
+    """Save prediction immediately. Archive proof in background — never blocks saving."""
     db.add(prediction_obj)
     db.flush()
-
-    # Rename archive file from p0_ to real ID
-    if proof_url.startswith("/archive/p0_"):
-        old_name = proof_url.replace("/archive/", "")
-        new_name = old_name.replace("p0_", f"p{prediction_obj.id}_")
-        old_path = os.path.join(ARCHIVE_DIR, old_name)
-        new_path = os.path.join(ARCHIVE_DIR, new_name)
-        if os.path.exists(old_path) and old_path != new_path:
-            import shutil
-            shutil.move(old_path, new_path)
-            prediction_obj.archive_url = f"/archive/{new_name}"
-
+    print(f"[Scraper] Saved prediction {prediction_obj.id}: {prediction_obj.ticker} from {(prediction_obj.source_url or '')[:60]}")
     return True
 
 # ── YouTube ──────────────────────────────────────────────────────────────────
