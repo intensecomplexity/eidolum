@@ -1,8 +1,8 @@
-// Build: 2026-03-26 api=api.eidolum.com
+// Build: 2026-03-26 api=railway-direct
 import axios from 'axios';
 
 const api = axios.create({
-  baseURL: `${import.meta.env.VITE_API_URL || 'https://api.eidolum.com'}/api`,
+  baseURL: `${import.meta.env.VITE_API_URL || 'https://eidolum-production.up.railway.app'}/api`,
 });
 
 export function getLeaderboard(params = {}) {
