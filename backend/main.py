@@ -229,20 +229,7 @@ def migrate_clear_fake_source_urls(db):
         print(f"[Eidolum] migrate_clear_fake_source_urls error: {e}")
 
 
-def wipe_all_predictions(db):
-    """CLEAN SLATE: Delete ALL predictions. Called once at startup to rebuild from real sources only."""
-    try:
-        from sqlalchemy import text
-        count = db.execute(text("SELECT COUNT(*) FROM predictions")).scalar()
-        if count == 0:
-            print("[Cleanup] Predictions table already empty")
-            return
-        result = db.execute(text("DELETE FROM predictions"))
-        db.commit()
-        print(f"[Cleanup] WIPED {result.rowcount} predictions — clean slate for real articles only")
-    except Exception as e:
-        db.rollback()
-        print(f"[Cleanup] wipe_all_predictions error: {e}")
+    # wipe_all_predictions removed — predictions persist between deploys
 
 
 def migrate_profile_urls():
@@ -485,6 +472,7 @@ async def lifespan(app):
         finally:
             db.close()
 
+    print("[STARTUP] Scheduler starting...")
     scheduler = AsyncIOScheduler()
     scheduler.add_job(run_hourly_scraper, "interval", hours=1, id="scraper")
     scheduler.add_job(run_fast_scraper, "interval", minutes=15, id="fast_scraper")
@@ -492,6 +480,7 @@ async def lifespan(app):
     scheduler.add_job(lambda: run_leaderboard_refresh(SessionLocal()), "interval", hours=1, id="leaderboard")
     scheduler.add_job(lambda: run_newsletter(SessionLocal()), "cron", hour=8, minute=0, id="newsletter")
     scheduler.start()
+    print(f"[STARTUP] Jobs registered: {[j.id for j in scheduler.get_jobs()]}")
     print("[Eidolum] Scheduler: scraper(1h), fast_scraper(15m), evaluator(15m), leaderboard(1h), newsletter(8am)")
     yield
     scheduler.shutdown()
