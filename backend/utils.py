@@ -16,7 +16,6 @@ def compute_forecaster_stats(
 ) -> dict:
     query = db.query(Prediction).filter(
         Prediction.forecaster_id == forecaster.id,
-        Prediction.outcome != "pending",
     )
 
     if sector:
@@ -27,9 +26,9 @@ def compute_forecaster_stats(
         cutoff = datetime.datetime.utcnow() - datetime.timedelta(days=period_days)
         query = query.filter(Prediction.prediction_date >= cutoff)
 
-    predictions = query.all()
-    total = len(predictions)
-    evaluated = [p for p in predictions if p.outcome != "pending"]
+    all_predictions = query.all()
+    total = len(all_predictions)
+    evaluated = [p for p in all_predictions if p.outcome not in ("pending", None)]
     correct = [p for p in evaluated if p.outcome == "correct"]
 
     accuracy = round(len(correct) / len(evaluated) * 100, 1) if evaluated else 0.0
