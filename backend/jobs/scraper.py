@@ -227,11 +227,6 @@ def run_scraper(db: Session):
     except Exception as e:
         print(f"[Scraper] Twitter history error (non-fatal): {e}")
     try:
-        from jobs.twitter_history import scrape_nitter_rss
-        scrape_nitter_rss(db)
-    except Exception as e:
-        print(f"[Scraper] Nitter RSS error (non-fatal): {e}")
-    try:
         from jobs.reddit_history import scrape_reddit_history
         scrape_reddit_history(db)
     except Exception as e:
