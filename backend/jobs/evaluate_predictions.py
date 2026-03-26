@@ -1,15 +1,21 @@
 """
 Prediction evaluator — checks pending predictions against actual stock prices.
-Uses yfinance (free, no API key). Uses latest available market data.
+Uses Finnhub API for prices (yfinance blocked on Railway).
 """
 
 
 def evaluate_all_pending(db):
-    """Evaluate pending predictions using latest available market data."""
-    import yfinance as yf
+    """Evaluate pending predictions using Finnhub API for stock prices."""
+    import os
+    import httpx
     import time
-    from datetime import datetime, timedelta
+    from datetime import datetime
     from models import Prediction
+
+    FINNHUB_KEY = os.getenv("FINNHUB_KEY", "")
+    if not FINNHUB_KEY:
+        print("[Evaluator] No FINNHUB_KEY — cannot evaluate")
+        return
 
     pending = db.query(Prediction).filter(
         Prediction.outcome == "pending",
@@ -17,62 +23,65 @@ def evaluate_all_pending(db):
     ).limit(500).all()
 
     if not pending:
-        print("[Evaluator] No pending predictions to evaluate")
+        print("[Evaluator] No pending predictions")
         return
 
-    print(f"[Evaluator] Evaluating {len(pending)} pending predictions...")
+    print(f"[Evaluator] Evaluating {len(pending)} predictions using Finnhub...")
     evaluated = 0
     errors = 0
-
-    # Cache ticker data to avoid repeated API calls
-    ticker_cache = {}
+    price_cache = {}
 
     for p in pending:
         try:
-            if evaluated == 0 and errors == 0:
-                print(f"[Evaluator] First prediction: id={p.id} ticker={p.ticker} direction={p.direction} date={p.prediction_date}")
-
             ticker = (p.ticker or "").upper().strip()
             if not ticker or len(ticker) > 6:
-                print(f"[Evaluator] Skipping bad ticker: '{ticker}' (id={p.id})")
                 continue
 
-            if ticker not in ticker_cache:
+            if ticker not in price_cache:
                 try:
-                    print(f"[Evaluator] Fetching yfinance data for {ticker}...")
-                    stock = yf.Ticker(ticker)
-                    hist = stock.history(period="3mo")
-                    print(f"[Evaluator] {ticker} 3mo history: {len(hist)} rows")
-                    if hist.empty:
-                        hist = stock.history(period="6mo")
-                        print(f"[Evaluator] {ticker} 6mo history: {len(hist)} rows")
-                    if hist.empty:
-                        print(f"[Evaluator] No data at all for {ticker}")
-                        ticker_cache[ticker] = None
-                        continue
-                    ticker_cache[ticker] = hist
-                    time.sleep(0.3)
+                    r = httpx.get(
+                        "https://finnhub.io/api/v1/quote",
+                        params={"symbol": ticker, "token": FINNHUB_KEY},
+                        timeout=10,
+                    )
+                    data = r.json()
+                    current = data.get("c", 0)
+                    prev_close = data.get("pc", 0)
+                    open_price = data.get("o", 0)
+
+                    if current and current > 0:
+                        price_cache[ticker] = {
+                            "current": current,
+                            "prev_close": prev_close,
+                            "open": open_price,
+                        }
+                        print(f"[Evaluator] {ticker}: current=${current}, prev_close=${prev_close}")
+                    else:
+                        print(f"[Evaluator] {ticker}: no price data from Finnhub: {data}")
+                        price_cache[ticker] = None
+
+                    time.sleep(1.1)
                 except Exception as e:
-                    print(f"[Evaluator] yfinance error for {ticker}: {e}")
-                    ticker_cache[ticker] = None
+                    print(f"[Evaluator] Finnhub error for {ticker}: {e}")
+                    price_cache[ticker] = None
                     errors += 1
                     continue
 
-            hist = ticker_cache[ticker]
-            if hist is None:
+            prices = price_cache.get(ticker)
+            if not prices:
                 continue
 
-            entry_price = float(hist["Close"].iloc[0])
-            current_price = float(hist["Close"].iloc[-1])
+            current_price = prices["current"]
+            entry_price = prices["prev_close"] or prices["open"]
 
-            if entry_price == 0:
+            if not entry_price or entry_price == 0:
                 continue
 
             direction = (p.direction or "bullish").lower()
             if direction in ("bear", "bearish"):
-                outcome = "correct" if current_price < entry_price else "incorrect"
+                outcome = "correct" if current_price <= entry_price else "incorrect"
             else:
-                outcome = "correct" if current_price > entry_price else "incorrect"
+                outcome = "correct" if current_price >= entry_price else "incorrect"
 
             pct_return = round(((current_price - entry_price) / entry_price) * 100, 2)
             if direction in ("bear", "bearish"):
@@ -82,20 +91,15 @@ def evaluate_all_pending(db):
             p.entry_price = entry_price
             p.actual_return = pct_return
             p.alpha = pct_return
-
             evaluated += 1
-
-            if evaluated <= 20:
-                print(f"[Evaluator] {ticker} ({direction}): ${entry_price:.2f} -> ${current_price:.2f} ({pct_return:+.1f}%) = {outcome}")
 
             if evaluated % 50 == 0:
                 db.commit()
-                print(f"[Evaluator] Committed {evaluated} so far...")
+                print(f"[Evaluator] Committed {evaluated}...")
 
         except Exception as e:
-            print(f"[Evaluator] Error on prediction {p.id}: {e}")
+            print(f"[Evaluator] Error on {p.id}: {e}")
             errors += 1
-            continue
 
     db.commit()
     print(f"[Evaluator] Done: evaluated {evaluated}, errors {errors}")
