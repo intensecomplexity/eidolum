@@ -6,50 +6,66 @@ import re
 
 # === LAYER 1: Scraper filter ===
 
-# Analyst action phrases
-ANALYST_ACTIONS = [
-    "upgrades", "upgraded", "upgrades to", "upgraded to",
-    "downgrades", "downgraded", "downgrades to", "downgraded to",
+# EXACT action phrases — headline MUST contain at least one of these. No exceptions.
+# If the headline doesn't have one of these, it's NOT a prediction.
+EXACT_ACTIONS = [
+    # Upgrade/downgrade — standalone is safe because product upgrades are caught by REJECT_PATTERNS
+    "upgrades to", "upgraded to", "upgrade to",
+    "downgrades to", "downgraded to", "downgrade to",
+    "upgrades", "upgraded", "downgrades", "downgraded",
+    # Upgrade/downgrade passive
+    "upgraded at", "downgraded at",
+    "upgraded from", "downgraded from",
+    "upgraded by", "downgraded by",
+    # Coverage initiation
     "initiates coverage", "initiated coverage", "initiates with",
-    "reiterates buy", "reiterates sell", "reiterates hold",
-    "reiterates overweight", "reiterates underweight",
-    "reiterates outperform", "reiterates underperform",
-    "reiterated buy", "reiterated sell", "reiterated hold",
-    "reiterated overweight", "reiterated underweight",
-    "maintains buy", "maintains sell", "maintains hold",
-    "maintains overweight", "maintains underweight",
-    "maintained buy", "maintained sell", "maintained hold",
+    "resumes coverage", "resumed coverage",
+    "starts coverage", "started coverage",
+    # Price target changes
     "raises price target", "raised price target",
-    "raises target to", "raised target to",
     "lowers price target", "lowered price target",
-    "lowers target to", "lowered target to",
     "cuts price target", "cut price target",
-    "cuts target to", "cut target to",
     "sets price target", "set price target",
     "boosts price target", "boosted price target",
     "slashes price target", "slashed price target",
-    "price target of $", "price target to $",
-    "target price of $", "target price to $",
+    "price target to $", "price target of $",
+    "target price to $", "target price of $",
+    "target of $", "target to $",
     "pt of $", "pt to $",
-    "resumed coverage", "resumes coverage",
-    "starts coverage", "started coverage",
-    # Passive patterns: "AAPL upgraded at Goldman"
-    "upgraded at", "downgraded at",
-    "upgraded by", "downgraded by",
+    # Reiterations with specific rating
+    "reiterates buy", "reiterated buy",
+    "reiterates sell", "reiterated sell",
+    "reiterates hold", "reiterated hold",
+    "reiterates overweight", "reiterated overweight",
+    "reiterates underweight", "reiterated underweight",
+    "reiterates outperform", "reiterated outperform",
+    "reiterates underperform", "reiterated underperform",
+    "reiterates neutral", "reiterated neutral",
+    # Maintains with specific rating
+    "maintains buy", "maintained buy",
+    "maintains sell", "maintained sell",
+    "maintains hold", "maintained hold",
+    "maintains overweight", "maintained overweight",
+    "maintains underweight", "maintained underweight",
+    "maintains outperform", "maintained outperform",
+    "maintains underperform", "maintained underperform",
+    "maintains neutral", "maintained neutral",
 ]
 
-# Rating words — article MUST also contain one of these
-RATING_WORDS = [
-    "buy", "sell", "hold", "neutral",
-    "overweight", "underweight", "equal weight", "equal-weight",
-    "outperform", "underperform", "market perform", "sector perform",
-    "strong buy", "strong sell",
-    "price target", "target price", "pt of", "pt to",
-    "target of $", "target to $", "fair value",
-    "conviction buy", "top pick",
-    # Standalone upgrade/downgrade implies a rating change
-    "upgrades", "upgraded", "downgrades", "downgraded",
-    "upgraded at", "downgraded at", "upgraded by", "downgraded by",
+# Commentary words that LOOK like actions but ARE NOT predictions
+# If headline contains these WITHOUT an EXACT_ACTION, it's rejected
+COMMENTARY_WORDS = [
+    "sees", "faces", "facing",
+    "could", "may", "might",
+    "wary", "cautious", "confident", "optimistic", "pessimistic",
+    "expects", "expected", "believes", "thinks",
+    "warns", "warned", "flags", "flagged",
+    "notes", "noted", "highlights", "highlighted",
+    "points to", "calls attention", "calls into question",
+    "eyes", "watching", "monitoring",
+    "suggests", "argues", "contends",
+    "anticipates", "predicts", "forecasts",
+    "views", "considers", "questions",
 ]
 
 # === ALL 50 REJECTION CATEGORIES ===
@@ -426,7 +442,7 @@ COMPANY_NAMES = [
 
 
 def is_real_prediction(headline, summary=""):
-    """Layer 1: Is this a REAL analyst prediction with a measurable claim?"""
+    """Layer 1: Maximum strictness — must contain an EXACT action phrase."""
     combined = (headline + " " + summary).lower()
 
     # Check all 50 rejection categories
@@ -434,18 +450,16 @@ def is_real_prediction(headline, summary=""):
         if re.search(pattern, combined, re.IGNORECASE):
             return False
 
-    # Must have analyst action AND rating word
-    has_action = any(a in combined for a in ANALYST_ACTIONS)
-    has_rating = any(r in combined for r in RATING_WORDS)
-    if not (has_action and has_rating):
+    # MUST contain at least one EXACT action phrase. No exceptions.
+    has_exact_action = any(a in combined for a in EXACT_ACTIONS)
+    if not has_exact_action:
         return False
 
-    # Sentiment check: require STRONG action if sentiment detected
-    has_sentiment = any(s in combined for s in SENTIMENT_ONLY)
-    if has_sentiment:
-        has_strong = any(a in combined for a in STRONG_ACTIONS)
-        if not has_strong:
-            return False
+    # If commentary words are present, the exact action must ALSO be present
+    # (already guaranteed by the check above, but reject if ONLY commentary)
+    has_commentary = any(c in combined for c in COMMENTARY_WORDS)
+    if has_commentary and not has_exact_action:
+        return False
 
     return True
 
@@ -591,17 +605,33 @@ def cleanup_invalid_predictions(db):
     """))
     deleted += r.rowcount
 
-    # Sentiment-only without strong action
+    # Sentiment/commentary without real action
     r = db.execute(sql_text("""
         DELETE FROM predictions WHERE
             (LOWER(context) LIKE '%wary of%' OR LOWER(context) LIKE '%confident of%'
              OR LOWER(context) LIKE '%cautious on%' OR LOWER(context) LIKE '%optimistic about%'
              OR LOWER(context) LIKE '%pessimistic about%' OR LOWER(context) LIKE '%skeptical of%'
              OR LOWER(context) LIKE '%concerned about%' OR LOWER(context) LIKE '%warming to%'
-             OR LOWER(context) LIKE '%cooling on%')
-            AND LOWER(context) NOT LIKE '%upgrades%'
-            AND LOWER(context) NOT LIKE '%downgrades%'
+             OR LOWER(context) LIKE '%cooling on%'
+             OR LOWER(context) LIKE '% sees %' OR LOWER(context) LIKE '% faces %'
+             OR LOWER(context) LIKE '% facing %' OR LOWER(context) LIKE '% warns %'
+             OR LOWER(context) LIKE '% flags %' OR LOWER(context) LIKE '% eyes %'
+             OR LOWER(context) LIKE '% expects %' OR LOWER(context) LIKE '% believes %'
+             OR LOWER(context) LIKE '% could %' OR LOWER(context) LIKE '% may %'
+             OR LOWER(context) LIKE '% might %' OR LOWER(context) LIKE '% highlights %'
+             OR LOWER(context) LIKE '% notes %')
+            AND LOWER(context) NOT LIKE '%upgrades to%'
+            AND LOWER(context) NOT LIKE '%downgrades to%'
+            AND LOWER(context) NOT LIKE '%upgraded to%'
+            AND LOWER(context) NOT LIKE '%downgraded to%'
+            AND LOWER(context) NOT LIKE '%upgraded at%'
+            AND LOWER(context) NOT LIKE '%downgraded at%'
             AND LOWER(context) NOT LIKE '%price target%'
+            AND LOWER(context) NOT LIKE '%initiates coverage%'
+            AND LOWER(context) NOT LIKE '%maintains buy%'
+            AND LOWER(context) NOT LIKE '%maintains sell%'
+            AND LOWER(context) NOT LIKE '%reiterates buy%'
+            AND LOWER(context) NOT LIKE '%reiterates sell%'
     """))
     deleted += r.rowcount
 
