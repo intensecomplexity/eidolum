@@ -38,7 +38,6 @@ def get_forecaster(request: Request, forecaster_id: int, db: Session = Depends(g
     predictions = (
         db.query(Prediction)
         .filter(Prediction.forecaster_id == f.id)
-        .filter(Prediction.outcome != "pending")
         .order_by(Prediction.prediction_date.desc())
         .all()
     )
