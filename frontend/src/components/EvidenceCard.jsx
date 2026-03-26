@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Play, ExternalLink, X as XIcon, Search } from 'lucide-react';
+import { Play, ExternalLink, X as XIcon, Search, Archive } from 'lucide-react';
 import getSourceUrl from '../utils/getSourceUrl';
 
 const SOURCE_BADGES = {
@@ -54,6 +54,13 @@ export default function EvidenceCard({ prediction: p, forecaster = null, expanda
   const hasRealVideo = isRealYouTubeId(p.source_platform_id);
   const badge = getSourceBadge(p.source_type, p.verified_by, !!p.video_timestamp_sec);
 
+  // Wayback Machine archive link (external archive_url or computed from source_url)
+  const archiveLink = p.archive_url && p.archive_url.startsWith('https://web.archive.org')
+    ? p.archive_url
+    : (hasSource && !p.source_url.includes('youtube.com') && !p.source_url.includes('x.com') && !p.source_url.includes('twitter.com') && !p.source_url.includes('reddit.com'))
+      ? `https://web.archive.org/web/${p.source_url}`
+      : null;
+
   // Build contextual search link as fallback
   const fc = forecaster || p.forecaster || null;
   const ctxSource = getSourceUrl(p, fc);
@@ -89,6 +96,13 @@ export default function EvidenceCard({ prediction: p, forecaster = null, expanda
              className="inline-flex items-center gap-1 text-[11px] text-accent active:underline mt-0.5">
             <Search className="w-2.5 h-2.5" />
             {ctxSource.label || 'Search source'}
+          </a>
+        )}
+        {archiveLink && (
+          <a href={archiveLink} target="_blank" rel="noopener noreferrer"
+             className="inline-flex items-center gap-1 text-[11px] text-emerald-400 active:underline mt-0.5 ml-2">
+            <Archive className="w-2.5 h-2.5" />
+            Proof
           </a>
         )}
         {showVideo && hasRealVideo && (
@@ -171,6 +185,20 @@ export default function EvidenceCard({ prediction: p, forecaster = null, expanda
             >
               <Search className="w-3 h-3" />
               {ctxSource.label || 'Search source'}
+            </a>
+          )}
+
+          {/* Wayback Machine archived proof link */}
+          {archiveLink && (
+            <a
+              href={archiveLink}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={(e) => e.stopPropagation()}
+              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-emerald-400/10 text-emerald-400 border border-emerald-400/20 active:bg-emerald-400/20 min-h-[28px]"
+            >
+              <Archive className="w-3 h-3" />
+              Archived Proof
             </a>
           )}
         </div>

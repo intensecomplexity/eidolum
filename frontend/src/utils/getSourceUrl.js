@@ -17,6 +17,18 @@ export default function getSourceUrl(prediction, forecaster) {
     return { url: prediction.source_url, type: 'direct' };
   }
 
+  // If we have a real article URL (news site, analyst page) — use it directly
+  const ARTICLE_DOMAINS = [
+    'stockanalysis.com', 'cnbc.com', 'reuters.com', 'marketwatch.com',
+    'benzinga.com', 'seekingalpha.com', 'barrons.com', 'thestreet.com',
+    'investors.com', 'fool.com', 'bloomberg.com', 'wsj.com', 'ft.com',
+    'forbes.com', 'yahoo.com', 'zacks.com', 'tipranks.com', 'morningstar.com',
+    'businessinsider.com',
+  ];
+  if (prediction.source_url && ARTICLE_DOMAINS.some(d => prediction.source_url.includes(d))) {
+    return { url: prediction.source_url, type: 'direct', label: 'Source Article' };
+  }
+
   // YouTube: search their channel for the ticker
   if (platform === 'youtube' || channelUrl.includes('youtube.com')) {
     const channelHandle = channelUrl.split('@')[1]?.split('/')[0] || '';

@@ -243,11 +243,7 @@ def run_scraper(db: Session):
         scrape_tipranks(db)
     except Exception as e:
         print(f"[Scraper] TipRanks/Benzinga error (non-fatal): {e}")
-    try:
-        from jobs.seed_magazines import seed_finnhub_predictions
-        seed_finnhub_predictions(db)
-    except Exception as e:
-        print(f"[Scraper] Magazine/Finnhub seed error (non-fatal): {e}")
+    # seed_finnhub_predictions removed — replaced by real news article scraper
     try:
         from jobs.substack_scraper import scrape_substacks
         scrape_substacks(db)
@@ -258,23 +254,19 @@ def run_scraper(db: Session):
         scrape_finviz_upgrades(db)
     except Exception as e:
         print(f"[Scraper] Finviz error (non-fatal): {e}")
+    # Real news articles from Finnhub company news API
     try:
-        from jobs.news_scraper import scrape_news_feeds
-        scrape_news_feeds(db)
+        from jobs.news_scraper import scrape_news_predictions
+        scrape_news_predictions(db)
     except Exception as e:
-        print(f"[Scraper] News feeds error (non-fatal): {e}")
+        print(f"[Scraper] News scraper error (non-fatal): {e}")
     # Archive any predictions missing proof
     try:
         from main import archive_missing_proofs
         archive_missing_proofs(db)
     except Exception as e:
         print(f"[Scraper] Archive missing proofs error (non-fatal): {e}")
-    # Finnhub analyst data
-    try:
-        from jobs.finnhub_scraper import scrape_finnhub_analysts
-        scrape_finnhub_analysts(db)
-    except Exception as e:
-        print(f"[Scraper] Finnhub error (non-fatal): {e}")
+    # scrape_finnhub_analysts removed — aggregate data, no real article URLs
     # Evaluate pending predictions against real prices
     try:
         from jobs.evaluate_predictions import evaluate_all_pending

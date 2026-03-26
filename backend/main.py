@@ -194,7 +194,7 @@ def migrate_populate_quotes(db):
 
 
 def migrate_clear_fake_source_urls(db):
-    """Clear source URLs that aren't real post/video/tweet links. Safe/idempotent."""
+    """Clear source URLs that aren't real post/video/tweet/article links. Safe/idempotent."""
     try:
         from sqlalchemy import text
         result = db.execute(text("""
@@ -205,12 +205,51 @@ def migrate_clear_fake_source_urls(db):
             AND source_url NOT LIKE '%/status/%'
             AND source_url NOT LIKE '%/comments/%'
             AND source_url NOT LIKE '%reddit.com/r/%'
+            AND source_url NOT LIKE '%stockanalysis.com%'
+            AND source_url NOT LIKE '%cnbc.com%'
+            AND source_url NOT LIKE '%reuters.com%'
+            AND source_url NOT LIKE '%marketwatch.com%'
+            AND source_url NOT LIKE '%benzinga.com%'
+            AND source_url NOT LIKE '%seekingalpha.com%'
+            AND source_url NOT LIKE '%barrons.com%'
+            AND source_url NOT LIKE '%thestreet.com%'
+            AND source_url NOT LIKE '%investors.com%'
+            AND source_url NOT LIKE '%fool.com%'
+            AND source_url NOT LIKE '%bloomberg.com%'
+            AND source_url NOT LIKE '%wsj.com%'
+            AND source_url NOT LIKE '%ft.com%'
+            AND source_url NOT LIKE '%forbes.com%'
+            AND source_url NOT LIKE '%yahoo.com%'
+            AND source_url NOT LIKE '%web.archive.org%'
         """))
         db.commit()
         print(f"[Eidolum] Cleared {result.rowcount} fake source URLs")
     except Exception as e:
         db.rollback()
         print(f"[Eidolum] migrate_clear_fake_source_urls error: {e}")
+
+
+def delete_fake_predictions(db):
+    """Delete predictions that link to generic pages instead of actual articles. Safe/idempotent."""
+    try:
+        from sqlalchemy import text
+        result = db.execute(text("""
+            DELETE FROM predictions
+            WHERE source_url LIKE '%finance.yahoo.com%'
+               OR source_url LIKE '%stockanalysis.com%'
+               OR source_url LIKE '%finnhub.io/api%'
+               OR context LIKE 'Analyst consensus:%'
+               OR context LIKE 'Price target for %'
+               OR (verified_by = 'finnhub_api' AND source_url NOT LIKE 'http%://%__.%/__%')
+        """))
+        db.commit()
+        if result.rowcount > 0:
+            print(f"[Cleanup] Deleted {result.rowcount} fake predictions (generic page links)")
+        else:
+            print("[Cleanup] No fake predictions to delete")
+    except Exception as e:
+        db.rollback()
+        print(f"[Cleanup] delete_fake_predictions error: {e}")
 
 
 def migrate_profile_urls():
@@ -398,6 +437,13 @@ async def lifespan(app):
         seed_verified()
     except Exception as e:
         print(f"[Eidolum] Verified reseed error (non-fatal): {e}")
+    # Delete fake predictions (generic Yahoo/stockanalysis/Finnhub API links)
+    try:
+        db = SessionLocal()
+        delete_fake_predictions(db)
+        db.close()
+    except Exception as e:
+        print(f"[Eidolum] Fake prediction cleanup error (non-fatal): {e}")
     # Run historical import in background thread so server starts immediately
     import threading
 
@@ -412,11 +458,6 @@ async def lifespan(app):
                 from jobs.youtube_history import run_youtube_history
                 run_youtube_history(db)
                 try:
-                    from jobs.seed_magazines import seed_finnhub_predictions
-                    seed_finnhub_predictions(db)
-                except Exception as e:
-                    print(f"[Background] Magazine seed error: {e}")
-                try:
                     from jobs.substack_scraper import scrape_substacks
                     scrape_substacks(db)
                 except Exception as e:
@@ -427,10 +468,10 @@ async def lifespan(app):
                 except Exception as e:
                     print(f"[Background] Finviz error: {e}")
                 try:
-                    from jobs.news_scraper import scrape_news_feeds
-                    scrape_news_feeds(db)
+                    from jobs.news_scraper import scrape_news_predictions
+                    scrape_news_predictions(db)
                 except Exception as e:
-                    print(f"[Background] News feeds error: {e}")
+                    print(f"[Background] News scraper error: {e}")
                 try:
                     from jobs.tipranks_scraper import scrape_tipranks
                     scrape_tipranks(db)

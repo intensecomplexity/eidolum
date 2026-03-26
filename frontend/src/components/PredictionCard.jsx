@@ -13,6 +13,13 @@ function ProofBlock({ p }) {
   const archive = p.archive_url;
   const archiveImg = archive && archive.startsWith('/archive/') ? `${API_BASE}${archive}` : null;
 
+  // Wayback Machine archive link (stored or computed from source_url for articles)
+  const waybackLink = archive && archive.startsWith('https://web.archive.org')
+    ? archive
+    : (source && !source.includes('youtube.com') && !source.includes('x.com') && !source.includes('twitter.com') && !source.includes('reddit.com'))
+      ? `https://web.archive.org/web/${source}`
+      : null;
+
   if (!source) return null;
 
   // YouTube: thumbnail + watch button
@@ -39,7 +46,8 @@ function ProofBlock({ p }) {
   // Twitter / Reddit: screenshot proof + source button
   const isTwitter = source.includes('x.com') || source.includes('twitter.com');
   const isReddit = source.includes('reddit.com');
-  const label = isTwitter ? '𝕏 View on X' : isReddit ? '🔴 View on Reddit' : '🔗 View Source';
+  const isArticle = !isTwitter && !isReddit;
+  const label = isTwitter ? '𝕏 View on X' : isReddit ? '🔴 View on Reddit' : '🔗 Source Article';
   const bg = isTwitter ? '#000' : isReddit ? '#FF4500' : '#333';
 
   return (
@@ -51,12 +59,23 @@ function ProofBlock({ p }) {
               border: '1px solid rgba(255,255,255,0.1)', cursor: 'pointer', display: 'block' }} />
         </a>
       )}
-      <a href={source} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()}
-        style={{ display: 'inline-flex', alignItems: 'center', gap: '6px',
-          padding: '6px 14px', borderRadius: '6px', background: bg, color: '#fff',
-          fontSize: '0.85rem', fontWeight: 500, textDecoration: 'none' }}>
-        {label}
-      </a>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+        <a href={source} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()}
+          style={{ display: 'inline-flex', alignItems: 'center', gap: '6px',
+            padding: '6px 14px', borderRadius: '6px', background: bg, color: '#fff',
+            fontSize: '0.85rem', fontWeight: 500, textDecoration: 'none' }}>
+          {label}
+        </a>
+        {waybackLink && (
+          <a href={waybackLink} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: '6px',
+              padding: '6px 14px', borderRadius: '6px', background: 'rgba(52, 211, 153, 0.1)',
+              color: '#34d399', border: '1px solid rgba(52, 211, 153, 0.2)',
+              fontSize: '0.8rem', fontWeight: 500, textDecoration: 'none' }}>
+            📁 Archived Proof
+          </a>
+        )}
+      </div>
     </div>
   );
 }

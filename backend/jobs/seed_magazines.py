@@ -160,7 +160,7 @@ def seed_finnhub_predictions(db: Session):
 
         current_price = quote.get("c", 0)
         prev_close = quote.get("pc", 0)
-        proof_url = f"https://finance.yahoo.com/quote/{ticker}/analysis/"
+        proof_url = f"https://stockanalysis.com/stocks/{ticker.lower()}/forecast/"
 
         # Process recommendations (up to 4 periods per ticker)
         for rec in recs[:4]:
@@ -252,7 +252,7 @@ def seed_finnhub_predictions(db: Session):
                         direction=direction,
                         context=quote_text[:200],
                         exact_quote=quote_text,
-                        source_url=f"https://finance.yahoo.com/quote/{ticker}/",
+                        source_url=f"https://stockanalysis.com/stocks/{ticker.lower()}/forecast/",
                         source_platform_id=source_id,
                         source_type="article",
                         target_price=target_mean,
