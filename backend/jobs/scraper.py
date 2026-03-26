@@ -1,8 +1,9 @@
 """
 Scraper job — fetches new predictions from Twitter/X, YouTube, and Reddit.
+Proof-first: screenshot/thumbnail must succeed BEFORE prediction is saved.
 Runs every hour via APScheduler.
 """
-import httpx, os, re, threading, asyncio
+import httpx, os, re, shutil
 from datetime import datetime
 from sqlalchemy.orm import Session
 from models import Prediction, Forecaster
@@ -11,57 +12,37 @@ from jobs.prediction_filter import is_prediction
 
 TWITTER_BEARER = os.getenv("TWITTER_BEARER_TOKEN", "")
 YOUTUBE_API_KEY = os.getenv("YOUTUBE_API_KEY", "")
+ARCHIVE_DIR = os.getenv("ARCHIVE_DIR", "/app/archive")
 
 
-def archive_url(url: str) -> str | None:
-    """Submit URL to archive.ph and return the archived URL."""
-    try:
-        r = httpx.post(
-            "https://archive.ph/submit/",
-            data={"url": url},
-            headers={"User-Agent": "Mozilla/5.0"},
-            follow_redirects=True,
-            timeout=15,
-        )
-        if r.url and "archive.ph/" in str(r.url):
-            return str(r.url)
-        match = re.search(r'https://archive\.ph/\w+', r.text)
-        return match.group(0) if match else None
-    except Exception:
-        return None
+def save_with_proof(db: Session, prediction_obj: Prediction) -> bool:
+    """
+    Try to archive proof FIRST. Only save the prediction if proof is obtained.
+    Returns True if saved, False if rejected.
+    """
+    from archiver.screenshot import archive_proof_sync
 
+    proof_url = archive_proof_sync(prediction_obj.source_url, 0)
+    if not proof_url:
+        print(f"[Archive] REJECTED — no proof for: {(prediction_obj.source_url or '')[:80]}")
+        return False
 
-def archive_after_save(prediction_id: int, source_url: str):
-    """Archive proof after saving. YouTube: keep even without thumbnail. Twitter/Reddit: delete if no screenshot."""
-    def run():
-        try:
-            from archiver.screenshot import take_screenshot
-            from sqlalchemy import text
-            loop = asyncio.new_event_loop()
-            archive_url = loop.run_until_complete(take_screenshot(source_url, prediction_id))
-            db2 = SessionLocal()
-            if archive_url:
-                db2.execute(
-                    text("UPDATE predictions SET archive_url=:url, archived_at=:ts WHERE id=:id"),
-                    {"url": archive_url, "ts": datetime.utcnow(), "id": prediction_id},
-                )
-                db2.commit()
-            elif "youtube.com" in source_url or "youtu.be" in source_url:
-                # YouTube: keep even without thumbnail — timestamp link is proof
-                print(f"[Archive] YouTube prediction {prediction_id} kept without thumbnail")
-            else:
-                # Twitter/Reddit: require screenshot — delete if can't get one
-                db2.execute(
-                    text("DELETE FROM predictions WHERE id=:id AND archive_url IS NULL"),
-                    {"id": prediction_id},
-                )
-                db2.commit()
-                print(f"[Archive] Prediction {prediction_id} DELETED — screenshot failed")
-            db2.close()
-            loop.close()
-        except Exception as e:
-            print(f"[Archive] archive_after_save error for {prediction_id}: {e}")
-    threading.Thread(target=run, daemon=True).start()
+    prediction_obj.archive_url = proof_url
+    prediction_obj.archived_at = datetime.utcnow()
+    db.add(prediction_obj)
+    db.flush()  # get real ID
+
+    # Rename archive file from p0_ to real ID
+    if proof_url.startswith("/archive/p0_"):
+        old_name = proof_url.replace("/archive/", "")
+        new_name = old_name.replace("p0_", f"p{prediction_obj.id}_")
+        old_path = os.path.join(ARCHIVE_DIR, old_name)
+        new_path = os.path.join(ARCHIVE_DIR, new_name)
+        if os.path.exists(old_path) and old_path != new_path:
+            shutil.move(old_path, new_path)
+            prediction_obj.archive_url = f"/archive/{new_name}"
+
+    return True
 
 # ── YouTube ──────────────────────────────────────────────────────────────────
 
@@ -114,9 +95,8 @@ def scrape_youtube(db: Session):
                     direction="bullish", outcome="pending",
                     verified_by="ai_parsed",
                 )
-                db.add(pred)
-                db.flush()
-                archive_after_save(pred.id, source_url)
+                if not save_with_proof(db, pred):
+                    continue
         except Exception as e:
             print(f"[Scraper] YouTube error for {handle}: {e}")
     db.commit()
@@ -150,21 +130,18 @@ def scrape_twitter(db: Session):
                 if db.query(Prediction).filter(Prediction.source_platform_id == tweet["id"]).first():
                     continue
                 tweet_url = f"https://x.com/{handle}/status/{tweet['id']}"
-                archive = archive_url(tweet_url)
                 pred = Prediction(
                     forecaster_id=f.id, ticker="UNKNOWN",
                     context=tweet["text"][:200],
                     exact_quote=tweet["text"], source_type="twitter",
                     source_platform_id=tweet["id"],
                     source_url=tweet_url,
-                    archive_url=archive,
                     prediction_date=datetime.utcnow(), window_days=30,
                     direction="bullish", outcome="pending",
                     verified_by="ai_parsed",
                 )
-                db.add(pred)
-                db.flush()
-                archive_after_save(pred.id, tweet_url)
+                if not save_with_proof(db, pred):
+                    continue
         except Exception as e:
             print(f"[Scraper] Twitter error for {handle}: {e}")
     db.commit()
@@ -202,7 +179,6 @@ def scrape_reddit(db: Session):
                     continue
                 post_url = f"https://reddit.com{permalink}"
                 full_quote = f"{title}\n\n{selftext}".strip() if selftext else title
-                archive = archive_url(post_url)
                 pred = Prediction(
                     forecaster_id=f.id, ticker="UNKNOWN",
                     context=title[:200],
@@ -210,14 +186,12 @@ def scrape_reddit(db: Session):
                     source_type="reddit",
                     source_platform_id=post_id,
                     source_url=post_url,
-                    archive_url=archive,
                     prediction_date=datetime.utcnow(), window_days=30,
                     direction="bullish", outcome="pending",
                     verified_by="ai_parsed",
                 )
-                db.add(pred)
-                db.flush()
-                archive_after_save(pred.id, post_url)
+                if not save_with_proof(db, pred):
+                    continue
         except Exception as e:
             print(f"[Scraper] Reddit error for {f.channel_url}: {e}")
     db.commit()

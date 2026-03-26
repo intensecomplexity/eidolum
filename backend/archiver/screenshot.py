@@ -1,17 +1,31 @@
 """
-Platform-specific proof archiver.
+Proof-first archiver. No screenshot = no prediction. Ever.
+
 YouTube → thumbnail saved locally (free, always works)
 Twitter/X → ScreenshotOne screenshot of tweet element
 Reddit → ScreenshotOne screenshot of post
+
+If proof cannot be obtained, the prediction is never saved.
 """
 import os
 import re
 import httpx
 import hashlib
+import asyncio
 from pathlib import Path
+from datetime import datetime
 
 ARCHIVE_DIR = os.getenv("ARCHIVE_DIR", "/app/archive")
 SCREENSHOTONE_KEY = os.getenv("SCREENSHOTONE_KEY", "")
+
+
+def log_archive_status():
+    """Print archive capability status on startup."""
+    if SCREENSHOTONE_KEY:
+        print("[Archive] ScreenshotOne configured — all platforms can be archived")
+    else:
+        print("[Archive] WARNING: No SCREENSHOTONE_KEY — Twitter/Reddit predictions will be rejected (no proof possible)")
+    print("[Archive] YouTube thumbnails always available (free)")
 
 
 def _extract_video_id(url: str) -> str | None:
@@ -39,7 +53,6 @@ async def save_youtube_proof(source_url: str, prediction_id: int) -> str | None:
             if r.status_code == 200 and len(r.content) > 5000:
                 with open(filepath, "wb") as f:
                     f.write(r.content)
-                print(f"[Archive] YouTube thumbnail saved for prediction {prediction_id}: {filename}")
                 return f"/archive/{filename}"
         except Exception:
             continue
@@ -80,12 +93,9 @@ async def save_twitter_screenshot(source_url: str, prediction_id: int) -> str | 
         if r.status_code == 200 and "image" in r.headers.get("content-type", ""):
             with open(filepath, "wb") as f:
                 f.write(r.content)
-            print(f"[Archive] Tweet screenshot saved for prediction {prediction_id}")
             return f"/archive/{filename}"
         elif r.status_code == 402:
             print("[Archive] ScreenshotOne quota exceeded")
-        else:
-            print(f"[Archive] ScreenshotOne error {r.status_code} for prediction {prediction_id}")
         return None
     except Exception as e:
         print(f"[Archive] Tweet screenshot exception: {e}")
@@ -123,10 +133,7 @@ async def save_reddit_screenshot(source_url: str, prediction_id: int) -> str | N
         if r.status_code == 200 and "image" in r.headers.get("content-type", ""):
             with open(filepath, "wb") as f:
                 f.write(r.content)
-            print(f"[Archive] Reddit screenshot saved for prediction {prediction_id}")
             return f"/archive/{filename}"
-        else:
-            print(f"[Archive] ScreenshotOne Reddit error {r.status_code}")
         return None
     except Exception as e:
         print(f"[Archive] Reddit screenshot exception: {e}")
@@ -134,12 +141,7 @@ async def save_reddit_screenshot(source_url: str, prediction_id: int) -> str | N
 
 
 async def take_screenshot(source_url: str, prediction_id: int) -> str | None:
-    """
-    Route to the right archiver based on platform.
-    YouTube → thumbnail (free, always works)
-    Twitter/X → ScreenshotOne tweet screenshot
-    Reddit → ScreenshotOne post screenshot
-    """
+    """Route to the right archiver based on URL."""
     if not source_url:
         return None
 
@@ -150,5 +152,13 @@ async def take_screenshot(source_url: str, prediction_id: int) -> str | None:
     elif "reddit.com" in source_url:
         return await save_reddit_screenshot(source_url, prediction_id)
     else:
-        # Generic: try twitter-style screenshot
         return await save_twitter_screenshot(source_url, prediction_id)
+
+
+def archive_proof_sync(source_url: str, prediction_id: int = 0) -> str | None:
+    """Synchronous wrapper around take_screenshot. Used by save_with_proof."""
+    loop = asyncio.new_event_loop()
+    try:
+        return loop.run_until_complete(take_screenshot(source_url, prediction_id))
+    finally:
+        loop.close()
