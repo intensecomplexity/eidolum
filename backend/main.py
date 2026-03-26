@@ -324,7 +324,7 @@ async def lifespan(app):
             db = SessionLocal()
             pred_count = db.query(Prediction).count()
             print(f"[Eidolum] Background import starting — {pred_count} predictions exist")
-            if pred_count < 50:
+            if pred_count < 500:
                 from jobs.youtube_history import run_youtube_history
                 from jobs.twitter_history import scrape_twitter_history, scrape_via_nitter_all
                 from jobs.reddit_history import scrape_reddit_history

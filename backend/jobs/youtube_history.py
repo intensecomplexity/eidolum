@@ -93,50 +93,70 @@ def get_channel_videos_rss(channel_id: str, max_results: int = 15) -> list:
     return videos[:max_results]
 
 
-def get_channel_videos(channel_id: str, max_results: int = 50) -> list:
-    """Get videos from a channel. Uses API if key is set, RSS feed otherwise."""
+def get_channel_videos(channel_id: str, max_results: int = 200) -> list:
+    """Get videos using uploads playlist — 1 unit/page vs 100 for search API."""
     if not YOUTUBE_API_KEY:
         return get_channel_videos_rss(channel_id, max_results=min(max_results, 15))
 
-    one_year_ago = (datetime.utcnow() - timedelta(days=365)).strftime("%Y-%m-%dT%H:%M:%SZ")
+    # Convert channel ID to uploads playlist ID (UC... -> UU...)
+    playlist_id = "UU" + channel_id[2:]
+    one_year_ago = datetime.utcnow() - timedelta(days=365)
     videos = []
     next_page = None
 
     while len(videos) < max_results:
         params = {
             "key": YOUTUBE_API_KEY,
-            "channelId": channel_id,
+            "playlistId": playlist_id,
             "part": "snippet",
-            "type": "video",
-            "order": "date",
             "maxResults": 50,
-            "publishedAfter": one_year_ago,
         }
         if next_page:
             params["pageToken"] = next_page
 
         try:
-            r = httpx.get("https://www.googleapis.com/youtube/v3/search", params=params, timeout=15)
+            r = httpx.get(
+                "https://www.googleapis.com/youtube/v3/playlistItems",
+                params=params, timeout=15,
+            )
             data = r.json()
-        except Exception as e:
-            print(f"[YTHistory] API error for {channel_id}: {e}")
-            break
 
-        items = data.get("items", [])
-        for item in items:
-            vid_id = item.get("id", {}).get("videoId")
-            if vid_id:
+            if "error" in data:
+                print(f"[YTHistory] API error: {data['error'].get('message')}")
+                break
+
+            for item in data.get("items", []):
+                snippet = item.get("snippet", {})
+                vid_id = snippet.get("resourceId", {}).get("videoId")
+                published = snippet.get("publishedAt", "")
+                title = snippet.get("title", "")
+
+                if not vid_id or title in ("Deleted video", "Private video"):
+                    continue
+
+                try:
+                    pub_date = datetime.strptime(published, "%Y-%m-%dT%H:%M:%SZ")
+                except Exception:
+                    pub_date = datetime.utcnow()
+
+                if pub_date < one_year_ago:
+                    return videos  # reverse chron — stop at old videos
+
                 videos.append({
                     "video_id": vid_id,
-                    "title": item["snippet"]["title"],
-                    "published_at": item["snippet"]["publishedAt"],
+                    "title": title,
+                    "published_at": published,
                 })
 
-        next_page = data.get("nextPageToken")
-        if not next_page or len(items) == 0:
+            next_page = data.get("nextPageToken")
+            if not next_page:
+                break
+
+        except Exception as e:
+            print(f"[YTHistory] Playlist fetch error: {e}")
             break
 
-    return videos[:max_results]
+    return videos
 
 
 def get_transcript_predictions(video_id: str, title: str) -> list:
@@ -202,7 +222,7 @@ def scrape_channel_history(forecaster: Forecaster, channel_info: dict, db: Sessi
     """Scrape 1 year of videos for a channel."""
     print(f"[YTHistory] Scraping {forecaster.name}...")
 
-    videos = get_channel_videos(channel_info["youtube_id"], max_results=50)
+    videos = get_channel_videos(channel_info["youtube_id"], max_results=200)
     added = 0
 
     for video in videos:
