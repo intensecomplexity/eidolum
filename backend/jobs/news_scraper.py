@@ -26,6 +26,7 @@ FINNHUB_KEY = os.getenv("FINNHUB_KEY", "")
 
 # Track when each ticker last produced a NEW prediction — used by fast scraper to skip cold tickers
 TICKER_LAST_FOUND = {}  # ticker -> datetime of last new prediction found
+LAST_FULL_SCAN = None   # datetime of last full scraper run
 
 TICKERS = [
     "AAPL", "MSFT", "GOOGL", "AMZN", "NVDA", "TSLA", "META",
@@ -137,13 +138,23 @@ def merge_duplicate_forecasters(db):
 
 def scrape_news_predictions(db: Session):
     """Scrape real prediction articles with 3-layer defense."""
+    global LAST_FULL_SCAN
     if not FINNHUB_KEY:
         print("[NewsScraper] No FINNHUB_KEY")
         return
 
     today = datetime.utcnow()
-    from_date = (today - timedelta(days=90)).strftime("%Y-%m-%d")
     to_date = today.strftime("%Y-%m-%d")
+
+    # Smart time window: 90 days on first run, then only since last scan
+    if LAST_FULL_SCAN is None:
+        from_date = (today - timedelta(days=90)).strftime("%Y-%m-%d")
+        print("[NewsScraper] First run — scanning 90 days of history")
+    else:
+        # Go back to last scan minus 1 hour buffer, minimum 1 day
+        lookback = max(today - LAST_FULL_SCAN + timedelta(hours=1), timedelta(days=1))
+        from_date = (today - lookback).strftime("%Y-%m-%d")
+        print(f"[NewsScraper] Incremental scan — from {from_date}")
 
     added = 0
     rejected_l1 = 0
@@ -269,6 +280,7 @@ def scrape_news_predictions(db: Session):
             continue
 
     db.commit()
+    LAST_FULL_SCAN = datetime.utcnow()
     print(f"[NewsScraper] DONE: {added} added, {rejected_l1} rejected L1, {rejected_l2} rejected L2")
 
 
@@ -287,7 +299,8 @@ def scrape_fast_predictions(db: Session):
         return
 
     today = datetime.utcnow()
-    from_date = (today - timedelta(days=1)).strftime("%Y-%m-%d")
+    # Only fetch articles from last few hours (Finnhub date granularity is daily, so use today)
+    from_date = (today - timedelta(hours=4)).strftime("%Y-%m-%d")
     to_date = today.strftime("%Y-%m-%d")
     hot_cutoff = today - timedelta(days=3)
 
