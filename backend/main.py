@@ -289,9 +289,10 @@ def archive_missing_proofs(db):
                     )
                     db.commit()
             except Exception as e:
-                print(f"[Archive] Failed for prediction {p.id}: {e}")
+                print(f"[Archive] Failed {p.id}: {e}")
             finally:
                 loop.close()
+            time.sleep(0.1)
 
         print("[Archive] Done archiving batch")
     except Exception as e:
@@ -422,8 +423,6 @@ async def lifespan(app):
                 print("[Eidolum] Background historical import complete")
             else:
                 print(f"[Eidolum] Skipping historical import — {pred_count} predictions already exist")
-            # Archive predictions missing proof
-            archive_missing_proofs(db)
             db.close()
         except Exception as e:
             print(f"[Eidolum] Background import error: {e}")
