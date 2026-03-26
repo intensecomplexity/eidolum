@@ -26,6 +26,7 @@ from jobs.scraper import run_scraper
 from jobs.evaluator import run_evaluator
 from jobs.leaderboard_refresh import run_leaderboard_refresh
 from jobs.newsletter import run_newsletter
+from admin_panel import router as admin_panel_router
 
 
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):
@@ -458,6 +459,7 @@ app.add_middleware(
     allow_origins=[
         "https://www.eidolum.com",
         "https://eidolum.com",
+        "https://api.eidolum.com",
         "http://localhost:5173",
         "http://localhost:3000",
     ],
@@ -487,6 +489,7 @@ app.include_router(contrarian.router, prefix="/api")
 app.include_router(power_rankings.router, prefix="/api")
 app.include_router(inverse.router, prefix="/api")
 app.include_router(subscribers.router, prefix="/api")
+app.include_router(admin_panel_router)  # /admin HTML + /api/admin/* endpoints
 
 
 @app.get("/health")
