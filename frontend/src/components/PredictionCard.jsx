@@ -145,7 +145,7 @@ export default function PredictionCard({ prediction: p, showForecaster = false, 
             }}
             title="Archived copy — proof this was said even if deleted"
           >
-            🗂 Archived proof
+            {p.archive_url.includes('web.archive.org') ? '🏛 Wayback Archive' : '🗂 Screenshot Proof'}
           </a>
         )}
       </div>

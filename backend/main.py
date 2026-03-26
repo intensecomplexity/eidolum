@@ -9,6 +9,7 @@ import os
 import sys
 import subprocess
 import time
+from datetime import datetime
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -335,6 +336,30 @@ async def lifespan(app):
                 print("[Eidolum] Background historical import complete")
             else:
                 print(f"[Eidolum] Skipping historical import — {pred_count} predictions already exist")
+            # Archive existing predictions that don't have archive_url yet
+            try:
+                from archiver.screenshot import archive_prediction
+                from sqlalchemy import text as _at
+                import asyncio
+                unarchived = db.execute(_at(
+                    "SELECT id, source_url FROM predictions WHERE source_url IS NOT NULL AND archive_url IS NULL"
+                )).fetchall()
+                if unarchived:
+                    print(f"[Archive] Archiving {len(unarchived)} existing predictions...")
+                    loop = asyncio.new_event_loop()
+                    for row in unarchived:
+                        try:
+                            url = loop.run_until_complete(archive_prediction(row[1], row[0]))
+                            if url:
+                                db.execute(_at("UPDATE predictions SET archive_url=:url, archived_at=:ts WHERE id=:id"),
+                                           {"url": url, "ts": datetime.utcnow(), "id": row[0]})
+                                db.commit()
+                        except Exception as e:
+                            print(f"[Archive] Failed for prediction {row[0]}: {e}")
+                    loop.close()
+                    print("[Archive] Background archiving complete")
+            except Exception as e:
+                print(f"[Archive] archive_existing error: {e}")
             db.close()
         except Exception as e:
             print(f"[Eidolum] Background import error: {e}")
