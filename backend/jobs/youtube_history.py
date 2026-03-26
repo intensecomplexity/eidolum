@@ -227,7 +227,7 @@ def scrape_channel_history(forecaster: Forecaster, channel_info: dict, db: Sessi
     """Scrape 1 year of videos for a channel."""
     print(f"[YTHistory] Scraping {forecaster.name}...")
 
-    videos = get_channel_videos(channel_info["youtube_id"], max_results=50)
+    videos = get_channel_videos(channel_info["youtube_id"], max_results=5)
     added = 0
 
     for video in videos:
@@ -274,8 +274,23 @@ def scrape_channel_history(forecaster: Forecaster, channel_info: dict, db: Sessi
 
 
 def run_youtube_history(db: Session):
-    """Run historical import for all 20 channels."""
-    print("[YTHistory] Starting 1-year historical import...")
+    """Run historical import for all channels."""
+    print(f"[YTHistory] Starting import. API key set: {bool(YOUTUBE_API_KEY)}. Channels: {len(CHANNELS)}")
+
+    # Only run once per 24 hours — check config table
+    try:
+        from sqlalchemy import text as _yt
+        last_run = db.execute(_yt("SELECT value FROM config WHERE key = 'youtube_history_last_run'")).fetchone()
+        if last_run:
+            from datetime import datetime as _dt
+            last = _dt.strptime(last_run[0], "%Y-%m-%d %H:%M:%S")
+            hours_ago = (datetime.utcnow() - last).total_seconds() / 3600
+            if hours_ago < 24:
+                print(f"[YTHistory] Last ran {hours_ago:.1f}h ago, skipping (runs once/24h)")
+                return
+    except Exception:
+        pass  # config table may not exist or no row yet
+
     total = 0
 
     for channel_info in CHANNELS:
@@ -295,4 +310,13 @@ def run_youtube_history(db: Session):
             print(f"[YTHistory] Error for {channel_info['name']}: {e}")
             db.rollback()
 
+    # Save last run time
+    try:
+        from sqlalchemy import text as _yt2
+        db.execute(_yt2("DELETE FROM config WHERE key = 'youtube_history_last_run'"))
+        db.execute(_yt2("INSERT INTO config (key, value) VALUES ('youtube_history_last_run', :ts)"),
+                   {"ts": datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")})
+        db.commit()
+    except Exception:
+        pass
     print(f"[YTHistory] Done! Total predictions added: {total}")

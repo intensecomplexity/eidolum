@@ -214,7 +214,7 @@ def scrape_reddit(db: Session):
     print("[Scraper] Reddit done")
 
 def run_scraper(db: Session):
-    print("[Scraper] Starting...")
+    print(f"[Scraper] Starting hourly run at {datetime.utcnow()}")
     scrape_twitter(db)
     scrape_youtube(db)
     scrape_reddit(db)
@@ -273,4 +273,5 @@ def run_scraper(db: Session):
         scrape_finviz_upgrades(db)
     except Exception as e:
         print(f"[Scraper] Finviz error (non-fatal): {e}")
-    print("[Scraper] All done")
+    count = db.query(Prediction).count()
+    print(f"[Scraper] Hourly run complete. Total predictions in DB: {count}")

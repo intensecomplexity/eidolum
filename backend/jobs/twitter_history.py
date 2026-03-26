@@ -42,25 +42,31 @@ def get_user_id(handle: str, headers: dict) -> str | None:
 
 
 def scrape_twitter_history(db: Session):
-    """Scrape up to 1 year of tweets from tracked Twitter/X accounts."""
+    """Scrape recent tweets from tracked Twitter/X accounts."""
     if not TWITTER_BEARER:
         print("[TwitterHistory] No TWITTER_BEARER_TOKEN, skipping")
         return
 
+    import time
     headers = {"Authorization": f"Bearer {TWITTER_BEARER}"}
     total = 0
+    scraped = 0
+    skipped = 0
 
     forecasters = db.query(Forecaster).filter(
         Forecaster.channel_url.contains("x.com")
     ).all()
+    print(f"[TwitterHistory] Found {len(forecasters)} Twitter accounts to scrape")
+
     for forecaster in forecasters:
         handle = forecaster.channel_url.rstrip("/").split("/")[-1]
         if not handle:
+            skipped += 1
             continue
 
         user_id = get_user_id(handle, headers)
         if not user_id:
-            print(f"[TwitterHistory] User ID not found: {handle}")
+            skipped += 1
             continue
 
         try:
@@ -68,14 +74,25 @@ def scrape_twitter_history(db: Session):
                 f"https://api.twitter.com/2/users/{user_id}/tweets",
                 headers=headers,
                 params={
-                    "max_results": 100,
+                    "max_results": 10,
                     "tweet.fields": "created_at,text",
                     "exclude": "retweets,replies",
-                    "start_time": (datetime.utcnow() - timedelta(days=365)).strftime("%Y-%m-%dT%H:%M:%SZ"),
                 },
-                timeout=15
+                timeout=15,
             )
+
+            if r.status_code == 429:
+                print(f"[TwitterHistory] Rate limited after {scraped} accounts. Stopping.")
+                break
+
+            if r.status_code != 200:
+                print(f"[TwitterHistory] API error {r.status_code} for {handle}: {r.text[:200]}")
+                skipped += 1
+                time.sleep(1)
+                continue
+
             tweets = r.json().get("data", [])
+            scraped += 1
 
             added = 0
             for tweet in tweets:
@@ -129,7 +146,9 @@ def scrape_twitter_history(db: Session):
             print(f"[TwitterHistory] Error for {handle}: {e}")
             db.rollback()
 
-    print(f"[TwitterHistory] Done! Total predictions added: {total}")
+        time.sleep(1)  # Rate limit courtesy
+
+    print(f"[TwitterHistory] Done! Scraped {scraped}, skipped {skipped}, added {total} predictions")
 
 
 # ── Nitter fallback — scrapes public HTML when Twitter API is unavailable ─────
