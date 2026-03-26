@@ -206,7 +206,7 @@ def run_scraper(db: Session):
     print(f"[Scraper] Starting hourly run at {datetime.utcnow()}")
     scrape_twitter(db)
     scrape_youtube(db)
-    scrape_reddit(db)
+    # scrape_reddit removed — replaced by magazine/Finnhub data
     try:
         from jobs.quiver_scraper import scrape_congress_trades
         scrape_congress_trades(db)
@@ -222,11 +222,7 @@ def run_scraper(db: Session):
         scrape_twitter_history(db)
     except Exception as e:
         print(f"[Scraper] Twitter history error (non-fatal): {e}")
-    try:
-        from jobs.reddit_history import scrape_reddit_history
-        scrape_reddit_history(db)
-    except Exception as e:
-        print(f"[Scraper] Reddit history error (non-fatal): {e}")
+    # Reddit history removed — replaced by magazine/Finnhub data
     try:
         from jobs.analyst_targets import scrape_analyst_targets
         scrape_analyst_targets(db)
@@ -248,10 +244,10 @@ def run_scraper(db: Session):
     except Exception as e:
         print(f"[Scraper] TipRanks/Benzinga error (non-fatal): {e}")
     try:
-        from jobs.reddit_expanded import scrape_reddit_expanded
-        scrape_reddit_expanded(db)
+        from jobs.seed_magazines import seed_finnhub_predictions
+        seed_finnhub_predictions(db)
     except Exception as e:
-        print(f"[Scraper] Reddit expanded error (non-fatal): {e}")
+        print(f"[Scraper] Magazine/Finnhub seed error (non-fatal): {e}")
     try:
         from jobs.substack_scraper import scrape_substacks
         scrape_substacks(db)

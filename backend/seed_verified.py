@@ -72,22 +72,10 @@ VERIFIED_PREDICTIONS = [
         "evaluation_date": datetime.datetime(2021, 10, 18),
         "sector": "Crypto",
     },
-    {
-        "forecaster_name": "WSB Consensus",
-        "exact_quote": "GME is massively shorted. This could be the biggest short squeeze in history.",
-        "source_url": "https://www.reddit.com/r/wallstreetbets/comments/l6xnte/gme_yolo_update_jan_25_2021/",
-        "source_type": "reddit",
-        "source_platform_id": "l6xnte",
-        "ticker": "GME",
-        "direction": "bullish",
-        "entry_price": 76.0,
-        "prediction_date": datetime.datetime(2021, 1, 25),
-        "window_days": 30,
-        "outcome": "correct",
-        "actual_return": 330.0,
-        "evaluation_date": datetime.datetime(2021, 1, 28),
-        "sector": "Meme",
-    },
+    # WSB/Reddit entries removed — replaced by magazine forecasters
+]
+
+_REMOVED = [
     {
         "forecaster_name": "WSB Consensus",
         "exact_quote": "AMC to the moon. Apes together strong.",

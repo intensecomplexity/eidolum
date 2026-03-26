@@ -316,6 +316,29 @@ async def lifespan(app):
         log_archive_status()
     except Exception:
         pass
+    # ONE-TIME: Remove Reddit forecasters and predictions (replaced by magazines)
+    try:
+        from sqlalchemy import text as _rd
+        db = SessionLocal()
+        reddit_count = db.execute(_rd("SELECT COUNT(*) FROM forecasters WHERE platform = 'reddit'")).scalar()
+        if reddit_count > 0:
+            r1 = db.execute(_rd("DELETE FROM predictions WHERE forecaster_id IN (SELECT id FROM forecasters WHERE platform = 'reddit')"))
+            r2 = db.execute(_rd("DELETE FROM forecasters WHERE platform = 'reddit'"))
+            r3 = db.execute(_rd("DELETE FROM predictions WHERE forecaster_id IN (SELECT id FROM forecasters WHERE name LIKE '%WSB%')"))
+            r4 = db.execute(_rd("DELETE FROM forecasters WHERE name LIKE '%WSB%'"))
+            db.commit()
+            print(f"[Migration] Removed {r1.rowcount} Reddit predictions, {r2.rowcount} Reddit forecasters, WSB entries cleaned")
+        db.close()
+    except Exception as e:
+        print(f"[Migration] Reddit cleanup error (non-fatal): {e}")
+    # Seed magazine forecasters
+    try:
+        db = SessionLocal()
+        from jobs.seed_magazines import seed_magazine_forecasters
+        seed_magazine_forecasters(db)
+        db.close()
+    except Exception as e:
+        print(f"[Eidolum] Magazine seed error (non-fatal): {e}")
     # Clear old config flag if it exists
     try:
         from sqlalchemy import text as _text
@@ -381,14 +404,12 @@ async def lifespan(app):
             print(f"[Eidolum] Background import starting — {pred_count} predictions exist")
             if pred_count < 5000:
                 from jobs.youtube_history import run_youtube_history
-                from jobs.reddit_history import scrape_reddit_history
                 run_youtube_history(db)
-                scrape_reddit_history(db)
                 try:
-                    from jobs.reddit_expanded import scrape_reddit_expanded
-                    scrape_reddit_expanded(db)
+                    from jobs.seed_magazines import seed_finnhub_predictions
+                    seed_finnhub_predictions(db)
                 except Exception as e:
-                    print(f"[Background] Reddit expanded error: {e}")
+                    print(f"[Background] Magazine seed error: {e}")
                 try:
                     from jobs.substack_scraper import scrape_substacks
                     scrape_substacks(db)
