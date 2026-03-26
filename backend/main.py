@@ -442,9 +442,12 @@ async def lifespan(app):
     if not os.getenv("ADMIN_SECRET"):
         print("[WARNING] ADMIN_SECRET not set — admin routes are unprotected!")
     # Start background job scheduler
+    from admin_panel import scheduler_last_run
+
     def run_fast_scraper():
         from datetime import datetime as _dt
         print(f"[Scheduler] Running fast scraper at {_dt.utcnow()}")
+        scheduler_last_run["fast_scraper"] = _dt.utcnow()
         from jobs.news_scraper import scrape_fast_predictions
         db = SessionLocal()
         try:
@@ -457,6 +460,7 @@ async def lifespan(app):
     def run_hourly_scraper():
         from datetime import datetime as _dt
         print(f"[Scheduler] Running full scraper at {_dt.utcnow()}")
+        scheduler_last_run["full_scraper"] = _dt.utcnow()
         db = SessionLocal()
         try:
             run_scraper(db)
@@ -466,6 +470,7 @@ async def lifespan(app):
     def run_15min_evaluator():
         from datetime import datetime as _dt
         print(f"[Scheduler] Running evaluator at {_dt.utcnow()}")
+        scheduler_last_run["evaluator"] = _dt.utcnow()
         db = SessionLocal()
         try:
             run_evaluator(db)
@@ -477,7 +482,16 @@ async def lifespan(app):
     scheduler.add_job(run_hourly_scraper, "interval", hours=1, id="scraper")
     scheduler.add_job(run_fast_scraper, "interval", minutes=15, id="fast_scraper")
     scheduler.add_job(run_15min_evaluator, "interval", minutes=15, id="evaluator")
-    scheduler.add_job(lambda: run_leaderboard_refresh(SessionLocal()), "interval", hours=1, id="leaderboard")
+    def run_hourly_leaderboard():
+        from datetime import datetime as _dt
+        scheduler_last_run["leaderboard"] = _dt.utcnow()
+        db = SessionLocal()
+        try:
+            run_leaderboard_refresh(db)
+        finally:
+            db.close()
+
+    scheduler.add_job(run_hourly_leaderboard, "interval", hours=1, id="leaderboard")
     scheduler.add_job(lambda: run_newsletter(SessionLocal()), "cron", hour=8, minute=0, id="newsletter")
     scheduler.start()
     print(f"[STARTUP] Jobs registered: {[j.id for j in scheduler.get_jobs()]}")

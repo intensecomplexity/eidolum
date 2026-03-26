@@ -1,15 +1,16 @@
 """
 Server-side admin panel — pure HTML served by FastAPI at /admin.
-No React, no frontend code. Only accessible with ADMIN_SECRET.
+Also provides API endpoints for the React admin page at /admin on frontend.
 """
 import os
 from datetime import datetime
-from typing import Optional
+from typing import Optional, List
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
+from sqlalchemy import or_
 
 from database import get_db
 from middleware.auth import require_admin
@@ -17,41 +18,60 @@ from models import Prediction, Forecaster
 
 router = APIRouter()
 
-# ---------------------------------------------------------------------------
-# API endpoints for the admin panel JS
-# ---------------------------------------------------------------------------
+# Global scheduler timestamps — updated by job wrappers in main.py
+scheduler_last_run = {}
 
 
 @router.get("/api/admin/predictions")
 def list_predictions_admin(
-    limit: int = 500,
+    page: int = Query(1, ge=1),
+    per_page: int = Query(50, ge=1, le=200),
+    search: str = Query(""),
     admin=Depends(require_admin),
     db: Session = Depends(get_db),
 ):
+    query = db.query(Prediction, Forecaster).join(
+        Forecaster, Prediction.forecaster_id == Forecaster.id
+    )
+    if search:
+        term = f"%{search}%"
+        query = query.filter(
+            or_(
+                Prediction.ticker.ilike(term),
+                Prediction.context.ilike(term),
+                Forecaster.name.ilike(term),
+            )
+        )
+    total = query.count()
     rows = (
-        db.query(Prediction, Forecaster)
-        .join(Forecaster, Prediction.forecaster_id == Forecaster.id)
-        .order_by(Prediction.id.desc())
-        .limit(limit)
+        query.order_by(Prediction.id.desc())
+        .offset((page - 1) * per_page)
+        .limit(per_page)
         .all()
     )
-    return [
-        {
-            "id": p.id,
-            "forecaster_id": p.forecaster_id,
-            "forecaster_name": f.name,
-            "exact_quote": p.exact_quote,
-            "context": p.context,
-            "source_url": p.source_url,
-            "archive_url": p.archive_url,
-            "ticker": p.ticker,
-            "direction": p.direction,
-            "target_price": float(p.target_price) if p.target_price else None,
-            "outcome": p.outcome,
-            "prediction_date": str(p.prediction_date)[:10] if p.prediction_date else None,
-        }
-        for p, f in rows
-    ]
+    return {
+        "predictions": [
+            {
+                "id": p.id,
+                "forecaster_id": p.forecaster_id,
+                "forecaster_name": f.name,
+                "exact_quote": p.exact_quote,
+                "context": p.context,
+                "source_url": p.source_url,
+                "archive_url": p.archive_url,
+                "ticker": p.ticker,
+                "direction": p.direction,
+                "target_price": float(p.target_price) if p.target_price else None,
+                "outcome": p.outcome,
+                "prediction_date": str(p.prediction_date)[:10] if p.prediction_date else None,
+            }
+            for p, f in rows
+        ],
+        "total": total,
+        "page": page,
+        "per_page": per_page,
+        "total_pages": (total + per_page - 1) // per_page if total > 0 else 0,
+    }
 
 
 @router.delete("/api/admin/predictions/{prediction_id}")
@@ -76,10 +96,60 @@ def delete_prediction_admin(
     return {"status": "deleted", "id": prediction_id}
 
 
+class BulkDeleteRequest(BaseModel):
+    ids: List[int]
+
+
+@router.delete("/api/admin/predictions/bulk")
+def bulk_delete_predictions(
+    data: BulkDeleteRequest,
+    admin=Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    deleted = 0
+    for pid in data.ids:
+        p = db.query(Prediction).filter(Prediction.id == pid).first()
+        if p:
+            db.delete(p)
+            deleted += 1
+    db.commit()
+    return {"status": "deleted", "count": deleted}
+
+
+@router.get("/api/admin/scheduler-status")
+def get_scheduler_status(admin=Depends(require_admin)):
+    """Return status of all scheduled jobs with last_run timestamps."""
+    jobs = [
+        {"id": "full_scraper", "name": "Full Scraper", "interval_minutes": 60},
+        {"id": "fast_scraper", "name": "Fast Scraper", "interval_minutes": 15},
+        {"id": "evaluator", "name": "Evaluator", "interval_minutes": 15},
+        {"id": "leaderboard", "name": "Leaderboard Refresh", "interval_minutes": 60},
+    ]
+    now = datetime.utcnow()
+    result = []
+    for job in jobs:
+        last_run = scheduler_last_run.get(job["id"])
+        next_run = None
+        if last_run:
+            from datetime import timedelta
+            next_run = last_run + timedelta(minutes=job["interval_minutes"])
+        result.append({
+            "id": job["id"],
+            "name": job["name"],
+            "interval_minutes": job["interval_minutes"],
+            "last_run": last_run.isoformat() if last_run else None,
+            "next_run": next_run.isoformat() if next_run else None,
+            "status": "ok" if last_run and (now - last_run).total_seconds() < job["interval_minutes"] * 120 else "unknown",
+        })
+    return result
+
+
 class PredictionCreate(BaseModel):
-    forecaster_id: int
+    forecaster_id: Optional[int] = None
+    forecaster_name: Optional[str] = None
     exact_quote: str
     source_url: str
+    archive_url: Optional[str] = None
     ticker: str
     direction: str = "bullish"
     target_price: Optional[float] = None
@@ -94,7 +164,11 @@ def create_prediction_admin(
     admin=Depends(require_admin),
     db: Session = Depends(get_db),
 ):
-    forecaster = db.query(Forecaster).filter(Forecaster.id == data.forecaster_id).first()
+    forecaster = None
+    if data.forecaster_id:
+        forecaster = db.query(Forecaster).filter(Forecaster.id == data.forecaster_id).first()
+    elif data.forecaster_name:
+        forecaster = db.query(Forecaster).filter(Forecaster.name.ilike(data.forecaster_name)).first()
     if not forecaster:
         raise HTTPException(status_code=404, detail="Forecaster not found")
 
@@ -113,7 +187,7 @@ def create_prediction_admin(
         direction = "bearish"
 
     p = Prediction(
-        forecaster_id=data.forecaster_id,
+        forecaster_id=forecaster.id,
         exact_quote=data.exact_quote,
         context=data.exact_quote[:200],
         source_url=data.source_url,
@@ -125,23 +199,27 @@ def create_prediction_admin(
         window_days=data.window_days,
         verified_by="manual",
     )
+    if data.archive_url:
+        p.archive_url = data.archive_url
+
     db.add(p)
     db.flush()
 
-    # Archive proof immediately
-    try:
-        from archiver.screenshot import archive_proof_sync
-        archive_url = archive_proof_sync(
-            data.source_url, p.id,
-            exact_quote=data.exact_quote,
-            forecaster_name=forecaster.name,
-            prediction_date=str(pred_date.date()),
-        )
-        if archive_url:
-            p.archive_url = archive_url
-            p.archived_at = datetime.utcnow()
-    except Exception as e:
-        print(f"[Admin] Archive error: {e}")
+    # Archive proof if not provided
+    if not p.archive_url:
+        try:
+            from archiver.screenshot import archive_proof_sync
+            archive_url = archive_proof_sync(
+                data.source_url, p.id,
+                exact_quote=data.exact_quote,
+                forecaster_name=forecaster.name,
+                prediction_date=str(pred_date.date()),
+            )
+            if archive_url:
+                p.archive_url = archive_url
+                p.archived_at = datetime.utcnow()
+        except Exception as e:
+            print(f"[Admin] Archive error: {e}")
 
     db.commit()
 

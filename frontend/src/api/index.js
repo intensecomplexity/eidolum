@@ -143,5 +143,31 @@ export function getInversePortfolio(forecasterId, startingAmount = 10000) {
   return api.get(`/inverse-portfolio/${forecasterId}`, { params: { starting_amount: startingAmount } }).then(r => r.data);
 }
 
+// Admin API (requires Bearer token in sessionStorage)
+function adminHeaders() {
+  const token = sessionStorage.getItem('admin_token') || '';
+  return { Authorization: `Bearer ${token}` };
+}
+
+export function getAdminPredictions(params = {}) {
+  return api.get('/admin/predictions', { params, headers: adminHeaders() }).then(r => r.data);
+}
+
+export function deleteAdminPrediction(id) {
+  return api.delete(`/admin/predictions/${id}`, { headers: adminHeaders() }).then(r => r.data);
+}
+
+export function bulkDeletePredictions(ids) {
+  return api.delete('/admin/predictions/bulk', { data: { ids }, headers: adminHeaders() }).then(r => r.data);
+}
+
+export function createAdminPrediction(data) {
+  return api.post('/admin/predictions', data, { headers: adminHeaders() }).then(r => r.data);
+}
+
+export function getSchedulerStatus() {
+  return api.get('/admin/scheduler-status', { headers: adminHeaders() }).then(r => r.data);
+}
+
 export default api;
 export { API_BASE };
