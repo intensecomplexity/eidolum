@@ -54,56 +54,22 @@ def safety_check(db):
 
 
 def init_db():
-    """Create tables and optionally seed — with retry for Postgres startup delay."""
-    # NEVER drop or truncate any table — ONLY create tables that don't exist yet
-    for attempt in range(5):
-        try:
-            Base.metadata.create_all(bind=engine)
-            print(f"[Eidolum] Database tables created (attempt {attempt + 1}).")
-            break
-        except Exception as e:
-            print(f"[Eidolum] DB connect attempt {attempt + 1} failed: {e}")
-            if attempt < 4:
-                time.sleep(2)
-            else:
-                print("[Eidolum] WARNING: Could not connect to database after 5 attempts.")
-                return
-
-    # Auto-seed if SEED_DATA=true
-    if os.getenv("SEED_DATA", "").lower() in ("true", "1", "yes"):
-        db = SessionLocal()
-        try:
-            forecaster_count = db.query(Forecaster).count()
-            prediction_count = db.query(Prediction).count()
-
-            if forecaster_count == 0:
-                # Fresh DB — seed everything
-                print(f"[Eidolum] DB empty — running full seed...")
-                subprocess.run(
-                    [sys.executable, "seed.py"],
-                    check=True,
-                    cwd=os.path.dirname(os.path.abspath(__file__)),
-                )
-                print("[Eidolum] Full seed complete.")
-
-            elif prediction_count == 0 and forecaster_count > 0:
-                # Forecasters exist but predictions missing — verified reseed handles this
-                print(f"[Eidolum] {forecaster_count} forecasters but 0 predictions — verified reseed will handle this.")
-
-            else:
-                print(f"[Eidolum] DB healthy: {forecaster_count} forecasters, "
-                      f"{prediction_count} predictions — skipping seed.")
-        except Exception as e:
-            print(f"[Eidolum] Seed error (non-fatal): {e}")
-        finally:
-            db.close()
-
-    # Run safety check (informational only — verified reseed handles data)
-    db = SessionLocal()
+    """Create tables — single attempt, no blocking retries."""
     try:
-        safety_check(db)
-    finally:
+        Base.metadata.create_all(bind=engine)
+        print("[Eidolum] Database tables ready.")
+    except Exception as e:
+        print(f"[Eidolum] WARNING: Could not create tables: {e}")
+        return
+
+    try:
+        db = SessionLocal()
+        fc = db.query(Forecaster).count()
+        pc = db.query(Prediction).count()
+        print(f"[Eidolum] DB state: {fc} forecasters, {pc} predictions")
         db.close()
+    except Exception as e:
+        print(f"[Eidolum] DB check error (non-fatal): {e}")
 
 
 def migrate_platform_types():
@@ -289,8 +255,14 @@ def migrate_profile_urls():
 @asynccontextmanager
 async def lifespan(app):
     init_db()
-    migrate_platform_types()
-    migrate_profile_urls()
+    try:
+        migrate_platform_types()
+    except Exception as e:
+        print(f"[Eidolum] Platform migration error (non-fatal): {e}")
+    try:
+        migrate_profile_urls()
+    except Exception as e:
+        print(f"[Eidolum] Profile URL migration error (non-fatal): {e}")
     # Wipe fake predictions (keeps only those with real source URLs)
     try:
         db = SessionLocal()
