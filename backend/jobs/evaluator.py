@@ -15,25 +15,30 @@ _price_cache = {}
 
 
 def get_current_price(ticker: str) -> float | None:
-    """Fetch current price from Alpha Vantage. Returns None if unavailable."""
-    if not ALPHA_VANTAGE_KEY:
-        return None
-
+    """Fetch current price. Tries Alpha Vantage first, falls back to yfinance (free)."""
     if ticker in _price_cache:
         return _price_cache[ticker]
 
+    # Try Alpha Vantage if key is set
+    if ALPHA_VANTAGE_KEY:
+        try:
+            r = httpx.get(
+                "https://www.alphavantage.co/query",
+                params={"function": "GLOBAL_QUOTE", "symbol": ticker, "apikey": ALPHA_VANTAGE_KEY},
+                timeout=10,
+            )
+            price = r.json().get("Global Quote", {}).get("05. price")
+            if price:
+                result = float(price)
+                _price_cache[ticker] = result
+                return result
+        except Exception:
+            pass
+
+    # Fallback to yfinance (free, no key needed)
     try:
-        r = httpx.get(
-            "https://www.alphavantage.co/query",
-            params={
-                "function": "GLOBAL_QUOTE",
-                "symbol": ticker,
-                "apikey": ALPHA_VANTAGE_KEY,
-            },
-            timeout=10,
-        )
-        price = r.json().get("Global Quote", {}).get("05. price")
-        result = float(price) if price else None
+        from jobs.price_checker import get_current_price as yf_price
+        result = yf_price(ticker)
         _price_cache[ticker] = result
         return result
     except Exception:

@@ -410,8 +410,12 @@ async def lifespan(app):
                 except Exception as e:
                     print(f"[Background] TipRanks error: {e}")
                 print("[Eidolum] Background historical import complete")
-            else:
-                print(f"[Eidolum] Skipping historical import — {pred_count} predictions already exist")
+            # Always evaluate pending predictions (uses yfinance, free)
+            try:
+                from jobs.evaluate_predictions import evaluate_all_pending
+                evaluate_all_pending(db)
+            except Exception as e:
+                print(f"[Background] Evaluator error: {e}")
             db.close()
         except Exception as e:
             print(f"[Eidolum] Background import error: {e}")

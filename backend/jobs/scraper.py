@@ -273,5 +273,17 @@ def run_scraper(db: Session):
         archive_missing_proofs(db)
     except Exception as e:
         print(f"[Scraper] Archive missing proofs error (non-fatal): {e}")
+    # Finnhub analyst data
+    try:
+        from jobs.finnhub_scraper import scrape_finnhub_analysts
+        scrape_finnhub_analysts(db)
+    except Exception as e:
+        print(f"[Scraper] Finnhub error (non-fatal): {e}")
+    # Evaluate pending predictions against real prices
+    try:
+        from jobs.evaluate_predictions import evaluate_all_pending
+        evaluate_all_pending(db)
+    except Exception as e:
+        print(f"[Scraper] Evaluator error (non-fatal): {e}")
     count = db.query(Prediction).count()
     print(f"[Scraper] Hourly run complete. Total predictions in DB: {count}")
