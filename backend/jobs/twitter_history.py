@@ -50,14 +50,12 @@ def scrape_twitter_history(db: Session):
     headers = {"Authorization": f"Bearer {TWITTER_BEARER}"}
     total = 0
 
-    for account in TWITTER_ACCOUNTS:
-        handle = account["handle"]
-        first_name = account["name"].split()[0]
-        forecaster = db.query(Forecaster).filter(
-            Forecaster.name.ilike(f"%{first_name}%")
-        ).first()
-        if not forecaster:
-            print(f"[TwitterHistory] Forecaster not found: {account['name']}")
+    forecasters = db.query(Forecaster).filter(
+        Forecaster.channel_url.contains("x.com")
+    ).all()
+    for forecaster in forecasters:
+        handle = forecaster.channel_url.rstrip("/").split("/")[-1]
+        if not handle:
             continue
 
         user_id = get_user_id(handle, headers)
@@ -263,18 +261,17 @@ def scrape_via_nitter_all(db: Session):
     print(f"[Nitter] Using {nitter_base}")
     total = 0
 
-    for account in TWITTER_ACCOUNTS:
-        handle = account["handle"]
-        first_name = account["name"].split()[0]
-        forecaster = db.query(Forecaster).filter(
-            Forecaster.name.ilike(f"%{first_name}%")
-        ).first()
-        if not forecaster:
+    forecasters = db.query(Forecaster).filter(
+        Forecaster.channel_url.contains("x.com")
+    ).all()
+    for forecaster in forecasters:
+        handle = forecaster.channel_url.rstrip("/").split("/")[-1]
+        if not handle:
             continue
 
         added = scrape_via_nitter(handle, forecaster.id, nitter_base, db)
         if added:
-            print(f"[Nitter] {account['name']}: {added} predictions")
+            print(f"[Nitter] {forecaster.name}: {added} predictions")
         total += added
 
     print(f"[Nitter] Done! Total predictions added: {total}")

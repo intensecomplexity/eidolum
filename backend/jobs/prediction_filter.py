@@ -58,3 +58,27 @@ def is_valid_prediction(text: str) -> bool:
 
 # Backward-compatible alias so existing imports don't break
 is_prediction = is_valid_prediction
+
+
+# Looser filter for YouTube transcript segments — spoken language is less precise
+_YT_ASSET = re.compile(
+    r'(\$[A-Z]{1,5}|bitcoin|btc|ethereum|eth|tesla|nvidia|apple|amazon|'
+    r'microsoft|google|meta|s&p|nasdaq|market|stock|crypto|shares|'
+    r'price|trade|invest)',
+    re.IGNORECASE,
+)
+
+_YT_DIRECTION = re.compile(
+    r'(bull|bear|buy|sell|long|short|up|down|higher|lower|'
+    r'target|forecast|expect|think|believe|predict|'
+    r'overvalued|undervalued|cheap|expensive|'
+    r'going to|will|could reach|might hit)',
+    re.IGNORECASE,
+)
+
+
+def is_valid_youtube_prediction(text: str) -> bool:
+    """Looser filter for YouTube transcript segments."""
+    if not text or len(text) < 30:
+        return False
+    return bool(_YT_ASSET.search(text) and _YT_DIRECTION.search(text))
