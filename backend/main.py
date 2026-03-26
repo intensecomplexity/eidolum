@@ -480,12 +480,13 @@ app.add_middleware(
     allow_origins=[
         "https://www.eidolum.com",
         "https://eidolum.com",
+        "https://eidolum.vercel.app",
         "https://api.eidolum.com",
         "http://localhost:5173",
         "http://localhost:3000",
     ],
     allow_credentials=True,
-    allow_methods=["GET", "POST", "DELETE", "PUT", "PATCH"],
+    allow_methods=["*"],
     allow_headers=["*"],
 )
 
