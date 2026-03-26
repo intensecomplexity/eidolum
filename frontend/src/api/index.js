@@ -1,8 +1,10 @@
-// Build: 2026-03-26 api=railway-direct
+// API configuration - using Railway URL directly
 import axios from 'axios';
 
+const API_BASE = 'https://eidolum-production.up.railway.app';
+
 const api = axios.create({
-  baseURL: `${import.meta.env.VITE_API_URL || 'https://eidolum-production.up.railway.app'}/api`,
+  baseURL: `${API_BASE}/api`,
 });
 
 export function getLeaderboard(params = {}) {
@@ -134,3 +136,4 @@ export function getInversePortfolio(forecasterId, startingAmount = 10000) {
 }
 
 export default api;
+export { API_BASE };

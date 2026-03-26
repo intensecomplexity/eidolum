@@ -6,7 +6,7 @@ import PlatformBadge from './PlatformBadge';
 
 const HORIZON_LABELS = { short: '30d', medium: '90d', long: '1y', custom: 'Custom' };
 
-const API_BASE = import.meta.env.VITE_API_URL || 'https://api.eidolum.com';
+const API_BASE = 'https://eidolum-production.up.railway.app';
 
 function ProofBlock({ p }) {
   const source = p.source_url || '';
