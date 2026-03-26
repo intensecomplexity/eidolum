@@ -108,18 +108,12 @@ VERIFIED_PREDICTIONS = [
 
 
 def seed_verified():
-    """Insert verified predictions. Reseeds if fewer than 5 have real source URLs."""
+    """Insert verified predictions only if DB is completely empty."""
     db = SessionLocal()
     try:
-        from sqlalchemy import text
-        verified_count = db.execute(text("""
-            SELECT COUNT(*) FROM predictions
-            WHERE source_url LIKE '%/status/%'
-               OR source_url LIKE '%/watch?v=%'
-               OR source_url LIKE '%/comments/%'
-        """)).scalar()
-        if verified_count >= 1:
-            print(f"[Eidolum] {verified_count} verified predictions exist, skipping reseed")
+        total = db.query(Prediction).count()
+        if total > 0:
+            print(f"[Eidolum] {total} predictions exist, skipping seed_verified")
             return
 
         # Build name -> forecaster_id map
