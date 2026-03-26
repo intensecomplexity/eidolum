@@ -370,6 +370,11 @@ async def lifespan(app):
                     scrape_finviz_upgrades(db)
                 except Exception as e:
                     print(f"[Background] Finviz error: {e}")
+                try:
+                    from jobs.news_scraper import scrape_news_feeds
+                    scrape_news_feeds(db)
+                except Exception as e:
+                    print(f"[Background] News feeds error: {e}")
                 print("[Eidolum] Background historical import complete")
             else:
                 print(f"[Eidolum] Skipping historical import — {pred_count} predictions already exist")

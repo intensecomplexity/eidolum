@@ -271,5 +271,10 @@ def run_scraper(db: Session):
         scrape_finviz_upgrades(db)
     except Exception as e:
         print(f"[Scraper] Finviz error (non-fatal): {e}")
+    try:
+        from jobs.news_scraper import scrape_news_feeds
+        scrape_news_feeds(db)
+    except Exception as e:
+        print(f"[Scraper] News feeds error (non-fatal): {e}")
     count = db.query(Prediction).count()
     print(f"[Scraper] Hourly run complete. Total predictions in DB: {count}")

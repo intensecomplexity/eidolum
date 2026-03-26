@@ -213,6 +213,64 @@ a{{color:#4fbdff;text-decoration:none}}
     return f"/archive/{filename}"
 
 
+async def archive_article(source_url: str, prediction_id: int,
+                          exact_quote: str, forecaster_name: str,
+                          prediction_date: str) -> str | None:
+    """Save news article prediction as styled HTML evidence card."""
+    Path(ARCHIVE_DIR).mkdir(parents=True, exist_ok=True)
+    filename = f"p{prediction_id}_art_{hashlib.md5(source_url.encode()).hexdigest()[:8]}.html"
+    filepath = f"{ARCHIVE_DIR}/{filename}"
+
+    if Path(filepath).exists():
+        return f"/archive/{filename}"
+
+    # Detect source from URL
+    source_name = "Financial News"
+    for name, label in [
+        ("cnbc", "CNBC"), ("reuters", "Reuters"), ("marketwatch", "MarketWatch"),
+        ("yahoo", "Yahoo Finance"), ("benzinga", "Benzinga"), ("thestreet", "The Street"),
+        ("barrons", "Barron's"), ("wsj", "WSJ"), ("seekingalpha", "Seeking Alpha"),
+        ("investors.com", "IBD"),
+    ]:
+        if name in source_url.lower():
+            source_name = label
+            break
+
+    date_str = prediction_date[:10] if prediction_date else ""
+
+    html = f"""<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><title>Eidolum Proof — {source_name}</title>
+<style>
+body{{margin:0;padding:20px;background:#0a0a0a;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif}}
+.card{{background:#111;border:1px solid #222;border-radius:10px;max-width:600px;padding:20px;color:#e8e8e6}}
+.source{{font-size:11px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:#888;margin-bottom:12px}}
+.analyst{{font-size:13px;color:#00c896;font-weight:600;margin-bottom:4px}}
+.quote{{border-left:3px solid #00c896;padding:10px 14px;background:rgba(0,200,150,0.05);border-radius:0 6px 6px 0;font-style:italic;color:#ccc;font-size:14px;line-height:1.6;margin-bottom:14px}}
+.meta{{font-size:12px;color:#555;margin-top:12px}}
+.archived{{background:#0d2018;border:1px solid #00c896;border-radius:4px;padding:4px 10px;font-size:11px;color:#00c896;display:inline-block;margin-top:10px}}
+a{{color:#4fbdff;text-decoration:none}}
+</style></head><body>
+<div class="card">
+<div class="source">📰 {source_name}</div>
+<div class="analyst">{forecaster_name}</div>
+<div class="quote">"{exact_quote or ""}"</div>
+<div class="meta">{date_str} · <a href="{source_url}" target="_blank">Read full article ↗</a></div>
+<div class="archived">📁 Archived by Eidolum · {datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')}</div>
+</div></body></html>"""
+
+    with open(filepath, "w", encoding="utf-8") as f:
+        f.write(html)
+    print(f"[Archive] Article evidence card: {filename}")
+    return f"/archive/{filename}"
+
+
+_ARTICLE_DOMAINS = [
+    "cnbc.com", "reuters.com", "marketwatch.com", "yahoo.com",
+    "benzinga.com", "thestreet.com", "barrons.com", "wsj.com",
+    "seekingalpha.com", "investors.com",
+]
+
+
 async def take_screenshot(source_url: str, prediction_id: int,
                           exact_quote: str = "", forecaster_name: str = "",
                           prediction_date: str = "") -> str | None:
@@ -225,6 +283,8 @@ async def take_screenshot(source_url: str, prediction_id: int,
         return await archive_twitter(source_url, prediction_id, exact_quote, forecaster_name, prediction_date)
     elif "reddit.com" in source_url:
         return await archive_reddit(source_url, prediction_id, exact_quote, forecaster_name, prediction_date)
+    elif any(d in source_url for d in _ARTICLE_DOMAINS):
+        return await archive_article(source_url, prediction_id, exact_quote, forecaster_name, prediction_date)
     return None
 
 
