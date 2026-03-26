@@ -45,6 +45,27 @@ CHANNELS = [
     {"name": "Josh Brown",          "youtube_id": "UCFq9-bHLdkwlDoUPVX1Z8kw"},
     {"name": "James Shack",         "youtube_id": "UCUfFy_oJEY4LL8E0GUCN89A"},
     {"name": "Jeremy Financial",    "youtube_id": "UCl8M_1cdkKyHBFfvRNsPEKQ"},
+    # ── Additional channels ──
+    {"name": "Aswath Damodaran",    "youtube_id": "UCLvnJL8htRR1T9cbpqa9NfA"},
+    {"name": "Ricky Gutierrez",     "youtube_id": "UCL4hHBwEfOSMdKFZ5nT0eKQ"},
+    {"name": "ZipTrader",           "youtube_id": "UC4OYk0qDMRJAHOJrq-K_cNQ"},
+    {"name": "Chris Camillo",       "youtube_id": "UCXmv47qb1YJz2j4SDWV7f5g"},
+    {"name": "Invest Answers",      "youtube_id": "UCSC7H9EIW3ELTPJsPCXHmvQ"},
+    {"name": "Warrior Trading",     "youtube_id": "UCG0B94cJcG7TtJLCBBNB5FQ"},
+    {"name": "Humbled Trader",      "youtube_id": "UC8xGFgr6cpQTFvJI_yXAsvg"},
+    {"name": "SMB Capital",         "youtube_id": "UCnlgOetqPaKPp8P6vmKH9KA"},
+    {"name": "Real Vision",         "youtube_id": "UCBMR4a_o5JD2HBXwgX0R6Dg"},
+    {"name": "Tastytrade",          "youtube_id": "UCBGiO7dC4LYb0j2s6FpK1Uw"},
+    {"name": "Market Rebellion",    "youtube_id": "UCHJqEThFYxTDTkCGicT5_DA"},
+    {"name": "Peter Schiff",        "youtube_id": "UCIGirOl2Eg3MdKVbKFMz5_A"},
+    {"name": "Raoul Pal",           "youtube_id": "UCBMR4a_o5JD2HBXwgX0R6Dg"},
+    {"name": "Anthony Pompliano",   "youtube_id": "UCMtJYS0PrtiUwlk6lGq4MXw"},
+    {"name": "Scott Galloway",      "youtube_id": "UCpCb_2_ypH6YuHkNj91_hSQ"},
+    {"name": "Coin Bureau",         "youtube_id": "UCqK_GSMbpiV8spgD3ZGloSw"},
+    {"name": "Benjamin Cowen",      "youtube_id": "UCRvqjQPSeaWn-uEx-w0XOIg"},
+    {"name": "DataDash",            "youtube_id": "UCCatR7nWbYrkVXdxXb4cGXg"},
+    {"name": "Adam Khoo",           "youtube_id": "UC4TcsiVnIGMCejOJMv1s2qw"},
+    {"name": "Financial Education", "youtube_id": "UCnMn36GT_H0X-w5_ckLtlgQ"},
 ]
 
 

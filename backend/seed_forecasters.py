@@ -95,6 +95,15 @@ NEW_FORECASTERS = [
     # --- PREDICTION MARKETS ---
     {"name": "Kalshi Prediction Markets", "handle": "KalshiMarkets",    "platform": "institutional", "channel_url": "https://kalshi.com"},
     {"name": "Polymarket",             "handle": "Polymarket",          "platform": "institutional", "channel_url": "https://polymarket.com"},
+    # --- REDDIT COMMUNITIES ---
+    {"name": "Roaring Kitty",          "handle": "TheRoaringKitty",     "platform": "reddit", "channel_url": "https://www.reddit.com/user/DeepFuckingValue"},
+    {"name": "r/SecurityAnalysis",     "handle": "r_SecurityAnalysis",  "platform": "reddit", "channel_url": "https://www.reddit.com/r/SecurityAnalysis"},
+    {"name": "r/ValueInvesting",       "handle": "r_ValueInvesting",    "platform": "reddit", "channel_url": "https://www.reddit.com/r/ValueInvesting"},
+    {"name": "r/options",              "handle": "r_options",            "platform": "reddit", "channel_url": "https://www.reddit.com/r/options"},
+    {"name": "r/Bitcoin",              "handle": "r_Bitcoin",            "platform": "reddit", "channel_url": "https://www.reddit.com/r/Bitcoin"},
+    {"name": "r/CryptoCurrency",       "handle": "r_CryptoCurrency",    "platform": "reddit", "channel_url": "https://www.reddit.com/r/CryptoCurrency"},
+    # --- INSTITUTIONAL (analyst aggregator) ---
+    {"name": "Wall Street Analysts",   "handle": "WallStAnalysts",      "platform": "institutional", "channel_url": "https://x.com/Benzinga"},
 ]
 
 

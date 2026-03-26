@@ -253,4 +253,24 @@ def run_scraper(db: Session):
         scrape_earnings_calls(db)
     except Exception as e:
         print(f"[Scraper] Earnings calls error (non-fatal): {e}")
+    try:
+        from jobs.tipranks_scraper import scrape_tipranks
+        scrape_tipranks(db)
+    except Exception as e:
+        print(f"[Scraper] TipRanks/Benzinga error (non-fatal): {e}")
+    try:
+        from jobs.reddit_expanded import scrape_reddit_expanded
+        scrape_reddit_expanded(db)
+    except Exception as e:
+        print(f"[Scraper] Reddit expanded error (non-fatal): {e}")
+    try:
+        from jobs.substack_scraper import scrape_substacks
+        scrape_substacks(db)
+    except Exception as e:
+        print(f"[Scraper] Substack error (non-fatal): {e}")
+    try:
+        from jobs.finviz_scraper import scrape_finviz_upgrades
+        scrape_finviz_upgrades(db)
+    except Exception as e:
+        print(f"[Scraper] Finviz error (non-fatal): {e}")
     print("[Scraper] All done")

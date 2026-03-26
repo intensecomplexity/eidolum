@@ -355,7 +355,7 @@ async def lifespan(app):
             db = SessionLocal()
             pred_count = db.query(Prediction).count()
             print(f"[Eidolum] Background import starting — {pred_count} predictions exist")
-            if pred_count < 1000:
+            if pred_count < 5000:
                 from jobs.youtube_history import run_youtube_history
                 from jobs.twitter_history import scrape_twitter_history, scrape_via_nitter_all
                 from jobs.reddit_history import scrape_reddit_history
@@ -363,6 +363,27 @@ async def lifespan(app):
                 scrape_twitter_history(db)
                 scrape_via_nitter_all(db)
                 scrape_reddit_history(db)
+                # New expanded sources
+                try:
+                    from jobs.tipranks_scraper import scrape_tipranks
+                    scrape_tipranks(db)
+                except Exception as e:
+                    print(f"[Background] TipRanks error: {e}")
+                try:
+                    from jobs.reddit_expanded import scrape_reddit_expanded
+                    scrape_reddit_expanded(db)
+                except Exception as e:
+                    print(f"[Background] Reddit expanded error: {e}")
+                try:
+                    from jobs.substack_scraper import scrape_substacks
+                    scrape_substacks(db)
+                except Exception as e:
+                    print(f"[Background] Substack error: {e}")
+                try:
+                    from jobs.finviz_scraper import scrape_finviz_upgrades
+                    scrape_finviz_upgrades(db)
+                except Exception as e:
+                    print(f"[Background] Finviz error: {e}")
                 print("[Eidolum] Background historical import complete")
             else:
                 print(f"[Eidolum] Skipping historical import — {pred_count} predictions already exist")
