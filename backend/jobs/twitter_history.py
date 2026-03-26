@@ -46,6 +46,10 @@ def scrape_twitter_history(db: Session):
         print("[Twitter] No TWITTER_BEARER_TOKEN set, skipping")
         return
 
+    # Credits depleted — skip until next month reset
+    print("[Twitter] Skipping — credits depleted until next month reset")
+    return
+
     print(f"[Twitter] Bearer token set: True, length: {len(TWITTER_BEARER)}")
     headers = {"Authorization": f"Bearer {TWITTER_BEARER}"}
 
