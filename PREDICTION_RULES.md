@@ -51,6 +51,15 @@ Always extract the actual analyst/firm name from the headline. Never attribute t
 ## Conflict of interest:
 Flag when forecaster has financial interest in the stock.
 
+## Sentiment vs prediction — the measurability test
+Sentiment words (wary of, confident of, cautious on, optimistic about, etc.) are NOT predictions on their own. The test: strip out the sentiment word — is there still a measurable claim? If yes = valid. If no = reject.
+
+- Reject: "UBS Wary of Nike's Weak Sales" — no measurable action
+- Reject: "Analyst Cautious on TSLA Amid Headwinds" — opinion, not a call
+- Accept: "Confident NVDA will fall to $200" — measurable claim ($200 target)
+- Accept: "Needham Raises NVDA Price Target to $200" — action + target
+- Accept: "Goldman Sachs Upgrades AAPL to Buy, Cautious on Macro" — has strong action (upgrades to buy)
+
 ## 3-Layer Defense System:
 - L1 (scraper): Must have analyst action + rating word. Reject press releases/clickbait/corporate news/past-tense reports.
 - L2 (validator): validate_prediction() checks all 7 fields before DB insert.

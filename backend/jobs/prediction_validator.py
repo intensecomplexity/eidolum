@@ -84,6 +84,38 @@ REJECT_PATTERNS = [
     r"\b(shares?|stock) (rise|rises|rose|fall|falls|fell|drop|drops|dropped|spike|spikes|spiked|surge|surges|surged)\b",
 ]
 
+# Sentiment-only phrases — opinions, NOT measurable predictions
+# Rejected when they appear WITHOUT a strong measurable action alongside
+SENTIMENT_ONLY = [
+    "wary of", "confident of", "cautious on", "optimistic about",
+    "pessimistic about", "constructive on", "warming to", "cooling on",
+    "skeptical of", "concerned about", "comfortable with", "uncomfortable with",
+    "excited about", "enthusiastic about", "remains positive", "remains cautious",
+    "remains neutral", "positive on", "negative on",
+    "favors", "likes", "prefers", "sees value in", "sees opportunity in",
+    "sees upside potential", "sees downside risk",
+    "could rally", "could decline", "could bounce", "could fall",
+    "may outperform", "may underperform", "might bounce", "might fall",
+    "believes", "thinks", "feels", "suggests", "argues", "expects",
+    "considers", "anticipates",
+    "looks attractive", "looks expensive", "looks cheap",
+    "well positioned", "poorly positioned",
+    "strong fundamentals", "weak fundamentals",
+    "headwinds", "tailwinds",
+]
+
+# Strong actions that override sentiment — if present, sentiment is OK
+STRONG_ACTIONS = [
+    "upgrades", "upgraded", "downgrades", "downgraded",
+    "upgrades to", "upgraded to", "downgrades to", "downgraded to",
+    "raises price target", "raised price target",
+    "lowers price target", "lowered price target",
+    "cuts price target", "cut price target",
+    "initiates coverage", "initiated coverage",
+    "price target of $", "price target to $",
+    "target price of $", "target price to $",
+]
+
 # Bullish signals — direction scoring (multi-word to avoid false matches)
 BULLISH_SIGNALS = [
     "upgrades", "upgraded",
@@ -173,8 +205,17 @@ def is_real_prediction(headline, summary=""):
     # Must have analyst action AND rating word
     has_action = any(a in combined for a in ANALYST_ACTIONS)
     has_rating = any(r in combined for r in RATING_WORDS)
+    if not (has_action and has_rating):
+        return False
 
-    return has_action and has_rating
+    # Sentiment check: if headline has sentiment phrases, require a STRONG action
+    has_sentiment = any(s in combined for s in SENTIMENT_ONLY)
+    if has_sentiment:
+        has_strong = any(a in combined for a in STRONG_ACTIONS)
+        if not has_strong:
+            return False  # Sentiment without strong action = opinion, not prediction
+
+    return True
 
 
 def get_direction(headline, summary=""):
@@ -301,6 +342,26 @@ def cleanup_invalid_predictions(db):
             OR context LIKE '%Stock Drops%' OR context LIKE '%stock drops%'
             OR context LIKE '%rate cut%' OR context LIKE '%Rate Cut%'
             OR context LIKE '%tax cut%' OR context LIKE '%Tax Cut%'
+    """))
+    deleted += r.rowcount
+
+    # Sentiment-only predictions without strong measurable action
+    r = db.execute(sql_text("""
+        DELETE FROM predictions WHERE
+            (LOWER(context) LIKE '%wary of%' OR LOWER(context) LIKE '%confident of%'
+             OR LOWER(context) LIKE '%cautious on%' OR LOWER(context) LIKE '%optimistic about%'
+             OR LOWER(context) LIKE '%pessimistic about%' OR LOWER(context) LIKE '%skeptical of%'
+             OR LOWER(context) LIKE '%concerned about%' OR LOWER(context) LIKE '%warming to%'
+             OR LOWER(context) LIKE '%cooling on%' OR LOWER(context) LIKE '%sees upside%'
+             OR LOWER(context) LIKE '%sees downside%' OR LOWER(context) LIKE '%could rally%'
+             OR LOWER(context) LIKE '%could decline%' OR LOWER(context) LIKE '%looks attractive%'
+             OR LOWER(context) LIKE '%looks expensive%' OR LOWER(context) LIKE '%looks cheap%')
+            AND LOWER(context) NOT LIKE '%upgrades to%'
+            AND LOWER(context) NOT LIKE '%downgrades to%'
+            AND LOWER(context) NOT LIKE '%price target%'
+            AND LOWER(context) NOT LIKE '%raises target%'
+            AND LOWER(context) NOT LIKE '%lowers target%'
+            AND LOWER(context) NOT LIKE '%cuts target%'
     """))
     deleted += r.rowcount
 
