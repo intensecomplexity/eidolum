@@ -53,10 +53,55 @@ CHANNELS = [
 ]
 
 
-def get_channel_videos(channel_id: str, max_results: int = 50) -> list:
-    """Get videos from a channel from the past year."""
-    if not YOUTUBE_API_KEY:
+def get_channel_videos_rss(channel_id: str, max_results: int = 15) -> list:
+    """Get recent videos via YouTube RSS feed — no API key required."""
+    import xml.etree.ElementTree as ET
+
+    url = f"https://www.youtube.com/feeds/videos.xml?channel_id={channel_id}"
+    try:
+        r = httpx.get(url, timeout=15, headers={"User-Agent": "Mozilla/5.0"})
+        if r.status_code != 200:
+            print(f"[YTHistory] RSS feed returned {r.status_code} for {channel_id}")
+            return []
+    except Exception as e:
+        print(f"[YTHistory] RSS fetch error for {channel_id}: {e}")
         return []
+
+    videos = []
+    one_year_ago = datetime.utcnow() - timedelta(days=365)
+
+    try:
+        root = ET.fromstring(r.text)
+        ns = {"atom": "http://www.w3.org/2005/Atom", "yt": "http://www.youtube.com/xml/schemas/2015", "media": "http://search.yahoo.com/mrss/"}
+        for entry in root.findall("atom:entry", ns):
+            vid_id_el = entry.find("yt:videoId", ns)
+            title_el = entry.find("atom:title", ns)
+            published_el = entry.find("atom:published", ns)
+            if vid_id_el is None or title_el is None:
+                continue
+            published_str = published_el.text if published_el is not None else None
+            try:
+                pub_date = datetime.strptime(published_str[:19], "%Y-%m-%dT%H:%M:%S") if published_str else datetime.utcnow()
+            except Exception:
+                pub_date = datetime.utcnow()
+            if pub_date < one_year_ago:
+                continue
+            videos.append({
+                "video_id": vid_id_el.text,
+                "title": title_el.text or "",
+                "published_at": published_str or datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
+            })
+    except ET.ParseError as e:
+        print(f"[YTHistory] RSS parse error for {channel_id}: {e}")
+        return []
+
+    return videos[:max_results]
+
+
+def get_channel_videos(channel_id: str, max_results: int = 50) -> list:
+    """Get videos from a channel. Uses API if key is set, RSS feed otherwise."""
+    if not YOUTUBE_API_KEY:
+        return get_channel_videos_rss(channel_id, max_results=min(max_results, 15))
 
     one_year_ago = (datetime.utcnow() - timedelta(days=365)).strftime("%Y-%m-%dT%H:%M:%SZ")
     videos = []
