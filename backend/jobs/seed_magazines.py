@@ -74,7 +74,7 @@ def seed_finnhub_predictions(db: Session):
     mag_handles = [m["handle"] for m in MAGAZINE_FORECASTERS]
     mag_ids = [f.id for f in db.query(Forecaster).filter(Forecaster.handle.in_(mag_handles)).all()]
     existing = db.query(Prediction).filter(Prediction.forecaster_id.in_(mag_ids)).count() if mag_ids else 0
-    if existing >= 200:
+    if existing >= 400:
         print(f"[Magazines] Already have {existing} magazine predictions, skipping seed")
         return
 
@@ -84,8 +84,8 @@ def seed_finnhub_predictions(db: Session):
         print("[Magazines] No magazine forecasters found — run seed_magazine_forecasters first")
         return
 
-    banks = [f for f in forecasters if f.handle in ("GoldmanSachs", "JPMorgan", "MorganStanley", "BofA_Research", "Citi")]
-    media = [f for f in forecasters if f not in banks]
+    # Round-robin counter to distribute evenly across ALL forecasters
+    fc_index = 0
 
     added = 0
     now = datetime.utcnow()
@@ -153,8 +153,9 @@ def seed_finnhub_predictions(db: Session):
             else:
                 continue
 
-            # Assign to a bank forecaster
-            forecaster = random.choice(banks) if banks else random.choice(forecasters)
+            # Rotate across ALL forecasters
+            forecaster = forecasters[fc_index % len(forecasters)]
+            fc_index += 1
             source_id = f"mag_{ticker}_{period}_{forecaster.handle}"
 
             if db.query(Prediction).filter(Prediction.source_platform_id == source_id).first():
@@ -201,7 +202,8 @@ def seed_finnhub_predictions(db: Session):
                 target_low = pt.get("targetLow", target_mean)
                 quote_text = f"Analyst price target for {ticker}: ${target_mean:.0f} (range ${target_low:.0f}-${target_high:.0f}), current ${current_price:.0f}"
 
-                forecaster = random.choice(media) if media else random.choice(forecasters)
+                forecaster = forecasters[fc_index % len(forecasters)]
+                fc_index += 1
                 source_id = f"mag_pt_{ticker}_{forecaster.handle}"
 
                 if not db.query(Prediction).filter(Prediction.source_platform_id == source_id).first():
