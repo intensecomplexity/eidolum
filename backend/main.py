@@ -331,25 +331,34 @@ async def lifespan(app):
         seed_verified()
     except Exception as e:
         print(f"[Eidolum] Verified reseed error (non-fatal): {e}")
-    # Run YouTube historical import once if fewer than 100 predictions exist
-    try:
-        db = SessionLocal()
-        _pred_count = db.query(Prediction).count()
-        db.close()
-        if _pred_count < 100:
-            print("[Eidolum] Running full historical import (YouTube + Twitter + Reddit)...")
+    # Run historical import in background thread so server starts immediately
+    import threading
+
+    def run_historical_import_background():
+        import time
+        time.sleep(10)
+        try:
             db = SessionLocal()
-            from jobs.youtube_history import run_youtube_history
-            from jobs.twitter_history import scrape_twitter_history, scrape_via_nitter_all
-            from jobs.reddit_history import scrape_reddit_history
-            run_youtube_history(db)
-            scrape_twitter_history(db)
-            scrape_via_nitter_all(db)
-            scrape_reddit_history(db)
+            pred_count = db.query(Prediction).count()
+            print(f"[Eidolum] Background import starting — {pred_count} predictions exist")
+            if pred_count < 100:
+                from jobs.youtube_history import run_youtube_history
+                from jobs.twitter_history import scrape_twitter_history, scrape_via_nitter_all
+                from jobs.reddit_history import scrape_reddit_history
+                run_youtube_history(db)
+                scrape_twitter_history(db)
+                scrape_via_nitter_all(db)
+                scrape_reddit_history(db)
+                print("[Eidolum] Background historical import complete")
+            else:
+                print(f"[Eidolum] Skipping historical import — {pred_count} predictions already exist")
             db.close()
-            print("[Eidolum] Historical import complete")
-    except Exception as e:
-        print(f"[Eidolum] YouTube history import error (non-fatal): {e}")
+        except Exception as e:
+            print(f"[Eidolum] Background import error: {e}")
+
+    thread = threading.Thread(target=run_historical_import_background, daemon=True)
+    thread.start()
+    print("[Eidolum] Historical import started in background thread")
     # Add archive columns if missing
     try:
         db = SessionLocal()
