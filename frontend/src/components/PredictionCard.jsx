@@ -128,24 +128,24 @@ export default function PredictionCard({ prediction: p, showForecaster = false, 
           );
         })()}
 
-        {p.archive_url && (
+        {p.archive_url && p.archive_url.startsWith('/archive/') && (
           <a
-            href={p.archive_url}
+            href={`${import.meta.env.VITE_API_URL || ''}${p.archive_url}`}
             target="_blank"
             rel="noopener noreferrer"
             onClick={e => e.stopPropagation()}
             style={{
               display: 'inline-flex', alignItems: 'center', gap: '5px',
-              padding: '6px 12px', borderRadius: '6px',
-              fontSize: '0.82rem', fontWeight: 500,
-              background: 'rgba(255,255,255,0.05)',
-              border: '1px solid rgba(255,255,255,0.12)',
-              color: '#9ca3af',
+              padding: '5px 12px', borderRadius: '6px',
+              fontSize: '0.8rem', fontWeight: 500,
+              background: 'rgba(0,200,150,0.1)',
+              border: '1px solid rgba(0,200,150,0.3)',
+              color: '#00c896',
               textDecoration: 'none',
             }}
-            title="Archived copy — proof this was said even if deleted"
+            title="Screenshot proof — saved on our server"
           >
-            {p.archive_url.includes('web.archive.org') ? '🏛 Wayback Archive' : '🗂 Screenshot Proof'}
+            View Proof
           </a>
         )}
       </div>

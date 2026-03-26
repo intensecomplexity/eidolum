@@ -32,25 +32,31 @@ def archive_url(url: str) -> str | None:
 
 
 def archive_after_save(prediction_id: int, source_url: str):
-    """Run Playwright screenshot archiver in background thread."""
+    """Take screenshot immediately after saving — delete prediction if screenshot fails."""
     def run():
         try:
-            from archiver.screenshot import archive_prediction as do_archive
+            from archiver.screenshot import take_screenshot
+            from sqlalchemy import text
             loop = asyncio.new_event_loop()
-            screenshot_path = loop.run_until_complete(do_archive(source_url, prediction_id))
-            if screenshot_path:
-                from sqlalchemy import text
-                db2 = SessionLocal()
+            archive_url = loop.run_until_complete(take_screenshot(source_url, prediction_id))
+            db2 = SessionLocal()
+            if archive_url:
                 db2.execute(
-                    text("UPDATE predictions SET archived_at=:ts WHERE id=:id AND archived_at IS NULL"),
-                    {"ts": datetime.utcnow(), "id": prediction_id},
+                    text("UPDATE predictions SET archive_url=:url, archived_at=:ts WHERE id=:id"),
+                    {"url": archive_url, "ts": datetime.utcnow(), "id": prediction_id},
                 )
                 db2.commit()
-                db2.close()
-                print(f"[Archive] Screenshot saved for prediction {prediction_id}")
+            else:
+                db2.execute(
+                    text("DELETE FROM predictions WHERE id=:id AND archive_url IS NULL"),
+                    {"id": prediction_id},
+                )
+                db2.commit()
+                print(f"[Archive] Prediction {prediction_id} DELETED — no screenshot possible")
+            db2.close()
             loop.close()
         except Exception as e:
-            print(f"[Archive] Background error for prediction {prediction_id}: {e}")
+            print(f"[Archive] archive_after_save error for {prediction_id}: {e}")
     threading.Thread(target=run, daemon=True).start()
 
 # ── YouTube ──────────────────────────────────────────────────────────────────
