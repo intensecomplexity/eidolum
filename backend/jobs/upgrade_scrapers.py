@@ -261,7 +261,7 @@ def _fmp_rss_inner(db: Session):
     for page_num in range(6):
         try:
             r = httpx.get(
-                "https://financialmodelingprep.com/api/v3/upgrades-downgrades-rss-feed",
+                "https://financialmodelingprep.com/stable/upgrades-downgrades-rss-feed",
                 params={"page": page_num, "apikey": FMP_KEY},
                 timeout=15,
             )
@@ -318,7 +318,7 @@ def _fmp_pt_inner(db: Session):
     for page_num in range(6):
         try:
             r = httpx.get(
-                "https://financialmodelingprep.com/api/v3/price-target-rss-feed",
+                "https://financialmodelingprep.com/stable/price-target-rss-feed",
                 params={"page": page_num, "apikey": FMP_KEY},
                 timeout=15,
             )
@@ -435,7 +435,7 @@ def _fmp_daily_inner(db: Session):
         date_str = (today - timedelta(days=days_ago)).strftime("%Y-%m-%d")
         try:
             r = httpx.get(
-                "https://financialmodelingprep.com/api/v3/upgrades-downgrades",
+                "https://financialmodelingprep.com/stable/upgrades-downgrades",
                 params={"date": date_str, "apikey": FMP_KEY},
                 timeout=15,
             )
