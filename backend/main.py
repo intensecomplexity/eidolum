@@ -370,12 +370,24 @@ async def lifespan(app):
                 scrape_finnhub_upgrades(db)
             except Exception as e:
                 print(f"[Background] Finnhub upgrades error: {e}")
-            # FMP upgrades API
+            # FMP upgrades RSS
             try:
                 from jobs.upgrade_scrapers import scrape_fmp_upgrades
                 scrape_fmp_upgrades(db)
             except Exception as e:
                 print(f"[Background] FMP upgrades error: {e}")
+            # FMP price targets
+            try:
+                from jobs.upgrade_scrapers import scrape_fmp_price_targets
+                scrape_fmp_price_targets(db)
+            except Exception as e:
+                print(f"[Background] FMP price targets error: {e}")
+            # FMP daily grades
+            try:
+                from jobs.upgrade_scrapers import scrape_fmp_daily_grades
+                scrape_fmp_daily_grades(db)
+            except Exception as e:
+                print(f"[Background] FMP daily grades error: {e}")
             pred_count = db.query(Prediction).count()
             print(f"[Eidolum] Background import complete — {pred_count} real predictions loaded")
             # Evaluate pending predictions
@@ -475,13 +487,41 @@ async def lifespan(app):
         finally:
             db.close()
 
+    def run_fmp_price_targets():
+        from datetime import datetime as _dt
+        print(f"[Scheduler] Running FMP price targets at {_dt.utcnow()}")
+        scheduler_last_run["fmp_price_targets"] = _dt.utcnow()
+        db = SessionLocal()
+        try:
+            from jobs.upgrade_scrapers import scrape_fmp_price_targets
+            scrape_fmp_price_targets(db)
+        except Exception as e:
+            print(f"[FMP-PT] Error: {e}")
+        finally:
+            db.close()
+
+    def run_fmp_daily_grades():
+        from datetime import datetime as _dt
+        print(f"[Scheduler] Running FMP daily grades at {_dt.utcnow()}")
+        scheduler_last_run["fmp_daily_grades"] = _dt.utcnow()
+        db = SessionLocal()
+        try:
+            from jobs.upgrade_scrapers import scrape_fmp_daily_grades
+            scrape_fmp_daily_grades(db)
+        except Exception as e:
+            print(f"[FMP-Daily] Error: {e}")
+        finally:
+            db.close()
+
     print("[STARTUP] Scheduler starting...")
     scheduler = AsyncIOScheduler()
     scheduler.add_job(run_hourly_scraper, "interval", hours=1, id="scraper")
     scheduler.add_job(run_fast_scraper, "interval", minutes=15, id="fast_scraper")
     scheduler.add_job(run_15min_evaluator, "interval", minutes=15, id="evaluator")
     scheduler.add_job(run_finnhub_upgrades, "interval", hours=2, id="finnhub_upgrades")
-    scheduler.add_job(run_fmp_upgrades, "interval", hours=2, id="fmp_upgrades", kwargs={}, next_run_time=datetime.utcnow() + timedelta(hours=1))
+    scheduler.add_job(run_fmp_upgrades, "interval", hours=2, id="fmp_upgrades", next_run_time=datetime.utcnow() + timedelta(minutes=30))
+    scheduler.add_job(run_fmp_price_targets, "interval", hours=2, id="fmp_price_targets", next_run_time=datetime.utcnow() + timedelta(minutes=60))
+    scheduler.add_job(run_fmp_daily_grades, "interval", hours=3, id="fmp_daily_grades", next_run_time=datetime.utcnow() + timedelta(minutes=90))
     def run_hourly_leaderboard():
         from datetime import datetime as _dt
         scheduler_last_run["leaderboard"] = _dt.utcnow()

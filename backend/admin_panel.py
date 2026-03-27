@@ -125,7 +125,9 @@ def get_scheduler_status(admin=Depends(require_admin)):
         {"id": "evaluator", "name": "Evaluator", "interval_minutes": 15},
         {"id": "leaderboard", "name": "Leaderboard Refresh", "interval_minutes": 60},
         {"id": "finnhub_upgrades", "name": "Finnhub Upgrades", "interval_minutes": 120},
-        {"id": "fmp_upgrades", "name": "FMP Upgrades", "interval_minutes": 120},
+        {"id": "fmp_upgrades", "name": "FMP RSS", "interval_minutes": 120},
+        {"id": "fmp_price_targets", "name": "FMP Price Targets", "interval_minutes": 120},
+        {"id": "fmp_daily_grades", "name": "FMP Daily Grades", "interval_minutes": 180},
     ]
     now = datetime.utcnow()
     result = []
