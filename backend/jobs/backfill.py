@@ -25,20 +25,25 @@ BACKFILL_TICKERS = FALLBACK_TICKERS[:200]
 
 def should_backfill(db: Session) -> bool:
     count = db.query(Prediction).count()
-    return count < 100
+    return count < 1000
 
 
 def run_backfill(db: Session):
-    """One-time historical backfill. Only runs if DB has <100 predictions."""
+    """Historical backfill. Runs if DB has <1000 predictions."""
     if not should_backfill(db):
-        print("[Backfill] DB already has 100+ predictions, skipping backfill")
+        pred_count = db.query(Prediction).count()
+        print(f"[Backfill] DB has {pred_count} predictions (>=1000), skipping backfill")
         return
 
-    print("[Backfill] Starting historical backfill (DB has <100 predictions)")
+    pred_count = db.query(Prediction).count()
+    print(f"[Backfill] Starting historical backfill (DB has {pred_count} predictions, need 1000)")
     total = 0
 
+    print("[Backfill] Starting Finnhub historical...")
     total += _backfill_finnhub(db)
+    print("[Backfill] Starting FMP daily grades...")
     total += _backfill_fmp_daily(db)
+    print("[Backfill] Starting yfinance historical...")
     total += _backfill_yfinance(db)
 
     pred_count = db.query(Prediction).count()
@@ -276,8 +281,13 @@ def _backfill_yfinance(db: Session) -> int:
         for i, ticker_symbol in enumerate(BACKFILL_TICKERS):
             try:
                 import yfinance as yf
-                stock = yf.Ticker(ticker_symbol)
-                recs = stock.recommendations
+                try:
+                    stock = yf.Ticker(ticker_symbol)
+                    recs = stock.recommendations
+                except Exception as yf_err:
+                    print(f"[Backfill-yfinance] Error fetching {ticker_symbol}: {yf_err}")
+                    time.sleep(10)
+                    continue
                 if recs is None or recs.empty:
                     continue
 
@@ -350,15 +360,14 @@ def _backfill_yfinance(db: Session) -> int:
                     ))
                     added += 1
 
-                time.sleep(0.5)
-                if (i + 1) % 50 == 0:
+                time.sleep(5)
+                if (i + 1) % 25 == 0:
                     db.commit()
                     print(f"[Backfill-yfinance] {i + 1}/{len(BACKFILL_TICKERS)} tickers, {added} added")
 
             except Exception as e:
-                if "Too Many Requests" not in str(e):
-                    print(f"[Backfill-yfinance] Error for {ticker_symbol}: {e}")
-                time.sleep(2)
+                print(f"[Backfill-yfinance] Error for {ticker_symbol}: {e}")
+                time.sleep(10)
 
         db.commit()
         print(f"[Backfill-yfinance] Done: {added} historical predictions")
