@@ -493,3 +493,144 @@ def _scrape_fast_inner(db: Session):
     if added > 0:
         db.commit()
         print(f"[FastScraper] Added {added} new predictions")
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# NewsAPI scraper — real article URLs from major financial news sites
+# ═══════════════════════════════════════════════════════════════════════════
+
+NEWSAPI_KEY = os.getenv("NEWSAPI_KEY", "")
+
+NEWSAPI_QUERIES = [
+    "analyst upgrades stock",
+    "analyst downgrades stock",
+    "price target raises",
+    "price target lowers",
+    "initiates coverage buy",
+    "downgrades to sell",
+]
+
+
+def scrape_newsapi(db: Session):
+    """Scrape analyst predictions from NewsAPI.org — real article URLs."""
+    if not SCRAPER_LOCK.acquire(blocking=False):
+        print("[NewsAPI] Another scraper running, skipping")
+        return
+    try:
+        _newsapi_inner(db)
+    finally:
+        SCRAPER_LOCK.release()
+
+
+def _newsapi_inner(db: Session):
+    if not NEWSAPI_KEY:
+        print("[NewsAPI] No NEWSAPI_KEY, skipping")
+        return
+
+    added = 0
+
+    for query in NEWSAPI_QUERIES:
+        try:
+            r = httpx.get(
+                "https://newsapi.org/v2/everything",
+                params={
+                    "q": query,
+                    "language": "en",
+                    "sortBy": "publishedAt",
+                    "pageSize": 50,
+                    "apiKey": NEWSAPI_KEY,
+                },
+                timeout=30,
+            )
+            data = r.json()
+            if data.get("status") != "ok":
+                print(f"[NewsAPI] Query '{query}': {data.get('message', 'error')}")
+                continue
+
+            articles = data.get("articles", [])
+            print(f"[NewsAPI] Query '{query}': {len(articles)} articles")
+
+            for article in articles:
+                title = article.get("title", "")
+                url = article.get("url", "")
+                published = article.get("publishedAt", "")
+
+                if not title or not url:
+                    continue
+
+                # Layer 1 strict filter
+                if not is_real_prediction(title):
+                    continue
+
+                direction = get_direction(title)
+                if not direction:
+                    continue
+
+                # Extract ticker from title: (AAPL) or (NYSE:AAPL)
+                ticker_match = re.search(r"\((?:NYSE|NASDAQ|NASD)?:?\s*([A-Z]{1,5})\)", title)
+                if not ticker_match:
+                    continue
+                ticker = ticker_match.group(1)
+
+                # Extract forecaster
+                forecaster_name = extract_forecaster_name(title, "", ticker)
+                if not forecaster_name:
+                    continue
+
+                # Deduplicate by URL
+                if db.execute(text("SELECT 1 FROM predictions WHERE source_url = :u LIMIT 1"), {"u": url}).first():
+                    continue
+
+                forecaster = find_forecaster(forecaster_name, db)
+                if not forecaster:
+                    continue
+
+                # Parse date
+                date_str = (published or "")[:10]
+                if not date_str or len(date_str) < 8:
+                    continue
+                try:
+                    pred_date = datetime.strptime(date_str, "%Y-%m-%d")
+                except Exception:
+                    continue
+
+                # Archive via Wayback Machine
+                arch = url
+                try:
+                    ar = httpx.get(f"https://web.archive.org/save/{url}", timeout=10, follow_redirects=True)
+                    loc = ar.headers.get("content-location", "")
+                    if loc:
+                        arch = f"https://web.archive.org{loc}"
+                    else:
+                        arch = f"https://web.archive.org/web/{url}"
+                except Exception:
+                    arch = f"https://web.archive.org/web/{url}"
+
+                text_lower = title.lower()
+                window_days = 365 if "price target" in text_lower or "target" in text_lower else 90
+
+                # Layer 2 validation
+                is_valid, _ = validate_prediction(
+                    ticker=ticker, direction=direction, source_url=url,
+                    archive_url=arch, context=title, forecaster_id=forecaster.id,
+                )
+                if not is_valid:
+                    continue
+
+                db.add(Prediction(
+                    forecaster_id=forecaster.id, ticker=ticker, direction=direction,
+                    prediction_date=pred_date, evaluation_date=pred_date + timedelta(days=window_days),
+                    window_days=window_days, source_url=url, archive_url=arch,
+                    source_type="article", context=title[:500], exact_quote=title,
+                    outcome="pending", verified_by="newsapi",
+                ))
+                added += 1
+
+            time.sleep(2)  # Rate limit between queries
+
+        except Exception as e:
+            print(f"[NewsAPI] Error for '{query}': {e}")
+
+    if added:
+        db.commit()
+    print(f"[NewsAPI] Done: {added} predictions added")

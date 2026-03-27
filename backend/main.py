@@ -418,6 +418,12 @@ async def lifespan(app):
                 scrape_yfinance_recommendations(db)
             except Exception as e:
                 print(f"[Background] yfinance error: {e}")
+            # NewsAPI
+            try:
+                from jobs.news_scraper import scrape_newsapi
+                scrape_newsapi(db)
+            except Exception as e:
+                print(f"[Background] NewsAPI error: {e}")
             pred_count = db.query(Prediction).count()
             print(f"[Eidolum] Background import complete — {pred_count} real predictions loaded")
             # Evaluate pending predictions
@@ -595,6 +601,19 @@ async def lifespan(app):
         finally:
             db.close()
 
+    def run_newsapi():
+        from datetime import datetime as _dt
+        print(f"[Scheduler] Running NewsAPI at {_dt.utcnow()}")
+        scheduler_last_run["newsapi"] = _dt.utcnow()
+        db = SessionLocal()
+        try:
+            from jobs.news_scraper import scrape_newsapi
+            scrape_newsapi(db)
+        except Exception as e:
+            print(f"[NewsAPI] Error: {e}")
+        finally:
+            db.close()
+
     print("[STARTUP] Scheduler starting...")
     scheduler = AsyncIOScheduler()
     scheduler.add_job(run_hourly_scraper, "interval", hours=1, id="scraper")
@@ -608,6 +627,7 @@ async def lifespan(app):
     scheduler.add_job(run_benzinga_rss, "interval", hours=1, id="benzinga_rss", next_run_time=datetime.utcnow() + timedelta(minutes=20))
     scheduler.add_job(run_marketbeat_rss, "interval", hours=2, id="marketbeat_rss", next_run_time=datetime.utcnow() + timedelta(minutes=45))
     scheduler.add_job(run_yfinance, "interval", hours=3, id="yfinance", next_run_time=datetime.utcnow() + timedelta(minutes=120))
+    scheduler.add_job(run_newsapi, "interval", hours=4, id="newsapi", next_run_time=datetime.utcnow() + timedelta(minutes=10))
     def run_hourly_leaderboard():
         from datetime import datetime as _dt
         scheduler_last_run["leaderboard"] = _dt.utcnow()
