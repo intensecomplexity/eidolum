@@ -20,55 +20,51 @@ from jobs.upgrade_scrapers import _action_to_direction, _is_self_analysis
 
 FMP_KEY = os.getenv("FMP_KEY", "")
 
-# Top 500 tickers for FMP backfill
-TOP_500 = FALLBACK_TICKERS + [
-    # Expand beyond FALLBACK_TICKERS to reach 500
-    "SHOP", "SQ", "MELI", "SE", "BKNG", "ORLY", "AZO", "FICO", "CPRT", "ODFL",
-    "FAST", "PAYX", "CTAS", "CINF", "POOL", "WST", "IDXX", "MTD", "TER", "ANSS",
-    "ZBRA", "KEYS", "TRMB", "PAYC", "CDW", "EPAM", "MANH", "VRSK", "FDS", "MSCI",
-    "ICE", "CME", "CBOE", "NDAQ", "MKTX", "TW", "FLT", "WEX", "GLOB", "QLYS",
-    "SAIA", "XPO", "JBHT", "WERN", "LSTR", "KNX", "CHRW", "EXPD", "HCA", "THC",
-    "CNC", "MOH", "DVA", "STE", "BAX", "BDX", "BSX", "EW", "MDT", "SYK",
-    "ZBH", "HOLX", "INCY", "ALNY", "EXAS", "NTRA", "GH", "RGEN", "TECH",
-    "WAT", "A", "CSGP", "PKI", "TFX", "PODD", "MASI", "NVCR",
-    "KR", "ACI", "SYY", "USFD", "PFGC", "CLX", "CHD", "SJM", "HRL",
-    "MKC", "CAG", "CPB", "BG", "TSN", "INGR", "POST",
-    "DOV", "GNRC", "IR", "XYL", "NDSN", "RRX", "AME", "FTV", "OTIS", "CARR",
-    "WSO", "SNA", "SWK", "TTC", "PCAR", "AGCO", "TEX", "ALG",
-    "EL", "TPR", "RL", "CPRI", "DECK", "ON", "CROX", "SKX", "HBI",
-    "LEVI", "PVH", "VFC", "UAA", "GOOS",
-    "MAA", "AVB", "EQR", "UDR", "ESS", "CPT", "AIV",
-    "ARE", "BXP", "SLG", "VNO", "HIW", "KRC", "DEI",
-    "WPC", "NNN", "STORE", "ADC", "EPRT", "GTY",
-    "SPR", "HWM", "TDG", "HEICO", "BWXT", "KTOS", "RKLB",
-    "ENPH", "SEDG", "FSLR", "RUN", "NOVA", "ARRY",
-    "PLUG", "BE", "CHPT", "BLNK", "QS",
-    "DKNG", "PENN", "MGM", "CZR", "WYNN", "LVS", "GENI",
-    "ZI", "TWLO", "TOST", "BRZE", "CFLT", "S", "CRDO", "SMMT",
-    "APP", "TTD", "PUBM", "MGNI", "DSP", "IS", "DT",
-    "CELH", "MNST", "SAM", "BUD", "TAP", "DEO",
-    "CMI", "OSK", "WAB", "GWW", "MSM", "ALLE", "AOS",
-    "ARES", "OWL", "APO", "KKR", "CG", "TPG", "STEP",
-    "RJF", "LPLA", "IBKR", "MKTX", "CBOE", "NDAQ",
-    "WRB", "RNR", "ACGL", "EG", "AFG", "KMPR",
-    "HIG", "LNC", "UNM", "GL", "VOYA", "PFG",
-    "PARA", "LYV", "IMAX", "CNK", "MSGS", "NXST",
-    "ZG", "RDFN", "OPEN", "EXPI", "COMP", "DHI", "LEN", "PHM", "TOL", "NVR",
-    "MTH", "MDC", "MHO", "KBH", "CCS", "TMHC",
-]
-# Deduplicate and cap at 500
-TOP_500 = list(dict.fromkeys(TOP_500))[:500]
-
 BACKFILL_TICKERS = FALLBACK_TICKERS[:50]  # yfinance only (rate limited)
 
-# FMP URL base
 _FMP_BASE = None
+_BACKFILL_DONE = False
+_ALL_FMP_TICKERS = None
 
-_BACKFILL_DONE = False  # Track if backfill already ran this deploy
+
+def _fetch_fmp_stock_list():
+    """Fetch ALL tickers FMP tracks."""
+    global _ALL_FMP_TICKERS
+    if _ALL_FMP_TICKERS is not None:
+        return _ALL_FMP_TICKERS
+
+    if not FMP_KEY:
+        _ALL_FMP_TICKERS = FALLBACK_TICKERS
+        return _ALL_FMP_TICKERS
+
+    try:
+        r = httpx.get(
+            "https://financialmodelingprep.com/stable/stock-list",
+            params={"apikey": FMP_KEY}, timeout=30,
+        )
+        if r.status_code == 200:
+            data = r.json()
+            if isinstance(data, list):
+                tickers = [
+                    s.get("symbol", "") for s in data
+                    if s.get("type") in ("stock", "Stock", "etf", "ETF", None)
+                    and s.get("exchangeShortName") in ("NYSE", "NASDAQ", "AMEX", None)
+                ]
+                tickers = [t for t in tickers if t and "." not in t and "-" not in t and 1 <= len(t) <= 5]
+                if tickers:
+                    print(f"[Backfill] Fetched {len(tickers)} tickers from FMP stock-list")
+                    _ALL_FMP_TICKERS = tickers
+                    return _ALL_FMP_TICKERS
+        print(f"[Backfill] FMP stock-list returned {r.status_code}, using fallback")
+    except Exception as e:
+        print(f"[Backfill] FMP stock-list error: {e}")
+
+    _ALL_FMP_TICKERS = FALLBACK_TICKERS
+    return _ALL_FMP_TICKERS
 
 
 def run_backfill(db: Session):
-    """Full 5-year backfill. Runs once per deploy."""
+    """Full 5-year backfill. Runs once per deploy, pulls ALL FMP data."""
     global _BACKFILL_DONE
     if _BACKFILL_DONE:
         print("[Backfill] Already ran this deploy, skipping")
@@ -76,19 +72,22 @@ def run_backfill(db: Session):
     _BACKFILL_DONE = True
 
     pred_count = db.query(Prediction).count()
-    print(f"[Backfill] Starting 5-year backfill (DB has {pred_count} predictions, {len(TOP_500)} tickers)")
+    print(f"[Backfill] Starting unlimited backfill (DB has {pred_count} predictions)")
     total = 0
 
     _test_fmp_endpoints()
 
+    # Get all FMP tickers
+    all_tickers = _fetch_fmp_stock_list()
+
     print("[Backfill] === FMP grades-latest (all stocks, one call) ===")
     total += _backfill_fmp_grades_latest(db)
 
-    print(f"[Backfill] === FMP grades-historical ({len(TOP_500)} tickers, full 5yr) ===")
-    total += _backfill_fmp_grades_by_ticker(db)
+    print(f"[Backfill] === FMP grades-historical ({len(all_tickers)} tickers, full 5yr) ===")
+    total += _backfill_fmp_grades_by_ticker(db, all_tickers)
 
-    print(f"[Backfill] === FMP price targets ({len(TOP_500)} tickers, full history) ===")
-    total += _backfill_fmp_price_targets(db)
+    print(f"[Backfill] === FMP price targets ({len(all_tickers)} tickers, full history) ===")
+    total += _backfill_fmp_price_targets(db, all_tickers)
 
     print("[Backfill] === yfinance historical (50 tickers) ===")
     total += _backfill_yfinance(db)
@@ -248,12 +247,13 @@ def _backfill_fmp_grades_latest(db: Session) -> int:
 
 # ── FMP grades by ticker (top 50) ───────────────────────────────────────
 
-def _backfill_fmp_grades_by_ticker(db: Session) -> int:
+def _backfill_fmp_grades_by_ticker(db: Session, tickers=None) -> int:
     if not FMP_KEY:
         return 0
 
+    if tickers is None:
+        tickers = FALLBACK_TICKERS
     added = 0
-    tickers = TOP_500
     print(f"[Backfill-FMP-Grades] Scanning {len(tickers)} tickers (full 5yr history)")
 
     for i, ticker in enumerate(tickers):
@@ -290,23 +290,24 @@ def _backfill_fmp_grades_by_ticker(db: Session) -> int:
                 print(f"[Backfill-FMP-Grades] {ticker} error: {e}")
 
         time.sleep(0.2)  # 300 calls/min = 5/sec
-        if (i + 1) % 25 == 0:
+        if (i + 1) % 100 == 0:
             db.commit()
             print(f"[Backfill-FMP-Grades] {i + 1}/{len(tickers)}, {added} added")
 
     db.commit()
-    print(f"[Backfill-FMP-Grades] Done: {added} predictions")
+    print(f"[Backfill-FMP-Grades] Done: {added} predictions from {len(tickers)} tickers")
     return added
 
 
 # ── FMP Price Targets (per ticker) ──────────────────────────────────────
 
-def _backfill_fmp_price_targets(db: Session) -> int:
+def _backfill_fmp_price_targets(db: Session, tickers=None) -> int:
     if not FMP_KEY:
         return 0
 
+    if tickers is None:
+        tickers = FALLBACK_TICKERS
     added = 0
-    tickers = TOP_500
     print(f"[Backfill-FMP-PT] Scanning {len(tickers)} tickers (full history)")
 
     for ti, tkr in enumerate(tickers):
@@ -384,7 +385,7 @@ def _backfill_fmp_price_targets(db: Session) -> int:
                 added += 1
 
             time.sleep(0.2)  # 300 calls/min
-            if (ti + 1) % 25 == 0:
+            if (ti + 1) % 100 == 0:
                 db.commit()
                 print(f"[Backfill-FMP-PT] {ti + 1}/{len(tickers)}, {added} added")
 
