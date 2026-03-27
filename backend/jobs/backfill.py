@@ -27,8 +27,8 @@ _BACKFILL_DONE = False
 _ALL_FMP_TICKERS = None
 
 
-def _fetch_fmp_stock_list():
-    """Fetch ALL tickers FMP tracks."""
+def _fetch_all_fmp_tickers():
+    """Fetch ALL tickers FMP tracks — stocks, ETFs, crypto, commodities."""
     global _ALL_FMP_TICKERS
     if _ALL_FMP_TICKERS is not None:
         return _ALL_FMP_TICKERS
@@ -37,29 +37,42 @@ def _fetch_fmp_stock_list():
         _ALL_FMP_TICKERS = FALLBACK_TICKERS
         return _ALL_FMP_TICKERS
 
-    try:
-        r = httpx.get(
-            "https://financialmodelingprep.com/stable/stock-list",
-            params={"apikey": FMP_KEY}, timeout=30,
-        )
-        if r.status_code == 200:
-            data = r.json()
-            if isinstance(data, list):
-                tickers = [
-                    s.get("symbol", "") for s in data
-                    if s.get("type") in ("stock", "Stock", "etf", "ETF", None)
-                    and s.get("exchangeShortName") in ("NYSE", "NASDAQ", "AMEX", None)
-                ]
-                tickers = [t for t in tickers if t and "." not in t and "-" not in t and 1 <= len(t) <= 5]
-                if tickers:
-                    print(f"[Backfill] Fetched {len(tickers)} tickers from FMP stock-list")
-                    _ALL_FMP_TICKERS = tickers
-                    return _ALL_FMP_TICKERS
-        print(f"[Backfill] FMP stock-list returned {r.status_code}, using fallback")
-    except Exception as e:
-        print(f"[Backfill] FMP stock-list error: {e}")
+    all_symbols = set()
 
-    _ALL_FMP_TICKERS = FALLBACK_TICKERS
+    endpoints = [
+        ("stock-list", "stocks"),
+        ("etf-list", "ETFs"),
+        ("cryptocurrency-list", "crypto"),
+        ("commodities-list", "commodities"),
+    ]
+
+    for endpoint, label in endpoints:
+        try:
+            r = httpx.get(
+                f"https://financialmodelingprep.com/stable/{endpoint}",
+                params={"apikey": FMP_KEY}, timeout=30,
+            )
+            if r.status_code != 200:
+                print(f"[Backfill] FMP {endpoint}: status {r.status_code}")
+                continue
+            data = r.json()
+            if not isinstance(data, list):
+                continue
+            symbols = [s.get("symbol", "") for s in data if s.get("symbol")]
+            # Clean symbols: no dots/dashes for stocks, allow crypto pairs
+            clean = [t for t in symbols if t and len(t) <= 10]
+            all_symbols.update(clean)
+            print(f"[Backfill] FMP {label}: {len(clean)} symbols")
+        except Exception as e:
+            print(f"[Backfill] FMP {endpoint} error: {e}")
+
+    if all_symbols:
+        _ALL_FMP_TICKERS = sorted(all_symbols)
+        print(f"[Backfill] Total unique FMP tickers: {len(_ALL_FMP_TICKERS)}")
+    else:
+        _ALL_FMP_TICKERS = FALLBACK_TICKERS
+        print(f"[Backfill] Using fallback: {len(_ALL_FMP_TICKERS)} tickers")
+
     return _ALL_FMP_TICKERS
 
 
@@ -72,13 +85,16 @@ def run_backfill(db: Session):
     _BACKFILL_DONE = True
 
     pred_count = db.query(Prediction).count()
-    print(f"[Backfill] Starting unlimited backfill (DB has {pred_count} predictions)")
+    if pred_count > 30000:
+        print(f"[Backfill] DB has {pred_count} predictions (>30k), backfill likely complete — skipping")
+        return
+
+    print(f"[Backfill] Starting full backfill (DB has {pred_count} predictions)")
     total = 0
 
     _test_fmp_endpoints()
 
-    # Get all FMP tickers
-    all_tickers = _fetch_fmp_stock_list()
+    all_tickers = _fetch_all_fmp_tickers()
 
     print("[Backfill] === FMP grades-latest (all stocks, one call) ===")
     total += _backfill_fmp_grades_latest(db)
