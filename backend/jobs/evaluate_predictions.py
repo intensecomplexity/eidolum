@@ -59,24 +59,28 @@ def evaluate_all_pending(db):
 
     now = datetime.utcnow()
 
-    # Get all pending predictions
-    pending = db.query(Prediction).filter(
+    from sqlalchemy import text as sql_text
+
+    # Count totals
+    total_pending = db.query(Prediction).filter(Prediction.outcome == "pending").count()
+
+    # SQL-level filter: only predictions past their evaluation window
+    # prediction_date + window_days < now
+    due = db.query(Prediction).filter(
         Prediction.outcome == "pending",
         Prediction.ticker.isnot(None),
         Prediction.prediction_date.isnot(None),
     ).all()
 
-    # Filter to those past evaluation window
-    due = []
-    for p in pending:
-        window = p.window_days or 90
-        eval_date = p.prediction_date + timedelta(days=window)
-        if eval_date <= now:
-            due.append(p)
+    # Filter in Python since interval math varies by DB engine
+    due = [p for p in due if p.prediction_date + timedelta(days=p.window_days or 90) <= now]
 
+    today_count = total_pending - len(due)
     if not due:
-        print(f"[Evaluator] {len(pending)} pending, 0 due for evaluation")
+        print(f"[Evaluator] {total_pending} pending ({today_count} recent, 0 due for evaluation)")
         return
+
+    print(f"[Evaluator] {len(due)} past-due predictions to score ({today_count} recent stay pending)")
 
     # Group by ticker for efficient API calls
     by_ticker = defaultdict(list)
@@ -104,8 +108,12 @@ def evaluate_all_pending(db):
             if not prices:
                 errors += len(preds)
                 tickers_done += 1
+                if tickers_done <= 3:
+                    print(f"[Evaluator] {ticker}: no price data ({len(preds)} predictions skipped)")
                 continue
 
+            ticker_correct = 0
+            ticker_total = 0
             for p in preds:
                 window = p.window_days or 90
                 start_date = p.prediction_date
@@ -134,6 +142,12 @@ def evaluate_all_pending(db):
                 p.alpha = adjusted
                 p.evaluation_date = end_date
                 evaluated += 1
+                ticker_total += 1
+                if outcome == "correct":
+                    ticker_correct += 1
+
+            if ticker_total > 0 and tickers_done < 10:
+                print(f"[Evaluator] {ticker}: {ticker_correct}/{ticker_total} correct")
 
             tickers_done += 1
             if tickers_done % 50 == 0:
