@@ -9,7 +9,7 @@ import os
 import sys
 import subprocess
 import time
-from datetime import datetime
+from datetime import datetime, timedelta
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -404,6 +404,18 @@ async def lifespan(app):
                 cleanup_invalid_predictions(db)
             except Exception as e:
                 print(f"[Background] L3 cleanup error: {e}")
+            # Finnhub upgrades API
+            try:
+                from jobs.upgrade_scrapers import scrape_finnhub_upgrades
+                scrape_finnhub_upgrades(db)
+            except Exception as e:
+                print(f"[Background] Finnhub upgrades error: {e}")
+            # FMP upgrades API
+            try:
+                from jobs.upgrade_scrapers import scrape_fmp_upgrades
+                scrape_fmp_upgrades(db)
+            except Exception as e:
+                print(f"[Background] FMP upgrades error: {e}")
             pred_count = db.query(Prediction).count()
             print(f"[Eidolum] Background import complete — {pred_count} real predictions loaded")
             # Evaluate pending predictions
@@ -477,11 +489,39 @@ async def lifespan(app):
         finally:
             db.close()
 
+    def run_finnhub_upgrades():
+        from datetime import datetime as _dt
+        print(f"[Scheduler] Running Finnhub upgrades at {_dt.utcnow()}")
+        scheduler_last_run["finnhub_upgrades"] = _dt.utcnow()
+        db = SessionLocal()
+        try:
+            from jobs.upgrade_scrapers import scrape_finnhub_upgrades
+            scrape_finnhub_upgrades(db)
+        except Exception as e:
+            print(f"[FinnhubUpgrades] Error: {e}")
+        finally:
+            db.close()
+
+    def run_fmp_upgrades():
+        from datetime import datetime as _dt
+        print(f"[Scheduler] Running FMP upgrades at {_dt.utcnow()}")
+        scheduler_last_run["fmp_upgrades"] = _dt.utcnow()
+        db = SessionLocal()
+        try:
+            from jobs.upgrade_scrapers import scrape_fmp_upgrades
+            scrape_fmp_upgrades(db)
+        except Exception as e:
+            print(f"[FMP] Error: {e}")
+        finally:
+            db.close()
+
     print("[STARTUP] Scheduler starting...")
     scheduler = AsyncIOScheduler()
     scheduler.add_job(run_hourly_scraper, "interval", hours=1, id="scraper")
     scheduler.add_job(run_fast_scraper, "interval", minutes=15, id="fast_scraper")
     scheduler.add_job(run_15min_evaluator, "interval", minutes=15, id="evaluator")
+    scheduler.add_job(run_finnhub_upgrades, "interval", hours=2, id="finnhub_upgrades")
+    scheduler.add_job(run_fmp_upgrades, "interval", hours=2, id="fmp_upgrades", kwargs={}, next_run_time=datetime.utcnow() + timedelta(hours=1))
     def run_hourly_leaderboard():
         from datetime import datetime as _dt
         scheduler_last_run["leaderboard"] = _dt.utcnow()
