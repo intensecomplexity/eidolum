@@ -358,6 +358,28 @@ async def lifespan(app):
                 run_backfill(db)
             except Exception as e:
                 print(f"[Background] Backfill error: {e}")
+            # Benzinga API test
+            try:
+                import httpx as _hx
+                _bz_key = os.getenv("BENZINGA_KEY", "")
+                if _bz_key:
+                    print("[Benzinga-Test] Testing API key...")
+                    _r = _hx.get(
+                        "https://api.benzinga.com/api/v1/ratings",
+                        params={"token": _bz_key, "limit": 3},
+                        headers={"Accept": "application/json"},
+                        timeout=30,
+                    )
+                    print(f"[Benzinga-Test] Status: {_r.status_code}")
+                    print(f"[Benzinga-Test] Response: {_r.text[:1000]}")
+            except Exception as e:
+                print(f"[Benzinga-Test] Error: {e}")
+            # Benzinga ratings scraper
+            try:
+                from jobs.benzinga_scraper import scrape_benzinga_ratings
+                scrape_benzinga_ratings(db)
+            except Exception as e:
+                print(f"[Background] Benzinga error: {e}")
             # Scrape real news articles (Layer 1 + Layer 2 built in)
             try:
                 from jobs.news_scraper import scrape_news_predictions
@@ -601,6 +623,19 @@ async def lifespan(app):
         finally:
             db.close()
 
+    def run_benzinga_api():
+        from datetime import datetime as _dt
+        print(f"[Scheduler] Running Benzinga API at {_dt.utcnow()}")
+        scheduler_last_run["benzinga_api"] = _dt.utcnow()
+        db = SessionLocal()
+        try:
+            from jobs.benzinga_scraper import scrape_benzinga_ratings
+            scrape_benzinga_ratings(db)
+        except Exception as e:
+            print(f"[Benzinga] Error: {e}")
+        finally:
+            db.close()
+
     def run_newsapi():
         from datetime import datetime as _dt
         print(f"[Scheduler] Running NewsAPI at {_dt.utcnow()}")
@@ -628,6 +663,7 @@ async def lifespan(app):
     scheduler.add_job(run_marketbeat_rss, "interval", hours=2, id="marketbeat_rss", next_run_time=datetime.utcnow() + timedelta(minutes=45))
     scheduler.add_job(run_yfinance, "interval", hours=3, id="yfinance", next_run_time=datetime.utcnow() + timedelta(minutes=120))
     scheduler.add_job(run_newsapi, "interval", hours=4, id="newsapi", next_run_time=datetime.utcnow() + timedelta(minutes=10))
+    scheduler.add_job(run_benzinga_api, "interval", hours=2, id="benzinga_api", next_run_time=datetime.utcnow() + timedelta(minutes=15))
     def run_hourly_leaderboard():
         from datetime import datetime as _dt
         scheduler_last_run["leaderboard"] = _dt.utcnow()

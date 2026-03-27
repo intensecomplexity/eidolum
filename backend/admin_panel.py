@@ -133,6 +133,7 @@ def get_scheduler_status(admin=Depends(require_admin)):
         {"id": "marketbeat_rss", "name": "MarketBeat RSS", "interval_minutes": 120},
         {"id": "yfinance", "name": "yfinance Recs", "interval_minutes": 180},
         {"id": "newsapi", "name": "NewsAPI", "interval_minutes": 240},
+        {"id": "benzinga_api", "name": "Benzinga API", "interval_minutes": 120},
     ]
     now = datetime.utcnow()
     result = []
