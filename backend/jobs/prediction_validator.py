@@ -40,8 +40,7 @@ EXACT_ACTIONS = [
     "reiterates underweight", "reiterated underweight",
     "reiterates outperform", "reiterated outperform",
     "reiterates underperform", "reiterated underperform",
-    "reiterates neutral", "reiterated neutral",
-    # Maintains with specific rating
+    # Maintains with specific rating (PT change required — checked in is_real_prediction)
     "maintains buy", "maintained buy",
     "maintains sell", "maintained sell",
     "maintains hold", "maintained hold",
@@ -49,7 +48,6 @@ EXACT_ACTIONS = [
     "maintains underweight", "maintained underweight",
     "maintains outperform", "maintained outperform",
     "maintains underperform", "maintained underperform",
-    "maintains neutral", "maintained neutral",
 ]
 
 # Commentary words that LOOK like actions but ARE NOT predictions
