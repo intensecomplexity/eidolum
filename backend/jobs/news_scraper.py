@@ -27,65 +27,68 @@ FINNHUB_KEY = os.getenv("FINNHUB_KEY", "")
 # Track when each ticker last produced a NEW prediction — used by fast scraper to skip cold tickers
 TICKER_LAST_FOUND = {}  # ticker -> datetime of last new prediction found
 LAST_FULL_SCAN = None   # datetime of last full scraper run
+ALL_TICKERS = None       # populated on first run from Finnhub
 
-TICKERS = [
-    # Mega cap tech
-    "AAPL", "MSFT", "GOOGL", "GOOG", "AMZN", "NVDA", "TSLA", "META", "AVGO", "ORCL",
-    # Large tech / software
+# Hardcoded fallback if Finnhub symbol fetch fails
+FALLBACK_TICKERS = [
+    "AAPL", "MSFT", "GOOGL", "AMZN", "NVDA", "TSLA", "META", "AVGO", "ORCL",
     "CRM", "ADBE", "AMD", "INTC", "QCOM", "NFLX", "CSCO", "IBM", "TXN", "MU",
-    "AMAT", "LRCX", "KLAC", "MRVL", "SNPS", "CDNS", "FTNT", "PANW", "CRWD", "ZS",
-    "NOW", "SNOW", "DDOG", "NET", "MDB", "OKTA", "ZM", "PATH", "HUBS",
-    "WDAY", "VEEV", "TEAM", "ESTC", "BILL", "PCOR", "MNDY",
-    # Semiconductors
-    "ARM", "SMCI", "MCHP", "ON", "ADI", "NXPI", "SWKS", "QRVO", "MPWR", "WOLF",
-    # Finance / banks
+    "AMAT", "LRCX", "MRVL", "SNPS", "CDNS", "FTNT", "PANW", "CRWD", "ZS",
+    "NOW", "SNOW", "DDOG", "NET", "MDB", "OKTA", "ZM", "HUBS", "WDAY",
+    "ARM", "SMCI", "MCHP", "ON", "ADI", "NXPI", "MPWR",
     "JPM", "BAC", "WFC", "GS", "MS", "C", "BLK", "SCHW", "AXP", "V", "MA",
-    "COF", "USB", "PNC", "TFC", "BK", "STT", "FITB", "RF", "CFG", "KEY",
-    # Insurance
-    "BRK.B", "AIG", "MET", "PRU", "ALL", "TRV",
-    # Health / pharma / biotech
+    "COF", "USB", "PNC", "TFC",
     "UNH", "JNJ", "LLY", "PFE", "ABBV", "MRK", "TMO", "ABT", "DHR", "BMY",
-    "AMGN", "GILD", "REGN", "VRTX", "ISRG", "DXCM", "MRNA", "BIIB",
-    "ZTS", "CI", "HUM", "ELV", "MCK", "CAH", "ILMN", "ALGN",
-    # Consumer staples
-    "WMT", "PG", "COST", "PEP", "KO", "MCD", "SBUX", "TGT", "KMB",
-    "CL", "GIS", "K", "HSY", "KHC", "MDLZ", "STZ", "MO", "PM",
-    # Consumer discretionary
-    "NKE", "LULU", "DG", "DLTR", "ROST", "TJX", "BURL",
-    "YUM", "CMG", "DPZ", "HLT", "MAR", "RCL", "CCL",
-    # Retail / e-commerce
-    "HD", "LOW", "BKNG", "ABNB", "UBER", "LYFT", "DASH", "PINS", "SNAP", "ETSY",
-    "EBAY", "W", "CHWY", "CARG",
-    # Media / entertainment
-    "DIS", "CMCSA", "PARA", "WBD", "NWSA", "ROKU", "SPOT", "RBLX", "EA", "TTWO",
-    "MTCH", "BMBL",
-    # Telecom
+    "AMGN", "GILD", "REGN", "VRTX", "ISRG", "MRNA",
+    "WMT", "PG", "COST", "PEP", "KO", "MCD", "SBUX", "TGT",
+    "NKE", "LULU", "CMG", "HLT", "MAR",
+    "HD", "LOW", "BKNG", "ABNB", "UBER", "DASH", "PINS", "SNAP", "ETSY",
+    "DIS", "CMCSA", "ROKU", "SPOT", "RBLX", "EA",
     "T", "VZ", "TMUS",
-    # Industrial
-    "BA", "CAT", "GE", "HON", "LMT", "RTX", "NOC", "GD", "DE", "MMM",
-    "UPS", "FDX", "WM", "RSG", "EMR", "ETN", "ITW", "PH", "ROK",
-    # Auto / EV
-    "F", "GM", "RIVN", "LCID", "LI", "NIO", "XPEV",
-    # Energy
-    "XOM", "CVX", "COP", "SLB", "EOG", "PXD", "OXY", "DVN", "HAL", "MPC",
-    "PSX", "VLO", "KMI", "WMB", "OKE",
-    # Utilities
-    "NEE", "DUK", "SO", "AEP", "D", "EXC", "SRE",
-    # Real estate
-    "AMT", "PLD", "CCI", "EQIX", "SPG", "O", "PSA", "DLR",
-    # Fintech / payments / crypto
-    "SQ", "PYPL", "COIN", "SOFI", "AFRM", "UPST", "HOOD", "FIS", "FISV", "GPN",
-    # Growth / AI / speculative
-    "PLTR", "AI", "IONQ", "RGTI", "BBAI", "SOUN", "BIGC",
-    # Aerospace / defense
-    "HII", "LHX", "TDG", "HEI", "AXON",
-    # Materials
-    "LIN", "APD", "SHW", "ECL", "DD", "NEM", "FCX",
-    # ETFs
-    "SPY", "QQQ", "ARKK", "XLF", "XLE", "XLK", "XLV", "XLI", "XLP", "XLY",
-    "GLD", "SLV", "USO", "IWM", "DIA", "VTI", "EEM", "TLT", "HYG", "LQD",
-    "SOXX", "SMH", "XBI", "IBB", "KRE", "XHB",
+    "BA", "CAT", "GE", "HON", "LMT", "RTX", "NOC", "DE",
+    "UPS", "FDX", "WM", "EMR", "ETN",
+    "F", "GM", "RIVN", "LCID", "NIO",
+    "XOM", "CVX", "COP", "SLB", "EOG", "OXY",
+    "NEE", "DUK", "SO",
+    "AMT", "PLD", "CCI", "EQIX", "SPG", "O",
+    "SQ", "PYPL", "COIN", "SOFI", "AFRM", "HOOD", "FIS", "FISV",
+    "PLTR", "AI", "IONQ",
+    "LIN", "APD", "SHW", "NEM", "FCX",
+    "SPY", "QQQ", "ARKK", "XLF", "XLE", "XLK", "XLV",
+    "GLD", "SLV", "IWM", "DIA", "SOXX", "SMH", "XBI",
 ]
+
+
+def _fetch_all_us_tickers():
+    """Fetch all US stock symbols from Finnhub. Returns 1000+ tickers."""
+    if not FINNHUB_KEY:
+        return FALLBACK_TICKERS
+    try:
+        r = httpx.get(
+            "https://finnhub.io/api/v1/stock/symbol",
+            params={"exchange": "US", "token": FINNHUB_KEY},
+            timeout=30,
+        )
+        symbols = r.json()
+        tickers = [
+            s["symbol"] for s in symbols
+            if s.get("type") in ("Common Stock", "ETP", "ETF")
+        ]
+        # Remove tickers with special characters, keep clean 1-5 char symbols
+        tickers = [t for t in tickers if "." not in t and "-" not in t and 1 <= len(t) <= 5]
+        print(f"[Tickers] Fetched {len(tickers)} US symbols from Finnhub")
+        return tickers if tickers else FALLBACK_TICKERS
+    except Exception as e:
+        print(f"[Tickers] Error fetching symbols, using fallback: {e}")
+        return FALLBACK_TICKERS
+
+
+def ensure_tickers():
+    """Load all tickers once, cache globally."""
+    global ALL_TICKERS
+    if ALL_TICKERS is None:
+        ALL_TICKERS = _fetch_all_us_tickers()
+    return ALL_TICKERS
 
 
 def resolve_redirect(url):
@@ -206,15 +209,18 @@ def scrape_news_predictions(db: Session):
     rejected_l1 = 0
     rejected_l2 = 0
 
+    tickers = ensure_tickers()
+
     seen_urls = set()
     existing = db.execute(text("SELECT source_url FROM predictions WHERE source_url IS NOT NULL"))
     for row in existing:
         if row[0]:
             seen_urls.add(row[0])
 
-    print(f"[NewsScraper] Starting — {len(seen_urls)} existing, {len(TICKERS)} tickers")
+    print(f"[NewsScraper] Starting — {len(seen_urls)} existing, {len(tickers)} tickers to scan")
 
-    for i, ticker in enumerate(TICKERS):
+    batch_size = 50
+    for i, ticker in enumerate(tickers):
         try:
             r = httpx.get(
                 "https://finnhub.io/api/v1/company-news",
@@ -315,11 +321,17 @@ def scrape_news_predictions(db: Session):
                     print(f"[NewsScraper] {added} predictions added...")
 
             time.sleep(1.1)
-            if (i + 1) % 10 == 0:
+
+            # Batch pause every 50 tickers to stay under rate limit
+            if (i + 1) % batch_size == 0 and (i + 1) < len(tickers):
+                db.commit()
                 print(
-                    f"[NewsScraper] {i + 1}/{len(TICKERS)} tickers, "
-                    f"{added} added, {rejected_l1} rejected L1, {rejected_l2} rejected L2"
+                    f"[NewsScraper] Batch {(i + 1) // batch_size} done "
+                    f"({i + 1}/{len(tickers)}), {added} added, pausing 10s..."
                 )
+                time.sleep(10)
+            elif (i + 1) % 100 == 0:
+                print(f"[NewsScraper] {i + 1}/{len(tickers)} tickers, {added} added")
 
         except Exception as e:
             print(f"[NewsScraper] Error for {ticker}: {e}")
@@ -327,15 +339,17 @@ def scrape_news_predictions(db: Session):
 
     db.commit()
     LAST_FULL_SCAN = datetime.utcnow()
-    print(f"[NewsScraper] DONE: {added} added, {rejected_l1} rejected L1, {rejected_l2} rejected L2")
+    print(f"[NewsScraper] DONE: {added} added, {rejected_l1} rejected L1, {rejected_l2} rejected L2 ({len(tickers)} tickers scanned)")
 
 
-# 30 most-watched tickers for the fast 15-minute scraper
+# Top 30 most-watched tickers for the fast 15-minute scraper
 FAST_TICKERS = [
-    "AAPL", "MSFT", "GOOGL", "AMZN", "NVDA", "TSLA", "META",
-    "AMD", "NFLX", "JPM", "BA", "NKE", "DIS", "COIN", "PLTR",
-    "CRM", "AVGO", "ADBE", "INTC", "QCOM", "GS", "MS",
-    "UNH", "LLY", "PFE", "XOM", "CRWD", "PANW", "SOFI", "ARM",
+    "AAPL", "MSFT", "GOOGL", "AMZN", "NVDA", "TSLA", "META", "AVGO",
+    "AMD", "NFLX", "CRM", "ADBE", "INTC", "QCOM", "ARM", "SMCI",
+    "JPM", "BAC", "GS", "MS", "V", "MA",
+    "UNH", "LLY", "PFE", "NKE", "BA", "DIS",
+    "XOM", "COIN", "PLTR", "CRWD", "PANW", "SOFI", "SQ", "PYPL",
+    "SNOW", "NOW", "UBER", "HD",
 ]
 
 
