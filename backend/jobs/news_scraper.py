@@ -500,14 +500,12 @@ def _scrape_fast_inner(db: Session):
 # ═══════════════════════════════════════════════════════════════════════════
 
 NEWSAPI_KEY = os.getenv("NEWSAPI_KEY", "")
+NEWSAPI_LAST_RUN = None  # Track last run to only fetch new articles
 
+# 2 combined queries instead of 6 — saves API calls (free tier = 100/day)
 NEWSAPI_QUERIES = [
-    "analyst upgrades stock",
-    "analyst downgrades stock",
-    "price target raises",
-    "price target lowers",
-    "initiates coverage buy",
-    "downgrades to sell",
+    "analyst upgrades downgrades stock rating",
+    "price target raises lowers initiates coverage",
 ]
 
 
@@ -523,6 +521,7 @@ def scrape_newsapi(db: Session):
 
 
 def _newsapi_inner(db: Session):
+    global NEWSAPI_LAST_RUN
     if not NEWSAPI_KEY:
         print("[NewsAPI] No NEWSAPI_KEY, skipping")
         return
@@ -531,17 +530,18 @@ def _newsapi_inner(db: Session):
 
     for query in NEWSAPI_QUERIES:
         try:
-            r = httpx.get(
-                "https://newsapi.org/v2/everything",
-                params={
-                    "q": query,
-                    "language": "en",
-                    "sortBy": "publishedAt",
-                    "pageSize": 50,
-                    "apiKey": NEWSAPI_KEY,
-                },
-                timeout=30,
-            )
+            params = {
+                "q": query,
+                "language": "en",
+                "sortBy": "publishedAt",
+                "pageSize": 100,
+                "apiKey": NEWSAPI_KEY,
+            }
+            # Only fetch articles published after our last check
+            if NEWSAPI_LAST_RUN:
+                params["from"] = NEWSAPI_LAST_RUN
+
+            r = httpx.get("https://newsapi.org/v2/everything", params=params, timeout=30)
             data = r.json()
             if data.get("status") != "ok":
                 print(f"[NewsAPI] Query '{query}': {data.get('message', 'error')}")
@@ -556,6 +556,10 @@ def _newsapi_inner(db: Session):
                 published = article.get("publishedAt", "")
 
                 if not title or not url:
+                    continue
+
+                # Check URL first (cheapest check — avoids wasting CPU on Layer 1)
+                if db.execute(text("SELECT 1 FROM predictions WHERE source_url = :u LIMIT 1"), {"u": url}).first():
                     continue
 
                 # Layer 1 strict filter
@@ -575,10 +579,6 @@ def _newsapi_inner(db: Session):
                 # Extract forecaster
                 forecaster_name = extract_forecaster_name(title, "", ticker)
                 if not forecaster_name:
-                    continue
-
-                # Deduplicate by URL
-                if db.execute(text("SELECT 1 FROM predictions WHERE source_url = :u LIMIT 1"), {"u": url}).first():
                     continue
 
                 forecaster = find_forecaster(forecaster_name, db)
@@ -633,4 +633,5 @@ def _newsapi_inner(db: Session):
 
     if added:
         db.commit()
-    print(f"[NewsAPI] Done: {added} predictions added")
+    NEWSAPI_LAST_RUN = datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%S")
+    print(f"[NewsAPI] Done: {added} predictions added (next run will fetch from {NEWSAPI_LAST_RUN})")
