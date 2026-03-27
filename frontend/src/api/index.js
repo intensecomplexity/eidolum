@@ -147,6 +147,115 @@ export function getInversePortfolio(forecasterId, startingAmount = 10000) {
   return api.get(`/inverse-portfolio/${forecasterId}`, { params: { starting_amount: startingAmount } }).then(r => r.data);
 }
 
+// ——— User Auth & Predictions API ———
+
+function authHeaders() {
+  const token = localStorage.getItem('eidolum_token') || '';
+  return { Authorization: `Bearer ${token}` };
+}
+
+export function registerUser(username, email, password, display_name) {
+  return api.post('/auth/register', { username, email, password, display_name }).then(r => r.data);
+}
+
+export function loginUser(email, password) {
+  return api.post('/auth/login', { email, password }).then(r => r.data);
+}
+
+export function getMe() {
+  return api.get('/auth/me', { headers: authHeaders() }).then(r => r.data);
+}
+
+export function submitUserPrediction(data) {
+  return api.post('/user-predictions/submit', data, { headers: authHeaders() }).then(r => r.data);
+}
+
+export function getUserPredictions(userId, outcome) {
+  const params = {};
+  if (outcome) params.outcome = outcome;
+  return api.get(`/user-predictions/${userId}`, { params }).then(r => r.data);
+}
+
+export function getUserProfile(userId) {
+  return api.get(`/users/${userId}/profile`).then(r => r.data);
+}
+
+export function getCommunityLeaderboard() {
+  return api.get('/leaderboard/community').then(r => r.data);
+}
+
+export function getUserAchievements(userId) {
+  return api.get(`/users/${userId}/achievements`).then(r => r.data);
+}
+
+// ——— Phase 2: Follows, Duels, Seasons, Consensus, Expiring ———
+
+export function followUser(userId) {
+  return api.post(`/follows/${userId}`, {}, { headers: authHeaders() }).then(r => r.data);
+}
+
+export function unfollowUser(userId) {
+  return api.delete(`/follows/${userId}`, { headers: authHeaders() }).then(r => r.data);
+}
+
+export function getFollowers(userId) {
+  return api.get(`/follows/${userId}/followers`).then(r => r.data);
+}
+
+export function getFollowing(userId) {
+  return api.get(`/follows/${userId}/following`).then(r => r.data);
+}
+
+export function getFeed() {
+  return api.get('/feed', { headers: authHeaders() }).then(r => r.data);
+}
+
+export function createDuel(data) {
+  return api.post('/duels/challenge', data, { headers: authHeaders() }).then(r => r.data);
+}
+
+export function acceptDuel(duelId, target) {
+  return api.post(`/duels/${duelId}/accept`, { target }, { headers: authHeaders() }).then(r => r.data);
+}
+
+export function declineDuel(duelId) {
+  return api.post(`/duels/${duelId}/decline`, {}, { headers: authHeaders() }).then(r => r.data);
+}
+
+export function getMyDuels(status) {
+  const params = {};
+  if (status) params.status = status;
+  return api.get('/duels/mine', { params, headers: authHeaders() }).then(r => r.data);
+}
+
+export function getDuelRecord(userId) {
+  return api.get(`/users/${userId}/duel-record`).then(r => r.data);
+}
+
+export function getSeasons() {
+  return api.get('/seasons').then(r => r.data);
+}
+
+export function getCurrentSeason() {
+  return api.get('/seasons/current').then(r => r.data);
+}
+
+export function getSeasonLeaderboard(seasonId) {
+  return api.get(`/seasons/${seasonId}/leaderboard`).then(r => r.data);
+}
+
+export function getTickerConsensus(ticker) {
+  return api.get(`/consensus/${ticker}`).then(r => r.data);
+}
+
+export function getAllConsensus() {
+  return api.get('/consensus').then(r => r.data);
+}
+
+export function getExpiringPredictions() {
+  return api.get('/predictions/expiring').then(r => r.data);
+}
+
 // Admin API (requires Bearer token in sessionStorage)
 function adminHeaders() {
   const token = sessionStorage.getItem('admin_token') || '';

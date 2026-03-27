@@ -18,6 +18,17 @@ import InversePortfolio from './pages/InversePortfolio';
 import RecentPredictions from './pages/RecentPredictions';
 import ForecastersList from './pages/ForecastersList';
 import AdminPanel from './pages/AdminPanel';
+import Login from './pages/Login';
+import Register from './pages/Register';
+import Profile from './pages/Profile';
+import SubmitCall from './pages/SubmitCall';
+import MyCalls from './pages/MyCalls';
+import CommunityLeaderboard from './pages/CommunityLeaderboard';
+import Badges from './pages/Badges';
+import Consensus from './pages/Consensus';
+import Expiring from './pages/Expiring';
+import Duels from './pages/Duels';
+import Seasons from './pages/Seasons';
 
 export default function App() {
   return (
@@ -40,6 +51,19 @@ export default function App() {
         <Route path="/predictions" element={<RecentPredictions />} />
         <Route path="/forecasters" element={<ForecastersList />} />
         <Route path="/admin" element={<AdminPanel />} />
+        {/* Phase 2 */}
+        <Route path="/login" element={<Login />} />
+        <Route path="/register" element={<Register />} />
+        <Route path="/profile" element={<Profile />} />
+        <Route path="/profile/:userId" element={<Profile />} />
+        <Route path="/submit" element={<SubmitCall />} />
+        <Route path="/my-calls" element={<MyCalls />} />
+        <Route path="/community" element={<CommunityLeaderboard />} />
+        <Route path="/badges" element={<Badges />} />
+        <Route path="/consensus" element={<Consensus />} />
+        <Route path="/expiring" element={<Expiring />} />
+        <Route path="/duels" element={<Duels />} />
+        <Route path="/seasons" element={<Seasons />} />
       </Routes>
       <SaveToast />
       <BottomNav />

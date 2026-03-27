@@ -1,0 +1,71 @@
+import { useState } from 'react';
+import { useNavigate, Link } from 'react-router-dom';
+import { LogIn, Eye, EyeOff } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
+import Footer from '../components/Footer';
+
+export default function Login() {
+  const navigate = useNavigate();
+  const { login } = useAuth();
+  const [showPw, setShowPw] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+
+  async function handleSubmit(e) {
+    e.preventDefault();
+    setError('');
+    if (!email.includes('@')) { setError('Valid email required'); return; }
+    if (password.length < 8) { setError('Password must be 8+ characters'); return; }
+
+    setLoading(true);
+    try {
+      await login(email, password);
+      navigate('/profile');
+    } catch (err) {
+      setError(err.response?.data?.detail || 'Invalid email or password');
+    } finally { setLoading(false); }
+  }
+
+  return (
+    <div>
+      <div className="max-w-md mx-auto px-4 py-10 sm:py-16">
+        <div className="text-center mb-8">
+          <h1 className="headline-serif text-3xl sm:text-4xl mb-2">Welcome back</h1>
+          <p className="text-text-secondary text-sm">Log in to track your predictions</p>
+        </div>
+
+        {error && (
+          <div className="bg-negative/10 border border-negative/20 rounded-lg px-4 py-3 mb-4 text-sm text-negative">{error}</div>
+        )}
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="block text-xs text-muted uppercase tracking-wider mb-1.5">Email</label>
+            <input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="you@example.com"
+              className="w-full px-4 py-3 bg-surface border border-border rounded-lg text-text-primary placeholder:text-muted focus:outline-none focus:border-accent/50" />
+          </div>
+          <div>
+            <label className="block text-xs text-muted uppercase tracking-wider mb-1.5">Password</label>
+            <div className="relative">
+              <input type={showPw ? 'text' : 'password'} value={password} onChange={e => setPassword(e.target.value)} placeholder="Min 8 characters"
+                className="w-full px-4 py-3 pr-12 bg-surface border border-border rounded-lg text-text-primary placeholder:text-muted focus:outline-none focus:border-accent/50" />
+              <button type="button" onClick={() => setShowPw(!showPw)} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted">
+                {showPw ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
+            </div>
+          </div>
+          <button type="submit" disabled={loading} className="btn-primary w-full disabled:opacity-50">
+            {loading ? <div className="w-5 h-5 border-2 border-bg border-t-transparent rounded-full animate-spin" /> : 'Log In'}
+          </button>
+        </form>
+
+        <p className="text-center text-muted text-xs mt-6">
+          Don't have an account? <Link to="/register" className="text-accent">Sign up</Link>
+        </p>
+      </div>
+      <Footer />
+    </div>
+  );
+}

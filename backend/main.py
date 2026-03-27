@@ -21,9 +21,10 @@ from database import engine, Base, SessionLocal
 from models import Forecaster, Prediction, Config
 from rate_limit import limiter
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
-from routers import leaderboard, forecasters, assets, sync, activity, admin, platforms, follows, newsletter, saved, positions, contrarian, power_rankings, inverse, subscribers, predictions
+from routers import leaderboard, forecasters, assets, sync, activity, admin, platforms, follows, newsletter, saved, positions, contrarian, power_rankings, inverse, subscribers, predictions, auth, user_predictions, community, user_follows, duels, seasons_router
 from jobs.scraper import run_scraper
 from jobs.evaluator import run_evaluator
+from jobs.user_evaluator import evaluate_user_predictions, evaluate_duels, check_season_completion
 from jobs.leaderboard_refresh import run_leaderboard_refresh
 from jobs.newsletter import run_newsletter
 from admin_panel import router as admin_panel_router
@@ -147,6 +148,255 @@ def migrate_add_archive_columns(db):
                 pass  # expected on subsequent boots
             else:
                 print(f"[Eidolum] migrate {col}: {e}")
+
+
+def run_phase2_migrations():
+    """Phase 2 schema: users, user_predictions, achievements, follows, duels, seasons, season_entries + indexes."""
+    from sqlalchemy import text
+    db = SessionLocal()
+
+    # ── 1. users ──────────────────────────────────────────────────────────
+    try:
+        db.execute(text("""
+            CREATE TABLE IF NOT EXISTS users (
+                id SERIAL PRIMARY KEY,
+                username VARCHAR(50) UNIQUE NOT NULL,
+                display_name VARCHAR(100),
+                email VARCHAR(255) UNIQUE,
+                password_hash VARCHAR(255) NOT NULL,
+                avatar_url TEXT,
+                bio TEXT,
+                created_at TIMESTAMP DEFAULT NOW(),
+                streak_current INTEGER DEFAULT 0,
+                streak_best INTEGER DEFAULT 0,
+                paper_balance DECIMAL(20,2) DEFAULT 0
+            )
+        """))
+        db.commit()
+        print("[Phase2] users table created")
+    except Exception as e:
+        db.rollback()
+        if "already exists" in str(e).lower():
+            pass
+        else:
+            print(f"[Phase2] users table: {e}")
+
+    # Add columns that may be missing from the earlier migration
+    for col, defn in [
+        ("avatar_url", "TEXT"),
+        ("bio", "TEXT"),
+        ("paper_balance", "DECIMAL(20,2) DEFAULT 0"),
+    ]:
+        try:
+            db.execute(text(f"ALTER TABLE users ADD COLUMN {col} {defn}"))
+            db.commit()
+            print(f"[Phase2] users.{col} column added")
+        except Exception as e:
+            db.rollback()
+            if "already exists" in str(e).lower() or "duplicate column" in str(e).lower():
+                pass
+            else:
+                print(f"[Phase2] users ADD {col}: {e}")
+
+    # Ensure password_hash is NOT NULL (may have been nullable before)
+    try:
+        db.execute(text("ALTER TABLE users ALTER COLUMN password_hash SET NOT NULL"))
+        db.commit()
+    except Exception:
+        db.rollback()
+
+    # ── 2. user_predictions ───────────────────────────────────────────────
+    try:
+        db.execute(text("""
+            CREATE TABLE IF NOT EXISTS user_predictions (
+                id SERIAL PRIMARY KEY,
+                user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+                ticker VARCHAR(10) NOT NULL,
+                direction VARCHAR(10) NOT NULL CHECK (direction IN ('bullish', 'bearish')),
+                price_target VARCHAR(50) NOT NULL,
+                price_at_call DECIMAL(20,2),
+                evaluation_window_days INTEGER NOT NULL CHECK (evaluation_window_days BETWEEN 1 AND 365),
+                reasoning TEXT,
+                created_at TIMESTAMP DEFAULT NOW(),
+                expires_at TIMESTAMP NOT NULL,
+                evaluated_at TIMESTAMP,
+                outcome VARCHAR(20) DEFAULT 'pending' CHECK (outcome IN ('pending', 'correct', 'incorrect')),
+                current_price DECIMAL(20,2)
+            )
+        """))
+        db.commit()
+        print("[Phase2] user_predictions table created")
+    except Exception as e:
+        db.rollback()
+        if "already exists" in str(e).lower():
+            pass
+        else:
+            print(f"[Phase2] user_predictions table: {e}")
+
+    # Add expires_at column if table existed from earlier migration
+    try:
+        db.execute(text("ALTER TABLE user_predictions ADD COLUMN expires_at TIMESTAMP"))
+        db.commit()
+        print("[Phase2] user_predictions.expires_at column added")
+    except Exception as e:
+        db.rollback()
+        if "already exists" in str(e).lower() or "duplicate column" in str(e).lower():
+            pass
+        else:
+            print(f"[Phase2] user_predictions ADD expires_at: {e}")
+
+    # Backfill expires_at for any existing rows that have NULL
+    try:
+        db.execute(text("""
+            UPDATE user_predictions
+            SET expires_at = created_at + (evaluation_window_days || ' days')::INTERVAL
+            WHERE expires_at IS NULL AND created_at IS NOT NULL
+        """))
+        db.commit()
+    except Exception:
+        db.rollback()
+
+    # ── 3. achievements ───────────────────────────────────────────────────
+    try:
+        db.execute(text("""
+            CREATE TABLE IF NOT EXISTS achievements (
+                id SERIAL PRIMARY KEY,
+                user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+                badge_id VARCHAR(50) NOT NULL,
+                unlocked_at TIMESTAMP DEFAULT NOW(),
+                UNIQUE(user_id, badge_id)
+            )
+        """))
+        db.commit()
+        print("[Phase2] achievements table created")
+    except Exception as e:
+        db.rollback()
+        if "already exists" in str(e).lower():
+            pass
+        else:
+            print(f"[Phase2] achievements table: {e}")
+
+    # ── 4. follows ────────────────────────────────────────────────────────
+    try:
+        db.execute(text("""
+            CREATE TABLE IF NOT EXISTS follows (
+                id SERIAL PRIMARY KEY,
+                follower_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+                following_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+                created_at TIMESTAMP DEFAULT NOW(),
+                UNIQUE(follower_id, following_id),
+                CHECK (follower_id != following_id)
+            )
+        """))
+        db.commit()
+        print("[Phase2] follows table created")
+    except Exception as e:
+        db.rollback()
+        if "already exists" in str(e).lower():
+            pass
+        else:
+            print(f"[Phase2] follows table: {e}")
+
+    # ── 5. duels ──────────────────────────────────────────────────────────
+    try:
+        db.execute(text("""
+            CREATE TABLE IF NOT EXISTS duels (
+                id SERIAL PRIMARY KEY,
+                challenger_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+                opponent_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+                ticker VARCHAR(10) NOT NULL,
+                challenger_direction VARCHAR(10) NOT NULL CHECK (challenger_direction IN ('bullish', 'bearish')),
+                opponent_direction VARCHAR(10) NOT NULL CHECK (opponent_direction IN ('bullish', 'bearish')),
+                challenger_target VARCHAR(50) NOT NULL,
+                opponent_target VARCHAR(50) NOT NULL,
+                evaluation_window_days INTEGER NOT NULL,
+                price_at_start DECIMAL(20,2),
+                created_at TIMESTAMP DEFAULT NOW(),
+                expires_at TIMESTAMP NOT NULL,
+                status VARCHAR(20) DEFAULT 'pending' CHECK (status IN ('pending', 'active', 'completed', 'declined')),
+                winner_id INTEGER REFERENCES users(id),
+                evaluated_at TIMESTAMP
+            )
+        """))
+        db.commit()
+        print("[Phase2] duels table created")
+    except Exception as e:
+        db.rollback()
+        if "already exists" in str(e).lower():
+            pass
+        else:
+            print(f"[Phase2] duels table: {e}")
+
+    # ── 6. seasons ────────────────────────────────────────────────────────
+    try:
+        db.execute(text("""
+            CREATE TABLE IF NOT EXISTS seasons (
+                id SERIAL PRIMARY KEY,
+                name VARCHAR(50) NOT NULL,
+                starts_at TIMESTAMP NOT NULL,
+                ends_at TIMESTAMP NOT NULL,
+                status VARCHAR(20) DEFAULT 'active' CHECK (status IN ('active', 'completed')),
+                created_at TIMESTAMP DEFAULT NOW()
+            )
+        """))
+        db.commit()
+        print("[Phase2] seasons table created")
+    except Exception as e:
+        db.rollback()
+        if "already exists" in str(e).lower():
+            pass
+        else:
+            print(f"[Phase2] seasons table: {e}")
+
+    # ── 7. season_entries ─────────────────────────────────────────────────
+    try:
+        db.execute(text("""
+            CREATE TABLE IF NOT EXISTS season_entries (
+                id SERIAL PRIMARY KEY,
+                season_id INTEGER REFERENCES seasons(id) ON DELETE CASCADE,
+                user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+                predictions_made INTEGER DEFAULT 0,
+                predictions_scored INTEGER DEFAULT 0,
+                predictions_correct INTEGER DEFAULT 0,
+                UNIQUE(season_id, user_id)
+            )
+        """))
+        db.commit()
+        print("[Phase2] season_entries table created")
+    except Exception as e:
+        db.rollback()
+        if "already exists" in str(e).lower():
+            pass
+        else:
+            print(f"[Phase2] season_entries table: {e}")
+
+    # ── Indexes ───────────────────────────────────────────────────────────
+    indexes = [
+        ("idx_user_predictions_user_id",       "user_predictions(user_id)"),
+        ("idx_user_predictions_outcome",       "user_predictions(outcome)"),
+        ("idx_user_predictions_ticker",        "user_predictions(ticker)"),
+        ("idx_user_predictions_expires_at",    "user_predictions(expires_at)"),
+        ("idx_follows_follower_id",            "follows(follower_id)"),
+        ("idx_follows_following_id",           "follows(following_id)"),
+        ("idx_duels_challenger_id",            "duels(challenger_id)"),
+        ("idx_duels_opponent_id",              "duels(opponent_id)"),
+        ("idx_duels_status",                   "duels(status)"),
+        ("idx_season_entries_season_id",       "season_entries(season_id)"),
+        ("idx_achievements_user_id",           "achievements(user_id)"),
+    ]
+    for idx_name, idx_target in indexes:
+        try:
+            db.execute(text(f"CREATE INDEX IF NOT EXISTS {idx_name} ON {idx_target}"))
+            db.commit()
+        except Exception as e:
+            db.rollback()
+            if "already exists" in str(e).lower():
+                pass
+            else:
+                print(f"[Phase2] index {idx_name}: {e}")
+
+    print("[Phase2] All migrations complete")
+    db.close()
 
 
 def migrate_populate_quotes(db):
@@ -437,6 +687,19 @@ async def lifespan(app):
         db.close()
     except Exception as e:
         print(f"[Eidolum] Archive column migration error (non-fatal): {e}")
+    # Phase 2 schema: users, predictions, achievements, follows, duels, seasons
+    try:
+        run_phase2_migrations()
+    except Exception as e:
+        print(f"[Eidolum] Phase 2 migration error (non-fatal): {e}")
+    # Ensure a season exists for the current quarter
+    try:
+        from seasons import ensure_current_season as _ecs
+        _db = SessionLocal()
+        _ecs(_db)
+        _db.close()
+    except Exception as e:
+        print(f"[Eidolum] Season init error (non-fatal): {e}")
     # Safety check — scan for dangerous patterns
     try:
         from safety_check import check_safety
@@ -485,6 +748,36 @@ async def lifespan(app):
         db = SessionLocal()
         try:
             run_evaluator(db)
+        finally:
+            db.close()
+
+    def run_15min_user_evaluator():
+        from datetime import datetime as _dt
+        print(f"[Scheduler] Running user evaluator at {_dt.utcnow()}")
+        scheduler_last_run["user_evaluator"] = _dt.utcnow()
+        db = SessionLocal()
+        try:
+            evaluate_user_predictions(db)
+        finally:
+            db.close()
+
+    def run_15min_duel_evaluator():
+        from datetime import datetime as _dt
+        print(f"[Scheduler] Running duel evaluator at {_dt.utcnow()}")
+        scheduler_last_run["duel_evaluator"] = _dt.utcnow()
+        db = SessionLocal()
+        try:
+            evaluate_duels(db)
+        finally:
+            db.close()
+
+    def run_hourly_season_check():
+        from datetime import datetime as _dt
+        print(f"[Scheduler] Running season check at {_dt.utcnow()}")
+        scheduler_last_run["season_check"] = _dt.utcnow()
+        db = SessionLocal()
+        try:
+            check_season_completion(db)
         finally:
             db.close()
 
@@ -595,6 +888,9 @@ async def lifespan(app):
     scheduler.add_job(run_yfinance, "interval", hours=3, id="yfinance", next_run_time=datetime.utcnow() + timedelta(minutes=120))
     # Evaluator + leaderboard
     scheduler.add_job(run_15min_evaluator, "interval", minutes=15, id="evaluator")
+    scheduler.add_job(run_15min_user_evaluator, "interval", minutes=15, id="user_evaluator")
+    scheduler.add_job(run_15min_duel_evaluator, "interval", minutes=15, id="duel_evaluator")
+    scheduler.add_job(run_hourly_season_check, "interval", hours=1, id="season_check")
     def run_hourly_leaderboard():
         from datetime import datetime as _dt
         scheduler_last_run["leaderboard"] = _dt.utcnow()
@@ -661,6 +957,12 @@ app.include_router(power_rankings.router, prefix="/api")
 app.include_router(inverse.router, prefix="/api")
 app.include_router(subscribers.router, prefix="/api")
 app.include_router(predictions.router, prefix="/api")
+app.include_router(auth.router, prefix="/api")
+app.include_router(user_predictions.router, prefix="/api")
+app.include_router(community.router, prefix="/api")
+app.include_router(user_follows.router, prefix="/api")
+app.include_router(duels.router, prefix="/api")
+app.include_router(seasons_router.router, prefix="/api")
 app.include_router(admin_panel_router)  # /admin HTML + /api/admin/* endpoints
 
 

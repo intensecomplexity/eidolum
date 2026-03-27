@@ -1,5 +1,5 @@
 import datetime
-from sqlalchemy import Column, Integer, String, Float, DateTime, ForeignKey, Text
+from sqlalchemy import Column, Integer, String, Float, DateTime, ForeignKey, Text, Numeric, UniqueConstraint, CheckConstraint
 from sqlalchemy.orm import relationship
 from database import Base
 
@@ -182,6 +182,144 @@ class DisclosedPosition(Base):
     disclosed_at = Column(DateTime, nullable=True)
     source_url = Column(Text, nullable=True)
     notes = Column(Text, nullable=True)
+
+
+class User(Base):
+    __tablename__ = "users"
+
+    id = Column(Integer, primary_key=True, index=True)
+    username = Column(String(50), unique=True, nullable=False)
+    display_name = Column(String(100), nullable=True)
+    email = Column(String(255), unique=True, nullable=True)
+    password_hash = Column(String(255), nullable=False)
+    avatar_url = Column(Text, nullable=True)
+    bio = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    streak_current = Column(Integer, default=0)
+    streak_best = Column(Integer, default=0)
+    paper_balance = Column(Numeric(20, 2), default=0)
+
+    predictions = relationship("UserPrediction", back_populates="user", cascade="all, delete-orphan")
+    achievements = relationship("Achievement", back_populates="user", cascade="all, delete-orphan")
+
+
+class UserPrediction(Base):
+    __tablename__ = "user_predictions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    ticker = Column(String(10), nullable=False, index=True)
+    direction = Column(String(10), nullable=False)  # "bullish" | "bearish"
+    price_target = Column(String(50), nullable=False)
+    price_at_call = Column(Numeric(20, 2), nullable=True)
+    evaluation_window_days = Column(Integer, nullable=False)
+    reasoning = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    expires_at = Column(DateTime, nullable=False)
+    evaluated_at = Column(DateTime, nullable=True)
+    outcome = Column(String(20), default="pending", index=True)  # "pending" | "correct" | "incorrect"
+    current_price = Column(Numeric(20, 2), nullable=True)
+
+    __table_args__ = (
+        CheckConstraint("direction IN ('bullish', 'bearish')", name="ck_up_direction"),
+        CheckConstraint("evaluation_window_days BETWEEN 1 AND 365", name="ck_up_window"),
+        CheckConstraint("outcome IN ('pending', 'correct', 'incorrect')", name="ck_up_outcome"),
+    )
+
+    user = relationship("User", back_populates="predictions")
+
+
+class Achievement(Base):
+    __tablename__ = "achievements"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    badge_id = Column(String(50), nullable=False)
+    unlocked_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+    __table_args__ = (UniqueConstraint("user_id", "badge_id", name="uq_user_badge"),)
+
+    user = relationship("User", back_populates="achievements")
+
+
+class Follow(Base):
+    __tablename__ = "follows"
+
+    id = Column(Integer, primary_key=True, index=True)
+    follower_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    following_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+    __table_args__ = (
+        UniqueConstraint("follower_id", "following_id", name="uq_follow_pair"),
+        CheckConstraint("follower_id != following_id", name="ck_no_self_follow"),
+    )
+
+    follower = relationship("User", foreign_keys=[follower_id], backref="following")
+    following = relationship("User", foreign_keys=[following_id], backref="followers")
+
+
+class Duel(Base):
+    __tablename__ = "duels"
+
+    id = Column(Integer, primary_key=True, index=True)
+    challenger_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    opponent_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    ticker = Column(String(10), nullable=False)
+    challenger_direction = Column(String(10), nullable=False)
+    opponent_direction = Column(String(10), nullable=False)
+    challenger_target = Column(String(50), nullable=False)
+    opponent_target = Column(String(50), nullable=False)
+    evaluation_window_days = Column(Integer, nullable=False)
+    price_at_start = Column(Numeric(20, 2), nullable=True)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    expires_at = Column(DateTime, nullable=False)
+    status = Column(String(20), default="pending", index=True)
+    winner_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    evaluated_at = Column(DateTime, nullable=True)
+
+    __table_args__ = (
+        CheckConstraint("challenger_direction IN ('bullish', 'bearish')", name="ck_duel_cdir"),
+        CheckConstraint("opponent_direction IN ('bullish', 'bearish')", name="ck_duel_odir"),
+        CheckConstraint("status IN ('pending', 'active', 'completed', 'declined')", name="ck_duel_status"),
+    )
+
+    challenger = relationship("User", foreign_keys=[challenger_id])
+    opponent = relationship("User", foreign_keys=[opponent_id])
+    winner = relationship("User", foreign_keys=[winner_id])
+
+
+class Season(Base):
+    __tablename__ = "seasons"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(50), nullable=False)
+    starts_at = Column(DateTime, nullable=False)
+    ends_at = Column(DateTime, nullable=False)
+    status = Column(String(20), default="active")
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+    __table_args__ = (
+        CheckConstraint("status IN ('active', 'completed')", name="ck_season_status"),
+    )
+
+    entries = relationship("SeasonEntry", back_populates="season", cascade="all, delete-orphan")
+
+
+class SeasonEntry(Base):
+    __tablename__ = "season_entries"
+
+    id = Column(Integer, primary_key=True, index=True)
+    season_id = Column(Integer, ForeignKey("seasons.id", ondelete="CASCADE"), nullable=False, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    predictions_made = Column(Integer, default=0)
+    predictions_scored = Column(Integer, default=0)
+    predictions_correct = Column(Integer, default=0)
+
+    __table_args__ = (UniqueConstraint("season_id", "user_id", name="uq_season_user"),)
+
+    season = relationship("Season", back_populates="entries")
+    user = relationship("User")
 
 
 class Config(Base):
