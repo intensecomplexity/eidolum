@@ -1,76 +1,72 @@
 """
 Prediction evaluator — scores pending predictions against actual stock prices.
-Uses Finnhub candle API for historical prices.
+Uses Finnhub candle API for historical prices, grouped by ticker for efficiency.
 """
 import os
 import time
 import httpx
 from datetime import datetime, timedelta
+from collections import defaultdict
 from models import Prediction
-from sqlalchemy import text
 
 
 FINNHUB_KEY = os.getenv("FINNHUB_KEY", "")
 
 
-def _get_close_price(ticker, date_obj, cache):
-    """Get closing price for a ticker on a specific date using Finnhub candles."""
-    cache_key = f"{ticker}_{date_obj.strftime('%Y-%m-%d')}"
-    if cache_key in cache:
-        return cache[cache_key]
-
-    # Fetch a 5-day window around the target date to handle weekends/holidays
-    start = int((date_obj - timedelta(days=3)).timestamp())
-    end = int((date_obj + timedelta(days=3)).timestamp())
+def _fetch_candles(ticker, from_date, to_date):
+    """Fetch daily candles for a ticker. Returns dict of {date_str: close_price}."""
+    start_ts = int(from_date.timestamp())
+    end_ts = int(to_date.timestamp())
 
     try:
         r = httpx.get(
             "https://finnhub.io/api/v1/stock/candle",
-            params={"symbol": ticker, "resolution": "D", "from": start, "to": end, "token": FINNHUB_KEY},
-            timeout=10,
+            params={"symbol": ticker, "resolution": "D", "from": start_ts, "to": end_ts, "token": FINNHUB_KEY},
+            timeout=15,
         )
         data = r.json()
         closes = data.get("c", [])
         timestamps = data.get("t", [])
 
         if not closes or data.get("s") == "no_data":
-            cache[cache_key] = None
-            return None
+            return {}
 
-        # Find the closest price to target date
-        target_ts = int(date_obj.timestamp())
-        best_price = None
-        best_diff = float("inf")
+        prices = {}
         for i, ts in enumerate(timestamps):
-            diff = abs(ts - target_ts)
-            if diff < best_diff:
-                best_diff = diff
-                best_price = closes[i]
-
-        cache[cache_key] = best_price
-        return best_price
+            dt = datetime.utcfromtimestamp(ts)
+            prices[dt.strftime("%Y-%m-%d")] = closes[i]
+        return prices
 
     except Exception:
-        cache[cache_key] = None
-        return None
+        return {}
+
+
+def _find_closest_price(prices, target_date, max_days=5):
+    """Find the closest available price to the target date."""
+    for offset in range(max_days + 1):
+        for delta in [offset, -offset]:
+            d = (target_date + timedelta(days=delta)).strftime("%Y-%m-%d")
+            if d in prices:
+                return prices[d]
+    return None
 
 
 def evaluate_all_pending(db):
-    """Evaluate ALL pending predictions that are past their evaluation window."""
+    """Bulk evaluate ALL pending predictions past their window, grouped by ticker."""
     if not FINNHUB_KEY:
         print("[Evaluator] No FINNHUB_KEY — cannot evaluate")
         return
 
     now = datetime.utcnow()
 
-    # Find all pending predictions past their evaluation date
+    # Get all pending predictions
     pending = db.query(Prediction).filter(
         Prediction.outcome == "pending",
         Prediction.ticker.isnot(None),
         Prediction.prediction_date.isnot(None),
     ).all()
 
-    # Filter to only those past their evaluation window
+    # Filter to those past evaluation window
     due = []
     for p in pending:
         window = p.window_days or 90
@@ -82,63 +78,72 @@ def evaluate_all_pending(db):
         print(f"[Evaluator] {len(pending)} pending, 0 due for evaluation")
         return
 
-    print(f"[Evaluator] {len(due)} predictions due for evaluation (out of {len(pending)} pending)")
+    # Group by ticker for efficient API calls
+    by_ticker = defaultdict(list)
+    for p in due:
+        by_ticker[p.ticker.upper()].append(p)
+
+    print(f"[Evaluator] {len(due)} predictions due across {len(by_ticker)} tickers")
 
     evaluated = 0
     errors = 0
-    price_cache = {}
+    tickers_done = 0
 
-    for i, p in enumerate(due):
+    for ticker, preds in by_ticker.items():
         try:
-            ticker = (p.ticker or "").upper().strip()
-            if not ticker or len(ticker) > 6:
+            # Find date range needed for this ticker
+            earliest = min(p.prediction_date for p in preds)
+            latest_eval = max(p.prediction_date + timedelta(days=p.window_days or 90) for p in preds)
+            # Add buffer for weekends
+            from_date = earliest - timedelta(days=5)
+            to_date = min(latest_eval + timedelta(days=5), now)
+
+            prices = _fetch_candles(ticker, from_date, to_date)
+            time.sleep(1.1)
+
+            if not prices:
+                errors += len(preds)
+                tickers_done += 1
                 continue
 
-            window = p.window_days or 90
-            start_date = p.prediction_date
-            end_date = start_date + timedelta(days=window)
+            for p in preds:
+                window = p.window_days or 90
+                start_date = p.prediction_date
+                end_date = start_date + timedelta(days=window)
 
-            # Get price at prediction date (entry) and at evaluation date (exit)
-            entry_price = p.entry_price  # Use stored entry price if available
-            if not entry_price or entry_price <= 0:
-                entry_price = _get_close_price(ticker, start_date, price_cache)
-                time.sleep(0.3)
+                entry = p.entry_price if (p.entry_price and p.entry_price > 0) else _find_closest_price(prices, start_date)
+                exit_price = _find_closest_price(prices, end_date)
 
-            exit_price = _get_close_price(ticker, end_date, price_cache)
-            time.sleep(0.3)
+                if not entry or not exit_price or entry <= 0:
+                    errors += 1
+                    continue
 
-            if not entry_price or not exit_price or entry_price <= 0:
-                errors += 1
-                continue
+                direction = (p.direction or "bullish").lower()
+                pct_return = round(((exit_price - entry) / entry) * 100, 2)
 
-            direction = (p.direction or "bullish").lower()
-            pct_return = round(((exit_price - entry_price) / entry_price) * 100, 2)
+                if direction in ("bear", "bearish"):
+                    outcome = "correct" if exit_price <= entry else "incorrect"
+                    adjusted = -pct_return
+                else:
+                    outcome = "correct" if exit_price >= entry else "incorrect"
+                    adjusted = pct_return
 
-            if direction in ("bear", "bearish"):
-                outcome = "correct" if exit_price <= entry_price else "incorrect"
-                adjusted_return = -pct_return
-            else:
-                outcome = "correct" if exit_price >= entry_price else "incorrect"
-                adjusted_return = pct_return
+                p.outcome = outcome
+                p.entry_price = entry
+                p.actual_return = adjusted
+                p.alpha = adjusted
+                p.evaluation_date = end_date
+                evaluated += 1
 
-            p.outcome = outcome
-            p.entry_price = entry_price
-            p.actual_return = adjusted_return
-            p.alpha = adjusted_return
-            p.evaluation_date = end_date
-            evaluated += 1
-
-            if evaluated % 100 == 0:
+            tickers_done += 1
+            if tickers_done % 50 == 0:
                 db.commit()
-                print(f"[Evaluator] Scored {evaluated}/{len(due)} predictions...")
-
-            # Rate limit: ~2 calls per prediction, sleep to stay under 60/min
-            if (i + 1) % 25 == 0:
-                time.sleep(5)
+                print(f"[Evaluator] {tickers_done}/{len(by_ticker)} tickers, {evaluated} scored")
 
         except Exception as e:
-            print(f"[Evaluator] Error on #{p.id}: {e}")
+            print(f"[Evaluator] Error for {ticker}: {e}")
             errors += 1
+            tickers_done += 1
 
     db.commit()
 
@@ -152,4 +157,4 @@ def evaluate_all_pending(db):
     except Exception as e:
         print(f"[Evaluator] Stats update error: {e}")
 
-    print(f"[Evaluator] Done: {evaluated} scored, {errors} errors, {len(due) - evaluated - errors} skipped (no price data)")
+    print(f"[Evaluator] Done: {evaluated} scored, {errors} errors, {len(by_ticker)} tickers processed")

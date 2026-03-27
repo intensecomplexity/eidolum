@@ -117,7 +117,8 @@ def _save_fmp_grade(item, db, source_prefix, date_override=None):
     new_grade = item.get("newGrade", "")
     prev_grade = item.get("previousGrade", "")
     news_url = item.get("newsURL", "")
-    published = item.get("publishedDate", "")
+    # FMP uses different date field names across endpoints
+    published = item.get("date", "") or item.get("publishedDate", "") or item.get("gradeDate", "")
 
     if not ticker or not company or not action:
         return 0
