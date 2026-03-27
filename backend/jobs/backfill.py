@@ -22,6 +22,9 @@ FMP_KEY = os.getenv("FMP_KEY", "")
 
 BACKFILL_TICKERS = FALLBACK_TICKERS[:50]  # Reduced for yfinance rate limits
 
+# FMP URL base — determined at startup by _test_fmp_endpoints()
+_FMP_BASE = None  # Will be set to "stable" or "api/v3" depending on which works
+
 
 def should_backfill(db: Session) -> bool:
     count = db.query(Prediction).count()
@@ -42,13 +45,13 @@ def run_backfill(db: Session):
     # Test FMP endpoints first
     _test_fmp_endpoints()
 
-    print("[Backfill] === FMP daily grades (365 days) ===")
-    total += _backfill_fmp_daily(db)
+    print("[Backfill] === FMP grades-latest ===")
+    total += _backfill_fmp_grades_latest(db)
 
-    print("[Backfill] === FMP upgrades RSS (6 pages) ===")
-    total += _backfill_fmp_rss(db)
+    print("[Backfill] === FMP grades by ticker (top 50) ===")
+    total += _backfill_fmp_grades_by_ticker(db)
 
-    print("[Backfill] === FMP price targets RSS (6 pages) ===")
+    print("[Backfill] === FMP price targets (top 50) ===")
     total += _backfill_fmp_price_targets(db)
 
     print("[Backfill] === yfinance historical (50 tickers) ===")
@@ -65,44 +68,45 @@ def run_backfill(db: Session):
         print(f"[Backfill] Evaluation error: {e}")
 
 
+def _fmp_url(path):
+    """Build FMP URL using whichever base works (stable or v3)."""
+    global _FMP_BASE
+    base = _FMP_BASE or "stable"
+    return f"https://financialmodelingprep.com/{base}/{path}"
+
+
 def _test_fmp_endpoints():
-    """Test all 3 FMP endpoints and print raw responses."""
+    """Test ALL FMP URL variants and print results."""
     if not FMP_KEY:
-        print("[Backfill-FMP] No FMP_KEY set!")
+        print("[FMP-Test] No FMP_KEY set!")
         return
 
-    print(f"[Backfill-FMP] FMP_KEY present: {FMP_KEY[:4]}...{FMP_KEY[-4:]}")
-    yesterday = (datetime.utcnow() - timedelta(days=1)).strftime("%Y-%m-%d")
+    print(f"[FMP-Test] FMP_KEY: {FMP_KEY[:4]}...{FMP_KEY[-4:]}")
 
-    # Test 1: Daily grades
-    try:
-        r = httpx.get(
-            "https://financialmodelingprep.com/api/v3/upgrades-downgrades",
-            params={"date": yesterday, "apikey": FMP_KEY}, timeout=15,
-        )
-        print(f"[FMP-Test] Daily grades ({yesterday}): status={r.status_code}, len={len(r.text)}, body={r.text[:200]}")
-    except Exception as e:
-        print(f"[FMP-Test] Daily grades error: {e}")
+    # Test every possible FMP endpoint
+    test_urls = [
+        # Grades endpoints (Starter plan)
+        ("stable/grades", {"symbol": "AAPL", "apikey": FMP_KEY}),
+        ("stable/grades-latest", {"apikey": FMP_KEY}),
+        ("stable/grades-historical", {"symbol": "AAPL", "apikey": FMP_KEY}),
+        ("stable/price-target", {"symbol": "AAPL", "apikey": FMP_KEY}),
+        # Legacy upgrades endpoints
+        ("stable/upgrades-downgrades", {"apikey": FMP_KEY}),
+        ("stable/upgrades-downgrades-rss-feed", {"page": 0, "apikey": FMP_KEY}),
+        ("stable/price-target-rss-feed", {"page": 0, "apikey": FMP_KEY}),
+        # v3 legacy
+        ("api/v3/grade/AAPL", {"apikey": FMP_KEY}),
+        ("api/v3/upgrades-downgrades-rss-feed", {"page": 0, "apikey": FMP_KEY}),
+    ]
 
-    # Test 2: RSS feed
-    try:
-        r = httpx.get(
-            "https://financialmodelingprep.com/api/v3/upgrades-downgrades-rss-feed",
-            params={"page": 0, "apikey": FMP_KEY}, timeout=15,
-        )
-        print(f"[FMP-Test] RSS feed: status={r.status_code}, len={len(r.text)}, body={r.text[:200]}")
-    except Exception as e:
-        print(f"[FMP-Test] RSS feed error: {e}")
-
-    # Test 3: Price targets
-    try:
-        r = httpx.get(
-            "https://financialmodelingprep.com/api/v3/price-target-rss-feed",
-            params={"page": 0, "apikey": FMP_KEY}, timeout=15,
-        )
-        print(f"[FMP-Test] Price targets: status={r.status_code}, len={len(r.text)}, body={r.text[:200]}")
-    except Exception as e:
-        print(f"[FMP-Test] Price targets error: {e}")
+    for path, params in test_urls:
+        try:
+            url = f"https://financialmodelingprep.com/{path}"
+            r = httpx.get(url, params=params, timeout=10)
+            body = r.text[:200].replace("\n", " ")
+            print(f"[FMP-Test] {path}: {r.status_code} len={len(r.text)} body={body}")
+        except Exception as e:
+            print(f"[FMP-Test] {path}: ERROR {e}")
 
 
 def _save_fmp_grade(item, db, source_prefix, date_override=None):
@@ -169,97 +173,114 @@ def _save_fmp_grade(item, db, source_prefix, date_override=None):
     return 1
 
 
-# ── FMP Daily Grades (365 days) ─────────────────────────────────────────
+# ── FMP grades-latest (all recent grades in one call) ────────────────────
 
-def _backfill_fmp_daily(db: Session) -> int:
+def _backfill_fmp_grades_latest(db: Session) -> int:
     if not FMP_KEY:
-        print("[Backfill-FMP-Daily] No FMP_KEY")
+        print("[Backfill-FMP-Latest] No FMP_KEY")
         return 0
 
     added = 0
-    today = datetime.utcnow()
+    # Try both grades-latest and grades endpoints
+    urls_to_try = [
+        ("https://financialmodelingprep.com/stable/grades-latest", {"apikey": FMP_KEY}),
+        ("https://financialmodelingprep.com/api/v3/grade/AAPL", {"apikey": FMP_KEY}),
+    ]
 
-    for days_ago in range(365):
-        date_str = (today - timedelta(days=days_ago)).strftime("%Y-%m-%d")
+    for url, params in urls_to_try:
         try:
-            r = httpx.get(
-                "https://financialmodelingprep.com/api/v3/upgrades-downgrades",
-                params={"date": date_str, "apikey": FMP_KEY}, timeout=15,
-            )
+            r = httpx.get(url, params=params, timeout=15)
+            print(f"[Backfill-FMP-Latest] {url.split('/')[-1]}: {r.status_code} len={len(r.text)}")
             if r.status_code != 200:
-                if days_ago < 3:
-                    print(f"[Backfill-FMP-Daily] {date_str}: status {r.status_code}")
                 continue
             items = r.json()
             if not isinstance(items, list):
                 continue
-
+            print(f"[Backfill-FMP-Latest] Got {len(items)} items")
             for item in items:
-                added += _save_fmp_grade(item, db, "bf_fmp_d", date_str)
-
-            time.sleep(1)
-            if (days_ago + 1) % 30 == 0:
-                db.commit()
-                print(f"[Backfill-FMP-Daily] {days_ago + 1}/365 days, {added} added")
-
+                added += _save_fmp_grade(item, db, "bf_fmp_l")
+            if added > 0:
+                break  # Got data, don't try other URLs
         except Exception as e:
-            print(f"[Backfill-FMP-Daily] {date_str} error: {e}")
+            print(f"[Backfill-FMP-Latest] Error: {e}")
 
     db.commit()
-    print(f"[Backfill-FMP-Daily] Done: {added} predictions")
+    print(f"[Backfill-FMP-Latest] Done: {added} predictions")
     return added
 
 
-# ── FMP Upgrades RSS (6 pages) ──────────────────────────────────────────
+# ── FMP grades by ticker (top 50) ───────────────────────────────────────
 
-def _backfill_fmp_rss(db: Session) -> int:
+def _backfill_fmp_grades_by_ticker(db: Session) -> int:
     if not FMP_KEY:
         return 0
 
     added = 0
-    for page in range(6):
-        try:
-            r = httpx.get(
-                "https://financialmodelingprep.com/api/v3/upgrades-downgrades-rss-feed",
-                params={"page": page, "apikey": FMP_KEY}, timeout=15,
-            )
-            if r.status_code != 200:
-                print(f"[Backfill-FMP-RSS] Page {page}: status {r.status_code}")
-                break
-            items = r.json()
-            if not isinstance(items, list) or not items:
-                break
-            for item in items:
-                added += _save_fmp_grade(item, db, "bf_fmp_r")
-            time.sleep(0.5)
-        except Exception as e:
-            print(f"[Backfill-FMP-RSS] Page {page} error: {e}")
-            break
+    tickers = BACKFILL_TICKERS[:50]
+    print(f"[Backfill-FMP-Grades] Scanning {len(tickers)} tickers")
+
+    for i, ticker in enumerate(tickers):
+        # Try stable/grades and stable/grades-historical
+        for endpoint in ["grades", "grades-historical"]:
+            try:
+                r = httpx.get(
+                    f"https://financialmodelingprep.com/stable/{endpoint}",
+                    params={"symbol": ticker, "apikey": FMP_KEY}, timeout=15,
+                )
+                if r.status_code != 200:
+                    if i == 0:
+                        print(f"[Backfill-FMP-Grades] {endpoint}/{ticker}: {r.status_code}")
+                    continue
+                items = r.json()
+                if not isinstance(items, list):
+                    continue
+                if i == 0 and items:
+                    print(f"[Backfill-FMP-Grades] {endpoint} sample: {items[0]}")
+
+                for item in items:
+                    added += _save_fmp_grade(item, db, "bf_fmp_g")
+
+                if items:
+                    break  # Got data from this endpoint, skip other
+            except Exception as e:
+                if i == 0:
+                    print(f"[Backfill-FMP-Grades] {endpoint}/{ticker} error: {e}")
+
+        time.sleep(0.5)
+        if (i + 1) % 10 == 0:
+            db.commit()
+            print(f"[Backfill-FMP-Grades] {i + 1}/{len(tickers)}, {added} added")
 
     db.commit()
-    print(f"[Backfill-FMP-RSS] Done: {added} predictions from RSS")
+    print(f"[Backfill-FMP-Grades] Done: {added} predictions")
     return added
 
 
-# ── FMP Price Targets RSS (6 pages) ─────────────────────────────────────
+# ── FMP Price Targets (per ticker) ──────────────────────────────────────
 
 def _backfill_fmp_price_targets(db: Session) -> int:
     if not FMP_KEY:
         return 0
 
     added = 0
-    for page in range(6):
+    tickers = BACKFILL_TICKERS[:50]
+    print(f"[Backfill-FMP-PT] Scanning {len(tickers)} tickers for price targets")
+
+    for ti, tkr in enumerate(tickers):
         try:
             r = httpx.get(
-                "https://financialmodelingprep.com/api/v3/price-target-rss-feed",
-                params={"page": page, "apikey": FMP_KEY}, timeout=15,
+                "https://financialmodelingprep.com/stable/price-target",
+                params={"symbol": tkr, "apikey": FMP_KEY}, timeout=15,
             )
             if r.status_code != 200:
-                print(f"[Backfill-FMP-PT] Page {page}: status {r.status_code}")
-                break
+                if ti == 0:
+                    print(f"[Backfill-FMP-PT] price-target/{tkr}: {r.status_code} body={r.text[:150]}")
+                continue
             items = r.json()
             if not isinstance(items, list) or not items:
-                break
+                continue
+            if ti == 0:
+                print(f"[Backfill-FMP-PT] Sample: {items[0]}")
 
             for item in items:
                 ticker = item.get("symbol", "")
@@ -320,9 +341,12 @@ def _backfill_fmp_price_targets(db: Session) -> int:
                 added += 1
 
             time.sleep(0.5)
+            if (ti + 1) % 10 == 0:
+                db.commit()
+                print(f"[Backfill-FMP-PT] {ti + 1}/{len(tickers)}, {added} added")
+
         except Exception as e:
-            print(f"[Backfill-FMP-PT] Page {page} error: {e}")
-            break
+            print(f"[Backfill-FMP-PT] {tkr} error: {e}")
 
     db.commit()
     print(f"[Backfill-FMP-PT] Done: {added} price target predictions")
