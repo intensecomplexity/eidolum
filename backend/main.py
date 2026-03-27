@@ -131,7 +131,6 @@ def migrate_platform_types():
         print(f"[Eidolum] Platform migration error (non-fatal): {e}")
 
 
-    # wipe_all_fake_data removed — predictions persist, Layer 3 handles cleanup
 
 
 def migrate_add_archive_columns(db):
@@ -203,7 +202,6 @@ def migrate_clear_fake_source_urls(db):
         print(f"[Eidolum] migrate_clear_fake_source_urls error: {e}")
 
 
-    # wipe_all_predictions removed — predictions persist between deploys
 
 
 def migrate_profile_urls():
@@ -310,19 +308,7 @@ async def lifespan(app):
     except Exception:
         pass
     # Predictions persist between deploys — Layer 3 cleanup handles invalid ones hourly
-    # Remove Reddit forecasters (replaced by magazines)
-    try:
-        from sqlalchemy import text as _rd
-        db = SessionLocal()
-        reddit_count = db.execute(_rd("SELECT COUNT(*) FROM forecasters WHERE platform = 'reddit'")).scalar()
-        if reddit_count > 0:
-            db.execute(_rd("DELETE FROM forecasters WHERE platform = 'reddit'"))
-            db.execute(_rd("DELETE FROM forecasters WHERE name LIKE '%WSB%'"))
-            db.commit()
-        db.close()
-    except Exception as e:
-        print(f"[Migration] Reddit cleanup error (non-fatal): {e}")
-    # STEP 2: Seed 50 forecasters (keep existing, add missing)
+    # Seed forecasters (keep existing, add missing)
     try:
         db = SessionLocal()
         from jobs.seed_magazines import seed_magazine_forecasters
