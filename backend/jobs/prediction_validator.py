@@ -474,10 +474,23 @@ def is_real_prediction(headline, summary=""):
         return False
 
     # If commentary words are present, the exact action must ALSO be present
-    # (already guaranteed by the check above, but reject if ONLY commentary)
     has_commentary = any(c in combined for c in COMMENTARY_WORDS)
     if has_commentary and not has_exact_action:
         return False
+
+    # Maintains/reiterates only valid if price target changed (in headline)
+    has_maintains = any(m in combined for m in ["maintains", "maintained", "reiterates", "reiterated"])
+    if has_maintains:
+        has_pt_change = any(pt in combined for pt in [
+            "raises price target", "raised price target", "lowers price target",
+            "lowered price target", "cuts price target", "cut price target",
+            "boosts price target", "slashes price target",
+            "price target to $", "price target of $",
+            "target to $", "target of $", "pt to $", "pt of $",
+            "from $", "to $",
+        ])
+        if not has_pt_change:
+            return False  # Maintains with no PT change = noise
 
     return True
 
