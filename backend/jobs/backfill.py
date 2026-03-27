@@ -247,7 +247,12 @@ def _save_fmp_grade(item, db, source_prefix, date_override=None):
     if _is_self_analysis(canonical, ticker):
         return 0
 
-    direction = _action_to_direction(action, new_grade)
+    # Check if price target changed (for maintains rule)
+    pt_current = item.get("pt_current") or item.get("priceTarget") or item.get("newPriceTarget")
+    pt_prior = item.get("pt_prior") or item.get("previousPriceTarget") or item.get("adjPriceTarget")
+    pt_changed = bool(pt_current) and str(pt_current) != str(pt_prior)
+
+    direction = _action_to_direction(action, new_grade, pt_changed=pt_changed)
     if not direction:
         return 0
 

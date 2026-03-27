@@ -27,8 +27,8 @@ FMP_KEY = os.getenv("FMP_KEY", "")
 UPGRADE_TICKERS = FALLBACK_TICKERS[:150]
 
 
-def _action_to_direction(action, to_grade=""):
-    """Convert action/grade to bullish/bearish."""
+def _action_to_direction(action, to_grade="", pt_changed=True):
+    """Convert action/grade to bullish/bearish. Maintains only valid if PT changed."""
     action_lower = (action or "").lower()
     grade_lower = (to_grade or "").lower()
 
@@ -40,7 +40,9 @@ def _action_to_direction(action, to_grade=""):
         if grade_lower in ("buy", "overweight", "outperform"):
             return "bullish"
         return "bearish"
-    if action_lower in ("reiterate", "maintain"):
+    if action_lower in ("reiterate", "maintain", "reiterated", "maintained"):
+        if not pt_changed:
+            return None  # Maintains with no PT change = noise
         if grade_lower in ("buy", "overweight", "outperform", "strong buy"):
             return "bullish"
         if grade_lower in ("sell", "underweight", "underperform", "reduce", "strong sell"):

@@ -51,6 +51,20 @@ Always extract the actual analyst/firm name from the headline. Never attribute t
 ## Conflict of interest:
 Flag when forecaster has financial interest in the stock.
 
+## Maintains Ratings Rule
+A "maintains" or "reiterates" rating is only a valid prediction if the price target CHANGED.
+
+Accept:
+- "Goldman Sachs maintains Buy on AAPL, raises price target $150 to $180" (PT changed)
+- "Wells Fargo maintains Sell on TSLA, lowers price target $200 to $170" (PT changed)
+
+Reject:
+- "Wells Fargo maintains Neutral on Ford" (no price target, no measurable claim)
+- "JPMorgan maintains Hold on AMZN" (nothing changed, pure noise)
+- "Citi maintains Buy on MSFT" (no price target change = not a prediction)
+
+Rule: maintains + price target change = prediction. maintains + no change = noise, reject.
+
 ## Sentiment rule
 "wary of", "confident of", "cautious on", "optimistic about", "bullish on", "bearish on"
 WITHOUT a specific action (upgrade/downgrade/price target) are NOT predictions.

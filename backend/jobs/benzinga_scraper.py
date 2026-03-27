@@ -101,6 +101,9 @@ def _benzinga_inner(db: Session):
             elif any(w in action_lower for w in ["downgrades", "downgrade"]):
                 direction = "bearish"
             elif "maintains" in action_lower or "reiterates" in action_lower:
+                # Maintains only valid if price target changed
+                if not pt_current or str(pt_current) == str(pt_prior):
+                    continue  # No PT change = noise, skip
                 if any(w in rating_lower for w in ["buy", "outperform", "overweight", "strong buy"]):
                     direction = "bullish"
                 elif any(w in rating_lower for w in ["sell", "underperform", "underweight", "reduce"]):

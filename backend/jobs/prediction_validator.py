@@ -670,6 +670,19 @@ def cleanup_invalid_predictions(db):
     """))
     deleted += r.rowcount
 
+    # Maintains/reiterates without price target = noise
+    r = db.execute(sql_text("""
+        DELETE FROM predictions WHERE
+            (LOWER(context) LIKE '%maintains %' OR LOWER(context) LIKE '%reiterates %'
+             OR LOWER(context) LIKE '%reiterated %' OR LOWER(context) LIKE '%maintained %')
+            AND target_price IS NULL
+            AND LOWER(context) NOT LIKE '%upgrades%'
+            AND LOWER(context) NOT LIKE '%downgrades%'
+            AND LOWER(context) NOT LIKE '%price target%'
+            AND LOWER(context) NOT LIKE '% pt %'
+    """))
+    deleted += r.rowcount
+
     db.commit()
     if deleted > 0:
         print(f"[Defense L3] Cleaned up {deleted} invalid predictions")
