@@ -1,7 +1,6 @@
 """
 Historical backfill — runs on startup if DB has <1000 predictions.
-Pulls 1-2 years of past analyst upgrades/downgrades for instant accuracy data.
-Does NOT use SCRAPER_LOCK — runs independently since it's a one-time startup task.
+Focuses on FMP (3 endpoints) + yfinance. Finnhub upgrade API requires paid tier.
 """
 import os
 import time
@@ -18,10 +17,9 @@ from jobs.prediction_validator import (
 from jobs.news_scraper import find_forecaster, FALLBACK_TICKERS
 from jobs.upgrade_scrapers import _action_to_direction, _is_self_analysis
 
-FINNHUB_KEY = os.getenv("FINNHUB_KEY", "")
 FMP_KEY = os.getenv("FMP_KEY", "")
 
-BACKFILL_TICKERS = FALLBACK_TICKERS[:200]
+BACKFILL_TICKERS = FALLBACK_TICKERS[:50]  # Reduced for yfinance rate limits
 
 
 def should_backfill(db: Session) -> bool:
@@ -40,17 +38,23 @@ def run_backfill(db: Session):
     print(f"[Backfill] Starting historical backfill (DB has {pred_count}, need 1000)")
     total = 0
 
-    print("[Backfill] === Starting Finnhub historical ===")
-    total += _backfill_finnhub(db)
+    # Test FMP endpoints first
+    _test_fmp_endpoints()
 
-    print("[Backfill] === Starting FMP daily grades ===")
+    print("[Backfill] === FMP daily grades (365 days) ===")
     total += _backfill_fmp_daily(db)
 
-    print("[Backfill] === Starting yfinance historical ===")
+    print("[Backfill] === FMP upgrades RSS (6 pages) ===")
+    total += _backfill_fmp_rss(db)
+
+    print("[Backfill] === FMP price targets RSS (6 pages) ===")
+    total += _backfill_fmp_price_targets(db)
+
+    print("[Backfill] === yfinance historical (50 tickers) ===")
     total += _backfill_yfinance(db)
 
     pred_count = db.query(Prediction).count()
-    print(f"[Backfill] Complete: {total} new predictions added, {pred_count} total in DB")
+    print(f"[Backfill] Complete: {total} new predictions, {pred_count} total in DB")
 
     try:
         from jobs.evaluate_predictions import evaluate_all_pending
@@ -60,169 +64,224 @@ def run_backfill(db: Session):
         print(f"[Backfill] Evaluation error: {e}")
 
 
-def _backfill_finnhub(db: Session) -> int:
-    """Backfill from Finnhub upgrade/downgrade API — 2 years of data."""
-    if not FINNHUB_KEY:
-        print("[Backfill-Finnhub] No FINNHUB_KEY, skipping")
+def _test_fmp_endpoints():
+    """Test all 3 FMP endpoints and print raw responses."""
+    if not FMP_KEY:
+        print("[Backfill-FMP] No FMP_KEY set!")
+        return
+
+    print(f"[Backfill-FMP] FMP_KEY present: {FMP_KEY[:4]}...{FMP_KEY[-4:]}")
+    yesterday = (datetime.utcnow() - timedelta(days=1)).strftime("%Y-%m-%d")
+
+    # Test 1: Daily grades
+    try:
+        r = httpx.get(
+            "https://financialmodelingprep.com/api/v3/upgrades-downgrades",
+            params={"date": yesterday, "apikey": FMP_KEY}, timeout=15,
+        )
+        print(f"[FMP-Test] Daily grades ({yesterday}): status={r.status_code}, len={len(r.text)}, body={r.text[:200]}")
+    except Exception as e:
+        print(f"[FMP-Test] Daily grades error: {e}")
+
+    # Test 2: RSS feed
+    try:
+        r = httpx.get(
+            "https://financialmodelingprep.com/api/v3/upgrades-downgrades-rss-feed",
+            params={"page": 0, "apikey": FMP_KEY}, timeout=15,
+        )
+        print(f"[FMP-Test] RSS feed: status={r.status_code}, len={len(r.text)}, body={r.text[:200]}")
+    except Exception as e:
+        print(f"[FMP-Test] RSS feed error: {e}")
+
+    # Test 3: Price targets
+    try:
+        r = httpx.get(
+            "https://financialmodelingprep.com/api/v3/price-target-rss-feed",
+            params={"page": 0, "apikey": FMP_KEY}, timeout=15,
+        )
+        print(f"[FMP-Test] Price targets: status={r.status_code}, len={len(r.text)}, body={r.text[:200]}")
+    except Exception as e:
+        print(f"[FMP-Test] Price targets error: {e}")
+
+
+def _save_fmp_grade(item, db, source_prefix, date_override=None):
+    """Process and save one FMP grade item. Returns 1 if saved, 0 if skipped."""
+    ticker = item.get("symbol", "")
+    company = item.get("gradingCompany", "")
+    action = item.get("action", "")
+    new_grade = item.get("newGrade", "")
+    prev_grade = item.get("previousGrade", "")
+    news_url = item.get("newsURL", "")
+    published = item.get("publishedDate", "")
+
+    if not ticker or not company or not action:
         return 0
 
-    added = 0
-    skipped_reasons = {}
-    today = datetime.utcnow()
-    from_date = (today - timedelta(days=730)).strftime("%Y-%m-%d")
-    to_date = today.strftime("%Y-%m-%d")
+    canonical = resolve_forecaster_alias(company)
+    if _is_self_analysis(canonical, ticker):
+        return 0
 
-    print(f"[Backfill-Finnhub] {len(BACKFILL_TICKERS)} tickers, {from_date} to {to_date}")
+    direction = _action_to_direction(action, new_grade)
+    if not direction:
+        return 0
 
-    for i, ticker in enumerate(BACKFILL_TICKERS):
-        try:
-            r = httpx.get(
-                "https://finnhub.io/api/v1/stock/upgrade-downgrade",
-                params={"symbol": ticker, "from": from_date, "to": to_date, "token": FINNHUB_KEY},
-                timeout=10,
-            )
-            if r.status_code != 200:
-                if i == 0:
-                    print(f"[Backfill-Finnhub] First ticker {ticker} returned status {r.status_code}")
-                continue
-            items = r.json()
-            if not isinstance(items, list):
-                if i == 0:
-                    print(f"[Backfill-Finnhub] First ticker {ticker} returned non-list: {type(items)}")
-                continue
+    date_str = date_override or (published or "")[:10]
+    source_id = f"{source_prefix}_{ticker}_{canonical}_{date_str}"
+    if db.execute(text("SELECT 1 FROM predictions WHERE source_platform_id = :sid LIMIT 1"), {"sid": source_id}).first():
+        return 0
+    if news_url and db.execute(text("SELECT 1 FROM predictions WHERE source_url = :u LIMIT 1"), {"u": news_url}).first():
+        return 0
 
-            # Debug: print first ticker's data
-            if i == 0:
-                print(f"[Backfill-Finnhub] {ticker}: {len(items)} items. Sample: {items[:2]}")
+    forecaster = find_forecaster(canonical, db)
+    if not forecaster:
+        return 0
 
-            for item in items:
-                company = item.get("company", "")
-                action = item.get("action", "")
-                to_grade = item.get("toGrade", "")
-                from_grade = item.get("fromGrade", "")
-                grade_date = item.get("gradeDate", "")
+    context = f"{canonical} {action}s {ticker}"
+    if prev_grade and new_grade:
+        context += f" from {prev_grade} to {new_grade}"
+    elif new_grade:
+        context += f" to {new_grade}"
 
-                if not company or not action or not grade_date:
-                    skipped_reasons["missing_fields"] = skipped_reasons.get("missing_fields", 0) + 1
-                    continue
+    source_url = news_url if news_url else f"https://www.google.com/search?q={canonical.replace(' ', '+')}+{action}+{ticker}+{date_str}"
+    arch = source_url
 
-                canonical = resolve_forecaster_alias(company)
-                if _is_self_analysis(canonical, ticker):
-                    skipped_reasons["self_analysis"] = skipped_reasons.get("self_analysis", 0) + 1
-                    continue
+    try:
+        pred_date = datetime.strptime(date_str, "%Y-%m-%d") if date_str else datetime.utcnow()
+    except Exception:
+        pred_date = datetime.utcnow()
 
-                direction = _action_to_direction(action, to_grade)
-                if not direction:
-                    skipped_reasons["no_direction"] = skipped_reasons.get("no_direction", 0) + 1
-                    continue
+    is_valid, _ = validate_prediction(
+        ticker=ticker.upper(), direction=direction, source_url=source_url,
+        archive_url=arch, context=context, forecaster_id=forecaster.id,
+    )
+    if not is_valid:
+        return 0
 
-                source_id = f"fh_ud_{ticker}_{canonical}_{grade_date}"
-                if db.execute(text("SELECT 1 FROM predictions WHERE source_platform_id = :sid LIMIT 1"), {"sid": source_id}).first():
-                    skipped_reasons["duplicate"] = skipped_reasons.get("duplicate", 0) + 1
-                    continue
+    db.add(Prediction(
+        forecaster_id=forecaster.id, ticker=ticker.upper(), direction=direction,
+        prediction_date=pred_date, evaluation_date=pred_date + timedelta(days=90),
+        window_days=90, source_url=source_url, archive_url=arch,
+        source_type="article", source_platform_id=source_id,
+        context=context[:500], exact_quote=context,
+        outcome="pending", verified_by=source_prefix,
+    ))
+    return 1
 
-                forecaster = find_forecaster(canonical, db)
-                if not forecaster:
-                    skipped_reasons["no_forecaster"] = skipped_reasons.get("no_forecaster", 0) + 1
-                    continue
 
-                context = f"{canonical} {action}s {ticker}"
-                if from_grade and to_grade:
-                    context += f" from {from_grade} to {to_grade}"
-                elif to_grade:
-                    context += f" to {to_grade}"
-
-                source_url = f"https://www.google.com/search?q={canonical.replace(' ', '+')}+{action}+{ticker}+{grade_date}"
-                arch = f"https://finnhub.io/api/v1/stock/upgrade-downgrade?symbol={ticker}"
-
-                try:
-                    pred_date = datetime.strptime(grade_date, "%Y-%m-%d")
-                except Exception:
-                    continue
-
-                is_valid, reason = validate_prediction(
-                    ticker=ticker, direction=direction, source_url=source_url,
-                    archive_url=arch, context=context, forecaster_id=forecaster.id,
-                )
-                if not is_valid:
-                    skipped_reasons[f"validation:{reason}"] = skipped_reasons.get(f"validation:{reason}", 0) + 1
-                    continue
-
-                db.add(Prediction(
-                    forecaster_id=forecaster.id, ticker=ticker, direction=direction,
-                    prediction_date=pred_date, evaluation_date=pred_date + timedelta(days=90),
-                    window_days=90, source_url=source_url, archive_url=arch,
-                    source_type="article", source_platform_id=source_id,
-                    context=context[:500], exact_quote=context,
-                    outcome="pending", verified_by="backfill_finnhub",
-                ))
-                added += 1
-
-            time.sleep(1.1)
-            if (i + 1) % 50 == 0:
-                db.commit()
-                print(f"[Backfill-Finnhub] {i + 1}/{len(BACKFILL_TICKERS)}, {added} added")
-                time.sleep(5)
-
-        except Exception as e:
-            print(f"[Backfill-Finnhub] Error for {ticker}: {e}")
-
-    db.commit()
-    print(f"[Backfill-Finnhub] Done: {added} added. Skip reasons: {skipped_reasons}")
-    return added
-
+# ── FMP Daily Grades (365 days) ─────────────────────────────────────────
 
 def _backfill_fmp_daily(db: Session) -> int:
-    """Backfill from FMP daily grades — 1 year of data."""
     if not FMP_KEY:
-        print("[Backfill-FMP] No FMP_KEY, skipping")
+        print("[Backfill-FMP-Daily] No FMP_KEY")
         return 0
 
     added = 0
     today = datetime.utcnow()
-    print(f"[Backfill-FMP] Fetching daily grades for past 365 days")
 
     for days_ago in range(365):
         date_str = (today - timedelta(days=days_ago)).strftime("%Y-%m-%d")
         try:
             r = httpx.get(
                 "https://financialmodelingprep.com/api/v3/upgrades-downgrades",
-                params={"date": date_str, "apikey": FMP_KEY},
-                timeout=15,
+                params={"date": date_str, "apikey": FMP_KEY}, timeout=15,
             )
             if r.status_code != 200:
-                if days_ago == 0:
-                    print(f"[Backfill-FMP] First date returned {r.status_code}: {r.text[:200]}")
+                if days_ago < 3:
+                    print(f"[Backfill-FMP-Daily] {date_str}: status {r.status_code}")
                 continue
             items = r.json()
             if not isinstance(items, list):
-                if days_ago == 0:
-                    print(f"[Backfill-FMP] Non-list response: {str(items)[:200]}")
                 continue
 
-            if days_ago == 0:
-                print(f"[Backfill-FMP] {date_str}: {len(items)} items. Sample: {items[:2] if items else 'empty'}")
+            for item in items:
+                added += _save_fmp_grade(item, db, "bf_fmp_d", date_str)
+
+            time.sleep(1)
+            if (days_ago + 1) % 30 == 0:
+                db.commit()
+                print(f"[Backfill-FMP-Daily] {days_ago + 1}/365 days, {added} added")
+
+        except Exception as e:
+            print(f"[Backfill-FMP-Daily] {date_str} error: {e}")
+
+    db.commit()
+    print(f"[Backfill-FMP-Daily] Done: {added} predictions")
+    return added
+
+
+# ── FMP Upgrades RSS (6 pages) ──────────────────────────────────────────
+
+def _backfill_fmp_rss(db: Session) -> int:
+    if not FMP_KEY:
+        return 0
+
+    added = 0
+    for page in range(6):
+        try:
+            r = httpx.get(
+                "https://financialmodelingprep.com/api/v3/upgrades-downgrades-rss-feed",
+                params={"page": page, "apikey": FMP_KEY}, timeout=15,
+            )
+            if r.status_code != 200:
+                print(f"[Backfill-FMP-RSS] Page {page}: status {r.status_code}")
+                break
+            items = r.json()
+            if not isinstance(items, list) or not items:
+                break
+            for item in items:
+                added += _save_fmp_grade(item, db, "bf_fmp_r")
+            time.sleep(0.5)
+        except Exception as e:
+            print(f"[Backfill-FMP-RSS] Page {page} error: {e}")
+            break
+
+    db.commit()
+    print(f"[Backfill-FMP-RSS] Done: {added} predictions from RSS")
+    return added
+
+
+# ── FMP Price Targets RSS (6 pages) ─────────────────────────────────────
+
+def _backfill_fmp_price_targets(db: Session) -> int:
+    if not FMP_KEY:
+        return 0
+
+    added = 0
+    for page in range(6):
+        try:
+            r = httpx.get(
+                "https://financialmodelingprep.com/api/v3/price-target-rss-feed",
+                params={"page": page, "apikey": FMP_KEY}, timeout=15,
+            )
+            if r.status_code != 200:
+                print(f"[Backfill-FMP-PT] Page {page}: status {r.status_code}")
+                break
+            items = r.json()
+            if not isinstance(items, list) or not items:
+                break
 
             for item in items:
                 ticker = item.get("symbol", "")
-                company = item.get("gradingCompany", "")
-                action = item.get("action", "")
-                new_grade = item.get("newGrade", "")
-                prev_grade = item.get("previousGrade", "")
+                company = item.get("analystCompany", "")
+                price_target = item.get("priceTarget")
+                price_when = item.get("priceWhenPosted")
                 news_url = item.get("newsURL", "")
+                published = item.get("publishedDate", "")
+                analyst = item.get("analystName", "")
 
-                if not ticker or not company or not action:
+                if not ticker or not company or not price_target or not price_when:
+                    continue
+                if price_when <= 0:
                     continue
 
                 canonical = resolve_forecaster_alias(company)
                 if _is_self_analysis(canonical, ticker):
                     continue
 
-                direction = _action_to_direction(action, new_grade)
-                if not direction:
-                    continue
+                direction = "bullish" if price_target > price_when else "bearish"
+                date_str = (published or "")[:10]
+                source_id = f"bf_fmp_pt_{ticker}_{canonical}_{date_str}"
 
-                source_id = f"bf_fmp_{ticker}_{canonical}_{date_str}"
                 if db.execute(text("SELECT 1 FROM predictions WHERE source_platform_id = :sid LIMIT 1"), {"sid": source_id}).first():
                     continue
                 if news_url and db.execute(text("SELECT 1 FROM predictions WHERE source_url = :u LIMIT 1"), {"u": news_url}).first():
@@ -232,61 +291,55 @@ def _backfill_fmp_daily(db: Session) -> int:
                 if not forecaster:
                     continue
 
-                context = f"{canonical} {action}s {ticker}"
-                if prev_grade and new_grade:
-                    context += f" from {prev_grade} to {new_grade}"
-                elif new_grade:
-                    context += f" to {new_grade}"
-
-                source_url = news_url if news_url else f"https://www.google.com/search?q={canonical.replace(' ', '+')}+{action}+{ticker}+{date_str}"
-                arch = source_url
+                who = analyst if analyst else canonical
+                context = f"{who} sets {ticker} price target at ${price_target:.0f}"
+                source_url = news_url if news_url else f"https://www.google.com/search?q={canonical.replace(' ', '+')}+price+target+{ticker}"
 
                 try:
-                    pred_date = datetime.strptime(date_str, "%Y-%m-%d")
+                    pred_date = datetime.strptime(date_str, "%Y-%m-%d") if date_str else datetime.utcnow()
                 except Exception:
-                    continue
+                    pred_date = datetime.utcnow()
 
                 is_valid, _ = validate_prediction(
                     ticker=ticker.upper(), direction=direction, source_url=source_url,
-                    archive_url=arch, context=context, forecaster_id=forecaster.id,
+                    archive_url=source_url, context=context, forecaster_id=forecaster.id,
                 )
                 if not is_valid:
                     continue
 
                 db.add(Prediction(
                     forecaster_id=forecaster.id, ticker=ticker.upper(), direction=direction,
-                    prediction_date=pred_date, evaluation_date=pred_date + timedelta(days=90),
-                    window_days=90, source_url=source_url, archive_url=arch,
+                    prediction_date=pred_date, evaluation_date=pred_date + timedelta(days=365),
+                    window_days=365, source_url=source_url, archive_url=source_url,
                     source_type="article", source_platform_id=source_id,
+                    target_price=float(price_target), entry_price=float(price_when),
                     context=context[:500], exact_quote=context,
-                    outcome="pending", verified_by="backfill_fmp",
+                    outcome="pending", verified_by="bf_fmp_pt",
                 ))
                 added += 1
 
-            time.sleep(1)
-            if (days_ago + 1) % 30 == 0:
-                db.commit()
-                print(f"[Backfill-FMP] {days_ago + 1}/365 days, {added} added")
-
+            time.sleep(0.5)
         except Exception as e:
-            print(f"[Backfill-FMP] Error for {date_str}: {e}")
+            print(f"[Backfill-FMP-PT] Page {page} error: {e}")
+            break
 
     db.commit()
-    print(f"[Backfill-FMP] Done: {added} historical predictions")
+    print(f"[Backfill-FMP-PT] Done: {added} price target predictions")
     return added
 
 
-def _backfill_yfinance(db: Session) -> int:
-    """Backfill from yfinance — all historical recommendations."""
-    added = 0
-    print(f"[Backfill-yfinance] Scanning {len(BACKFILL_TICKERS)} tickers")
+# ── yfinance Historical ─────────────────────────────────────────────────
 
-    for i, ticker_symbol in enumerate(BACKFILL_TICKERS):
+def _backfill_yfinance(db: Session) -> int:
+    added = 0
+    tickers = BACKFILL_TICKERS[:50]
+    print(f"[Backfill-yfinance] Scanning {len(tickers)} tickers")
+
+    for i, ticker_symbol in enumerate(tickers):
         try:
             import yfinance as yf
             try:
                 stock = yf.Ticker(ticker_symbol)
-                # Try newer API first, fall back to older one
                 recs = None
                 try:
                     recs = stock.upgrades_downgrades
@@ -299,15 +352,13 @@ def _backfill_yfinance(db: Session) -> int:
                         pass
                 if recs is None or (hasattr(recs, "empty") and recs.empty):
                     continue
-            except Exception as yf_err:
-                print(f"[Backfill-yfinance] Fetch error {ticker_symbol}: {yf_err}")
+            except Exception as e:
+                print(f"[Backfill-yfinance] Fetch error {ticker_symbol}: {e}")
                 time.sleep(10)
                 continue
 
-            # Debug: print first ticker's columns and sample
             if i == 0:
-                print(f"[Backfill-yfinance] {ticker_symbol} columns: {list(recs.columns)}")
-                print(f"[Backfill-yfinance] {ticker_symbol} sample:\n{recs.head(2)}")
+                print(f"[Backfill-yfinance] {ticker_symbol} cols: {list(recs.columns)}, rows: {len(recs)}")
 
             for idx, row in recs.iterrows():
                 try:
@@ -317,13 +368,11 @@ def _backfill_yfinance(db: Session) -> int:
                         rec_date = idx
                     else:
                         rec_date = datetime.strptime(str(idx)[:10], "%Y-%m-%d")
-                    # Make timezone-naive
                     if hasattr(rec_date, "tzinfo") and rec_date.tzinfo is not None:
                         rec_date = rec_date.replace(tzinfo=None)
                 except Exception:
                     continue
 
-                # Handle both old and new yfinance column names
                 firm = str(row.get("Firm", row.get("firm", "")) or "")
                 to_grade = str(row.get("To Grade", row.get("toGrade", "")) or "")
                 from_grade = str(row.get("From Grade", row.get("fromGrade", "")) or "")
@@ -332,14 +381,13 @@ def _backfill_yfinance(db: Session) -> int:
                 if not firm or not action:
                     continue
 
-                grade_lower = to_grade.lower()
                 if action in ("upgrade", "up"):
                     direction = "bullish"
                 elif action in ("downgrade", "down"):
                     direction = "bearish"
-                elif action == "init" and grade_lower in ("buy", "overweight", "outperform", "strong buy"):
+                elif action == "init" and to_grade.lower() in ("buy", "overweight", "outperform", "strong buy"):
                     direction = "bullish"
-                elif action == "init" and grade_lower in ("sell", "underweight", "underperform"):
+                elif action == "init" and to_grade.lower() in ("sell", "underweight", "underperform"):
                     direction = "bearish"
                 else:
                     continue
@@ -376,19 +424,19 @@ def _backfill_yfinance(db: Session) -> int:
                     window_days=90, source_url=source_url, archive_url=arch,
                     source_type="article", source_platform_id=source_id,
                     context=context[:500], exact_quote=context,
-                    outcome="pending", verified_by="backfill_yfinance",
+                    outcome="pending", verified_by="bf_yfinance",
                 ))
                 added += 1
 
-            time.sleep(5)
-            if (i + 1) % 25 == 0:
+            time.sleep(10)
+            if (i + 1) % 10 == 0:
                 db.commit()
-                print(f"[Backfill-yfinance] {i + 1}/{len(BACKFILL_TICKERS)}, {added} added")
+                print(f"[Backfill-yfinance] {i + 1}/{len(tickers)}, {added} added")
 
         except Exception as e:
             print(f"[Backfill-yfinance] Error for {ticker_symbol}: {e}")
             time.sleep(10)
 
     db.commit()
-    print(f"[Backfill-yfinance] Done: {added} historical predictions")
+    print(f"[Backfill-yfinance] Done: {added} predictions")
     return added
