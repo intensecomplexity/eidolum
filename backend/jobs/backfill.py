@@ -28,30 +28,30 @@ _FMP_BASE = None  # Will be set to "stable" or "api/v3" depending on which works
 
 def should_backfill(db: Session) -> bool:
     count = db.query(Prediction).count()
-    return count < 1000
+    return count < 50000
 
 
 def run_backfill(db: Session):
-    """Historical backfill. Runs if DB has <1000 predictions."""
+    """Full 5-year historical backfill. Runs if DB has <50,000 predictions."""
     if not should_backfill(db):
         pred_count = db.query(Prediction).count()
-        print(f"[Backfill] DB has {pred_count} predictions (>=1000), skipping")
+        print(f"[Backfill] DB has {pred_count} predictions (>=50000), skipping")
         return
 
     pred_count = db.query(Prediction).count()
-    print(f"[Backfill] Starting historical backfill (DB has {pred_count}, need 1000)")
+    print(f"[Backfill] Starting 5-year backfill (DB has {pred_count}, target 50000)")
     total = 0
 
     # Test FMP endpoints first
     _test_fmp_endpoints()
 
-    print("[Backfill] === FMP grades-latest ===")
+    print("[Backfill] === FMP grades-latest (all stocks, one call) ===")
     total += _backfill_fmp_grades_latest(db)
 
-    print("[Backfill] === FMP grades by ticker (top 50) ===")
+    print("[Backfill] === FMP grades-historical (200 tickers, full 5yr history) ===")
     total += _backfill_fmp_grades_by_ticker(db)
 
-    print("[Backfill] === FMP price targets (top 50) ===")
+    print("[Backfill] === FMP price targets (200 tickers, full history) ===")
     total += _backfill_fmp_price_targets(db)
 
     print("[Backfill] === yfinance historical (50 tickers) ===")
@@ -217,38 +217,44 @@ def _backfill_fmp_grades_by_ticker(db: Session) -> int:
         return 0
 
     added = 0
-    tickers = BACKFILL_TICKERS[:50]
-    print(f"[Backfill-FMP-Grades] Scanning {len(tickers)} tickers")
+    tickers = FALLBACK_TICKERS[:200]
+    print(f"[Backfill-FMP-Grades] Scanning {len(tickers)} tickers (full 5yr history)")
 
     for i, ticker in enumerate(tickers):
-        # Try stable/grades and stable/grades-historical
-        for endpoint in ["grades", "grades-historical"]:
-            try:
+        try:
+            r = httpx.get(
+                "https://financialmodelingprep.com/stable/grades-historical",
+                params={"symbol": ticker, "apikey": FMP_KEY}, timeout=15,
+            )
+            if r.status_code != 200:
+                # Fallback to /stable/grades
                 r = httpx.get(
-                    f"https://financialmodelingprep.com/stable/{endpoint}",
+                    "https://financialmodelingprep.com/stable/grades",
                     params={"symbol": ticker, "apikey": FMP_KEY}, timeout=15,
                 )
-                if r.status_code != 200:
-                    if i == 0:
-                        print(f"[Backfill-FMP-Grades] {endpoint}/{ticker}: {r.status_code}")
-                    continue
-                items = r.json()
-                if not isinstance(items, list):
-                    continue
-                if i == 0 and items:
-                    print(f"[Backfill-FMP-Grades] {endpoint} sample: {items[0]}")
-
-                for item in items:
-                    added += _save_fmp_grade(item, db, "bf_fmp_g")
-
-                if items:
-                    break  # Got data from this endpoint, skip other
-            except Exception as e:
+            if r.status_code != 200:
                 if i == 0:
-                    print(f"[Backfill-FMP-Grades] {endpoint}/{ticker} error: {e}")
+                    print(f"[Backfill-FMP-Grades] {ticker}: {r.status_code}")
+                time.sleep(0.2)
+                continue
 
-        time.sleep(0.5)
-        if (i + 1) % 10 == 0:
+            items = r.json()
+            if not isinstance(items, list):
+                time.sleep(0.2)
+                continue
+
+            if i == 0 and items:
+                print(f"[Backfill-FMP-Grades] {ticker}: {len(items)} grades. Sample: {items[0]}")
+
+            for item in items:
+                added += _save_fmp_grade(item, db, "bf_fmp_g")
+
+        except Exception as e:
+            if i < 3:
+                print(f"[Backfill-FMP-Grades] {ticker} error: {e}")
+
+        time.sleep(0.2)  # 300 calls/min = 5/sec
+        if (i + 1) % 25 == 0:
             db.commit()
             print(f"[Backfill-FMP-Grades] {i + 1}/{len(tickers)}, {added} added")
 
@@ -264,8 +270,8 @@ def _backfill_fmp_price_targets(db: Session) -> int:
         return 0
 
     added = 0
-    tickers = BACKFILL_TICKERS[:50]
-    print(f"[Backfill-FMP-PT] Scanning {len(tickers)} tickers for price targets")
+    tickers = FALLBACK_TICKERS[:200]
+    print(f"[Backfill-FMP-PT] Scanning {len(tickers)} tickers (full history)")
 
     for ti, tkr in enumerate(tickers):
         try:
@@ -341,13 +347,14 @@ def _backfill_fmp_price_targets(db: Session) -> int:
                 ))
                 added += 1
 
-            time.sleep(0.5)
-            if (ti + 1) % 10 == 0:
+            time.sleep(0.2)  # 300 calls/min
+            if (ti + 1) % 25 == 0:
                 db.commit()
                 print(f"[Backfill-FMP-PT] {ti + 1}/{len(tickers)}, {added} added")
 
         except Exception as e:
-            print(f"[Backfill-FMP-PT] {tkr} error: {e}")
+            if ti < 3:
+                print(f"[Backfill-FMP-PT] {tkr} error: {e}")
 
     db.commit()
     print(f"[Backfill-FMP-PT] Done: {added} price target predictions")
