@@ -76,19 +76,51 @@ def _fetch_all_fmp_tickers():
     return _ALL_FMP_TICKERS
 
 
+def _dedup_predictions(db: Session):
+    """Remove duplicate predictions (same forecaster + ticker + date + context)."""
+    try:
+        result = db.execute(text("""
+            DELETE FROM predictions WHERE id NOT IN (
+                SELECT MIN(id) FROM predictions
+                GROUP BY forecaster_id, ticker, direction,
+                         CAST(prediction_date AS DATE), context
+            )
+        """))
+        db.commit()
+        if result.rowcount > 0:
+            print(f"[Dedup] Removed {result.rowcount} duplicate predictions")
+        else:
+            print("[Dedup] No duplicates found")
+    except Exception as e:
+        db.rollback()
+        print(f"[Dedup] Error: {e}")
+
+
+def _backfill_already_ran(db: Session) -> bool:
+    """Check if backfill already ran by looking for predictions with old dates."""
+    old = db.execute(text(
+        "SELECT 1 FROM predictions WHERE prediction_date < '2025-01-01' LIMIT 1"
+    )).first()
+    return old is not None
+
+
 def run_backfill(db: Session):
-    """Full 5-year backfill. Runs once per deploy, pulls ALL FMP data."""
+    """Full 5-year backfill. Runs once — skips if historical data already exists."""
     global _BACKFILL_DONE
     if _BACKFILL_DONE:
         print("[Backfill] Already ran this deploy, skipping")
         return
     _BACKFILL_DONE = True
 
-    pred_count = db.query(Prediction).count()
-    if pred_count > 30000:
-        print(f"[Backfill] DB has {pred_count} predictions (>30k), backfill likely complete — skipping")
+    # Remove duplicates first
+    _dedup_predictions(db)
+
+    if _backfill_already_ran(db):
+        pred_count = db.query(Prediction).count()
+        print(f"[Backfill] Historical data already exists ({pred_count} predictions), skipping backfill")
         return
 
+    pred_count = db.query(Prediction).count()
     print(f"[Backfill] Starting full backfill (DB has {pred_count} predictions)")
     total = 0
 
@@ -168,10 +200,21 @@ def _save_fmp_grade(item, db, source_prefix, date_override=None):
     new_grade = item.get("newGrade", "")
     prev_grade = item.get("previousGrade", "")
     news_url = item.get("newsURL", "")
-    # FMP uses different date field names across endpoints
-    published = item.get("date", "") or item.get("publishedDate", "") or item.get("gradeDate", "")
+    # FMP uses different date field names across endpoints — check ALL of them
+    published = (
+        item.get("date", "")
+        or item.get("publishedDate", "")
+        or item.get("gradeDate", "")
+        or item.get("datePublished", "")
+        or item.get("updated", "")
+        or ""
+    )
 
     if not ticker or not company or not action:
+        return 0
+    # MUST have a date — skip if no date found (prevents saving with today's date)
+    date_str_check = (published or "")[:10]
+    if not date_str_check or len(date_str_check) < 8:
         return 0
 
     canonical = resolve_forecaster_alias(company)
@@ -203,9 +246,9 @@ def _save_fmp_grade(item, db, source_prefix, date_override=None):
     arch = source_url
 
     try:
-        pred_date = datetime.strptime(date_str, "%Y-%m-%d") if date_str else datetime.utcnow()
+        pred_date = datetime.strptime(date_str, "%Y-%m-%d")
     except Exception:
-        pred_date = datetime.utcnow()
+        return 0  # Skip if date can't be parsed — never use today's date for historical
 
     is_valid, _ = validate_prediction(
         ticker=ticker.upper(), direction=direction, source_url=source_url,
@@ -361,7 +404,9 @@ def _backfill_fmp_price_targets(db: Session, tickers=None) -> int:
                     continue
 
                 direction = "bullish" if price_target > price_when else "bearish"
-                date_str = (published or "")[:10]
+                date_str = (published or item.get("date", "") or "")[:10]
+                if not date_str or len(date_str) < 8:
+                    continue  # Must have original date
                 source_id = f"bf_fmp_pt_{ticker}_{canonical}_{date_str}"
 
                 if db.execute(text("SELECT 1 FROM predictions WHERE source_platform_id = :sid LIMIT 1"), {"sid": source_id}).first():
@@ -378,9 +423,9 @@ def _backfill_fmp_price_targets(db: Session, tickers=None) -> int:
                 source_url = news_url if news_url else f"https://www.google.com/search?q={canonical.replace(' ', '+')}+price+target+{ticker}"
 
                 try:
-                    pred_date = datetime.strptime(date_str, "%Y-%m-%d") if date_str else datetime.utcnow()
+                    pred_date = datetime.strptime(date_str, "%Y-%m-%d")
                 except Exception:
-                    pred_date = datetime.utcnow()
+                    continue  # Skip if date can't be parsed
 
                 is_valid, _ = validate_prediction(
                     ticker=ticker.upper(), direction=direction, source_url=source_url,
