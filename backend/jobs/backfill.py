@@ -1,6 +1,7 @@
 """
 Historical backfill — runs on startup if DB has <1000 predictions.
 Focuses on FMP (3 endpoints) + yfinance. Finnhub upgrade API requires paid tier.
+# FMP Starter plan active — upgrades/downgrades + price targets endpoints unlocked
 """
 import os
 import time
