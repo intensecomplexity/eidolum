@@ -112,7 +112,21 @@ def run_backfill(db: Session):
         return
     _BACKFILL_DONE = True
 
-    # Remove duplicates first
+    # Clean up broken old backfill data (google.com URLs with today's date)
+    try:
+        r = db.execute(text("""
+            DELETE FROM predictions
+            WHERE source_url LIKE '%google.com/search%'
+            AND CAST(prediction_date AS DATE) = CAST(NOW() AS DATE)
+        """))
+        db.commit()
+        if r.rowcount > 0:
+            print(f"[Backfill] Cleaned {r.rowcount} broken backfill predictions (today + google URLs)")
+    except Exception as e:
+        db.rollback()
+        print(f"[Backfill] Cleanup error: {e}")
+
+    # Remove duplicates
     _dedup_predictions(db)
 
     if _backfill_already_ran(db):
@@ -121,6 +135,9 @@ def run_backfill(db: Session):
         return
 
     pred_count = db.query(Prediction).count()
+    global _skip_log_count
+    _skip_log_count = 0
+
     print(f"[Backfill] Starting full backfill (DB has {pred_count} predictions)")
     total = 0
 
@@ -192,29 +209,42 @@ def _test_fmp_endpoints():
             print(f"[FMP-Test] {path}: ERROR {e}")
 
 
+_skip_log_count = 0  # limit debug log spam
+
+
 def _save_fmp_grade(item, db, source_prefix, date_override=None):
     """Process and save one FMP grade item. Returns 1 if saved, 0 if skipped."""
+    global _skip_log_count
+
+    # Flexible field names — FMP uses different names across endpoints
     ticker = item.get("symbol", "")
-    company = item.get("gradingCompany", "")
+    company = item.get("gradingCompany") or item.get("company") or ""
     action = item.get("action", "")
-    new_grade = item.get("newGrade", "")
-    prev_grade = item.get("previousGrade", "")
-    news_url = item.get("newsURL", "")
-    # FMP uses different date field names across endpoints — check ALL of them
+    new_grade = item.get("newGrade") or item.get("toGrade") or ""
+    prev_grade = item.get("previousGrade") or item.get("fromGrade") or ""
+    news_url = item.get("newsURL") or item.get("newsUrl") or ""
+
+    # Check ALL possible date fields
     published = (
-        item.get("date", "")
-        or item.get("publishedDate", "")
-        or item.get("gradeDate", "")
-        or item.get("datePublished", "")
-        or item.get("updated", "")
+        item.get("date")
+        or item.get("publishedDate")
+        or item.get("gradeDate")
+        or item.get("datePublished")
+        or item.get("updated")
         or ""
     )
 
     if not ticker or not company or not action:
+        if _skip_log_count < 5:
+            _skip_log_count += 1
+            print(f"[Backfill-SKIP] missing fields: ticker={ticker!r} company={company!r} action={action!r}")
         return 0
-    # MUST have a date — skip if no date found (prevents saving with today's date)
+
     date_str_check = (published or "")[:10]
     if not date_str_check or len(date_str_check) < 8:
+        if _skip_log_count < 5:
+            _skip_log_count += 1
+            print(f"[Backfill-SKIP] no date: {ticker} {company} published={published!r}")
         return 0
 
     canonical = resolve_forecaster_alias(company)
@@ -315,6 +345,7 @@ def _backfill_fmp_grades_by_ticker(db: Session, tickers=None) -> int:
     added = 0
     print(f"[Backfill-FMP-Grades] Scanning {len(tickers)} tickers (full 5yr history)")
 
+    printed_sample = False
     for i, ticker in enumerate(tickers):
         try:
             r = httpx.get(
@@ -322,14 +353,13 @@ def _backfill_fmp_grades_by_ticker(db: Session, tickers=None) -> int:
                 params={"symbol": ticker, "apikey": FMP_KEY}, timeout=15,
             )
             if r.status_code != 200:
-                # Fallback to /stable/grades
                 r = httpx.get(
                     "https://financialmodelingprep.com/stable/grades",
                     params={"symbol": ticker, "apikey": FMP_KEY}, timeout=15,
                 )
             if r.status_code != 200:
-                if i == 0:
-                    print(f"[Backfill-FMP-Grades] {ticker}: {r.status_code}")
+                if i < 3:
+                    print(f"[Backfill-FMP-Grades] {ticker}: status {r.status_code} body={r.text[:150]}")
                 time.sleep(0.2)
                 continue
 
@@ -338,8 +368,13 @@ def _backfill_fmp_grades_by_ticker(db: Session, tickers=None) -> int:
                 time.sleep(0.2)
                 continue
 
-            if i == 0 and items:
-                print(f"[Backfill-FMP-Grades] {ticker}: {len(items)} grades. Sample: {items[0]}")
+            if not printed_sample and items:
+                import json
+                print(f"[Backfill-DEBUG] FMP grades-historical fields: {list(items[0].keys())}")
+                print(f"[Backfill-DEBUG] Sample: {json.dumps(items[:2], default=str)}")
+                printed_sample = True
+            if i < 3 and items:
+                print(f"[Backfill-FMP-Grades] {ticker}: {len(items)} grades")
 
             for item in items:
                 added += _save_fmp_grade(item, db, "bf_fmp_g")
