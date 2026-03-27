@@ -427,6 +427,24 @@ def resolve_forecaster_alias(name):
     return name
 
 
+# Ticker -> company names that should NOT be treated as the forecaster for that ticker
+# e.g. "Bank of America" is an analyst when covering AAPL, but NOT when covering BAC
+TICKER_COMPANY_NAMES = {
+    "AAPL": ["apple"], "MSFT": ["microsoft"], "GOOGL": ["alphabet", "google"], "GOOG": ["alphabet", "google"],
+    "AMZN": ["amazon"], "NVDA": ["nvidia"], "TSLA": ["tesla"], "META": ["meta", "facebook"],
+    "BAC": ["bank of america", "bofa"], "WFC": ["wells fargo"], "JPM": ["jpmorgan", "jp morgan"],
+    "C": ["citigroup", "citi"], "GS": ["goldman sachs", "goldman"], "MS": ["morgan stanley"],
+    "ADBE": ["adobe"], "NKE": ["nike"], "BA": ["boeing"], "DIS": ["disney", "walt disney"],
+    "INTC": ["intel"], "AMD": ["amd", "advanced micro"], "ARM": ["arm holdings", "arm"],
+    "NFLX": ["netflix"], "CRM": ["salesforce"], "ORCL": ["oracle"],
+    "PFE": ["pfizer"], "JNJ": ["johnson"], "WMT": ["walmart"],
+    "HD": ["home depot"], "CAT": ["caterpillar"], "HON": ["honeywell"],
+    "QCOM": ["qualcomm"], "COIN": ["coinbase"], "PLTR": ["palantir"],
+    "UBER": ["uber"], "ABNB": ["airbnb"], "SNOW": ["snowflake"],
+    "UBS": ["ubs"], "SCHW": ["schwab", "charles schwab"],
+    "BLK": ["blackrock"], "V": ["visa"], "MA": ["mastercard"],
+}
+
 # Company names that are NOT forecasters
 COMPANY_NAMES = [
     "apple", "microsoft", "google", "alphabet", "amazon", "nvidia", "tesla", "meta",
@@ -476,7 +494,16 @@ def get_direction(headline, summary=""):
     return None
 
 
-def extract_forecaster_name(headline, source=""):
+def _is_company_for_ticker(name, ticker):
+    """Check if the extracted name is actually the company being analyzed (not the analyst)."""
+    if not ticker or not name:
+        return False
+    company_names = TICKER_COMPANY_NAMES.get(ticker.upper(), [])
+    name_lower = name.lower()
+    return any(cn in name_lower for cn in company_names)
+
+
+def extract_forecaster_name(headline, source="", ticker=""):
     """Extract REAL analyst/firm name. Returns canonical name via aliases."""
     combined = (headline + " " + source).lower()
 
@@ -484,12 +511,18 @@ def extract_forecaster_name(headline, source=""):
     for canonical, aliases in FORECASTER_ALIASES.items():
         for alias in aliases:
             if alias in combined:
+                # Make sure this isn't the company being analyzed
+                if _is_company_for_ticker(canonical, ticker):
+                    continue  # Skip — try to find the REAL analyst
                 return canonical
 
     # Fallback: check KNOWN_ANALYSTS (for names not in aliases)
     for name in KNOWN_ANALYSTS:
         if name in combined:
-            return resolve_forecaster_alias(name.title())
+            resolved = resolve_forecaster_alias(name.title())
+            if _is_company_for_ticker(resolved, ticker):
+                continue
+            return resolved
 
     # Regex: "{Multi-Word Firm} upgrades/downgrades..."
     match = re.search(
@@ -502,6 +535,7 @@ def extract_forecaster_name(headline, source=""):
         if (" " in firm
                 and firm.lower() not in PLATFORMS
                 and firm.lower() not in COMPANY_NAMES
+                and not _is_company_for_ticker(firm, ticker)
                 and len(firm) > 4):
             return resolve_forecaster_alias(firm)
 
@@ -514,6 +548,7 @@ def extract_forecaster_name(headline, source=""):
         firm = match2.group(1).strip()
         if (firm.lower() not in COMPANY_NAMES
                 and firm.lower() not in PLATFORMS
+                and not _is_company_for_ticker(firm, ticker)
                 and len(firm) > 3):
             if firm.lower() in KNOWN_ANALYSTS or " " in firm:
                 return resolve_forecaster_alias(firm)

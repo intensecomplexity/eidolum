@@ -29,16 +29,62 @@ TICKER_LAST_FOUND = {}  # ticker -> datetime of last new prediction found
 LAST_FULL_SCAN = None   # datetime of last full scraper run
 
 TICKERS = [
-    "AAPL", "MSFT", "GOOGL", "AMZN", "NVDA", "TSLA", "META",
-    "AVGO", "CRM", "ADBE", "AMD", "INTC", "QCOM", "NFLX", "ORCL",
-    "JPM", "BAC", "WFC", "GS", "MS", "C", "BLK",
-    "UNH", "JNJ", "LLY", "PFE", "ABBV", "MRK",
-    "WMT", "PG", "COST", "PEP", "KO", "MCD", "NKE", "SBUX",
-    "BA", "CAT", "GE", "HON", "LMT", "RTX",
-    "PLTR", "CRWD", "PANW", "SQ", "PYPL", "COIN", "SNOW",
-    "SOFI", "ARM", "SMCI", "RIVN",
-    "XOM", "CVX",
-    "SPY", "QQQ", "ARKK", "XLF", "XLE", "GLD", "IWM",
+    # Mega cap tech
+    "AAPL", "MSFT", "GOOGL", "GOOG", "AMZN", "NVDA", "TSLA", "META", "AVGO", "ORCL",
+    # Large tech / software
+    "CRM", "ADBE", "AMD", "INTC", "QCOM", "NFLX", "CSCO", "IBM", "TXN", "MU",
+    "AMAT", "LRCX", "KLAC", "MRVL", "SNPS", "CDNS", "FTNT", "PANW", "CRWD", "ZS",
+    "NOW", "SNOW", "DDOG", "NET", "MDB", "OKTA", "ZM", "PATH", "HUBS",
+    "WDAY", "VEEV", "TEAM", "ESTC", "BILL", "PCOR", "MNDY",
+    # Semiconductors
+    "ARM", "SMCI", "MCHP", "ON", "ADI", "NXPI", "SWKS", "QRVO", "MPWR", "WOLF",
+    # Finance / banks
+    "JPM", "BAC", "WFC", "GS", "MS", "C", "BLK", "SCHW", "AXP", "V", "MA",
+    "COF", "USB", "PNC", "TFC", "BK", "STT", "FITB", "RF", "CFG", "KEY",
+    # Insurance
+    "BRK.B", "AIG", "MET", "PRU", "ALL", "TRV",
+    # Health / pharma / biotech
+    "UNH", "JNJ", "LLY", "PFE", "ABBV", "MRK", "TMO", "ABT", "DHR", "BMY",
+    "AMGN", "GILD", "REGN", "VRTX", "ISRG", "DXCM", "MRNA", "BIIB",
+    "ZTS", "CI", "HUM", "ELV", "MCK", "CAH", "ILMN", "ALGN",
+    # Consumer staples
+    "WMT", "PG", "COST", "PEP", "KO", "MCD", "SBUX", "TGT", "KMB",
+    "CL", "GIS", "K", "HSY", "KHC", "MDLZ", "STZ", "MO", "PM",
+    # Consumer discretionary
+    "NKE", "LULU", "DG", "DLTR", "ROST", "TJX", "BURL",
+    "YUM", "CMG", "DPZ", "HLT", "MAR", "RCL", "CCL",
+    # Retail / e-commerce
+    "HD", "LOW", "BKNG", "ABNB", "UBER", "LYFT", "DASH", "PINS", "SNAP", "ETSY",
+    "EBAY", "W", "CHWY", "CARG",
+    # Media / entertainment
+    "DIS", "CMCSA", "PARA", "WBD", "NWSA", "ROKU", "SPOT", "RBLX", "EA", "TTWO",
+    "MTCH", "BMBL",
+    # Telecom
+    "T", "VZ", "TMUS",
+    # Industrial
+    "BA", "CAT", "GE", "HON", "LMT", "RTX", "NOC", "GD", "DE", "MMM",
+    "UPS", "FDX", "WM", "RSG", "EMR", "ETN", "ITW", "PH", "ROK",
+    # Auto / EV
+    "F", "GM", "RIVN", "LCID", "LI", "NIO", "XPEV",
+    # Energy
+    "XOM", "CVX", "COP", "SLB", "EOG", "PXD", "OXY", "DVN", "HAL", "MPC",
+    "PSX", "VLO", "KMI", "WMB", "OKE",
+    # Utilities
+    "NEE", "DUK", "SO", "AEP", "D", "EXC", "SRE",
+    # Real estate
+    "AMT", "PLD", "CCI", "EQIX", "SPG", "O", "PSA", "DLR",
+    # Fintech / payments / crypto
+    "SQ", "PYPL", "COIN", "SOFI", "AFRM", "UPST", "HOOD", "FIS", "FISV", "GPN",
+    # Growth / AI / speculative
+    "PLTR", "AI", "IONQ", "RGTI", "BBAI", "SOUN", "BIGC",
+    # Aerospace / defense
+    "HII", "LHX", "TDG", "HEI", "AXON",
+    # Materials
+    "LIN", "APD", "SHW", "ECL", "DD", "NEM", "FCX",
+    # ETFs
+    "SPY", "QQQ", "ARKK", "XLF", "XLE", "XLK", "XLV", "XLI", "XLP", "XLY",
+    "GLD", "SLV", "USO", "IWM", "DIA", "VTI", "EEM", "TLT", "HYG", "LQD",
+    "SOXX", "SMH", "XBI", "IBB", "KRE", "XHB",
 ]
 
 
@@ -207,7 +253,7 @@ def scrape_news_predictions(db: Session):
                     continue
 
                 # Extract the REAL forecaster — SKIP if no known analyst found
-                forecaster_name = extract_forecaster_name(headline, source)
+                forecaster_name = extract_forecaster_name(headline, source, ticker)
                 if not forecaster_name:
                     rejected_l1 += 1
                     continue
@@ -361,7 +407,7 @@ def scrape_fast_predictions(db: Session):
                 if not direction:
                     continue
 
-                forecaster_name = extract_forecaster_name(headline, source)
+                forecaster_name = extract_forecaster_name(headline, source, ticker)
                 if not forecaster_name:
                     continue
                 forecaster = find_forecaster(forecaster_name, db)
