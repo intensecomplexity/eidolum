@@ -20,38 +20,74 @@ from jobs.upgrade_scrapers import _action_to_direction, _is_self_analysis
 
 FMP_KEY = os.getenv("FMP_KEY", "")
 
-BACKFILL_TICKERS = FALLBACK_TICKERS[:50]  # Reduced for yfinance rate limits
+# Top 500 tickers for FMP backfill
+TOP_500 = FALLBACK_TICKERS + [
+    # Expand beyond FALLBACK_TICKERS to reach 500
+    "SHOP", "SQ", "MELI", "SE", "BKNG", "ORLY", "AZO", "FICO", "CPRT", "ODFL",
+    "FAST", "PAYX", "CTAS", "CINF", "POOL", "WST", "IDXX", "MTD", "TER", "ANSS",
+    "ZBRA", "KEYS", "TRMB", "PAYC", "CDW", "EPAM", "MANH", "VRSK", "FDS", "MSCI",
+    "ICE", "CME", "CBOE", "NDAQ", "MKTX", "TW", "FLT", "WEX", "GLOB", "QLYS",
+    "SAIA", "XPO", "JBHT", "WERN", "LSTR", "KNX", "CHRW", "EXPD", "HCA", "THC",
+    "CNC", "MOH", "DVA", "STE", "BAX", "BDX", "BSX", "EW", "MDT", "SYK",
+    "ZBH", "HOLX", "INCY", "ALNY", "EXAS", "NTRA", "GH", "RGEN", "TECH",
+    "WAT", "A", "CSGP", "PKI", "TFX", "PODD", "MASI", "NVCR",
+    "KR", "ACI", "SYY", "USFD", "PFGC", "CLX", "CHD", "SJM", "HRL",
+    "MKC", "CAG", "CPB", "BG", "TSN", "INGR", "POST",
+    "DOV", "GNRC", "IR", "XYL", "NDSN", "RRX", "AME", "FTV", "OTIS", "CARR",
+    "WSO", "SNA", "SWK", "TTC", "PCAR", "AGCO", "TEX", "ALG",
+    "EL", "TPR", "RL", "CPRI", "DECK", "ON", "CROX", "SKX", "HBI",
+    "LEVI", "PVH", "VFC", "UAA", "GOOS",
+    "MAA", "AVB", "EQR", "UDR", "ESS", "CPT", "AIV",
+    "ARE", "BXP", "SLG", "VNO", "HIW", "KRC", "DEI",
+    "WPC", "NNN", "STORE", "ADC", "EPRT", "GTY",
+    "SPR", "HWM", "TDG", "HEICO", "BWXT", "KTOS", "RKLB",
+    "ENPH", "SEDG", "FSLR", "RUN", "NOVA", "ARRY",
+    "PLUG", "BE", "CHPT", "BLNK", "QS",
+    "DKNG", "PENN", "MGM", "CZR", "WYNN", "LVS", "GENI",
+    "ZI", "TWLO", "TOST", "BRZE", "CFLT", "S", "CRDO", "SMMT",
+    "APP", "TTD", "PUBM", "MGNI", "DSP", "IS", "DT",
+    "CELH", "MNST", "SAM", "BUD", "TAP", "DEO",
+    "CMI", "OSK", "WAB", "GWW", "MSM", "ALLE", "AOS",
+    "ARES", "OWL", "APO", "KKR", "CG", "TPG", "STEP",
+    "RJF", "LPLA", "IBKR", "MKTX", "CBOE", "NDAQ",
+    "WRB", "RNR", "ACGL", "EG", "AFG", "KMPR",
+    "HIG", "LNC", "UNM", "GL", "VOYA", "PFG",
+    "PARA", "LYV", "IMAX", "CNK", "MSGS", "NXST",
+    "ZG", "RDFN", "OPEN", "EXPI", "COMP", "DHI", "LEN", "PHM", "TOL", "NVR",
+    "MTH", "MDC", "MHO", "KBH", "CCS", "TMHC",
+]
+# Deduplicate and cap at 500
+TOP_500 = list(dict.fromkeys(TOP_500))[:500]
 
-# FMP URL base — determined at startup by _test_fmp_endpoints()
-_FMP_BASE = None  # Will be set to "stable" or "api/v3" depending on which works
+BACKFILL_TICKERS = FALLBACK_TICKERS[:50]  # yfinance only (rate limited)
 
+# FMP URL base
+_FMP_BASE = None
 
-def should_backfill(db: Session) -> bool:
-    count = db.query(Prediction).count()
-    return count < 50000
+_BACKFILL_DONE = False  # Track if backfill already ran this deploy
 
 
 def run_backfill(db: Session):
-    """Full 5-year historical backfill. Runs if DB has <50,000 predictions."""
-    if not should_backfill(db):
-        pred_count = db.query(Prediction).count()
-        print(f"[Backfill] DB has {pred_count} predictions (>=50000), skipping")
+    """Full 5-year backfill. Runs once per deploy."""
+    global _BACKFILL_DONE
+    if _BACKFILL_DONE:
+        print("[Backfill] Already ran this deploy, skipping")
         return
+    _BACKFILL_DONE = True
 
     pred_count = db.query(Prediction).count()
-    print(f"[Backfill] Starting 5-year backfill (DB has {pred_count}, target 50000)")
+    print(f"[Backfill] Starting 5-year backfill (DB has {pred_count} predictions, {len(TOP_500)} tickers)")
     total = 0
 
-    # Test FMP endpoints first
     _test_fmp_endpoints()
 
     print("[Backfill] === FMP grades-latest (all stocks, one call) ===")
     total += _backfill_fmp_grades_latest(db)
 
-    print("[Backfill] === FMP grades-historical (200 tickers, full 5yr history) ===")
+    print(f"[Backfill] === FMP grades-historical ({len(TOP_500)} tickers, full 5yr) ===")
     total += _backfill_fmp_grades_by_ticker(db)
 
-    print("[Backfill] === FMP price targets (200 tickers, full history) ===")
+    print(f"[Backfill] === FMP price targets ({len(TOP_500)} tickers, full history) ===")
     total += _backfill_fmp_price_targets(db)
 
     print("[Backfill] === yfinance historical (50 tickers) ===")
@@ -217,7 +253,7 @@ def _backfill_fmp_grades_by_ticker(db: Session) -> int:
         return 0
 
     added = 0
-    tickers = FALLBACK_TICKERS[:200]
+    tickers = TOP_500
     print(f"[Backfill-FMP-Grades] Scanning {len(tickers)} tickers (full 5yr history)")
 
     for i, ticker in enumerate(tickers):
@@ -270,7 +306,7 @@ def _backfill_fmp_price_targets(db: Session) -> int:
         return 0
 
     added = 0
-    tickers = FALLBACK_TICKERS[:200]
+    tickers = TOP_500
     print(f"[Backfill-FMP-PT] Scanning {len(tickers)} tickers (full history)")
 
     for ti, tkr in enumerate(tickers):
