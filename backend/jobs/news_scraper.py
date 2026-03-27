@@ -8,6 +8,7 @@ Uses 3-layer defense + extracts the real forecaster name from headlines
 import os
 import re
 import time
+import threading
 import httpx
 from datetime import datetime, timedelta
 from sqlalchemy.orm import Session
@@ -28,6 +29,9 @@ FINNHUB_KEY = os.getenv("FINNHUB_KEY", "")
 TICKER_LAST_FOUND = {}  # ticker -> datetime of last new prediction found
 LAST_FULL_SCAN = None   # datetime of last full scraper run
 ALL_TICKERS = None       # populated on first run from Finnhub
+
+# Lock to prevent simultaneous scraper runs (shared by all scrapers)
+SCRAPER_LOCK = threading.Lock()
 
 # Hardcoded fallback if Finnhub symbol fetch fails
 FALLBACK_TICKERS = [
@@ -187,6 +191,17 @@ def merge_duplicate_forecasters(db):
 
 def scrape_news_predictions(db: Session):
     """Scrape real prediction articles with 3-layer defense."""
+    global LAST_FULL_SCAN
+    if not SCRAPER_LOCK.acquire(blocking=False):
+        print("[NewsScraper] Another scraper running, skipping")
+        return
+    try:
+        _scrape_news_predictions_inner(db)
+    finally:
+        SCRAPER_LOCK.release()
+
+
+def _scrape_news_predictions_inner(db: Session):
     global LAST_FULL_SCAN
     if not FINNHUB_KEY:
         print("[NewsScraper] No FINNHUB_KEY")
@@ -355,6 +370,16 @@ FAST_TICKERS = [
 
 def scrape_fast_predictions(db: Session):
     """Fast scraper — runs every 15 min. Skips cold tickers to save API calls."""
+    if not SCRAPER_LOCK.acquire(blocking=False):
+        print("[FastScraper] Another scraper running, skipping")
+        return
+    try:
+        _scrape_fast_inner(db)
+    finally:
+        SCRAPER_LOCK.release()
+
+
+def _scrape_fast_inner(db: Session):
     if not FINNHUB_KEY:
         return
 

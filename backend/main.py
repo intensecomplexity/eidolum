@@ -131,33 +131,7 @@ def migrate_platform_types():
         print(f"[Eidolum] Platform migration error (non-fatal): {e}")
 
 
-def wipe_all_fake_data(db):
-    """Delete predictions without real source URLs. Always runs — idempotent."""
-    try:
-        from sqlalchemy import text
-        total = db.execute(text("SELECT COUNT(*) FROM predictions")).scalar()
-        real = db.execute(text("""
-            SELECT COUNT(*) FROM predictions
-            WHERE source_url LIKE '%/status/%'
-               OR source_url LIKE '%/watch?v=%'
-               OR source_url LIKE '%/comments/%'
-        """)).scalar()
-        fake = total - real
-        if fake == 0:
-            print(f"[Eidolum] Data clean: {total} total, {real} verified, 0 fake")
-            return
-        result = db.execute(text("""
-            DELETE FROM predictions
-            WHERE source_url IS NULL
-            OR (source_url NOT LIKE '%/status/%'
-                AND source_url NOT LIKE '%/watch?v=%'
-                AND source_url NOT LIKE '%/comments/%')
-        """))
-        db.commit()
-        print(f"[Eidolum] Wiped {result.rowcount} fake predictions (kept {real} verified)")
-    except Exception as e:
-        db.rollback()
-        print(f"[Eidolum] wipe_all_fake_data error: {e}")
+    # wipe_all_fake_data removed — predictions persist, Layer 3 handles cleanup
 
 
 def migrate_add_archive_columns(db):

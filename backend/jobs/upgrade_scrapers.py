@@ -16,7 +16,7 @@ from jobs.prediction_validator import (
     FORECASTER_ALIASES,
     TICKER_COMPANY_NAMES,
 )
-from jobs.news_scraper import ensure_tickers, find_forecaster, archive_url, FAST_TICKERS
+from jobs.news_scraper import ensure_tickers, find_forecaster, archive_url, FAST_TICKERS, SCRAPER_LOCK
 
 FINNHUB_KEY = os.getenv("FINNHUB_KEY", "")
 FMP_KEY = os.getenv("FMP_KEY", "")
@@ -48,6 +48,16 @@ def _action_to_direction(action, to_grade=""):
 
 def scrape_finnhub_upgrades(db: Session):
     """Scrape Finnhub upgrade/downgrade endpoint — structured data, no parsing needed."""
+    if not SCRAPER_LOCK.acquire(blocking=False):
+        print("[FinnhubUpgrades] Another scraper running, skipping")
+        return
+    try:
+        _scrape_finnhub_upgrades_inner(db)
+    finally:
+        SCRAPER_LOCK.release()
+
+
+def _scrape_finnhub_upgrades_inner(db: Session):
     if not FINNHUB_KEY:
         print("[FinnhubUpgrades] No FINNHUB_KEY")
         return
@@ -169,6 +179,16 @@ def scrape_finnhub_upgrades(db: Session):
 
 def scrape_fmp_upgrades(db: Session):
     """Scrape FMP upgrades/downgrades — has real article URLs."""
+    if not SCRAPER_LOCK.acquire(blocking=False):
+        print("[FMP] Another scraper running, skipping")
+        return
+    try:
+        _scrape_fmp_inner(db)
+    finally:
+        SCRAPER_LOCK.release()
+
+
+def _scrape_fmp_inner(db: Session):
     if not FMP_KEY:
         print("[FMP] No FMP_KEY set, skipping")
         return
@@ -176,21 +196,33 @@ def scrape_fmp_upgrades(db: Session):
     added = 0
     skipped = 0
 
-    try:
-        r = httpx.get(
-            "https://financialmodelingprep.com/api/v3/upgrades-downgrades",
-            params={"apikey": FMP_KEY},
-            timeout=15,
-        )
-        if r.status_code != 200:
-            print(f"[FMP] API returned {r.status_code}")
-            return
-        items = r.json()
-        if not isinstance(items, list):
-            print("[FMP] Unexpected response format")
-            return
+    # Fetch pages 0-2 for more results
+    all_items = []
+    for page_num in range(3):
+        try:
+            r = httpx.get(
+                "https://financialmodelingprep.com/api/v3/upgrades-downgrades-rss-feed",
+                params={"page": page_num, "apikey": FMP_KEY},
+                timeout=15,
+            )
+            if r.status_code != 200:
+                print(f"[FMP] API returned {r.status_code} for page {page_num}")
+                break
+            page_items = r.json()
+            if not isinstance(page_items, list) or not page_items:
+                break
+            all_items.extend(page_items)
+            time.sleep(0.5)
+        except Exception as e:
+            print(f"[FMP] Error fetching page {page_num}: {e}")
+            break
 
-        print(f"[FMP] Processing {len(items)} upgrades/downgrades")
+    if not all_items:
+        print("[FMP] No data received")
+        return
+
+    items = all_items
+    print(f"[FMP] Processing {len(items)} upgrades/downgrades")
 
         for item in items:
             ticker = item.get("symbol", "")
