@@ -124,6 +124,7 @@ def get_scheduler_status(admin=Depends(require_admin)):
         {"id": "fast_scraper", "name": "Finnhub Fast", "interval_minutes": 15},
         {"id": "benzinga_api", "name": "Benzinga API", "interval_minutes": 120},
         {"id": "newsapi", "name": "NewsAPI", "interval_minutes": 240},
+        {"id": "benzinga_web", "name": "Benzinga Web", "interval_minutes": 120},
         {"id": "fmp_upgrades", "name": "FMP Upgrades", "interval_minutes": 120},
         {"id": "fmp_price_targets", "name": "FMP Price Targets", "interval_minutes": 120},
         {"id": "fmp_daily_grades", "name": "FMP Daily Grades", "interval_minutes": 180},

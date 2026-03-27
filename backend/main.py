@@ -388,6 +388,13 @@ async def lifespan(app):
                 active_scrapers.append("fmp_daily_grades")
             except Exception as e:
                 print(f"[Background] FMP daily grades error: {e}")
+            # Benzinga web scraper
+            try:
+                from jobs.benzinga_web_scraper import scrape_benzinga_web
+                scrape_benzinga_web(db)
+                active_scrapers.append("benzinga_web")
+            except Exception as e:
+                print(f"[Background] Benzinga web error: {e}")
             # NewsAPI
             try:
                 from jobs.news_scraper import scrape_newsapi
@@ -546,6 +553,19 @@ async def lifespan(app):
         finally:
             db.close()
 
+    def run_benzinga_web():
+        from datetime import datetime as _dt
+        print(f"[Scheduler] Running Benzinga Web at {_dt.utcnow()}")
+        scheduler_last_run["benzinga_web"] = _dt.utcnow()
+        db = SessionLocal()
+        try:
+            from jobs.benzinga_web_scraper import scrape_benzinga_web
+            scrape_benzinga_web(db)
+        except Exception as e:
+            print(f"[BenzingaWeb] Error: {e}")
+        finally:
+            db.close()
+
     def run_newsapi():
         from datetime import datetime as _dt
         print(f"[Scheduler] Running NewsAPI at {_dt.utcnow()}")
@@ -566,6 +586,7 @@ async def lifespan(app):
     scheduler.add_job(run_fast_scraper, "interval", minutes=15, id="fast_scraper")
     scheduler.add_job(run_benzinga_api, "interval", hours=2, id="benzinga_api", next_run_time=datetime.utcnow() + timedelta(minutes=15))
     scheduler.add_job(run_newsapi, "interval", hours=4, id="newsapi", next_run_time=datetime.utcnow() + timedelta(minutes=10))
+    scheduler.add_job(run_benzinga_web, "interval", hours=2, id="benzinga_web", next_run_time=datetime.utcnow() + timedelta(minutes=25))
     # FMP structured data
     scheduler.add_job(run_fmp_upgrades, "interval", hours=2, id="fmp_upgrades", next_run_time=datetime.utcnow() + timedelta(minutes=30))
     scheduler.add_job(run_fmp_price_targets, "interval", hours=2, id="fmp_price_targets", next_run_time=datetime.utcnow() + timedelta(minutes=60))
