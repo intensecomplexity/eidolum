@@ -67,6 +67,9 @@ export default function Navbar() {
             <Link to="/leaderboard" className={linkClass('/leaderboard')}>
               Leaderboard
             </Link>
+            <Link to="/forecasters" className={linkClass('/forecasters')}>
+              Forecasters
+            </Link>
             <Link to="/platforms" className={linkClass('/platforms')}>
               Platforms
             </Link>
@@ -118,6 +121,12 @@ export default function Navbar() {
               className="flex items-center px-3 py-3 rounded-lg text-text-primary font-medium active:bg-surface-2 min-h-[44px]"
             >
               Leaderboard
+            </Link>
+            <Link
+              to="/forecasters"
+              className="flex items-center px-3 py-3 rounded-lg text-text-primary font-medium active:bg-surface-2 min-h-[44px]"
+            >
+              Forecasters
             </Link>
             <Link
               to="/platforms"

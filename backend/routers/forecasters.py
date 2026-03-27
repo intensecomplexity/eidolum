@@ -26,6 +26,53 @@ def list_forecasters(request: Request, db: Session = Depends(get_db)):
     ]
 
 
+from fastapi import Query as Q
+
+
+@router.get("/forecasters/all")
+@limiter.limit("60/minute")
+def list_all_forecasters(
+    request: Request,
+    letter: str = Q(None),
+    search: str = Q(None),
+    db: Session = Depends(get_db),
+):
+    """List all forecasters A-Z with stats. Optional letter/search filter."""
+    query = db.query(Forecaster)
+    if letter and len(letter) == 1:
+        query = query.filter(Forecaster.name.ilike(f"{letter}%"))
+    if search:
+        query = query.filter(Forecaster.name.ilike(f"%{search}%"))
+    forecasters = query.order_by(Forecaster.name).all()
+
+    results = []
+    for f in forecasters:
+        total = db.query(Prediction).filter(Prediction.forecaster_id == f.id).count()
+        scored = db.query(Prediction).filter(
+            Prediction.forecaster_id == f.id,
+            Prediction.outcome.in_(["correct", "incorrect"]),
+        ).count()
+        correct = db.query(Prediction).filter(
+            Prediction.forecaster_id == f.id,
+            Prediction.outcome == "correct",
+        ).count()
+        accuracy = round(correct / scored * 100, 1) if scored > 0 else None
+
+        results.append({
+            "id": f.id,
+            "name": f.name,
+            "handle": f.handle,
+            "platform": f.platform or "institutional",
+            "profile_image_url": f.profile_image_url,
+            "total_predictions": total,
+            "scored_predictions": scored,
+            "accuracy": accuracy,
+            "is_ranked": scored >= 10,
+        })
+
+    return results
+
+
 @router.get("/forecaster/{forecaster_id}")
 @limiter.limit("30/minute")
 def get_forecaster(request: Request, forecaster_id: int, db: Session = Depends(get_db)):

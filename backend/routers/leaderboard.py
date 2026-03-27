@@ -52,10 +52,24 @@ def get_leaderboard(
             **stats,
         })
 
-    # Sort by accuracy descending, break ties by alpha
-    results.sort(key=lambda x: (x["accuracy_rate"], x["alpha"]), reverse=True)
-    for i, r in enumerate(results):
+    # Add scored_count to each result
+    for r in results:
+        r["scored_count"] = r.get("evaluated_predictions", 0)
+
+    # Only rank forecasters with 10+ scored predictions
+    ranked = [r for r in results if r["scored_count"] >= 10]
+    unranked = [r for r in results if r["scored_count"] < 10]
+
+    # Sort ranked by accuracy descending, break ties by alpha
+    ranked.sort(key=lambda x: (x["accuracy_rate"], x["alpha"]), reverse=True)
+    for i, r in enumerate(ranked):
         r["rank"] = i + 1
+
+    # Unranked get no rank
+    for r in unranked:
+        r["rank"] = None
+
+    results = ranked  # Only return ranked forecasters on leaderboard
 
     # Compute rank movement after assigning ranks
     for r in results:

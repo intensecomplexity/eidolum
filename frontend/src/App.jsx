@@ -16,6 +16,7 @@ import ContrarianSignals from './pages/ContrarianSignals';
 import PowerRankings from './pages/PowerRankings';
 import InversePortfolio from './pages/InversePortfolio';
 import RecentPredictions from './pages/RecentPredictions';
+import ForecastersList from './pages/ForecastersList';
 import AdminPanel from './pages/AdminPanel';
 
 export default function App() {
@@ -37,6 +38,7 @@ export default function App() {
         <Route path="/power-rankings" element={<PowerRankings />} />
         <Route path="/inverse-portfolio" element={<InversePortfolio />} />
         <Route path="/predictions" element={<RecentPredictions />} />
+        <Route path="/forecasters" element={<ForecastersList />} />
         <Route path="/admin" element={<AdminPanel />} />
       </Routes>
       <SaveToast />

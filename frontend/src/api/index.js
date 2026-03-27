@@ -115,6 +115,10 @@ export function getForecasterPositions(forecasterId) {
   return api.get(`/forecaster/${forecasterId}/positions`).then(r => r.data);
 }
 
+export function getAllForecasters(params = {}) {
+  return api.get('/forecasters/all', { params }).then(r => r.data);
+}
+
 export function getConflictPredictions() {
   return api.get('/predictions/conflicts').then(r => r.data);
 }
