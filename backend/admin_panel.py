@@ -120,20 +120,16 @@ def bulk_delete_predictions(
 def get_scheduler_status(admin=Depends(require_admin)):
     """Return status of all scheduled jobs with last_run timestamps."""
     jobs = [
-        {"id": "full_scraper", "name": "Full Scraper", "interval_minutes": 60},
-        {"id": "fast_scraper", "name": "Fast Scraper", "interval_minutes": 15},
-        {"id": "evaluator", "name": "Evaluator", "interval_minutes": 15},
-        {"id": "leaderboard", "name": "Leaderboard Refresh", "interval_minutes": 60},
-        {"id": "finnhub_upgrades", "name": "Finnhub Upgrades", "interval_minutes": 120},
-        {"id": "fmp_upgrades", "name": "FMP RSS", "interval_minutes": 120},
+        {"id": "full_scraper", "name": "Finnhub News", "interval_minutes": 60},
+        {"id": "fast_scraper", "name": "Finnhub Fast", "interval_minutes": 15},
+        {"id": "benzinga_api", "name": "Benzinga API", "interval_minutes": 120},
+        {"id": "newsapi", "name": "NewsAPI", "interval_minutes": 240},
+        {"id": "fmp_upgrades", "name": "FMP Upgrades", "interval_minutes": 120},
         {"id": "fmp_price_targets", "name": "FMP Price Targets", "interval_minutes": 120},
         {"id": "fmp_daily_grades", "name": "FMP Daily Grades", "interval_minutes": 180},
-        {"id": "alphavantage", "name": "Alpha Vantage", "interval_minutes": 360},
-        {"id": "benzinga_rss", "name": "Benzinga RSS", "interval_minutes": 60},
-        {"id": "marketbeat_rss", "name": "MarketBeat RSS", "interval_minutes": 120},
-        {"id": "yfinance", "name": "yfinance Recs", "interval_minutes": 180},
-        {"id": "newsapi", "name": "NewsAPI", "interval_minutes": 240},
-        {"id": "benzinga_api", "name": "Benzinga API", "interval_minutes": 120},
+        {"id": "yfinance", "name": "yfinance", "interval_minutes": 180},
+        {"id": "evaluator", "name": "Evaluator", "interval_minutes": 15},
+        {"id": "leaderboard", "name": "Leaderboard", "interval_minutes": 60},
     ]
     now = datetime.utcnow()
     result = []

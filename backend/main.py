@@ -352,102 +352,64 @@ async def lifespan(app):
             db = SessionLocal()
             pred_count = db.query(Prediction).count()
             print(f"[Eidolum] Background import starting — {pred_count} predictions exist")
-            # Historical backfill — only runs if DB has <100 predictions
-            try:
-                from jobs.backfill import run_backfill
-                run_backfill(db)
-            except Exception as e:
-                print(f"[Background] Backfill error: {e}")
-            # Benzinga API test
-            try:
-                import httpx as _hx
-                _bz_key = os.getenv("BENZINGA_KEY", "")
-                if _bz_key:
-                    print("[Benzinga-Test] Testing API key...")
-                    _r = _hx.get(
-                        "https://api.benzinga.com/api/v1/ratings",
-                        params={"token": _bz_key, "limit": 3},
-                        headers={"Accept": "application/json"},
-                        timeout=30,
-                    )
-                    print(f"[Benzinga-Test] Status: {_r.status_code}")
-                    print(f"[Benzinga-Test] Response: {_r.text[:1000]}")
-            except Exception as e:
-                print(f"[Benzinga-Test] Error: {e}")
-            # Benzinga ratings scraper
-            try:
-                from jobs.benzinga_scraper import scrape_benzinga_ratings
-                scrape_benzinga_ratings(db)
-            except Exception as e:
-                print(f"[Background] Benzinga error: {e}")
-            # Scrape real news articles (Layer 1 + Layer 2 built in)
+            active_scrapers = []
+            # Finnhub news (primary)
             try:
                 from jobs.news_scraper import scrape_news_predictions
                 scrape_news_predictions(db)
+                active_scrapers.append("news_scraper")
             except Exception as e:
                 print(f"[Background] News scraper error: {e}")
-            # Layer 3: cleanup anything that slipped through
+            # Benzinga API
             try:
-                from jobs.prediction_validator import cleanup_invalid_predictions
-                cleanup_invalid_predictions(db)
+                from jobs.benzinga_scraper import scrape_benzinga_ratings
+                scrape_benzinga_ratings(db)
+                active_scrapers.append("benzinga_api")
             except Exception as e:
-                print(f"[Background] L3 cleanup error: {e}")
-            # Finnhub upgrades API
-            try:
-                from jobs.upgrade_scrapers import scrape_finnhub_upgrades
-                scrape_finnhub_upgrades(db)
-            except Exception as e:
-                print(f"[Background] Finnhub upgrades error: {e}")
-            # FMP upgrades RSS
+                print(f"[Background] Benzinga error: {e}")
+            # FMP upgrades
             try:
                 from jobs.upgrade_scrapers import scrape_fmp_upgrades
                 scrape_fmp_upgrades(db)
+                active_scrapers.append("fmp_upgrades")
             except Exception as e:
                 print(f"[Background] FMP upgrades error: {e}")
             # FMP price targets
             try:
                 from jobs.upgrade_scrapers import scrape_fmp_price_targets
                 scrape_fmp_price_targets(db)
+                active_scrapers.append("fmp_price_targets")
             except Exception as e:
                 print(f"[Background] FMP price targets error: {e}")
             # FMP daily grades
             try:
                 from jobs.upgrade_scrapers import scrape_fmp_daily_grades
                 scrape_fmp_daily_grades(db)
+                active_scrapers.append("fmp_daily_grades")
             except Exception as e:
                 print(f"[Background] FMP daily grades error: {e}")
-            # Alpha Vantage news
-            try:
-                from jobs.rss_scrapers import scrape_alphavantage_news
-                scrape_alphavantage_news(db)
-            except Exception as e:
-                print(f"[Background] Alpha Vantage error: {e}")
-            # Benzinga RSS
-            try:
-                from jobs.rss_scrapers import scrape_benzinga_rss
-                scrape_benzinga_rss(db)
-            except Exception as e:
-                print(f"[Background] Benzinga error: {e}")
-            # MarketBeat RSS
-            try:
-                from jobs.rss_scrapers import scrape_marketbeat_rss
-                scrape_marketbeat_rss(db)
-            except Exception as e:
-                print(f"[Background] MarketBeat error: {e}")
-            # yfinance recommendations
-            try:
-                from jobs.rss_scrapers import scrape_yfinance_recommendations
-                scrape_yfinance_recommendations(db)
-            except Exception as e:
-                print(f"[Background] yfinance error: {e}")
             # NewsAPI
             try:
                 from jobs.news_scraper import scrape_newsapi
                 scrape_newsapi(db)
+                active_scrapers.append("newsapi")
             except Exception as e:
                 print(f"[Background] NewsAPI error: {e}")
+            # yfinance recommendations
+            try:
+                from jobs.rss_scrapers import scrape_yfinance_recommendations
+                scrape_yfinance_recommendations(db)
+                active_scrapers.append("yfinance")
+            except Exception as e:
+                print(f"[Background] yfinance error: {e}")
+            # Layer 3 cleanup
+            try:
+                from jobs.prediction_validator import cleanup_invalid_predictions
+                cleanup_invalid_predictions(db)
+            except Exception as e:
+                print(f"[Background] L3 cleanup error: {e}")
             pred_count = db.query(Prediction).count()
-            print(f"[Eidolum] Background import complete — {pred_count} real predictions loaded")
+            print(f"[Eidolum] Background import complete — {pred_count} predictions. Active: {', '.join(active_scrapers)}")
             # Evaluate pending predictions
             try:
                 from jobs.evaluate_predictions import evaluate_all_pending
@@ -519,19 +481,6 @@ async def lifespan(app):
         finally:
             db.close()
 
-    def run_finnhub_upgrades():
-        from datetime import datetime as _dt
-        print(f"[Scheduler] Running Finnhub upgrades at {_dt.utcnow()}")
-        scheduler_last_run["finnhub_upgrades"] = _dt.utcnow()
-        db = SessionLocal()
-        try:
-            from jobs.upgrade_scrapers import scrape_finnhub_upgrades
-            scrape_finnhub_upgrades(db)
-        except Exception as e:
-            print(f"[FinnhubUpgrades] Error: {e}")
-        finally:
-            db.close()
-
     def run_fmp_upgrades():
         from datetime import datetime as _dt
         print(f"[Scheduler] Running FMP upgrades at {_dt.utcnow()}")
@@ -568,45 +517,6 @@ async def lifespan(app):
             scrape_fmp_daily_grades(db)
         except Exception as e:
             print(f"[FMP-Daily] Error: {e}")
-        finally:
-            db.close()
-
-    def run_alphavantage():
-        from datetime import datetime as _dt
-        print(f"[Scheduler] Running Alpha Vantage at {_dt.utcnow()}")
-        scheduler_last_run["alphavantage"] = _dt.utcnow()
-        db = SessionLocal()
-        try:
-            from jobs.rss_scrapers import scrape_alphavantage_news
-            scrape_alphavantage_news(db)
-        except Exception as e:
-            print(f"[AlphaVantage] Error: {e}")
-        finally:
-            db.close()
-
-    def run_benzinga_rss():
-        from datetime import datetime as _dt
-        print(f"[Scheduler] Running Benzinga RSS at {_dt.utcnow()}")
-        scheduler_last_run["benzinga_rss"] = _dt.utcnow()
-        db = SessionLocal()
-        try:
-            from jobs.rss_scrapers import scrape_benzinga_rss
-            scrape_benzinga_rss(db)
-        except Exception as e:
-            print(f"[Benzinga] Error: {e}")
-        finally:
-            db.close()
-
-    def run_marketbeat_rss():
-        from datetime import datetime as _dt
-        print(f"[Scheduler] Running MarketBeat RSS at {_dt.utcnow()}")
-        scheduler_last_run["marketbeat_rss"] = _dt.utcnow()
-        db = SessionLocal()
-        try:
-            from jobs.rss_scrapers import scrape_marketbeat_rss
-            scrape_marketbeat_rss(db)
-        except Exception as e:
-            print(f"[MarketBeat] Error: {e}")
         finally:
             db.close()
 
@@ -651,19 +561,19 @@ async def lifespan(app):
 
     print("[STARTUP] Scheduler starting...")
     scheduler = AsyncIOScheduler()
+    # Core scrapers
     scheduler.add_job(run_hourly_scraper, "interval", hours=1, id="scraper")
     scheduler.add_job(run_fast_scraper, "interval", minutes=15, id="fast_scraper")
-    scheduler.add_job(run_15min_evaluator, "interval", minutes=15, id="evaluator")
-    scheduler.add_job(run_finnhub_upgrades, "interval", hours=2, id="finnhub_upgrades")
+    scheduler.add_job(run_benzinga_api, "interval", hours=2, id="benzinga_api", next_run_time=datetime.utcnow() + timedelta(minutes=15))
+    scheduler.add_job(run_newsapi, "interval", hours=4, id="newsapi", next_run_time=datetime.utcnow() + timedelta(minutes=10))
+    # FMP structured data
     scheduler.add_job(run_fmp_upgrades, "interval", hours=2, id="fmp_upgrades", next_run_time=datetime.utcnow() + timedelta(minutes=30))
     scheduler.add_job(run_fmp_price_targets, "interval", hours=2, id="fmp_price_targets", next_run_time=datetime.utcnow() + timedelta(minutes=60))
     scheduler.add_job(run_fmp_daily_grades, "interval", hours=3, id="fmp_daily_grades", next_run_time=datetime.utcnow() + timedelta(minutes=90))
-    scheduler.add_job(run_alphavantage, "interval", hours=6, id="alphavantage")
-    scheduler.add_job(run_benzinga_rss, "interval", hours=1, id="benzinga_rss", next_run_time=datetime.utcnow() + timedelta(minutes=20))
-    scheduler.add_job(run_marketbeat_rss, "interval", hours=2, id="marketbeat_rss", next_run_time=datetime.utcnow() + timedelta(minutes=45))
+    # yfinance
     scheduler.add_job(run_yfinance, "interval", hours=3, id="yfinance", next_run_time=datetime.utcnow() + timedelta(minutes=120))
-    scheduler.add_job(run_newsapi, "interval", hours=4, id="newsapi", next_run_time=datetime.utcnow() + timedelta(minutes=10))
-    scheduler.add_job(run_benzinga_api, "interval", hours=2, id="benzinga_api", next_run_time=datetime.utcnow() + timedelta(minutes=15))
+    # Evaluator + leaderboard
+    scheduler.add_job(run_15min_evaluator, "interval", minutes=15, id="evaluator")
     def run_hourly_leaderboard():
         from datetime import datetime as _dt
         scheduler_last_run["leaderboard"] = _dt.utcnow()
@@ -676,8 +586,9 @@ async def lifespan(app):
     scheduler.add_job(run_hourly_leaderboard, "interval", hours=1, id="leaderboard")
     scheduler.add_job(lambda: run_newsletter(SessionLocal()), "cron", hour=8, minute=0, id="newsletter")
     scheduler.start()
-    print(f"[STARTUP] Jobs registered: {[j.id for j in scheduler.get_jobs()]}")
-    print("[Eidolum] Scheduler: scraper(1h), fast_scraper(15m), evaluator(15m), leaderboard(1h), newsletter(8am)")
+    job_ids = [j.id for j in scheduler.get_jobs()]
+    print(f"[STARTUP] Active scrapers: {', '.join(job_ids)}")
+    print(f"[STARTUP] {len(job_ids)} jobs registered")
     yield
     scheduler.shutdown()
 
