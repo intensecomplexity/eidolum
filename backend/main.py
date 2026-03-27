@@ -406,6 +406,12 @@ async def lifespan(app):
                 scrape_marketbeat_rss(db)
             except Exception as e:
                 print(f"[Background] MarketBeat error: {e}")
+            # yfinance recommendations
+            try:
+                from jobs.rss_scrapers import scrape_yfinance_recommendations
+                scrape_yfinance_recommendations(db)
+            except Exception as e:
+                print(f"[Background] yfinance error: {e}")
             pred_count = db.query(Prediction).count()
             print(f"[Eidolum] Background import complete — {pred_count} real predictions loaded")
             # Evaluate pending predictions
@@ -570,6 +576,19 @@ async def lifespan(app):
         finally:
             db.close()
 
+    def run_yfinance():
+        from datetime import datetime as _dt
+        print(f"[Scheduler] Running yfinance at {_dt.utcnow()}")
+        scheduler_last_run["yfinance"] = _dt.utcnow()
+        db = SessionLocal()
+        try:
+            from jobs.rss_scrapers import scrape_yfinance_recommendations
+            scrape_yfinance_recommendations(db)
+        except Exception as e:
+            print(f"[yfinance] Error: {e}")
+        finally:
+            db.close()
+
     print("[STARTUP] Scheduler starting...")
     scheduler = AsyncIOScheduler()
     scheduler.add_job(run_hourly_scraper, "interval", hours=1, id="scraper")
@@ -582,6 +601,7 @@ async def lifespan(app):
     scheduler.add_job(run_alphavantage, "interval", hours=6, id="alphavantage")
     scheduler.add_job(run_benzinga_rss, "interval", hours=1, id="benzinga_rss", next_run_time=datetime.utcnow() + timedelta(minutes=20))
     scheduler.add_job(run_marketbeat_rss, "interval", hours=2, id="marketbeat_rss", next_run_time=datetime.utcnow() + timedelta(minutes=45))
+    scheduler.add_job(run_yfinance, "interval", hours=3, id="yfinance", next_run_time=datetime.utcnow() + timedelta(minutes=120))
     def run_hourly_leaderboard():
         from datetime import datetime as _dt
         scheduler_last_run["leaderboard"] = _dt.utcnow()

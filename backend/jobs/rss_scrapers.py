@@ -333,3 +333,152 @@ def _marketbeat_inner(db: Session):
     if added:
         db.commit()
     print(f"[MarketBeat] Done: {added} added")
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# SOURCE 8: yfinance Analyst Recommendations
+# ═══════════════════════════════════════════════════════════════════════════
+
+YF_TICKERS = [
+    "AAPL", "MSFT", "GOOGL", "AMZN", "NVDA", "TSLA", "META", "AVGO", "ORCL",
+    "CRM", "ADBE", "AMD", "INTC", "QCOM", "NFLX", "CSCO", "IBM", "TXN", "MU",
+    "AMAT", "LRCX", "MRVL", "SNPS", "PANW", "CRWD", "ZS", "NOW", "SNOW",
+    "DDOG", "NET", "ARM", "SMCI", "ON", "ADI", "NXPI",
+    "JPM", "BAC", "WFC", "GS", "MS", "C", "BLK", "SCHW", "V", "MA",
+    "UNH", "JNJ", "LLY", "PFE", "ABBV", "MRK", "TMO", "ABT", "BMY",
+    "AMGN", "GILD", "REGN", "VRTX", "ISRG", "MRNA",
+    "WMT", "PG", "COST", "PEP", "KO", "MCD", "SBUX", "TGT",
+    "NKE", "LULU", "CMG", "HLT", "MAR",
+    "HD", "LOW", "BKNG", "ABNB", "UBER", "DASH", "ETSY",
+    "DIS", "CMCSA", "ROKU", "SPOT", "EA",
+    "BA", "CAT", "GE", "HON", "LMT", "RTX", "DE",
+    "UPS", "FDX", "WM",
+    "F", "GM", "RIVN", "NIO",
+    "XOM", "CVX", "COP", "SLB", "OXY",
+    "NEE", "DUK",
+    "AMT", "PLD", "CCI", "EQIX", "O",
+    "SQ", "PYPL", "COIN", "SOFI", "AFRM", "HOOD",
+    "PLTR", "AI", "IONQ",
+    "SPY", "QQQ",
+]
+
+
+def scrape_yfinance_recommendations(db: Session):
+    if not SCRAPER_LOCK.acquire(blocking=False):
+        print("[yfinance] Another scraper running, skipping")
+        return
+    try:
+        _yf_inner(db)
+    finally:
+        SCRAPER_LOCK.release()
+
+
+def _yf_inner(db: Session):
+    added = 0
+    skipped = 0
+    cutoff = datetime.utcnow() - timedelta(days=30)
+
+    print(f"[yfinance] Scanning {len(YF_TICKERS)} tickers for recommendations")
+
+    for ticker_symbol in YF_TICKERS:
+        try:
+            import yfinance as yf
+            stock = yf.Ticker(ticker_symbol)
+            recs = stock.recommendations
+            if recs is None or recs.empty:
+                continue
+
+            for idx, row in recs.iterrows():
+                # idx is the date (can be Timestamp or string)
+                try:
+                    if hasattr(idx, "to_pydatetime"):
+                        rec_date = idx.to_pydatetime()
+                    else:
+                        rec_date = datetime.strptime(str(idx)[:10], "%Y-%m-%d")
+                except Exception:
+                    continue
+
+                if rec_date < cutoff:
+                    continue
+
+                firm = str(row.get("Firm", "") or "")
+                to_grade = str(row.get("To Grade", "") or "")
+                from_grade = str(row.get("From Grade", "") or "")
+                action = str(row.get("Action", "") or "").lower()
+
+                if not firm or not action:
+                    continue
+
+                # Map action + grade to direction
+                grade_lower = to_grade.lower()
+                if action in ("upgrade", "init") and grade_lower in (
+                    "buy", "overweight", "outperform", "strong buy", "positive",
+                    "sector outperform", "top pick",
+                ):
+                    direction = "bullish"
+                elif action == "upgrade":
+                    direction = "bullish"
+                elif action == "downgrade" and grade_lower in (
+                    "sell", "underweight", "underperform", "reduce", "negative",
+                ):
+                    direction = "bearish"
+                elif action == "downgrade":
+                    direction = "bearish"
+                elif action in ("init",) and grade_lower in (
+                    "sell", "underweight", "underperform", "reduce",
+                ):
+                    direction = "bearish"
+                else:
+                    skipped += 1
+                    continue  # Skip maintain/reiterate/ambiguous
+
+                canonical = resolve_forecaster_alias(firm)
+
+                # Deduplicate
+                date_str = rec_date.strftime("%Y-%m-%d")
+                source_id = f"yf_{ticker_symbol}_{canonical}_{date_str}"
+                if db.execute(text("SELECT 1 FROM predictions WHERE source_platform_id = :sid LIMIT 1"), {"sid": source_id}).first():
+                    continue
+
+                forecaster = find_forecaster(canonical, db)
+                if not forecaster:
+                    skipped += 1
+                    continue
+
+                context = f"{canonical} {action}s {ticker_symbol}"
+                if from_grade and to_grade:
+                    context += f" from {from_grade} to {to_grade}"
+                elif to_grade:
+                    context += f" to {to_grade}"
+
+                source_url = f"https://finance.yahoo.com/quote/{ticker_symbol}"
+                arch = f"https://finance.yahoo.com/quote/{ticker_symbol}/analysis/"
+
+                is_valid, _ = validate_prediction(
+                    ticker=ticker_symbol, direction=direction, source_url=source_url,
+                    archive_url=arch, context=context, forecaster_id=forecaster.id,
+                )
+                if not is_valid:
+                    skipped += 1
+                    continue
+
+                db.add(Prediction(
+                    forecaster_id=forecaster.id, ticker=ticker_symbol, direction=direction,
+                    prediction_date=rec_date, evaluation_date=rec_date + timedelta(days=90),
+                    window_days=90, source_url=source_url, archive_url=arch,
+                    source_type="article", source_platform_id=source_id,
+                    context=context[:500], exact_quote=context,
+                    outcome="pending", verified_by="yfinance",
+                ))
+                added += 1
+
+            time.sleep(0.5)  # Be gentle with Yahoo
+
+        except Exception as e:
+            if "Too Many Requests" not in str(e):
+                print(f"[yfinance] Error for {ticker_symbol}: {e}")
+            time.sleep(2)
+
+    if added:
+        db.commit()
+    print(f"[yfinance] Done: {added} added, {skipped} skipped")
