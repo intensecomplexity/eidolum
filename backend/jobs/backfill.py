@@ -143,16 +143,17 @@ def run_backfill(db: Session):
 
     _test_fmp_endpoints()
 
-    all_tickers = _fetch_all_fmp_tickers()
+    # Use top 500 tickers — most small stocks have no analyst coverage
+    top_tickers = FALLBACK_TICKERS[:500] if len(FALLBACK_TICKERS) >= 500 else FALLBACK_TICKERS
 
     print("[Backfill] === FMP grades-latest (all stocks, one call) ===")
     total += _backfill_fmp_grades_latest(db)
 
-    print(f"[Backfill] === FMP grades-historical ({len(all_tickers)} tickers, full 5yr) ===")
-    total += _backfill_fmp_grades_by_ticker(db, all_tickers)
+    print(f"[Backfill] === FMP upgrades-downgrades ({len(top_tickers)} tickers, individual actions) ===")
+    total += _backfill_fmp_grades_by_ticker(db, top_tickers)
 
-    print(f"[Backfill] === FMP price targets ({len(all_tickers)} tickers, full history) ===")
-    total += _backfill_fmp_price_targets(db, all_tickers)
+    print(f"[Backfill] === FMP price targets ({len(top_tickers)} tickers, full history) ===")
+    total += _backfill_fmp_price_targets(db, top_tickers)
 
     print("[Backfill] === yfinance historical (50 tickers) ===")
     total += _backfill_yfinance(db)
@@ -183,20 +184,15 @@ def _test_fmp_endpoints():
 
     print(f"[FMP-Test] FMP_KEY: {FMP_KEY[:4]}...{FMP_KEY[-4:]}")
 
-    # Test every possible FMP endpoint
+    # Test FMP endpoints — focus on upgrades-downgrades (individual analyst actions)
     test_urls = [
-        # Grades endpoints (Starter plan)
-        ("stable/grades", {"symbol": "AAPL", "apikey": FMP_KEY}),
-        ("stable/grades-latest", {"apikey": FMP_KEY}),
-        ("stable/grades-historical", {"symbol": "AAPL", "apikey": FMP_KEY}),
+        # Primary: individual analyst actions
+        ("stable/upgrades-downgrades", {"symbol": "AAPL", "apikey": FMP_KEY}),
         ("stable/price-target", {"symbol": "AAPL", "apikey": FMP_KEY}),
-        # Legacy upgrades endpoints
-        ("stable/upgrades-downgrades", {"apikey": FMP_KEY}),
-        ("stable/upgrades-downgrades-rss-feed", {"page": 0, "apikey": FMP_KEY}),
-        ("stable/price-target-rss-feed", {"page": 0, "apikey": FMP_KEY}),
-        # v3 legacy
-        ("api/v3/grade/AAPL", {"apikey": FMP_KEY}),
-        ("api/v3/upgrades-downgrades-rss-feed", {"page": 0, "apikey": FMP_KEY}),
+        ("stable/grades-latest", {"apikey": FMP_KEY}),
+        # Alternatives
+        ("stable/grades-historical", {"symbol": "AAPL", "apikey": FMP_KEY}),
+        ("stable/grades", {"symbol": "AAPL", "apikey": FMP_KEY}),
     ]
 
     for path, params in test_urls:
@@ -266,14 +262,22 @@ def _save_fmp_grade(item, db, source_prefix, date_override=None):
     if not forecaster:
         return 0
 
-    context = f"{canonical} {action}s {ticker}"
-    if prev_grade and new_grade:
-        context += f" from {prev_grade} to {new_grade}"
-    elif new_grade:
-        context += f" to {new_grade}"
+    # Use newsTitle if available, otherwise build context
+    news_title = item.get("newsTitle", "")
+    if news_title:
+        context = news_title
+    else:
+        context = f"{canonical} {action}s {ticker}"
+        if prev_grade and new_grade:
+            context += f" from {prev_grade} to {new_grade}"
+        elif new_grade:
+            context += f" to {new_grade}"
 
     source_url = news_url if news_url else f"https://www.google.com/search?q={canonical.replace(' ', '+')}+{action}+{ticker}+{date_str}"
     arch = source_url
+
+    # Store entry price if available
+    price_when = item.get("priceWhenPosted")
 
     try:
         pred_date = datetime.strptime(date_str, "%Y-%m-%d")
@@ -291,6 +295,7 @@ def _save_fmp_grade(item, db, source_prefix, date_override=None):
         forecaster_id=forecaster.id, ticker=ticker.upper(), direction=direction,
         prediction_date=pred_date, evaluation_date=pred_date + timedelta(days=90),
         window_days=90, source_url=source_url, archive_url=arch,
+        entry_price=float(price_when) if price_when else None,
         source_type="article", source_platform_id=source_id,
         context=context[:500], exact_quote=context,
         outcome="pending", verified_by=source_prefix,
@@ -348,18 +353,14 @@ def _backfill_fmp_grades_by_ticker(db: Session, tickers=None) -> int:
     printed_sample = False
     for i, ticker in enumerate(tickers):
         try:
+            # Use upgrades-downgrades — returns individual analyst actions
             r = httpx.get(
-                "https://financialmodelingprep.com/stable/grades-historical",
+                "https://financialmodelingprep.com/stable/upgrades-downgrades",
                 params={"symbol": ticker, "apikey": FMP_KEY}, timeout=15,
             )
             if r.status_code != 200:
-                r = httpx.get(
-                    "https://financialmodelingprep.com/stable/grades",
-                    params={"symbol": ticker, "apikey": FMP_KEY}, timeout=15,
-                )
-            if r.status_code != 200:
                 if i < 3:
-                    print(f"[Backfill-FMP-Grades] {ticker}: status {r.status_code} body={r.text[:150]}")
+                    print(f"[Backfill-FMP] {ticker}: status {r.status_code} body={r.text[:150]}")
                 time.sleep(0.2)
                 continue
 
@@ -370,11 +371,11 @@ def _backfill_fmp_grades_by_ticker(db: Session, tickers=None) -> int:
 
             if not printed_sample and items:
                 import json
-                print(f"[Backfill-DEBUG] FMP grades-historical fields: {list(items[0].keys())}")
+                print(f"[Backfill-DEBUG] FMP upgrades-downgrades fields: {list(items[0].keys())}")
                 print(f"[Backfill-DEBUG] Sample: {json.dumps(items[:2], default=str)}")
                 printed_sample = True
             if i < 3 and items:
-                print(f"[Backfill-FMP-Grades] {ticker}: {len(items)} grades")
+                print(f"[Backfill-FMP] {ticker}: {len(items)} analyst actions")
 
             for item in items:
                 added += _save_fmp_grade(item, db, "bf_fmp_g")
