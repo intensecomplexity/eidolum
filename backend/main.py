@@ -352,6 +352,12 @@ async def lifespan(app):
             db = SessionLocal()
             pred_count = db.query(Prediction).count()
             print(f"[Eidolum] Background import starting — {pred_count} predictions exist")
+            # Historical backfill — only runs if DB has <100 predictions
+            try:
+                from jobs.backfill import run_backfill
+                run_backfill(db)
+            except Exception as e:
+                print(f"[Background] Backfill error: {e}")
             # Scrape real news articles (Layer 1 + Layer 2 built in)
             try:
                 from jobs.news_scraper import scrape_news_predictions
