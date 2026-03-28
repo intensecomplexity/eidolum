@@ -125,9 +125,9 @@ def google_auth_url(request: Request):
 @router.get("/auth/google/callback")
 @limiter.limit("20/minute")
 def google_callback(request: Request, code: str = Query(...), db: Session = Depends(get_db)):
-    """Exchange Google auth code for user info, create/login user, redirect with JWT."""
+    """Exchange Google auth code for user info, create/login user, return JWT."""
     if not GOOGLE_CLIENT_ID or not GOOGLE_CLIENT_SECRET:
-        return RedirectResponse(url=f"{FRONTEND_URL}/login?error=google_not_configured", status_code=302)
+        raise HTTPException(status_code=503, detail="Google sign-in is not configured")
 
     # Exchange code for tokens
     try:
@@ -139,14 +139,15 @@ def google_callback(request: Request, code: str = Query(...), db: Session = Depe
             "grant_type": "authorization_code",
         }, timeout=15)
         token_data = token_resp.json()
+        print(f"[GoogleAuth] Token response status: {token_resp.status_code}")
     except Exception as e:
         print(f"[GoogleAuth] Token exchange failed: {e}")
-        return RedirectResponse(url=f"{FRONTEND_URL}/login?error=google_auth_failed", status_code=302)
+        raise HTTPException(status_code=502, detail="Failed to contact Google")
 
     if "access_token" not in token_data:
         error = token_data.get("error_description", token_data.get("error", "unknown"))
         print(f"[GoogleAuth] No access_token: {error}")
-        return RedirectResponse(url=f"{FRONTEND_URL}/login?error=google_auth_failed", status_code=302)
+        raise HTTPException(status_code=400, detail=f"Google auth failed: {error}")
 
     # Fetch user info
     try:
@@ -154,61 +155,58 @@ def google_callback(request: Request, code: str = Query(...), db: Session = Depe
             "Authorization": f"Bearer {token_data['access_token']}"
         }, timeout=10)
         guser = userinfo_resp.json()
+        print(f"[GoogleAuth] Got user: {guser.get('email')}")
     except Exception as e:
         print(f"[GoogleAuth] Userinfo fetch failed: {e}")
-        return RedirectResponse(url=f"{FRONTEND_URL}/login?error=google_auth_failed", status_code=302)
+        raise HTTPException(status_code=502, detail="Failed to fetch Google profile")
 
     google_email = guser.get("email")
     if not google_email:
-        return RedirectResponse(url=f"{FRONTEND_URL}/login?error=google_no_email", status_code=302)
+        raise HTTPException(status_code=400, detail="Google account has no email")
 
     google_name = guser.get("name", "")
     google_picture = guser.get("picture", "")
 
     # Check if user exists
-    try:
-        user = db.query(User).filter(User.email == google_email).first()
+    user = db.query(User).filter(User.email == google_email).first()
 
-        if user:
-            # Existing user — link account if they signed up with email
-            if hasattr(user, 'auth_provider') and (not user.auth_provider or user.auth_provider == 'email'):
-                user.auth_provider = 'google'
-            if google_picture and not user.avatar_url:
-                user.avatar_url = google_picture
-            if google_name and not user.display_name:
-                user.display_name = google_name
-            db.commit()
-        else:
-            # New user — create account
-            username = _generate_username(google_email, db)
-            user = User(
-                username=username,
-                email=google_email,
-                password_hash=secrets.token_hex(32),
-                display_name=google_name or username,
-                avatar_url=google_picture,
-            )
-            if hasattr(User, 'auth_provider'):
-                user.auth_provider = 'google'
-            db.add(user)
-            db.commit()
-            db.refresh(user)
+    if user:
+        # Existing user — link account if they signed up with email
+        if hasattr(user, 'auth_provider') and (not user.auth_provider or user.auth_provider == 'email'):
+            user.auth_provider = 'google'
+        if google_picture and not user.avatar_url:
+            user.avatar_url = google_picture
+        if google_name and not user.display_name:
+            user.display_name = google_name
+        db.commit()
+    else:
+        # New user — create account
+        username = _generate_username(google_email, db)
+        user = User(
+            username=username,
+            email=google_email,
+            password_hash=secrets.token_hex(32),
+            display_name=google_name or username,
+            avatar_url=google_picture,
+        )
+        if hasattr(User, 'auth_provider'):
+            user.auth_provider = 'google'
+        db.add(user)
+        db.commit()
+        db.refresh(user)
 
-            from activity import log_activity
-            log_activity(user_id=user.id, event_type="user_joined", description=f"{user.username} joined Eidolum", data={"user_id": user.id}, db=db)
-            db.commit()
+        from activity import log_activity
+        log_activity(user_id=user.id, event_type="user_joined", description=f"{user.username} joined Eidolum", data={"user_id": user.id}, db=db)
+        db.commit()
 
-        jwt_token = create_token(user.id, user.username)
-        params = urlencode({
-            "token": jwt_token,
-            "user_id": user.id,
-            "username": user.username,
-        })
-        return RedirectResponse(url=f"{FRONTEND_URL}/auth/callback?{params}", status_code=302)
-
-    except Exception as e:
-        db.rollback()
-        print(f"[GoogleAuth] DB error: {e}")
+    jwt_token = create_token(user.id, user.username)
+    print(f"[GoogleAuth] Login success: user_id={user.id} username={user.username}")
+    return {
+        "token": jwt_token,
+        "user_id": user.id,
+        "username": user.username,
+        "display_name": user.display_name,
+    }
         return RedirectResponse(url=f"{FRONTEND_URL}/login?error=google_auth_failed", status_code=302)
 
 

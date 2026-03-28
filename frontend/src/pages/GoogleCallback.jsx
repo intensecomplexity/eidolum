@@ -1,16 +1,17 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { API_BASE } from '../api';
+import { googleCallback } from '../api';
 
 export default function GoogleCallback() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { loginWithToken } = useAuth();
   const [error, setError] = useState('');
+  const [processing, setProcessing] = useState(false);
 
   useEffect(() => {
-    // Check for token first (backend redirected here after code exchange)
+    // Flow 1: Arrived with token already (e.g. from a backend redirect)
     const token = searchParams.get('token');
     if (token) {
       const userId = searchParams.get('user_id');
@@ -20,24 +21,33 @@ export default function GoogleCallback() {
       return;
     }
 
-    // Check for error from login page redirect
+    // Flow 2: Arrived with error param
     const errorParam = searchParams.get('error');
     if (errorParam) {
       setError('Google sign-in failed. Please try again.');
       return;
     }
 
-    // Google redirected here with a code — redirect browser to backend to exchange it
+    // Flow 3: Google redirected here with a code — call backend API to exchange it
     const code = searchParams.get('code');
-    if (code) {
-      // Redirect the browser (not an API call) to the backend callback
-      // The backend will exchange the code, create/find the user, and redirect back
-      // to /auth/callback?token=...
-      window.location.href = `${API_BASE}/api/auth/google/callback?code=${encodeURIComponent(code)}`;
+    if (!code) {
+      setError('No authorization code received from Google.');
       return;
     }
 
-    setError('No authorization code received from Google.');
+    if (processing) return;
+    setProcessing(true);
+
+    googleCallback(code)
+      .then(data => {
+        loginWithToken(data);
+        navigate('/');
+      })
+      .catch(err => {
+        const detail = err?.response?.data?.detail || '';
+        console.error('[GoogleCallback] Error:', detail || err);
+        setError(detail || 'Google sign-in failed. Please try again.');
+      });
   }, []);
 
   if (error) {

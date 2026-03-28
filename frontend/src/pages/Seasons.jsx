@@ -95,20 +95,22 @@ export default function Seasons() {
           </div>
         )}
 
-        {/* Season tabs */}
-        <div className="flex gap-2 mb-6 overflow-x-auto pills-scroll">
-          {allSeasons.map(s => {
-            const isActive = selectedId === s.id;
-            const c = s.theme_color || '#00a878';
-            return (
-              <button key={s.id} onClick={() => handleSelectSeason(s.id)}
-                className={`px-4 py-2 rounded-lg text-xs font-bold whitespace-nowrap transition-colors uppercase tracking-wider ${isActive ? 'border' : 'bg-surface text-text-secondary border border-border'}`}
-                style={isActive ? { color: c, borderColor: `${c}40`, background: `${c}15` } : {}}>
-                {s.name} <span className="font-normal normal-case tracking-normal opacity-60">&middot; {s.quarter_label}</span> {s.status === 'active' ? '(Live)' : ''}
-              </button>
-            );
-          })}
-        </div>
+        {/* Past season tabs (only show non-active seasons) */}
+        {allSeasons.filter(s => s.status !== 'active').length > 0 && (
+          <div className="flex gap-2 mb-6 overflow-x-auto pills-scroll">
+            {allSeasons.filter(s => s.status !== 'active').map(s => {
+              const isSelected = selectedId === s.id;
+              const c = s.theme_color || '#00a878';
+              return (
+                <button key={s.id} onClick={() => handleSelectSeason(s.id)}
+                  className={`px-4 py-2 rounded-lg text-xs font-bold whitespace-nowrap transition-colors uppercase tracking-wider ${isSelected ? 'border' : 'bg-surface text-text-secondary border border-border'}`}
+                  style={isSelected ? { color: c, borderColor: `${c}40`, background: `${c}15` } : {}}>
+                  {s.name} <span className="font-normal normal-case tracking-normal opacity-60">&middot; {s.quarter_label}</span>
+                </button>
+              );
+            })}
+          </div>
+        )}
 
         {/* Leaderboard */}
         {leaderboard.length === 0 ? (
