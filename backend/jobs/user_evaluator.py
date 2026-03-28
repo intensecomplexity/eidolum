@@ -22,59 +22,79 @@ STREAK_MILESTONES = {5, 10, 15, 20}
 
 CRYPTO_TICKERS = {"BTC": "BINANCE:BTCUSDT", "ETH": "BINANCE:ETHUSDT", "SOL": "BINANCE:SOLUSDT"}
 
+# Track what source was used for each price (for admin endpoint reporting)
+_price_sources: dict[str, str] = {}
+
 
 def _fetch_price(ticker: str) -> float | None:
-    """Fetch current price with multiple fallbacks: Finnhub → evaluator → yfinance."""
+    """Fetch price with timeouts, previous-close fallback, and multiple sources."""
     if ticker in _price_cache:
         return _price_cache[ticker]
 
-    # Attempt 1: Finnhub
+    # Attempt 1: Finnhub (current price OR previous close)
     if FINNHUB_KEY:
         symbols_to_try = [ticker]
         if ticker in CRYPTO_TICKERS:
             symbols_to_try.insert(0, CRYPTO_TICKERS[ticker])
         for sym in symbols_to_try:
             try:
-                r = httpx.get("https://finnhub.io/api/v1/quote", params={"symbol": sym, "token": FINNHUB_KEY}, timeout=10)
+                r = httpx.get(
+                    "https://finnhub.io/api/v1/quote",
+                    params={"symbol": sym, "token": FINNHUB_KEY},
+                    timeout=8,
+                )
                 data = r.json()
-                price = data.get("c")
-                if price and float(price) > 0:
-                    result = round(float(price), 2)
+                # Try current price first, then previous close
+                current = data.get("c", 0) or 0
+                prev_close = data.get("pc", 0) or 0
+                if float(current) > 0:
+                    result = round(float(current), 2)
                     _price_cache[ticker] = result
-                    print(f"[UserEval] Price for {ticker} via Finnhub: ${result}")
+                    _price_sources[ticker] = "finnhub_current"
+                    print(f"[UserEval] {ticker}: ${result} (Finnhub current)")
                     return result
+                elif float(prev_close) > 0:
+                    result = round(float(prev_close), 2)
+                    _price_cache[ticker] = result
+                    _price_sources[ticker] = "finnhub_previous_close"
+                    print(f"[UserEval] {ticker}: ${result} (Finnhub previous close)")
+                    return result
+            except httpx.TimeoutException:
+                print(f"[UserEval] Finnhub TIMEOUT for {sym}")
             except Exception as e:
-                print(f"[UserEval] Finnhub failed for {sym}: {e}")
-                continue
+                print(f"[UserEval] Finnhub error for {sym}: {e}")
     else:
         print("[UserEval] WARNING: FINNHUB_KEY not set")
 
-    # Attempt 2: evaluator module
-    try:
-        from jobs.evaluator import get_current_price
-        result = get_current_price(ticker)
-        if result and float(result) > 0:
-            _price_cache[ticker] = result
-            print(f"[UserEval] Price for {ticker} via evaluator: ${result}")
-            return result
-    except Exception as e:
-        print(f"[UserEval] Evaluator fallback failed for {ticker}: {e}")
-
-    # Attempt 3: yfinance direct
+    # Attempt 2: yfinance (most recent close price)
     try:
         import yfinance as yf
         t = yf.Ticker(ticker)
         hist = t.history(period="5d")
-        if not hist.empty:
+        if hist is not None and not hist.empty:
             result = round(float(hist['Close'].iloc[-1]), 2)
             if result > 0:
                 _price_cache[ticker] = result
-                print(f"[UserEval] Price for {ticker} via yfinance: ${result}")
+                _price_sources[ticker] = "yfinance"
+                print(f"[UserEval] {ticker}: ${result} (yfinance)")
                 return result
     except Exception as e:
-        print(f"[UserEval] yfinance fallback failed for {ticker}: {e}")
+        print(f"[UserEval] yfinance failed for {ticker}: {e}")
+
+    # Attempt 3: evaluator module
+    try:
+        from jobs.evaluator import get_current_price
+        result = get_current_price(ticker)
+        if result and float(result) > 0:
+            _price_cache[ticker] = float(result)
+            _price_sources[ticker] = "evaluator"
+            print(f"[UserEval] {ticker}: ${result} (evaluator)")
+            return float(result)
+    except Exception as e:
+        print(f"[UserEval] Evaluator failed for {ticker}: {e}")
 
     print(f"[UserEval] ALL price sources failed for {ticker}")
+    _price_sources[ticker] = "failed"
     return None
 
 
@@ -90,8 +110,11 @@ def _parse_target(target_str: str) -> float | None:
 # ══════════════════════════════════════════════════════════════════════════════
 
 
-def evaluate_user_predictions(db: Session):
+def evaluate_user_predictions(db: Session) -> list[dict]:
+    """Score all expired user predictions. Returns list of results for reporting."""
     _price_cache.clear()
+    _price_sources.clear()
+    results = []
     now = datetime.utcnow()
     print(f"[UserEval] Running at {now.isoformat()}")
 
@@ -108,7 +131,7 @@ def evaluate_user_predictions(db: Session):
 
     if not overdue:
         print("[UserEval] No expired predictions to evaluate")
-        return
+        return results
 
     print(f"[UserEval] Found {len(overdue)} expired predictions to evaluate")
 
@@ -142,6 +165,12 @@ def evaluate_user_predictions(db: Session):
         p.current_price = Decimal(str(price))
 
         print(f"[UserEval] Prediction {p.id}: {p.ticker} {p.direction} entry=${entry} current=${price} → {outcome}")
+
+        results.append({
+            "id": p.id, "ticker": p.ticker, "direction": p.direction,
+            "outcome": outcome, "entry_price": entry, "price_used": price,
+            "source": _price_sources.get(p.ticker, "unknown"),
+        })
 
         if outcome == "correct":
             correct_count += 1
@@ -222,6 +251,8 @@ def evaluate_user_predictions(db: Session):
         db.commit()
     except Exception as e:
         print(f"[UserEval] Rival check error: {e}")
+
+    return results
 
 
 def _update_season_scored(user_id: int, outcome: str, db: Session):
