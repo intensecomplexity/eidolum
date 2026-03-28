@@ -20,19 +20,27 @@ _price_cache: dict[str, float] = {}
 STREAK_MILESTONES = {5, 10, 15, 20}
 
 
+CRYPTO_TICKERS = {"BTC": "BINANCE:BTCUSDT", "ETH": "BINANCE:ETHUSDT", "SOL": "BINANCE:SOLUSDT"}
+
+
 def _fetch_price(ticker: str) -> float | None:
     if ticker in _price_cache:
         return _price_cache[ticker]
     if FINNHUB_KEY:
-        try:
-            r = httpx.get("https://finnhub.io/api/v1/quote", params={"symbol": ticker, "token": FINNHUB_KEY}, timeout=10)
-            price = r.json().get("c")
-            if price and price > 0:
-                result = round(float(price), 2)
-                _price_cache[ticker] = result
-                return result
-        except Exception:
-            pass
+        # Try crypto symbol mapping first
+        symbols_to_try = [ticker]
+        if ticker in CRYPTO_TICKERS:
+            symbols_to_try.insert(0, CRYPTO_TICKERS[ticker])
+        for sym in symbols_to_try:
+            try:
+                r = httpx.get("https://finnhub.io/api/v1/quote", params={"symbol": sym, "token": FINNHUB_KEY}, timeout=10)
+                price = r.json().get("c")
+                if price and price > 0:
+                    result = round(float(price), 2)
+                    _price_cache[ticker] = result
+                    return result
+            except Exception:
+                continue
     try:
         from jobs.evaluator import get_current_price
         result = get_current_price(ticker)
@@ -66,13 +74,16 @@ def evaluate_user_predictions(db: Session):
             UserPrediction.outcome == "pending",
             UserPrediction.expires_at.isnot(None),
             UserPrediction.expires_at <= now,
+            UserPrediction.deleted_at.is_(None),
         )
         .all()
     )
 
     if not overdue:
-        print("[UserEval] No expired predictions")
+        print("[UserEval] No expired predictions to evaluate")
         return
+
+    print(f"[UserEval] Found {len(overdue)} expired predictions to evaluate")
 
     correct_count = 0
     incorrect_count = 0
@@ -84,10 +95,12 @@ def evaluate_user_predictions(db: Session):
 
         price = _fetch_price(p.ticker)
         if price is None:
+            print(f"[UserEval] Could not fetch price for {p.ticker} (prediction {p.id}), skipping")
             continue
 
         entry = float(p.price_at_call) if p.price_at_call else None
         if entry is None:
+            print(f"[UserEval] No entry price for prediction {p.id} ({p.ticker}), skipping")
             continue
 
         if p.direction == "bullish":
@@ -100,6 +113,8 @@ def evaluate_user_predictions(db: Session):
         p.outcome = outcome
         p.evaluated_at = now
         p.current_price = Decimal(str(price))
+
+        print(f"[UserEval] Prediction {p.id}: {p.ticker} {p.direction} entry=${entry} current=${price} → {outcome}")
 
         if outcome == "correct":
             correct_count += 1

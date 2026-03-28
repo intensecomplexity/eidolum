@@ -88,7 +88,7 @@ def get_user_profile(request: Request, user_id: int, credentials: Optional[HTTPA
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
-    all_preds = db.query(UserPrediction).filter(UserPrediction.user_id == user_id).all()
+    all_preds = db.query(UserPrediction).filter(UserPrediction.user_id == user_id, UserPrediction.deleted_at.is_(None)).all()
     scored = [p for p in all_preds if p.outcome in ("correct", "incorrect")]
     correct = [p for p in scored if p.outcome == "correct"]
     pending = [p for p in all_preds if p.outcome == "pending"]
@@ -124,14 +124,18 @@ def get_user_profile(request: Request, user_id: int, credentials: Optional[HTTPA
     ]
     sector_accuracy.sort(key=lambda x: x["total_scored"], reverse=True)
 
-    # Direction split
-    bull_all = [p for p in scored if p.direction == "bullish"]
-    bear_all = [p for p in scored if p.direction == "bearish"]
+    # Direction split (scored predictions)
+    bull_scored = [p for p in scored if p.direction == "bullish"]
+    bear_scored = [p for p in scored if p.direction == "bearish"]
+    bull_pending = sum(1 for p in pending if p.direction == "bullish")
+    bear_pending = sum(1 for p in pending if p.direction == "bearish")
     direction_split = {
-        "bullish_count": len(bull_all),
-        "bearish_count": len(bear_all),
-        "bullish_correct": sum(1 for p in bull_all if p.outcome == "correct"),
-        "bearish_correct": sum(1 for p in bear_all if p.outcome == "correct"),
+        "bullish_count": len(bull_scored),
+        "bearish_count": len(bear_scored),
+        "bullish_correct": sum(1 for p in bull_scored if p.outcome == "correct"),
+        "bearish_correct": sum(1 for p in bear_scored if p.outcome == "correct"),
+        "bullish_pending": bull_pending,
+        "bearish_pending": bear_pending,
     }
 
     # Fastest correct
@@ -305,6 +309,7 @@ def community_leaderboard(request: Request, user_type: str = Query(None), db: Se
             .filter(
                 UserPrediction.user_id == user.id,
                 UserPrediction.outcome.in_(["correct", "incorrect"]),
+                UserPrediction.deleted_at.is_(None),
             )
             .all()
         )

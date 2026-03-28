@@ -206,11 +206,17 @@ export default function Profile() {
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2"><TrendingUp className="w-4 h-4 text-positive" /><span className="text-sm">Bullish</span></div>
-                  <span className="font-mono text-sm">{profile.direction_split.bullish_correct}/{profile.direction_split.bullish_count}</span>
+                  <div className="flex items-center gap-2">
+                    <span className="font-mono text-sm">{profile.direction_split.bullish_correct}/{profile.direction_split.bullish_count}</span>
+                    {profile.direction_split.bullish_pending > 0 && <span className="text-[10px] text-muted">+{profile.direction_split.bullish_pending} pending</span>}
+                  </div>
                 </div>
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2"><TrendingDown className="w-4 h-4 text-negative" /><span className="text-sm">Bearish</span></div>
-                  <span className="font-mono text-sm">{profile.direction_split.bearish_correct}/{profile.direction_split.bearish_count}</span>
+                  <div className="flex items-center gap-2">
+                    <span className="font-mono text-sm">{profile.direction_split.bearish_correct}/{profile.direction_split.bearish_count}</span>
+                    {profile.direction_split.bearish_pending > 0 && <span className="text-[10px] text-muted">+{profile.direction_split.bearish_pending} pending</span>}
+                  </div>
                 </div>
               </div>
             </div>
