@@ -1228,10 +1228,14 @@ async def lifespan(app):
         finally:
             db.close()
 
-    # 9:30 AM EST = 14:30 UTC
-    scheduler.add_job(run_create_daily_challenge, "cron", hour=14, minute=30, id="daily_challenge_create", day_of_week="mon-fri")
-    # 4:30 PM EST = 21:30 UTC
-    scheduler.add_job(run_score_daily_challenge, "cron", hour=21, minute=30, id="daily_challenge_score", day_of_week="mon-fri")
+    # Weekday: create at 14:30 UTC (9:30 AM EST)
+    scheduler.add_job(run_create_daily_challenge, "cron", hour=14, minute=30, id="daily_challenge_create_weekday", day_of_week="mon-fri")
+    # Weekend: create crypto challenge at 00:05 UTC
+    scheduler.add_job(run_create_daily_challenge, "cron", hour=0, minute=5, id="daily_challenge_create_weekend", day_of_week="sat,sun")
+    # Weekday stock scoring: 21:30 UTC (4:30 PM EST)
+    scheduler.add_job(run_score_daily_challenge, "cron", hour=21, minute=30, id="daily_challenge_score_weekday", day_of_week="mon-fri")
+    # Crypto scoring (weekdays + weekends): 23:55 UTC
+    scheduler.add_job(run_score_daily_challenge, "cron", hour=23, minute=55, id="daily_challenge_score_crypto")
 
     # Price alerts — every 30 min during market hours
     def run_price_alerts():

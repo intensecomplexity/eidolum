@@ -15,13 +15,19 @@ export default function DailyChallengeCard() {
     getTodayChallenge().then(setData).catch(() => {}).finally(() => setLoading(false));
   }, []);
 
-  // Countdown to 4:30 PM EST (21:30 UTC)
+  // Countdown — crypto ends at 23:55 UTC, stocks at 21:30 UTC
+  const isCrypto = data && ['BTC', 'ETH', 'SOL'].includes(data.ticker);
+
   useEffect(() => {
     if (!data?.active) return;
     const tick = () => {
       const now = new Date();
       const close = new Date(now);
-      close.setUTCHours(21, 30, 0, 0);
+      if (isCrypto) {
+        close.setUTCHours(23, 55, 0, 0);
+      } else {
+        close.setUTCHours(21, 30, 0, 0);
+      }
       if (close <= now) close.setDate(close.getDate() + 1);
       const diff = close - now;
       const h = Math.floor(diff / 3600000);
@@ -31,7 +37,7 @@ export default function DailyChallengeCard() {
     tick();
     const id = setInterval(tick, 60000);
     return () => clearInterval(id);
-  }, [data]);
+  }, [data, isCrypto]);
 
   async function handleVote(direction) {
     setEntering(true);

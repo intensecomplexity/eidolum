@@ -1,8 +1,7 @@
 """
 Daily Challenge jobs:
-  - create_daily_challenge: weekdays at 14:30 UTC (9:30 AM EST)
-  - score_daily_challenge: weekdays at 21:30 UTC (4:30 PM EST)
-  - For crypto: create at 00:00 UTC, score at 00:00 UTC next day
+  - Weekdays: create at 14:30 UTC (9:30 AM EST), score stocks at 21:30 UTC, score crypto at 23:55 UTC
+  - Weekends: create at 00:05 UTC (crypto only), score at 23:55 UTC
 """
 import os
 import random
@@ -21,120 +20,91 @@ FINNHUB_KEY = os.getenv("FINNHUB_KEY", "")
 POPULAR = {"NVDA", "TSLA", "AAPL", "META", "BTC", "AMZN", "GOOGL"}
 CRYPTO = {"BTC", "ETH", "SOL"}
 ALL_TICKERS = list(TICKER_INFO.keys())
+CRYPTO_LIST = list(CRYPTO)
 
 
 def _fetch_quote(ticker: str) -> dict | None:
-    """Fetch quote from Finnhub. Returns dict with 'c' (current), 'o' (open), 'pc' (prev close)."""
     if not FINNHUB_KEY:
-        print(f"[DailyChallenge] No FINNHUB_KEY set")
+        print("[DailyChallenge] No FINNHUB_KEY set")
         return None
-
-    # Crypto tickers need special Finnhub symbol format
-    symbol = ticker
-    if ticker in CRYPTO:
-        symbol = f"BINANCE:{ticker}USDT"
-
+    symbol = f"BINANCE:{ticker}USDT" if ticker in CRYPTO else ticker
     try:
-        r = httpx.get(
-            "https://finnhub.io/api/v1/quote",
-            params={"symbol": symbol, "token": FINNHUB_KEY},
-            timeout=10,
-        )
+        r = httpx.get("https://finnhub.io/api/v1/quote", params={"symbol": symbol, "token": FINNHUB_KEY}, timeout=10)
         data = r.json()
-
         if data.get("c") and data["c"] > 0:
             return data
-
-        # Crypto fallback: try without exchange prefix
         if ticker in CRYPTO:
-            r2 = httpx.get(
-                "https://finnhub.io/api/v1/quote",
-                params={"symbol": ticker, "token": FINNHUB_KEY},
-                timeout=10,
-            )
+            r2 = httpx.get("https://finnhub.io/api/v1/quote", params={"symbol": ticker, "token": FINNHUB_KEY}, timeout=10)
             data2 = r2.json()
             if data2.get("c") and data2["c"] > 0:
                 return data2
-
-        print(f"[DailyChallenge] Finnhub returned no data for {ticker} (symbol: {symbol})")
+        print(f"[DailyChallenge] Finnhub no data for {ticker}")
         return None
-
     except Exception as e:
-        print(f"[DailyChallenge] Finnhub API error for {ticker}: {e}")
+        print(f"[DailyChallenge] Finnhub error for {ticker}: {e}")
         return None
 
 
 def _get_price(ticker: str) -> float | None:
-    """Get current price. Tries Finnhub, falls back to evaluator."""
     quote = _fetch_quote(ticker)
     if quote:
         return round(float(quote["c"]), 2)
-
-    # Fallback
     try:
         from jobs.evaluator import get_current_price
         result = get_current_price(ticker)
         if result:
             return round(result, 2)
-    except Exception as e:
-        print(f"[DailyChallenge] Fallback price error for {ticker}: {e}")
-
+    except Exception:
+        pass
     return None
 
 
 def _get_open_price(ticker: str) -> float | None:
-    """Get today's opening price from Finnhub."""
     quote = _fetch_quote(ticker)
     if quote and quote.get("o") and quote["o"] > 0:
         return round(float(quote["o"]), 2)
-    # If no open price, use current as proxy
     if quote and quote.get("c") and quote["c"] > 0:
         return round(float(quote["c"]), 2)
     return _get_price(ticker)
 
 
-def pick_daily_ticker(db: Session, force_ticker: str | None = None) -> str:
-    """Pick a ticker. If force_ticker is provided, use that instead."""
+def pick_daily_ticker(db: Session, force_ticker: str | None = None, crypto_only: bool = False) -> str:
     if force_ticker and force_ticker.upper() in set(ALL_TICKERS):
         return force_ticker.upper()
 
     week_ago = date.today() - timedelta(days=7)
-    recent = [
-        r[0] for r in db.query(DailyChallenge.ticker)
-        .filter(DailyChallenge.challenge_date >= week_ago)
-        .all()
-    ]
-    recent_set = set(recent)
+    recent = set(r[0] for r in db.query(DailyChallenge.ticker).filter(DailyChallenge.challenge_date >= week_ago).all())
 
+    candidates = CRYPTO_LIST if crypto_only else ALL_TICKERS
     pool = []
-    for t in ALL_TICKERS:
-        if t in recent_set:
+    for t in candidates:
+        if t in recent:
             continue
         weight = 3 if t in POPULAR else 1
         pool.extend([t] * weight)
 
     if not pool:
-        pool = [t for t in ALL_TICKERS if t not in recent_set] or ALL_TICKERS
+        pool = [t for t in candidates if t not in recent] or candidates
 
     return random.choice(pool)
 
 
 def create_daily_challenge(db: Session, force_ticker: str | None = None):
-    """Create today's daily challenge."""
     today = date.today()
-    print(f"[DailyChallenge] Creating challenge for {today}")
+    is_weekend = today.weekday() >= 5
+    print(f"[DailyChallenge] Creating for {today} (weekend={is_weekend})")
 
     existing = db.query(DailyChallenge).filter(DailyChallenge.challenge_date == today).first()
     if existing:
-        print(f"[DailyChallenge] Already exists for {today}: {existing.ticker}")
+        print(f"[DailyChallenge] Already exists: {existing.ticker}")
         return existing
 
-    ticker = pick_daily_ticker(db, force_ticker)
+    ticker = pick_daily_ticker(db, force_ticker, crypto_only=is_weekend)
     open_price = _get_open_price(ticker)
     ticker_name = TICKER_INFO.get(ticker, ticker)
 
     if open_price is None:
-        print(f"[DailyChallenge] WARNING: Could not fetch open price for {ticker}, creating challenge anyway")
+        print(f"[DailyChallenge] WARNING: No price for {ticker}")
 
     challenge = DailyChallenge(
         ticker=ticker,
@@ -144,47 +114,30 @@ def create_daily_challenge(db: Session, force_ticker: str | None = None):
         status="active",
     )
     db.add(challenge)
-
-    log_activity(
-        user_id=0, event_type="daily_challenge",
-        description=f"Daily Challenge: {ticker} ({ticker_name}) — Bull or Bear?",
-        ticker=ticker, data={"ticker": ticker}, db=db,
-    )
-
+    log_activity(user_id=0, event_type="daily_challenge", description=f"Daily Challenge: {ticker} ({ticker_name}) — Bull or Bear?", ticker=ticker, data={"ticker": ticker, "is_crypto": ticker in CRYPTO}, db=db)
     db.commit()
     db.refresh(challenge)
-    print(f"[DailyChallenge] Created: {ticker} at open price ${open_price}")
+    print(f"[DailyChallenge] Created: {ticker} @ ${open_price}")
     return challenge
 
 
 def score_daily_challenge(db: Session):
-    """Score today's (or any active) daily challenge."""
     today = date.today()
     print(f"[DailyChallenge] Scoring for {today}")
 
-    challenge = db.query(DailyChallenge).filter(
-        DailyChallenge.status == "active",
-    ).order_by(DailyChallenge.challenge_date.desc()).first()
-
+    challenge = db.query(DailyChallenge).filter(DailyChallenge.status == "active").order_by(DailyChallenge.challenge_date.desc()).first()
     if not challenge:
         print("[DailyChallenge] No active challenge to score")
         return
 
     price = _get_price(challenge.ticker)
     if price is None:
-        print(f"[DailyChallenge] Could not fetch close price for {challenge.ticker}")
+        print(f"[DailyChallenge] No close price for {challenge.ticker}")
         return
 
     challenge.price_at_close = Decimal(str(price))
     open_price = float(challenge.price_at_open) if challenge.price_at_open else 0
-
-    if price > open_price:
-        challenge.correct_direction = "bullish"
-    elif price < open_price:
-        challenge.correct_direction = "bearish"
-    else:
-        challenge.correct_direction = "bullish"
-
+    challenge.correct_direction = "bullish" if price >= open_price else "bearish"
     challenge.status = "completed"
 
     entries = db.query(DailyChallengeEntry).filter(DailyChallengeEntry.challenge_id == challenge.id).all()
@@ -192,11 +145,9 @@ def score_daily_challenge(db: Session):
     total = len(entries)
 
     for entry in entries:
-        if entry.direction == challenge.correct_direction:
-            entry.outcome = "correct"
+        entry.outcome = "correct" if entry.direction == challenge.correct_direction else "incorrect"
+        if entry.outcome == "correct":
             correct_count += 1
-        else:
-            entry.outcome = "incorrect"
 
         user = db.query(User).filter(User.id == entry.user_id).first()
         if user:
@@ -208,39 +159,33 @@ def score_daily_challenge(db: Session):
                 user.daily_streak_current = 0
 
             pct = round(correct_count / total * 100) if total > 0 else 0
-            if entry.outcome == "correct":
-                msg = f"You got today's challenge right! {pct}% of players agreed with you."
-            else:
-                msg = f"Today's {challenge.ticker} challenge was {challenge.correct_direction}. Better luck tomorrow!"
+            msg = f"You got today's challenge right! {pct}% of players agreed." if entry.outcome == "correct" else f"Today's {challenge.ticker} was {challenge.correct_direction}. Better luck tomorrow!"
             create_notification(user_id=entry.user_id, type="prediction_scored", title="Daily Challenge Scored!", message=msg, data={"challenge_id": challenge.id}, db=db)
 
     community_acc = round(correct_count / total * 100, 1) if total > 0 else 0
-    log_activity(
-        user_id=0, event_type="daily_challenge_scored",
-        description=f"Daily Challenge: {challenge.ticker} was {challenge.correct_direction}. {community_acc}% of {total} players got it right.",
-        ticker=challenge.ticker, data={"ticker": challenge.ticker, "correct": challenge.correct_direction, "accuracy": community_acc}, db=db,
-    )
-
+    log_activity(user_id=0, event_type="daily_challenge_scored", description=f"Daily Challenge: {challenge.ticker} was {challenge.correct_direction}. {community_acc}% of {total} got it right.", ticker=challenge.ticker, data={"ticker": challenge.ticker, "correct": challenge.correct_direction, "accuracy": community_acc}, db=db)
     db.commit()
     print(f"[DailyChallenge] Scored: {challenge.ticker} = {challenge.correct_direction}, {correct_count}/{total} correct")
 
 
 def ensure_daily_challenge_exists(db: Session):
-    """On startup, create today's challenge if it doesn't exist and it's a weekday after market open."""
+    """On startup, create today's challenge if missing. Weekends get crypto."""
     today = date.today()
     now = datetime.utcnow()
+    is_weekend = today.weekday() >= 5
 
     existing = db.query(DailyChallenge).filter(DailyChallenge.challenge_date == today).first()
     if existing:
-        print(f"[DailyChallenge] Startup: challenge exists for today ({existing.ticker})")
+        print(f"[DailyChallenge] Startup: exists ({existing.ticker})")
         return
 
-    # Only auto-create on weekdays after 14:30 UTC, or any day for crypto
-    is_weekday = today.weekday() < 5
-    past_market_open = now.hour >= 14 or (now.hour == 14 and now.minute >= 30)
-
-    if is_weekday and past_market_open:
-        print("[DailyChallenge] Startup: no challenge for today, creating one")
+    if is_weekend:
+        # Weekends: always create a crypto challenge
+        print("[DailyChallenge] Startup: weekend, creating crypto challenge")
+        create_daily_challenge(db)
+    elif now.hour >= 14 or (now.hour == 14 and now.minute >= 30):
+        # Weekday after market open
+        print("[DailyChallenge] Startup: weekday post-open, creating challenge")
         create_daily_challenge(db)
     else:
-        print(f"[DailyChallenge] Startup: no challenge yet (weekday={is_weekday}, past_open={past_market_open})")
+        print(f"[DailyChallenge] Startup: weekday pre-open, skipping")
