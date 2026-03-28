@@ -1,4 +1,6 @@
 import { Swords } from 'lucide-react';
+import TypeBadge from './TypeBadge';
+import TickerLink from './TickerLink';
 
 const STATUS_STYLES = {
   pending: 'bg-warning/10 text-warning border-warning/20',
@@ -21,17 +23,17 @@ export default function DuelCard({ duel, currentUserId }) {
   return (
     <div className={`rounded-xl border p-4 ${duel.status === 'completed' && won ? 'border-accent/30 bg-accent/5' : duel.status === 'completed' && lost ? 'border-negative/20 bg-negative/5' : 'border-border bg-surface'}`}>
       <div className="flex items-center justify-between mb-3">
-        <span className="font-mono text-lg font-bold tracking-wider">{duel.ticker}</span>
+        <TickerLink ticker={duel.ticker} className="text-lg" />
         <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded border ${STATUS_STYLES[duel.status] || STATUS_STYLES.pending}`}>
           {duel.status}
         </span>
       </div>
 
       {/* VS layout */}
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-2 sm:gap-3">
         {/* Left player */}
-        <div className="flex-1 text-center">
-          <p className="text-xs text-muted mb-1">{isChallenger ? 'You' : duel.challenger_username}</p>
+        <div className="flex-1 text-center min-w-0">
+          <p className="text-xs text-muted mb-1 truncate">{isChallenger ? 'You' : duel.challenger_username}</p>
           <span className={`text-xs font-mono font-semibold ${myDir === 'bullish' ? 'text-positive' : 'text-negative'}`}>
             {isChallenger ? myDir : theirDir}
           </span>
@@ -45,8 +47,8 @@ export default function DuelCard({ duel, currentUserId }) {
         </div>
 
         {/* Right player */}
-        <div className="flex-1 text-center">
-          <p className="text-xs text-muted mb-1">{isChallenger ? duel.opponent_username : 'You'}</p>
+        <div className="flex-1 text-center min-w-0">
+          <p className="text-xs text-muted mb-1 truncate">{isChallenger ? duel.opponent_username : 'You'}</p>
           <span className={`text-xs font-mono font-semibold ${theirDir === 'bullish' ? 'text-positive' : 'text-negative'}`}>
             {isChallenger ? theirDir : myDir}
           </span>

@@ -40,6 +40,7 @@ def _user_dict(user: User) -> dict:
         "created_at": user.created_at.isoformat() if user.created_at else None,
         "streak_current": user.streak_current,
         "streak_best": user.streak_best,
+        "onboarding_completed": bool(user.onboarding_completed),
     }
 
 
@@ -80,6 +81,10 @@ def register(request: Request, req: RegisterRequest, db: Session = Depends(get_d
     db.commit()
     db.refresh(user)
 
+    from activity import log_activity
+    log_activity(user_id=user.id, event_type="user_joined", description=f"{user.username} joined Eidolum", data={"user_id": user.id}, db=db)
+    db.commit()
+
     return {
         "user_id": user.id,
         "username": user.username,
@@ -119,3 +124,17 @@ def me(request: Request, current_user: dict = Depends(get_current_user_dep), db:
         raise HTTPException(status_code=404, detail="User not found")
 
     return _user_dict(user)
+
+
+# ── POST /api/auth/onboarding-complete ────────────────────────────────────────
+
+
+@router.post("/auth/onboarding-complete")
+@limiter.limit("10/minute")
+def complete_onboarding(request: Request, current_user: dict = Depends(get_current_user_dep), db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.id == current_user["user_id"]).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    user.onboarding_completed = 1
+    db.commit()
+    return {"status": "completed"}

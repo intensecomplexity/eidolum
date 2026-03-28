@@ -1,26 +1,23 @@
 import { useEffect, useState } from 'react';
-import { Search, TrendingUp } from 'lucide-react';
+import { TrendingUp } from 'lucide-react';
 import ConsensusBar from '../components/ConsensusBar';
+import TickerSearch from '../components/TickerSearch';
+import TickerLink from '../components/TickerLink';
 import Footer from '../components/Footer';
 import { getAllConsensus, getTickerConsensus } from '../api';
 
 export default function Consensus() {
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState('');
   const [singleResult, setSingleResult] = useState(null);
-  const [searching, setSearching] = useState(false);
 
   useEffect(() => {
     getAllConsensus().then(setData).catch(() => {}).finally(() => setLoading(false));
   }, []);
 
-  function handleSearch(e) {
-    e.preventDefault();
-    const t = search.trim().toUpperCase();
-    if (!t) { setSingleResult(null); return; }
-    setSearching(true);
-    getTickerConsensus(t).then(setSingleResult).catch(() => setSingleResult(null)).finally(() => setSearching(false));
+  function handleTickerSelect(ticker) {
+    if (!ticker) { setSingleResult(null); return; }
+    getTickerConsensus(ticker).then(setSingleResult).catch(() => setSingleResult(null));
   }
 
   if (loading) return (
@@ -40,11 +37,19 @@ export default function Consensus() {
         </div>
         <p className="text-text-secondary text-sm mb-6">Community sentiment on active tickers.</p>
 
-        <form onSubmit={handleSearch} className="relative mb-6">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted" />
-          <input type="text" value={search} onChange={e => setSearch(e.target.value)} placeholder="Search ticker..."
-            className="w-full sm:w-64 pl-9 pr-3 py-2.5 bg-surface border border-border rounded-lg text-text-primary placeholder:text-muted focus:outline-none focus:border-accent/50 font-mono" />
-        </form>
+        <div className="mb-6">
+          <TickerSearch
+            onChange={(ticker) => handleTickerSelect(ticker)}
+            placeholder="Search ticker or company..."
+            className="sm:max-w-xs"
+            inputClassName="!text-sm !py-2.5"
+          />
+          {singleResult && (
+            <button onClick={() => setSingleResult(null)} className="text-accent text-xs mt-2 font-medium">
+              Show all tickers
+            </button>
+          )}
+        </div>
 
         {display.length === 0 && (
           <div className="text-center py-16">
@@ -57,7 +62,7 @@ export default function Consensus() {
           {display.map(c => (
             <div key={c.ticker} className="card">
               <div className="flex items-center justify-between mb-3">
-                <span className="font-mono text-lg font-bold tracking-wider">{c.ticker}</span>
+                <TickerLink ticker={c.ticker} className="text-lg" />
                 <span className="text-muted text-xs font-mono">{c.total_predictions} calls</span>
               </div>
               <ConsensusBar bullish={c.bullish_count} bearish={c.bearish_count} />

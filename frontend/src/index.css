@@ -275,3 +275,78 @@ tbody tr { border-bottom: 1px solid rgba(255,255,255,0.08); }
   font-variant-numeric: tabular-nums;
   letter-spacing: 0.02em;
 }
+
+/* ── Notification bell ring ──────────────────────────── */
+@keyframes bell-ring {
+  0% { transform: rotate(0); }
+  15% { transform: rotate(14deg); }
+  30% { transform: rotate(-12deg); }
+  45% { transform: rotate(10deg); }
+  60% { transform: rotate(-8deg); }
+  75% { transform: rotate(4deg); }
+  100% { transform: rotate(0); }
+}
+
+/* ── Success checkmark animation ────────────────────── */
+@keyframes check-draw {
+  0% { stroke-dashoffset: 48; }
+  100% { stroke-dashoffset: 0; }
+}
+
+@keyframes check-circle-draw {
+  0% { stroke-dashoffset: 166; }
+  100% { stroke-dashoffset: 0; }
+}
+
+@keyframes check-scale-in {
+  0% { transform: scale(0.5); opacity: 0; }
+  60% { transform: scale(1.08); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+.success-check-circle {
+  stroke-dasharray: 166;
+  stroke-dashoffset: 166;
+  animation: check-circle-draw 0.6s ease-out 0.1s forwards;
+}
+
+.success-check-mark {
+  stroke-dasharray: 48;
+  stroke-dashoffset: 48;
+  animation: check-draw 0.35s ease-out 0.5s forwards;
+}
+
+.success-check-wrap {
+  animation: check-scale-in 0.5s ease-out forwards;
+}
+
+/* ── Confetti particles ─────────────────────────────── */
+@keyframes confetti-fall {
+  0% {
+    transform: translateY(0) rotate(0deg) scale(1);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(120px) rotate(720deg) scale(0);
+    opacity: 0;
+  }
+}
+
+.confetti-particle {
+  position: absolute;
+  width: 6px;
+  height: 6px;
+  border-radius: 1px;
+  pointer-events: none;
+  animation: confetti-fall 2s ease-out forwards;
+}
+
+/* Card entrance */
+@keyframes card-enter {
+  0% { opacity: 0; transform: translateY(16px) scale(0.97); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.success-card-enter {
+  animation: card-enter 0.4s ease-out forwards;
+}

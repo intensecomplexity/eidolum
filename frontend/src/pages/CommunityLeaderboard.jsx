@@ -2,64 +2,95 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Users, Trophy, Flame } from 'lucide-react';
 import Footer from '../components/Footer';
+import TypeBadge from '../components/TypeBadge';
 import { getCommunityLeaderboard } from '../api';
 
-const TIER_STYLES = {
-  diamond: { bg: 'bg-blue/10', border: 'border-blue/20', text: 'text-blue', label: 'Diamond' },
-  platinum: { bg: 'bg-text-primary/5', border: 'border-border', text: 'text-text-primary', label: 'Platinum' },
-  gold: { bg: 'bg-warning/10', border: 'border-warning/20', text: 'text-warning', label: 'Gold' },
-  silver: { bg: 'bg-text-secondary/10', border: 'border-text-secondary/20', text: 'text-text-secondary', label: 'Silver' },
-  bronze: { bg: 'bg-orange-400/10', border: 'border-orange-400/20', text: 'text-orange-400', label: 'Bronze' },
-};
+const TYPE_FILTERS = [
+  { key: null, label: 'All' },
+  { key: 'player', label: 'Players' },
+  { key: 'analyst', label: 'Analysts' },
+];
 
 export default function CommunityLeaderboard() {
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [typeFilter, setTypeFilter] = useState(null);
 
   useEffect(() => {
-    getCommunityLeaderboard()
+    setLoading(true);
+    const params = typeFilter ? `?user_type=${typeFilter}` : '';
+    getCommunityLeaderboard(typeFilter)
       .then(setData)
       .catch(() => {})
       .finally(() => setLoading(false));
-  }, []);
+  }, [typeFilter]);
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <div className="w-8 h-8 border-2 border-accent border-t-transparent rounded-full animate-spin" />
-      </div>
-    );
-  }
+  if (loading) return (
+    <div className="flex items-center justify-center min-h-[60vh]">
+      <div className="w-8 h-8 border-2 border-accent border-t-transparent rounded-full animate-spin" />
+    </div>
+  );
 
   return (
     <div>
       <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-10">
-        {/* Header */}
         <div className="mb-6 sm:mb-8">
           <div className="flex items-center gap-2 mb-1">
             <Users className="w-6 h-6 text-accent" />
-            <h1 className="font-bold" style={{ fontSize: 'clamp(24px, 5vw, 36px)' }}>
-              Community Rankings
-            </h1>
+            <h1 className="font-bold" style={{ fontSize: 'clamp(24px, 5vw, 36px)' }}>Community Rankings</h1>
           </div>
-          <p className="text-text-secondary text-sm sm:text-base">
-            Users with 10+ scored predictions, ranked by accuracy.
-          </p>
+          <p className="text-text-secondary text-sm sm:text-base">Ranked by accuracy with 10 or more scored predictions.</p>
         </div>
 
-        {/* Empty state */}
+        {/* Type filter */}
+        <div className="flex gap-2 mb-6">
+          {TYPE_FILTERS.map(f => (
+            <button key={f.key || 'all'} onClick={() => setTypeFilter(f.key)}
+              className={`px-4 py-2 rounded-lg text-xs font-semibold whitespace-nowrap transition-colors ${typeFilter === f.key ? 'bg-accent/15 text-accent border border-accent/30' : 'bg-surface text-text-secondary border border-border'}`}>
+              {f.label}
+            </button>
+          ))}
+        </div>
+
         {data.length === 0 && (
           <div className="text-center py-16">
             <Trophy className="w-10 h-10 text-muted/30 mx-auto mb-3" />
-            <p className="text-text-secondary">No users have enough scored predictions yet.</p>
-            <p className="text-muted text-sm mt-1">Rankings require 10+ evaluated calls.</p>
+            <p className="text-text-secondary">No users match this filter yet.</p>
           </div>
         )}
 
         {/* Mobile cards */}
         <div className="sm:hidden space-y-3">
           {data.map(u => (
-            <CommunityCard key={u.user_id} u={u} />
+            <div key={u.user_id} className="bg-surface border border-border rounded-xl p-4">
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2.5">
+                  <span className={`font-mono text-lg font-bold ${u.rank <= 3 ? 'text-warning' : 'text-text-secondary'}`}>
+                    {u.rank <= 3 ? [null, '\uD83E\uDD47', '\uD83E\uDD48', '\uD83E\uDD49'][u.rank] : `#${u.rank}`}
+                  </span>
+                  <div>
+                    <div className="flex items-center gap-1">
+                      <span className="font-medium text-sm">{u.display_name || u.username}</span>
+                      <TypeBadge type={u.user_type} />
+                    </div>
+                    <span className="text-muted text-xs font-mono block">@{u.username}</span>
+                  </div>
+                </div>
+              </div>
+              <div className="flex gap-4 text-xs mt-2">
+                <div>
+                  <span className={`font-mono font-bold ${u.accuracy >= 60 ? 'text-positive' : 'text-negative'}`}>{u.accuracy.toFixed(1)}%</span>
+                  <span className="text-muted ml-1">accuracy</span>
+                </div>
+                <div>
+                  <span className="font-mono font-semibold text-text-secondary">{u.scored_count}</span>
+                  <span className="text-muted ml-1">scored</span>
+                </div>
+                {u.streak_current >= 3 && (
+                  <span className="text-orange-400 font-mono font-semibold flex items-center gap-0.5"><Flame className="w-3 h-3" /> {u.streak_current}</span>
+                )}
+              </div>
+            </div>
           ))}
         </div>
 
@@ -72,15 +103,44 @@ export default function CommunityLeaderboard() {
                   <tr className="text-left text-muted text-xs uppercase tracking-wider border-b border-border">
                     <th className="px-6 py-3 w-20">Rank</th>
                     <th className="px-6 py-3">User</th>
+                    <th className="px-6 py-3 text-center w-16">Type</th>
                     <th className="px-6 py-3 text-right">Accuracy</th>
                     <th className="px-6 py-3 text-right">Scored</th>
                     <th className="px-6 py-3 text-center">Streak</th>
-                    <th className="px-6 py-3 text-center">Tier</th>
                   </tr>
                 </thead>
                 <tbody>
                   {data.map(u => (
-                    <CommunityRow key={u.user_id} u={u} />
+                    <tr key={u.user_id} className="border-b border-border/50 hover:bg-surface-2/50 transition-colors">
+                      <td className="px-6 py-4">
+                        <span className={`font-mono font-bold ${u.rank <= 3 ? 'text-warning' : 'text-text-secondary'}`}>
+                          {u.rank <= 3 ? [null, '\uD83E\uDD47', '\uD83E\uDD48', '\uD83E\uDD49'][u.rank] : `#${u.rank}`}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-1.5">
+                          <span className="font-medium">{u.display_name || u.username}</span>
+                          <TypeBadge type={u.user_type} />
+                        </div>
+                        <span className="text-muted text-xs font-mono">@{u.username}</span>
+                      </td>
+                      <td className="px-6 py-4 text-center">
+                        <span className="text-[10px] text-muted capitalize">{u.user_type || 'player'}</span>
+                      </td>
+                      <td className="px-6 py-4 text-right">
+                        <span className={`font-mono font-semibold ${u.accuracy >= 60 ? 'text-positive' : 'text-negative'}`}>{u.accuracy.toFixed(1)}%</span>
+                      </td>
+                      <td className="px-6 py-4 text-right">
+                        <span className="font-mono text-text-secondary">{u.scored_count}</span>
+                      </td>
+                      <td className="px-6 py-4 text-center">
+                        {u.streak_current >= 3 ? (
+                          <span className="text-orange-400 font-mono font-semibold flex items-center justify-center gap-0.5"><Flame className="w-3.5 h-3.5" /> {u.streak_current}</span>
+                        ) : (
+                          <span className="font-mono text-muted text-sm">{u.streak_current}</span>
+                        )}
+                      </td>
+                    </tr>
                   ))}
                 </tbody>
               </table>
@@ -90,87 +150,5 @@ export default function CommunityLeaderboard() {
       </div>
       <Footer />
     </div>
-  );
-}
-
-function TierBadge({ tier }) {
-  const style = TIER_STYLES[tier] || TIER_STYLES.bronze;
-  return (
-    <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${style.bg} ${style.text} border ${style.border}`}>
-      {style.label}
-    </span>
-  );
-}
-
-function CommunityCard({ u }) {
-  return (
-    <div className="bg-surface border border-border rounded-xl p-4">
-      <div className="flex items-center justify-between mb-2">
-        <div className="flex items-center gap-2.5">
-          <span className={`font-mono text-lg font-bold ${u.rank <= 3 ? 'text-warning' : 'text-text-secondary'}`}>
-            {u.rank <= 3 ? [null, '\uD83E\uDD47', '\uD83E\uDD48', '\uD83E\uDD49'][u.rank] : `#${u.rank}`}
-          </span>
-          <div>
-            <span className="font-medium text-sm">{u.display_name || u.username}</span>
-            <span className="text-muted text-xs font-mono block">@{u.username}</span>
-          </div>
-        </div>
-        <TierBadge tier={u.rank_tier} />
-      </div>
-      <div className="flex gap-4 text-xs mt-2">
-        <div>
-          <span className={`font-mono font-bold ${u.accuracy >= 60 ? 'text-positive' : 'text-negative'}`}>
-            {u.accuracy.toFixed(1)}%
-          </span>
-          <span className="text-muted ml-1">accuracy</span>
-        </div>
-        <div>
-          <span className="font-mono font-semibold text-text-secondary">{u.scored_count}</span>
-          <span className="text-muted ml-1">scored</span>
-        </div>
-        {u.streak_current >= 3 && (
-          <span className="text-orange-400 font-mono font-semibold flex items-center gap-0.5">
-            <Flame className="w-3 h-3" /> {u.streak_current}
-          </span>
-        )}
-      </div>
-    </div>
-  );
-}
-
-function CommunityRow({ u }) {
-  return (
-    <tr className="border-b border-border/50 hover:bg-surface-2/50 transition-colors">
-      <td className="px-6 py-4">
-        <span className={`font-mono font-bold ${u.rank <= 3 ? 'text-warning' : 'text-text-secondary'}`}>
-          {u.rank <= 3 ? [null, '\uD83E\uDD47', '\uD83E\uDD48', '\uD83E\uDD49'][u.rank] : `#${u.rank}`}
-        </span>
-      </td>
-      <td className="px-6 py-4">
-        <div className="font-medium">{u.display_name || u.username}</div>
-        <span className="text-muted text-xs font-mono">@{u.username}</span>
-      </td>
-      <td className="px-6 py-4 text-right">
-        <span className={`font-mono font-semibold ${u.accuracy >= 60 ? 'text-positive' : 'text-negative'}`}>
-          {u.accuracy.toFixed(1)}%
-        </span>
-      </td>
-      <td className="px-6 py-4 text-right">
-        <span className="font-mono text-text-secondary">{u.scored_count}</span>
-        <span className="text-muted text-xs ml-1">({u.correct_count} correct)</span>
-      </td>
-      <td className="px-6 py-4 text-center">
-        {u.streak_current >= 3 ? (
-          <span className="text-orange-400 font-mono font-semibold flex items-center justify-center gap-0.5">
-            <Flame className="w-3.5 h-3.5" /> {u.streak_current}
-          </span>
-        ) : (
-          <span className="font-mono text-muted text-sm">{u.streak_current}</span>
-        )}
-      </td>
-      <td className="px-6 py-4 text-center">
-        <TierBadge tier={u.rank_tier} />
-      </td>
-    </tr>
   );
 }

@@ -198,6 +198,8 @@ class User(Base):
     streak_current = Column(Integer, default=0)
     streak_best = Column(Integer, default=0)
     paper_balance = Column(Numeric(20, 2), default=0)
+    user_type = Column(String(20), default="player")  # "player" | "analyst"
+    onboarding_completed = Column(Integer, default=0)  # 0=false, 1=true
 
     predictions = relationship("UserPrediction", back_populates="user", cascade="all, delete-orphan")
     achievements = relationship("Achievement", back_populates="user", cascade="all, delete-orphan")
@@ -219,6 +221,7 @@ class UserPrediction(Base):
     evaluated_at = Column(DateTime, nullable=True)
     outcome = Column(String(20), default="pending", index=True)  # "pending" | "correct" | "incorrect"
     current_price = Column(Numeric(20, 2), nullable=True)
+    deleted_at = Column(DateTime, nullable=True)
 
     __table_args__ = (
         CheckConstraint("direction IN ('bullish', 'bearish')", name="ck_up_direction"),
@@ -227,6 +230,40 @@ class UserPrediction(Base):
     )
 
     user = relationship("User", back_populates="predictions")
+
+
+class ActivityEvent(Base):
+    __tablename__ = "activity_feed_v2"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    event_type = Column(String(50), nullable=False)
+    ticker = Column(String(10), nullable=True)
+    description = Column(Text, nullable=False)
+    data = Column(Text, nullable=True)  # JSON string
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+
+class Notification(Base):
+    __tablename__ = "notifications"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    type = Column(String(50), nullable=False)
+    title = Column(String(200), nullable=False)
+    message = Column(Text, nullable=False)
+    data = Column(Text, nullable=True)  # JSON string
+    read = Column(Integer, default=0)  # 0=false, 1=true
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+
+class DeletionLog(Base):
+    __tablename__ = "deletion_log"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    prediction_id = Column(Integer, ForeignKey("user_predictions.id"), nullable=False)
+    deleted_at = Column(DateTime, default=datetime.datetime.utcnow)
 
 
 class Achievement(Base):
@@ -293,11 +330,13 @@ class Season(Base):
     __tablename__ = "seasons"
 
     id = Column(Integer, primary_key=True, index=True)
-    name = Column(String(50), nullable=False)
+    name = Column(String(100), nullable=False)
     starts_at = Column(DateTime, nullable=False)
     ends_at = Column(DateTime, nullable=False)
     status = Column(String(20), default="active")
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    theme_color = Column(String(7), nullable=True)
+    theme_icon = Column(String(50), nullable=True)
 
     __table_args__ = (
         CheckConstraint("status IN ('active', 'completed')", name="ck_season_status"),

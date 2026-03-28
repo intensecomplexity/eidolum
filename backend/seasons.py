@@ -6,12 +6,18 @@ import datetime
 from sqlalchemy.orm import Session
 from models import Season
 
+SEASON_THEMES = {
+    1: {"name": "Season of the Bull",    "color": "#22c55e", "icon": "bull"},
+    2: {"name": "Season of the Hawk",    "color": "#4A9EFF", "icon": "hawk"},
+    3: {"name": "Season of the Serpent", "color": "#A855F7", "icon": "serpent"},
+    4: {"name": "Season of the Wolf",    "color": "#EF4444", "icon": "wolf"},
+}
+
 
 def ensure_current_season(db: Session) -> Season:
     """Return the active season for the current quarter, creating it if needed."""
     now = datetime.datetime.utcnow()
 
-    # Check for an existing active season that covers right now
     active = (
         db.query(Season)
         .filter(Season.status == "active", Season.starts_at <= now, Season.ends_at > now)
@@ -20,32 +26,42 @@ def ensure_current_season(db: Session) -> Season:
     if active:
         return active
 
-    # Determine current quarter boundaries
     year = now.year
     quarter = (now.month - 1) // 3 + 1
     month_start = (quarter - 1) * 3 + 1
     starts_at = datetime.datetime(year, month_start, 1)
+    ends_at = datetime.datetime(year + 1, 1, 1) if quarter == 4 else datetime.datetime(year, month_start + 3, 1)
 
-    if quarter == 4:
-        ends_at = datetime.datetime(year + 1, 1, 1)
-    else:
-        ends_at = datetime.datetime(year, month_start + 3, 1)
+    theme = SEASON_THEMES[quarter]
+    name = f"{theme['name']} \u2014 {year}"
 
-    name = f"Q{quarter} {year}"
-
-    # Check if this season already exists (maybe status was set wrong)
-    existing = db.query(Season).filter(Season.name == name).first()
+    # Check if this exact season already exists
+    existing = (
+        db.query(Season)
+        .filter(Season.starts_at == starts_at, Season.ends_at == ends_at)
+        .first()
+    )
     if existing:
         existing.status = "active"
+        if not existing.theme_color:
+            existing.theme_color = theme["color"]
+            existing.theme_icon = theme["icon"]
+            existing.name = name
         db.commit()
         return existing
 
-    # Mark any old active seasons as completed
-    old_active = db.query(Season).filter(Season.status == "active").all()
-    for s in old_active:
+    # Mark old active seasons as completed
+    for s in db.query(Season).filter(Season.status == "active").all():
         s.status = "completed"
 
-    season = Season(name=name, starts_at=starts_at, ends_at=ends_at, status="active")
+    season = Season(
+        name=name,
+        starts_at=starts_at,
+        ends_at=ends_at,
+        status="active",
+        theme_color=theme["color"],
+        theme_icon=theme["icon"],
+    )
     db.add(season)
     db.commit()
     db.refresh(season)

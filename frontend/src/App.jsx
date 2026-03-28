@@ -3,6 +3,8 @@ import Navbar from './components/Navbar';
 import BottomNav from './components/BottomNav';
 import SaveToast from './components/SaveToast';
 import Landing from './pages/Landing';
+import LandingPublic from './pages/LandingPublic';
+import Dashboard from './pages/Dashboard';
 import Leaderboard from './pages/Leaderboard';
 import ForecasterProfile from './pages/ForecasterProfile';
 import AssetConsensus from './pages/AssetConsensus';
@@ -29,13 +31,34 @@ import Consensus from './pages/Consensus';
 import Expiring from './pages/Expiring';
 import Duels from './pages/Duels';
 import Seasons from './pages/Seasons';
+import Friends from './pages/Friends';
+import Notifications from './pages/Notifications';
+import TickerDetail from './pages/TickerDetail';
+import Activity from './pages/Activity';
+import PredictionView from './pages/PredictionView';
+import Onboarding from './components/Onboarding';
+import { useAuth } from './context/AuthContext';
+import { useState } from 'react';
 
 export default function App() {
+  const { needsOnboarding, user, markOnboarded, isAuthenticated } = useAuth();
+  const [showOnboarding, setShowOnboarding] = useState(true);
+
   return (
     <div className="min-h-screen bg-bg pb-bottom-nav sm:pb-0">
+      {needsOnboarding && showOnboarding && (
+        <Onboarding
+          user={user}
+          onComplete={(finished) => {
+            if (finished) markOnboarded();
+            setShowOnboarding(false);
+          }}
+        />
+      )}
       <Navbar />
       <Routes>
-        <Route path="/" element={<Landing />} />
+        <Route path="/" element={isAuthenticated ? <Dashboard /> : <LandingPublic />} />
+        <Route path="/home" element={<Landing />} />
         <Route path="/leaderboard" element={<Leaderboard />} />
         <Route path="/leaderboard/report-cards" element={<ReportCards />} />
         <Route path="/platforms" element={<Platforms />} />
@@ -64,6 +87,11 @@ export default function App() {
         <Route path="/expiring" element={<Expiring />} />
         <Route path="/duels" element={<Duels />} />
         <Route path="/seasons" element={<Seasons />} />
+        <Route path="/friends" element={<Friends />} />
+        <Route path="/notifications" element={<Notifications />} />
+        <Route path="/ticker/:symbol" element={<TickerDetail />} />
+        <Route path="/activity" element={<Activity />} />
+        <Route path="/prediction/:predictionId" element={<PredictionView />} />
       </Routes>
       <SaveToast />
       <BottomNav />

@@ -147,6 +147,20 @@ export function getInversePortfolio(forecasterId, startingAmount = 10000) {
   return api.get(`/inverse-portfolio/${forecasterId}`, { params: { starting_amount: startingAmount } }).then(r => r.data);
 }
 
+// ——— Search ———
+
+export function searchTickers(query) {
+  return api.get('/tickers/search', { params: { q: query } }).then(r => r.data);
+}
+
+export function universalSearch(query) {
+  return api.get('/search', { params: { q: query }, headers: authHeaders() }).then(r => r.data);
+}
+
+export function getFriendSuggestions() {
+  return api.get('/friends/suggestions', { headers: authHeaders() }).then(r => r.data);
+}
+
 // ——— User Auth & Predictions API ———
 
 function authHeaders() {
@@ -166,8 +180,81 @@ export function getMe() {
   return api.get('/auth/me', { headers: authHeaders() }).then(r => r.data);
 }
 
+export function completeOnboarding() {
+  return api.post('/auth/onboarding-complete', {}, { headers: authHeaders() }).then(r => r.data);
+}
+
+export function getNotifications(unreadOnly = false, limit = 50) {
+  return api.get('/notifications', { params: { unread_only: unreadOnly, limit }, headers: authHeaders() }).then(r => r.data);
+}
+
+export function markNotificationRead(id) {
+  return api.post(`/notifications/read/${id}`, {}, { headers: authHeaders() }).then(r => r.data);
+}
+
+export function markAllNotificationsRead() {
+  return api.post('/notifications/read-all', {}, { headers: authHeaders() }).then(r => r.data);
+}
+
+// ——— Sharing ———
+
+export function getPredictionShareData(predictionId) {
+  return api.get(`/predictions/${predictionId}/share-data`).then(r => r.data);
+}
+
+export function getProfileShareData(userId) {
+  return api.get(`/profiles/${userId}/share-data`).then(r => r.data);
+}
+
+// ——— Global Stats ———
+
+export function getGlobalStats() {
+  return api.get('/stats/global').then(r => r.data);
+}
+
+// ——— Activity Feed ———
+
+export function getGlobalFeed(before, ticker) {
+  const params = {};
+  if (before) params.before = before;
+  if (ticker) params.ticker = ticker;
+  return api.get('/feed/global', { params }).then(r => r.data);
+}
+
+export function getFollowingFeed(before) {
+  const params = {};
+  if (before) params.before = before;
+  return api.get('/feed/following', { params, headers: authHeaders() }).then(r => r.data);
+}
+
+// ——— Ticker Detail ———
+
+export function getTickerPrice(symbol) {
+  return api.get(`/tickers/${symbol}/price`).then(r => r.data);
+}
+
+export function getTickerPredictions(symbol, status = 'pending') {
+  return api.get(`/tickers/${symbol}/predictions`, { params: { status } }).then(r => r.data);
+}
+
+export function getTickerTopCallers(symbol) {
+  return api.get(`/tickers/${symbol}/top-callers`).then(r => r.data);
+}
+
+export function getTickerStats(symbol) {
+  return api.get(`/tickers/${symbol}/stats`).then(r => r.data);
+}
+
 export function submitUserPrediction(data) {
   return api.post('/user-predictions/submit', data, { headers: authHeaders() }).then(r => r.data);
+}
+
+export function deletePrediction(predictionId) {
+  return api.delete(`/user-predictions/${predictionId}`, { headers: authHeaders() }).then(r => r.data);
+}
+
+export function getDeletionStatus() {
+  return api.get('/user-predictions/deletion-status', { headers: authHeaders() }).then(r => r.data);
 }
 
 export function getUserPredictions(userId, outcome) {
@@ -180,8 +267,10 @@ export function getUserProfile(userId) {
   return api.get(`/users/${userId}/profile`).then(r => r.data);
 }
 
-export function getCommunityLeaderboard() {
-  return api.get('/leaderboard/community').then(r => r.data);
+export function getCommunityLeaderboard(userType) {
+  const params = {};
+  if (userType) params.user_type = userType;
+  return api.get('/leaderboard/community', { params }).then(r => r.data);
 }
 
 export function getUserAchievements(userId) {

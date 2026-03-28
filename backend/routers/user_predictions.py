@@ -7,16 +7,20 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel
 from typing import Optional
 from sqlalchemy.orm import Session
+from sqlalchemy import func, extract
 
 from database import get_db
-from models import User, UserPrediction, Season, SeasonEntry
+from models import User, UserPrediction, Season, SeasonEntry, DeletionLog
 from middleware.auth import require_user
 from rate_limit import limiter
 from seasons import ensure_current_season
+from ticker_lookup import resolve_ticker, search_tickers as _search_tickers, TICKER_INFO
 
 router = APIRouter()
 
 FINNHUB_KEY = os.getenv("FINNHUB_KEY", "")
+DELETE_WINDOW_SECONDS = 300  # 5 minutes
+MAX_DELETIONS_PER_MONTH = 3
 
 ALLOWED_TICKERS = {
     "AAPL", "MSFT", "NVDA", "TSLA", "AMZN", "META", "GOOGL",
@@ -54,8 +58,12 @@ def _prediction_to_dict(p: UserPrediction) -> dict:
     }
 
 
+def _not_deleted():
+    """Filter clause: only non-deleted predictions."""
+    return UserPrediction.deleted_at.is_(None)
+
+
 def _fetch_finnhub_price(ticker: str) -> float | None:
-    """Fetch current price from Finnhub. Falls back to yfinance if unavailable."""
     if FINNHUB_KEY:
         try:
             r = httpx.get(
@@ -64,13 +72,11 @@ def _fetch_finnhub_price(ticker: str) -> float | None:
                 timeout=10,
             )
             data = r.json()
-            price = data.get("c")  # current price
+            price = data.get("c")
             if price and price > 0:
                 return round(float(price), 2)
         except Exception:
             pass
-
-    # Fallback to evaluator price chain (Alpha Vantage -> yfinance)
     try:
         from jobs.evaluator import get_current_price
         return get_current_price(ticker)
@@ -79,11 +85,9 @@ def _fetch_finnhub_price(ticker: str) -> float | None:
 
 
 def _update_season_entry(user_id: int, db: Session):
-    """Increment predictions_made on the current active season entry for this user."""
     season = ensure_current_season(db)
     if not season:
         return
-
     entry = (
         db.query(SeasonEntry)
         .filter(SeasonEntry.season_id == season.id, SeasonEntry.user_id == user_id)
@@ -92,14 +96,45 @@ def _update_season_entry(user_id: int, db: Session):
     if entry:
         entry.predictions_made = (entry.predictions_made or 0) + 1
     else:
-        db.add(SeasonEntry(
-            season_id=season.id,
-            user_id=user_id,
-            predictions_made=1,
-        ))
+        db.add(SeasonEntry(season_id=season.id, user_id=user_id, predictions_made=1))
 
 
-# ── POST /api/user-predictions/submit ────────────────────────────────────────
+def _decrement_season_entry(user_id: int, db: Session):
+    season = ensure_current_season(db)
+    if not season:
+        return
+    entry = (
+        db.query(SeasonEntry)
+        .filter(SeasonEntry.season_id == season.id, SeasonEntry.user_id == user_id)
+        .first()
+    )
+    if entry and (entry.predictions_made or 0) > 0:
+        entry.predictions_made -= 1
+
+
+def _deletions_this_month(user_id: int, db: Session) -> int:
+    now = datetime.datetime.utcnow()
+    return (
+        db.query(func.count(DeletionLog.id))
+        .filter(
+            DeletionLog.user_id == user_id,
+            extract("year", DeletionLog.deleted_at) == now.year,
+            extract("month", DeletionLog.deleted_at) == now.month,
+        )
+        .scalar() or 0
+    )
+
+
+# ── GET /api/tickers/search ──────────────────────────────────────────────────
+
+
+@router.get("/tickers/search")
+@limiter.limit("60/minute")
+def search_tickers_endpoint(request: Request, q: str = Query("")):
+    return _search_tickers(q)
+
+
+# ── POST /api/user-predictions/submit ─────────────────────────────────────────
 
 
 @router.post("/user-predictions/submit")
@@ -110,27 +145,22 @@ def submit_prediction(
     user_id: int = Depends(require_user),
     db: Session = Depends(get_db),
 ):
-    # Validate ticker
-    ticker = req.ticker.upper().strip()
+    raw = req.ticker.strip()
+    resolved = resolve_ticker(raw)
+    ticker = resolved if resolved else raw.upper()
     if ticker not in ALLOWED_TICKERS:
-        raise HTTPException(status_code=400, detail=f"Unsupported ticker: {ticker}")
+        raise HTTPException(status_code=400, detail=f"Unsupported ticker: {raw}")
 
-    # Validate direction
     if req.direction not in ("bullish", "bearish"):
         raise HTTPException(status_code=400, detail="Direction must be 'bullish' or 'bearish'")
-
-    # Validate price_target
     if not req.price_target or not req.price_target.strip():
         raise HTTPException(status_code=400, detail="Price target is required")
-
-    # Validate window
     if req.evaluation_window_days < 1 or req.evaluation_window_days > 365:
         raise HTTPException(status_code=400, detail="Evaluation window must be 1-365 days")
 
-    # Fetch current price from Finnhub
     current_price = _fetch_finnhub_price(ticker)
-
     now = datetime.datetime.utcnow()
+
     prediction = UserPrediction(
         user_id=user_id,
         ticker=ticker,
@@ -143,14 +173,93 @@ def submit_prediction(
         expires_at=now + timedelta(days=req.evaluation_window_days),
     )
     db.add(prediction)
-
-    # Update season tracking
     _update_season_entry(user_id, db)
+
+    # Activity feed
+    from activity import log_activity
+    _user = db.query(User).filter(User.id == user_id).first()
+    _uname = _user.username if _user else "Someone"
+    log_activity(
+        user_id=user_id, event_type="prediction_submitted",
+        description=f"{_uname} went {req.direction} on {ticker}",
+        ticker=ticker,
+        data={"prediction_id": None, "direction": req.direction, "ticker": ticker, "target": req.price_target.strip()},
+        db=db,
+    )
 
     db.commit()
     db.refresh(prediction)
 
     return _prediction_to_dict(prediction)
+
+
+# ── DELETE /api/user-predictions/{prediction_id} ──────────────────────────────
+
+
+@router.delete("/user-predictions/{prediction_id}")
+@limiter.limit("10/minute")
+def delete_prediction(
+    request: Request,
+    prediction_id: int,
+    user_id: int = Depends(require_user),
+    db: Session = Depends(get_db),
+):
+    pred = (
+        db.query(UserPrediction)
+        .filter(UserPrediction.id == prediction_id, _not_deleted())
+        .first()
+    )
+    if not pred:
+        raise HTTPException(status_code=404, detail="Prediction not found")
+    if pred.user_id != user_id:
+        raise HTTPException(status_code=403, detail="Not your prediction")
+
+    # Check 1: must be within 5-minute window
+    now = datetime.datetime.utcnow()
+    age_seconds = (now - pred.created_at).total_seconds() if pred.created_at else float("inf")
+    if age_seconds > DELETE_WINDOW_SECONDS:
+        raise HTTPException(
+            status_code=403,
+            detail="Predictions are locked after 5 minutes and cannot be deleted.",
+        )
+
+    # Check 2: monthly deletion limit
+    used = _deletions_this_month(user_id, db)
+    if used >= MAX_DELETIONS_PER_MONTH:
+        raise HTTPException(
+            status_code=403,
+            detail="You've used all 3 deletions this month. Deletions reset on the 1st.",
+        )
+
+    # Check 3: must be pending
+    if pred.outcome != "pending":
+        raise HTTPException(status_code=403, detail="Cannot delete a scored prediction")
+
+    # Perform soft-delete
+    pred.deleted_at = now
+    db.add(DeletionLog(user_id=user_id, prediction_id=prediction_id, deleted_at=now))
+    _decrement_season_entry(user_id, db)
+    db.commit()
+
+    return {"status": "deleted", "prediction_id": prediction_id}
+
+
+# ── GET /api/user-predictions/deletion-status ─────────────────────────────────
+
+
+@router.get("/user-predictions/deletion-status")
+@limiter.limit("30/minute")
+def deletion_status(
+    request: Request,
+    user_id: int = Depends(require_user),
+    db: Session = Depends(get_db),
+):
+    used = _deletions_this_month(user_id, db)
+    return {
+        "deletions_used_this_month": used,
+        "deletions_remaining": max(0, MAX_DELETIONS_PER_MONTH - used),
+        "max_deletions": MAX_DELETIONS_PER_MONTH,
+    }
 
 
 # ── GET /api/user-predictions/{user_id} ──────────────────────────────────────
@@ -168,8 +277,10 @@ def get_user_predictions(
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
-    query = db.query(UserPrediction).filter(UserPrediction.user_id == user_id)
-
+    query = db.query(UserPrediction).filter(
+        UserPrediction.user_id == user_id,
+        _not_deleted(),
+    )
     if outcome and outcome in ("pending", "correct", "incorrect"):
         query = query.filter(UserPrediction.outcome == outcome)
 
@@ -187,9 +298,10 @@ def get_expiring_predictions(request: Request, db: Session = Depends(get_db)):
     cutoff = now + timedelta(days=30)
 
     rows = (
-        db.query(UserPrediction, User.username)
+        db.query(UserPrediction, User.username, User.user_type)
         .join(User, User.id == UserPrediction.user_id)
         .filter(
+            _not_deleted(),
             UserPrediction.outcome == "pending",
             UserPrediction.expires_at.isnot(None),
             UserPrediction.expires_at <= cutoff,
@@ -201,9 +313,10 @@ def get_expiring_predictions(request: Request, db: Session = Depends(get_db)):
     )
 
     results = []
-    for pred, username in rows:
+    for pred, username, utype in rows:
         d = _prediction_to_dict(pred)
         d["username"] = username
+        d["user_type"] = utype or "player"
         remaining = (pred.expires_at - now).days if pred.expires_at else None
         d["days_remaining"] = max(remaining, 0) if remaining is not None else None
         results.append(d)

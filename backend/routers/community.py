@@ -1,6 +1,6 @@
 import datetime
 from collections import defaultdict
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 
@@ -113,6 +113,7 @@ def get_user_profile(request: Request, user_id: int, db: Session = Depends(get_d
         "display_name": user.display_name,
         "bio": user.bio,
         "avatar_url": user.avatar_url,
+        "user_type": user.user_type or "player",
         "created_at": user.created_at.isoformat() if user.created_at else None,
         "streak_current": user.streak_current,
         "streak_best": user.streak_best,
@@ -136,8 +137,11 @@ def get_user_profile(request: Request, user_id: int, db: Session = Depends(get_d
 
 @router.get("/leaderboard/community")
 @limiter.limit("60/minute")
-def community_leaderboard(request: Request, db: Session = Depends(get_db)):
-    users = db.query(User).all()
+def community_leaderboard(request: Request, user_type: str = Query(None), db: Session = Depends(get_db)):
+    query = db.query(User)
+    if user_type and user_type in ("player", "analyst"):
+        query = query.filter(User.user_type == user_type)
+    users = query.all()
 
     results = []
     for user in users:
@@ -161,6 +165,7 @@ def community_leaderboard(request: Request, db: Session = Depends(get_db)):
             "user_id": user.id,
             "username": user.username,
             "display_name": user.display_name,
+            "user_type": user.user_type or "player",
             "scored_count": scored_count,
             "correct_count": correct_count,
             "accuracy": accuracy,
@@ -173,6 +178,43 @@ def community_leaderboard(request: Request, db: Session = Depends(get_db)):
         r["rank"] = i + 1
 
     return results[:50]
+
+
+# ── GET /api/stats/global ──────────────────────────────────────────────────────
+
+
+@router.get("/stats/global")
+@limiter.limit("60/minute")
+def get_global_stats(request: Request, db: Session = Depends(get_db)):
+    # User predictions
+    up_total = db.query(func.count(UserPrediction.id)).filter(UserPrediction.deleted_at.is_(None)).scalar() or 0
+    up_active = db.query(func.count(UserPrediction.id)).filter(UserPrediction.outcome == "pending", UserPrediction.deleted_at.is_(None)).scalar() or 0
+    up_scored = db.query(func.count(UserPrediction.id)).filter(UserPrediction.outcome.in_(["correct", "incorrect"]), UserPrediction.deleted_at.is_(None)).scalar() or 0
+    up_correct = db.query(func.count(UserPrediction.id)).filter(UserPrediction.outcome == "correct", UserPrediction.deleted_at.is_(None)).scalar() or 0
+
+    # Also count scraped predictions from the original predictions table
+    try:
+        from models import Prediction, Forecaster
+        scraped_total = db.query(func.count(Prediction.id)).scalar() or 0
+        scraped_scored = db.query(func.count(Prediction.id)).filter(Prediction.outcome.in_(["correct", "incorrect"])).scalar() or 0
+        scraped_correct = db.query(func.count(Prediction.id)).filter(Prediction.outcome == "correct").scalar() or 0
+        total_forecasters = db.query(func.count(Forecaster.id)).scalar() or 0
+    except Exception:
+        scraped_total = scraped_scored = scraped_correct = total_forecasters = 0
+
+    total_predictions = up_total + scraped_total
+    total_scored = up_scored + scraped_scored
+    total_correct = up_correct + scraped_correct
+    avg_accuracy = round(total_correct / total_scored * 100, 1) if total_scored > 0 else 0
+    total_users = db.query(func.count(User.id)).scalar() or 0
+
+    return {
+        "total_predictions": total_predictions,
+        "total_forecasters": total_forecasters,
+        "total_users": total_users,
+        "average_accuracy": avg_accuracy,
+        "active_predictions": up_active,
+    }
 
 
 # ── GET /api/consensus/{ticker} ──────────────────────────────────────────────

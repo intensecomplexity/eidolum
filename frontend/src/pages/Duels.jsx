@@ -3,9 +3,9 @@ import { useNavigate } from 'react-router-dom';
 import { Swords } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import DuelCard from '../components/DuelCard';
+import DuelModal from '../components/DuelModal';
 import Footer from '../components/Footer';
-import { getMyDuels, getDuelRecord, createDuel, acceptDuel, declineDuel } from '../api';
-import { Crosshair } from 'lucide-react';
+import { getMyDuels, getDuelRecord, acceptDuel, declineDuel, getFollowing } from '../api';
 
 const FILTERS = [
   { key: null, label: 'All' },
@@ -20,8 +20,10 @@ export default function Duels() {
   const { isAuthenticated, user } = useAuth();
   const [duels, setDuels] = useState([]);
   const [record, setRecord] = useState(null);
+  const [friends, setFriends] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState(null);
+  const [duelTarget, setDuelTarget] = useState(null);
 
   useEffect(() => {
     if (!isAuthenticated || !user) { setLoading(false); return; }
@@ -30,7 +32,8 @@ export default function Duels() {
     Promise.all([
       getMyDuels(filter),
       getDuelRecord(uid),
-    ]).then(([d, r]) => { setDuels(d); setRecord(r); })
+      getFollowing(uid).catch(() => []),
+    ]).then(([d, r, f]) => { setDuels(d); setRecord(r); setFriends(f); })
       .catch(() => {})
       .finally(() => setLoading(false));
   }, [isAuthenticated, user, filter]);
@@ -77,6 +80,24 @@ export default function Duels() {
           </div>
         </div>
 
+        {/* Challenge a Friend */}
+        {friends.length > 0 && (
+          <div className="mb-6">
+            <h2 className="text-xs text-muted uppercase tracking-wider font-bold mb-2">Challenge a Friend</h2>
+            <div className="flex gap-3 overflow-x-auto pills-scroll pb-1">
+              {friends.map(f => (
+                <button key={f.user_id} onClick={() => setDuelTarget(f)}
+                  className="flex flex-col items-center gap-1 flex-shrink-0 active:opacity-70 transition-opacity">
+                  <div className="w-10 h-10 rounded-full bg-accent/10 border border-accent/20 flex items-center justify-center">
+                    <span className="font-mono text-sm text-accent font-bold">{(f.username || '?')[0].toUpperCase()}</span>
+                  </div>
+                  <span className="text-[10px] text-text-secondary truncate max-w-[56px]">{f.username}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
         <div className="flex gap-2 mb-6 overflow-x-auto pills-scroll">
           {FILTERS.map(f => (
             <button key={f.key || 'all'} onClick={() => setFilter(f.key)}
@@ -111,6 +132,13 @@ export default function Duels() {
         )}
       </div>
       <Footer />
+      {duelTarget && (
+        <DuelModal
+          opponent={duelTarget}
+          onClose={() => setDuelTarget(null)}
+          onCreated={() => getMyDuels(filter).then(setDuels).catch(() => {})}
+        />
+      )}
     </div>
   );
 }

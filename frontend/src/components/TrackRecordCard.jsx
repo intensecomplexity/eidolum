@@ -1,18 +1,25 @@
+import ShareButton from './ShareButton';
+
 export default function TrackRecordCard({ profile }) {
   if (!profile) return null;
 
+  const uid = profile.id || profile.user_id;
+
   return (
     <div className="card bg-gradient-to-br from-surface to-surface-2 border-accent/20" id="track-record-card">
-      <div className="flex items-center gap-3 mb-4">
-        <div className="w-12 h-12 rounded-full bg-accent/10 border border-accent/20 flex items-center justify-center">
-          <span className="font-mono text-xl text-accent font-bold">
-            {(profile.username || '?')[0].toUpperCase()}
-          </span>
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-3">
+          <div className="w-12 h-12 rounded-full bg-accent/10 border border-accent/20 flex items-center justify-center">
+            <span className="font-mono text-xl text-accent font-bold">
+              {(profile.username || '?')[0].toUpperCase()}
+            </span>
+          </div>
+          <div>
+            <div className="font-medium">{profile.display_name || profile.username}</div>
+            <div className="text-xs text-muted font-mono">@{profile.username}</div>
+          </div>
         </div>
-        <div>
-          <div className="font-medium">{profile.display_name || profile.username}</div>
-          <div className="text-xs text-muted font-mono">@{profile.username}</div>
-        </div>
+        {uid && <ShareButton userId={uid} className="text-text-secondary" />}
       </div>
 
       <div className="grid grid-cols-3 gap-3 mb-4">
@@ -31,7 +38,7 @@ export default function TrackRecordCard({ profile }) {
       </div>
 
       <div className="text-center text-[10px] text-muted border-t border-border pt-2">
-        eidolum.com/profile/{profile.id || profile.user_id}
+        eidolum.com/profile/{uid}
       </div>
     </div>
   );

@@ -8,19 +8,14 @@ export function AuthProvider({ children }) {
   const [token, setToken] = useState(() => localStorage.getItem('eidolum_token'));
   const [loading, setLoading] = useState(!!localStorage.getItem('eidolum_token'));
 
-  // On mount, if we have a token, hydrate from /auth/me
   useEffect(() => {
-    if (!token) {
-      setLoading(false);
-      return;
-    }
+    if (!token) { setLoading(false); return; }
     getMe()
       .then(userData => {
         setUser(userData);
         localStorage.setItem('eidolum_user', JSON.stringify(userData));
       })
       .catch(() => {
-        // Token expired or invalid — clear everything
         localStorage.removeItem('eidolum_token');
         localStorage.removeItem('eidolum_user');
         setToken(null);
@@ -32,12 +27,10 @@ export function AuthProvider({ children }) {
   const login = useCallback(async (email, password) => {
     const data = await loginUser(email, password);
     localStorage.setItem('eidolum_token', data.token);
-    // data has {user_id, username, display_name, token} — store as user obj
     const userObj = { id: data.user_id, username: data.username, display_name: data.display_name };
     localStorage.setItem('eidolum_user', JSON.stringify(userObj));
     setToken(data.token);
     setUser(userObj);
-    // Fetch full profile in background to populate all fields
     getMe().then(full => {
       setUser(full);
       localStorage.setItem('eidolum_user', JSON.stringify(full));
@@ -48,11 +41,10 @@ export function AuthProvider({ children }) {
   const register = useCallback(async (username, email, password) => {
     const data = await registerUser(username, email, password);
     localStorage.setItem('eidolum_token', data.token);
-    const userObj = { id: data.user_id, username: data.username };
+    const userObj = { id: data.user_id, username: data.username, onboarding_completed: false };
     localStorage.setItem('eidolum_user', JSON.stringify(userObj));
     setToken(data.token);
     setUser(userObj);
-    // Fetch full profile in background
     getMe().then(full => {
       setUser(full);
       localStorage.setItem('eidolum_user', JSON.stringify(full));
@@ -63,6 +55,7 @@ export function AuthProvider({ children }) {
   const logout = useCallback(() => {
     localStorage.removeItem('eidolum_token');
     localStorage.removeItem('eidolum_user');
+    localStorage.removeItem('eidolum_onboarding_step');
     setToken(null);
     setUser(null);
   }, []);
@@ -77,10 +70,20 @@ export function AuthProvider({ children }) {
     } catch {}
   }, [user]);
 
+  const markOnboarded = useCallback(() => {
+    setUser(prev => {
+      const updated = { ...prev, onboarding_completed: true };
+      localStorage.setItem('eidolum_user', JSON.stringify(updated));
+      return updated;
+    });
+    localStorage.removeItem('eidolum_onboarding_step');
+  }, []);
+
   const isAuthenticated = !!token && !!user;
+  const needsOnboarding = isAuthenticated && user && !user.onboarding_completed;
 
   return (
-    <AuthContext.Provider value={{ user, token, loading, isAuthenticated, login, register, logout, refreshProfile }}>
+    <AuthContext.Provider value={{ user, token, loading, isAuthenticated, needsOnboarding, login, register, logout, refreshProfile, markOnboarded }}>
       {children}
     </AuthContext.Provider>
   );

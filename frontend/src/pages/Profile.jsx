@@ -3,6 +3,9 @@ import { useNavigate, useParams, Link } from 'react-router-dom';
 import { User, TrendingUp, TrendingDown, Flame, Target, Award, LogOut, Crosshair, UserPlus, UserMinus } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import Footer from '../components/Footer';
+import TypeBadge from '../components/TypeBadge';
+import OnboardingBanner from '../components/OnboardingBanner';
+import Onboarding from '../components/Onboarding';
 import StreakCalendar from '../components/StreakCalendar';
 import TrackRecordCard from '../components/TrackRecordCard';
 import { getUserProfile, getUserAchievements, getUserPredictions, followUser, unfollowUser, getFollowers } from '../api';
@@ -21,6 +24,7 @@ export default function Profile() {
   const [loading, setLoading] = useState(true);
   const [isFollowing, setIsFollowing] = useState(false);
   const [followLoading, setFollowLoading] = useState(false);
+  const [showOnboarding, setShowOnboarding] = useState(false);
 
   useEffect(() => {
     if (!targetId) { setLoading(false); return; }
@@ -79,20 +83,30 @@ export default function Profile() {
 
   return (
     <div>
+      {showOnboarding && (
+        <Onboarding user={user} onComplete={(finished) => { setShowOnboarding(false); if (finished) window.location.reload(); }} />
+      )}
       <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-10">
+        {/* Onboarding banner for dismissed users */}
+        {isOwnProfile && !profile?.onboarding_completed && profile?.total_predictions === 0 && (
+          <OnboardingBanner onStart={() => setShowOnboarding(true)} />
+        )}
         {/* Header */}
         <div className="card mb-6">
-          <div className="flex items-start justify-between">
+          <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
             <div className="flex items-center gap-4">
-              <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-accent/10 border border-accent/20 flex items-center justify-center">
+              <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-accent/10 border border-accent/20 flex items-center justify-center flex-shrink-0">
                 <span className="font-mono text-2xl text-accent font-bold">{(profile.username || '?')[0].toUpperCase()}</span>
               </div>
               <div>
-                <h1 className="font-bold text-lg sm:text-xl">{profile.display_name || profile.username}</h1>
+                <div className="flex items-center gap-2">
+                  <h1 className="font-bold text-lg sm:text-xl">{profile.display_name || profile.username}</h1>
+                  <TypeBadge type={profile.user_type} showLabel size={14} />
+                </div>
                 <p className="text-muted text-sm font-mono">@{profile.username}</p>
                 <div className="flex items-center gap-3 mt-1">
                   <span className="text-xs" style={{ color: profile.rank_color }}>{profile.rank_name}</span>
-                  <span className="text-muted text-xs">{profile.followers_count || 0} followers</span>
+                  <span className="text-muted text-xs">{profile.followers_count || 0} friends</span>
                   <span className="text-muted text-xs">{profile.following_count || 0} following</span>
                 </div>
               </div>
@@ -101,7 +115,7 @@ export default function Profile() {
               {!isOwnProfile && isAuthenticated && (
                 <button onClick={toggleFollow} disabled={followLoading}
                   className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${isFollowing ? 'bg-surface-2 text-text-secondary border border-border' : 'bg-accent/15 text-accent border border-accent/30'}`}>
-                  {isFollowing ? <><UserMinus className="w-3.5 h-3.5" /> Unfollow</> : <><UserPlus className="w-3.5 h-3.5" /> Follow</>}
+                  {isFollowing ? <><UserMinus className="w-3.5 h-3.5" /> Remove Friend</> : <><UserPlus className="w-3.5 h-3.5" /> Add Friend</>}
                 </button>
               )}
               {isOwnProfile && <button onClick={logout} className="text-muted text-xs flex items-center gap-1"><LogOut className="w-3.5 h-3.5" /><span className="hidden sm:inline">Log out</span></button>}

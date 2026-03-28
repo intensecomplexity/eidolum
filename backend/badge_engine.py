@@ -391,6 +391,21 @@ def evaluate_badges(user_id: int, db: Session) -> list[str]:
     # ── Persist ───────────────────────────────────────────────────────────
 
     if newly_awarded:
+        from notifications import create_notification
+        from activity import log_activity
+        for bid in newly_awarded:
+            info = BADGE_INFO.get(bid, {})
+            create_notification(
+                user_id=user_id, type="badge_earned",
+                title="Badge Unlocked!",
+                message=f"You earned the {info.get('name', bid)} badge: {info.get('description', '')}",
+                data={"badge_id": bid}, db=db,
+            )
+            log_activity(
+                user_id=user_id, event_type="badge_earned",
+                description=f"{user.username} earned the {info.get('name', bid)} badge",
+                data={"badge_id": bid, "badge_name": info.get('name', bid)}, db=db,
+            )
         db.commit()
         logger.info(f"[BadgeEngine] User {user_id}: awarded {len(newly_awarded)} badge(s): {newly_awarded}")
 

@@ -9,43 +9,34 @@ from seasons import ensure_current_season
 
 router = APIRouter()
 
+ICON_EMOJI = {"bull": "\U0001F402", "hawk": "\U0001F985", "serpent": "\U0001F40D", "wolf": "\U0001F43A"}
 
-# ── GET /api/seasons ──────────────────────────────────────────────────────────
+
+def _season_dict(s: Season) -> dict:
+    return {
+        "id": s.id,
+        "name": s.name,
+        "starts_at": s.starts_at.isoformat() if s.starts_at else None,
+        "ends_at": s.ends_at.isoformat() if s.ends_at else None,
+        "status": s.status,
+        "theme_color": s.theme_color,
+        "theme_icon": s.theme_icon,
+        "theme_emoji": ICON_EMOJI.get(s.theme_icon, ""),
+    }
 
 
 @router.get("/seasons")
 @limiter.limit("60/minute")
 def list_seasons(request: Request, db: Session = Depends(get_db)):
     seasons = db.query(Season).order_by(Season.starts_at.desc()).all()
-    return [
-        {
-            "id": s.id,
-            "name": s.name,
-            "starts_at": s.starts_at.isoformat() if s.starts_at else None,
-            "ends_at": s.ends_at.isoformat() if s.ends_at else None,
-            "status": s.status,
-        }
-        for s in seasons
-    ]
-
-
-# ── GET /api/seasons/current ──────────────────────────────────────────────────
+    return [_season_dict(s) for s in seasons]
 
 
 @router.get("/seasons/current")
 @limiter.limit("60/minute")
 def get_current_season(request: Request, db: Session = Depends(get_db)):
     season = ensure_current_season(db)
-    return {
-        "id": season.id,
-        "name": season.name,
-        "starts_at": season.starts_at.isoformat() if season.starts_at else None,
-        "ends_at": season.ends_at.isoformat() if season.ends_at else None,
-        "status": season.status,
-    }
-
-
-# ── GET /api/seasons/{season_id}/leaderboard ──────────────────────────────────
+    return _season_dict(season)
 
 
 @router.get("/seasons/{season_id}/leaderboard")
@@ -64,14 +55,11 @@ def season_leaderboard(request: Request, season_id: int, db: Session = Depends(g
 
     results = []
     for entry, user in entries:
-        accuracy = (
-            round(entry.predictions_correct / entry.predictions_scored * 100, 1)
-            if entry.predictions_scored > 0
-            else 0.0
-        )
+        accuracy = round(entry.predictions_correct / entry.predictions_scored * 100, 1) if entry.predictions_scored > 0 else 0.0
         results.append({
             "user_id": user.id,
             "username": user.username,
+            "user_type": user.user_type or "player",
             "predictions_made": entry.predictions_made,
             "predictions_scored": entry.predictions_scored,
             "predictions_correct": entry.predictions_correct,
@@ -82,4 +70,4 @@ def season_leaderboard(request: Request, season_id: int, db: Session = Depends(g
     for i, r in enumerate(results):
         r["rank"] = i + 1
 
-    return results
+    return {"season": _season_dict(season), "leaderboard": results}

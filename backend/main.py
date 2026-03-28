@@ -21,7 +21,7 @@ from database import engine, Base, SessionLocal
 from models import Forecaster, Prediction, Config
 from rate_limit import limiter
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
-from routers import leaderboard, forecasters, assets, sync, activity, admin, platforms, follows, newsletter, saved, positions, contrarian, power_rankings, inverse, subscribers, predictions, auth, user_predictions, community, user_follows, duels, seasons_router
+from routers import leaderboard, forecasters, assets, sync, activity, admin, platforms, follows, newsletter, saved, positions, contrarian, power_rankings, inverse, subscribers, predictions, auth, user_predictions, community, user_follows, duels, seasons_router, notifications as notifications_router, ticker_detail, activity_feed, share
 from jobs.scraper import run_scraper
 from jobs.evaluator import run_evaluator
 from jobs.user_evaluator import evaluate_user_predictions, evaluate_duels, check_season_completion
@@ -394,6 +394,163 @@ def run_phase2_migrations():
                 pass
             else:
                 print(f"[Phase2] index {idx_name}: {e}")
+
+    # ── 8. user_predictions.deleted_at column ────────────────────────────────
+    try:
+        db.execute(text("ALTER TABLE user_predictions ADD COLUMN deleted_at TIMESTAMP"))
+        db.commit()
+        print("[Phase2] user_predictions.deleted_at column added")
+    except Exception as e:
+        db.rollback()
+        if "already exists" in str(e).lower() or "duplicate column" in str(e).lower():
+            pass
+        else:
+            print(f"[Phase2] user_predictions ADD deleted_at: {e}")
+
+    # ── 9. deletion_log table ─────────────────────────────────────────────
+    try:
+        db.execute(text("""
+            CREATE TABLE IF NOT EXISTS deletion_log (
+                id SERIAL PRIMARY KEY,
+                user_id INTEGER REFERENCES users(id),
+                prediction_id INTEGER REFERENCES user_predictions(id),
+                deleted_at TIMESTAMP DEFAULT NOW()
+            )
+        """))
+        db.commit()
+        print("[Phase2] deletion_log table created")
+    except Exception as e:
+        db.rollback()
+        if "already exists" in str(e).lower():
+            pass
+        else:
+            print(f"[Phase2] deletion_log table: {e}")
+
+    # ── 10. users.user_type column ───────────────────────────────────────
+    try:
+        db.execute(text("ALTER TABLE users ADD COLUMN user_type VARCHAR(20) DEFAULT 'player'"))
+        db.commit()
+        print("[Phase2] users.user_type column added")
+    except Exception as e:
+        db.rollback()
+        if "already exists" in str(e).lower() or "duplicate column" in str(e).lower():
+            pass
+        else:
+            print(f"[Phase2] users ADD user_type: {e}")
+
+    # ── 11. seasons theme columns ─────────────────────────────────────────
+    for col, defn in [("theme_color", "VARCHAR(7)"), ("theme_icon", "VARCHAR(50)")]:
+        try:
+            db.execute(text(f"ALTER TABLE seasons ADD COLUMN {col} {defn}"))
+            db.commit()
+            print(f"[Phase2] seasons.{col} column added")
+        except Exception as e:
+            db.rollback()
+            if "already exists" in str(e).lower() or "duplicate column" in str(e).lower():
+                pass
+            else:
+                print(f"[Phase2] seasons ADD {col}: {e}")
+
+    # ── 12. Rename existing Q-style seasons to themed names ───────────────
+    _season_renames = {
+        "Q1": ("Season of the Bull", "#22c55e", "bull"),
+        "Q2": ("Season of the Hawk", "#4A9EFF", "hawk"),
+        "Q3": ("Season of the Serpent", "#A855F7", "serpent"),
+        "Q4": ("Season of the Wolf", "#EF4444", "wolf"),
+    }
+    for q_prefix, (themed_name, color, icon) in _season_renames.items():
+        try:
+            db.execute(text(
+                "UPDATE seasons SET name = :new_name, theme_color = :color, theme_icon = :icon "
+                "WHERE name LIKE :pattern AND theme_color IS NULL"
+            ), {"new_name": None, "color": color, "icon": icon, "pattern": f"{q_prefix} %"})
+            # Actually need to include the year in the name
+            rows = db.execute(text(
+                "SELECT id, name FROM seasons WHERE name LIKE :pattern"
+            ), {"pattern": f"{q_prefix} %"}).fetchall()
+            for row in rows:
+                year = row[1].replace(f"{q_prefix} ", "")
+                db.execute(text(
+                    "UPDATE seasons SET name = :n, theme_color = :c, theme_icon = :i WHERE id = :id"
+                ), {"n": f"{themed_name} \u2014 {year}", "c": color, "i": icon, "id": row[0]})
+            db.commit()
+        except Exception:
+            db.rollback()
+
+    # ── 13. users.onboarding_completed column ────────────────────────────
+    try:
+        db.execute(text("ALTER TABLE users ADD COLUMN onboarding_completed INTEGER DEFAULT 0"))
+        db.commit()
+        print("[Phase2] users.onboarding_completed column added")
+    except Exception as e:
+        db.rollback()
+        if "already exists" in str(e).lower() or "duplicate column" in str(e).lower():
+            pass
+        else:
+            print(f"[Phase2] users ADD onboarding_completed: {e}")
+
+    # ── 14. notifications table ──────────────────────────────────────────
+    try:
+        db.execute(text("""
+            CREATE TABLE IF NOT EXISTS notifications (
+                id SERIAL PRIMARY KEY,
+                user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+                type VARCHAR(50) NOT NULL,
+                title VARCHAR(200) NOT NULL,
+                message TEXT NOT NULL,
+                data TEXT,
+                read INTEGER DEFAULT 0,
+                created_at TIMESTAMP DEFAULT NOW()
+            )
+        """))
+        db.commit()
+        print("[Phase2] notifications table created")
+    except Exception as e:
+        db.rollback()
+        if "already exists" in str(e).lower():
+            pass
+        else:
+            print(f"[Phase2] notifications table: {e}")
+
+    try:
+        db.execute(text("CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id, read, created_at DESC)"))
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        if "already exists" in str(e).lower():
+            pass
+        else:
+            print(f"[Phase2] notifications index: {e}")
+
+    # ── 15. activity_feed_v2 table ───────────────────────────────────────
+    try:
+        db.execute(text("""
+            CREATE TABLE IF NOT EXISTS activity_feed_v2 (
+                id SERIAL PRIMARY KEY,
+                user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+                event_type VARCHAR(50) NOT NULL,
+                ticker VARCHAR(10),
+                description TEXT NOT NULL,
+                data TEXT,
+                created_at TIMESTAMP DEFAULT NOW()
+            )
+        """))
+        db.commit()
+        print("[Phase2] activity_feed_v2 table created")
+    except Exception as e:
+        db.rollback()
+        if "already exists" in str(e).lower():
+            pass
+        else:
+            print(f"[Phase2] activity_feed_v2 table: {e}")
+
+    try:
+        db.execute(text("CREATE INDEX IF NOT EXISTS idx_activity_feed_v2_created ON activity_feed_v2(created_at DESC)"))
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        if "already exists" in str(e).lower():
+            pass
 
     print("[Phase2] All migrations complete")
     db.close()
@@ -963,6 +1120,10 @@ app.include_router(community.router, prefix="/api")
 app.include_router(user_follows.router, prefix="/api")
 app.include_router(duels.router, prefix="/api")
 app.include_router(seasons_router.router, prefix="/api")
+app.include_router(notifications_router.router, prefix="/api")
+app.include_router(ticker_detail.router, prefix="/api")
+app.include_router(activity_feed.router, prefix="/api")
+app.include_router(share.router, prefix="/api")
 app.include_router(admin_panel_router)  # /admin HTML + /api/admin/* endpoints
 
 

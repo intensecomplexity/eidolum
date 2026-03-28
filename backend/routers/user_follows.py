@@ -1,14 +1,29 @@
 import datetime
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
 from sqlalchemy import func, or_
+from typing import Optional
 
 from database import get_db
 from models import User, UserPrediction, Follow
 from middleware.auth import require_user
 from rate_limit import limiter
+from ticker_lookup import search_tickers as _search_tickers
+from auth import get_current_user as _decode_token
+
+_optional_bearer = HTTPBearer(auto_error=False)
 
 router = APIRouter()
+
+
+def _rank_name(scored: int) -> str:
+    if scored >= 250: return "Legendary"
+    if scored >= 100: return "Oracle"
+    if scored >= 50: return "Strategist"
+    if scored >= 25: return "Analyst"
+    if scored >= 10: return "Novice"
+    return "Unranked"
 
 
 def _user_accuracy(user_id: int, db: Session) -> float:
@@ -21,6 +36,121 @@ def _user_accuracy(user_id: int, db: Session) -> float:
         return 0.0
     correct = sum(1 for p in scored if p.outcome == "correct")
     return round(correct / len(scored) * 100, 1)
+
+
+# ── GET /api/search ────────────────────────────────────────────────────────────
+
+
+@router.get("/search")
+@limiter.limit("60/minute")
+def unified_search(
+    request: Request,
+    q: str = Query(""),
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(_optional_bearer),
+    db: Session = Depends(get_db),
+):
+    query = q.strip()
+    if not query:
+        return {"tickers": [], "users": []}
+
+    # Ticker results
+    tickers = _search_tickers(query)
+    for t in tickers:
+        t["type"] = "ticker"
+
+    # User results
+    pattern = f"%{query.lower()}%"
+    user_rows = (
+        db.query(User)
+        .filter(or_(
+            func.lower(User.username).like(pattern),
+            func.lower(User.display_name).like(pattern),
+        ))
+        .limit(5)
+        .all()
+    )
+
+    # Determine current user for is_friend check
+    current_user_id = None
+    if credentials and credentials.credentials:
+        try:
+            data = _decode_token(credentials.credentials)
+            current_user_id = data.get("user_id")
+        except Exception:
+            pass
+
+    friend_ids = set()
+    if current_user_id:
+        friend_ids = set(
+            f.following_id
+            for f in db.query(Follow.following_id).filter(Follow.follower_id == current_user_id).all()
+        )
+
+    users = []
+    for u in user_rows:
+        scored = _user_scored_count(u.id, db)
+        accuracy = _user_accuracy(u.id, db)
+        users.append({
+            "user_id": u.id,
+            "username": u.username,
+            "display_name": u.display_name,
+            "accuracy": accuracy,
+            "scored": scored,
+            "rank": _rank_name(scored),
+            "is_friend": u.id in friend_ids,
+            "type": "user",
+        })
+
+    return {"tickers": tickers, "users": users}
+
+
+# ── GET /api/friends/suggestions ──────────────────────────────────────────────
+
+
+@router.get("/friends/suggestions")
+@limiter.limit("30/minute")
+def friend_suggestions(
+    request: Request,
+    current_user_id: int = Depends(require_user),
+    db: Session = Depends(get_db),
+):
+    friend_ids = set(
+        f.following_id
+        for f in db.query(Follow.following_id).filter(Follow.follower_id == current_user_id).all()
+    )
+    friend_ids.add(current_user_id)  # exclude self
+
+    users = db.query(User).filter(User.id.notin_(friend_ids)).all()
+
+    results = []
+    for u in users:
+        scored = _user_scored_count(u.id, db)
+        if scored < 5:
+            continue
+        accuracy = _user_accuracy(u.id, db)
+        results.append({
+            "user_id": u.id,
+            "username": u.username,
+            "display_name": u.display_name,
+            "accuracy": accuracy,
+            "scored": scored,
+            "rank": _rank_name(scored),
+        })
+
+    results.sort(key=lambda x: x["accuracy"], reverse=True)
+    return results[:5]
+
+
+def _user_scored_count(user_id: int, db: Session) -> int:
+    return (
+        db.query(func.count(UserPrediction.id))
+        .filter(
+            UserPrediction.user_id == user_id,
+            UserPrediction.outcome.in_(["correct", "incorrect"]),
+            UserPrediction.deleted_at.is_(None),
+        )
+        .scalar() or 0
+    )
 
 
 # ── POST /api/follows/{user_id} ──────────────────────────────────────────────
@@ -51,6 +181,18 @@ def follow_user(
 
     follow = Follow(follower_id=current_user_id, following_id=user_id)
     db.add(follow)
+
+    # Notify the person being followed
+    from notifications import create_notification
+    follower = db.query(User).filter(User.id == current_user_id).first()
+    follower_name = follower.username if follower else "Someone"
+    create_notification(
+        user_id=user_id, type="new_follower",
+        title="New Friend!",
+        message=f"{follower_name} added you as a friend",
+        data={"follower_id": current_user_id}, db=db,
+    )
+
     db.commit()
     db.refresh(follow)
 

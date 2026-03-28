@@ -10,26 +10,22 @@ from datetime import datetime
 from decimal import Decimal
 from sqlalchemy.orm import Session
 from models import User, UserPrediction, Duel, Season, SeasonEntry
+from notifications import create_notification
+from activity import log_activity
 
 FINNHUB_KEY = os.getenv("FINNHUB_KEY", "")
 
-# ── Shared price helper ───────────────────────────────────────────────────────
-
 _price_cache: dict[str, float] = {}
+
+STREAK_MILESTONES = {5, 10, 15, 20}
 
 
 def _fetch_price(ticker: str) -> float | None:
-    """Fetch current price. Tries Finnhub, then Alpha Vantage, then yfinance."""
     if ticker in _price_cache:
         return _price_cache[ticker]
-
     if FINNHUB_KEY:
         try:
-            r = httpx.get(
-                "https://finnhub.io/api/v1/quote",
-                params={"symbol": ticker, "token": FINNHUB_KEY},
-                timeout=10,
-            )
+            r = httpx.get("https://finnhub.io/api/v1/quote", params={"symbol": ticker, "token": FINNHUB_KEY}, timeout=10)
             price = r.json().get("c")
             if price and price > 0:
                 result = round(float(price), 2)
@@ -37,7 +33,6 @@ def _fetch_price(ticker: str) -> float | None:
                 return result
         except Exception:
             pass
-
     try:
         from jobs.evaluator import get_current_price
         result = get_current_price(ticker)
@@ -61,7 +56,6 @@ def _parse_target(target_str: str) -> float | None:
 
 
 def evaluate_user_predictions(db: Session):
-    """Score expired pending user predictions. Updates streaks, seasons, badges."""
     _price_cache.clear()
     now = datetime.utcnow()
     print(f"[UserEval] Running at {now.isoformat()}")
@@ -96,7 +90,6 @@ def evaluate_user_predictions(db: Session):
         if entry is None:
             continue
 
-        # Determine outcome based on direction vs price movement
         if p.direction == "bullish":
             outcome = "correct" if price > entry else "incorrect"
         elif p.direction == "bearish":
@@ -115,17 +108,48 @@ def evaluate_user_predictions(db: Session):
 
         affected_user_ids.add(p.user_id)
 
-        # Update streak on the user row
+        # Update streak
         user = db.query(User).filter(User.id == p.user_id).first()
         if user:
             if outcome == "correct":
                 user.streak_current = (user.streak_current or 0) + 1
                 if user.streak_current > (user.streak_best or 0):
                     user.streak_best = user.streak_current
+                # Streak milestone
+                if user.streak_current in STREAK_MILESTONES:
+                    create_notification(
+                        user_id=p.user_id, type="streak_milestone",
+                        title="Streak Milestone!",
+                        message=f"You're on a {user.streak_current} prediction streak!",
+                        data={"streak": user.streak_current}, db=db,
+                    )
+                    log_activity(
+                        user_id=p.user_id, event_type="streak_milestone",
+                        description=f"{user.username} hit a {user.streak_current} prediction streak!",
+                        data={"streak_count": user.streak_current}, db=db,
+                    )
             else:
                 user.streak_current = 0
 
-        # Update season_entries
+        # Prediction scored notification
+        if outcome == "correct":
+            msg = f"Your {p.direction} call on {p.ticker} was correct! Target: {p.price_target}, Final price: ${price}"
+        else:
+            msg = f"Your {p.direction} call on {p.ticker} was incorrect. Target: {p.price_target}, Final price: ${price}"
+        create_notification(
+            user_id=p.user_id, type="prediction_scored",
+            title="Prediction Scored!",
+            message=msg,
+            data={"prediction_id": p.id, "outcome": outcome, "ticker": p.ticker}, db=db,
+        )
+        _uname = user.username if user else "Someone"
+        log_activity(
+            user_id=p.user_id, event_type="prediction_scored",
+            description=f"{_uname}'s {p.ticker} call was {outcome}",
+            ticker=p.ticker,
+            data={"prediction_id": p.id, "outcome": outcome, "ticker": p.ticker}, db=db,
+        )
+
         _update_season_scored(p.user_id, outcome, db)
 
     db.commit()
@@ -133,7 +157,7 @@ def evaluate_user_predictions(db: Session):
     total = correct_count + incorrect_count
     print(f"[UserEval] Evaluated {total} user predictions: {correct_count} correct, {incorrect_count} incorrect")
 
-    # Run badge engine for affected users
+    # Badge engine
     try:
         from badge_engine import evaluate_badges
         for uid in affected_user_ids:
@@ -143,21 +167,17 @@ def evaluate_user_predictions(db: Session):
 
 
 def _update_season_scored(user_id: int, outcome: str, db: Session):
-    """Increment predictions_scored (and predictions_correct) on the current season entry."""
     season = db.query(Season).filter(Season.status == "active").first()
     if not season:
         return
-
     entry = (
         db.query(SeasonEntry)
         .filter(SeasonEntry.season_id == season.id, SeasonEntry.user_id == user_id)
         .first()
     )
     if not entry:
-        # User submitted before seasons existed; create an entry now
         entry = SeasonEntry(season_id=season.id, user_id=user_id, predictions_made=0)
         db.add(entry)
-
     entry.predictions_scored = (entry.predictions_scored or 0) + 1
     if outcome == "correct":
         entry.predictions_correct = (entry.predictions_correct or 0) + 1
@@ -169,18 +189,13 @@ def _update_season_scored(user_id: int, outcome: str, db: Session):
 
 
 def evaluate_duels(db: Session):
-    """Score expired active duels. Determines winner by target accuracy."""
     _price_cache.clear()
     now = datetime.utcnow()
     print(f"[DuelEval] Running at {now.isoformat()}")
 
     expired = (
         db.query(Duel)
-        .filter(
-            Duel.status == "active",
-            Duel.expires_at.isnot(None),
-            Duel.expires_at <= now,
-        )
+        .filter(Duel.status == "active", Duel.expires_at.isnot(None), Duel.expires_at <= now)
         .all()
     )
 
@@ -197,48 +212,53 @@ def evaluate_duels(db: Session):
         start_price = float(duel.price_at_start) if duel.price_at_start else None
         c_target = _parse_target(duel.challenger_target)
         o_target = _parse_target(duel.opponent_target)
-
         if start_price is None:
             continue
 
-        # Did the price go up or down from start?
         price_went_up = price >= start_price
-
-        # Check if each player's direction was right
-        c_dir_right = (
-            (duel.challenger_direction == "bullish" and price_went_up) or
-            (duel.challenger_direction == "bearish" and not price_went_up)
-        )
-        o_dir_right = (
-            (duel.opponent_direction == "bullish" and price_went_up) or
-            (duel.opponent_direction == "bearish" and not price_went_up)
-        )
-
-        winner_id = None
+        c_dir_right = (duel.challenger_direction == "bullish" and price_went_up) or (duel.challenger_direction == "bearish" and not price_went_up)
+        o_dir_right = (duel.opponent_direction == "bullish" and price_went_up) or (duel.opponent_direction == "bearish" and not price_went_up)
 
         if c_dir_right and not o_dir_right:
-            # Challenger's direction was right, opponent was wrong
             winner_id = duel.challenger_id
         elif o_dir_right and not c_dir_right:
-            # Opponent's direction was right, challenger was wrong
             winner_id = duel.opponent_id
         else:
-            # Both right or both wrong — compare target distance
             c_dist = abs(price - c_target) if c_target is not None else float("inf")
             o_dist = abs(price - o_target) if o_target is not None else float("inf")
-
-            if c_dist < o_dist:
-                winner_id = duel.challenger_id
-            elif o_dist < c_dist:
-                winner_id = duel.opponent_id
-            else:
-                # Perfect tie — challenger wins (they initiated)
-                winner_id = duel.challenger_id
+            winner_id = duel.challenger_id if c_dist <= o_dist else duel.opponent_id
 
         duel.winner_id = winner_id
         duel.status = "completed"
         duel.evaluated_at = now
         evaluated += 1
+
+        # Notifications for both players
+        challenger = db.query(User).filter(User.id == duel.challenger_id).first()
+        opponent = db.query(User).filter(User.id == duel.opponent_id).first()
+        c_name = challenger.username if challenger else "Unknown"
+        o_name = opponent.username if opponent else "Unknown"
+
+        for uid, is_winner in [(duel.challenger_id, winner_id == duel.challenger_id), (duel.opponent_id, winner_id == duel.opponent_id)]:
+            other_name = o_name if uid == duel.challenger_id else c_name
+            result = "won" if is_winner else "lost"
+            msg = f"You won the {duel.ticker} duel against {other_name}!" if is_winner else f"You lost the {duel.ticker} duel against {other_name}"
+            create_notification(
+                user_id=uid, type="duel_result",
+                title="Duel Complete!",
+                message=msg,
+                data={"duel_id": duel.id, "result": result}, db=db,
+            )
+
+        # Activity: duel completed
+        winner_name = c_name if winner_id == duel.challenger_id else o_name
+        loser_name = o_name if winner_id == duel.challenger_id else c_name
+        log_activity(
+            user_id=winner_id, event_type="duel_completed",
+            description=f"{winner_name} won the {duel.ticker} duel against {loser_name}",
+            ticker=duel.ticker,
+            data={"duel_id": duel.id, "winner": winner_name, "loser": loser_name, "ticker": duel.ticker}, db=db,
+        )
 
     db.commit()
     print(f"[DuelEval] Evaluated {evaluated} duels")
@@ -250,18 +270,34 @@ def evaluate_duels(db: Session):
 
 
 def check_season_completion(db: Session):
-    """Mark expired active seasons as completed."""
     now = datetime.utcnow()
 
-    expired = (
-        db.query(Season)
-        .filter(Season.status == "active", Season.ends_at <= now)
-        .all()
-    )
+    expired = db.query(Season).filter(Season.status == "active", Season.ends_at <= now).all()
 
     for season in expired:
         season.status = "completed"
         print(f"[Seasons] Completed season: {season.name}")
+
+        # Notify participants
+        entries = (
+            db.query(SeasonEntry)
+            .filter(SeasonEntry.season_id == season.id, SeasonEntry.predictions_scored >= 1)
+            .all()
+        )
+        ranked = sorted(
+            entries,
+            key=lambda e: (e.predictions_correct / e.predictions_scored if e.predictions_scored else 0),
+            reverse=True,
+        )
+        for i, entry in enumerate(ranked):
+            rank = i + 1
+            accuracy = round(entry.predictions_correct / entry.predictions_scored * 100, 1) if entry.predictions_scored > 0 else 0
+            create_notification(
+                user_id=entry.user_id, type="season_ended",
+                title="Season Complete!",
+                message=f"You finished #{rank} in {season.name} with {accuracy}% accuracy",
+                data={"season_id": season.id, "rank": rank, "accuracy": accuracy}, db=db,
+            )
 
     if expired:
         db.commit()

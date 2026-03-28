@@ -139,6 +139,25 @@ def create_challenge(
         status="pending",
     )
     db.add(duel)
+
+    # Notify opponent + activity
+    from notifications import create_notification
+    from activity import log_activity
+    challenger = db.query(User).filter(User.id == user_id).first()
+    challenger_name = challenger.username if challenger else "Someone"
+    create_notification(
+        user_id=req.opponent_id, type="duel_challenge",
+        title="New Duel Challenge!",
+        message=f"{challenger_name} challenged you to a {ticker} duel",
+        data={"duel_id": None, "challenger_id": user_id}, db=db,
+    )
+    log_activity(
+        user_id=user_id, event_type="duel_created",
+        description=f"{challenger_name} challenged {opponent.username} on {ticker}",
+        ticker=ticker,
+        data={"duel_id": None, "ticker": ticker}, db=db,
+    )
+
     db.commit()
     db.refresh(duel)
 
