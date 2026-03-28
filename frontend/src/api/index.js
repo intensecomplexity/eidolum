@@ -224,6 +224,12 @@ export function getSentRequests() {
   return api.get('/follows/sent', { headers: authHeaders() }).then(r => r.data);
 }
 
+// ——— Prediction Detail ———
+
+export function getPredictionDetail(predictionId, source = 'user') {
+  return api.get(`/predictions/detail/${predictionId}`, { params: { source }, headers: authHeaders() }).then(r => r.data);
+}
+
 // ——— Comments ———
 
 export function getComments(predictionId, source, limit = 20, offset = 0) {
