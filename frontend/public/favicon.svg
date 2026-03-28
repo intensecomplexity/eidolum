@@ -1,19 +1,20 @@
-<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
-  <rect width="100" height="100" rx="16" fill="#07090a"/>
-  <line x1="18" y1="15" x2="18" y2="85" stroke="#D4A017" stroke-width="5" stroke-linecap="round"/>
-  <line x1="18" y1="18" x2="55" y2="18" stroke="#D4A017" stroke-width="4.5" stroke-linecap="round"/>
-  <line x1="55" y1="18" x2="66" y2="18" stroke="#D4A017" stroke-width="3" stroke-linecap="round" opacity="0.5"/>
-  <line x1="66" y1="18" x2="73" y2="18" stroke="#D4A017" stroke-width="2" stroke-linecap="round" opacity="0.3"/>
-  <circle cx="78" cy="18" r="2.5" fill="#D4A017" opacity="0.3"/>
-  <circle cx="83" cy="18" r="1.5" fill="#D4A017" opacity="0.18"/>
-  <line x1="18" y1="50" x2="45" y2="50" stroke="#D4A017" stroke-width="4.5" stroke-linecap="round"/>
-  <line x1="45" y1="50" x2="55" y2="50" stroke="#D4A017" stroke-width="3" stroke-linecap="round" opacity="0.5"/>
-  <line x1="55" y1="50" x2="62" y2="50" stroke="#D4A017" stroke-width="2" stroke-linecap="round" opacity="0.3"/>
-  <circle cx="67" cy="50" r="2.5" fill="#D4A017" opacity="0.3"/>
-  <circle cx="72" cy="50" r="1.5" fill="#D4A017" opacity="0.18"/>
-  <line x1="18" y1="82" x2="55" y2="82" stroke="#D4A017" stroke-width="4.5" stroke-linecap="round"/>
-  <line x1="55" y1="82" x2="66" y2="82" stroke="#D4A017" stroke-width="3" stroke-linecap="round" opacity="0.5"/>
-  <line x1="66" y1="82" x2="73" y2="82" stroke="#D4A017" stroke-width="2" stroke-linecap="round" opacity="0.3"/>
-  <circle cx="78" cy="82" r="2.5" fill="#D4A017" opacity="0.3"/>
-  <circle cx="83" cy="82" r="1.5" fill="#D4A017" opacity="0.18"/>
+<svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="48" height="48" rx="10" fill="#07090a"/>
+  <!-- Vertical spine -->
+  <line x1="10" y1="8" x2="10" y2="40" stroke="#D4A843" stroke-width="3.5" stroke-linecap="round"/>
+  <!-- Top arm + dots -->
+  <line x1="10" y1="10" x2="28" y2="10" stroke="#D4A843" stroke-width="3.5" stroke-linecap="round"/>
+  <circle cx="32" cy="10" r="1.8" fill="#D4A843"/>
+  <circle cx="36" cy="10" r="1.2" fill="#D4A843" opacity="0.6"/>
+  <circle cx="39.5" cy="10" r="0.8" fill="#D4A843" opacity="0.3"/>
+  <!-- Middle arm + dots -->
+  <line x1="10" y1="24" x2="22" y2="24" stroke="#D4A843" stroke-width="3.5" stroke-linecap="round"/>
+  <circle cx="26" cy="24" r="1.8" fill="#D4A843"/>
+  <circle cx="29.5" cy="24" r="1.2" fill="#D4A843" opacity="0.6"/>
+  <circle cx="32.5" cy="24" r="0.8" fill="#D4A843" opacity="0.3"/>
+  <!-- Bottom arm + dots -->
+  <line x1="10" y1="38" x2="28" y2="38" stroke="#D4A843" stroke-width="3.5" stroke-linecap="round"/>
+  <circle cx="32" cy="38" r="1.8" fill="#D4A843"/>
+  <circle cx="36" cy="38" r="1.2" fill="#D4A843" opacity="0.6"/>
+  <circle cx="39.5" cy="38" r="0.8" fill="#D4A843" opacity="0.3"/>
 </svg>

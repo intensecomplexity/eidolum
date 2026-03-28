@@ -3,7 +3,7 @@
  * Props: badgeId (string), earned (boolean), size (number, default 32)
  */
 export default function BadgeIcon({ badgeId, earned = false, size = 32 }) {
-  const color = earned ? '#D4A017' : '#52525b';
+  const color = earned ? '#D4A843' : '#52525b';
   const id = (badgeId || '').replace(/-/g, '_');
   const s = `${size}`;
 
@@ -23,7 +23,7 @@ export default function BadgeIcon({ badgeId, earned = false, size = 32 }) {
 
 // Category header icons
 export function CategoryIcon({ category, size = 16 }) {
-  const color = '#D4A017';
+  const color = '#D4A843';
   const s = `${size}`;
   const icons = {
     Accuracy: () => (<svg width={s} height={s} viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6" stroke={color} strokeWidth="1.2"/><circle cx="8" cy="8" r="2.5" stroke={color} strokeWidth="1"/><circle cx="8" cy="8" r="0.8" fill={color}/></svg>),

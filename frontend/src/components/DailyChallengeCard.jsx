@@ -59,7 +59,7 @@ export default function DailyChallengeCard() {
   return (
     <div className="card mb-6 border-accent/20 relative overflow-hidden">
       {/* Subtle gradient */}
-      <div className="absolute inset-0 opacity-[0.04]" style={{ background: 'linear-gradient(135deg, #D4A017, transparent 60%)' }} />
+      <div className="absolute inset-0 opacity-[0.04]" style={{ background: 'linear-gradient(135deg, #D4A843, transparent 60%)' }} />
       <div className="relative">
         {/* Header */}
         <div className="flex items-center justify-between mb-3">

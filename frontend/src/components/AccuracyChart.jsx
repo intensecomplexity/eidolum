@@ -51,7 +51,7 @@ export default function AccuracyChart({ data = [], onMonthClick }) {
           <Line
             type="monotone"
             dataKey="rolling_accuracy"
-            stroke="#D4A017"
+            stroke="#D4A843"
             strokeWidth={2}
             dot={false}
             connectNulls

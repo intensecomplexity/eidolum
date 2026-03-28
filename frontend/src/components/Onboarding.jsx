@@ -8,7 +8,7 @@ import { submitUserPrediction, completeOnboarding } from '../api';
 
 function spawnConfetti(container) {
   if (!container) return;
-  const colors = ['#D4A017', '#FDE68A', '#B8860B', '#22c55e', '#0ea5e9', '#f59e0b'];
+  const colors = ['#D4A843', '#FDE68A', '#B8860B', '#22c55e', '#0ea5e9', '#f59e0b'];
   for (let i = 0; i < 30; i++) {
     const el = document.createElement('div');
     el.style.cssText = `position:absolute;width:${4+Math.random()*4}px;height:${4+Math.random()*4}px;border-radius:${Math.random()>.5?'50%':'1px'};background:${colors[Math.floor(Math.random()*colors.length)]};pointer-events:none;left:${30+Math.random()*40}%;top:${10+Math.random()*20}%`;

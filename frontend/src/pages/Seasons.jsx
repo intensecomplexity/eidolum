@@ -61,9 +61,9 @@ export default function Seasons() {
     </div>
   );
 
-  const activeColor = current?.theme_color || '#D4A017';
+  const activeColor = current?.theme_color || '#D4A843';
   const selectedSeason = seasonMeta || allSeasons.find(s => s.id === selectedId);
-  const selectedColor = selectedSeason?.theme_color || '#D4A017';
+  const selectedColor = selectedSeason?.theme_color || '#D4A843';
 
   return (
     <div>
@@ -100,7 +100,7 @@ export default function Seasons() {
           <div className="flex gap-2 mb-6 overflow-x-auto pills-scroll">
             {allSeasons.filter(s => s.status !== 'active').map(s => {
               const isSelected = selectedId === s.id;
-              const c = s.theme_color || '#D4A017';
+              const c = s.theme_color || '#D4A843';
               return (
                 <button key={s.id} onClick={() => handleSelectSeason(s.id)}
                   className={`px-4 py-2 rounded-lg text-xs font-bold whitespace-nowrap transition-colors uppercase tracking-wider ${isSelected ? 'border' : 'bg-surface text-text-secondary border border-border'}`}

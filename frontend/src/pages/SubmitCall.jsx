@@ -11,7 +11,7 @@ import { submitUserPrediction, getDeletionStatus, searchTickers, getWeeklyChalle
 
 function spawnConfetti(container) {
   if (!container) return;
-  const colors = ['#D4A017', '#FDE68A', '#B8860B', '#22c55e', '#0ea5e9', '#f59e0b'];
+  const colors = ['#D4A843', '#FDE68A', '#B8860B', '#22c55e', '#0ea5e9', '#f59e0b'];
   for (let i = 0; i < 28; i++) {
     const el = document.createElement('div');
     el.className = 'confetti-particle';

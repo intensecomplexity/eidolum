@@ -207,7 +207,7 @@ def embed_widget(request: Request, username: str, db: Session = Depends(get_db))
 body{{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:transparent}}
 .w{{background:#0f1115;border:1px solid rgba(212,160,23,0.15);border-radius:10px;padding:12px 16px;display:flex;align-items:center;gap:12px;text-decoration:none;color:#e4e4e7;max-width:300px}}
 .w:hover{{border-color:rgba(212,160,23,0.3)}}
-.acc{{font-family:monospace;font-size:20px;font-weight:700;color:#D4A017}}
+.acc{{font-family:monospace;font-size:20px;font-weight:700;color:#D4A843}}
 .meta{{font-size:11px;color:#a1a1aa}}
 .lbl{{font-size:10px;color:#52525b}}
 </style></head><body>
