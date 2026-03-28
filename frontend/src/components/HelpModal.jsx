@@ -41,20 +41,7 @@ const SCORING_RULES = [
 export default function HelpModal({ onClose }) {
   const [carouselIdx, setCarouselIdx] = useState(0);
   const [openAccordion, setOpenAccordion] = useState(null);
-  const scrollRef = useRef(null);
-
-  // Sync scroll position with carousel index
-  useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTo({ left: carouselIdx * scrollRef.current.offsetWidth, behavior: 'smooth' });
-    }
-  }, [carouselIdx]);
-
-  function handleScroll() {
-    if (!scrollRef.current) return;
-    const idx = Math.round(scrollRef.current.scrollLeft / scrollRef.current.offsetWidth);
-    if (idx !== carouselIdx) setCarouselIdx(idx);
-  }
+  const touchStartX = useRef(0);
 
   return (
     <div className="fixed inset-0 z-[85] bg-bg/90 backdrop-blur-sm flex items-start justify-center overflow-y-auto" onClick={onClose}>
@@ -71,38 +58,44 @@ export default function HelpModal({ onClose }) {
             <div className="relative">
               {/* Arrow buttons */}
               {carouselIdx > 0 && (
-                <button onClick={() => setCarouselIdx(i => i - 1)}
-                  className="absolute left-0 top-1/2 -translate-y-1/2 z-10 w-8 h-8 rounded-full bg-surface-2 border border-border flex items-center justify-center text-text-secondary hover:text-text-primary -ml-1">
-                  <ChevronLeft className="w-4 h-4" />
+                <button onClick={() => setCarouselIdx(i => Math.max(i - 1, 0))}
+                  className="absolute left-0 top-1/2 -translate-y-1/2 z-10 w-9 h-9 rounded-full bg-surface-2 border border-border flex items-center justify-center text-text-secondary hover:text-text-primary -ml-2 shadow-lg">
+                  <ChevronLeft className="w-5 h-5" />
                 </button>
               )}
               {carouselIdx < HOW_CARDS.length - 1 && (
-                <button onClick={() => setCarouselIdx(i => i + 1)}
-                  className="absolute right-0 top-1/2 -translate-y-1/2 z-10 w-8 h-8 rounded-full bg-surface-2 border border-border flex items-center justify-center text-text-secondary hover:text-text-primary -mr-1">
-                  <ChevronRight className="w-4 h-4" />
+                <button onClick={() => setCarouselIdx(i => Math.min(i + 1, HOW_CARDS.length - 1))}
+                  className="absolute right-0 top-1/2 -translate-y-1/2 z-10 w-9 h-9 rounded-full bg-surface-2 border border-border flex items-center justify-center text-text-secondary hover:text-text-primary -mr-2 shadow-lg">
+                  <ChevronRight className="w-5 h-5" />
                 </button>
               )}
 
-              {/* Scrollable container */}
-              <div ref={scrollRef} onScroll={handleScroll}
-                className="flex overflow-x-auto snap-x snap-mandatory scrollbar-hide"
-                style={{ scrollbarWidth: 'none', msOverflowStyle: 'none', WebkitOverflowScrolling: 'touch' }}>
-                {HOW_CARDS.map((card, i) => (
-                  <div key={i} className="snap-center flex-shrink-0 w-full px-6">
-                    <div className="card text-center py-8">
-                      <div className="flex justify-center mb-4">{card.icon}</div>
-                      <h3 className="font-semibold text-base mb-2">{card.title}</h3>
-                      <p className="text-sm text-text-secondary leading-relaxed max-w-xs mx-auto">{card.desc}</p>
+              {/* Sliding container */}
+              <div className="overflow-hidden rounded-xl"
+                onTouchStart={e => { touchStartX.current = e.touches[0].clientX; }}
+                onTouchEnd={e => {
+                  const diff = touchStartX.current - e.changedTouches[0].clientX;
+                  if (diff > 50) setCarouselIdx(i => Math.min(i + 1, HOW_CARDS.length - 1));
+                  else if (diff < -50) setCarouselIdx(i => Math.max(i - 1, 0));
+                }}>
+                <div className="flex" style={{ transform: `translateX(-${carouselIdx * 100}%)`, transition: 'transform 0.3s ease' }}>
+                  {HOW_CARDS.map((card, i) => (
+                    <div key={i} className="flex-shrink-0 w-full px-4">
+                      <div className="card text-center py-8">
+                        <div className="flex justify-center mb-4">{card.icon}</div>
+                        <h3 className="font-semibold text-base mb-2">{card.title}</h3>
+                        <p className="text-sm text-text-secondary leading-relaxed max-w-xs mx-auto">{card.desc}</p>
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  ))}
+                </div>
               </div>
 
               {/* Dot indicators */}
               <div className="flex items-center justify-center gap-2 mt-4">
                 {HOW_CARDS.map((_, i) => (
                   <button key={i} onClick={() => setCarouselIdx(i)}
-                    className={`w-2 h-2 rounded-full transition-colors ${i === carouselIdx ? 'bg-accent' : 'bg-surface-2'}`} />
+                    className={`w-2.5 h-2.5 rounded-full transition-all ${i === carouselIdx ? 'bg-accent scale-110' : 'bg-surface-2 hover:bg-muted/30'}`} />
                 ))}
               </div>
             </div>
