@@ -94,6 +94,10 @@ BADGE_INFO = {
     "return-7":          {"name": "Committed",         "description": "7 day prediction streak",                            "icon": "📅", "category": "Prestige"},
     "return-30":         {"name": "Dedicated",         "description": "30 day prediction streak",                           "icon": "📅", "category": "Prestige"},
     "return-100":        {"name": "Obsessed",          "description": "100 day prediction streak",                          "icon": "🔥", "category": "Prestige"},
+    # Weekly Challenges
+    "weekly-1":          {"name": "Challenge Accepted", "description": "Complete 1 weekly challenge",                          "icon": "📋", "category": "Prestige"},
+    "weekly-5":          {"name": "Weekly Warrior",     "description": "Complete 5 weekly challenges",                         "icon": "⚔️", "category": "Prestige"},
+    "weekly-10":         {"name": "Never Miss",         "description": "Complete 10 weekly challenges",                        "icon": "🏅", "category": "Prestige"},
 }
 
 ALL_BADGE_IDS = list(BADGE_INFO.keys())
@@ -473,6 +477,23 @@ def evaluate_badges(user_id: int, db: Session) -> list[str]:
     if "return-100" not in existing and ret_best >= 100:
         _award("return-100")
 
+    # ── WEEKLY CHALLENGE BADGES ────────────────────────────────────────────
+
+    try:
+        from models import WeeklyChallengeProgress
+        weekly_completed = db.query(func.count(WeeklyChallengeProgress.id)).filter(
+            WeeklyChallengeProgress.user_id == user_id,
+            WeeklyChallengeProgress.completed == 1,
+        ).scalar() or 0
+        if "weekly-1" not in existing and weekly_completed >= 1:
+            _award("weekly-1")
+        if "weekly-5" not in existing and weekly_completed >= 5:
+            _award("weekly-5")
+        if "weekly-10" not in existing and weekly_completed >= 10:
+            _award("weekly-10")
+    except Exception:
+        pass
+
     # ── Persist ───────────────────────────────────────────────────────────
 
     if newly_awarded:
@@ -624,5 +645,18 @@ def compute_progress(user_id: int, db: Session) -> dict[str, dict]:
         "return-30":         {"current": user.return_streak_best or 0, "target": 30},
         "return-100":        {"current": user.return_streak_best or 0, "target": 100},
     }
+
+    # Weekly challenge badges
+    try:
+        from models import WeeklyChallengeProgress
+        wc = db.query(func.count(WeeklyChallengeProgress.id)).filter(
+            WeeklyChallengeProgress.user_id == user_id,
+            WeeklyChallengeProgress.completed == 1,
+        ).scalar() or 0
+        progress["weekly-1"] = {"current": wc, "target": 1}
+        progress["weekly-5"] = {"current": wc, "target": 5}
+        progress["weekly-10"] = {"current": wc, "target": 10}
+    except Exception:
+        pass
 
     return progress

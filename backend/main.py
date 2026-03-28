@@ -802,6 +802,46 @@ def run_phase2_migrations():
         except Exception:
             db.rollback()
 
+    # ── 32. Weekly challenges tables ─────────────────────────────
+    try:
+        db.execute(text("""
+            CREATE TABLE IF NOT EXISTS weekly_challenges (
+                id SERIAL PRIMARY KEY,
+                title VARCHAR(100) NOT NULL,
+                description TEXT NOT NULL,
+                challenge_type VARCHAR(50) NOT NULL,
+                requirements TEXT NOT NULL,
+                xp_reward INTEGER DEFAULT 100,
+                starts_at TIMESTAMP NOT NULL,
+                ends_at TIMESTAMP NOT NULL,
+                status VARCHAR(20) DEFAULT 'active',
+                created_at TIMESTAMP DEFAULT NOW()
+            )
+        """))
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        if "already exists" not in str(e).lower():
+            print(f"[Phase2] weekly_challenges: {e}")
+
+    try:
+        db.execute(text("""
+            CREATE TABLE IF NOT EXISTS weekly_challenge_progress (
+                id SERIAL PRIMARY KEY,
+                challenge_id INTEGER REFERENCES weekly_challenges(id) ON DELETE CASCADE,
+                user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+                progress INTEGER DEFAULT 0,
+                completed INTEGER DEFAULT 0,
+                completed_at TIMESTAMP,
+                CONSTRAINT uq_weekly_progress UNIQUE (challenge_id, user_id)
+            )
+        """))
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        if "already exists" not in str(e).lower():
+            print(f"[Phase2] weekly_challenge_progress: {e}")
+
     print("[Phase2] All migrations complete")
     db.close()
 
@@ -1407,6 +1447,19 @@ async def lifespan(app):
     from jobs.analyst_notifications import run_analyst_notifications
     scheduler.add_job(run_analyst_notifications, "interval", hours=1, id="analyst_notifications", next_run_time=datetime.utcnow() + timedelta(minutes=45))
 
+    # Weekly challenge — create every Monday at 00:01 UTC
+    def run_weekly_challenge():
+        db = SessionLocal()
+        try:
+            from weekly_challenges import create_weekly_challenge
+            create_weekly_challenge(db)
+        except Exception as e:
+            print(f"[WeeklyChallenge] Error: {e}")
+        finally:
+            db.close()
+
+    scheduler.add_job(run_weekly_challenge, "cron", day_of_week="mon", hour=0, minute=1, id="weekly_challenge")
+
     scheduler.start()
     job_ids = [j.id for j in scheduler.get_jobs()]
     print(f"[STARTUP] Active scrapers: {', '.join(job_ids)}")
@@ -1487,6 +1540,8 @@ app.include_router(analysts_router.router, prefix="/api")
 app.include_router(heatmap.router, prefix="/api")
 from routers import earnings as earnings_router
 app.include_router(earnings_router.router, prefix="/api")
+from routers import weekly_challenge as weekly_challenge_router
+app.include_router(weekly_challenge_router.router, prefix="/api")
 app.include_router(admin_panel_router)  # /admin HTML + /api/admin/* endpoints
 
 

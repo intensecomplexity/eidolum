@@ -5,7 +5,7 @@ import { useAuth } from '../context/AuthContext';
 import TimeframeSlider from '../components/TimeframeSlider';
 import TickerSearch from '../components/TickerSearch';
 import Footer from '../components/Footer';
-import { submitUserPrediction, getDeletionStatus, searchTickers } from '../api';
+import { submitUserPrediction, getDeletionStatus, searchTickers, getWeeklyChallenge } from '../api';
 
 // ── Confetti burst ───────────────────────────────────────────────────────────
 
@@ -84,9 +84,13 @@ export default function SubmitCall() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(null);
   const [delStatus, setDelStatus] = useState(null);
+  const [weeklyChallenge, setWeeklyChallenge] = useState(null);
 
   useEffect(() => {
-    if (isAuthenticated) getDeletionStatus().then(setDelStatus).catch(() => {});
+    if (isAuthenticated) {
+      getDeletionStatus().then(setDelStatus).catch(() => {});
+      getWeeklyChallenge().then(wc => { if (wc?.active && !wc.completed) setWeeklyChallenge(wc); }).catch(() => {});
+    }
   }, [isAuthenticated]);
 
   // Fire confetti when success appears
@@ -290,6 +294,14 @@ export default function SubmitCall() {
           <div className="bg-negative/10 border border-negative/20 rounded-lg px-4 py-3 mb-4 flex items-center gap-2 text-sm text-negative">
             <AlertCircle className="w-4 h-4 flex-shrink-0" />
             {error}
+          </div>
+        )}
+
+        {/* Weekly challenge hint */}
+        {weeklyChallenge && (
+          <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-warning/5 border border-warning/20 text-xs text-warning mb-4">
+            <span>This counts toward <span className="font-bold">{weeklyChallenge.title}</span>!</span>
+            <span className="font-mono">({weeklyChallenge.progress}/{weeklyChallenge.target})</span>
           </div>
         )}
 

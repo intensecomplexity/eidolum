@@ -73,6 +73,13 @@ def create_reaction(
         except Exception:
             pass
 
+        # Weekly challenge progress
+        try:
+            from weekly_challenges import check_weekly_progress
+            check_weekly_progress(user_id, "react_to_prediction", db)
+        except Exception:
+            pass
+
     db.commit()
     return {"status": "ok", "reaction": req.reaction}
 

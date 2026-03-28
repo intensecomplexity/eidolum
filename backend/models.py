@@ -463,6 +463,34 @@ class SeasonEntry(Base):
     user = relationship("User")
 
 
+class WeeklyChallenge(Base):
+    __tablename__ = "weekly_challenges"
+
+    id = Column(Integer, primary_key=True, index=True)
+    title = Column(String(100), nullable=False)
+    description = Column(Text, nullable=False)
+    challenge_type = Column(String(50), nullable=False)
+    requirements = Column(Text, nullable=False)  # JSON string
+    xp_reward = Column(Integer, default=100)
+    starts_at = Column(DateTime, nullable=False)
+    ends_at = Column(DateTime, nullable=False)
+    status = Column(String(20), default="active")
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+
+class WeeklyChallengeProgress(Base):
+    __tablename__ = "weekly_challenge_progress"
+
+    id = Column(Integer, primary_key=True, index=True)
+    challenge_id = Column(Integer, ForeignKey("weekly_challenges.id", ondelete="CASCADE"), nullable=False, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    progress = Column(Integer, default=0)
+    completed = Column(Integer, default=0)  # 0=false, 1=true
+    completed_at = Column(DateTime, nullable=True)
+
+    __table_args__ = (UniqueConstraint("challenge_id", "user_id", name="uq_weekly_progress"),)
+
+
 class AnalystSubscription(Base):
     __tablename__ = "analyst_subscriptions"
 

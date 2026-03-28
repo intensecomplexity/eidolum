@@ -243,6 +243,13 @@ def submit_prediction(
     except Exception:
         pass
 
+    # Weekly challenge progress
+    try:
+        from weekly_challenges import check_weekly_progress
+        check_weekly_progress(user_id, "submit_prediction", db, prediction=prediction)
+    except Exception:
+        pass
+
     db.commit()
     db.refresh(prediction)
 

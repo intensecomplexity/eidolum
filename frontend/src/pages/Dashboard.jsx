@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { Flame, Crosshair, Clock, Users, Swords, Award } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import DailyChallengeCard from '../components/DailyChallengeCard';
+import WeeklyChallengeCard from '../components/WeeklyChallengeCard';
 import LiveActivityFeed from '../components/LiveActivityFeed';
 import SectorBlock from '../components/SectorBlock';
 import Countdown from '../components/Countdown';
@@ -72,8 +73,9 @@ export default function Dashboard() {
           </div>
         )}
 
-        {/* ── SECTION 2: DAILY CHALLENGE ─────────────────────────────── */}
+        {/* ── SECTION 2: DAILY + WEEKLY CHALLENGES ─────────────────────── */}
         <DailyChallengeCard />
+        <WeeklyChallengeCard />
 
         {/* ── SECTION 3: ACTION ITEMS ────────────────────────────────── */}
         {(expiringUrgent.length > 0 || badgeNudges.length > 0) ? (

@@ -582,6 +582,12 @@ export function getExpiringPredictions() {
   return api.get('/predictions/expiring').then(r => r.data);
 }
 
+export function getWeeklyChallenge() {
+  const token = localStorage.getItem('eidolum_token');
+  const config = token ? { headers: { Authorization: `Bearer ${token}` } } : {};
+  return api.get('/weekly-challenge/current', config).then(r => r.data);
+}
+
 // Admin API (requires Bearer token in sessionStorage)
 function adminHeaders() {
   const token = sessionStorage.getItem('admin_token') || '';
