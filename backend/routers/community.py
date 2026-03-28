@@ -9,6 +9,7 @@ from database import get_db
 from models import User, UserPrediction, Achievement, Follow
 from rate_limit import limiter
 from xp import get_xp_info as _get_xp_info
+from rivals import get_rival as _get_rival
 
 router = APIRouter()
 
@@ -164,6 +165,7 @@ def get_user_profile(request: Request, user_id: int, credentials: Optional[HTTPA
         "direction_split": direction_split,
         "fastest_correct_days": fastest,
         **_get_xp_info(user),
+        "rival": _get_rival(user_id, db),
     }
 
 
@@ -331,6 +333,47 @@ def community_leaderboard(request: Request, user_type: str = Query(None), db: Se
         r["rank"] = i + 1
 
     return results[:50]
+
+
+# ── GET /api/rivals/mine ──────────────────────────────────────────────────────
+
+
+from fastapi.security import HTTPBearer as _HTTPBearer2
+from middleware.auth import require_user as _require_user
+
+
+@router.get("/rivals/mine")
+@limiter.limit("30/minute")
+def get_my_rival(request: Request, current_user_id: int = Depends(_require_user), db: Session = Depends(get_db)):
+    rival = _get_rival(current_user_id, db)
+    if not rival:
+        return {"rival": None}
+
+    # Head-to-head: shared tickers
+    my_preds = db.query(UserPrediction).filter(
+        UserPrediction.user_id == current_user_id,
+        UserPrediction.outcome.in_(["correct", "incorrect"]),
+    ).all()
+    rival_preds = db.query(UserPrediction).filter(
+        UserPrediction.user_id == rival["rival_user_id"],
+        UserPrediction.outcome.in_(["correct", "incorrect"]),
+    ).all()
+
+    my_tickers = {p.ticker for p in my_preds}
+    rival_tickers = {p.ticker for p in rival_preds}
+    shared = my_tickers & rival_tickers
+
+    h2h = []
+    for ticker in list(shared)[:10]:
+        my_correct = sum(1 for p in my_preds if p.ticker == ticker and p.outcome == "correct")
+        rival_correct = sum(1 for p in rival_preds if p.ticker == ticker and p.outcome == "correct")
+        h2h.append({"ticker": ticker, "you_correct": my_correct, "rival_correct": rival_correct})
+
+    return {
+        "rival": rival,
+        "head_to_head": h2h,
+        "shared_tickers": len(shared),
+    }
 
 
 # ── GET /api/stats/global ──────────────────────────────────────────────────────

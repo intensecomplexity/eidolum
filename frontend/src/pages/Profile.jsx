@@ -251,6 +251,27 @@ export default function Profile() {
           </div>
         )}
 
+        {/* Rival section (own profile only) */}
+        {isOwnProfile && profile.rival && (
+          <div className="card mb-6" style={{ borderColor: '#f59e0b30' }}>
+            <h3 className="text-xs text-warning uppercase tracking-wider mb-3 font-bold">Your Rival</h3>
+            <div className="flex items-center justify-between">
+              <Link to={`/profile/${profile.rival.rival_user_id}`} className="flex items-center gap-2 hover:text-accent transition-colors">
+                <div className="w-8 h-8 rounded-full bg-warning/10 border border-warning/20 flex items-center justify-center">
+                  <span className="font-mono text-xs text-warning font-bold">{(profile.rival.rival_username || '?')[0].toUpperCase()}</span>
+                </div>
+                <div>
+                  <span className="font-medium text-sm">{profile.rival.rival_display_name || profile.rival.rival_username}</span>
+                  <span className="text-xs text-muted font-mono ml-2">{profile.rival.rival_accuracy}%</span>
+                </div>
+              </Link>
+              <span className={`font-mono text-xs font-bold ${profile.rival.accuracy_gap < 0 ? 'text-positive' : 'text-negative'}`}>
+                {profile.rival.accuracy_gap < 0 ? `You're ${Math.abs(profile.rival.accuracy_gap).toFixed(1)}% ahead` : `${Math.abs(profile.rival.accuracy_gap).toFixed(1)}% ahead of you`}
+              </span>
+            </div>
+          </div>
+        )}
+
         {/* Quick actions */}
         {isOwnProfile && (
           <div className="grid grid-cols-2 gap-3">

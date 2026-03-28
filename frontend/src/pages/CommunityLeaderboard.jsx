@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Users, Trophy, Flame } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
 import Footer from '../components/Footer';
 import TypeBadge from '../components/TypeBadge';
-import { getCommunityLeaderboard } from '../api';
+import { getCommunityLeaderboard, getMyRival } from '../api';
 
 const TYPE_FILTERS = [
   { key: null, label: 'All' },
@@ -12,13 +13,20 @@ const TYPE_FILTERS = [
 ];
 
 export default function CommunityLeaderboard() {
+  const { isAuthenticated, user } = useAuth();
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [typeFilter, setTypeFilter] = useState(null);
+  const [rivalId, setRivalId] = useState(null);
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      getMyRival().then(d => { if (d?.rival) setRivalId(d.rival.rival_user_id); }).catch(() => {});
+    }
+  }, [isAuthenticated]);
 
   useEffect(() => {
     setLoading(true);
-    const params = typeFilter ? `?user_type=${typeFilter}` : '';
     getCommunityLeaderboard(typeFilter)
       .then(setData)
       .catch(() => {})
@@ -61,8 +69,12 @@ export default function CommunityLeaderboard() {
 
         {/* Mobile cards */}
         <div className="sm:hidden space-y-3">
-          {data.map(u => (
-            <div key={u.user_id} className="bg-surface border border-border rounded-xl p-4">
+          {data.map(u => {
+            const isMe = user && (u.user_id === user.id || u.user_id === user.user_id);
+            const isRival = u.user_id === rivalId;
+            return (
+            <div key={u.user_id} className={`rounded-xl p-4 ${isRival ? 'bg-warning/5 border border-warning/20' : isMe ? 'bg-accent/5 border border-accent/20' : 'bg-surface border border-border'}`}>
+              {isRival && <div className="text-[9px] font-bold uppercase tracking-widest text-warning mb-1">Your Rival</div>}
               <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center gap-2.5">
                   <span className={`font-mono text-lg font-bold ${u.rank <= 3 ? 'text-warning' : 'text-text-secondary'}`}>
@@ -92,7 +104,8 @@ export default function CommunityLeaderboard() {
                 )}
               </div>
             </div>
-          ))}
+          );
+          })}
         </div>
 
         {/* Desktop table */}
@@ -111,12 +124,18 @@ export default function CommunityLeaderboard() {
                   </tr>
                 </thead>
                 <tbody>
-                  {data.map(u => (
-                    <tr key={u.user_id} className="border-b border-border/50 hover:bg-surface-2/50 transition-colors">
+                  {data.map(u => {
+                    const isMe = user && (u.user_id === user.id || u.user_id === user.user_id);
+                    const isRival = u.user_id === rivalId;
+                    return (
+                    <tr key={u.user_id} className={`border-b border-border/50 transition-colors ${isRival ? 'bg-warning/5' : isMe ? 'bg-accent/5' : 'hover:bg-surface-2/50'}`}>
                       <td className="px-6 py-4">
-                        <span className={`font-mono font-bold ${u.rank <= 3 ? 'text-warning' : 'text-text-secondary'}`}>
-                          {u.rank <= 3 ? [null, '\uD83E\uDD47', '\uD83E\uDD48', '\uD83E\uDD49'][u.rank] : `#${u.rank}`}
-                        </span>
+                        <div>
+                          <span className={`font-mono font-bold ${u.rank <= 3 ? 'text-warning' : 'text-text-secondary'}`}>
+                            {u.rank <= 3 ? [null, '\uD83E\uDD47', '\uD83E\uDD48', '\uD83E\uDD49'][u.rank] : `#${u.rank}`}
+                          </span>
+                          {isRival && <div className="text-[8px] font-bold uppercase tracking-widest text-warning mt-0.5">Rival</div>}
+                        </div>
                       </td>
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-1.5">
@@ -143,7 +162,8 @@ export default function CommunityLeaderboard() {
                         )}
                       </td>
                     </tr>
-                  ))}
+                  );
+                  })}
                 </tbody>
               </table>
             </div>

@@ -172,6 +172,15 @@ def evaluate_user_predictions(db: Session):
     except Exception as e:
         print(f"[UserEval] Badge engine error: {e}")
 
+    # Rival checks
+    try:
+        from rivals import check_rival_changes
+        for uid in affected_user_ids:
+            check_rival_changes(uid, db)
+        db.commit()
+    except Exception as e:
+        print(f"[UserEval] Rival check error: {e}")
+
 
 def _update_season_scored(user_id: int, outcome: str, db: Session):
     season = db.query(Season).filter(Season.status == "active").first()

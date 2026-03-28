@@ -582,6 +582,10 @@ export function getExpiringPredictions() {
   return api.get('/predictions/expiring').then(r => r.data);
 }
 
+export function getMyRival() {
+  return api.get('/rivals/mine', { headers: authHeaders() }).then(r => r.data);
+}
+
 export function getLivePrices(tickers) {
   return api.get('/predictions/live-prices', { params: { tickers: tickers.join(',') } }).then(r => r.data);
 }

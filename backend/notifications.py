@@ -25,6 +25,7 @@ TYPE_TO_CATEGORY = {
     "watchlist_prediction": "watchlist",
     "leaderboard_rank": "leaderboard",
     "analyst_prediction": "watchlist",
+    "rival_update": "leaderboard",
 }
 
 DEFAULT_PREFERENCES = {
