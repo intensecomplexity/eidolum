@@ -7,16 +7,17 @@ import WeeklyChallengeCard from '../components/WeeklyChallengeCard';
 import LiveActivityFeed from '../components/LiveActivityFeed';
 import SectorBlock from '../components/SectorBlock';
 import Countdown from '../components/Countdown';
-import PnLBadge from '../components/PnLBadge';
+import LivePnL from '../components/LivePnL';
 import TickerLink from '../components/TickerLink';
 import Footer from '../components/Footer';
-import { getUserProfile, getUserPredictions, getGlobalStats, getSectorHeatmap, getNudges } from '../api';
+import { getUserProfile, getUserPredictions, getGlobalStats, getSectorHeatmap, getNudges, getLivePrices } from '../api';
 
 export default function Dashboard() {
   const { user } = useAuth();
   const uid = user?.id || user?.user_id;
   const [profile, setProfile] = useState(null);
   const [pending, setPending] = useState([]);
+  const [livePrices, setLivePrices] = useState({});
   const [stats, setStats] = useState(null);
   const [sectors, setSectors] = useState([]);
   const [nudges, setNudges] = useState([]);
@@ -30,14 +31,45 @@ export default function Dashboard() {
     getNudges().then(setNudges).catch(() => {});
   }, [uid]);
 
+  // Fetch live prices for pending predictions + poll every 2 minutes
+  useEffect(() => {
+    if (pending.length === 0) return;
+    const tickers = [...new Set(pending.map(p => p.ticker))];
+    const fetchPrices = () => getLivePrices(tickers).then(setLivePrices).catch(() => {});
+    fetchPrices();
+    const id = setInterval(fetchPrices, 120000);
+    return () => clearInterval(id);
+  }, [pending]);
+
   const acc = profile?.accuracy_percentage || 0;
   const streak = profile?.streak_current || 0;
   const predStreak = user?.prediction_streak_daily || 0;
-  const pendingSorted = [...pending].sort((a, b) => {
+
+  // Calculate P&L for each prediction and compute overall
+  const pendingWithPnl = pending.map(p => {
+    const entry = p.price_at_call ? parseFloat(p.price_at_call) : null;
+    const current = livePrices[p.ticker] || (p.current_price ? parseFloat(p.current_price) : null);
+    let pnl = null;
+    if (entry && current) {
+      const raw = (current - entry) / entry * 100;
+      pnl = p.direction === 'bearish' ? -raw : raw;
+    }
+    return { ...p, _current: current, _pnl: pnl };
+  });
+
+  // Sort by PnL (best first), fallback to expiration
+  const pendingSorted = [...pendingWithPnl].sort((a, b) => {
+    if (a._pnl != null && b._pnl != null) return b._pnl - a._pnl;
+    if (a._pnl != null) return -1;
+    if (b._pnl != null) return 1;
     const da = a.expires_at ? new Date(a.expires_at).getTime() : Infinity;
     const db2 = b.expires_at ? new Date(b.expires_at).getTime() : Infinity;
     return da - db2;
   });
+
+  // Overall P&L
+  const pnlValues = pendingWithPnl.filter(p => p._pnl != null).map(p => p._pnl);
+  const overallPnl = pnlValues.length > 0 ? pnlValues.reduce((a, b) => a + b, 0) / pnlValues.length : null;
 
   // Action items
   const expiringUrgent = pending.filter(p => {
@@ -110,7 +142,14 @@ export default function Dashboard() {
         {/* ── SECTION 4: OPEN CALLS ──────────────────────────────────── */}
         <div className="mb-4">
           <div className="flex items-center justify-between mb-2">
-            <h2 className="headline-serif text-base">Open Calls</h2>
+            <div className="flex items-center gap-3">
+              <h2 className="headline-serif text-base">Open Calls</h2>
+              {overallPnl !== null && (
+                <span className={`font-mono text-xs font-bold ${overallPnl >= 0 ? 'text-positive' : 'text-negative'}`}>
+                  {overallPnl >= 0 ? '+' : ''}{overallPnl.toFixed(1)}% avg
+                </span>
+              )}
+            </div>
             {pending.length > 5 && <Link to="/my-calls" className="text-[10px] text-accent font-medium">See all {pending.length}</Link>}
           </div>
           {pendingSorted.length === 0 ? (
@@ -130,8 +169,8 @@ export default function Dashboard() {
                     <span className="font-mono text-xs text-muted">{p.price_target}</span>
                   </div>
                   <div className="flex items-center gap-3">
-                    {p.outcome === 'pending' && p.price_at_call && p.current_price && (
-                      <PnLBadge direction={p.direction} priceAtCall={p.price_at_call} currentPrice={p.current_price} />
+                    {p.price_at_call && p._current && (
+                      <LivePnL direction={p.direction} priceAtCall={parseFloat(p.price_at_call)} currentPrice={p._current} compact />
                     )}
                     {p.expires_at && <Countdown expiresAt={p.expires_at} className="text-xs" />}
                   </div>

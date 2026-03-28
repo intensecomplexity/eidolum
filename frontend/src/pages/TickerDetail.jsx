@@ -8,7 +8,7 @@ import DuelModal from '../components/DuelModal';
 import LiveActivityFeed from '../components/LiveActivityFeed';
 import WatchToggle from '../components/WatchToggle';
 import Footer from '../components/Footer';
-import { getTickerPrice, getTickerPredictions, getTickerTopCallers, getTickerStats } from '../api';
+import { getTickerPrice, getTickerPredictions, getTickerTopCallers, getTickerStats, getLivePrices } from '../api';
 
 export default function TickerDetail() {
   const { symbol } = useParams();
@@ -23,6 +23,7 @@ export default function TickerDetail() {
   const [topCallers, setTopCallers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [duelOpen, setDuelOpen] = useState(false);
+  const [livePrice, setLivePrice] = useState(null);
 
   useEffect(() => {
     if (!ticker) return;
@@ -40,6 +41,17 @@ export default function TickerDetail() {
       setScored(sc);
       setTopCallers(tc);
     }).finally(() => setLoading(false));
+  }, [ticker]);
+
+  // Poll live price every 2 minutes
+  useEffect(() => {
+    if (!ticker) return;
+    const fetchLive = () => getLivePrices([ticker]).then(data => {
+      if (data[ticker]) setLivePrice(data[ticker]);
+    }).catch(() => {});
+    fetchLive();
+    const id = setInterval(fetchLive, 120000);
+    return () => clearInterval(id);
   }, [ticker]);
 
   if (loading) return (
@@ -64,13 +76,15 @@ export default function TickerDetail() {
                 <span className="text-text-secondary text-lg">{price?.name || stats?.name || ticker}</span>
                 <WatchToggle ticker={ticker} />
               </div>
-              {price?.current_price && (
+              {(livePrice || price?.current_price) && (
                 <div className="flex items-center gap-3 mt-2">
-                  <span className="font-mono text-2xl font-bold">${price.current_price}</span>
-                  <span className={`flex items-center gap-1 font-mono text-sm font-semibold ${changePositive ? 'text-positive' : 'text-negative'}`}>
-                    {changePositive ? <TrendingUp className="w-4 h-4" /> : <TrendingDown className="w-4 h-4" />}
-                    {changePositive ? '+' : ''}{price.price_change_24h} ({price.price_change_percent}%)
-                  </span>
+                  <span className="font-mono text-2xl font-bold">${(livePrice || price.current_price).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                  {price?.price_change_24h != null && (
+                    <span className={`flex items-center gap-1 font-mono text-sm font-semibold ${changePositive ? 'text-positive' : 'text-negative'}`}>
+                      {changePositive ? <TrendingUp className="w-4 h-4" /> : <TrendingDown className="w-4 h-4" />}
+                      {changePositive ? '+' : ''}{price.price_change_24h} ({price.price_change_percent}%)
+                    </span>
+                  )}
                 </div>
               )}
             </div>

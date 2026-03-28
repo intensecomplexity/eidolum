@@ -20,6 +20,11 @@ router = APIRouter()
 
 FINNHUB_KEY = os.getenv("FINNHUB_KEY", "")
 DELETE_WINDOW_SECONDS = 300  # 5 minutes
+
+# Price cache for live prices (ticker -> (price, timestamp))
+import time as _time
+_price_cache: dict[str, tuple[float, float]] = {}
+PRICE_CACHE_TTL = 120  # 2 minutes
 MAX_DELETIONS_PER_MONTH = 3
 
 ALLOWED_TICKERS = {
@@ -385,6 +390,49 @@ def get_expiring_predictions(request: Request, db: Session = Depends(get_db)):
         d["user_type"] = utype or "player"
         remaining = (pred.expires_at - now).days if pred.expires_at else None
         d["days_remaining"] = max(remaining, 0) if remaining is not None else None
+
+        # Add live PnL data
+        entry = float(pred.price_at_call) if pred.price_at_call else None
+        current = _get_cached_price(pred.ticker)
+        if entry and current:
+            d["current_price"] = current
+            raw_pnl = (current - entry) / entry * 100
+            d["pnl_percentage"] = round(raw_pnl if pred.direction == "bullish" else -raw_pnl, 2)
+            d["direction_winning"] = (pred.direction == "bullish" and current > entry) or (pred.direction == "bearish" and current < entry)
+
         results.append(d)
 
     return results
+
+
+# ── GET /api/predictions/live-prices ──────────────────────────────────────────
+
+
+def _get_cached_price(ticker: str) -> float | None:
+    """Get price from cache or fetch fresh from Finnhub."""
+    now = _time.time()
+    cached = _price_cache.get(ticker)
+    if cached and (now - cached[1]) < PRICE_CACHE_TTL:
+        return cached[0]
+    price = _fetch_finnhub_price(ticker)
+    if price:
+        _price_cache[ticker] = (price, now)
+    return price
+
+
+@router.get("/predictions/live-prices")
+@limiter.limit("30/minute")
+def get_live_prices(request: Request, tickers: str = Query(""), db: Session = Depends(get_db)):
+    """Get current prices for a list of tickers. Cached for 2 minutes."""
+    ticker_list = [t.strip().upper() for t in tickers.split(",") if t.strip()]
+    if not ticker_list:
+        return {}
+    if len(ticker_list) > 20:
+        ticker_list = ticker_list[:20]
+
+    result = {}
+    for t in ticker_list:
+        price = _get_cached_price(t)
+        if price:
+            result[t] = price
+    return result

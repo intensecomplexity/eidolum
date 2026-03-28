@@ -582,6 +582,10 @@ export function getExpiringPredictions() {
   return api.get('/predictions/expiring').then(r => r.data);
 }
 
+export function getLivePrices(tickers) {
+  return api.get('/predictions/live-prices', { params: { tickers: tickers.join(',') } }).then(r => r.data);
+}
+
 export function getWeeklyChallenge() {
   const token = localStorage.getItem('eidolum_token');
   const config = token ? { headers: { Authorization: `Bearer ${token}` } } : {};
