@@ -44,7 +44,7 @@ export default function DailyChallengeCard() {
     } finally { setEntering(false); }
   }
 
-  if (loading || !data) return null;
+  if (loading || !data || !data.ticker) return null;
 
   const hasVoted = !!data.user_entry;
   const isCompleted = data.status === 'completed';

@@ -43,8 +43,8 @@ def _user_dict(user: User) -> dict:
         "onboarding_completed": bool(user.onboarding_completed),
         "price_alerts_enabled": bool(user.price_alerts_enabled) if hasattr(user, 'price_alerts_enabled') else True,
         "weekly_digest_enabled": bool(user.weekly_digest_enabled) if hasattr(user, 'weekly_digest_enabled') else True,
-        "return_streak_current": user.return_streak_current or 0,
-        "return_streak_best": user.return_streak_best or 0,
+        "prediction_streak_daily": user.return_streak_current or 0,
+        "prediction_streak_daily_best": user.return_streak_best or 0,
     }
 
 
@@ -213,15 +213,15 @@ def get_nudges(request: Request, current_user: dict = Depends(get_current_user_d
             "icon": info.get("icon", "🏅"),
         })
 
-    # Return streak nudge
+    # Daily prediction streak nudge
     ret = user.return_streak_current or 0
     if ret > 0:
         nudges.append({
             "type": "streak",
-            "message": f"You've visited {ret} days in a row. Come back tomorrow!",
+            "message": f"You've predicted {ret} days in a row. Keep it going!",
             "progress": ret,
             "target": ret + 1,
-            "pct": 95,
+            "pct": round(ret / (ret + 1) * 100),
             "icon": "📅",
         })
 

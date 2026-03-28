@@ -1,5 +1,5 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { BarChart3, Menu, X, Crosshair, HelpCircle, LogOut, Settings, Award, Swords, Users, Eye, User, Target } from 'lucide-react';
+import { BarChart3, Menu, X, Crosshair, HelpCircle, LogOut, Settings, Award, Swords, Users, Eye, User, Target, Search } from 'lucide-react';
 import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
 import UniversalSearch from './UniversalSearch';
@@ -15,6 +15,8 @@ export default function Navbar() {
   const [userDropdown, setUserDropdown] = useState(false);
   const [duelTarget, setDuelTarget] = useState(null);
   const [showHelp, setShowHelp] = useState(false);
+  const [searchExpanded, setSearchExpanded] = useState(false);
+  const searchRef = useRef(null);
   const navRef = useRef(null);
   const dropdownRef = useRef(null);
 
@@ -32,12 +34,22 @@ export default function Navbar() {
     return () => { document.removeEventListener('mousedown', handle); document.removeEventListener('touchstart', handle); };
   }, [userDropdown]);
 
-  // Close dropdown on Escape
+  // Close dropdown + search on Escape
   useEffect(() => {
-    function handle(e) { if (e.key === 'Escape') setUserDropdown(false); }
+    function handle(e) { if (e.key === 'Escape') { setUserDropdown(false); setSearchExpanded(false); } }
     document.addEventListener('keydown', handle);
     return () => document.removeEventListener('keydown', handle);
   }, []);
+
+  // Close search on outside click
+  useEffect(() => {
+    if (!searchExpanded) return;
+    function handle(e) {
+      if (searchRef.current && !searchRef.current.contains(e.target)) setSearchExpanded(false);
+    }
+    document.addEventListener('mousedown', handle);
+    return () => document.removeEventListener('mousedown', handle);
+  }, [searchExpanded]);
 
   // Close mobile menu on outside click
   useEffect(() => {
@@ -88,14 +100,22 @@ export default function Navbar() {
 
             {/* ── RIGHT: Search + Help + Bell + User dropdown ─────── */}
             <div className="flex items-center gap-2">
-              {/* Desktop search */}
-              <div className="hidden sm:block">
-                <UniversalSearch
-                  className="w-36 lg:w-44"
-                  inputClassName="font-mono text-sm"
-                  onStartDuel={(u) => setDuelTarget(u)}
-                  onClose={() => {}}
-                />
+              {/* Desktop search — icon only, expands on click */}
+              <div className="hidden sm:block relative" ref={searchRef}>
+                {searchExpanded ? (
+                  <UniversalSearch
+                    className="w-64"
+                    inputClassName="font-mono text-sm"
+                    onStartDuel={(u) => { setDuelTarget(u); setSearchExpanded(false); }}
+                    onClose={() => setSearchExpanded(false)}
+                    autoFocus
+                  />
+                ) : (
+                  <button onClick={() => setSearchExpanded(true)}
+                    className="flex items-center justify-center w-9 h-9 rounded-lg text-text-secondary hover:text-accent transition-colors" title="Search">
+                    <Search className="w-4.5 h-4.5" />
+                  </button>
+                )}
               </div>
 
               {/* Help button */}

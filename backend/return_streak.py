@@ -1,27 +1,26 @@
 """
-Return streak — tracks consecutive daily visits.
-Call update_return_streak() on authenticated requests.
-Uses a module-level cache to avoid DB hits on every request.
+Prediction streak — tracks consecutive days where the user submitted a prediction.
+Call update_prediction_streak() from the submit endpoint after a successful submission.
 """
 from datetime import date, timedelta
 from sqlalchemy.orm import Session
 from models import User
 
-# Cache: user_id -> last date we checked (avoid DB on every request)
-_checked_today: dict[int, str] = {}
+# Cache: user_id -> last date we updated (avoid duplicate updates same day)
+_updated_today: dict[int, str] = {}
 
 MILESTONES = {3, 7, 14, 30, 60, 100}
 
 
-def update_return_streak(user_id: int, db: Session) -> int | None:
-    """Update return streak for user. Returns milestone hit (or None).
+def update_prediction_streak(user_id: int, db: Session) -> int | None:
+    """Update daily prediction streak after a submission. Returns milestone hit (or None).
 
-    Only touches DB if we haven't checked this user today.
+    Only increments once per calendar day regardless of how many predictions are submitted.
     """
     today_str = str(date.today())
 
-    # Fast path: already checked today
-    if _checked_today.get(user_id) == today_str:
+    # Already counted a submission today
+    if _updated_today.get(user_id) == today_str:
         return None
 
     user = db.query(User).filter(User.id == user_id).first()
@@ -37,7 +36,7 @@ def update_return_streak(user_id: int, db: Session) -> int | None:
 
     # Already counted today
     if last_date == today:
-        _checked_today[user_id] = today_str
+        _updated_today[user_id] = today_str
         return None
 
     milestone = None
@@ -50,38 +49,32 @@ def update_return_streak(user_id: int, db: Session) -> int | None:
         if user.return_streak_current in MILESTONES:
             milestone = user.return_streak_current
     else:
-        # Streak broken (or first visit)
+        # Streak broken or first prediction
         user.return_streak_current = 1
 
     user.last_active_date = today
-    _checked_today[user_id] = today_str
-
-    try:
-        db.commit()
-    except Exception:
-        db.rollback()
+    _updated_today[user_id] = today_str
 
     # Send notification for milestones
     if milestone:
         try:
             from notifications import create_notification
             messages = {
-                3: "3 days in a row! You're building a habit.",
-                7: "A full week streak! Keep it going.",
+                3: "3 days predicting in a row! You're building a habit.",
+                7: "A full week of daily predictions! Keep it going.",
                 14: "Two weeks straight. You're dedicated.",
-                30: "30-day streak! You're a regular.",
-                60: "60 days. Eidolum is part of your routine.",
+                30: "30-day prediction streak! You're a regular.",
+                60: "60 days of daily predictions. Incredible.",
                 100: "100 DAYS! Legendary commitment.",
             }
             create_notification(
                 user_id=user_id,
                 type="streak_milestone",
-                title=f"{milestone}-Day Streak!",
-                message=messages.get(milestone, f"{milestone} days in a row!"),
-                data={"streak": milestone, "type": "return"},
+                title=f"{milestone}-Day Prediction Streak!",
+                message=messages.get(milestone, f"{milestone} days of predictions in a row!"),
+                data={"streak": milestone, "type": "prediction_daily"},
                 db=db,
             )
-            db.commit()
         except Exception:
             pass
 

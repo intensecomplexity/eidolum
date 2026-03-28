@@ -1001,6 +1001,14 @@ async def lifespan(app):
         _db.close()
     except Exception as e:
         print(f"[Eidolum] Season init error (non-fatal): {e}")
+    # Ensure daily challenge exists on startup
+    try:
+        from jobs.daily_challenge import ensure_daily_challenge_exists
+        _db = SessionLocal()
+        ensure_daily_challenge_exists(_db)
+        _db.close()
+    except Exception as e:
+        print(f"[Eidolum] Daily challenge startup error (non-fatal): {e}")
     # Safety check — scan for dangerous patterns
     try:
         from safety_check import check_safety
@@ -1220,9 +1228,9 @@ async def lifespan(app):
         finally:
             db.close()
 
-    # 9:00 AM EST = 14:00 UTC (standard) / 13:00 UTC (daylight)
-    scheduler.add_job(run_create_daily_challenge, "cron", hour=14, minute=0, id="daily_challenge_create", day_of_week="mon-fri")
-    # 4:30 PM EST = 21:30 UTC (standard) / 20:30 UTC (daylight)
+    # 9:30 AM EST = 14:30 UTC
+    scheduler.add_job(run_create_daily_challenge, "cron", hour=14, minute=30, id="daily_challenge_create", day_of_week="mon-fri")
+    # 4:30 PM EST = 21:30 UTC
     scheduler.add_job(run_score_daily_challenge, "cron", hour=21, minute=30, id="daily_challenge_score", day_of_week="mon-fri")
 
     # Price alerts — every 30 min during market hours

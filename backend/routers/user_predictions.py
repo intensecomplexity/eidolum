@@ -229,6 +229,13 @@ def submit_prediction(
     except Exception:
         pass
 
+    # Update daily prediction streak
+    try:
+        from return_streak import update_prediction_streak
+        update_prediction_streak(user_id, db)
+    except Exception:
+        pass
+
     db.commit()
     db.refresh(prediction)
 

@@ -20,6 +20,7 @@ export default function UniversalSearch({
   inputClassName = '',
   placeholder = 'Search tickers or people...',
   onStartDuel,
+  autoFocus = false,
 }) {
   const navigate = useNavigate();
   const { isAuthenticated } = useAuth();
@@ -117,6 +118,7 @@ export default function UniversalSearch({
           onChange={e => handleInput(e.target.value)}
           onFocus={() => { if (results && ((results.tickers?.length || 0) + (results.users?.length || 0) > 0)) setOpen(true); }}
           placeholder={placeholder}
+          autoFocus={autoFocus}
           className={`w-full pl-9 pr-3 py-2 bg-surface border border-border rounded-lg text-text-primary placeholder:text-muted focus:outline-none focus:border-accent/50 ${inputClassName}`}
         />
       </div>

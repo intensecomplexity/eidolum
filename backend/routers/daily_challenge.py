@@ -231,3 +231,40 @@ def challenge_leaderboard(request: Request, db: Session = Depends(get_db)):
         r["rank"] = i + 1
 
     return results[:50]
+
+
+# ── Admin: manual triggers ────────────────────────────────────────────────────
+
+import os
+ADMIN_SECRET = os.getenv("ADMIN_SECRET", "")
+
+
+@router.post("/admin/daily-challenge/create")
+@limiter.limit("5/minute")
+def admin_create_challenge(
+    request: Request,
+    ticker: Optional[str] = None,
+    db: Session = Depends(get_db),
+):
+    # Check admin auth via query param or header
+    secret = request.headers.get("X-Admin-Secret", "") or request.query_params.get("secret", "")
+    if not ADMIN_SECRET or secret != ADMIN_SECRET:
+        raise HTTPException(status_code=403, detail="Forbidden")
+
+    from jobs.daily_challenge import create_daily_challenge
+    challenge = create_daily_challenge(db, force_ticker=ticker)
+    if not challenge:
+        return {"status": "already_exists"}
+    return {"status": "created", "ticker": challenge.ticker, "price_at_open": float(challenge.price_at_open) if challenge.price_at_open else None}
+
+
+@router.post("/admin/daily-challenge/score")
+@limiter.limit("5/minute")
+def admin_score_challenge(request: Request, db: Session = Depends(get_db)):
+    secret = request.headers.get("X-Admin-Secret", "") or request.query_params.get("secret", "")
+    if not ADMIN_SECRET or secret != ADMIN_SECRET:
+        raise HTTPException(status_code=403, detail="Forbidden")
+
+    from jobs.daily_challenge import score_daily_challenge
+    score_daily_challenge(db)
+    return {"status": "scored"}
