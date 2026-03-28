@@ -146,8 +146,8 @@ export default function Navbar() {
                   {/* Dropdown */}
                   {userDropdown && (
                     <div className="absolute right-0 top-full mt-2 w-64 bg-surface border border-border rounded-xl shadow-lg overflow-hidden z-[60] feed-item-enter">
-                      {/* Mini profile header */}
-                      <div className="px-4 py-3 border-b border-border bg-surface-2/50">
+                      {/* Mini profile header — clickable */}
+                      <Link to="/profile" onClick={() => setUserDropdown(false)} className="block px-4 py-3 border-b border-border bg-surface-2/50 hover:bg-surface-2 transition-colors">
                         <div className="flex items-center gap-2.5">
                           <div className="w-9 h-9 rounded-full bg-accent/15 flex items-center justify-center font-mono text-sm font-bold text-accent">
                             {(user?.username || '?')[0].toUpperCase()}
@@ -157,7 +157,7 @@ export default function Navbar() {
                             <div className="text-[10px] text-muted font-mono">@{user?.username} &middot; Lv.{userLevel} {levelName}</div>
                           </div>
                         </div>
-                      </div>
+                      </Link>
 
                       {/* Menu items */}
                       <div className="py-1">
@@ -192,10 +192,10 @@ export default function Navbar() {
                   </button>
                   {userDropdown && (
                     <div className="absolute right-0 top-full mt-2 w-56 bg-surface border border-border rounded-xl shadow-lg overflow-hidden z-[60] feed-item-enter">
-                      <div className="px-4 py-3 border-b border-border">
+                      <Link to="/profile" onClick={() => setUserDropdown(false)} className="block px-4 py-3 border-b border-border hover:bg-surface-2 transition-colors">
                         <div className="text-sm font-medium">{user?.display_name || user?.username}</div>
                         <div className="text-[10px] text-muted font-mono">@{user?.username}</div>
-                      </div>
+                      </Link>
                       <div className="py-1">
                         <DropdownItem to="/my-calls" icon="◇" label="My Calls" onClick={() => setUserDropdown(false)} />
                         <DropdownItem to="/duels" icon="⚔" label="Duels" onClick={() => setUserDropdown(false)} />
