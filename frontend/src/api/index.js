@@ -206,6 +206,24 @@ export function getProfileShareData(userId) {
   return api.get(`/profiles/${userId}/share-data`).then(r => r.data);
 }
 
+// ——— Comments ———
+
+export function getComments(predictionId, source, limit = 20, offset = 0) {
+  return api.get(`/comments/${predictionId}/${source}`, { params: { limit, offset } }).then(r => r.data);
+}
+
+export function postComment(predictionId, source, comment) {
+  return api.post('/comments', { prediction_id: predictionId, prediction_source: source, comment }, { headers: authHeaders() }).then(r => r.data);
+}
+
+export function deleteComment(commentId) {
+  return api.delete(`/comments/${commentId}`, { headers: authHeaders() }).then(r => r.data);
+}
+
+export function getCommentCount(predictionId, source) {
+  return api.get(`/comments/count/${predictionId}/${source}`).then(r => r.data);
+}
+
 // ——— Reactions ———
 
 export function getReactions(predictionId, source) {

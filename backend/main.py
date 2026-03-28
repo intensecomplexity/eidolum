@@ -716,6 +716,29 @@ def run_phase2_migrations():
         db.rollback()
         print(f"[Phase2] Season rename: {e}")
 
+    # ── 26. prediction_comments table ──────────────────────────────
+    try:
+        db.execute(text("""
+            CREATE TABLE IF NOT EXISTS prediction_comments (
+                id SERIAL PRIMARY KEY,
+                prediction_id INTEGER NOT NULL,
+                prediction_source VARCHAR(20) NOT NULL,
+                user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+                comment TEXT NOT NULL,
+                created_at TIMESTAMP DEFAULT NOW()
+            )
+        """))
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        if "already exists" not in str(e).lower(): print(f"[Phase2] prediction_comments: {e}")
+
+    try:
+        db.execute(text("CREATE INDEX IF NOT EXISTS idx_comments_pred ON prediction_comments(prediction_id, prediction_source, created_at DESC)"))
+        db.commit()
+    except Exception:
+        db.rollback()
+
     print("[Phase2] All migrations complete")
     db.close()
 
@@ -1383,6 +1406,8 @@ app.include_router(activity_feed.router, prefix="/api")
 app.include_router(share.router, prefix="/api")
 app.include_router(daily_challenge_router.router, prefix="/api")
 app.include_router(reactions.router, prefix="/api")
+from routers import comments as comments_router
+app.include_router(comments_router.router, prefix="/api")
 app.include_router(watchlist_router.router, prefix="/api")
 app.include_router(controversial.router, prefix="/api")
 from routers import analysts as analysts_router, heatmap

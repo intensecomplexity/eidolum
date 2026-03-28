@@ -5,6 +5,7 @@ import TypeBadge from '../components/TypeBadge';
 import TickerLink from '../components/TickerLink';
 import ReactionBar from '../components/ReactionBar';
 import Countdown from '../components/Countdown';
+import CommentSection from '../components/CommentSection';
 import { getExpiringPredictions } from '../api';
 
 export default function Expiring() {
@@ -68,6 +69,7 @@ export default function Expiring() {
                     </div>
                   </div>
                   <ReactionBar predictionId={p.id} source="user" outcome={p.outcome} />
+                  <CommentSection predictionId={p.id} source="user" />
                 </div>
               );
             })}

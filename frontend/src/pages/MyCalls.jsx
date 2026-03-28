@@ -8,6 +8,7 @@ import ShareButton from '../components/ShareButton';
 import ReactionBar from '../components/ReactionBar';
 import ToldYouSoModal from '../components/ToldYouSoModal';
 import PnLBadge from '../components/PnLBadge';
+import CommentSection from '../components/CommentSection';
 import { getUserPredictions, deletePrediction, getDeletionStatus } from '../api';
 
 const OUTCOME_FILTERS = [
@@ -247,6 +248,7 @@ function PredictionCard({ p, onDelete }) {
         {remaining === 0 && p.outcome === 'pending' && <span className="font-mono text-accent">Evaluating...</span>}
       </div>
       <ReactionBar predictionId={p.id} source="user" isOwn={true} outcome={p.outcome} />
+      <CommentSection predictionId={p.id} source="user" />
       {p.outcome === 'correct' && (
         <button onClick={() => setShowBrag(true)} className="mt-2 text-xs text-warning/70 hover:text-warning transition-colors font-medium">
           I Told You So

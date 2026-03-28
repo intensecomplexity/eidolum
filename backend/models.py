@@ -300,6 +300,17 @@ class WatchlistItem(Base):
     __table_args__ = (UniqueConstraint("user_id", "ticker", name="uq_watchlist"),)
 
 
+class PredictionComment(Base):
+    __tablename__ = "prediction_comments"
+
+    id = Column(Integer, primary_key=True, index=True)
+    prediction_id = Column(Integer, nullable=False)
+    prediction_source = Column(String(20), nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    comment = Column(Text, nullable=False)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+
 class PredictionReaction(Base):
     __tablename__ = "prediction_reactions"
 
