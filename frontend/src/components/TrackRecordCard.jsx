@@ -37,9 +37,6 @@ export default function TrackRecordCard({ profile }) {
         </div>
       </div>
 
-      <div className="text-center text-[10px] text-muted border-t border-border pt-2">
-        eidolum.com/profile/{uid}
-      </div>
     </div>
   );
 }
