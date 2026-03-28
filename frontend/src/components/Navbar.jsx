@@ -23,15 +23,25 @@ export default function Navbar() {
   // Close everything on route change
   useEffect(() => { setMobileOpen(false); setUserDropdown(false); }, [location.pathname]);
 
-  // Close dropdown on outside click
+  // Close dropdown on outside click — use 'click' (not mousedown) to avoid
+  // racing with button onClick handlers inside the dropdown
   useEffect(() => {
     if (!userDropdown) return;
     function handle(e) {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) setUserDropdown(false);
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
+        setUserDropdown(false);
+      }
     }
-    document.addEventListener('mousedown', handle);
-    document.addEventListener('touchstart', handle);
-    return () => { document.removeEventListener('mousedown', handle); document.removeEventListener('touchstart', handle); };
+    // Use setTimeout so the listener is added AFTER the current click cycle
+    const timer = setTimeout(() => {
+      document.addEventListener('click', handle);
+      document.addEventListener('touchend', handle);
+    }, 0);
+    return () => {
+      clearTimeout(timer);
+      document.removeEventListener('click', handle);
+      document.removeEventListener('touchend', handle);
+    };
   }, [userDropdown]);
 
   // Close dropdown + search on Escape
@@ -175,7 +185,7 @@ export default function Navbar() {
 
               {/* Mobile: avatar dropdown + hamburger */}
               {isAuthenticated && (
-                <div className="relative sm:hidden" ref={!mobileOpen ? dropdownRef : undefined}>
+                <div className="relative sm:hidden" ref={dropdownRef}>
                   <button onClick={() => setUserDropdown(!userDropdown)}
                     className="flex items-center justify-center w-9 h-9 rounded-full bg-accent/15">
                     <span className="font-mono text-xs font-bold text-accent">{(user?.username || '?')[0].toUpperCase()}</span>
@@ -251,14 +261,14 @@ export default function Navbar() {
 }
 
 function DropdownItem({ to, icon, label, onClick }) {
-  const navigate = useNavigate();
   return (
-    <button
-      onClick={() => { if (onClick) onClick(); navigate(to); }}
-      className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-text-secondary hover:bg-surface-2 hover:text-text-primary transition-colors min-h-[40px] text-left cursor-pointer"
+    <Link
+      to={to}
+      onClick={onClick}
+      className="flex items-center gap-3 px-4 py-2.5 text-sm text-text-secondary hover:bg-surface-2 hover:text-text-primary transition-colors min-h-[44px] cursor-pointer"
     >
       <span className="w-5 text-center text-xs">{icon}</span> {label}
-    </button>
+    </Link>
   );
 }
 
