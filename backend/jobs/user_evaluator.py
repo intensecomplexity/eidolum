@@ -8,92 +8,86 @@ import os
 import httpx
 from datetime import datetime
 from decimal import Decimal
+from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeout
 from sqlalchemy.orm import Session
 from models import User, UserPrediction, Duel, Season, SeasonEntry
 from notifications import create_notification
 from activity import log_activity
 
-FINNHUB_KEY = os.getenv("FINNHUB_KEY", "")
+FINNHUB_KEY = os.getenv("FINNHUB_KEY", "").strip()
 
 _price_cache: dict[str, float] = {}
+_price_sources: dict[str, str] = {}
 
 STREAK_MILESTONES = {5, 10, 15, 20}
 
-
 CRYPTO_TICKERS = {"BTC": "BINANCE:BTCUSDT", "ETH": "BINANCE:ETHUSDT", "SOL": "BINANCE:SOLUSDT"}
 
-# Track what source was used for each price (for admin endpoint reporting)
-_price_sources: dict[str, str] = {}
+# Thread pool for timeout-wrapping slow calls
+_executor = ThreadPoolExecutor(max_workers=2)
 
 
 def _fetch_price(ticker: str) -> float | None:
-    """Fetch price with timeouts, previous-close fallback, and multiple sources."""
+    """Fetch price with strict timeouts on every external call."""
     if ticker in _price_cache:
         return _price_cache[ticker]
 
-    # Attempt 1: Finnhub (current price OR previous close)
+    print(f"[UserEval] Fetching price for {ticker}...")
+
+    # Attempt 1: Finnhub (fast, 5s timeout)
     if FINNHUB_KEY:
-        symbols_to_try = [ticker]
+        symbols = [ticker]
         if ticker in CRYPTO_TICKERS:
-            symbols_to_try.insert(0, CRYPTO_TICKERS[ticker])
-        for sym in symbols_to_try:
+            symbols.insert(0, CRYPTO_TICKERS[ticker])
+        for sym in symbols:
             try:
                 r = httpx.get(
                     "https://finnhub.io/api/v1/quote",
                     params={"symbol": sym, "token": FINNHUB_KEY},
-                    timeout=8,
+                    timeout=5,
                 )
                 data = r.json()
-                # Try current price first, then previous close
-                current = data.get("c", 0) or 0
-                prev_close = data.get("pc", 0) or 0
-                if float(current) > 0:
-                    result = round(float(current), 2)
-                    _price_cache[ticker] = result
+                current = float(data.get("c", 0) or 0)
+                prev_close = float(data.get("pc", 0) or 0)
+                if current > 0:
+                    _price_cache[ticker] = round(current, 2)
                     _price_sources[ticker] = "finnhub_current"
-                    print(f"[UserEval] {ticker}: ${result} (Finnhub current)")
-                    return result
-                elif float(prev_close) > 0:
-                    result = round(float(prev_close), 2)
-                    _price_cache[ticker] = result
-                    _price_sources[ticker] = "finnhub_previous_close"
-                    print(f"[UserEval] {ticker}: ${result} (Finnhub previous close)")
-                    return result
-            except httpx.TimeoutException:
-                print(f"[UserEval] Finnhub TIMEOUT for {sym}")
+                    print(f"[UserEval] {ticker}: ${current} (Finnhub current)")
+                    return _price_cache[ticker]
+                if prev_close > 0:
+                    _price_cache[ticker] = round(prev_close, 2)
+                    _price_sources[ticker] = "finnhub_prev_close"
+                    print(f"[UserEval] {ticker}: ${prev_close} (Finnhub prev close)")
+                    return _price_cache[ticker]
+                print(f"[UserEval] Finnhub returned 0 for {sym}")
             except Exception as e:
                 print(f"[UserEval] Finnhub error for {sym}: {e}")
     else:
-        print("[UserEval] WARNING: FINNHUB_KEY not set")
+        print("[UserEval] FINNHUB_KEY not set, skipping Finnhub")
 
-    # Attempt 2: yfinance (most recent close price)
+    # Attempt 2: yfinance with 10s timeout via thread pool
     try:
-        import yfinance as yf
-        t = yf.Ticker(ticker)
-        hist = t.history(period="5d")
-        if hist is not None and not hist.empty:
-            result = round(float(hist['Close'].iloc[-1]), 2)
-            if result > 0:
-                _price_cache[ticker] = result
-                _price_sources[ticker] = "yfinance"
-                print(f"[UserEval] {ticker}: ${result} (yfinance)")
-                return result
-    except Exception as e:
-        print(f"[UserEval] yfinance failed for {ticker}: {e}")
+        def _yf_fetch():
+            import yfinance as yf
+            t = yf.Ticker(ticker)
+            h = t.history(period="5d")
+            if h is not None and not h.empty:
+                return round(float(h['Close'].iloc[-1]), 2)
+            return None
 
-    # Attempt 3: evaluator module
-    try:
-        from jobs.evaluator import get_current_price
-        result = get_current_price(ticker)
-        if result and float(result) > 0:
-            _price_cache[ticker] = float(result)
-            _price_sources[ticker] = "evaluator"
-            print(f"[UserEval] {ticker}: ${result} (evaluator)")
-            return float(result)
+        future = _executor.submit(_yf_fetch)
+        result = future.result(timeout=10)
+        if result and result > 0:
+            _price_cache[ticker] = result
+            _price_sources[ticker] = "yfinance"
+            print(f"[UserEval] {ticker}: ${result} (yfinance)")
+            return result
+    except FuturesTimeout:
+        print(f"[UserEval] yfinance TIMEOUT for {ticker} (>10s)")
     except Exception as e:
-        print(f"[UserEval] Evaluator failed for {ticker}: {e}")
+        print(f"[UserEval] yfinance error for {ticker}: {e}")
 
-    print(f"[UserEval] ALL price sources failed for {ticker}")
+    print(f"[UserEval] ALL sources failed for {ticker}")
     _price_sources[ticker] = "failed"
     return None
 
@@ -111,7 +105,7 @@ def _parse_target(target_str: str) -> float | None:
 
 
 def evaluate_user_predictions(db: Session) -> list[dict]:
-    """Score all expired user predictions. Returns list of results for reporting."""
+    """Score all expired user predictions. Returns list of results."""
     _price_cache.clear()
     _price_sources.clear()
     results = []
@@ -133,7 +127,7 @@ def evaluate_user_predictions(db: Session) -> list[dict]:
         print("[UserEval] No expired predictions to evaluate")
         return results
 
-    print(f"[UserEval] Found {len(overdue)} expired predictions to evaluate")
+    print(f"[UserEval] Found {len(overdue)} expired predictions")
 
     correct_count = 0
     incorrect_count = 0
@@ -146,12 +140,12 @@ def evaluate_user_predictions(db: Session) -> list[dict]:
 
             price = _fetch_price(p.ticker)
             if price is None:
-                print(f"[UserEval] Could not fetch price for {p.ticker} (prediction {p.id}), skipping")
+                print(f"[UserEval] Skipping prediction {p.id} — no price for {p.ticker}")
                 continue
 
             entry = float(p.price_at_call) if p.price_at_call else None
             if entry is None:
-                print(f"[UserEval] No entry price for prediction {p.id} ({p.ticker}), skipping")
+                print(f"[UserEval] Skipping prediction {p.id} — no entry price")
                 continue
 
             if p.direction == "bullish":
@@ -165,7 +159,7 @@ def evaluate_user_predictions(db: Session) -> list[dict]:
             p.evaluated_at = now
             p.current_price = Decimal(str(price))
 
-            print(f"[UserEval] Prediction {p.id}: {p.ticker} {p.direction} entry=${entry} current=${price} → {outcome}")
+            print(f"[UserEval] #{p.id}: {p.ticker} {p.direction} entry=${entry} now=${price} → {outcome}")
 
             results.append({
                 "id": p.id, "ticker": p.ticker, "direction": p.direction,
@@ -194,25 +188,21 @@ def evaluate_user_predictions(db: Session) -> list[dict]:
                             message=f"You're on a {user.streak_current} prediction streak!",
                             data={"streak": user.streak_current}, db=db,
                         )
-                        log_activity(
-                            user_id=p.user_id, event_type="streak_milestone",
-                            description=f"{user.username} hit a {user.streak_current} prediction streak!",
-                            data={"streak_count": user.streak_current}, db=db,
-                        )
                 else:
                     user.streak_current = 0
 
             # Notification
             if outcome == "correct":
-                msg = f"Your {p.direction} call on {p.ticker} was correct! Target: {p.price_target}, Final price: ${price}. Share your win \u2192"
+                msg = f"Your {p.direction} call on {p.ticker} was correct! Final price: ${price}"
             else:
-                msg = f"Your {p.direction} call on {p.ticker} was incorrect. Target: {p.price_target}, Final price: ${price}"
+                msg = f"Your {p.direction} call on {p.ticker} was incorrect. Final price: ${price}"
             create_notification(
                 user_id=p.user_id, type="prediction_scored",
                 title="You Called It!" if outcome == "correct" else "Prediction Scored",
                 message=msg,
-                data={"prediction_id": p.id, "outcome": outcome, "ticker": p.ticker, "told_you_so": outcome == "correct"}, db=db,
+                data={"prediction_id": p.id, "outcome": outcome, "ticker": p.ticker}, db=db,
             )
+
             _uname = user.username if user else "Someone"
             log_activity(
                 user_id=p.user_id, event_type="prediction_scored",
@@ -230,19 +220,19 @@ def evaluate_user_predictions(db: Session) -> list[dict]:
             except Exception:
                 pass
 
-            # Commit after EACH prediction so one failure doesn't lose the batch
+            # Commit each prediction individually
             db.commit()
-            print(f"[UserEval] Committed prediction {p.id} as {outcome}")
+            print(f"[UserEval] Committed #{p.id} as {outcome}")
 
         except Exception as e:
             db.rollback()
-            print(f"[UserEval] ERROR scoring prediction {p.id}: {e}")
+            print(f"[UserEval] ERROR on prediction {p.id}: {e}")
             import traceback
             traceback.print_exc()
             continue
 
     total = correct_count + incorrect_count
-    print(f"[UserEval] Evaluated {total} user predictions: {correct_count} correct, {incorrect_count} incorrect")
+    print(f"[UserEval] Done: {total} evaluated ({correct_count} correct, {incorrect_count} incorrect)")
 
     # Badge engine
     try:
@@ -273,12 +263,10 @@ def _update_season_scored(user_id: int, outcome: str, db: Session):
         .filter(SeasonEntry.season_id == season.id, SeasonEntry.user_id == user_id)
         .first()
     )
-    if not entry:
-        entry = SeasonEntry(season_id=season.id, user_id=user_id, predictions_made=0)
-        db.add(entry)
-    entry.predictions_scored = (entry.predictions_scored or 0) + 1
-    if outcome == "correct":
-        entry.predictions_correct = (entry.predictions_correct or 0) + 1
+    if entry:
+        entry.predictions_scored = (entry.predictions_scored or 0) + 1
+        if outcome == "correct":
+            entry.predictions_correct = (entry.predictions_correct or 0) + 1
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -287,31 +275,36 @@ def _update_season_scored(user_id: int, outcome: str, db: Session):
 
 
 def evaluate_duels(db: Session):
-    _price_cache.clear()
     now = datetime.utcnow()
     print(f"[DuelEval] Running at {now.isoformat()}")
 
-    expired = (
+    overdue = (
         db.query(Duel)
-        .filter(Duel.status == "active", Duel.expires_at.isnot(None), Duel.expires_at <= now)
+        .filter(
+            Duel.status == "active",
+            Duel.expires_at.isnot(None),
+            Duel.expires_at <= now,
+        )
         .all()
     )
 
-    if not expired:
+    if not overdue:
         print("[DuelEval] No expired duels")
         return
 
     evaluated = 0
-    for duel in expired:
+
+    for duel in overdue:
         price = _fetch_price(duel.ticker)
         if price is None:
             continue
 
         start_price = float(duel.price_at_start) if duel.price_at_start else None
-        c_target = _parse_target(duel.challenger_target)
-        o_target = _parse_target(duel.opponent_target)
         if start_price is None:
             continue
+
+        c_target = _parse_target(duel.challenger_target)
+        o_target = _parse_target(duel.opponent_target) if duel.opponent_target else None
 
         price_went_up = price >= start_price
         c_dir_right = (duel.challenger_direction == "bullish" and price_went_up) or (duel.challenger_direction == "bearish" and not price_went_up)
@@ -331,7 +324,6 @@ def evaluate_duels(db: Session):
         duel.evaluated_at = now
         evaluated += 1
 
-        # Notifications for both players
         challenger = db.query(User).filter(User.id == duel.challenger_id).first()
         opponent = db.query(User).filter(User.id == duel.opponent_id).first()
         c_name = challenger.username if challenger else "Unknown"
@@ -339,26 +331,23 @@ def evaluate_duels(db: Session):
 
         for uid, is_winner in [(duel.challenger_id, winner_id == duel.challenger_id), (duel.opponent_id, winner_id == duel.opponent_id)]:
             other_name = o_name if uid == duel.challenger_id else c_name
-            result = "won" if is_winner else "lost"
             msg = f"You won the {duel.ticker} duel against {other_name}!" if is_winner else f"You lost the {duel.ticker} duel against {other_name}"
             create_notification(
                 user_id=uid, type="duel_result",
                 title="Duel Complete!",
                 message=msg,
-                data={"duel_id": duel.id, "result": result}, db=db,
+                data={"duel_id": duel.id, "result": "won" if is_winner else "lost"}, db=db,
             )
 
-        # Activity: duel completed
         winner_name = c_name if winner_id == duel.challenger_id else o_name
         loser_name = o_name if winner_id == duel.challenger_id else c_name
         log_activity(
             user_id=winner_id, event_type="duel_completed",
             description=f"{winner_name} won the {duel.ticker} duel against {loser_name}",
             ticker=duel.ticker,
-            data={"duel_id": duel.id, "winner": winner_name, "loser": loser_name, "ticker": duel.ticker}, db=db,
+            data={"duel_id": duel.id, "winner": winner_name, "loser": loser_name}, db=db,
         )
 
-        # XP for duel winner
         try:
             from xp import award_xp
             award_xp(winner_id, "duel_won", db)
@@ -376,33 +365,9 @@ def evaluate_duels(db: Session):
 
 def check_season_completion(db: Session):
     now = datetime.utcnow()
-
-    expired = db.query(Season).filter(Season.status == "active", Season.ends_at <= now).all()
-
-    for season in expired:
+    seasons = db.query(Season).filter(Season.status == "active", Season.ends_at <= now).all()
+    for season in seasons:
         season.status = "completed"
-        print(f"[Seasons] Completed season: {season.name}")
-
-        # Notify participants
-        entries = (
-            db.query(SeasonEntry)
-            .filter(SeasonEntry.season_id == season.id, SeasonEntry.predictions_scored >= 1)
-            .all()
-        )
-        ranked = sorted(
-            entries,
-            key=lambda e: (e.predictions_correct / e.predictions_scored if e.predictions_scored else 0),
-            reverse=True,
-        )
-        for i, entry in enumerate(ranked):
-            rank = i + 1
-            accuracy = round(entry.predictions_correct / entry.predictions_scored * 100, 1) if entry.predictions_scored > 0 else 0
-            create_notification(
-                user_id=entry.user_id, type="season_ended",
-                title="Season Complete!",
-                message=f"You finished #{rank} in {season.name} with {accuracy}% accuracy",
-                data={"season_id": season.id, "rank": rank, "accuracy": accuracy}, db=db,
-            )
-
-    if expired:
+        print(f"[SeasonCheck] Season {season.id} ({season.name}) completed")
+    if seasons:
         db.commit()
