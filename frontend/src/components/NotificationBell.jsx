@@ -52,6 +52,16 @@ export default function NotificationBell() {
     return () => clearInterval(id);
   }, [isAuthenticated, fetchNotifications]);
 
+  // Auto-mark as read when dropdown opens
+  useEffect(() => {
+    if (open && unreadCount > 0) {
+      markAllNotificationsRead().then(() => {
+        setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+        setUnreadCount(0);
+      }).catch(() => {});
+    }
+  }, [open]);
+
   // Close on click outside
   useEffect(() => {
     function handle(e) {
