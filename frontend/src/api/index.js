@@ -582,6 +582,18 @@ export function getExpiringPredictions() {
   return api.get('/predictions/expiring').then(r => r.data);
 }
 
+export function getUserPerks() {
+  return api.get('/xp/me', { headers: authHeaders() }).then(r => r.data);
+}
+
+export function setCustomTitle(title) {
+  return api.post('/profile/title', { title }, { headers: authHeaders() }).then(r => r.data);
+}
+
+export function getTitleOptions() {
+  return api.get('/profile/title-options').then(r => r.data);
+}
+
 export function getMyXp() {
   return api.get('/xp/me', { headers: authHeaders() }).then(r => r.data);
 }

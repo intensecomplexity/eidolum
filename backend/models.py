@@ -214,6 +214,7 @@ class User(Base):
     xp_level = Column(Integer, default=1)
     xp_today = Column(Integer, default=0)
     xp_last_reset = Column(DateTime, nullable=True)
+    custom_title = Column(String(50), nullable=True)
 
     predictions = relationship("UserPrediction", back_populates="user", cascade="all, delete-orphan")
     achievements = relationship("Achievement", back_populates="user", cascade="all, delete-orphan")

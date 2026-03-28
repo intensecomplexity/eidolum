@@ -121,7 +121,7 @@ export default function Profile() {
     <div>
       <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-10">
         {/* Header */}
-        <div className="card mb-6">
+        <div className={`card mb-6 ${profile.profile_border && profile.profile_border !== 'none' ? `profile-border-${profile.profile_border}` : ''}`}>
           <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
             <div className="flex items-center gap-4">
               {profile.avatar_url ? (
@@ -136,7 +136,7 @@ export default function Profile() {
                   <h1 className="font-bold text-lg sm:text-xl">{profile.display_name || profile.username}</h1>
                   <TypeBadge type={profile.user_type} showLabel size={14} />
                 </div>
-                <p className="text-muted text-sm font-mono">@{profile.username}</p>
+                <p className="text-muted text-sm font-mono">@{profile.username}{profile.custom_title && <span className="text-text-secondary ml-1">· {profile.custom_title}</span>}</p>
                 <div className="flex items-center gap-3 mt-1">
                   <span className="text-xs" style={{ color: profile.rank_color }}>{profile.rank_name}</span>
                   <span className="text-accent text-xs font-mono font-bold">Lv.{profile.xp_level || 1}</span>

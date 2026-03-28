@@ -172,6 +172,24 @@ def submit_prediction(
     user_id: int = Depends(require_user),
     db: Session = Depends(get_db),
 ):
+    # Enforce level-based daily prediction limit
+    from perks import get_user_perks
+    user_obj = db.query(User).filter(User.id == user_id).first()
+    user_level = getattr(user_obj, 'xp_level', 1) or 1
+    perks = get_user_perks(user_level)
+    max_daily = perks["max_predictions_per_day"]
+    if max_daily != -1:
+        today_start = datetime.datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+        today_count = db.query(func.count(UserPrediction.id)).filter(
+            UserPrediction.user_id == user_id,
+            UserPrediction.created_at >= today_start,
+            _not_deleted(),
+        ).scalar() or 0
+        if today_count >= max_daily:
+            next_lvl = {5: 5, 8: 3, 10: 5, 15: 10, 20: 13, 30: 18, 50: 20}.get(max_daily, None)
+            hint = f" Level up to Level {next_lvl} for more!" if next_lvl else ""
+            raise HTTPException(status_code=403, detail=f"Daily prediction limit reached ({max_daily}/day).{hint}")
+
     raw = req.ticker.strip()
     resolved = resolve_ticker(raw)
     ticker = resolved if resolved else raw.upper()
@@ -282,13 +300,20 @@ def delete_prediction(
     if pred.user_id != user_id:
         raise HTTPException(status_code=403, detail="Not your prediction")
 
-    # Check 1: must be within 5-minute window
+    # Check 1: must be within deletion window (level-based)
+    from perks import get_user_perks
+    user_obj = db.query(User).filter(User.id == user_id).first()
+    user_level = getattr(user_obj, 'xp_level', 1) or 1 if user_obj else 1
+    perks = get_user_perks(user_level)
+    window_seconds = perks["deletion_window_minutes"] * 60
+
     now = datetime.datetime.utcnow()
     age_seconds = (now - pred.created_at).total_seconds() if pred.created_at else float("inf")
-    if age_seconds > DELETE_WINDOW_SECONDS:
+    if age_seconds > window_seconds:
+        mins = perks["deletion_window_minutes"]
         raise HTTPException(
             status_code=403,
-            detail="Predictions are locked after 5 minutes and cannot be deleted.",
+            detail=f"Predictions are locked after {mins} minutes and cannot be deleted.",
         )
 
     # Check 2: monthly deletion limit

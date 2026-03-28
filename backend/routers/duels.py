@@ -102,9 +102,34 @@ def create_challenge(
     if user_id == req.opponent_id:
         raise HTTPException(status_code=400, detail="Cannot challenge yourself")
 
+    # Enforce level-based duel perks
+    from perks import get_user_perks
+    challenger = db.query(User).filter(User.id == user_id).first()
+    user_level = getattr(challenger, 'xp_level', 1) or 1 if challenger else 1
+    perks = get_user_perks(user_level)
+
+    # Check active duels limit
+    max_duels = perks["max_active_duels"]
+    if max_duels != -1:
+        active_count = db.query(func.count(Duel.id)).filter(
+            ((Duel.challenger_id == user_id) | (Duel.opponent_id == user_id)),
+            Duel.status.in_(["pending", "active"]),
+        ).scalar() or 0
+        if active_count >= max_duels:
+            raise HTTPException(status_code=403, detail=f"Max active duels reached ({max_duels}). Level up for more slots!")
+
     opponent = db.query(User).filter(User.id == req.opponent_id).first()
     if not opponent:
         raise HTTPException(status_code=404, detail="Opponent not found")
+
+    # Check can_duel_anyone perk
+    if not perks["can_duel_anyone"]:
+        from models import Follow
+        is_friend = db.query(Follow).filter(
+            Follow.follower_id == user_id, Follow.following_id == req.opponent_id, Follow.status == "accepted"
+        ).first()
+        if not is_friend:
+            raise HTTPException(status_code=403, detail="Reach Level 5 to challenge anyone. For now you can only duel friends.")
 
     ticker = req.ticker.upper().strip()
     if ticker not in ALLOWED_TICKERS:

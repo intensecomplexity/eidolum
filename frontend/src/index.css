@@ -251,6 +251,23 @@
   animation: toast-slide-up 0.25s ease-out;
 }
 
+/* Profile border perks */
+.profile-border-subtle { border-color: rgba(0, 168, 120, 0.3); }
+.profile-border-glow { border-color: rgba(0, 168, 120, 0.4); box-shadow: 0 0 12px rgba(0, 168, 120, 0.15); }
+@keyframes border-pulse {
+  0%, 100% { box-shadow: 0 0 12px rgba(0, 168, 120, 0.15); }
+  50% { box-shadow: 0 0 20px rgba(0, 168, 120, 0.3); }
+}
+.profile-border-animated { border-color: rgba(0, 168, 120, 0.4); animation: border-pulse 3s ease-in-out infinite; }
+.profile-border-legendary { border-color: rgba(245, 158, 11, 0.5); box-shadow: 0 0 20px rgba(245, 158, 11, 0.2); }
+@keyframes eidolon-border {
+  0% { border-color: rgba(0, 168, 120, 0.5); box-shadow: 0 0 15px rgba(0, 168, 120, 0.2); }
+  33% { border-color: rgba(79, 70, 229, 0.5); box-shadow: 0 0 15px rgba(79, 70, 229, 0.2); }
+  66% { border-color: rgba(245, 158, 11, 0.5); box-shadow: 0 0 15px rgba(245, 158, 11, 0.2); }
+  100% { border-color: rgba(0, 168, 120, 0.5); box-shadow: 0 0 15px rgba(0, 168, 120, 0.2); }
+}
+.profile-border-eidolon { animation: eidolon-border 6s ease-in-out infinite; }
+
 /* Price flash animations */
 @keyframes price-flash-up {
   0% { background-color: transparent; }

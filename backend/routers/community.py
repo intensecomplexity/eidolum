@@ -10,6 +10,12 @@ from models import User, UserPrediction, Achievement, Follow
 from rate_limit import limiter
 from xp import get_xp_info as _get_xp_info, _level_name as _level_name_for
 from rivals import get_rival as _get_rival
+from perks import get_user_perks as _get_user_perks
+
+
+def _get_perks(user):
+    level = getattr(user, 'xp_level', 1) or 1
+    return _get_user_perks(level)
 
 router = APIRouter()
 
@@ -165,6 +171,9 @@ def get_user_profile(request: Request, user_id: int, credentials: Optional[HTTPA
         "direction_split": direction_split,
         "fastest_correct_days": fastest,
         **_get_xp_info(user),
+        "custom_title": getattr(user, 'custom_title', None),
+        "profile_border": _get_perks(user).get("profile_border", "none"),
+        "comment_highlight": _get_perks(user).get("comment_highlight", False),
         "rival": _get_rival(user_id, db),
     }
 

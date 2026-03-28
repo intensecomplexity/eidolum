@@ -842,6 +842,13 @@ def run_phase2_migrations():
         if "already exists" not in str(e).lower():
             print(f"[Phase2] weekly_challenge_progress: {e}")
 
+    # ── 33a. users.custom_title column ─────────────────────────────
+    try:
+        db.execute(text("ALTER TABLE users ADD COLUMN custom_title VARCHAR(50)"))
+        db.commit()
+    except Exception:
+        db.rollback()
+
     # ── 33. xp_log table ───────────────────────────────────────────
     try:
         db.execute(text("""

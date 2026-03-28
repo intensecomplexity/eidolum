@@ -5,7 +5,7 @@ import { useAuth } from '../context/AuthContext';
 import TimeframeSlider from '../components/TimeframeSlider';
 import TickerSearch from '../components/TickerSearch';
 import Footer from '../components/Footer';
-import { submitUserPrediction, getDeletionStatus, searchTickers, getWeeklyChallenge } from '../api';
+import { submitUserPrediction, getDeletionStatus, searchTickers, getWeeklyChallenge, getUserPerks } from '../api';
 
 // ── Confetti burst ───────────────────────────────────────────────────────────
 
@@ -85,11 +85,13 @@ export default function SubmitCall() {
   const [success, setSuccess] = useState(null);
   const [delStatus, setDelStatus] = useState(null);
   const [weeklyChallenge, setWeeklyChallenge] = useState(null);
+  const [perksInfo, setPerksInfo] = useState(null);
 
   useEffect(() => {
     if (isAuthenticated) {
       getDeletionStatus().then(setDelStatus).catch(() => {});
       getWeeklyChallenge().then(wc => { if (wc?.active && !wc.completed) setWeeklyChallenge(wc); }).catch(() => {});
+      getUserPerks().then(setPerksInfo).catch(() => {});
     }
   }, [isAuthenticated]);
 
@@ -355,6 +357,12 @@ export default function SubmitCall() {
             <button type="submit" disabled={loading} className="btn-primary w-full disabled:opacity-50">
               {loading ? <div className="w-5 h-5 border-2 border-bg border-t-transparent rounded-full animate-spin" /> : 'Lock In My Call'}
             </button>
+            {perksInfo?.current_perks && perksInfo.current_perks.max_predictions_per_day !== -1 && (
+              <p className="text-[10px] text-muted text-center mt-1.5 font-mono">
+                Daily limit: {perksInfo.current_perks.max_predictions_per_day}/day
+                {perksInfo.next_perk_level && <span className="text-accent ml-1">· Lv.{perksInfo.next_perk_level} unlocks more</span>}
+              </p>
+            )}
           </div>
 
           {delStatus && (
