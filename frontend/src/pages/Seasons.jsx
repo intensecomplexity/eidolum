@@ -4,7 +4,6 @@ import Footer from '../components/Footer';
 import TypeBadge from '../components/TypeBadge';
 import { getSeasons, getCurrentSeason, getSeasonLeaderboard } from '../api';
 
-const THEME_EMOJI = { bull: '\uD83D\uDC02', hawk: '\uD83E\uDD85', serpent: '\uD83D\uDC0D', wolf: '\uD83D\uDC3A' };
 
 export default function Seasons() {
   const [current, setCurrent] = useState(null);
@@ -62,12 +61,9 @@ export default function Seasons() {
     </div>
   );
 
-  const activeIcon = current?.theme_icon;
   const activeColor = current?.theme_color || '#00a878';
-  const activeEmoji = THEME_EMOJI[activeIcon] || '';
   const selectedSeason = seasonMeta || allSeasons.find(s => s.id === selectedId);
   const selectedColor = selectedSeason?.theme_color || '#00a878';
-  const selectedEmoji = THEME_EMOJI[selectedSeason?.theme_icon] || '';
 
   return (
     <div>
@@ -81,19 +77,17 @@ export default function Seasons() {
         {/* Current season card */}
         {current && (
           <div className="card mb-6 relative overflow-hidden" style={{ borderColor: `${activeColor}30` }}>
-            {/* Theme gradient bg */}
             <div className="absolute inset-0 opacity-[0.06]" style={{ background: `linear-gradient(135deg, ${activeColor}, transparent 70%)` }} />
             <div className="relative">
-              <div className="flex items-center justify-between mb-2">
-                <div className="flex items-center gap-2">
-                  <span className="text-2xl">{activeEmoji}</span>
-                  <span className="font-semibold" style={{ color: activeColor }}>{current.name}</span>
-                  <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded border" style={{ color: activeColor, borderColor: `${activeColor}40`, background: `${activeColor}15` }}>Active</span>
-                </div>
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-[10px] font-bold uppercase tracking-widest" style={{ color: activeColor }}>Active Season</span>
                 <span className="font-mono text-sm" style={{ color: activeColor }}>{countdown}</span>
               </div>
+              <h2 className="headline-serif text-2xl sm:text-3xl mb-1" style={{ color: activeColor }}>{current.name}</h2>
+              {current.subtitle && <p className="text-sm text-muted mb-2">{current.subtitle}</p>}
               <div className="text-xs text-muted">
-                {current.name} ends in <span className="font-mono" style={{ color: activeColor }}>{countdown}</span>
+                Ends in <span className="font-mono" style={{ color: activeColor }}>{countdown}</span>
+                <span className="ml-2">{new Date(current.starts_at).toLocaleDateString()} — {new Date(current.ends_at).toLocaleDateString()}</span>
               </div>
             </div>
           </div>
@@ -102,13 +96,13 @@ export default function Seasons() {
         {/* Season tabs */}
         <div className="flex gap-2 mb-6 overflow-x-auto pills-scroll">
           {allSeasons.map(s => {
-            const emoji = THEME_EMOJI[s.theme_icon] || '';
             const isActive = selectedId === s.id;
+            const c = s.theme_color || '#00a878';
             return (
               <button key={s.id} onClick={() => handleSelectSeason(s.id)}
-                className={`px-4 py-2 rounded-lg text-xs font-semibold whitespace-nowrap transition-colors flex items-center gap-1.5 ${isActive ? 'border' : 'bg-surface text-text-secondary border border-border'}`}
-                style={isActive ? { color: s.theme_color || '#00a878', borderColor: `${s.theme_color || '#00a878'}40`, background: `${s.theme_color || '#00a878'}15` } : {}}>
-                {emoji} {s.name} {s.status === 'active' ? '(Live)' : ''}
+                className={`px-4 py-2 rounded-lg text-xs font-bold whitespace-nowrap transition-colors uppercase tracking-wider ${isActive ? 'border' : 'bg-surface text-text-secondary border border-border'}`}
+                style={isActive ? { color: c, borderColor: `${c}40`, background: `${c}15` } : {}}>
+                {s.name} {s.status === 'active' ? '(Live)' : ''}
               </button>
             );
           })}
@@ -116,9 +110,9 @@ export default function Seasons() {
 
         {/* Season leaderboard header */}
         {selectedSeason && (
-          <div className="flex items-center gap-2 mb-4">
-            <span className="text-xl">{selectedEmoji}</span>
-            <h2 className="font-semibold" style={{ color: selectedColor }}>{selectedSeason.name}</h2>
+          <div className="mb-4">
+            <h2 className="headline-serif text-xl" style={{ color: selectedColor }}>{selectedSeason.name}</h2>
+            {selectedSeason.subtitle && <p className="text-xs text-muted">{selectedSeason.subtitle}</p>}
           </div>
         )}
 

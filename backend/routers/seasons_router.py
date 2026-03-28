@@ -9,19 +9,16 @@ from seasons import ensure_current_season
 
 router = APIRouter()
 
-ICON_EMOJI = {"bull": "\U0001F402", "hawk": "\U0001F985", "serpent": "\U0001F40D", "wolf": "\U0001F43A"}
-
 
 def _season_dict(s: Season) -> dict:
     return {
         "id": s.id,
         "name": s.name,
+        "subtitle": s.theme_icon or "",  # theme_icon column stores subtitle
         "starts_at": s.starts_at.isoformat() if s.starts_at else None,
         "ends_at": s.ends_at.isoformat() if s.ends_at else None,
         "status": s.status,
         "theme_color": s.theme_color,
-        "theme_icon": s.theme_icon,
-        "theme_emoji": ICON_EMOJI.get(s.theme_icon, ""),
     }
 
 

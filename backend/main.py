@@ -696,6 +696,26 @@ def run_phase2_migrations():
         except Exception:
             db.rollback()
 
+    # ── 25. Rename old seasons to epic names ─────────────────────────
+    try:
+        from seasons import SEASON_NAMES
+        all_seasons = db.execute(text("SELECT id, starts_at, name FROM seasons")).fetchall()
+        for row in all_seasons:
+            sid, starts, old_name = row
+            if starts:
+                y = starts.year if hasattr(starts, 'year') else int(str(starts)[:4])
+                m = starts.month if hasattr(starts, 'month') else int(str(starts)[5:7])
+                q = (m - 1) // 3 + 1
+                key = f"{y}-Q{q}"
+                meta = SEASON_NAMES.get(key)
+                if meta and old_name != meta["name"]:
+                    db.execute(text("UPDATE seasons SET name=:n, theme_color=:c, theme_icon=:s WHERE id=:id"),
+                        {"n": meta["name"], "c": meta["color"], "s": meta["subtitle"], "id": sid})
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        print(f"[Phase2] Season rename: {e}")
+
     print("[Phase2] All migrations complete")
     db.close()
 
