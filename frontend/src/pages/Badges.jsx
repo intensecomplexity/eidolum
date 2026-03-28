@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Award } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import BadgeCard from '../components/BadgeCard';
+import { CategoryIcon } from '../components/BadgeIcon';
 import Footer from '../components/Footer';
 import { getUserAchievements } from '../api';
 
@@ -99,7 +100,10 @@ export default function Badges() {
           return (
             <div key={cat} className="mb-8">
               <div className="flex items-center justify-between mb-3">
-                <h2 className="text-sm font-semibold text-text-secondary uppercase tracking-wider">{cat}</h2>
+                <div className="flex items-center gap-2">
+                  <CategoryIcon category={cat} size={16} />
+                  <h2 className="text-sm font-semibold text-accent uppercase tracking-wider">{cat}</h2>
+                </div>
                 <span className="text-xs text-muted font-mono">{catEarned}/{catBadges.length}</span>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">

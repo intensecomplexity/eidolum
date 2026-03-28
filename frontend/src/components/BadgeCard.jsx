@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { Lock, Award, Share2 } from 'lucide-react';
+import { Share2 } from 'lucide-react';
+import BadgeIcon from './BadgeIcon';
 import ShareModal from './ShareModal';
 
 export default function BadgeCard({ badge, username }) {
@@ -7,8 +8,9 @@ export default function BadgeCard({ badge, username }) {
   const [showShare, setShowShare] = useState(false);
 
   return (
-    <div className={`rounded-xl p-4 border transition-colors relative group ${earned ? 'bg-accent/5 border-accent/20' : 'bg-surface border-border opacity-60'}`}>
-      {/* Hover share icon — only on earned badges */}
+    <div className={`rounded-xl p-4 border transition-colors relative group ${
+      earned ? 'border-accent/20 bg-accent/[0.03]' : 'bg-surface border-border/50 opacity-60'
+    }`}>
       {earned && (
         <button
           onClick={(e) => { e.stopPropagation(); setShowShare(true); }}
@@ -20,17 +22,16 @@ export default function BadgeCard({ badge, username }) {
       )}
 
       <div className="flex items-start gap-3">
-        <div className={`w-10 h-10 rounded-lg flex items-center justify-center text-lg ${earned ? 'bg-accent/10' : 'bg-surface-2'}`}>
-          {earned ? icon : <Lock className="w-4 h-4 text-muted" />}
+        <div className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ${
+          earned ? 'bg-accent/10' : 'bg-surface-2'
+        }`}>
+          <BadgeIcon badgeId={badge_id} earned={earned} size={28} />
         </div>
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2">
-            <span className={`font-medium text-sm ${earned ? 'text-text-primary' : 'text-muted'}`}>{name}</span>
-            {earned && <Award className="w-3.5 h-3.5 text-accent" />}
-          </div>
+          <span className={`font-medium text-sm ${earned ? 'text-accent' : 'text-muted'}`}>{name}</span>
           <p className="text-xs text-muted mt-0.5">{description}</p>
           {earned && unlocked_at && (
-            <p className="text-[10px] text-accent/60 font-mono mt-1">
+            <p className="text-[10px] text-accent/50 font-mono mt-1">
               Unlocked {new Date(unlocked_at).toLocaleDateString()}
             </p>
           )}
