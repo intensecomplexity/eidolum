@@ -75,27 +75,23 @@ export default function Navbar() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-14 sm:h-16">
 
-            {/* ── LEFT: Logo + public nav ──────────────────────────── */}
-            <div className="flex items-center gap-4 lg:gap-5">
+            {/* ── LEFT GROUP: Logo + nav links ─────────────────────── */}
+            <div className="flex items-center gap-6">
               <Link to="/" className="flex items-center gap-2 min-h-[44px]">
                 <BarChart3 className="w-5 h-5 sm:w-6 sm:h-6 text-accent" />
                 <span className="font-serif text-lg sm:text-xl" style={{ letterSpacing: '-0.01em' }}>
                   <span className="text-accent">eido</span><span className="text-muted">lum</span>
                 </span>
               </Link>
-
-              {/* Desktop links */}
-              <div className="hidden sm:flex items-center gap-4 lg:gap-5">
-                <Link to="/leaderboard" className={linkClass('/leaderboard')}>Leaderboard</Link>
-                <Link to="/consensus" className={linkClass('/consensus')}>Consensus</Link>
-                <Link to="/expiring" className={linkClass('/expiring')}>Expiring</Link>
-                <Link to="/seasons" className={linkClass('/seasons')}>Seasons</Link>
-                {isAuthenticated && (
-                  <Link to="/submit" className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-sm font-medium bg-accent/10 text-accent border border-accent/30 hover:bg-accent/15 transition-colors min-h-[36px]">
-                    <Crosshair className="w-3.5 h-3.5" /> Submit
-                  </Link>
-                )}
-              </div>
+              <Link to="/leaderboard" className={`hidden sm:flex ${linkClass('/leaderboard')}`}>Leaderboard</Link>
+              <Link to="/consensus" className={`hidden sm:flex ${linkClass('/consensus')}`}>Consensus</Link>
+              <Link to="/expiring" className={`hidden sm:flex ${linkClass('/expiring')}`}>Expiring</Link>
+              <Link to="/seasons" className={`hidden sm:flex ${linkClass('/seasons')}`}>Seasons</Link>
+              {isAuthenticated && (
+                <Link to="/submit" className="hidden sm:flex items-center gap-1 px-3 py-1.5 rounded-lg text-sm font-medium bg-accent/10 text-accent border border-accent/30 hover:bg-accent/15 transition-colors min-h-[36px]">
+                  <Crosshair className="w-3.5 h-3.5" /> Submit
+                </Link>
+              )}
             </div>
 
             {/* ── RIGHT: Search + Help + Bell + User dropdown ─────── */}
