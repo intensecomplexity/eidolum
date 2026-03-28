@@ -1032,8 +1032,12 @@ def archive_missing_proofs(db):
         print(f"[Archive] archive_missing_proofs error: {e}")
 
 
+_scheduler = None  # module-level reference for diagnostic endpoints
+
+
 @asynccontextmanager
 async def lifespan(app):
+    global _scheduler
     init_db()
     try:
         migrate_platform_types()
@@ -1379,6 +1383,7 @@ async def lifespan(app):
 
     print("[STARTUP] Scheduler starting...")
     scheduler = AsyncIOScheduler()
+    _scheduler = scheduler
     # Core scrapers
     scheduler.add_job(run_hourly_scraper, "interval", hours=1, id="scraper")
     scheduler.add_job(run_fast_scraper, "interval", minutes=15, id="fast_scraper")
@@ -1611,14 +1616,17 @@ def scheduler_status():
     """Show all scheduled jobs and their last run times."""
     from admin_panel import scheduler_last_run
     jobs = []
-    try:
-        for job in scheduler.get_jobs():
-            jobs.append({
-                "id": job.id,
-                "next_run": job.next_run_time.isoformat() if job.next_run_time else None,
-            })
-    except Exception as e:
-        jobs = [{"error": str(e)}]
+    if _scheduler:
+        try:
+            for job in _scheduler.get_jobs():
+                jobs.append({
+                    "id": job.id,
+                    "next_run": job.next_run_time.isoformat() if job.next_run_time else None,
+                })
+        except Exception as e:
+            jobs = [{"error": str(e)}]
+    else:
+        jobs = [{"error": "scheduler not initialized yet"}]
     return {
         "jobs": jobs,
         "last_runs": {k: v.isoformat() if v else None for k, v in scheduler_last_run.items()},
