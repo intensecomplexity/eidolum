@@ -4,7 +4,7 @@ export default function EidolumLogo({ size = 24, className = "" }) {
   return (
     <svg viewBox="0 0 40 48" fill="none" xmlns="http://www.w3.org/2000/svg" width={size} height={size * 1.2} className={className}>
       {/* Vertical spine */}
-      <line x1="5" y1="4" x2="5" y2="44" stroke={c} strokeWidth={sw} strokeLinecap="round"/>
+      <line x1="5" y1="6" x2="5" y2="42" stroke={c} strokeWidth={sw} strokeLinecap="round"/>
 
       {/* Top arm + dissolving dots */}
       <line x1="5" y1="6" x2="26" y2="6" stroke={c} strokeWidth={sw} strokeLinecap="round"/>
