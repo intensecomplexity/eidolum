@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams, useSearchParams, Link } from 'react-router-dom';
-import { BarChart3, TrendingUp, TrendingDown, Check, X, Clock, ArrowRight } from 'lucide-react';
+import { TrendingUp, TrendingDown, Check, X, Clock, ArrowRight } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import TypeBadge from '../components/TypeBadge';
 import TickerLink from '../components/TickerLink';

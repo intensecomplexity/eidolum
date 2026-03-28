@@ -1,6 +1,7 @@
 import { useEffect, useState, useRef } from 'react';
 import { useParams, useSearchParams, Link } from 'react-router-dom';
-import { BarChart3, TrendingUp, TrendingDown } from 'lucide-react';
+import { TrendingUp, TrendingDown } from 'lucide-react';
+import EidolumLogo from '../components/EidolumLogo';
 import Footer from '../components/Footer';
 import ShareButton from '../components/ShareButton';
 import { getToldYouSo, trackReferral } from '../api';
@@ -49,8 +50,8 @@ export default function ToldYouSo() {
           <div className="absolute inset-0 opacity-[0.03]" style={{ background: 'linear-gradient(135deg, #fbbf24, transparent 50%)' }} />
           <div className="relative">
             <div className="flex items-center gap-2 mb-4">
-              <BarChart3 className="w-5 h-5 text-accent" />
-              <span className="font-serif text-lg"><span className="text-accent">eido</span><span className="text-muted">lum</span></span>
+              <EidolumLogo size={20} />
+              <span className="font-serif text-lg text-accent">Eidolum</span>
             </div>
 
             <h1 className="headline-serif text-2xl sm:text-3xl text-warning mb-4">I TOLD YOU SO</h1>

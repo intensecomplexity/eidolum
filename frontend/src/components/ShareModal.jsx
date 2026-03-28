@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { X, Copy, Check, ExternalLink, TrendingUp, TrendingDown, BarChart3 } from 'lucide-react';
+import { X, Copy, Check, ExternalLink, TrendingUp, TrendingDown } from 'lucide-react';
+import EidolumLogo from './EidolumLogo';
 import { getPredictionShareData, getProfileShareData } from '../api';
 
 /**
@@ -97,7 +98,7 @@ function PredictionPreview({ data }) {
   return (
     <div className="bg-bg rounded-lg border border-border p-4">
       <div className="flex items-center gap-2 mb-3">
-        <BarChart3 className="w-4 h-4 text-accent" />
+        <EidolumLogo size={16} />
         <span className="text-[10px] text-muted">eidolum.com</span>
       </div>
 
@@ -146,7 +147,7 @@ function ProfilePreview({ data }) {
   return (
     <div className="bg-bg rounded-lg border border-border p-4">
       <div className="flex items-center gap-2 mb-3">
-        <BarChart3 className="w-4 h-4 text-accent" />
+        <EidolumLogo size={16} />
         <span className="text-[10px] text-muted">eidolum.com</span>
       </div>
       <div className="flex items-center gap-3 mb-4">
@@ -180,7 +181,7 @@ function BadgePreview({ data }) {
   return (
     <div className="bg-bg rounded-lg border border-border p-4 text-center">
       <div className="flex items-center justify-center gap-2 mb-3">
-        <BarChart3 className="w-4 h-4 text-accent" />
+        <EidolumLogo size={16} />
         <span className="text-[10px] text-muted">eidolum.com</span>
       </div>
       <div className="text-3xl mb-2">{data.icon}</div>

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Search, BarChart3, CheckCircle, ArrowRight, TrendingUp, TrendingDown } from 'lucide-react';
+import { Search, Filter, CheckCircle, ArrowRight, TrendingUp, TrendingDown } from 'lucide-react';
 import TickerBar from '../components/TickerBar';
 import PlatformBadge from '../components/PlatformBadge';
 import RankBadge from '../components/RankBadge';
@@ -212,7 +212,7 @@ export default function Landing() {
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '32px' }}>
           {[
             { num: '01', icon: Search, title: 'Collect', desc: 'We pull analyst predictions from financial news — upgrades, downgrades, and price target changes from real firms.' },
-            { num: '02', icon: BarChart3, title: 'Parse', desc: 'NLP and keyword matching extract structured predictions: ticker, direction, and price targets.' },
+            { num: '02', icon: Filter, title: 'Parse', desc: 'NLP and keyword matching extract structured predictions: ticker, direction, and price targets.' },
             { num: '03', icon: CheckCircle, title: 'Verify', desc: 'After 30/60/90 days we compare predictions to actual market data and score each forecaster.' },
           ].map(step => (
             <div key={step.num} style={{ padding: '28px', background: '#0e1212', border: '1px solid rgba(255,255,255,0.07)', borderRadius: '12px' }}>

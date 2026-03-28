@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { BarChart3, TrendingUp, TrendingDown, Check, Trophy, Crosshair, Lock } from 'lucide-react';
+import { TrendingUp, TrendingDown, Check, Trophy, Crosshair, Lock } from 'lucide-react';
+import EidolumLogo from './EidolumLogo';
 import TickerSearch from './TickerSearch';
 import TimeframeSlider from './TimeframeSlider';
 import { submitUserPrediction, completeOnboarding } from '../api';
@@ -94,8 +95,8 @@ export default function Onboarding({ user, onComplete }) {
         {STEPS[step] === 'welcome' && (
           <div className="text-center py-8">
             <div className="flex items-center justify-center gap-3 mb-6">
-              <BarChart3 className="w-10 h-10 text-accent" />
-              <span className="font-serif text-3xl"><span className="text-accent">eido</span><span className="text-muted">lum</span></span>
+              <EidolumLogo size={40} />
+              <span className="font-serif text-3xl text-accent">Eidolum</span>
             </div>
             <p className="headline-serif text-2xl sm:text-3xl text-text-primary mb-4">Where predictions meet accountability</p>
             <p className="text-text-secondary text-sm leading-relaxed max-w-md mx-auto mb-8">

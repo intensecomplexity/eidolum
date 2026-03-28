@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
-import { X, Copy, Check, TrendingUp, TrendingDown, BarChart3, Download } from 'lucide-react';
+import { X, Copy, Check, TrendingUp, TrendingDown, Download } from 'lucide-react';
+import EidolumLogo from './EidolumLogo';
 import { getToldYouSo } from '../api';
 
 function spawnConfetti(container) {
@@ -68,7 +69,7 @@ export default function ToldYouSoModal({ predictionId, onClose }) {
               <div className="absolute inset-0 opacity-[0.04]" style={{ background: 'linear-gradient(135deg, #fbbf24, transparent 50%)' }} />
               <div className="relative">
                 <div className="flex items-center gap-2 mb-3">
-                  <BarChart3 className="w-4 h-4 text-accent" />
+                  <EidolumLogo size={16} />
                   <span className="text-[10px] text-muted">eidolum.com</span>
                 </div>
 

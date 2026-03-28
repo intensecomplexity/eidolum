@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import { Link } from 'react-router-dom';
-import { Bookmark, ArrowRight, Clock, Pencil, ExternalLink, X, ChevronDown, BarChart3, Search } from 'lucide-react';
+import { Bookmark, ArrowRight, Clock, Pencil, ExternalLink, X, ChevronDown, Trophy, Search } from 'lucide-react';
 import Footer from '../components/Footer';
 import PredictionBadge from '../components/PredictionBadge';
 import PlatformBadge from '../components/PlatformBadge';
@@ -252,7 +252,7 @@ function EmptyState() {
 
       <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-3">
         <Link to="/leaderboard" className="btn-primary text-sm">
-          <BarChart3 className="w-4 h-4" /> Browse Leaderboard
+          <Trophy className="w-4 h-4" /> Browse Leaderboard
         </Link>
         <Link to="/" className="btn-secondary text-sm">
           <Search className="w-4 h-4" /> Explore Assets
