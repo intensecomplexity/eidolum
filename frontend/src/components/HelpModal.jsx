@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { X, Crosshair, Check, Trophy, ChevronLeft, ChevronRight, ChevronDown } from 'lucide-react';
+import useLockBodyScroll from '../hooks/useLockBodyScroll';
 
 // ── How It Works carousel cards ──────────────────────────────────────────────
 
@@ -39,6 +40,7 @@ const SCORING_RULES = [
 // ── Component ────────────────────────────────────────────────────────────────
 
 export default function HelpModal({ onClose }) {
+  useLockBodyScroll();
   const [carouselIdx, setCarouselIdx] = useState(0);
   const [openAccordion, setOpenAccordion] = useState(null);
   const touchStartX = useRef(0);

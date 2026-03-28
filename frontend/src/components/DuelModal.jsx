@@ -1,10 +1,12 @@
 import { useState } from 'react';
+import useLockBodyScroll from '../hooks/useLockBodyScroll';
 import { X, Swords, TrendingUp, TrendingDown } from 'lucide-react';
 import TickerSearch from './TickerSearch';
 import TimeframeSlider from './TimeframeSlider';
 import { createDuel } from '../api';
 
 export default function DuelModal({ opponent, onClose, onCreated }) {
+  useLockBodyScroll();
   const [ticker, setTicker] = useState('');
   const [direction, setDirection] = useState('');
   const [target, setTarget] = useState('');

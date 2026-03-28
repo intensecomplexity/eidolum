@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import useLockBodyScroll from '../hooks/useLockBodyScroll';
 import { useNavigate } from 'react-router-dom';
 import { TrendingUp, TrendingDown, Check, Trophy, Crosshair, Lock } from 'lucide-react';
 import EidolumLogo from './EidolumLogo';
@@ -26,6 +27,7 @@ function spawnConfetti(container) {
 const STEPS = ['welcome', 'predict', 'done'];
 
 export default function Onboarding({ user, onComplete }) {
+  useLockBodyScroll();
   const navigate = useNavigate();
   const [step, setStep] = useState(0);
   const [fade, setFade] = useState(true);

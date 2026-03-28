@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { X, Copy, Check, ExternalLink, TrendingUp, TrendingDown } from 'lucide-react';
 import EidolumLogo from './EidolumLogo';
+import useLockBodyScroll from '../hooks/useLockBodyScroll';
 import { getPredictionShareData, getProfileShareData } from '../api';
 
 /**
@@ -10,6 +11,7 @@ import { getPredictionShareData, getProfileShareData } from '../api';
  *  - onClose: () => void
  */
 export default function ShareModal({ predictionId, userId, badgeShare, onClose }) {
+  useLockBodyScroll();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState(false);

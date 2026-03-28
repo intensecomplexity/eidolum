@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react';
+import useLockBodyScroll from '../hooks/useLockBodyScroll';
 import { X, Bell, CheckCircle } from 'lucide-react';
 import { createFollow } from '../api';
 
 export default function FollowModal({ forecaster, onClose, onFollowed }) {
+  useLockBodyScroll();
   const [email, setEmail] = useState('');
   const [alerts, setAlerts] = useState({
     new_prediction: true,

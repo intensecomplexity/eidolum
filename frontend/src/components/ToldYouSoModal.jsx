@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import useLockBodyScroll from '../hooks/useLockBodyScroll';
 import { X, Copy, Check, TrendingUp, TrendingDown, Download } from 'lucide-react';
 import EidolumLogo from './EidolumLogo';
 import { getToldYouSo } from '../api';
@@ -20,6 +21,7 @@ function spawnConfetti(container) {
 }
 
 export default function ToldYouSoModal({ predictionId, onClose }) {
+  useLockBodyScroll();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState(false);
