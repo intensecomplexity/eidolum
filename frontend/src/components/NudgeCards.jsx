@@ -29,17 +29,30 @@ export default function NudgeCards() {
               <X className="w-3 h-3" />
             </button>
             <div className="relative">
-              <span className="text-lg mr-2">{n.icon}</span>
-              <div className="mt-1.5 mb-2">
-                <div className="flex items-center justify-between text-[10px] text-muted mb-0.5">
-                  <span>{n.progress}/{n.target}</span>
-                  <span>{n.pct}%</span>
-                </div>
-                <div className="h-1.5 bg-surface-2 rounded-full overflow-hidden">
-                  <div className="h-full bg-accent rounded-full transition-all" style={{ width: `${Math.min(n.pct, 100)}%` }} />
-                </div>
-              </div>
-              <p className="text-xs text-text-secondary leading-relaxed">{n.message}</p>
+              {n.type === 'streak' ? (
+                <>
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="text-lg">{n.icon}</span>
+                    <span className="font-mono text-2xl font-bold text-accent">{n.progress}</span>
+                    <span className="text-xs text-muted">{n.progress === 1 ? 'day' : 'days'}</span>
+                  </div>
+                  <p className="text-xs text-text-secondary leading-relaxed">{n.message}</p>
+                </>
+              ) : (
+                <>
+                  <span className="text-lg mr-2">{n.icon}</span>
+                  <div className="mt-1.5 mb-2">
+                    <div className="flex items-center justify-between text-[10px] text-muted mb-0.5">
+                      <span>{n.progress}/{n.target}</span>
+                      <span>{n.pct}%</span>
+                    </div>
+                    <div className="h-1.5 bg-surface-2 rounded-full overflow-hidden">
+                      <div className="h-full bg-accent rounded-full transition-all" style={{ width: `${Math.min(n.pct, 100)}%` }} />
+                    </div>
+                  </div>
+                  <p className="text-xs text-text-secondary leading-relaxed">{n.message}</p>
+                </>
+              )}
             </div>
           </div>
         );

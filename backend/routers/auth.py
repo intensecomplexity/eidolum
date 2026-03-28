@@ -216,13 +216,14 @@ def get_nudges(request: Request, current_user: dict = Depends(get_current_user_d
     # Daily prediction streak nudge
     ret = user.return_streak_current or 0
     if ret > 0:
+        day_word = "day" if ret == 1 else "days"
         nudges.append({
             "type": "streak",
-            "message": f"You've predicted {ret} days in a row. Keep it going!",
+            "message": f"You've predicted {ret} {day_word} in a row. Keep it going!",
             "progress": ret,
-            "target": ret + 1,
-            "pct": round(ret / (ret + 1) * 100),
-            "icon": "📅",
+            "target": None,
+            "pct": 0,
+            "icon": "🔥",
         })
 
     # Sort by closest to completion (highest pct first), take top 3
