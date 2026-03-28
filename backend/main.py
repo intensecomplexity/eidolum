@@ -1425,6 +1425,8 @@ from routers import prediction_detail
 app.include_router(prediction_detail.router, prefix="/api")
 app.include_router(watchlist_router.router, prefix="/api")
 app.include_router(controversial.router, prefix="/api")
+from routers import compare as compare_router
+app.include_router(compare_router.router, prefix="/api")
 from routers import analysts as analysts_router, heatmap
 app.include_router(analysts_router.router, prefix="/api")
 app.include_router(heatmap.router, prefix="/api")

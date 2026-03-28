@@ -45,6 +45,7 @@ import AnalystsPage from './pages/Analysts';
 import AnalystProfilePage from './pages/AnalystProfile';
 import HeatmapPage from './pages/Heatmap';
 import EarningsPage from './pages/Earnings';
+import ComparePage from './pages/Compare';
 import { useAuth } from './context/AuthContext';
 
 export default function App() {
@@ -93,6 +94,7 @@ export default function App() {
         <Route path="/prediction/:predictionId/told-you-so" element={<ToldYouSo />} />
         <Route path="/settings" element={<SettingsPage />} />
         <Route path="/controversial" element={<ControversialPage />} />
+        <Route path="/compare/:id1/:id2" element={<ComparePage />} />
         <Route path="/analysts" element={<AnalystsPage />} />
         <Route path="/analyst/:name" element={<AnalystProfilePage />} />
         <Route path="/heatmap" element={<HeatmapPage />} />

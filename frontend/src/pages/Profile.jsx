@@ -118,7 +118,10 @@ export default function Profile() {
             </div>
             <div className="flex items-center gap-2">
               {!isOwnProfile && isAuthenticated && (
-                <FriendButton status={friendshipStatus} loading={followLoading} onAction={handleFriendAction} />
+                <>
+                  <FriendButton status={friendshipStatus} loading={followLoading} onAction={handleFriendAction} />
+                  <Link to={`/compare/${user?.id || user?.user_id}/${targetId}`} className="text-[10px] text-muted hover:text-accent transition-colors">Compare</Link>
+                </>
               )}
               {isOwnProfile && (
                 <>

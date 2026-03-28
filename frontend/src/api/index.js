@@ -224,6 +224,12 @@ export function getSentRequests() {
   return api.get('/follows/sent', { headers: authHeaders() }).then(r => r.data);
 }
 
+// ——— Compare ———
+
+export function compareUsers(id1, id2) {
+  return api.get(`/compare/${id1}/${id2}`).then(r => r.data);
+}
+
 // ——— Prediction Detail ———
 
 export function getPredictionDetail(predictionId, source = 'user') {
