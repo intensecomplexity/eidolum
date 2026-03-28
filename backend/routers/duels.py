@@ -186,7 +186,10 @@ def create_challenge(
     db.commit()
     db.refresh(duel)
 
-    return _duel_to_dict(duel, db)
+    result = _duel_to_dict(duel, db)
+    result["share_url"] = f"https://www.eidolum.com/duel/{duel.id}"
+    result["share_text"] = f"I challenged @{opponent.username} to a duel on {ticker}. Accept it: https://www.eidolum.com/duel/{duel.id}"
+    return result
 
 
 # ── POST /api/duels/{duel_id}/accept ──────────────────────────────────────────

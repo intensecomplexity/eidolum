@@ -85,6 +85,9 @@ export default function Friends() {
           <h1 className="font-bold" style={{ fontSize: 'clamp(24px, 5vw, 36px)' }}>Friends</h1>
         </div>
 
+        {/* Invite */}
+        <InviteCard username={user?.username} />
+
         {/* Suggestions */}
         {suggestions.length > 0 && (
           <div className="mb-8">
@@ -158,6 +161,37 @@ export default function Friends() {
       </div>
       <Footer />
       {duelTarget && <DuelModal opponent={duelTarget} onClose={() => setDuelTarget(null)} />}
+    </div>
+  );
+}
+
+function InviteCard({ username }) {
+  const [copied, setCopied] = useState(false);
+  if (!username) return null;
+  const link = `https://www.eidolum.com/join?ref=${username}`;
+  const tweetText = `I'm tracking my stock predictions on @Eidolum — verified accuracy, no BS. Join me: ${link}`;
+  const tweetUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(tweetText)}`;
+
+  function handleCopy() {
+    navigator.clipboard.writeText(link).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  }
+
+  return (
+    <div className="card mb-6" style={{ borderColor: 'rgba(212,160,23,0.2)' }}>
+      <h2 className="text-xs text-accent uppercase tracking-wider font-bold mb-2">Invite to Eidolum</h2>
+      <p className="text-xs text-muted mb-3">Both you and your friend get 25 XP when they join.</p>
+      <div className="flex items-center gap-2">
+        <input readOnly value={link} className="flex-1 px-3 py-2 bg-surface-2 border border-border rounded-lg text-xs text-text-primary font-mono truncate" />
+        <button onClick={handleCopy} className="px-3 py-2 rounded-lg text-xs font-medium bg-accent/10 text-accent border border-accent/30 hover:bg-accent/20 transition-colors">
+          {copied ? 'Copied!' : 'Copy'}
+        </button>
+        <a href={tweetUrl} target="_blank" rel="noopener noreferrer" className="px-3 py-2 rounded-lg text-xs font-medium text-text-secondary border border-border hover:border-accent/30 transition-colors">
+          Share on X
+        </a>
+      </div>
     </div>
   );
 }

@@ -38,8 +38,8 @@ export function AuthProvider({ children }) {
     return data;
   }, []);
 
-  const register = useCallback(async (username, email, password) => {
-    const data = await registerUser(username, email, password);
+  const register = useCallback(async (username, email, password, ref) => {
+    const data = await registerUser(username, email, password, null, ref);
     localStorage.setItem('eidolum_token', data.token);
     const userObj = { id: data.user_id, username: data.username };
     localStorage.setItem('eidolum_user', JSON.stringify(userObj));

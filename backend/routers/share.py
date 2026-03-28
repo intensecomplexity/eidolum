@@ -18,12 +18,8 @@ SITE_URL = "https://www.eidolum.com"
 
 
 def _rank_name(scored: int) -> str:
-    if scored >= 250: return "Legendary"
-    if scored >= 100: return "Oracle"
-    if scored >= 50: return "Strategist"
-    if scored >= 25: return "Analyst"
-    if scored >= 10: return "Novice"
-    return "Unranked"
+    """Legacy compatibility — now uses XP levels."""
+    return "Player"
 
 
 # ── GET /api/predictions/{id}/share-data ──────────────────────────────────────
@@ -158,8 +154,9 @@ def get_profile_share_data(request: Request, user_id: int, db: Session = Depends
     ).scalar() or 0
     accuracy = round(correct_count / scored_count * 100, 1) if scored_count > 0 else 0
 
+    level = getattr(user, 'xp_level', 1) or 1
     share_url = f"{SITE_URL}/profile/{user_id}"
-    tweet_text = f"My verified prediction track record on @Eidolum: {accuracy}% accuracy across {scored_count} calls. Can you beat me? {share_url}"
+    tweet_text = f"My verified prediction track record: {accuracy}% accuracy across {scored_count} calls. Think you can beat me? {share_url} @Eidolum"
 
     return {
         "user_id": user_id,
@@ -178,6 +175,50 @@ def get_profile_share_data(request: Request, user_id: int, db: Session = Depends
 def _url_encode(text: str) -> str:
     import urllib.parse
     return urllib.parse.quote(text, safe='')
+
+
+# ── GET /api/embed/{username} — embeddable widget ────────────────────────────
+
+
+@router.get("/embed/{username}", response_class=HTMLResponse)
+@limiter.limit("120/minute")
+def embed_widget(request: Request, username: str, db: Session = Depends(get_db)):
+    from sqlalchemy import func
+    user = db.query(User).filter(User.username == username).first()
+    if not user:
+        return HTMLResponse("<html><body style='background:transparent'>User not found</body></html>", status_code=404)
+
+    scored_count = db.query(func.count(UserPrediction.id)).filter(
+        UserPrediction.user_id == user.id,
+        UserPrediction.outcome.in_(["correct", "incorrect"]),
+        UserPrediction.deleted_at.is_(None),
+    ).scalar() or 0
+    correct_count = db.query(func.count(UserPrediction.id)).filter(
+        UserPrediction.user_id == user.id,
+        UserPrediction.outcome == "correct",
+        UserPrediction.deleted_at.is_(None),
+    ).scalar() or 0
+    accuracy = round(correct_count / scored_count * 100, 1) if scored_count > 0 else 0
+    level = getattr(user, 'xp_level', 1) or 1
+
+    html = f"""<!DOCTYPE html>
+<html><head><meta charset="utf-8"><style>
+*{{margin:0;padding:0;box-sizing:border-box}}
+body{{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:transparent}}
+.w{{background:#0f1115;border:1px solid rgba(212,160,23,0.15);border-radius:10px;padding:12px 16px;display:flex;align-items:center;gap:12px;text-decoration:none;color:#e4e4e7;max-width:300px}}
+.w:hover{{border-color:rgba(212,160,23,0.3)}}
+.acc{{font-family:monospace;font-size:20px;font-weight:700;color:#D4A017}}
+.meta{{font-size:11px;color:#a1a1aa}}
+.lbl{{font-size:10px;color:#52525b}}
+</style></head><body>
+<a href="{SITE_URL}/profile/{user.id}" target="_blank" class="w">
+<div><div class="acc">{accuracy}%</div><div class="lbl">accuracy</div></div>
+<div style="width:1px;height:28px;background:rgba(212,160,23,0.15)"></div>
+<div><div style="font-size:13px;font-weight:600">@{user.username}</div>
+<div class="meta">Lv.{level} · {scored_count} scored</div>
+<div class="lbl">Verified by Eidolum</div></div>
+</a></body></html>"""
+    return HTMLResponse(html)
 
 
 # ══════════════════════════════════════════════════════════════════════════════

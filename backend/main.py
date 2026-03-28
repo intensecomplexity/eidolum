@@ -880,6 +880,13 @@ def run_phase2_migrations():
     except Exception:
         db.rollback()
 
+    # ── 34. users.referred_by column ────────────────────────────────
+    try:
+        db.execute(text("ALTER TABLE users ADD COLUMN referred_by INTEGER REFERENCES users(id)"))
+        db.commit()
+    except Exception:
+        db.rollback()
+
     print("[Phase2] All migrations complete")
     db.close()
 

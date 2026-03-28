@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { Eye, EyeOff } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import GoogleSignInButton from '../components/GoogleSignInButton';
@@ -7,6 +7,8 @@ import Footer from '../components/Footer';
 
 export default function Register() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const ref = searchParams.get('ref') || '';
   const { register } = useAuth();
   const [showPw, setShowPw] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -30,7 +32,7 @@ export default function Register() {
 
     setLoading(true);
     try {
-      await register(username.trim(), email.trim(), password);
+      await register(username.trim(), email.trim(), password, ref);
       navigate('/');
     } catch (err) {
       setError(err.response?.data?.detail || 'Registration failed');
@@ -44,6 +46,12 @@ export default function Register() {
           <h1 className="headline-serif text-3xl sm:text-4xl mb-2">Create Account</h1>
           <p className="text-text-secondary text-sm">Start tracking your predictions</p>
         </div>
+
+        {ref && (
+          <div className="bg-accent/5 border border-accent/20 rounded-lg px-4 py-3 mb-4 text-sm text-accent">
+            Invited by <span className="font-mono font-bold">@{ref}</span> — you'll both get 25 XP!
+          </div>
+        )}
 
         {error && (
           <div className="bg-negative/10 border border-negative/20 rounded-lg px-4 py-3 mb-4 text-sm text-negative">{error}</div>

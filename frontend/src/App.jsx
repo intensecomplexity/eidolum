@@ -76,6 +76,7 @@ export default function App() {
         {/* Phase 2 */}
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
+        <Route path="/join" element={<Register />} />
         <Route path="/auth/google/callback" element={<GoogleCallback />} />
         <Route path="/auth/callback" element={<GoogleCallback />} />
         <Route path="/profile" element={<Profile />} />

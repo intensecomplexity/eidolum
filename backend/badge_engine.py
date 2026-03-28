@@ -101,6 +101,9 @@ BADGE_INFO = {
     "xp-500":            {"name": "XP Grinder",         "description": "Earn 500 total XP",                                   "icon": "💪", "category": "Prestige"},
     "xp-5000":           {"name": "XP Machine",         "description": "Earn 5000 total XP",                                  "icon": "🔋", "category": "Prestige"},
     "xp-daily-cap":      {"name": "Max Effort",         "description": "Hit the daily XP cap",                                "icon": "🔥", "category": "Prestige"},
+    # Referrals
+    "recruiter":         {"name": "Recruiter",          "description": "Invite 3 friends who join",                            "icon": "📨", "category": "Prestige"},
+    "ambassador":        {"name": "Ambassador",         "description": "Invite 10 friends who join",                           "icon": "🌟", "category": "Prestige"},
 }
 
 ALL_BADGE_IDS = list(BADGE_INFO.keys())
@@ -492,6 +495,17 @@ def evaluate_badges(user_id: int, db: Session) -> list[str]:
             _award("weekly-5")
         if "weekly-10" not in existing and weekly_completed >= 10:
             _award("weekly-10")
+    except Exception:
+        pass
+
+    # ── REFERRAL BADGES ────────────────────────────────────────────────
+
+    try:
+        referral_count = db.query(func.count(User.id)).filter(User.referred_by == user_id).scalar() or 0
+        if "recruiter" not in existing and referral_count >= 3:
+            _award("recruiter")
+        if "ambassador" not in existing and referral_count >= 10:
+            _award("ambassador")
     except Exception:
         pass
 

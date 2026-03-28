@@ -216,6 +216,7 @@ class User(Base):
     xp_last_reset = Column(DateTime, nullable=True)
     custom_title = Column(String(50), nullable=True)
     subscription_tier = Column(String(20), default="free")  # "free" | "pro" | "institutional"
+    referred_by = Column(Integer, ForeignKey("users.id"), nullable=True)
 
     predictions = relationship("UserPrediction", back_populates="user", cascade="all, delete-orphan")
     achievements = relationship("Achievement", back_populates="user", cascade="all, delete-orphan")

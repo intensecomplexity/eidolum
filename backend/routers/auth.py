@@ -31,6 +31,7 @@ class RegisterRequest(BaseModel):
     email: str
     password: str
     display_name: Optional[str] = None
+    ref: Optional[str] = None  # referral username
 
 
 class LoginRequest(BaseModel):
@@ -248,11 +249,19 @@ def register(request: Request, req: RegisterRequest, db: Session = Depends(get_d
     if db.query(User).filter(User.email == req.email).first():
         raise HTTPException(status_code=409, detail="Email already registered")
 
+    # Handle referral
+    referrer_id = None
+    if req.ref:
+        referrer = db.query(User).filter(User.username == req.ref).first()
+        if referrer:
+            referrer_id = referrer.id
+
     user = User(
         username=req.username,
         email=req.email,
         password_hash=hash_password(req.password),
         display_name=req.display_name or req.username,
+        referred_by=referrer_id,
     )
     db.add(user)
     db.commit()
@@ -260,6 +269,15 @@ def register(request: Request, req: RegisterRequest, db: Session = Depends(get_d
 
     from activity import log_activity
     log_activity(user_id=user.id, event_type="user_joined", description=f"{user.username} joined Eidolum", data={"user_id": user.id}, db=db)
+
+    # Award XP to both referrer and new user
+    if referrer_id:
+        try:
+            from xp import award_xp
+            award_xp(referrer_id, "friend_added", db)
+            award_xp(user.id, "friend_added", db)
+        except Exception:
+            pass
     db.commit()
 
     return {
