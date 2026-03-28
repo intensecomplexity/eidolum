@@ -226,7 +226,7 @@ function PredictionCard({ p, onDelete }) {
           {p.outcome === 'pending' && p.price_at_call && p.current_price && (
             <PnLBadge direction={p.direction} priceAtCall={p.price_at_call} currentPrice={p.current_price} />
           )}
-          <ShareButton predictionId={p.id} />
+          {p.outcome !== 'incorrect' && <ShareButton predictionId={p.id} />}
           {canDelete && <DeleteButton prediction={p} onDelete={onDelete} />}
           {!canDelete && p.outcome === 'pending' && <Lock className="w-3 h-3 text-muted/30" />}
           <OutcomeBadge outcome={p.outcome} />
@@ -248,7 +248,7 @@ function PredictionCard({ p, onDelete }) {
       </div>
       <ReactionBar predictionId={p.id} source="user" isOwn={true} outcome={p.outcome} />
       {p.outcome === 'correct' && (
-        <button onClick={() => setShowBrag(true)} className="mt-2 w-full flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-bold text-warning bg-warning/10 border border-warning/20 hover:bg-warning/15 transition-colors min-h-[36px]">
+        <button onClick={() => setShowBrag(true)} className="mt-2 text-xs text-warning/70 hover:text-warning transition-colors font-medium">
           I Told You So
         </button>
       )}

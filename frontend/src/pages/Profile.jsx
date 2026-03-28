@@ -8,6 +8,7 @@ import StreakCalendar from '../components/StreakCalendar';
 import TrackRecordCard from '../components/TrackRecordCard';
 import AccuracyChart from '../components/AccuracyChart';
 import AccuracyBreakdown from '../components/AccuracyBreakdown';
+import ShareButton from '../components/ShareButton';
 import { getUserProfile, getUserAchievements, getUserPredictions, followUser, unfollowUser, getFollowers, getUserAccuracyHistory, getUserAccuracyByCategory } from '../api';
 
 export default function Profile() {
@@ -116,7 +117,12 @@ export default function Profile() {
                   {isFollowing ? <><UserMinus className="w-3.5 h-3.5" /> Remove Friend</> : <><UserPlus className="w-3.5 h-3.5" /> Add Friend</>}
                 </button>
               )}
-              {isOwnProfile && <button onClick={logout} className="text-muted text-xs flex items-center gap-1"><LogOut className="w-3.5 h-3.5" /><span className="hidden sm:inline">Log out</span></button>}
+              {isOwnProfile && (
+                <>
+                  <ShareButton userId={targetId} />
+                  <button onClick={logout} className="text-muted text-xs flex items-center gap-1"><LogOut className="w-3.5 h-3.5" /><span className="hidden sm:inline">Log out</span></button>
+                </>
+              )}
             </div>
           </div>
         </div>

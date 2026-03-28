@@ -8,17 +8,30 @@ import { getPredictionShareData, getProfileShareData } from '../api';
  *  - userId: number (share a profile)
  *  - onClose: () => void
  */
-export default function ShareModal({ predictionId, userId, onClose }) {
+export default function ShareModal({ predictionId, userId, badgeShare, onClose }) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
+    // Badge share is client-side only, no API call
+    if (badgeShare) {
+      const url = `https://www.eidolum.com/profile/${badgeShare.username || ''}`;
+      const tweet = `Just earned the ${badgeShare.name} badge on Eidolum. ${badgeShare.description}. ${url}`;
+      setData({
+        share_url: url,
+        tweet_text: tweet,
+        tweet_url: `https://twitter.com/intent/tweet?text=${encodeURIComponent(tweet)}`,
+        _badge: badgeShare,
+      });
+      setLoading(false);
+      return;
+    }
     const fetcher = predictionId
       ? getPredictionShareData(predictionId)
       : getProfileShareData(userId);
     fetcher.then(setData).catch(() => {}).finally(() => setLoading(false));
-  }, [predictionId, userId]);
+  }, [predictionId, userId, badgeShare]);
 
   async function handleCopy() {
     if (!data?.share_url) return;
@@ -49,21 +62,27 @@ export default function ShareModal({ predictionId, userId, onClose }) {
         ) : data && (
           <div className="p-5">
             {/* Card preview */}
-            {predictionId ? (
+            {data._badge ? (
+              <BadgePreview data={data._badge} />
+            ) : predictionId ? (
               <PredictionPreview data={data} />
             ) : (
               <ProfilePreview data={data} />
             )}
 
-            {/* Actions */}
-            <div className="flex gap-3 mt-4">
-              <button onClick={handleTweet}
-                className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-[#1d9bf0] text-white rounded-lg text-sm font-medium hover:bg-[#1a8cd8] transition-colors min-h-[44px]">
-                <span className="font-bold">𝕏</span> Share on X
-              </button>
+            {/* Actions — three quiet buttons */}
+            <div className="flex gap-2 mt-4">
               <button onClick={handleCopy}
-                className="flex items-center justify-center gap-2 px-4 py-3 bg-surface-2 border border-border rounded-lg text-sm font-medium text-text-secondary hover:text-text-primary transition-colors min-h-[44px]">
-                {copied ? <><Check className="w-4 h-4 text-positive" /> Copied</> : <><Copy className="w-4 h-4" /> Copy link</>}
+                className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 bg-surface-2 border border-border rounded-lg text-xs font-medium text-text-secondary hover:text-text-primary transition-colors min-h-[40px]">
+                {copied ? <><Check className="w-3.5 h-3.5 text-positive" /> Copied</> : <><Copy className="w-3.5 h-3.5" /> Copy Link</>}
+              </button>
+              <button onClick={handleTweet}
+                className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 bg-surface-2 border border-border rounded-lg text-xs font-medium text-text-secondary hover:text-text-primary transition-colors min-h-[40px]">
+                <span className="font-bold text-sm">𝕏</span>
+              </button>
+              <button onClick={() => { if (data?.share_url) window.open(`https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(data.share_url)}`, '_blank'); }}
+                className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 bg-surface-2 border border-border rounded-lg text-xs font-medium text-text-secondary hover:text-text-primary transition-colors min-h-[40px]">
+                in
               </button>
             </div>
           </div>
@@ -130,7 +149,6 @@ function ProfilePreview({ data }) {
         <BarChart3 className="w-4 h-4 text-accent" />
         <span className="text-[10px] text-muted">eidolum.com</span>
       </div>
-
       <div className="flex items-center gap-3 mb-4">
         <div className="w-12 h-12 rounded-full bg-accent/10 border border-accent/20 flex items-center justify-center">
           <span className="font-mono text-xl text-accent font-bold">{(data.username || '?')[0].toUpperCase()}</span>
@@ -140,7 +158,6 @@ function ProfilePreview({ data }) {
           <div className="text-xs text-muted font-mono">@{data.username} &middot; {data.rank}</div>
         </div>
       </div>
-
       <div className="grid grid-cols-3 gap-3 text-center">
         <div>
           <div className="font-mono text-lg font-bold text-accent">{data.accuracy}%</div>
@@ -155,6 +172,26 @@ function ProfilePreview({ data }) {
           <div className="text-[10px] text-muted">Best Streak</div>
         </div>
       </div>
+    </div>
+  );
+}
+
+function BadgePreview({ data }) {
+  return (
+    <div className="bg-bg rounded-lg border border-border p-4 text-center">
+      <div className="flex items-center justify-center gap-2 mb-3">
+        <BarChart3 className="w-4 h-4 text-accent" />
+        <span className="text-[10px] text-muted">eidolum.com</span>
+      </div>
+      <div className="text-3xl mb-2">{data.icon}</div>
+      <div className="font-semibold text-base mb-1">{data.name}</div>
+      <p className="text-xs text-text-secondary mb-2">{data.description}</p>
+      {data.unlocked_at && (
+        <p className="text-[10px] text-accent/60 font-mono">Earned {new Date(data.unlocked_at).toLocaleDateString()}</p>
+      )}
+      {data.username && (
+        <p className="text-[10px] text-muted mt-2">@{data.username}</p>
+      )}
     </div>
   );
 }

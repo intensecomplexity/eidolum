@@ -1,10 +1,24 @@
-import { Lock, Award } from 'lucide-react';
+import { useState } from 'react';
+import { Lock, Award, Share2 } from 'lucide-react';
+import ShareModal from './ShareModal';
 
-export default function BadgeCard({ badge }) {
-  const { earned, icon, name, description, unlocked_at, progress } = badge;
+export default function BadgeCard({ badge, username }) {
+  const { earned, icon, name, description, unlocked_at, progress, badge_id } = badge;
+  const [showShare, setShowShare] = useState(false);
 
   return (
-    <div className={`rounded-xl p-4 border transition-colors ${earned ? 'bg-accent/5 border-accent/20' : 'bg-surface border-border opacity-60'}`}>
+    <div className={`rounded-xl p-4 border transition-colors relative group ${earned ? 'bg-accent/5 border-accent/20' : 'bg-surface border-border opacity-60'}`}>
+      {/* Hover share icon — only on earned badges */}
+      {earned && (
+        <button
+          onClick={(e) => { e.stopPropagation(); setShowShare(true); }}
+          className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity text-muted hover:text-accent"
+          title="Share badge"
+        >
+          <Share2 className="w-3 h-3" />
+        </button>
+      )}
+
       <div className="flex items-start gap-3">
         <div className={`w-10 h-10 rounded-lg flex items-center justify-center text-lg ${earned ? 'bg-accent/10' : 'bg-surface-2'}`}>
           {earned ? icon : <Lock className="w-4 h-4 text-muted" />}
@@ -33,6 +47,15 @@ export default function BadgeCard({ badge }) {
           )}
         </div>
       </div>
+
+      {showShare && (
+        <ShareModal
+          predictionId={null}
+          userId={null}
+          badgeShare={{ name, description, icon, unlocked_at, username }}
+          onClose={() => setShowShare(false)}
+        />
+      )}
     </div>
   );
 }
