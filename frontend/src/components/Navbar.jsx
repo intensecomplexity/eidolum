@@ -151,13 +151,13 @@ export default function Navbar() {
 
                       {/* Menu items */}
                       <div className="py-1">
-                        <DropdownItem to="/my-calls" icon="◇" label="My Calls" />
-                        <DropdownItem to="/duels" icon="⚔" label="Duels" />
-                        <DropdownItem to="/friends" icon="👥" label="Friends" />
-                        <DropdownItem to="/badges" icon="✦" label="Badges" />
-                        <DropdownItem to="/watchlist" icon="☆" label="Watchlist" />
-                        <DropdownItem to="/profile" icon="◉" label="Profile" />
-                        <DropdownItem to="/settings" icon="⚙" label="Settings" />
+                        <DropdownItem to="/my-calls" icon="◇" label="My Calls" onClick={() => setUserDropdown(false)} />
+                        <DropdownItem to="/duels" icon="⚔" label="Duels" onClick={() => setUserDropdown(false)} />
+                        <DropdownItem to="/friends" icon="👥" label="Friends" onClick={() => setUserDropdown(false)} />
+                        <DropdownItem to="/badges" icon="✦" label="Badges" onClick={() => setUserDropdown(false)} />
+                        <DropdownItem to="/watchlist" icon="☆" label="Watchlist" onClick={() => setUserDropdown(false)} />
+                        <DropdownItem to="/profile" icon="◉" label="Profile" onClick={() => setUserDropdown(false)} />
+                        <DropdownItem to="/settings" icon="⚙" label="Settings" onClick={() => setUserDropdown(false)} />
                       </div>
 
                       <div className="border-t border-border py-1">
@@ -187,13 +187,13 @@ export default function Navbar() {
                         <div className="text-[10px] text-muted font-mono">@{user?.username}</div>
                       </div>
                       <div className="py-1">
-                        <DropdownItem to="/my-calls" icon="◇" label="My Calls" />
-                        <DropdownItem to="/duels" icon="⚔" label="Duels" />
-                        <DropdownItem to="/friends" icon="👥" label="Friends" />
-                        <DropdownItem to="/badges" icon="✦" label="Badges" />
-                        <DropdownItem to="/watchlist" icon="☆" label="Watchlist" />
-                        <DropdownItem to="/profile" icon="◉" label="Profile" />
-                        <DropdownItem to="/settings" icon="⚙" label="Settings" />
+                        <DropdownItem to="/my-calls" icon="◇" label="My Calls" onClick={() => setUserDropdown(false)} />
+                        <DropdownItem to="/duels" icon="⚔" label="Duels" onClick={() => setUserDropdown(false)} />
+                        <DropdownItem to="/friends" icon="👥" label="Friends" onClick={() => setUserDropdown(false)} />
+                        <DropdownItem to="/badges" icon="✦" label="Badges" onClick={() => setUserDropdown(false)} />
+                        <DropdownItem to="/watchlist" icon="☆" label="Watchlist" onClick={() => setUserDropdown(false)} />
+                        <DropdownItem to="/profile" icon="◉" label="Profile" onClick={() => setUserDropdown(false)} />
+                        <DropdownItem to="/settings" icon="⚙" label="Settings" onClick={() => setUserDropdown(false)} />
                       </div>
                       <div className="border-t border-border py-1">
                         <button onClick={() => { setUserDropdown(false); logout(); navigate('/'); }}
@@ -250,11 +250,15 @@ export default function Navbar() {
   );
 }
 
-function DropdownItem({ to, icon, label }) {
+function DropdownItem({ to, icon, label, onClick }) {
+  const navigate = useNavigate();
   return (
-    <Link to={to} className="flex items-center gap-3 px-4 py-2.5 text-sm text-text-secondary hover:bg-surface-2 hover:text-text-primary transition-colors min-h-[40px]">
+    <button
+      onClick={() => { if (onClick) onClick(); navigate(to); }}
+      className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-text-secondary hover:bg-surface-2 hover:text-text-primary transition-colors min-h-[40px] text-left cursor-pointer"
+    >
       <span className="w-5 text-center text-xs">{icon}</span> {label}
-    </Link>
+    </button>
   );
 }
 
