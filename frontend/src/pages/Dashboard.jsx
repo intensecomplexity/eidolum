@@ -1,231 +1,178 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Crosshair, Trophy, Clock, Flame, ArrowRight, HelpCircle } from 'lucide-react';
+import { Flame, Crosshair, Clock, AlertTriangle, Users, Swords, Award } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-import LiveActivityFeed from '../components/LiveActivityFeed';
 import DailyChallengeCard from '../components/DailyChallengeCard';
-import NudgeCards from '../components/NudgeCards';
-import HelpModal from '../components/HelpModal';
-import ConsensusBar from '../components/ConsensusBar';
+import LiveActivityFeed from '../components/LiveActivityFeed';
+import SectorBlock from '../components/SectorBlock';
+import Countdown from '../components/Countdown';
+import PnLBadge from '../components/PnLBadge';
 import TickerLink from '../components/TickerLink';
 import Footer from '../components/Footer';
-import SectorBlock from '../components/SectorBlock';
-import { getUserProfile, getUserPredictions, getGlobalStats, getWatchlist, getControversialPredictions, getSectorHeatmap, getUpcomingEarnings } from '../api';
+import { getUserProfile, getUserPredictions, getGlobalStats, getSectorHeatmap, getNudges } from '../api';
 
 export default function Dashboard() {
   const { user } = useAuth();
   const uid = user?.id || user?.user_id;
   const [profile, setProfile] = useState(null);
-  const [recentPreds, setRecentPreds] = useState([]);
+  const [pending, setPending] = useState([]);
   const [stats, setStats] = useState(null);
-  const [watchlist, setWatchlist] = useState([]);
-  const [hotTakes, setHotTakes] = useState([]);
-  const [sectorData, setSectorData] = useState([]);
-  const [earningsData, setEarningsData] = useState([]);
-  const [showHelp, setShowHelp] = useState(false);
+  const [sectors, setSectors] = useState([]);
+  const [nudges, setNudges] = useState([]);
 
   useEffect(() => {
     if (!uid) return;
     getUserProfile(uid).then(setProfile).catch(() => {});
-    getUserPredictions(uid).then(p => setRecentPreds((p || []).slice(0, 5))).catch(() => {});
+    getUserPredictions(uid, 'pending').then(p => setPending(p || [])).catch(() => {});
     getGlobalStats().then(setStats).catch(() => {});
-    getWatchlist().then(w => setWatchlist((w || []).slice(0, 5))).catch(() => {});
-    getControversialPredictions().then(c => setHotTakes((c || []).slice(0, 3))).catch(() => {});
-    getSectorHeatmap().then(setSectorData).catch(() => {});
-    getUpcomingEarnings().then(e => setEarningsData((e || []).slice(0, 3))).catch(() => {});
+    getSectorHeatmap().then(s => setSectors((s || []).slice(0, 4))).catch(() => {});
+    getNudges().then(setNudges).catch(() => {});
   }, [uid]);
 
+  const acc = profile?.accuracy_percentage || 0;
   const streak = profile?.streak_current || 0;
+  const predStreak = user?.prediction_streak_daily || 0;
+  const pendingSorted = [...pending].sort((a, b) => {
+    const da = a.expires_at ? new Date(a.expires_at).getTime() : Infinity;
+    const db2 = b.expires_at ? new Date(b.expires_at).getTime() : Infinity;
+    return da - db2;
+  });
+
+  // Action items
+  const expiringUrgent = pending.filter(p => {
+    if (!p.expires_at) return false;
+    const hrs = (new Date(p.expires_at).getTime() - Date.now()) / 3600000;
+    return hrs > 0 && hrs <= 24;
+  });
+
+  const badgeNudges = nudges.filter(n => n.type === 'badge' && n.pct >= 60);
 
   return (
     <div>
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-10">
-        {/* Greeting */}
-        <div className="mb-6">
-          <h1 className="font-bold text-xl sm:text-2xl">
-            Hey, {user?.display_name || user?.username || 'there'}
-            {streak >= 3 && <span className="text-orange-400 ml-2 text-base"><Flame className="w-4 h-4 inline" /> {streak} streak</span>}
-          </h1>
-          <p className="text-text-secondary text-sm mt-1">Here's what's happening today.</p>
-          {profile && profile.total_predictions < 3 && (
-            <button onClick={() => setShowHelp(true)} className="flex items-center gap-1.5 text-xs text-accent mt-2 hover:text-accent/80">
-              <HelpCircle className="w-3.5 h-3.5" /> First time? Start here &rarr;
-            </button>
+      <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6">
+
+        {/* ── SECTION 1: STATUS BAR ──────────────────────────────────── */}
+        {profile && (
+          <div className="flex items-center gap-3 sm:gap-5 overflow-x-auto pills-scroll py-3 mb-4 border-b border-border">
+            <StatusItem label="Accuracy" value={`${acc}%`} color={acc >= 50 ? 'text-accent' : 'text-negative'} />
+            <Divider />
+            <StatusItem label="Rank" value={profile.rank_name} />
+            <Divider />
+            <StatusItem label="Scored" value={profile.scored_predictions} />
+            <Divider />
+            {streak >= 1 && (<><StatusItem label="Streak" value={<><Flame className="w-3 h-3 text-orange-400 inline" /> {streak}</>} /><Divider /></>)}
+            <StatusItem label="Pred. Streak" value={`${predStreak}d`} />
+          </div>
+        )}
+
+        {/* ── SECTION 2: DAILY CHALLENGE ─────────────────────────────── */}
+        <DailyChallengeCard />
+
+        {/* ── SECTION 3: ACTION ITEMS ────────────────────────────────── */}
+        {(expiringUrgent.length > 0 || badgeNudges.length > 0) ? (
+          <div className="card mb-4">
+            <h2 className="headline-serif text-base mb-3">Needs Your Attention</h2>
+            <div className="space-y-2">
+              {expiringUrgent.length > 0 && (
+                <Link to="/expiring" className="flex items-center gap-2 text-sm text-warning hover:text-warning/80">
+                  <Clock className="w-4 h-4" />
+                  <span>{expiringUrgent.length} prediction{expiringUrgent.length > 1 ? 's' : ''} expire{expiringUrgent.length === 1 ? 's' : ''} within 24 hours</span>
+                  <span className="text-xs text-muted ml-auto">{expiringUrgent.map(p => p.ticker).join(', ')}</span>
+                </Link>
+              )}
+              {badgeNudges.map((n, i) => (
+                <Link to="/badges" key={i} className="flex items-center gap-2 text-sm text-text-secondary hover:text-accent">
+                  <span>{n.icon}</span>
+                  <span>{n.message}</span>
+                  <span className="text-xs text-muted ml-auto font-mono">{n.progress}/{n.target}</span>
+                </Link>
+              ))}
+            </div>
+          </div>
+        ) : profile && profile.total_predictions > 0 ? null : (
+          <div className="card mb-4 text-center py-6">
+            <p className="text-sm text-text-secondary mb-2">All clear. Ready to make a call?</p>
+            <Link to="/submit" className="text-accent text-xs font-medium flex items-center gap-1 justify-center">
+              <Crosshair className="w-3.5 h-3.5" /> Submit a prediction
+            </Link>
+          </div>
+        )}
+
+        {/* ── SECTION 4: OPEN CALLS ──────────────────────────────────── */}
+        <div className="mb-4">
+          <div className="flex items-center justify-between mb-2">
+            <h2 className="headline-serif text-base">Open Calls</h2>
+            {pending.length > 5 && <Link to="/my-calls" className="text-[10px] text-accent font-medium">See all {pending.length}</Link>}
+          </div>
+          {pendingSorted.length === 0 ? (
+            <div className="card text-center py-6">
+              <p className="text-sm text-text-secondary mb-2">No open calls.</p>
+              <Link to="/submit" className="text-accent text-xs font-medium">Make your first prediction &rarr;</Link>
+            </div>
+          ) : (
+            <div className="card p-0 overflow-hidden">
+              {pendingSorted.slice(0, 5).map((p, i) => (
+                <div key={p.id} className={`flex items-center justify-between px-4 py-2.5 ${i > 0 ? 'border-t border-border/50' : ''}`}>
+                  <div className="flex items-center gap-2.5">
+                    <TickerLink ticker={p.ticker} className="text-sm" />
+                    <span className={`text-[10px] ${p.direction === 'bullish' ? 'text-positive' : 'text-negative'}`}>
+                      {p.direction === 'bullish' ? '▲' : '▼'}
+                    </span>
+                    <span className="font-mono text-xs text-muted">{p.price_target}</span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    {p.outcome === 'pending' && p.price_at_call && p.current_price && (
+                      <PnLBadge direction={p.direction} priceAtCall={p.price_at_call} currentPrice={p.current_price} />
+                    )}
+                    {p.expires_at && <Countdown expiresAt={p.expires_at} className="text-xs" />}
+                  </div>
+                </div>
+              ))}
+            </div>
           )}
         </div>
 
-        {/* Daily Challenge */}
-        <DailyChallengeCard />
-
-        {/* Nudges */}
-        <NudgeCards />
-
-        {/* Quick stats */}
-        {profile && (
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
-            <QuickStat label="Total Calls" value={profile.total_predictions} />
-            <QuickStat label="Accuracy" value={`${profile.accuracy_percentage}%`} accent />
-            <QuickStat label="Pending" value={profile.pending_predictions} />
-            <QuickStat label="Rank" value={profile.rank_name} />
+        {/* ── SECTION 5: ACTIVITY + COMMUNITY PULSE ──────────────────── */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+          <div className="card">
+            <LiveActivityFeed limit={8} poll={30000} />
           </div>
-        )}
-
-        {/* Quick actions */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-8">
-          <Link to="/submit" className="card py-4 text-center hover:border-accent/20 transition-colors">
-            <Crosshair className="w-5 h-5 text-accent mx-auto mb-1.5" />
-            <span className="text-xs font-medium">Submit Call</span>
-          </Link>
-          <Link to="/leaderboard" className="card py-4 text-center hover:border-accent/20 transition-colors">
-            <Trophy className="w-5 h-5 text-warning mx-auto mb-1.5" />
-            <span className="text-xs font-medium">Leaderboard</span>
-          </Link>
-          <Link to="/expiring" className="card py-4 text-center hover:border-accent/20 transition-colors">
-            <Clock className="w-5 h-5 text-warning mx-auto mb-1.5" />
-            <span className="text-xs font-medium">Expiring</span>
-          </Link>
-          <Link to="/my-calls" className="card py-4 text-center hover:border-accent/20 transition-colors">
-            <ArrowRight className="w-5 h-5 text-text-secondary mx-auto mb-1.5" />
-            <span className="text-xs font-medium">My Calls</span>
-          </Link>
-        </div>
-
-        {/* Watchlist mini */}
-        {watchlist.length > 0 && (
-          <div className="mb-6">
-            <div className="flex items-center justify-between mb-3">
-              <h2 className="text-xs text-muted uppercase tracking-wider font-bold">My Watchlist</h2>
-              <Link to="/watchlist" className="text-[10px] text-accent font-medium">See all</Link>
-            </div>
-            <div className="flex gap-3 overflow-x-auto pills-scroll pb-1">
-              {watchlist.map(w => (
-                <div key={w.ticker} className="flex-shrink-0 w-44 card py-3">
-                  <div className="flex items-center justify-between mb-1">
-                    <TickerLink ticker={w.ticker} className="text-sm" />
-                    {w.current_price && <span className="font-mono text-xs">${w.current_price}</span>}
-                  </div>
-                  <ConsensusBar bullish={Math.round(w.bullish_pct)} bearish={Math.round(w.bearish_pct)} />
-                  <div className="text-[10px] text-muted mt-1">{w.active_predictions_count} active</div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Upcoming Earnings */}
-        {earningsData.length > 0 && (
-          <div className="mb-6">
-            <div className="flex items-center justify-between mb-3">
-              <h2 className="text-xs text-muted uppercase tracking-wider font-bold">Upcoming Earnings</h2>
-              <Link to="/earnings" className="text-[10px] text-accent font-medium">View calendar</Link>
-            </div>
-            <div className="space-y-2">
-              {earningsData.map(e => (
-                <div key={e.ticker} className="card py-3 flex items-center justify-between">
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <TickerLink ticker={e.ticker} className="text-sm" />
-                      <span className="text-xs text-text-secondary">{e.name}</span>
-                    </div>
-                    <span className={`text-[10px] font-mono ${e.days_until <= 1 ? 'text-warning' : 'text-muted'}`}>
-                      {e.days_until === 0 ? 'Today' : e.days_until === 1 ? 'Tomorrow' : `${e.days_until}d`}
-                    </span>
-                  </div>
-                  <Link to={`/submit?ticker=${e.ticker}&template=earnings_play`}
-                    className="text-[10px] text-accent font-medium px-2 py-1 rounded bg-accent/10 border border-accent/20">
-                    Make call
-                  </Link>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Mini Heatmap */}
-        {sectorData.length > 0 && (
-          <div className="mb-6">
-            <div className="flex items-center justify-between mb-3">
-              <h2 className="text-xs text-muted uppercase tracking-wider font-bold">Sector Sentiment</h2>
-              <Link to="/heatmap" className="text-[10px] text-accent font-medium">Full heatmap</Link>
-            </div>
-            <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
-              {sectorData.map(s => (
-                <SectorBlock key={s.sector} sector={s} compact onClick={() => {}} />
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Hot Takes */}
-        {hotTakes.length > 0 && (
-          <div className="mb-6">
-            <div className="flex items-center justify-between mb-3">
-              <h2 className="text-xs text-muted uppercase tracking-wider font-bold flex items-center gap-1"><Flame className="w-3 h-3 text-warning" /> Hot Takes</h2>
-              <Link to="/controversial" className="text-[10px] text-accent font-medium">See all debates</Link>
-            </div>
-            <div className="space-y-2">
-              {hotTakes.map(p => (
-                <div key={p.prediction_id} className="card py-3 flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <TickerLink ticker={p.ticker} className="text-sm" />
-                    <span className={p.direction === 'bullish' ? 'badge-bull' : 'badge-bear'}>{p.direction}</span>
-                    <span className="text-xs text-muted">by @{p.username}</span>
-                  </div>
-                  <div className="text-xs text-muted font-mono">{p.total_reactions} reactions</div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-          {/* Recent predictions */}
-          <div>
-            <div className="flex items-center justify-between mb-3">
-              <h2 className="text-xs text-muted uppercase tracking-wider font-bold">Recent Calls</h2>
-              <Link to="/my-calls" className="text-[10px] text-accent font-medium">See all</Link>
-            </div>
-            {recentPreds.length === 0 ? (
-              <div className="card text-center py-8">
-                <p className="text-sm text-text-secondary mb-2">No predictions yet</p>
-                <Link to="/submit" className="text-accent text-xs font-medium">Make your first call</Link>
+          {sectors.length > 0 && (
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <h2 className="headline-serif text-base">Community Pulse</h2>
+                <Link to="/heatmap" className="text-[10px] text-accent font-medium">Full heatmap</Link>
               </div>
-            ) : (
-              <div className="space-y-2">
-                {recentPreds.map(p => (
-                  <div key={p.id} className="card py-3 flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <Link to={`/ticker/${p.ticker}`} className="font-mono font-bold text-sm tracking-wider hover:text-accent">{p.ticker}</Link>
-                      <span className={p.direction === 'bullish' ? 'badge-bull' : 'badge-bear'}>{p.direction}</span>
-                    </div>
-                    <span className={`text-xs font-mono ${p.outcome === 'correct' ? 'text-positive' : p.outcome === 'incorrect' ? 'text-negative' : 'text-muted'}`}>
-                      {p.outcome}
-                    </span>
-                  </div>
+              <div className="grid grid-cols-2 gap-2">
+                {sectors.map(s => (
+                  <SectorBlock key={s.sector} sector={s} compact onClick={() => {}} />
                 ))}
               </div>
-            )}
-          </div>
-
-          {/* Activity feed */}
-          <div>
-            <div className="card">
-              <LiveActivityFeed limit={8} poll={30000} />
             </div>
-          </div>
+          )}
         </div>
+
+        {/* ── SECTION 6: FOOTER STATS ────────────────────────────────── */}
+        {stats && (
+          <p className="text-center text-[11px] text-muted/50 mb-4">
+            Eidolum is tracking <span className="font-mono">{stats.total_predictions?.toLocaleString()}</span> predictions across <span className="font-mono">{(stats.total_forecasters + stats.total_users)?.toLocaleString()}</span> forecasters. Updated hourly.
+          </p>
+        )}
       </div>
-      {showHelp && <HelpModal onClose={() => setShowHelp(false)} />}
       <Footer />
     </div>
   );
 }
 
-function QuickStat({ label, value, accent }) {
+function StatusItem({ label, value, color = 'text-text-primary' }) {
   return (
-    <div className="card text-center py-3">
-      <div className={`font-mono text-lg font-bold ${accent ? 'text-accent' : 'text-text-primary'}`}>{value}</div>
-      <div className="text-[10px] text-muted">{label}</div>
+    <div className="flex-shrink-0 text-center">
+      <div className={`font-mono text-sm font-bold ${color}`}>{value}</div>
+      <div className="text-[9px] text-muted uppercase tracking-wider">{label}</div>
     </div>
   );
+}
+
+function Divider() {
+  return <div className="w-px h-6 bg-border flex-shrink-0" />;
 }
