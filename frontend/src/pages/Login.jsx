@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { LogIn, Eye, EyeOff } from 'lucide-react';
+import { Eye, EyeOff } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import GoogleSignInButton from '../components/GoogleSignInButton';
 import Footer from '../components/Footer';
 
 export default function Login() {
@@ -22,7 +23,7 @@ export default function Login() {
     setLoading(true);
     try {
       await login(email, password);
-      navigate('/profile');
+      navigate('/');
     } catch (err) {
       setError(err.response?.data?.detail || 'Invalid email or password');
     } finally { setLoading(false); }
@@ -39,6 +40,14 @@ export default function Login() {
         {error && (
           <div className="bg-negative/10 border border-negative/20 rounded-lg px-4 py-3 mb-4 text-sm text-negative">{error}</div>
         )}
+
+        <GoogleSignInButton label="Sign in with Google" />
+
+        <div className="flex items-center gap-3 my-6">
+          <div className="flex-1 h-px bg-border" />
+          <span className="text-xs text-muted">or</span>
+          <div className="flex-1 h-px bg-border" />
+        </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>

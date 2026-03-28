@@ -59,7 +59,6 @@ export default function WatchlistPage() {
               <Eye className="w-6 h-6 text-accent" />
               <h1 className="font-bold" style={{ fontSize: 'clamp(24px, 5vw, 36px)' }}>Watchlist</h1>
             </div>
-            <p className="text-text-secondary text-sm">{items.length} ticker{items.length !== 1 ? 's' : ''}</p>
           </div>
           <button onClick={() => setShowAdd(!showAdd)} className="btn-primary text-sm px-4 py-2.5">
             <Plus className="w-4 h-4" /> Add

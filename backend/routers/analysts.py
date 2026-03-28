@@ -2,13 +2,18 @@
 Analyst/forecaster pages — dedicated profiles for scraped Wall Street analysts and firms.
 """
 from collections import defaultdict
-from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from typing import Optional
+from fastapi import APIRouter, Body, Depends, HTTPException, Query, Request
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 
 from database import get_db
-from models import Forecaster, Prediction
+from models import Forecaster, Prediction, AnalystSubscription, User
 from rate_limit import limiter
+from auth import get_current_user as _decode_token
+
+_optional_bearer = HTTPBearer(auto_error=False)
 
 router = APIRouter()
 
@@ -297,3 +302,134 @@ def analyst_predictions(
             for p in preds
         ],
     }
+
+
+def _get_user_id(credentials) -> Optional[int]:
+    """Extract user_id from optional bearer token, or return None."""
+    if not credentials or not credentials.credentials:
+        return None
+    try:
+        return _decode_token(credentials.credentials).get("user_id")
+    except Exception:
+        return None
+
+
+# ── GET /api/analysts/{name}/subscription-status ─────────────────────────────
+
+
+@router.get("/analysts/{name}/subscription-status")
+@limiter.limit("60/minute")
+def subscription_status(
+    request: Request,
+    name: str,
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(_optional_bearer),
+    db: Session = Depends(get_db),
+):
+    uid = _get_user_id(credentials)
+    if not uid:
+        return {"subscribed": False}
+
+    sub = db.query(AnalystSubscription).filter(
+        AnalystSubscription.user_id == uid,
+        func.lower(AnalystSubscription.forecaster_name) == name.lower(),
+    ).first()
+    return {"subscribed": sub is not None}
+
+
+# ── POST /api/analysts/{name}/subscribe ──────────────────────────────────────
+
+
+@router.post("/analysts/{name}/subscribe")
+@limiter.limit("30/minute")
+def subscribe_analyst(
+    request: Request,
+    name: str,
+    email: Optional[str] = Body(None, embed=True),
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(_optional_bearer),
+    db: Session = Depends(get_db),
+):
+    # Verify analyst exists
+    f = db.query(Forecaster).filter(func.lower(Forecaster.name) == name.lower()).first()
+    if not f:
+        f = db.query(Forecaster).filter(func.lower(Forecaster.handle) == name.lower()).first()
+    if not f:
+        raise HTTPException(status_code=404, detail="Analyst not found")
+
+    canonical_name = f.name  # Use the DB name for consistency
+
+    uid = _get_user_id(credentials)
+
+    if uid:
+        # Authenticated user — subscribe by user_id
+        existing = db.query(AnalystSubscription).filter(
+            AnalystSubscription.user_id == uid,
+            AnalystSubscription.forecaster_name == canonical_name,
+        ).first()
+        if existing:
+            return {"status": "already_subscribed"}
+
+        # Get user email for the record
+        user = db.query(User).filter(User.id == uid).first()
+        sub = AnalystSubscription(
+            user_id=uid,
+            email=user.email if user else None,
+            forecaster_name=canonical_name,
+        )
+        db.add(sub)
+        db.commit()
+        return {"status": "subscribed"}
+    else:
+        # Anonymous — require email
+        if not email or not email.strip():
+            raise HTTPException(status_code=400, detail="Email is required")
+
+        clean_email = email.strip().lower()
+        existing = db.query(AnalystSubscription).filter(
+            AnalystSubscription.email == clean_email,
+            AnalystSubscription.forecaster_name == canonical_name,
+        ).first()
+        if existing:
+            return {"status": "already_subscribed"}
+
+        sub = AnalystSubscription(
+            email=clean_email,
+            forecaster_name=canonical_name,
+        )
+        db.add(sub)
+        db.commit()
+        return {"status": "subscribed"}
+
+
+# ── DELETE /api/analysts/{name}/subscribe ────────────────────────────────────
+
+
+@router.delete("/analysts/{name}/subscribe")
+@limiter.limit("30/minute")
+def unsubscribe_analyst(
+    request: Request,
+    name: str,
+    email: Optional[str] = Query(None),
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(_optional_bearer),
+    db: Session = Depends(get_db),
+):
+    uid = _get_user_id(credentials)
+
+    if uid:
+        sub = db.query(AnalystSubscription).filter(
+            AnalystSubscription.user_id == uid,
+            func.lower(AnalystSubscription.forecaster_name) == name.lower(),
+        ).first()
+    elif email:
+        sub = db.query(AnalystSubscription).filter(
+            AnalystSubscription.email == email.strip().lower(),
+            func.lower(AnalystSubscription.forecaster_name) == name.lower(),
+        ).first()
+    else:
+        raise HTTPException(status_code=400, detail="Authentication or email required")
+
+    if not sub:
+        return {"status": "not_subscribed"}
+
+    db.delete(sub)
+    db.commit()
+    return {"status": "unsubscribed"}

@@ -31,11 +31,10 @@ export default function Consensus() {
   return (
     <div>
       <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-10">
-        <div className="flex items-center gap-2 mb-1">
+        <div className="flex items-center gap-2 mb-6">
           <TrendingUp className="w-6 h-6 text-accent" />
           <h1 className="font-bold" style={{ fontSize: 'clamp(24px, 5vw, 36px)' }}>Consensus</h1>
         </div>
-        <p className="text-text-secondary text-sm mb-6">Community sentiment on active tickers.</p>
 
         <div className="mb-6">
           <TickerSearch
@@ -53,8 +52,8 @@ export default function Consensus() {
 
         {display.length === 0 && (
           <div className="text-center py-16">
-            <p className="text-text-secondary">No consensus data yet.</p>
-            <p className="text-muted text-sm mt-1">Tickers need 5+ pending predictions to appear.</p>
+            <p className="text-text-secondary">The consensus meter activates with 5 or more active predictions per ticker.</p>
+            <p className="text-muted text-sm mt-1">Start submitting calls.</p>
           </div>
         )}
 

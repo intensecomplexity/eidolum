@@ -209,6 +209,7 @@ class User(Base):
     last_active_date = Column(DateTime, nullable=True)
     last_seen_at = Column(DateTime, nullable=True)
     notification_preferences = Column(Text, nullable=True)  # JSON string
+    auth_provider = Column(String(20), default="email")  # "email" | "google"
 
     predictions = relationship("UserPrediction", back_populates="user", cascade="all, delete-orphan")
     achievements = relationship("Achievement", back_populates="user", cascade="all, delete-orphan")
@@ -457,6 +458,23 @@ class SeasonEntry(Base):
     __table_args__ = (UniqueConstraint("season_id", "user_id", name="uq_season_user"),)
 
     season = relationship("Season", back_populates="entries")
+    user = relationship("User")
+
+
+class AnalystSubscription(Base):
+    __tablename__ = "analyst_subscriptions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=True, index=True)
+    email = Column(String(255), nullable=True)
+    forecaster_name = Column(String(200), nullable=False, index=True)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+    __table_args__ = (
+        UniqueConstraint("user_id", "forecaster_name", name="uq_analyst_sub_user"),
+        UniqueConstraint("email", "forecaster_name", name="uq_analyst_sub_email"),
+    )
+
     user = relationship("User")
 
 

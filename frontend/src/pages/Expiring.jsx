@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Clock, AlertTriangle } from 'lucide-react';
+import { Clock } from 'lucide-react';
 import Footer from '../components/Footer';
 import TypeBadge from '../components/TypeBadge';
 import TickerLink from '../components/TickerLink';
@@ -25,11 +25,10 @@ export default function Expiring() {
   return (
     <div>
       <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-10">
-        <div className="flex items-center gap-2 mb-1">
+        <div className="flex items-center gap-2 mb-6">
           <Clock className="w-6 h-6 text-warning" />
           <h1 className="font-bold" style={{ fontSize: 'clamp(24px, 5vw, 36px)' }}>Expiring Soon</h1>
         </div>
-        <p className="text-text-secondary text-sm mb-6">Predictions about to be scored.</p>
 
         {preds.length === 0 ? (
           <div className="text-center py-16">
@@ -49,7 +48,6 @@ export default function Expiring() {
                       <div className="flex items-center gap-2 mb-1">
                         <TickerLink ticker={p.ticker} className="text-sm" />
                         <span className={p.direction === 'bullish' ? 'badge-bull' : 'badge-bear'}>{p.direction}</span>
-                        {urgent && <AlertTriangle className="w-3.5 h-3.5 text-negative" />}
                       </div>
                       <div className="flex items-center gap-1 text-xs text-muted">
                         <span>by</span>

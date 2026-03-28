@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { TrendingUp, TrendingDown, Clock, AlertTriangle, Trophy, Crosshair, Swords, Check, X } from 'lucide-react';
+import { TrendingUp, TrendingDown, Clock, Trophy, Crosshair, Swords, Check, X } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import ConsensusBar from '../components/ConsensusBar';
 import TypeBadge from '../components/TypeBadge';
@@ -95,7 +95,7 @@ export default function TickerDetail() {
         {expiringSoon.length > 0 && (
           <div className="mb-6">
             <h2 className="text-xs text-muted uppercase tracking-wider mb-3 flex items-center gap-1.5">
-              <AlertTriangle className="w-3.5 h-3.5 text-warning" /> Expiring Soon
+              <Clock className="w-3.5 h-3.5 text-warning" /> Expiring Soon
             </h2>
             <div className="space-y-2">
               {expiringSoon.map(p => {

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Zap, AlertTriangle, Flame, TrendingUp, TrendingDown } from 'lucide-react';
+import { Zap, Flame, TrendingUp, TrendingDown } from 'lucide-react';
 import TypeBadge from '../components/TypeBadge';
 import TickerLink from '../components/TickerLink';
 import ReactionBar from '../components/ReactionBar';

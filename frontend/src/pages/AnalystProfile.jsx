@@ -1,26 +1,96 @@
 import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { Shield, TrendingUp, TrendingDown, Check, X, ExternalLink } from 'lucide-react';
+import { Shield, TrendingUp, TrendingDown, Check, X, ExternalLink, Bell, BellOff } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
 import TypeBadge from '../components/TypeBadge';
 import TickerLink from '../components/TickerLink';
 import AccuracyChart from '../components/AccuracyChart';
 import Footer from '../components/Footer';
-import { getAnalystProfile, getAnalystAccuracyHistory } from '../api';
+import { getAnalystProfile, getAnalystAccuracyHistory, getAnalystSubscriptionStatus, subscribeAnalyst, unsubscribeAnalyst } from '../api';
 
 export default function AnalystProfile() {
   const { name } = useParams();
+  const { isAuthenticated, user } = useAuth();
   const [profile, setProfile] = useState(null);
   const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [subscribed, setSubscribed] = useState(false);
+  const [subLoading, setSubLoading] = useState(false);
+  const [emailInput, setEmailInput] = useState('');
+  const [emailSubmitted, setEmailSubmitted] = useState(false);
+  const [toast, setToast] = useState(null);
 
   useEffect(() => {
     if (!name) return;
     setLoading(true);
-    Promise.all([
+    const fetches = [
       getAnalystProfile(name),
       getAnalystAccuracyHistory(name).catch(() => []),
-    ]).then(([p, h]) => { setProfile(p); setHistory(h); }).catch(() => {}).finally(() => setLoading(false));
-  }, [name]);
+    ];
+    if (isAuthenticated) {
+      fetches.push(getAnalystSubscriptionStatus(name).catch(() => ({ subscribed: false })));
+    }
+    Promise.all(fetches).then(([p, h, sub]) => {
+      setProfile(p);
+      setHistory(h);
+      if (sub) setSubscribed(sub.subscribed);
+    }).catch(() => {}).finally(() => setLoading(false));
+  }, [name, isAuthenticated]);
+
+  function showToast(message) {
+    setToast(message);
+    setTimeout(() => setToast(null), 3500);
+  }
+
+  async function handleSubscribe() {
+    setSubLoading(true);
+    try {
+      await subscribeAnalyst(name);
+      setSubscribed(true);
+      showToast(`You'll be notified when ${profile?.name || name} makes a new prediction`);
+    } catch {
+      showToast('Failed to subscribe');
+    } finally { setSubLoading(false); }
+  }
+
+  async function handleUnsubscribe() {
+    setSubLoading(true);
+    try {
+      await unsubscribeAnalyst(name);
+      setSubscribed(false);
+      showToast(`Unsubscribed from ${profile?.name || name}`);
+    } catch {
+      showToast('Failed to unsubscribe');
+    } finally { setSubLoading(false); }
+  }
+
+  async function handleEmailSubscribe(e) {
+    e.preventDefault();
+    const email = emailInput.trim();
+    if (!email) return;
+    setSubLoading(true);
+    try {
+      await subscribeAnalyst(name, email);
+      setEmailSubmitted(true);
+      showToast(`You'll be notified when ${profile?.name || name} makes a new prediction`);
+    } catch {
+      showToast('Failed to subscribe');
+    } finally { setSubLoading(false); }
+  }
+
+  async function handleEmailUnsubscribe() {
+    const email = emailInput.trim();
+    if (!email) return;
+    setSubLoading(true);
+    try {
+      await unsubscribeAnalyst(name, email);
+      setEmailSubmitted(false);
+      setEmailInput('');
+      showToast(`Unsubscribed from ${profile?.name || name}`);
+    } catch {
+      showToast('Failed to unsubscribe');
+    } finally { setSubLoading(false); }
+  }
 
   if (loading) return <div className="flex items-center justify-center min-h-[60vh]"><div className="w-8 h-8 border-2 border-accent border-t-transparent rounded-full animate-spin" /></div>;
   if (!profile) return <div className="max-w-lg mx-auto px-4 py-20 text-center"><p className="text-text-secondary">Analyst not found.</p></div>;
@@ -30,20 +100,36 @@ export default function AnalystProfile() {
       <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-10">
         {/* Header */}
         <div className="card mb-6">
-          <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-            <div className="w-14 h-14 rounded-full bg-warning/10 border border-warning/20 flex items-center justify-center flex-shrink-0">
-              <Shield className="w-7 h-7 text-warning" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h1 className="font-bold text-xl">{profile.name}</h1>
-                <TypeBadge type="analyst" showLabel size={14} />
+          <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <div className="w-14 h-14 rounded-full bg-warning/10 border border-warning/20 flex items-center justify-center flex-shrink-0">
+                <Shield className="w-7 h-7 text-warning" />
               </div>
-              <p className="text-xs text-muted">Verified Analyst — predictions sourced from published research</p>
-              {profile.channel_url && (
-                <a href={profile.channel_url} target="_blank" rel="noopener noreferrer" className="text-xs text-accent flex items-center gap-1 mt-1">
-                  Source <ExternalLink className="w-3 h-3" />
-                </a>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h1 className="font-bold text-xl">{profile.name}</h1>
+                  <TypeBadge type="analyst" showLabel size={14} />
+                </div>
+                <p className="text-xs text-muted">Verified Analyst — predictions sourced from published research</p>
+                {profile.channel_url && (
+                  <a href={profile.channel_url} target="_blank" rel="noopener noreferrer" className="text-xs text-accent flex items-center gap-1 mt-1">
+                    Source <ExternalLink className="w-3 h-3" />
+                  </a>
+                )}
+              </div>
+            </div>
+            <div className="flex-shrink-0">
+              {isAuthenticated ? (
+                <SubscribeButton subscribed={subscribed} loading={subLoading} onSubscribe={handleSubscribe} onUnsubscribe={handleUnsubscribe} />
+              ) : (
+                <EmailSubscribe
+                  email={emailInput}
+                  setEmail={setEmailInput}
+                  submitted={emailSubmitted}
+                  loading={subLoading}
+                  onSubmit={handleEmailSubscribe}
+                  onUnsubscribe={handleEmailUnsubscribe}
+                />
               )}
             </div>
           </div>
@@ -168,6 +254,11 @@ export default function AnalystProfile() {
         )}
       </div>
       <Footer />
+      {toast && (
+        <div className="fixed bottom-[80px] sm:bottom-6 left-1/2 -translate-x-1/2 z-[70] px-4 py-2.5 rounded-xl text-xs font-medium shadow-lg border bg-surface border-border text-text-primary backdrop-blur-sm toast-slide-up">
+          {toast}
+        </div>
+      )}
     </div>
   );
 }
@@ -178,5 +269,58 @@ function Stat({ label, value, accent }) {
       <div className={`font-mono text-lg font-bold ${accent ? 'text-accent' : 'text-text-primary'}`}>{value}</div>
       <div className="text-[10px] text-muted">{label}</div>
     </div>
+  );
+}
+
+function SubscribeButton({ subscribed, loading, onSubscribe, onUnsubscribe }) {
+  if (subscribed) {
+    return (
+      <div className="relative group">
+        <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-positive bg-positive/10 border border-positive/20">
+          <Bell className="w-3.5 h-3.5" /> Subscribed
+        </span>
+        <button onClick={onUnsubscribe} disabled={loading}
+          className="absolute inset-0 opacity-0 group-hover:opacity-100 flex items-center justify-center rounded-lg text-xs font-medium text-negative bg-negative/10 border border-negative/20 transition-opacity">
+          <BellOff className="w-3.5 h-3.5 mr-1" /> Unsubscribe
+        </button>
+      </div>
+    );
+  }
+  return (
+    <button onClick={onSubscribe} disabled={loading}
+      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-accent bg-accent/10 border border-accent/30 hover:bg-accent/20 transition-colors">
+      <Bell className="w-3.5 h-3.5" /> Get notified
+    </button>
+  );
+}
+
+function EmailSubscribe({ email, setEmail, submitted, loading, onSubmit, onUnsubscribe }) {
+  if (submitted) {
+    return (
+      <div className="flex items-center gap-2">
+        <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-positive bg-positive/10 border border-positive/20">
+          <Bell className="w-3.5 h-3.5" /> Subscribed
+        </span>
+        <button onClick={onUnsubscribe} className="text-[10px] text-muted hover:text-negative transition-colors">
+          Unsubscribe
+        </button>
+      </div>
+    );
+  }
+  return (
+    <form onSubmit={onSubmit} className="flex items-center gap-2">
+      <input
+        type="email"
+        value={email}
+        onChange={e => setEmail(e.target.value)}
+        placeholder="your@email.com"
+        required
+        className="w-40 sm:w-48 px-3 py-1.5 bg-surface-2 border border-border rounded-lg text-xs text-text-primary placeholder:text-muted focus:outline-none focus:border-accent/50"
+      />
+      <button type="submit" disabled={loading}
+        className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium text-accent bg-accent/10 border border-accent/30 hover:bg-accent/20 transition-colors whitespace-nowrap">
+        <Bell className="w-3.5 h-3.5" /> Notify me
+      </button>
+    </form>
   );
 }

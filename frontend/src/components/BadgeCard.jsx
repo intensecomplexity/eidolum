@@ -34,11 +34,10 @@ export default function BadgeCard({ badge, username }) {
               Unlocked {new Date(unlocked_at).toLocaleDateString()}
             </p>
           )}
-          {!earned && progress && (
+          {!earned && progress && progress.target > 0 && (
             <div className="mt-2">
-              <div className="flex items-center justify-between text-[10px] text-muted mb-0.5">
-                <span>{progress.current} / {progress.target}</span>
-                <span>{Math.min(Math.round(progress.current / progress.target * 100), 100)}%</span>
+              <div className="text-[10px] text-muted mb-0.5 font-mono">
+                {progress.current} / {progress.target}
               </div>
               <div className="h-1 bg-surface-2 rounded-full overflow-hidden">
                 <div className="h-full bg-accent/40 rounded-full" style={{ width: `${Math.min(progress.current / progress.target * 100, 100)}%` }} />

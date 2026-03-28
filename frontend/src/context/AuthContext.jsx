@@ -52,6 +52,20 @@ export function AuthProvider({ children }) {
     return data;
   }, []);
 
+  const loginWithToken = useCallback(async (data) => {
+    // data = { user_id, username, display_name, token }
+    localStorage.setItem('eidolum_token', data.token);
+    const userObj = { id: data.user_id, username: data.username, display_name: data.display_name };
+    localStorage.setItem('eidolum_user', JSON.stringify(userObj));
+    setToken(data.token);
+    setUser(userObj);
+    getMe().then(full => {
+      setUser(full);
+      localStorage.setItem('eidolum_user', JSON.stringify(full));
+    }).catch(() => {});
+    return data;
+  }, []);
+
   const logout = useCallback(() => {
     localStorage.removeItem('eidolum_token');
     localStorage.removeItem('eidolum_user');
@@ -72,7 +86,7 @@ export function AuthProvider({ children }) {
   const isAuthenticated = !!token && !!user;
 
   return (
-    <AuthContext.Provider value={{ user, token, loading, isAuthenticated, login, register, logout, refreshProfile }}>
+    <AuthContext.Provider value={{ user, token, loading, isAuthenticated, login, loginWithToken, register, logout, refreshProfile }}>
       {children}
     </AuthContext.Provider>
   );

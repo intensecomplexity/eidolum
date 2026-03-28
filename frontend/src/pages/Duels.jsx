@@ -110,7 +110,8 @@ export default function Duels() {
         {duels.length === 0 ? (
           <div className="text-center py-16">
             <Swords className="w-10 h-10 text-muted/30 mx-auto mb-3" />
-            <p className="text-text-secondary">No duels yet.</p>
+            <p className="text-text-secondary mb-1">No duels yet.</p>
+            <p className="text-muted text-sm">Challenge a friend to see who predicts better.</p>
           </div>
         ) : (
           <div className="space-y-3">

@@ -180,6 +180,14 @@ export function getMe() {
   return api.get('/auth/me', { headers: authHeaders() }).then(r => r.data);
 }
 
+export function getGoogleAuthUrl() {
+  return api.get('/auth/google/login').then(r => r.data);
+}
+
+export function googleCallback(code) {
+  return api.get('/auth/google/callback', { params: { code } }).then(r => r.data);
+}
+
 export function completeOnboarding() {
   return api.post('/auth/onboarding-complete', {}, { headers: authHeaders() }).then(r => r.data);
 }
@@ -356,6 +364,25 @@ export function getAnalystRankings() {
   return api.get('/analysts/rankings').then(r => r.data);
 }
 
+export function getAnalystSubscriptionStatus(name) {
+  const token = localStorage.getItem('eidolum_token');
+  const config = token ? { headers: { Authorization: `Bearer ${token}` } } : {};
+  return api.get(`/analysts/${encodeURIComponent(name)}/subscription-status`, config).then(r => r.data);
+}
+
+export function subscribeAnalyst(name, email) {
+  const token = localStorage.getItem('eidolum_token');
+  const config = token ? { headers: { Authorization: `Bearer ${token}` } } : {};
+  return api.post(`/analysts/${encodeURIComponent(name)}/subscribe`, email ? { email } : {}, config).then(r => r.data);
+}
+
+export function unsubscribeAnalyst(name, email) {
+  const token = localStorage.getItem('eidolum_token');
+  const params = email ? { email } : {};
+  const headers = token ? { Authorization: `Bearer ${token}` } : {};
+  return api.delete(`/analysts/${encodeURIComponent(name)}/subscribe`, { headers, params }).then(r => r.data);
+}
+
 // ——— Controversial ———
 
 export function getControversialPredictions() {
@@ -472,7 +499,9 @@ export function getUserPredictions(userId, outcome) {
 }
 
 export function getUserProfile(userId) {
-  return api.get(`/users/${userId}/profile`).then(r => r.data);
+  const token = localStorage.getItem('eidolum_token');
+  const config = token ? { headers: { Authorization: `Bearer ${token}` } } : {};
+  return api.get(`/users/${userId}/profile`, config).then(r => r.data);
 }
 
 export function getCommunityLeaderboard(userType) {

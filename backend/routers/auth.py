@@ -1,13 +1,26 @@
+import os
 import re
-from fastapi import APIRouter, Depends, HTTPException, Request
+import secrets
+from urllib.parse import urlencode, quote
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi.responses import RedirectResponse
 from pydantic import BaseModel
 from typing import Optional
 from sqlalchemy.orm import Session
+import httpx
 
 from database import get_db
 from models import User
 from auth import hash_password, verify_password, create_token, get_current_user_dep
 from rate_limit import limiter
+
+# Google OAuth config
+GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID", "")
+GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET", "")
+GOOGLE_REDIRECT_URI = os.getenv("GOOGLE_REDIRECT_URI", "https://eidolum.com/auth/google/callback")
+# NOTE: If this points to the frontend SPA, the frontend exchanges the code via API.
+# If this points to the backend (e.g. /api/auth/google/callback), the backend handles
+# the code exchange and redirects to the frontend with the token.
 
 router = APIRouter()
 
@@ -45,6 +58,7 @@ def _user_dict(user: User) -> dict:
         "weekly_digest_enabled": bool(user.weekly_digest_enabled) if hasattr(user, 'weekly_digest_enabled') else True,
         "prediction_streak_daily": user.return_streak_current or 0,
         "prediction_streak_daily_best": user.return_streak_best or 0,
+        "auth_provider": getattr(user, 'auth_provider', 'email') or 'email',
         "is_online": _is_user_online(user),
         "last_seen": _last_seen(user),
     }
@@ -58,6 +72,138 @@ def _is_user_online(user):
 def _last_seen(user):
     from online_status import last_seen_text
     return last_seen_text(user)
+
+
+def _has_real_password(user) -> bool:
+    """Check if a user has a real (user-set) password vs a random placeholder."""
+    if not user.password_hash:
+        return False
+    # Google-created users get a 64-char random hash as placeholder
+    # bcrypt hashes always start with $2b$ — so if it's a bcrypt hash, it's real
+    return user.password_hash.startswith("$2b$") or user.password_hash.startswith("$2a$")
+
+
+def _generate_username(email: str, db: Session) -> str:
+    """Generate a unique username from an email address."""
+    base = re.sub(r'[^a-zA-Z0-9_]', '', email.split('@')[0])[:20]
+    if len(base) < 3:
+        base = "user"
+    # Try the base first
+    if not db.query(User).filter(User.username == base).first():
+        return base
+    # Append random digits
+    for _ in range(20):
+        candidate = f"{base}{secrets.randbelow(1000)}"
+        if not db.query(User).filter(User.username == candidate).first():
+            return candidate
+    return f"{base}{secrets.token_hex(4)}"
+
+
+# ── GET /api/auth/google/login ────────────────────────────────────────────────
+
+
+@router.get("/auth/google/login")
+@limiter.limit("20/minute")
+def google_auth_url(request: Request):
+    """Return the Google OAuth consent screen URL."""
+    if not GOOGLE_CLIENT_ID:
+        raise HTTPException(status_code=503, detail="Google sign-in is not configured")
+
+    params = {
+        "client_id": GOOGLE_CLIENT_ID,
+        "redirect_uri": GOOGLE_REDIRECT_URI,
+        "response_type": "code",
+        "scope": "openid email profile",
+        "access_type": "offline",
+        "prompt": "select_account",
+    }
+    url = f"https://accounts.google.com/o/oauth2/v2/auth?{urlencode(params)}"
+    return {"url": url}
+
+
+# ── GET /api/auth/google/callback ────────────────────────────────────────────
+
+
+@router.get("/auth/google/callback")
+@limiter.limit("20/minute")
+def google_callback(request: Request, code: str = Query(...), db: Session = Depends(get_db)):
+    """Exchange Google auth code for user info, create/login user, return JWT."""
+    if not GOOGLE_CLIENT_ID or not GOOGLE_CLIENT_SECRET:
+        raise HTTPException(status_code=503, detail="Google sign-in is not configured")
+
+    # Exchange code for tokens
+    try:
+        token_resp = httpx.post("https://oauth2.googleapis.com/token", data={
+            "code": code,
+            "client_id": GOOGLE_CLIENT_ID,
+            "client_secret": GOOGLE_CLIENT_SECRET,
+            "redirect_uri": GOOGLE_REDIRECT_URI,
+            "grant_type": "authorization_code",
+        }, timeout=10)
+        token_data = token_resp.json()
+    except Exception:
+        raise HTTPException(status_code=502, detail="Failed to contact Google")
+
+    if "access_token" not in token_data:
+        error = token_data.get("error_description", token_data.get("error", "Unknown error"))
+        raise HTTPException(status_code=400, detail=f"Google auth failed: {error}")
+
+    # Fetch user info
+    try:
+        userinfo_resp = httpx.get("https://www.googleapis.com/oauth2/v2/userinfo", headers={
+            "Authorization": f"Bearer {token_data['access_token']}"
+        }, timeout=10)
+        guser = userinfo_resp.json()
+    except Exception:
+        raise HTTPException(status_code=502, detail="Failed to fetch Google profile")
+
+    google_email = guser.get("email")
+    if not google_email:
+        raise HTTPException(status_code=400, detail="Google account has no email")
+
+    google_name = guser.get("name", "")
+    google_picture = guser.get("picture", "")
+
+    # Check if user exists
+    user = db.query(User).filter(User.email == google_email).first()
+
+    if user:
+        # Existing user — link account if they signed up with email
+        if hasattr(user, 'auth_provider') and (not user.auth_provider or user.auth_provider == 'email'):
+            user.auth_provider = 'google'
+        if google_picture and not user.avatar_url:
+            user.avatar_url = google_picture
+        if google_name and not user.display_name:
+            user.display_name = google_name
+        db.commit()
+    else:
+        # New user — create account
+        username = _generate_username(google_email, db)
+        user = User(
+            username=username,
+            email=google_email,
+            password_hash=secrets.token_hex(32),  # Random placeholder, not a real password
+            display_name=google_name or username,
+            avatar_url=google_picture,
+        )
+        if hasattr(User, 'auth_provider'):
+            user.auth_provider = 'google'
+        db.add(user)
+        db.commit()
+        db.refresh(user)
+
+        from activity import log_activity
+        log_activity(user_id=user.id, event_type="user_joined", description=f"{user.username} joined Eidolum", data={"user_id": user.id}, db=db)
+        db.commit()
+
+    jwt_token = create_token(user.id, user.username)
+    frontend_url = os.getenv("FRONTEND_URL", "https://eidolum.com")
+    params = urlencode({
+        "token": jwt_token,
+        "user_id": user.id,
+        "username": user.username,
+    })
+    return RedirectResponse(url=f"{frontend_url}/auth/callback?{params}", status_code=302)
 
 
 # ── POST /api/auth/register ──────────────────────────────────────────────────
@@ -115,10 +261,15 @@ def register(request: Request, req: RegisterRequest, db: Session = Depends(get_d
 @limiter.limit("10/minute")
 def login(request: Request, req: LoginRequest, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.email == req.email).first()
-    if not user or not user.password_hash:
+    if not user:
         raise HTTPException(status_code=401, detail="Invalid email or password")
 
-    if not verify_password(req.password, user.password_hash):
+    # Google-only user trying password login
+    auth_provider = getattr(user, 'auth_provider', 'email') or 'email'
+    if auth_provider == 'google' and not _has_real_password(user):
+        raise HTTPException(status_code=401, detail="This account uses Google sign-in. Please use the Google button.")
+
+    if not user.password_hash or not verify_password(req.password, user.password_hash):
         raise HTTPException(status_code=401, detail="Invalid email or password")
 
     return {

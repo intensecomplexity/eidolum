@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Calendar, TrendingUp, TrendingDown, AlertTriangle, Crosshair } from 'lucide-react';
+import { Calendar, TrendingUp, TrendingDown, Crosshair } from 'lucide-react';
 import ConsensusBar from '../components/ConsensusBar';
 import TickerLink from '../components/TickerLink';
 import Footer from '../components/Footer';
@@ -51,7 +51,6 @@ export default function Earnings() {
                     <h2 className={`text-sm font-semibold ${urgent ? 'text-warning' : 'text-text-secondary'}`}>
                       {dayLabel}
                     </h2>
-                    {urgent && <AlertTriangle className="w-3.5 h-3.5 text-warning" />}
                     <span className="text-xs text-muted font-mono">{items[0].days_until}d</span>
                   </div>
 

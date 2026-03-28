@@ -1,6 +1,21 @@
 # ──────────────────────────────────────────────────────────────────────────────
 # Required environment variables (add to Railway / .env):
-#   JWT_SECRET  – long random string, e.g. openssl rand -hex 32
+#   JWT_SECRET           – long random string, e.g. openssl rand -hex 32
+#
+# Google OAuth setup (optional — skip if not using Google sign-in):
+#   GOOGLE_CLIENT_ID     – from console.cloud.google.com → APIs & Services → Credentials
+#   GOOGLE_CLIENT_SECRET – same page
+#   GOOGLE_REDIRECT_URI  – set to: https://eidolum.com/auth/google/callback
+#   FRONTEND_URL         – set to: https://eidolum.com (for post-auth redirect)
+#   Steps:
+#     1. Go to console.cloud.google.com (project: youtube-api-project-491213)
+#     2. APIs & Services → Credentials → Create OAuth 2.0 Client ID
+#     3. Application type: Web application
+#     4. Authorized redirect URI: https://eidolum.com/auth/google/callback
+#     5. Copy Client ID + Client Secret to Railway env vars
+#   Endpoints:
+#     GET /api/auth/google/login    → returns OAuth URL for frontend to redirect to
+#     GET /api/auth/google/callback → exchanges code, redirects to frontend with token
 # ──────────────────────────────────────────────────────────────────────────────
 
 import os

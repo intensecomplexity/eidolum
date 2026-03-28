@@ -347,7 +347,7 @@ def get_global_stats(request: Request, db: Session = Depends(get_db)):
         scraped_total = db.query(func.count(Prediction.id)).scalar() or 0
         scraped_scored = db.query(func.count(Prediction.id)).filter(Prediction.outcome.in_(["correct", "incorrect"])).scalar() or 0
         scraped_correct = db.query(func.count(Prediction.id)).filter(Prediction.outcome == "correct").scalar() or 0
-        total_forecasters = db.query(func.count(Forecaster.id)).scalar() or 0
+        total_forecasters = db.query(func.count(Forecaster.id)).filter(Forecaster.total_predictions > 0).scalar() or 0
     except Exception:
         scraped_total = scraped_scored = scraped_correct = total_forecasters = 0
 

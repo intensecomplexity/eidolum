@@ -68,11 +68,10 @@ export default function Seasons() {
   return (
     <div>
       <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-10">
-        <div className="flex items-center gap-2 mb-1">
+        <div className="flex items-center gap-2 mb-6">
           <Calendar className="w-6 h-6 text-accent" />
           <h1 className="font-bold" style={{ fontSize: 'clamp(24px, 5vw, 36px)' }}>Seasons</h1>
         </div>
-        <p className="text-text-secondary text-sm mb-6">Quarterly competitive seasons with unique themes.</p>
 
         {/* Current season card */}
         {current && (

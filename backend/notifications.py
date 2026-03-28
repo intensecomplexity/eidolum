@@ -24,6 +24,7 @@ TYPE_TO_CATEGORY = {
     "price_alert": "price_alerts",
     "watchlist_prediction": "watchlist",
     "leaderboard_rank": "leaderboard",
+    "analyst_prediction": "watchlist",
 }
 
 DEFAULT_PREFERENCES = {

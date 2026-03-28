@@ -760,6 +760,40 @@ def run_phase2_migrations():
         except Exception:
             db.rollback()
 
+    # ── 29. analyst_subscriptions table ──────────────────────────────
+    try:
+        db.execute(text("""
+            CREATE TABLE IF NOT EXISTS analyst_subscriptions (
+                id SERIAL PRIMARY KEY,
+                user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+                email VARCHAR(255),
+                forecaster_name VARCHAR(200) NOT NULL,
+                created_at TIMESTAMP DEFAULT NOW(),
+                CONSTRAINT uq_analyst_sub_user UNIQUE (user_id, forecaster_name),
+                CONSTRAINT uq_analyst_sub_email UNIQUE (email, forecaster_name)
+            )
+        """))
+        db.commit()
+        print("[Phase2] analyst_subscriptions table created")
+    except Exception as e:
+        db.rollback()
+        if "already exists" not in str(e).lower():
+            print(f"[Phase2] analyst_subscriptions: {e}")
+
+    try:
+        db.execute(text("CREATE INDEX IF NOT EXISTS ix_analyst_sub_forecaster ON analyst_subscriptions(forecaster_name)"))
+        db.commit()
+    except Exception:
+        db.rollback()
+
+    # ── 30. users.auth_provider column ───────────────────────────────
+    try:
+        db.execute(text("ALTER TABLE users ADD COLUMN auth_provider VARCHAR(20) DEFAULT 'email'"))
+        db.commit()
+        print("[Phase2] users.auth_provider column added")
+    except Exception:
+        db.rollback()
+
     print("[Phase2] All migrations complete")
     db.close()
 
@@ -1360,6 +1394,11 @@ async def lifespan(app):
             db.close()
 
     scheduler.add_job(run_earnings_update, "cron", hour=0, minute=15, id="earnings_update")
+
+    # Analyst subscription notifications — every hour
+    from jobs.analyst_notifications import run_analyst_notifications
+    scheduler.add_job(run_analyst_notifications, "interval", hours=1, id="analyst_notifications", next_run_time=datetime.utcnow() + timedelta(minutes=45))
+
     scheduler.start()
     job_ids = [j.id for j in scheduler.get_jobs()]
     print(f"[STARTUP] Active scrapers: {', '.join(job_ids)}")

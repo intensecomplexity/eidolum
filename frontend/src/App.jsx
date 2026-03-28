@@ -23,6 +23,7 @@ import ForecastersList from './pages/ForecastersList';
 import AdminPanel from './pages/AdminPanel';
 import Login from './pages/Login';
 import Register from './pages/Register';
+import GoogleCallback from './pages/GoogleCallback';
 import Profile from './pages/Profile';
 import SubmitCall from './pages/SubmitCall';
 import MyCalls from './pages/MyCalls';
@@ -75,6 +76,8 @@ export default function App() {
         {/* Phase 2 */}
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
+        <Route path="/auth/google/callback" element={<GoogleCallback />} />
+        <Route path="/auth/callback" element={<GoogleCallback />} />
         <Route path="/profile" element={<Profile />} />
         <Route path="/profile/:userId" element={<Profile />} />
         <Route path="/submit" element={<SubmitCall />} />

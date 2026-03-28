@@ -1,20 +1,19 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams, Link } from 'react-router-dom';
-import { User, TrendingUp, TrendingDown, Flame, Target, Award, LogOut, Crosshair, UserPlus, UserMinus } from 'lucide-react';
+import { User, TrendingUp, TrendingDown, Flame, Target, Crosshair, UserPlus } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import Footer from '../components/Footer';
 import TypeBadge from '../components/TypeBadge';
 import StreakCalendar from '../components/StreakCalendar';
-import TrackRecordCard from '../components/TrackRecordCard';
 import AccuracyChart from '../components/AccuracyChart';
 import AccuracyBreakdown from '../components/AccuracyBreakdown';
 import ShareButton from '../components/ShareButton';
-import { getUserProfile, getUserAchievements, getUserPredictions, followUser, unfollowUser, getFollowers, getUserAccuracyHistory, getUserAccuracyByCategory } from '../api';
+import { getUserProfile, getUserAchievements, getUserPredictions, followUser, unfollowUser, getUserAccuracyHistory, getUserAccuracyByCategory } from '../api';
 
 export default function Profile() {
   const navigate = useNavigate();
   const { userId } = useParams();
-  const { isAuthenticated, user, logout } = useAuth();
+  const { isAuthenticated, user } = useAuth();
 
   const isOwnProfile = !userId || (user && (userId == user.id || userId == user.user_id));
   const targetId = isOwnProfile ? (user?.id || user?.user_id) : parseInt(userId);
@@ -27,6 +26,7 @@ export default function Profile() {
   const [loading, setLoading] = useState(true);
   const [friendshipStatus, setFriendshipStatus] = useState('none'); // none, pending_sent, pending_received, accepted
   const [followLoading, setFollowLoading] = useState(false);
+  const [toast, setToast] = useState(null); // { message, type: 'success' | 'error' }
 
   useEffect(() => {
     if (!targetId) { setLoading(false); return; }
@@ -70,27 +70,51 @@ export default function Profile() {
 
   const earnedBadges = badges.filter(b => b.earned);
 
+  function showToast(message, type = 'success') {
+    setToast({ message, type });
+    setTimeout(() => setToast(null), 3000);
+  }
+
   async function handleFriendAction(action) {
     setFollowLoading(true);
     try {
       if (action === 'send') {
         await followUser(targetId);
         setFriendshipStatus('pending_sent');
+        showToast('Friend request sent');
       } else if (action === 'accept') {
         const { acceptFriendRequest } = await import('../api');
         await acceptFriendRequest(targetId);
         setFriendshipStatus('accepted');
         setProfile(p => ({ ...p, followers_count: (p.followers_count || 0) + 1 }));
+        showToast('Friend request accepted');
       } else if (action === 'decline') {
         const { declineFriendRequest } = await import('../api');
         await declineFriendRequest(targetId);
         setFriendshipStatus('none');
+        showToast('Request declined');
       } else if (action === 'unfriend') {
         await unfollowUser(targetId);
         setFriendshipStatus('none');
         setProfile(p => ({ ...p, followers_count: Math.max(0, (p.followers_count || 1) - 1) }));
+        showToast('Unfriended');
       }
-    } catch {} finally { setFollowLoading(false); }
+    } catch (err) {
+      const status = err?.response?.status;
+      const detail = err?.response?.data?.detail || '';
+      if (status === 409) {
+        if (detail.toLowerCase().includes('already friends') || detail.toLowerCase().includes('already accepted')) {
+          setFriendshipStatus('accepted');
+          showToast('Already friends');
+        } else {
+          // "Request already sent" or any other 409
+          setFriendshipStatus('pending_sent');
+          showToast('Friend request already sent');
+        }
+      } else {
+        showToast(detail || 'Something went wrong', 'error');
+      }
+    } finally { setFollowLoading(false); }
   }
 
   return (
@@ -100,9 +124,13 @@ export default function Profile() {
         <div className="card mb-6">
           <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
             <div className="flex items-center gap-4">
-              <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-accent/10 border border-accent/20 flex items-center justify-center flex-shrink-0">
-                <span className="font-mono text-2xl text-accent font-bold">{(profile.username || '?')[0].toUpperCase()}</span>
-              </div>
+              {profile.avatar_url ? (
+                <img src={profile.avatar_url} alt="" className="w-14 h-14 sm:w-16 sm:h-16 rounded-full border border-accent/20 flex-shrink-0 object-cover" referrerPolicy="no-referrer" />
+              ) : (
+                <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-accent/10 border border-accent/20 flex items-center justify-center flex-shrink-0">
+                  <span className="font-mono text-2xl text-accent font-bold">{(profile.username || '?')[0].toUpperCase()}</span>
+                </div>
+              )}
               <div>
                 <div className="flex items-center gap-2">
                   <h1 className="font-bold text-lg sm:text-xl">{profile.display_name || profile.username}</h1>
@@ -112,7 +140,6 @@ export default function Profile() {
                 <div className="flex items-center gap-3 mt-1">
                   <span className="text-xs" style={{ color: profile.rank_color }}>{profile.rank_name}</span>
                   <span className="text-muted text-xs">{profile.followers_count || 0} friends</span>
-                  <span className="text-muted text-xs">{profile.following_count || 0} following</span>
                 </div>
               </div>
             </div>
@@ -124,10 +151,7 @@ export default function Profile() {
                 </>
               )}
               {isOwnProfile && (
-                <>
-                  <ShareButton userId={targetId} />
-                  <button onClick={logout} className="text-muted text-xs flex items-center gap-1"><LogOut className="w-3.5 h-3.5" /><span className="hidden sm:inline">Log out</span></button>
-                </>
+                <ShareButton userId={targetId} />
               )}
             </div>
           </div>
@@ -201,11 +225,6 @@ export default function Profile() {
           )}
         </div>
 
-        {/* Track Record Card */}
-        <div className="mb-6">
-          <TrackRecordCard profile={profile} />
-        </div>
-
         {/* Badges */}
         {earnedBadges.length > 0 && (
           <div className="card mb-6">
@@ -232,6 +251,15 @@ export default function Profile() {
         )}
       </div>
       <Footer />
+      {toast && (
+        <div className={`fixed bottom-[80px] sm:bottom-6 left-1/2 -translate-x-1/2 z-[70] px-4 py-2.5 rounded-xl text-xs font-medium shadow-lg border backdrop-blur-sm toast-slide-up ${
+          toast.type === 'error'
+            ? 'bg-negative/90 border-negative/30 text-white'
+            : 'bg-surface border-border text-text-primary'
+        }`}>
+          {toast.message}
+        </div>
+      )}
     </div>
   );
 }

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Flame, Crosshair, Clock, AlertTriangle, Users, Swords, Award } from 'lucide-react';
+import { Flame, Crosshair, Clock, Users, Swords, Award } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import DailyChallengeCard from '../components/DailyChallengeCard';
 import LiveActivityFeed from '../components/LiveActivityFeed';
@@ -155,7 +155,7 @@ export default function Dashboard() {
         {/* ── SECTION 6: FOOTER STATS ────────────────────────────────── */}
         {stats && (
           <p className="text-center text-[11px] text-muted/50 mb-4">
-            Eidolum is tracking <span className="font-mono">{stats.total_predictions?.toLocaleString()}</span> predictions across <span className="font-mono">{(stats.total_forecasters + stats.total_users)?.toLocaleString()}</span> forecasters. Updated hourly.
+            Eidolum is tracking <span className="font-mono">{stats.total_predictions?.toLocaleString()}</span> predictions from <span className="font-mono">{stats.total_forecasters?.toLocaleString()}</span> analysts and <span className="font-mono">{stats.total_users?.toLocaleString()}</span> players. Updated hourly.
           </p>
         )}
       </div>

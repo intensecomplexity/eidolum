@@ -1,58 +1,46 @@
 import { useEffect, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { ChevronDown, Filter, Clock, Trophy, Flame, FileText } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { ChevronDown, Filter, Trophy, Flame } from 'lucide-react';
 import Footer from '../components/Footer';
 import PlatformBadge from '../components/PlatformBadge';
 import RankBadge from '../components/RankBadge';
 import StreakBadge from '../components/StreakBadge';
 import LeaderboardCard from '../components/LeaderboardCard';
-import PendingPredictions from '../components/PendingPredictions';
 import NotificationBanner from '../components/NotificationBanner';
 import FollowButton from '../components/FollowButton';
 import { getLeaderboard } from '../api';
 
 const SECTORS = ['All', 'Technology', 'Finance', 'Energy', 'Healthcare', 'Consumer', 'Index', 'Crypto'];
 const DIRECTIONS = ['All', 'bullish', 'bearish'];
-const CONFLICT_FILTERS = ['All', 'No Conflicts', 'Has Disclosures'];
 
 const TABS = [
   { key: 'alltime', label: 'All Time', mobileLabel: 'All', icon: Trophy },
   { key: 'week', label: 'This Week', mobileLabel: 'Week', icon: Flame },
   { key: 'sector', label: 'By Sector', mobileLabel: 'Sector', icon: Filter },
-  { key: 'report', label: 'Report Cards', mobileLabel: 'Grades', icon: FileText },
-  { key: 'pending', label: 'Pending', mobileLabel: 'Pending', icon: Clock },
 ];
 
 export default function Leaderboard() {
-  const navigate = useNavigate();
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('alltime');
   const [sector, setSector] = useState('All');
   const [direction, setDirection] = useState('All');
-  const [conflictFilter, setConflictFilter] = useState('All');
 
   function handleTabClick(key) {
-    if (key === 'report') {
-      navigate('/leaderboard/report-cards');
-      return;
-    }
     setActiveTab(key);
   }
 
   useEffect(() => {
-    if (activeTab === 'pending') return;
     setLoading(true);
     const params = {};
     if (activeTab === 'week') params.tab = 'week';
     if (sector !== 'All') params.sector = sector;
     if (direction !== 'All') params.direction = direction;
-    if (conflictFilter === 'No Conflicts') params.filter = 'no_conflicts';
     getLeaderboard(params)
       .then(setData)
       .catch(() => {})
       .finally(() => setLoading(false));
-  }, [activeTab, sector, direction, conflictFilter]);
+  }, [activeTab, sector, direction]);
 
   return (
     <div>
@@ -81,28 +69,12 @@ export default function Leaderboard() {
               <Icon className="w-4 h-4" />
               <span className="sm:hidden">{mobileLabel}</span>
               <span className="hidden sm:inline">{label}</span>
-              {key === 'pending' && (
-                <span className="pulse-live w-1.5 h-1.5 rounded-full bg-muted inline-block" />
-              )}
             </button>
           ))}
         </div>
 
-        {/* Pending Tab */}
-        {activeTab === 'pending' ? (
-          <div>
-            <div className="mb-4">
-              <h2 className="text-base sm:text-lg font-semibold mb-1">Awaiting Resolution</h2>
-              <p className="text-text-secondary text-sm">
-                Predictions made but not yet verified.
-              </p>
-            </div>
-            <PendingPredictions />
-          </div>
-        ) : (
-          <>
-            {/* Filters — horizontal scroll pills on mobile */}
-            <div className="flex items-center gap-2 mb-4 sm:mb-6 overflow-x-auto pills-scroll pb-1">
+        {/* Filters */}
+        <div className="flex items-center gap-2 mb-4 sm:mb-6 overflow-x-auto pills-scroll pb-1">
               <Filter className="w-4 h-4 text-muted shrink-0 hidden sm:block" />
 
               {(activeTab === 'sector' || activeTab === 'alltime') && (
@@ -164,20 +136,6 @@ export default function Leaderboard() {
                 >
                   {DIRECTIONS.map((d) => (
                     <option key={d} value={d}>{d === 'All' ? 'All Calls' : d === 'bullish' ? 'Bullish Only' : 'Bearish Only'}</option>
-                  ))}
-                </select>
-                <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-muted pointer-events-none" />
-              </div>
-
-              {/* Conflict filter (desktop) */}
-              <div className="relative hidden sm:block">
-                <select
-                  value={conflictFilter}
-                  onChange={(e) => setConflictFilter(e.target.value)}
-                  className="appearance-none bg-surface border border-border rounded-lg px-3 py-1.5 pr-8 text-sm text-text-primary focus:outline-none focus:border-accent/50 cursor-pointer"
-                >
-                  {CONFLICT_FILTERS.map((cf) => (
-                    <option key={cf} value={cf}>{cf}</option>
                   ))}
                 </select>
                 <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-muted pointer-events-none" />
@@ -285,8 +243,6 @@ export default function Leaderboard() {
             {activeTab === 'week' && data.length > 0 && (
               <NotificationBanner text="Get weekly leaderboard updates delivered to your inbox every Monday." />
             )}
-          </>
-        )}
       </div>
 
       <Footer />
