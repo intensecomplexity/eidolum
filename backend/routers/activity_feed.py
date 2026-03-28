@@ -12,6 +12,9 @@ from auth import get_current_user as _decode_token
 router = APIRouter()
 _optional_bearer = HTTPBearer(auto_error=False)
 
+# Only show prediction-related events in the public feed
+FEED_EVENT_TYPES = ("prediction_submitted", "prediction_scored")
+
 
 def _rank_name(scored: int) -> str:
     if scored >= 250: return "Legendary"
@@ -44,7 +47,7 @@ def global_feed(
     ticker: Optional[str] = Query(None),
     db: Session = Depends(get_db),
 ):
-    query = db.query(ActivityEvent)
+    query = db.query(ActivityEvent).filter(ActivityEvent.event_type.in_(FEED_EVENT_TYPES))
 
     if before:
         query = query.filter(ActivityEvent.id < before)
@@ -53,7 +56,6 @@ def global_feed(
 
     events = query.order_by(ActivityEvent.created_at.desc()).limit(50).all()
 
-    # Batch fetch users
     user_ids = set(e.user_id for e in events)
     users = {u.id: u for u in db.query(User).filter(User.id.in_(user_ids)).all()} if user_ids else {}
 
@@ -83,11 +85,10 @@ def following_feed(
             for f in db.query(Follow.following_id).filter(Follow.follower_id == current_user_id).all()
         ]
 
-    query = db.query(ActivityEvent)
+    query = db.query(ActivityEvent).filter(ActivityEvent.event_type.in_(FEED_EVENT_TYPES))
 
     if following_ids:
         query = query.filter(ActivityEvent.user_id.in_(following_ids))
-    # If not following anyone, fall back to global
 
     if before:
         query = query.filter(ActivityEvent.id < before)
