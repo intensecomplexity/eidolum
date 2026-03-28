@@ -11,10 +11,17 @@ router = APIRouter()
 
 
 def _season_dict(s: Season) -> dict:
+    # Compute quarter label from start date
+    quarter_label = ""
+    if s.starts_at:
+        q = (s.starts_at.month - 1) // 3 + 1
+        quarter_label = f"Q{q} {s.starts_at.year}"
+
     return {
         "id": s.id,
         "name": s.name,
-        "subtitle": s.theme_icon or "",  # theme_icon column stores subtitle
+        "quarter_label": quarter_label,
+        "subtitle": s.theme_icon or "",
         "starts_at": s.starts_at.isoformat() if s.starts_at else None,
         "ends_at": s.ends_at.isoformat() if s.ends_at else None,
         "status": s.status,

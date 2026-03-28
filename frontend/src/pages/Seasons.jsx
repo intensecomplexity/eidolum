@@ -84,7 +84,10 @@ export default function Seasons() {
                 <span className="font-mono text-sm" style={{ color: activeColor }}>{countdown}</span>
               </div>
               <h2 className="headline-serif text-2xl sm:text-3xl mb-1" style={{ color: activeColor }}>{current.name}</h2>
-              {current.subtitle && <p className="text-sm text-muted mb-2">{current.subtitle}</p>}
+              <p className="text-sm text-muted mb-2">
+                <span className="font-mono text-text-secondary text-xs">{current.quarter_label}</span>
+                {current.subtitle && <> &middot; {current.subtitle}</>}
+              </p>
               <div className="text-xs text-muted">
                 Ends in <span className="font-mono" style={{ color: activeColor }}>{countdown}</span>
                 <span className="ml-2">{new Date(current.starts_at).toLocaleDateString()} — {new Date(current.ends_at).toLocaleDateString()}</span>
@@ -102,19 +105,11 @@ export default function Seasons() {
               <button key={s.id} onClick={() => handleSelectSeason(s.id)}
                 className={`px-4 py-2 rounded-lg text-xs font-bold whitespace-nowrap transition-colors uppercase tracking-wider ${isActive ? 'border' : 'bg-surface text-text-secondary border border-border'}`}
                 style={isActive ? { color: c, borderColor: `${c}40`, background: `${c}15` } : {}}>
-                {s.name} {s.status === 'active' ? '(Live)' : ''}
+                {s.name} <span className="font-normal normal-case tracking-normal opacity-60">&middot; {s.quarter_label}</span> {s.status === 'active' ? '(Live)' : ''}
               </button>
             );
           })}
         </div>
-
-        {/* Season leaderboard header */}
-        {selectedSeason && (
-          <div className="mb-4">
-            <h2 className="headline-serif text-xl" style={{ color: selectedColor }}>{selectedSeason.name}</h2>
-            {selectedSeason.subtitle && <p className="text-xs text-muted">{selectedSeason.subtitle}</p>}
-          </div>
-        )}
 
         {/* Leaderboard */}
         {leaderboard.length === 0 ? (
