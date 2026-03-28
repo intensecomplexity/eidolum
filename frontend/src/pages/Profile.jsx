@@ -140,14 +140,15 @@ export default function Profile() {
                 <div className="flex items-center gap-3 mt-1">
                   <span className="text-xs" style={{ color: profile.rank_color }}>{profile.rank_name}</span>
                   <span className="text-accent text-xs font-mono font-bold">Lv.{profile.xp_level || 1}</span>
+                  <span className="text-[10px] text-muted">{profile.level_name || 'Newcomer'}</span>
                   <span className="text-muted text-xs">{profile.followers_count || 0} friends</span>
                 </div>
                 {profile.xp_total != null && (
                   <div className="flex items-center gap-2 mt-1.5">
-                    <div className="w-20 h-1.5 bg-surface-2 rounded-full overflow-hidden">
-                      <div className="h-full bg-accent rounded-full" style={{ width: `${profile.xp_progress_pct || 0}%` }} />
+                    <div className="w-24 h-1.5 bg-surface-2 rounded-full overflow-hidden">
+                      <div className="h-full bg-accent rounded-full transition-all" style={{ width: `${profile.xp_progress_pct || 0}%` }} />
                     </div>
-                    <span className="text-[10px] text-muted font-mono">{(profile.xp_total || 0).toLocaleString()} / {(profile.xp_to_next_level || 100).toLocaleString()} XP</span>
+                    <span className="text-[10px] text-muted font-mono">{(profile.xp_total || 0).toLocaleString()} / {(profile.xp_to_next_level || 50).toLocaleString()} XP</span>
                   </div>
                 )}
               </div>

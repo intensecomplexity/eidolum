@@ -8,7 +8,7 @@ from sqlalchemy import func
 from database import get_db
 from models import User, UserPrediction, Achievement, Follow
 from rate_limit import limiter
-from xp import get_xp_info as _get_xp_info
+from xp import get_xp_info as _get_xp_info, _level_name as _level_name_for
 from rivals import get_rival as _get_rival
 
 router = APIRouter()
@@ -326,6 +326,7 @@ def community_leaderboard(request: Request, user_type: str = Query(None), db: Se
             "rank_name": rank["rank_name"],
             "xp_level": getattr(user, 'xp_level', 1) or 1,
             "xp_total": getattr(user, 'xp_total', 0) or 0,
+            "level_name": _level_name_for(getattr(user, 'xp_level', 1) or 1),
         })
 
     results.sort(key=lambda x: (x["accuracy"], x["scored_count"]), reverse=True)

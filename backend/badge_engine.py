@@ -98,6 +98,13 @@ BADGE_INFO = {
     "weekly-1":          {"name": "Challenge Accepted", "description": "Complete 1 weekly challenge",                          "icon": "📋", "category": "Prestige"},
     "weekly-5":          {"name": "Weekly Warrior",     "description": "Complete 5 weekly challenges",                         "icon": "⚔️", "category": "Prestige"},
     "weekly-10":         {"name": "Never Miss",         "description": "Complete 10 weekly challenges",                        "icon": "🏅", "category": "Prestige"},
+    # XP
+    "xp-first":          {"name": "First XP",           "description": "Earn your first XP",                                  "icon": "⚡", "category": "Prestige"},
+    "xp-500":            {"name": "XP Grinder",         "description": "Earn 500 total XP",                                   "icon": "💪", "category": "Prestige"},
+    "xp-5000":           {"name": "XP Machine",         "description": "Earn 5000 total XP",                                  "icon": "🔋", "category": "Prestige"},
+    "xp-daily-cap":      {"name": "Max Effort",         "description": "Hit the daily XP cap",                                "icon": "🔥", "category": "Prestige"},
+    "xp-level-10":       {"name": "Level 10",           "description": "Reach Level 10 — Expert",                             "icon": "🌟", "category": "Prestige"},
+    "xp-level-25":       {"name": "Eidolon",            "description": "Reach Level 25 — the ultimate level",                 "icon": "👁️", "category": "Prestige"},
 }
 
 ALL_BADGE_IDS = list(BADGE_INFO.keys())
@@ -494,6 +501,24 @@ def evaluate_badges(user_id: int, db: Session) -> list[str]:
     except Exception:
         pass
 
+    # ── XP BADGES ───────────────────────────────────────────────────────
+
+    xp_total = getattr(user, 'xp_total', 0) or 0
+    xp_today = getattr(user, 'xp_today', 0) or 0
+    xp_level = getattr(user, 'xp_level', 1) or 1
+    if "xp-first" not in existing and xp_total >= 1:
+        _award("xp-first")
+    if "xp-500" not in existing and xp_total >= 500:
+        _award("xp-500")
+    if "xp-5000" not in existing and xp_total >= 5000:
+        _award("xp-5000")
+    if "xp-daily-cap" not in existing and xp_today >= 300:
+        _award("xp-daily-cap")
+    if "xp-level-10" not in existing and xp_level >= 10:
+        _award("xp-level-10")
+    if "xp-level-25" not in existing and xp_level >= 25:
+        _award("xp-level-25")
+
     # ── Persist ───────────────────────────────────────────────────────────
 
     if newly_awarded:
@@ -658,5 +683,14 @@ def compute_progress(user_id: int, db: Session) -> dict[str, dict]:
         progress["weekly-10"] = {"current": wc, "target": 10}
     except Exception:
         pass
+
+    # XP badges
+    xp_total = getattr(user, 'xp_total', 0) or 0
+    xp_level = getattr(user, 'xp_level', 1) or 1
+    progress["xp-first"] = {"current": min(xp_total, 1), "target": 1}
+    progress["xp-500"] = {"current": min(xp_total, 500), "target": 500}
+    progress["xp-5000"] = {"current": min(xp_total, 5000), "target": 5000}
+    progress["xp-level-10"] = {"current": xp_level, "target": 10}
+    progress["xp-level-25"] = {"current": xp_level, "target": 25}
 
     return progress

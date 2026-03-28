@@ -92,13 +92,15 @@ export default function Dashboard() {
             <Divider />
             <StatusItem label="Rank" value={profile.rank_name} />
             <Divider />
-            <StatusItem label="Level" value={<span className="text-accent">Lv.{profile.xp_level || 1}</span>} />
-            <Divider />
             <div className="flex flex-col items-center gap-0.5 shrink-0">
-              <span className="font-mono text-xs text-accent font-bold">{(profile.xp_total || 0).toLocaleString()} XP</span>
-              <div className="w-12 h-1 bg-surface-2 rounded-full overflow-hidden">
-                <div className="h-full bg-accent rounded-full" style={{ width: `${profile.xp_progress_pct || 0}%` }} />
+              <div className="flex items-center gap-1">
+                <span className="font-mono text-xs text-accent font-bold">Lv.{profile.xp_level || 1}</span>
+                <span className="text-[9px] text-muted">{profile.level_name || 'Newcomer'}</span>
               </div>
+              <div className="w-16 h-1 bg-surface-2 rounded-full overflow-hidden">
+                <div className="h-full bg-accent rounded-full transition-all" style={{ width: `${profile.xp_progress_pct || 0}%` }} />
+              </div>
+              <span className="text-[9px] text-muted font-mono">{(profile.xp_total || 0).toLocaleString()} / {(profile.xp_to_next_level || 50).toLocaleString()} XP</span>
             </div>
             <Divider />
             {streak >= 1 && (<><StatusItem label="Streak" value={<><Flame className="w-3 h-3 text-orange-400 inline" /> {streak}</>} /><Divider /></>)}

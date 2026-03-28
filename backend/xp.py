@@ -1,127 +1,274 @@
 """
 XP (Experience Points) system — awards XP for every user action.
+Daily cap of 300 XP. 25 levels from Newcomer to Eidolon.
 """
+import datetime
 from sqlalchemy.orm import Session
-from models import User
+from models import User, XpLog
+
+DAILY_CAP = 300
+SOCIAL_DAILY_CAP = 50  # Sub-cap for social actions within the 300
 
 XP_REWARDS = {
+    # Predictions
     "submit_prediction": 10,
     "prediction_scored_correct": 50,
     "prediction_scored_incorrect": 10,
+    "prediction_target_hit_exact": 100,
+    # Daily challenge
     "daily_challenge_enter": 15,
     "daily_challenge_correct": 40,
+    "daily_challenge_streak_3": 30,
+    "daily_challenge_streak_7": 75,
+    "crypto_weekend_enter": 20,
+    "crypto_weekend_correct": 50,
+    # Weekly challenge
+    "weekly_challenge_progress": 5,
+    "weekly_challenge_complete": 100,
+    # Social
     "react_to_prediction": 2,
     "comment_on_prediction": 5,
     "receive_reaction": 1,
-    "duel_accepted": 10,
-    "duel_won": 30,
-    "badge_earned": 25,
+    "receive_comment": 3,
     "friend_added": 5,
-    "daily_login": 5,
+    "share_prediction": 5,
+    "i_told_you_so_shared": 10,
+    # Duels
+    "duel_challenge_sent": 5,
+    "duel_accepted": 5,
+    "duel_won": 30,
+    "duel_lost": 5,
+    # Badges and milestones
+    "badge_earned": 25,
+    "rank_up": 50,
+    "level_up": 10,
+    # Engagement
+    "first_action_of_day": 5,
+    "prediction_streak_day": 3,
+    "watchlist_ticker_predicted": 5,
 }
 
+SOCIAL_ACTIONS = {"react_to_prediction", "comment_on_prediction", "receive_reaction", "receive_comment"}
+
 LEVELS = [
-    (1, 0),
-    (2, 100),
-    (3, 250),
-    (4, 500),
-    (5, 1000),
-    (6, 2000),
-    (7, 3500),
-    (8, 5000),
-    (9, 7500),
-    (10, 10000),
-    (11, 15000),
-    (12, 20000),
-    (13, 30000),
-    (14, 40000),
-    (15, 50000),
+    (1, 0, "Newcomer"),
+    (2, 50, "Observer"),
+    (3, 150, "Participant"),
+    (4, 300, "Regular"),
+    (5, 500, "Active Trader"),
+    (6, 800, "Market Watcher"),
+    (7, 1200, "Sharpshooter"),
+    (8, 1800, "Tactician"),
+    (9, 2500, "Veteran"),
+    (10, 3500, "Expert"),
+    (11, 5000, "Authority"),
+    (12, 7000, "Elite"),
+    (13, 9500, "Master"),
+    (14, 12500, "Grandmaster"),
+    (15, 16000, "Sage"),
+    (16, 20000, "Visionary"),
+    (17, 25000, "Prophet"),
+    (18, 32000, "Titan"),
+    (19, 40000, "Apex"),
+    (20, 50000, "Mythic"),
+    (21, 65000, "Transcendent"),
+    (22, 80000, "Immortal"),
+    (23, 100000, "Ascended"),
+    (24, 130000, "Ethereal"),
+    (25, 170000, "Eidolon"),
 ]
 
 
 def _calc_level(xp: int) -> int:
-    """Return the level for a given XP total."""
     level = 1
-    for lvl, threshold in LEVELS:
+    for lvl, threshold, _ in LEVELS:
         if xp >= threshold:
             level = lvl
     return level
 
 
+def _level_name(level: int) -> str:
+    for lvl, _, name in LEVELS:
+        if lvl == level:
+            return name
+    return "Newcomer"
+
+
 def _xp_for_next_level(xp: int) -> int:
-    """Return the XP needed to reach the next level."""
-    for lvl, threshold in LEVELS:
+    for _, threshold, _ in LEVELS:
         if threshold > xp:
             return threshold
-    return LEVELS[-1][1]  # Max level
+    return LEVELS[-1][1]
 
 
-def award_xp(user_id: int, action: str, db: Session) -> dict:
+def _reset_daily_if_needed(user):
+    """Reset xp_today if the date has changed."""
+    today = datetime.date.today()
+    last_reset = getattr(user, 'xp_last_reset', None)
+    if last_reset is None or (hasattr(last_reset, 'date') and last_reset.date() < today) or (isinstance(last_reset, datetime.date) and last_reset < today):
+        try:
+            user.xp_today = 0
+            user.xp_last_reset = today
+        except Exception:
+            pass
+
+
+def award_xp(user_id: int, action: str, db: Session, metadata: dict | None = None) -> dict:
     """Award XP for an action. Caller must commit.
 
-    Returns: {"xp_gained": int, "new_total": int, "new_level": int, "leveled_up": bool}
+    Returns: {"xp_gained", "action", "new_total", "xp_today", "daily_cap_remaining",
+              "new_level", "level_name", "leveled_up", "xp_to_next_level"}
     """
     xp_amount = XP_REWARDS.get(action, 0)
+
+    # Dynamic streak bonuses
+    if action == "prediction_correct_streak_bonus" and metadata:
+        xp_amount = (metadata.get("streak_count", 0)) * 5
+
     if xp_amount == 0:
-        return {"xp_gained": 0, "new_total": 0, "new_level": 1, "leveled_up": False}
+        return _empty_result()
 
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
-        return {"xp_gained": 0, "new_total": 0, "new_level": 1, "leveled_up": False}
+        return _empty_result()
+
+    # Reset daily counter if new day
+    _reset_daily_if_needed(user)
+
+    xp_today = getattr(user, 'xp_today', 0) or 0
+
+    # Check daily cap
+    if xp_today >= DAILY_CAP:
+        return _empty_result()
+
+    # Clamp to remaining cap
+    remaining = DAILY_CAP - xp_today
+    xp_amount = min(xp_amount, remaining)
 
     old_xp = getattr(user, 'xp_total', 0) or 0
     old_level = getattr(user, 'xp_level', 1) or 1
 
     new_xp = old_xp + xp_amount
     new_level = _calc_level(new_xp)
+    new_xp_today = xp_today + xp_amount
 
     try:
         user.xp_total = new_xp
         user.xp_level = new_level
+        user.xp_today = new_xp_today
     except Exception:
-        return {"xp_gained": xp_amount, "new_total": new_xp, "new_level": new_level, "leveled_up": False}
+        pass
 
     leveled_up = new_level > old_level
 
+    # Log the XP event
+    try:
+        desc = _action_description(action, metadata)
+        db.add(XpLog(user_id=user_id, action=action, xp_gained=xp_amount, description=desc))
+    except Exception:
+        pass
+
     if leveled_up:
+        name = _level_name(new_level)
         try:
             from notifications import create_notification
             create_notification(
                 user_id=user_id,
                 type="badge_earned",
                 title="Level Up!",
-                message=f"You reached Level {new_level}!",
-                data={"old_level": old_level, "new_level": new_level, "xp_total": new_xp},
+                message=f"You reached Level {new_level} — {name}!",
+                data={"old_level": old_level, "new_level": new_level, "level_name": name, "xp_total": new_xp},
                 db=db,
             )
         except Exception:
             pass
+        print(f"[XP] User {user_id} leveled up to {new_level} ({name})")
 
     return {
         "xp_gained": xp_amount,
+        "action": action,
         "new_total": new_xp,
+        "xp_today": new_xp_today,
+        "daily_cap_remaining": max(DAILY_CAP - new_xp_today, 0),
         "new_level": new_level,
+        "level_name": _level_name(new_level),
         "leveled_up": leveled_up,
+        "xp_to_next_level": _xp_for_next_level(new_xp),
     }
+
+
+def _empty_result():
+    return {"xp_gained": 0, "action": "", "new_total": 0, "xp_today": 0,
+            "daily_cap_remaining": 0, "new_level": 1, "level_name": "Newcomer",
+            "leveled_up": False, "xp_to_next_level": 50}
+
+
+def _action_description(action: str, metadata: dict | None) -> str:
+    descs = {
+        "submit_prediction": "Submitted a prediction",
+        "prediction_scored_correct": "Prediction scored correct",
+        "prediction_scored_incorrect": "Prediction scored",
+        "prediction_target_hit_exact": "Exact target hit!",
+        "daily_challenge_enter": "Entered daily challenge",
+        "daily_challenge_correct": "Daily challenge correct",
+        "daily_challenge_streak_3": "3-day challenge streak bonus",
+        "daily_challenge_streak_7": "7-day challenge streak bonus",
+        "crypto_weekend_enter": "Weekend crypto challenge",
+        "crypto_weekend_correct": "Weekend crypto correct",
+        "weekly_challenge_progress": "Weekly challenge progress",
+        "weekly_challenge_complete": "Weekly challenge complete!",
+        "react_to_prediction": "Reacted to a prediction",
+        "comment_on_prediction": "Commented on a prediction",
+        "receive_reaction": "Received a reaction",
+        "receive_comment": "Received a comment",
+        "friend_added": "Made a new friend",
+        "share_prediction": "Shared a prediction",
+        "i_told_you_so_shared": "Shared I Told You So",
+        "duel_challenge_sent": "Sent a duel challenge",
+        "duel_accepted": "Duel accepted",
+        "duel_won": "Won a duel!",
+        "duel_lost": "Duel participation",
+        "badge_earned": "Earned a badge",
+        "rank_up": "Ranked up!",
+        "level_up": "Level up bonus",
+        "first_action_of_day": "Daily login bonus",
+        "prediction_streak_day": "Prediction streak day",
+        "watchlist_ticker_predicted": "Predicted a watched ticker",
+    }
+    ticker = metadata.get("ticker") if metadata else None
+    base = descs.get(action, action)
+    return f"{base} ({ticker})" if ticker else base
 
 
 def get_xp_info(user) -> dict:
     """Get XP display info for a user object."""
     xp = getattr(user, 'xp_total', 0) or 0
     level = getattr(user, 'xp_level', 1) or 1
+    name = _level_name(level)
     next_threshold = _xp_for_next_level(xp)
-    # Find current level threshold
     current_threshold = 0
-    for lvl, threshold in LEVELS:
+    for lvl, threshold, _ in LEVELS:
         if lvl == level:
             current_threshold = threshold
             break
     range_total = next_threshold - current_threshold
     range_progress = xp - current_threshold
     pct = round(range_progress / range_total * 100) if range_total > 0 else 100
+
+    xp_today = getattr(user, 'xp_today', 0) or 0
+    _reset_daily_if_needed(user)
+    xp_today = getattr(user, 'xp_today', 0) or 0
+
+    next_name = _level_name(level + 1) if level < 25 else "Eidolon"
+
     return {
         "xp_total": xp,
         "xp_level": level,
+        "level_name": name,
         "xp_to_next_level": next_threshold,
         "xp_progress_pct": min(pct, 100),
+        "xp_today": xp_today,
+        "daily_cap": DAILY_CAP,
+        "daily_cap_remaining": max(DAILY_CAP - xp_today, 0),
+        "next_level_name": next_name,
     }

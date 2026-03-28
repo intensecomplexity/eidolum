@@ -212,6 +212,8 @@ class User(Base):
     auth_provider = Column(String(20), default="email")  # "email" | "google"
     xp_total = Column(Integer, default=0)
     xp_level = Column(Integer, default=1)
+    xp_today = Column(Integer, default=0)
+    xp_last_reset = Column(DateTime, nullable=True)
 
     predictions = relationship("UserPrediction", back_populates="user", cascade="all, delete-orphan")
     achievements = relationship("Achievement", back_populates="user", cascade="all, delete-orphan")
@@ -461,6 +463,17 @@ class SeasonEntry(Base):
 
     season = relationship("Season", back_populates="entries")
     user = relationship("User")
+
+
+class XpLog(Base):
+    __tablename__ = "xp_log"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    action = Column(String(50), nullable=False)
+    xp_gained = Column(Integer, nullable=False)
+    description = Column(String(200), nullable=True)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
 
 
 class WeeklyChallenge(Base):

@@ -582,6 +582,14 @@ export function getExpiringPredictions() {
   return api.get('/predictions/expiring').then(r => r.data);
 }
 
+export function getMyXp() {
+  return api.get('/xp/me', { headers: authHeaders() }).then(r => r.data);
+}
+
+export function getXpHistory() {
+  return api.get('/xp/history', { headers: authHeaders() }).then(r => r.data);
+}
+
 export function getMyRival() {
   return api.get('/rivals/mine', { headers: authHeaders() }).then(r => r.data);
 }

@@ -59,6 +59,9 @@ def _user_dict(user: User) -> dict:
         "auth_provider": getattr(user, 'auth_provider', 'email') or 'email',
         "is_online": _is_user_online(user),
         "last_seen": _last_seen(user),
+        "xp_total": getattr(user, 'xp_total', 0) or 0,
+        "xp_level": getattr(user, 'xp_level', 1) or 1,
+        "level_name": _get_level_name(user),
     }
 
 
@@ -70,6 +73,14 @@ def _is_user_online(user):
 def _last_seen(user):
     from online_status import last_seen_text
     return last_seen_text(user)
+
+
+def _get_level_name(user):
+    try:
+        from xp import _level_name
+        return _level_name(getattr(user, 'xp_level', 1) or 1)
+    except Exception:
+        return "Newcomer"
 
 
 def _has_real_password(user) -> bool:

@@ -84,7 +84,7 @@ export default function CommunityLeaderboard() {
                     <div className="flex items-center gap-1">
                       <span className="font-medium text-sm">{u.display_name || u.username}</span>
                       <TypeBadge type={u.user_type} />
-                      {u.xp_level > 1 && <span className="text-[10px] font-mono text-accent font-bold">Lv.{u.xp_level}</span>}
+                      {u.xp_level > 1 && <span className="text-[10px] font-mono text-accent font-bold" title={u.level_name}>Lv.{u.xp_level}</span>}
                     </div>
                     <span className="text-muted text-xs font-mono block">@{u.username}</span>
                   </div>

@@ -795,7 +795,7 @@ def run_phase2_migrations():
         db.rollback()
 
     # ── 31. XP system columns ──────────────────────────────────────
-    for col in ["xp_total INTEGER DEFAULT 0", "xp_level INTEGER DEFAULT 1"]:
+    for col in ["xp_total INTEGER DEFAULT 0", "xp_level INTEGER DEFAULT 1", "xp_today INTEGER DEFAULT 0", "xp_last_reset DATE"]:
         try:
             db.execute(text(f"ALTER TABLE users ADD COLUMN {col}"))
             db.commit()
@@ -841,6 +841,30 @@ def run_phase2_migrations():
         db.rollback()
         if "already exists" not in str(e).lower():
             print(f"[Phase2] weekly_challenge_progress: {e}")
+
+    # ── 33. xp_log table ───────────────────────────────────────────
+    try:
+        db.execute(text("""
+            CREATE TABLE IF NOT EXISTS xp_log (
+                id SERIAL PRIMARY KEY,
+                user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+                action VARCHAR(50) NOT NULL,
+                xp_gained INTEGER NOT NULL,
+                description VARCHAR(200),
+                created_at TIMESTAMP DEFAULT NOW()
+            )
+        """))
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        if "already exists" not in str(e).lower():
+            print(f"[Phase2] xp_log: {e}")
+
+    try:
+        db.execute(text("CREATE INDEX IF NOT EXISTS ix_xp_log_user_created ON xp_log(user_id, created_at DESC)"))
+        db.commit()
+    except Exception:
+        db.rollback()
 
     print("[Phase2] All migrations complete")
     db.close()
@@ -1542,6 +1566,8 @@ from routers import earnings as earnings_router
 app.include_router(earnings_router.router, prefix="/api")
 from routers import weekly_challenge as weekly_challenge_router
 app.include_router(weekly_challenge_router.router, prefix="/api")
+from routers import xp_router
+app.include_router(xp_router.router, prefix="/api")
 app.include_router(admin_panel_router)  # /admin HTML + /api/admin/* endpoints
 
 
