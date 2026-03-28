@@ -4,6 +4,7 @@ import Footer from '../components/Footer';
 import TypeBadge from '../components/TypeBadge';
 import TickerLink from '../components/TickerLink';
 import ReactionBar from '../components/ReactionBar';
+import Countdown from '../components/Countdown';
 import { getExpiringPredictions } from '../api';
 
 export default function Expiring() {
@@ -37,7 +38,9 @@ export default function Expiring() {
         ) : (
           <div className="space-y-3">
             {preds.map(p => {
-              const urgent = p.days_remaining !== null && p.days_remaining <= 3;
+              const diffMs = p.expires_at ? new Date(p.expires_at).getTime() - Date.now() : null;
+              const daysLeft = diffMs !== null ? Math.max(0, Math.floor(diffMs / 86400000)) : null;
+              const urgent = daysLeft !== null && daysLeft <= 3;
               return (
                 <div key={p.id} className={`card ${urgent ? 'border-negative/30' : ''}`}>
                   <div className="flex items-center justify-between">
@@ -56,9 +59,11 @@ export default function Expiring() {
                       </div>
                     </div>
                     <div className="text-right ml-4 flex-shrink-0">
-                      <div className={`font-mono text-lg font-bold ${urgent ? 'text-negative' : 'text-warning'}`}>
-                        {p.days_remaining !== null ? `${p.days_remaining}d` : '?'}
-                      </div>
+                      {p.expires_at ? (
+                        <Countdown expiresAt={p.expires_at} className="text-lg" />
+                      ) : (
+                        <span className="font-mono text-lg text-muted">?</span>
+                      )}
                       <div className="text-[10px] text-muted">remaining</div>
                     </div>
                   </div>
