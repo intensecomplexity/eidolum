@@ -80,6 +80,13 @@ def create_comment(
     if len(text) > MAX_COMMENT_LEN:
         raise HTTPException(status_code=400, detail=f"Comment must be under {MAX_COMMENT_LEN} characters")
 
+    # Check level-based commenting perk
+    from perks import get_user_perks
+    _user_obj = db.query(User).filter(User.id == user_id).first()
+    _perks = get_user_perks(getattr(_user_obj, 'xp_level', 1) or 1)
+    if not _perks.get("can_comment"):
+        raise HTTPException(status_code=403, detail="Comments unlock at Level 4. Keep earning XP!")
+
     # Check per-prediction limit
     per_pred = (
         db.query(func.count(PredictionComment.id))

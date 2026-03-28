@@ -76,10 +76,8 @@ BADGE_INFO = {
     "strong-conviction": {"name": "Strong Conviction", "description": "3 correct on one ticker",                  "icon": "💪", "category": "Conviction"},
     "flip-master":       {"name": "Flip Master",       "description": "Correct bull & bear on same ticker",       "icon": "🔀", "category": "Conviction"},
     # Prestige
-    "rank-analyst":      {"name": "Analyst Rank",      "description": "25 scored predictions",                    "icon": "💼", "category": "Prestige"},
-    "rank-strategist":   {"name": "Strategist Rank",   "description": "50 scored predictions",                    "icon": "🎖️", "category": "Prestige"},
-    "rank-oracle":       {"name": "Oracle Rank",       "description": "100 scored predictions",                   "icon": "🔮", "category": "Prestige"},
-    "rank-legendary":    {"name": "Legendary Rank",    "description": "250 scored predictions",                   "icon": "🏆", "category": "Prestige"},
+    "level-5":           {"name": "Sharpshooter",       "description": "Reach Level 5",                            "icon": "🎯", "category": "Prestige"},
+    "level-10":          {"name": "Eidolon",            "description": "Reach Level 10 — the ultimate level",      "icon": "👁️", "category": "Prestige"},
     "top-10":            {"name": "Top 10",            "description": "Reach top 10 on community leaderboard",    "icon": "🎯", "category": "Prestige"},
     "summit":            {"name": "The Summit",        "description": "Reach #1 on community leaderboard",        "icon": "🏔️", "category": "Prestige"},
     "duel-win":          {"name": "Duelist",           "description": "Win 10 duels",                             "icon": "⚔️", "category": "Prestige"},
@@ -103,8 +101,6 @@ BADGE_INFO = {
     "xp-500":            {"name": "XP Grinder",         "description": "Earn 500 total XP",                                   "icon": "💪", "category": "Prestige"},
     "xp-5000":           {"name": "XP Machine",         "description": "Earn 5000 total XP",                                  "icon": "🔋", "category": "Prestige"},
     "xp-daily-cap":      {"name": "Max Effort",         "description": "Hit the daily XP cap",                                "icon": "🔥", "category": "Prestige"},
-    "xp-level-10":       {"name": "Level 10",           "description": "Reach Level 10 — Expert",                             "icon": "🌟", "category": "Prestige"},
-    "xp-level-25":       {"name": "Eidolon",            "description": "Reach Level 25 — the ultimate level",                 "icon": "👁️", "category": "Prestige"},
 }
 
 ALL_BADGE_IDS = list(BADGE_INFO.keys())
@@ -358,14 +354,12 @@ def evaluate_badges(user_id: int, db: Session) -> list[str]:
 
     # ── PRESTIGE ──────────────────────────────────────────────────────────
 
-    if "rank-analyst" not in existing and scored_preds >= 25:
-        _award("rank-analyst")
-    if "rank-strategist" not in existing and scored_preds >= 50:
-        _award("rank-strategist")
-    if "rank-oracle" not in existing and scored_preds >= 100:
-        _award("rank-oracle")
-    if "rank-legendary" not in existing and scored_preds >= 250:
-        _award("rank-legendary")
+    # Level-based badges
+    user_xp_level = getattr(user, 'xp_level', 1) or 1
+    if "level-5" not in existing and user_xp_level >= 5:
+        _award("level-5")
+    if "level-10" not in existing and user_xp_level >= 10:
+        _award("level-10")
 
     if "top-10" not in existing or "summit" not in existing:
         board = _get_cached_leaderboard(db)
@@ -514,10 +508,6 @@ def evaluate_badges(user_id: int, db: Session) -> list[str]:
         _award("xp-5000")
     if "xp-daily-cap" not in existing and xp_today >= 300:
         _award("xp-daily-cap")
-    if "xp-level-10" not in existing and xp_level >= 10:
-        _award("xp-level-10")
-    if "xp-level-25" not in existing and xp_level >= 25:
-        _award("xp-level-25")
 
     # ── Persist ───────────────────────────────────────────────────────────
 
@@ -656,10 +646,8 @@ def compute_progress(user_id: int, db: Session) -> dict[str, dict]:
         "perma-bear":        {"current": bear_correct_cnt, "target": 10},
         "strong-conviction": {"current": max_ticker_correct, "target": 3},
         # Prestige
-        "rank-analyst":      {"current": scored_preds,     "target": 25},
-        "rank-strategist":   {"current": scored_preds,     "target": 50},
-        "rank-oracle":       {"current": scored_preds,     "target": 100},
-        "rank-legendary":    {"current": scored_preds,     "target": 250},
+        "level-5":           {"current": getattr(user, 'xp_level', 1) or 1, "target": 5},
+        "level-10":          {"current": getattr(user, 'xp_level', 1) or 1, "target": 10},
         "duel-win":          {"current": duel_wins,        "target": 10},
         "crowd-favorite":    {"current": 0,                "target": 50},
         "earnings-whisper":  {"current": sum(1 for p in correct if getattr(p, 'template', None) == 'earnings_play'), "target": 5},
@@ -690,7 +678,5 @@ def compute_progress(user_id: int, db: Session) -> dict[str, dict]:
     progress["xp-first"] = {"current": min(xp_total, 1), "target": 1}
     progress["xp-500"] = {"current": min(xp_total, 500), "target": 500}
     progress["xp-5000"] = {"current": min(xp_total, 5000), "target": 5000}
-    progress["xp-level-10"] = {"current": xp_level, "target": 10}
-    progress["xp-level-25"] = {"current": xp_level, "target": 25}
 
     return progress

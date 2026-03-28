@@ -138,9 +138,8 @@ export default function Profile() {
                 </div>
                 <p className="text-muted text-sm font-mono">@{profile.username}{profile.custom_title && <span className="text-text-secondary ml-1">· {profile.custom_title}</span>}</p>
                 <div className="flex items-center gap-3 mt-1">
-                  <span className="text-xs" style={{ color: profile.rank_color }}>{profile.rank_name}</span>
-                  <span className="text-accent text-xs font-mono font-bold">Lv.{profile.xp_level || 1}</span>
-                  <span className="text-[10px] text-muted">{profile.level_name || 'Newcomer'}</span>
+                  <span className="text-xs font-mono font-bold" style={{ color: profile.rank_color || '#00a878' }}>Lv.{profile.xp_level || 1}</span>
+                  <span className="text-[10px]" style={{ color: profile.rank_color || '#6b7280' }}>{profile.level_name || profile.rank_name || 'Newcomer'}</span>
                   <span className="text-muted text-xs">{profile.followers_count || 0} friends</span>
                 </div>
                 {profile.xp_total != null && (

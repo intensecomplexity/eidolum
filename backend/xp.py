@@ -50,55 +50,7 @@ XP_REWARDS = {
 
 SOCIAL_ACTIONS = {"react_to_prediction", "comment_on_prediction", "receive_reaction", "receive_comment"}
 
-LEVELS = [
-    (1, 0, "Newcomer"),
-    (2, 50, "Observer"),
-    (3, 150, "Participant"),
-    (4, 300, "Regular"),
-    (5, 500, "Active Trader"),
-    (6, 800, "Market Watcher"),
-    (7, 1200, "Sharpshooter"),
-    (8, 1800, "Tactician"),
-    (9, 2500, "Veteran"),
-    (10, 3500, "Expert"),
-    (11, 5000, "Authority"),
-    (12, 7000, "Elite"),
-    (13, 9500, "Master"),
-    (14, 12500, "Grandmaster"),
-    (15, 16000, "Sage"),
-    (16, 20000, "Visionary"),
-    (17, 25000, "Prophet"),
-    (18, 32000, "Titan"),
-    (19, 40000, "Apex"),
-    (20, 50000, "Mythic"),
-    (21, 65000, "Transcendent"),
-    (22, 80000, "Immortal"),
-    (23, 100000, "Ascended"),
-    (24, 130000, "Ethereal"),
-    (25, 170000, "Eidolon"),
-]
-
-
-def _calc_level(xp: int) -> int:
-    level = 1
-    for lvl, threshold, _ in LEVELS:
-        if xp >= threshold:
-            level = lvl
-    return level
-
-
-def _level_name(level: int) -> str:
-    for lvl, _, name in LEVELS:
-        if lvl == level:
-            return name
-    return "Newcomer"
-
-
-def _xp_for_next_level(xp: int) -> int:
-    for _, threshold, _ in LEVELS:
-        if threshold > xp:
-            return threshold
-    return LEVELS[-1][1]
+from perks import get_level_for_xp as _calc_level, get_level_name as _level_name, get_xp_for_next_level as _xp_for_next_level, LEVEL_PERKS
 
 
 def _reset_daily_if_needed(user):
@@ -246,20 +198,15 @@ def get_xp_info(user) -> dict:
     level = getattr(user, 'xp_level', 1) or 1
     name = _level_name(level)
     next_threshold = _xp_for_next_level(xp)
-    current_threshold = 0
-    for lvl, threshold, _ in LEVELS:
-        if lvl == level:
-            current_threshold = threshold
-            break
+    current_threshold = LEVEL_PERKS.get(level, {}).get("xp_required", 0)
     range_total = next_threshold - current_threshold
     range_progress = xp - current_threshold
     pct = round(range_progress / range_total * 100) if range_total > 0 else 100
 
-    xp_today = getattr(user, 'xp_today', 0) or 0
     _reset_daily_if_needed(user)
     xp_today = getattr(user, 'xp_today', 0) or 0
 
-    next_name = _level_name(level + 1) if level < 25 else "Eidolon"
+    next_name = _level_name(min(level + 1, 10))
 
     return {
         "xp_total": xp,

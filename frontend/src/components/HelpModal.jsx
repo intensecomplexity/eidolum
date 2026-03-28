@@ -22,7 +22,7 @@ const FEATURES = [
   { title: 'Watchlist', body: 'Save tickers you care about. See all predictions on your watched stocks in one feed. Get notified when someone makes a new call.' },
   { title: 'Prediction Reactions', body: 'React to other people\'s predictions: Agree, Disagree, Bold Call, or No Way. See if the crowd was right after scoring.' },
   { title: 'Analyst Tracker', body: 'Every Wall Street analyst tracked with a verified accuracy score. See how Goldman Sachs, Morgan Stanley, and others actually perform.' },
-  { title: 'Ranks', body: 'Progress through 6 tiers: Unranked, Novice, Analyst, Strategist, Oracle, Legendary. Based on total scored predictions.' },
+  { title: 'Levels & XP', body: 'Earn XP from predictions, challenges, duels, and social actions. Progress through 10 levels from Newcomer to Eidolon, unlocking perks along the way.' },
   { title: 'Streaks', body: 'Two types: Prediction Streak (consecutive correct calls) and Return Streak (consecutive days visiting Eidolum). Both tracked on your profile.' },
   { title: 'Templates', body: 'Structured prediction types: Earnings Play, Momentum Trade, Macro Thesis, Technical Breakout, Contrarian Bet, Sector Rotation. Each has suggested timeframes.' },
   { title: 'Sharing', body: 'Share any prediction on Twitter/X with timestamped proof. When you\'re right, use the \'I Told You So\' button for maximum bragging rights.' },

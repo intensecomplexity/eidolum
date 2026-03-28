@@ -842,7 +842,14 @@ def run_phase2_migrations():
         if "already exists" not in str(e).lower():
             print(f"[Phase2] weekly_challenge_progress: {e}")
 
-    # ── 33a. users.custom_title column ─────────────────────────────
+    # ── 33a. users.subscription_tier column ─────────────────────────
+    try:
+        db.execute(text("ALTER TABLE users ADD COLUMN subscription_tier VARCHAR(20) DEFAULT 'free'"))
+        db.commit()
+    except Exception:
+        db.rollback()
+
+    # ── 33b. users.custom_title column ─────────────────────────────
     try:
         db.execute(text("ALTER TABLE users ADD COLUMN custom_title VARCHAR(50)"))
         db.commit()

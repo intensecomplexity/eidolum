@@ -35,20 +35,13 @@ SECTOR_MAP = {
 }
 
 
-# ── Rank thresholds ───────────────────────────────────────────────────────────
+# ── Level colors ──────────────────────────────────────────────────────────────
 
-def _rank_info(scored: int) -> dict:
-    if scored >= 250:
-        return {"rank_name": "Legendary", "rank_color": "#f59e0b"}
-    if scored >= 100:
-        return {"rank_name": "Oracle", "rank_color": "#a855f7"}
-    if scored >= 50:
-        return {"rank_name": "Strategist", "rank_color": "#0ea5e9"}
-    if scored >= 25:
-        return {"rank_name": "Analyst", "rank_color": "#22c55e"}
-    if scored >= 10:
-        return {"rank_name": "Novice", "rank_color": "#94a3b8"}
-    return {"rank_name": "Unranked", "rank_color": "#6b7280"}
+_LEVEL_COLORS = {1: "#6b7280", 2: "#94a3b8", 3: "#22c55e", 4: "#22c55e", 5: "#0ea5e9",
+                 6: "#0ea5e9", 7: "#a855f7", 8: "#a855f7", 9: "#f59e0b", 10: "#f59e0b"}
+
+def _level_color(level: int) -> str:
+    return _LEVEL_COLORS.get(level, "#6b7280")
 
 
 from badge_engine import BADGE_INFO, ALL_BADGE_IDS, compute_progress
@@ -108,8 +101,8 @@ def get_user_profile(request: Request, user_id: int, credentials: Optional[HTTPA
     followers_count = db.query(func.count(Follow.id)).filter(Follow.following_id == user_id, Follow.status == "accepted").scalar() or 0
     following_count = db.query(func.count(Follow.id)).filter(Follow.follower_id == user_id, Follow.status == "accepted").scalar() or 0
 
-    # Rank
-    rank = _rank_info(scored_count)
+    # Level info
+    user_level = getattr(user, 'xp_level', 1) or 1
 
     # Sector accuracy
     sector_stats = defaultdict(lambda: {"correct": 0, "total": 0})
@@ -165,8 +158,8 @@ def get_user_profile(request: Request, user_id: int, credentials: Optional[HTTPA
         "followers_count": followers_count,
         "following_count": following_count,
         "friendship_status": _get_friendship_status(user_id, credentials, db),
-        "rank_name": rank["rank_name"],
-        "rank_color": rank["rank_color"],
+        "rank_name": _level_name_for(user_level),
+        "rank_color": _level_color(user_level),
         "sector_accuracy": sector_accuracy,
         "direction_split": direction_split,
         "fastest_correct_days": fastest,
@@ -321,7 +314,7 @@ def community_leaderboard(request: Request, user_type: str = Query(None), db: Se
 
         correct_count = sum(1 for p in scored if p.outcome == "correct")
         accuracy = round(correct_count / scored_count * 100, 1)
-        rank = _rank_info(scored_count)
+        ulevel = getattr(user, 'xp_level', 1) or 1
 
         results.append({
             "user_id": user.id,
@@ -332,10 +325,10 @@ def community_leaderboard(request: Request, user_type: str = Query(None), db: Se
             "correct_count": correct_count,
             "accuracy": accuracy,
             "streak_current": user.streak_current,
-            "rank_name": rank["rank_name"],
-            "xp_level": getattr(user, 'xp_level', 1) or 1,
+            "rank_name": _level_name_for(ulevel),
+            "xp_level": ulevel,
             "xp_total": getattr(user, 'xp_total', 0) or 0,
-            "level_name": _level_name_for(getattr(user, 'xp_level', 1) or 1),
+            "level_name": _level_name_for(ulevel),
         })
 
     results.sort(key=lambda x: (x["accuracy"], x["scored_count"]), reverse=True)

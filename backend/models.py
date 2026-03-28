@@ -215,6 +215,7 @@ class User(Base):
     xp_today = Column(Integer, default=0)
     xp_last_reset = Column(DateTime, nullable=True)
     custom_title = Column(String(50), nullable=True)
+    subscription_tier = Column(String(20), default="free")  # "free" | "pro" | "institutional"
 
     predictions = relationship("UserPrediction", back_populates="user", cascade="all, delete-orphan")
     achievements = relationship("Achievement", back_populates="user", cascade="all, delete-orphan")

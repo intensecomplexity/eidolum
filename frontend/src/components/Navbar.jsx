@@ -77,7 +77,8 @@ export default function Navbar() {
   };
 
   const accuracy = user?.accuracy_percentage || user?.accuracy || 0;
-  const rankName = user?.rank_name || 'Unranked';
+  const levelName = user?.level_name || user?.rank_name || 'Newcomer';
+  const userLevel = user?.xp_level || 1;
 
   return (
     <>
@@ -154,7 +155,7 @@ export default function Navbar() {
                           </div>
                           <div className="min-w-0">
                             <div className="text-sm font-medium truncate">{user?.display_name || user?.username}</div>
-                            <div className="text-[10px] text-muted font-mono">@{user?.username} &middot; {rankName}</div>
+                            <div className="text-[10px] text-muted font-mono">@{user?.username} &middot; Lv.{userLevel} {levelName}</div>
                           </div>
                         </div>
                       </div>

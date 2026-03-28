@@ -90,8 +90,6 @@ export default function Dashboard() {
           <div className="flex items-center gap-3 sm:gap-5 overflow-x-auto pills-scroll py-3 mb-4 border-b border-border">
             <StatusItem label="Accuracy" value={`${acc}%`} color={acc >= 50 ? 'text-accent' : 'text-negative'} />
             <Divider />
-            <StatusItem label="Rank" value={profile.rank_name} />
-            <Divider />
             <div className="flex flex-col items-center gap-0.5 shrink-0">
               <div className="flex items-center gap-1">
                 <span className="font-mono text-xs text-accent font-bold">Lv.{profile.xp_level || 1}</span>
