@@ -41,7 +41,7 @@ export function AuthProvider({ children }) {
   const register = useCallback(async (username, email, password) => {
     const data = await registerUser(username, email, password);
     localStorage.setItem('eidolum_token', data.token);
-    const userObj = { id: data.user_id, username: data.username, onboarding_completed: false };
+    const userObj = { id: data.user_id, username: data.username };
     localStorage.setItem('eidolum_user', JSON.stringify(userObj));
     setToken(data.token);
     setUser(userObj);
@@ -55,7 +55,6 @@ export function AuthProvider({ children }) {
   const logout = useCallback(() => {
     localStorage.removeItem('eidolum_token');
     localStorage.removeItem('eidolum_user');
-    localStorage.removeItem('eidolum_onboarding_step');
     setToken(null);
     setUser(null);
   }, []);
@@ -70,20 +69,10 @@ export function AuthProvider({ children }) {
     } catch {}
   }, [user]);
 
-  const markOnboarded = useCallback(() => {
-    setUser(prev => {
-      const updated = { ...prev, onboarding_completed: true };
-      localStorage.setItem('eidolum_user', JSON.stringify(updated));
-      return updated;
-    });
-    localStorage.removeItem('eidolum_onboarding_step');
-  }, []);
-
   const isAuthenticated = !!token && !!user;
-  const needsOnboarding = isAuthenticated && user && !user.onboarding_completed;
 
   return (
-    <AuthContext.Provider value={{ user, token, loading, isAuthenticated, needsOnboarding, login, register, logout, refreshProfile, markOnboarded }}>
+    <AuthContext.Provider value={{ user, token, loading, isAuthenticated, login, register, logout, refreshProfile }}>
       {children}
     </AuthContext.Provider>
   );

@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Crosshair, Trophy, Clock, Flame, ArrowRight } from 'lucide-react';
+import { Crosshair, Trophy, Clock, Flame, ArrowRight, HelpCircle } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import LiveActivityFeed from '../components/LiveActivityFeed';
 import DailyChallengeCard from '../components/DailyChallengeCard';
 import NudgeCards from '../components/NudgeCards';
+import HelpModal from '../components/HelpModal';
 import ConsensusBar from '../components/ConsensusBar';
 import TickerLink from '../components/TickerLink';
 import Footer from '../components/Footer';
@@ -21,6 +22,7 @@ export default function Dashboard() {
   const [hotTakes, setHotTakes] = useState([]);
   const [sectorData, setSectorData] = useState([]);
   const [earningsData, setEarningsData] = useState([]);
+  const [showHelp, setShowHelp] = useState(false);
 
   useEffect(() => {
     if (!uid) return;
@@ -45,6 +47,11 @@ export default function Dashboard() {
             {streak >= 3 && <span className="text-orange-400 ml-2 text-base"><Flame className="w-4 h-4 inline" /> {streak} streak</span>}
           </h1>
           <p className="text-text-secondary text-sm mt-1">Here's what's happening today.</p>
+          {profile && profile.total_predictions < 3 && (
+            <button onClick={() => setShowHelp(true)} className="flex items-center gap-1.5 text-xs text-accent mt-2 hover:text-accent/80">
+              <HelpCircle className="w-3.5 h-3.5" /> First time? Start here &rarr;
+            </button>
+          )}
         </div>
 
         {/* Daily Challenge */}
@@ -208,6 +215,7 @@ export default function Dashboard() {
           </div>
         </div>
       </div>
+      {showHelp && <HelpModal onClose={() => setShowHelp(false)} />}
       <Footer />
     </div>
   );

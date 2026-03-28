@@ -37,7 +37,7 @@ export default function CommunityLeaderboard() {
         <div className="mb-6 sm:mb-8">
           <div className="flex items-center gap-2 mb-1">
             <Users className="w-6 h-6 text-accent" />
-            <h1 className="font-bold" style={{ fontSize: 'clamp(24px, 5vw, 36px)' }}>Community Rankings</h1>
+            <h1 className="font-bold" style={{ fontSize: 'clamp(24px, 5vw, 36px)' }}>Community Leaderboard</h1>
           </div>
           <p className="text-text-secondary text-sm sm:text-base">Ranked by accuracy with 10 or more scored predictions.</p>
         </div>

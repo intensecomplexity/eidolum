@@ -4,8 +4,6 @@ import { User, TrendingUp, TrendingDown, Flame, Target, Award, LogOut, Crosshair
 import { useAuth } from '../context/AuthContext';
 import Footer from '../components/Footer';
 import TypeBadge from '../components/TypeBadge';
-import OnboardingBanner from '../components/OnboardingBanner';
-import Onboarding from '../components/Onboarding';
 import StreakCalendar from '../components/StreakCalendar';
 import TrackRecordCard from '../components/TrackRecordCard';
 import AccuracyChart from '../components/AccuracyChart';
@@ -28,7 +26,6 @@ export default function Profile() {
   const [loading, setLoading] = useState(true);
   const [isFollowing, setIsFollowing] = useState(false);
   const [followLoading, setFollowLoading] = useState(false);
-  const [showOnboarding, setShowOnboarding] = useState(false);
 
   useEffect(() => {
     if (!targetId) { setLoading(false); return; }
@@ -91,14 +88,7 @@ export default function Profile() {
 
   return (
     <div>
-      {showOnboarding && (
-        <Onboarding user={user} onComplete={(finished) => { setShowOnboarding(false); if (finished) window.location.reload(); }} />
-      )}
       <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-10">
-        {/* Onboarding banner for dismissed users */}
-        {isOwnProfile && !profile?.onboarding_completed && profile?.total_predictions === 0 && (
-          <OnboardingBanner onStart={() => setShowOnboarding(true)} />
-        )}
         {/* Header */}
         <div className="card mb-6">
           <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">

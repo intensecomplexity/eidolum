@@ -45,25 +45,13 @@ import AnalystsPage from './pages/Analysts';
 import AnalystProfilePage from './pages/AnalystProfile';
 import HeatmapPage from './pages/Heatmap';
 import EarningsPage from './pages/Earnings';
-import Onboarding from './components/Onboarding';
 import { useAuth } from './context/AuthContext';
-import { useState } from 'react';
 
 export default function App() {
-  const { needsOnboarding, user, markOnboarded, isAuthenticated } = useAuth();
-  const [showOnboarding, setShowOnboarding] = useState(true);
+  const { isAuthenticated } = useAuth();
 
   return (
     <div className="min-h-screen bg-bg pb-bottom-nav sm:pb-0">
-      {needsOnboarding && showOnboarding && (
-        <Onboarding
-          user={user}
-          onComplete={(finished) => {
-            if (finished) markOnboarded();
-            setShowOnboarding(false);
-          }}
-        />
-      )}
       <Navbar />
       <Routes>
         <Route path="/" element={isAuthenticated ? <Dashboard /> : <LandingPublic />} />
