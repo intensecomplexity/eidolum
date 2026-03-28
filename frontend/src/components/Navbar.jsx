@@ -72,7 +72,7 @@ export default function Navbar() {
   return (
     <>
       <nav className="sticky top-0 z-50 bg-bg/80 backdrop-blur-md" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }} ref={navRef}>
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="max-w-full mx-auto px-4 sm:px-6 lg:px-12">
           <div className="flex items-center justify-between h-14 sm:h-16">
 
             {/* ── LEFT GROUP: Logo + nav links ─────────────────────── */}
