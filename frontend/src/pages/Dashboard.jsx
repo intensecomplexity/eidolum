@@ -58,7 +58,14 @@ export default function Dashboard() {
             <Divider />
             <StatusItem label="Rank" value={profile.rank_name} />
             <Divider />
-            <StatusItem label="Scored" value={profile.scored_predictions} />
+            <StatusItem label="Level" value={<span className="text-accent">Lv.{profile.xp_level || 1}</span>} />
+            <Divider />
+            <div className="flex flex-col items-center gap-0.5 shrink-0">
+              <span className="font-mono text-xs text-accent font-bold">{(profile.xp_total || 0).toLocaleString()} XP</span>
+              <div className="w-12 h-1 bg-surface-2 rounded-full overflow-hidden">
+                <div className="h-full bg-accent rounded-full" style={{ width: `${profile.xp_progress_pct || 0}%` }} />
+              </div>
+            </div>
             <Divider />
             {streak >= 1 && (<><StatusItem label="Streak" value={<><Flame className="w-3 h-3 text-orange-400 inline" /> {streak}</>} /><Divider /></>)}
             <StatusItem label="Pred. Streak" value={`${predStreak}d`} />

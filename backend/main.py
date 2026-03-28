@@ -794,6 +794,14 @@ def run_phase2_migrations():
     except Exception:
         db.rollback()
 
+    # ── 31. XP system columns ──────────────────────────────────────
+    for col in ["xp_total INTEGER DEFAULT 0", "xp_level INTEGER DEFAULT 1"]:
+        try:
+            db.execute(text(f"ALTER TABLE users ADD COLUMN {col}"))
+            db.commit()
+        except Exception:
+            db.rollback()
+
     print("[Phase2] All migrations complete")
     db.close()
 

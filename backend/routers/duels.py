@@ -191,6 +191,15 @@ def accept_duel(
 
     duel.opponent_target = req.target.strip()
     duel.status = "active"
+
+    # XP for both participants
+    try:
+        from xp import award_xp
+        award_xp(duel.challenger_id, "duel_accepted", db)
+        award_xp(duel.opponent_id, "duel_accepted", db)
+    except Exception:
+        pass
+
     db.commit()
     db.refresh(duel)
 

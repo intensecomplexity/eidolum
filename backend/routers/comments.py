@@ -126,6 +126,13 @@ def create_comment(
                 data={"prediction_id": pred.id, "comment_id": None}, db=db,
             )
 
+    # XP
+    try:
+        from xp import award_xp
+        award_xp(user_id, "comment_on_prediction", db)
+    except Exception:
+        pass
+
     db.commit()
     db.refresh(comment)
 

@@ -491,6 +491,14 @@ def evaluate_badges(user_id: int, db: Session) -> list[str]:
                 description=f"{user.username} earned the {info.get('name', bid)} badge",
                 data={"badge_id": bid, "badge_name": info.get('name', bid)}, db=db,
             )
+        # XP for each badge
+        try:
+            from xp import award_xp
+            for _ in newly_awarded:
+                award_xp(user_id, "badge_earned", db)
+        except Exception:
+            pass
+
         db.commit()
         logger.info(f"[BadgeEngine] User {user_id}: awarded {len(newly_awarded)} badge(s): {newly_awarded}")
 

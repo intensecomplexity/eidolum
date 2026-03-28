@@ -210,6 +210,8 @@ class User(Base):
     last_seen_at = Column(DateTime, nullable=True)
     notification_preferences = Column(Text, nullable=True)  # JSON string
     auth_provider = Column(String(20), default="email")  # "email" | "google"
+    xp_total = Column(Integer, default=0)
+    xp_level = Column(Integer, default=1)
 
     predictions = relationship("UserPrediction", back_populates="user", cascade="all, delete-orphan")
     achievements = relationship("Achievement", back_populates="user", cascade="all, delete-orphan")

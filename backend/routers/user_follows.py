@@ -154,6 +154,14 @@ def accept_friend_request(request: Request, user_id: int, current_user_id: int =
     aname = accepter.username if accepter else "Someone"
     create_notification(user_id=user_id, type="new_follower", title="Friend Request Accepted", message=f"{aname} accepted your friend request", data={"user_id": current_user_id}, db=db)
 
+    # XP for both users
+    try:
+        from xp import award_xp
+        award_xp(current_user_id, "friend_added", db)
+        award_xp(user_id, "friend_added", db)
+    except Exception:
+        pass
+
     db.commit()
     return {"status": "accepted"}
 

@@ -152,6 +152,13 @@ def evaluate_user_predictions(db: Session):
 
         _update_season_scored(p.user_id, outcome, db)
 
+        # XP
+        try:
+            from xp import award_xp
+            award_xp(p.user_id, "prediction_scored_correct" if outcome == "correct" else "prediction_scored_incorrect", db)
+        except Exception:
+            pass
+
     db.commit()
 
     total = correct_count + incorrect_count
@@ -259,6 +266,13 @@ def evaluate_duels(db: Session):
             ticker=duel.ticker,
             data={"duel_id": duel.id, "winner": winner_name, "loser": loser_name, "ticker": duel.ticker}, db=db,
         )
+
+        # XP for duel winner
+        try:
+            from xp import award_xp
+            award_xp(winner_id, "duel_won", db)
+        except Exception:
+            pass
 
     db.commit()
     print(f"[DuelEval] Evaluated {evaluated} duels")

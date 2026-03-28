@@ -129,6 +129,14 @@ def enter_challenge(
         direction=req.direction,
     )
     db.add(entry)
+
+    # XP
+    try:
+        from xp import award_xp
+        award_xp(user_id, "daily_challenge_enter", db)
+    except Exception:
+        pass
+
     db.commit()
     db.refresh(entry)
 

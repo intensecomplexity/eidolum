@@ -236,6 +236,13 @@ def submit_prediction(
     except Exception:
         pass
 
+    # XP
+    try:
+        from xp import award_xp
+        award_xp(user_id, "submit_prediction", db)
+    except Exception:
+        pass
+
     db.commit()
     db.refresh(prediction)
 

@@ -40,6 +40,7 @@ def create_reaction(
         raise HTTPException(status_code=400, detail=f"reaction must be one of: {', '.join(VALID_REACTIONS)}")
 
     # Cannot react to your own prediction
+    pred = None
     if req.prediction_source == "user":
         pred = db.query(UserPrediction).filter(UserPrediction.id == req.prediction_id).first()
         if pred and pred.user_id == user_id:
@@ -51,6 +52,7 @@ def create_reaction(
         PredictionReaction.user_id == user_id,
     ).first()
 
+    is_new = existing is None
     if existing:
         existing.reaction = req.reaction
     else:
@@ -60,6 +62,16 @@ def create_reaction(
             user_id=user_id,
             reaction=req.reaction,
         ))
+
+    # XP for new reactions
+    if is_new:
+        try:
+            from xp import award_xp
+            award_xp(user_id, "react_to_prediction", db)
+            if req.prediction_source == "user" and pred and pred.user_id != user_id:
+                award_xp(pred.user_id, "receive_reaction", db)
+        except Exception:
+            pass
 
     db.commit()
     return {"status": "ok", "reaction": req.reaction}

@@ -162,6 +162,14 @@ def score_daily_challenge(db: Session):
             msg = f"You got today's challenge right! {pct}% of players agreed." if entry.outcome == "correct" else f"Today's {challenge.ticker} was {challenge.correct_direction}. Better luck tomorrow!"
             create_notification(user_id=entry.user_id, type="prediction_scored", title="Daily Challenge Scored!", message=msg, data={"challenge_id": challenge.id}, db=db)
 
+            # XP
+            try:
+                from xp import award_xp
+                if entry.outcome == "correct":
+                    award_xp(entry.user_id, "daily_challenge_correct", db)
+            except Exception:
+                pass
+
     community_acc = round(correct_count / total * 100, 1) if total > 0 else 0
     log_activity(user_id=0, event_type="daily_challenge_scored", description=f"Daily Challenge: {challenge.ticker} was {challenge.correct_direction}. {community_acc}% of {total} got it right.", ticker=challenge.ticker, data={"ticker": challenge.ticker, "correct": challenge.correct_direction, "accuracy": community_acc}, db=db)
     db.commit()
