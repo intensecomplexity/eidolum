@@ -230,7 +230,6 @@ export default function LandingPublic() {
                 <BarChart3 className="w-5 h-5 text-accent" />
                 <span className="font-serif text-lg"><span className="text-accent">eido</span><span className="text-muted">lum</span></span>
               </div>
-              <h3 className="font-semibold text-sm mb-1 text-accent">Eidolum</h3>
               <p className="text-xs text-text-secondary">Every call tracked, scored, and ranked. Free.</p>
             </div>
           </div>

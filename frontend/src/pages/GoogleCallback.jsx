@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { googleCallback } from '../api';
+import { API_BASE } from '../api';
 
 export default function GoogleCallback() {
   const navigate = useNavigate();
@@ -10,7 +10,7 @@ export default function GoogleCallback() {
   const [error, setError] = useState('');
 
   useEffect(() => {
-    // Flow 1: Backend already exchanged the code and redirected here with a token
+    // Check for token first (backend redirected here after code exchange)
     const token = searchParams.get('token');
     if (token) {
       const userId = searchParams.get('user_id');
@@ -20,21 +20,24 @@ export default function GoogleCallback() {
       return;
     }
 
-    // Flow 2: Google redirected here with a code — exchange it via backend API
-    const code = searchParams.get('code');
-    if (code) {
-      googleCallback(code)
-        .then(data => {
-          loginWithToken(data);
-          navigate('/');
-        })
-        .catch(err => {
-          setError(err.response?.data?.detail || 'Google sign-in failed. Please try again.');
-        });
+    // Check for error from login page redirect
+    const errorParam = searchParams.get('error');
+    if (errorParam) {
+      setError('Google sign-in failed. Please try again.');
       return;
     }
 
-    setError('No authorization code or token received from Google');
+    // Google redirected here with a code — redirect browser to backend to exchange it
+    const code = searchParams.get('code');
+    if (code) {
+      // Redirect the browser (not an API call) to the backend callback
+      // The backend will exchange the code, create/find the user, and redirect back
+      // to /auth/callback?token=...
+      window.location.href = `${API_BASE}/api/auth/google/callback?code=${encodeURIComponent(code)}`;
+      return;
+    }
+
+    setError('No authorization code received from Google.');
   }, []);
 
   if (error) {

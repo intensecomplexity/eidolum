@@ -15,12 +15,10 @@ from auth import hash_password, verify_password, create_token, get_current_user_
 from rate_limit import limiter
 
 # Google OAuth config
-GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID", "")
-GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET", "")
-GOOGLE_REDIRECT_URI = os.getenv("GOOGLE_REDIRECT_URI", "https://eidolum.com/auth/google/callback")
-# NOTE: If this points to the frontend SPA, the frontend exchanges the code via API.
-# If this points to the backend (e.g. /api/auth/google/callback), the backend handles
-# the code exchange and redirects to the frontend with the token.
+GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID", "").strip()
+GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET", "").strip()
+GOOGLE_REDIRECT_URI = os.getenv("GOOGLE_REDIRECT_URI", "https://eidolum.com/auth/google/callback").strip()
+FRONTEND_URL = os.getenv("FRONTEND_URL", "https://www.eidolum.com").strip()
 
 router = APIRouter()
 
@@ -127,9 +125,9 @@ def google_auth_url(request: Request):
 @router.get("/auth/google/callback")
 @limiter.limit("20/minute")
 def google_callback(request: Request, code: str = Query(...), db: Session = Depends(get_db)):
-    """Exchange Google auth code for user info, create/login user, return JWT."""
+    """Exchange Google auth code for user info, create/login user, redirect with JWT."""
     if not GOOGLE_CLIENT_ID or not GOOGLE_CLIENT_SECRET:
-        raise HTTPException(status_code=503, detail="Google sign-in is not configured")
+        return RedirectResponse(url=f"{FRONTEND_URL}/login?error=google_not_configured", status_code=302)
 
     # Exchange code for tokens
     try:
@@ -139,14 +137,16 @@ def google_callback(request: Request, code: str = Query(...), db: Session = Depe
             "client_secret": GOOGLE_CLIENT_SECRET,
             "redirect_uri": GOOGLE_REDIRECT_URI,
             "grant_type": "authorization_code",
-        }, timeout=10)
+        }, timeout=15)
         token_data = token_resp.json()
-    except Exception:
-        raise HTTPException(status_code=502, detail="Failed to contact Google")
+    except Exception as e:
+        print(f"[GoogleAuth] Token exchange failed: {e}")
+        return RedirectResponse(url=f"{FRONTEND_URL}/login?error=google_auth_failed", status_code=302)
 
     if "access_token" not in token_data:
-        error = token_data.get("error_description", token_data.get("error", "Unknown error"))
-        raise HTTPException(status_code=400, detail=f"Google auth failed: {error}")
+        error = token_data.get("error_description", token_data.get("error", "unknown"))
+        print(f"[GoogleAuth] No access_token: {error}")
+        return RedirectResponse(url=f"{FRONTEND_URL}/login?error=google_auth_failed", status_code=302)
 
     # Fetch user info
     try:
@@ -154,56 +154,62 @@ def google_callback(request: Request, code: str = Query(...), db: Session = Depe
             "Authorization": f"Bearer {token_data['access_token']}"
         }, timeout=10)
         guser = userinfo_resp.json()
-    except Exception:
-        raise HTTPException(status_code=502, detail="Failed to fetch Google profile")
+    except Exception as e:
+        print(f"[GoogleAuth] Userinfo fetch failed: {e}")
+        return RedirectResponse(url=f"{FRONTEND_URL}/login?error=google_auth_failed", status_code=302)
 
     google_email = guser.get("email")
     if not google_email:
-        raise HTTPException(status_code=400, detail="Google account has no email")
+        return RedirectResponse(url=f"{FRONTEND_URL}/login?error=google_no_email", status_code=302)
 
     google_name = guser.get("name", "")
     google_picture = guser.get("picture", "")
 
     # Check if user exists
-    user = db.query(User).filter(User.email == google_email).first()
+    try:
+        user = db.query(User).filter(User.email == google_email).first()
 
-    if user:
-        # Existing user — link account if they signed up with email
-        if hasattr(user, 'auth_provider') and (not user.auth_provider or user.auth_provider == 'email'):
-            user.auth_provider = 'google'
-        if google_picture and not user.avatar_url:
-            user.avatar_url = google_picture
-        if google_name and not user.display_name:
-            user.display_name = google_name
-        db.commit()
-    else:
-        # New user — create account
-        username = _generate_username(google_email, db)
-        user = User(
-            username=username,
-            email=google_email,
-            password_hash=secrets.token_hex(32),  # Random placeholder, not a real password
-            display_name=google_name or username,
-            avatar_url=google_picture,
-        )
-        if hasattr(User, 'auth_provider'):
-            user.auth_provider = 'google'
-        db.add(user)
-        db.commit()
-        db.refresh(user)
+        if user:
+            # Existing user — link account if they signed up with email
+            if hasattr(user, 'auth_provider') and (not user.auth_provider or user.auth_provider == 'email'):
+                user.auth_provider = 'google'
+            if google_picture and not user.avatar_url:
+                user.avatar_url = google_picture
+            if google_name and not user.display_name:
+                user.display_name = google_name
+            db.commit()
+        else:
+            # New user — create account
+            username = _generate_username(google_email, db)
+            user = User(
+                username=username,
+                email=google_email,
+                password_hash=secrets.token_hex(32),
+                display_name=google_name or username,
+                avatar_url=google_picture,
+            )
+            if hasattr(User, 'auth_provider'):
+                user.auth_provider = 'google'
+            db.add(user)
+            db.commit()
+            db.refresh(user)
 
-        from activity import log_activity
-        log_activity(user_id=user.id, event_type="user_joined", description=f"{user.username} joined Eidolum", data={"user_id": user.id}, db=db)
-        db.commit()
+            from activity import log_activity
+            log_activity(user_id=user.id, event_type="user_joined", description=f"{user.username} joined Eidolum", data={"user_id": user.id}, db=db)
+            db.commit()
 
-    jwt_token = create_token(user.id, user.username)
-    frontend_url = os.getenv("FRONTEND_URL", "https://eidolum.com")
-    params = urlencode({
-        "token": jwt_token,
-        "user_id": user.id,
-        "username": user.username,
-    })
-    return RedirectResponse(url=f"{frontend_url}/auth/callback?{params}", status_code=302)
+        jwt_token = create_token(user.id, user.username)
+        params = urlencode({
+            "token": jwt_token,
+            "user_id": user.id,
+            "username": user.username,
+        })
+        return RedirectResponse(url=f"{FRONTEND_URL}/auth/callback?{params}", status_code=302)
+
+    except Exception as e:
+        db.rollback()
+        print(f"[GoogleAuth] DB error: {e}")
+        return RedirectResponse(url=f"{FRONTEND_URL}/login?error=google_auth_failed", status_code=302)
 
 
 # ── POST /api/auth/register ──────────────────────────────────────────────────
