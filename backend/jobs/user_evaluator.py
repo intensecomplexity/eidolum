@@ -140,97 +140,106 @@ def evaluate_user_predictions(db: Session) -> list[dict]:
     affected_user_ids = set()
 
     for p in overdue:
-        if not p.ticker:
-            continue
-
-        price = _fetch_price(p.ticker)
-        if price is None:
-            print(f"[UserEval] Could not fetch price for {p.ticker} (prediction {p.id}), skipping")
-            continue
-
-        entry = float(p.price_at_call) if p.price_at_call else None
-        if entry is None:
-            print(f"[UserEval] No entry price for prediction {p.id} ({p.ticker}), skipping")
-            continue
-
-        if p.direction == "bullish":
-            outcome = "correct" if price > entry else "incorrect"
-        elif p.direction == "bearish":
-            outcome = "correct" if price < entry else "incorrect"
-        else:
-            continue
-
-        p.outcome = outcome
-        p.evaluated_at = now
-        p.current_price = Decimal(str(price))
-
-        print(f"[UserEval] Prediction {p.id}: {p.ticker} {p.direction} entry=${entry} current=${price} → {outcome}")
-
-        results.append({
-            "id": p.id, "ticker": p.ticker, "direction": p.direction,
-            "outcome": outcome, "entry_price": entry, "price_used": price,
-            "source": _price_sources.get(p.ticker, "unknown"),
-        })
-
-        if outcome == "correct":
-            correct_count += 1
-        else:
-            incorrect_count += 1
-
-        affected_user_ids.add(p.user_id)
-
-        # Update streak
-        user = db.query(User).filter(User.id == p.user_id).first()
-        if user:
-            if outcome == "correct":
-                user.streak_current = (user.streak_current or 0) + 1
-                if user.streak_current > (user.streak_best or 0):
-                    user.streak_best = user.streak_current
-                # Streak milestone
-                if user.streak_current in STREAK_MILESTONES:
-                    create_notification(
-                        user_id=p.user_id, type="streak_milestone",
-                        title="Streak Milestone!",
-                        message=f"You're on a {user.streak_current} prediction streak!",
-                        data={"streak": user.streak_current}, db=db,
-                    )
-                    log_activity(
-                        user_id=p.user_id, event_type="streak_milestone",
-                        description=f"{user.username} hit a {user.streak_current} prediction streak!",
-                        data={"streak_count": user.streak_current}, db=db,
-                    )
-            else:
-                user.streak_current = 0
-
-        # Prediction scored notification
-        if outcome == "correct":
-            msg = f"Your {p.direction} call on {p.ticker} was correct! Target: {p.price_target}, Final price: ${price}. Share your win \u2192"
-        else:
-            msg = f"Your {p.direction} call on {p.ticker} was incorrect. Target: {p.price_target}, Final price: ${price}"
-        create_notification(
-            user_id=p.user_id, type="prediction_scored",
-            title="You Called It!" if outcome == "correct" else "Prediction Scored",
-            message=msg,
-            data={"prediction_id": p.id, "outcome": outcome, "ticker": p.ticker, "told_you_so": outcome == "correct"}, db=db,
-        )
-        _uname = user.username if user else "Someone"
-        log_activity(
-            user_id=p.user_id, event_type="prediction_scored",
-            description=f"{_uname}'s {p.ticker} call was {outcome}",
-            ticker=p.ticker,
-            data={"prediction_id": p.id, "outcome": outcome, "ticker": p.ticker}, db=db,
-        )
-
-        _update_season_scored(p.user_id, outcome, db)
-
-        # XP
         try:
-            from xp import award_xp
-            award_xp(p.user_id, "prediction_scored_correct" if outcome == "correct" else "prediction_scored_incorrect", db)
-        except Exception:
-            pass
+            if not p.ticker:
+                continue
 
-    db.commit()
+            price = _fetch_price(p.ticker)
+            if price is None:
+                print(f"[UserEval] Could not fetch price for {p.ticker} (prediction {p.id}), skipping")
+                continue
+
+            entry = float(p.price_at_call) if p.price_at_call else None
+            if entry is None:
+                print(f"[UserEval] No entry price for prediction {p.id} ({p.ticker}), skipping")
+                continue
+
+            if p.direction == "bullish":
+                outcome = "correct" if price > entry else "incorrect"
+            elif p.direction == "bearish":
+                outcome = "correct" if price < entry else "incorrect"
+            else:
+                continue
+
+            p.outcome = outcome
+            p.evaluated_at = now
+            p.current_price = Decimal(str(price))
+
+            print(f"[UserEval] Prediction {p.id}: {p.ticker} {p.direction} entry=${entry} current=${price} → {outcome}")
+
+            results.append({
+                "id": p.id, "ticker": p.ticker, "direction": p.direction,
+                "outcome": outcome, "entry_price": entry, "price_used": price,
+                "source": _price_sources.get(p.ticker, "unknown"),
+            })
+
+            if outcome == "correct":
+                correct_count += 1
+            else:
+                incorrect_count += 1
+
+            affected_user_ids.add(p.user_id)
+
+            # Update streak
+            user = db.query(User).filter(User.id == p.user_id).first()
+            if user:
+                if outcome == "correct":
+                    user.streak_current = (user.streak_current or 0) + 1
+                    if user.streak_current > (user.streak_best or 0):
+                        user.streak_best = user.streak_current
+                    if user.streak_current in STREAK_MILESTONES:
+                        create_notification(
+                            user_id=p.user_id, type="streak_milestone",
+                            title="Streak Milestone!",
+                            message=f"You're on a {user.streak_current} prediction streak!",
+                            data={"streak": user.streak_current}, db=db,
+                        )
+                        log_activity(
+                            user_id=p.user_id, event_type="streak_milestone",
+                            description=f"{user.username} hit a {user.streak_current} prediction streak!",
+                            data={"streak_count": user.streak_current}, db=db,
+                        )
+                else:
+                    user.streak_current = 0
+
+            # Notification
+            if outcome == "correct":
+                msg = f"Your {p.direction} call on {p.ticker} was correct! Target: {p.price_target}, Final price: ${price}. Share your win \u2192"
+            else:
+                msg = f"Your {p.direction} call on {p.ticker} was incorrect. Target: {p.price_target}, Final price: ${price}"
+            create_notification(
+                user_id=p.user_id, type="prediction_scored",
+                title="You Called It!" if outcome == "correct" else "Prediction Scored",
+                message=msg,
+                data={"prediction_id": p.id, "outcome": outcome, "ticker": p.ticker, "told_you_so": outcome == "correct"}, db=db,
+            )
+            _uname = user.username if user else "Someone"
+            log_activity(
+                user_id=p.user_id, event_type="prediction_scored",
+                description=f"{_uname}'s {p.ticker} call was {outcome}",
+                ticker=p.ticker,
+                data={"prediction_id": p.id, "outcome": outcome, "ticker": p.ticker}, db=db,
+            )
+
+            _update_season_scored(p.user_id, outcome, db)
+
+            # XP
+            try:
+                from xp import award_xp
+                award_xp(p.user_id, "prediction_scored_correct" if outcome == "correct" else "prediction_scored_incorrect", db)
+            except Exception:
+                pass
+
+            # Commit after EACH prediction so one failure doesn't lose the batch
+            db.commit()
+            print(f"[UserEval] Committed prediction {p.id} as {outcome}")
+
+        except Exception as e:
+            db.rollback()
+            print(f"[UserEval] ERROR scoring prediction {p.id}: {e}")
+            import traceback
+            traceback.print_exc()
+            continue
 
     total = correct_count + incorrect_count
     print(f"[UserEval] Evaluated {total} user predictions: {correct_count} correct, {incorrect_count} incorrect")

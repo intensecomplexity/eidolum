@@ -1257,7 +1257,12 @@ async def lifespan(app):
         scheduler_last_run["user_evaluator"] = _dt.utcnow()
         db = SessionLocal()
         try:
-            evaluate_user_predictions(db)
+            results = evaluate_user_predictions(db)
+            print(f"[Scheduler] User evaluator completed: {len(results or [])} predictions scored")
+        except Exception as e:
+            print(f"[Scheduler] USER EVALUATOR FAILED: {e}")
+            import traceback
+            traceback.print_exc()
         finally:
             db.close()
 
