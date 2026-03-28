@@ -17,7 +17,7 @@ from rate_limit import limiter
 # Google OAuth config
 GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID", "").strip()
 GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET", "").strip()
-GOOGLE_REDIRECT_URI = os.getenv("GOOGLE_REDIRECT_URI", "https://eidolum.com/auth/google/callback").strip()
+GOOGLE_REDIRECT_URI = os.getenv("GOOGLE_REDIRECT_URI", "https://www.eidolum.com/auth/google/callback").strip()
 FRONTEND_URL = os.getenv("FRONTEND_URL", "https://www.eidolum.com").strip()
 
 router = APIRouter()
@@ -217,8 +217,8 @@ def google_callback(request: Request, code: str = Query(...), db: Session = Depe
         "user_id": user.id,
         "username": user.username,
         "display_name": user.display_name,
+        "email": user.email,
     }
-        return RedirectResponse(url=f"{FRONTEND_URL}/login?error=google_auth_failed", status_code=302)
 
 
 # ── POST /api/auth/register ──────────────────────────────────────────────────

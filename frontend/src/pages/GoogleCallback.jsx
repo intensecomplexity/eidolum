@@ -1,52 +1,62 @@
 import { useEffect, useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
-import { googleCallback } from '../api';
+import { useSearchParams } from 'react-router-dom';
+
+const API_BASE = 'https://eidolum-production.up.railway.app';
 
 export default function GoogleCallback() {
-  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { loginWithToken } = useAuth();
-  const [error, setError] = useState('');
-  const [processing, setProcessing] = useState(false);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
-    // Flow 1: Arrived with token already (e.g. from a backend redirect)
+    // Flow 1: Already have a token (backend redirect flow)
     const token = searchParams.get('token');
     if (token) {
       const userId = searchParams.get('user_id');
       const username = searchParams.get('username');
-      loginWithToken({ token, user_id: parseInt(userId), username });
-      navigate('/');
+      localStorage.setItem('eidolum_token', token);
+      localStorage.setItem('eidolum_user', JSON.stringify({
+        id: parseInt(userId), user_id: parseInt(userId), username,
+      }));
+      window.location.href = '/';
       return;
     }
 
-    // Flow 2: Arrived with error param
+    // Flow 2: Error from previous attempt
     const errorParam = searchParams.get('error');
     if (errorParam) {
       setError('Google sign-in failed. Please try again.');
       return;
     }
 
-    // Flow 3: Google redirected here with a code — call backend API to exchange it
+    // Flow 3: Google redirected here with a code — exchange it
     const code = searchParams.get('code');
     if (!code) {
       setError('No authorization code received from Google.');
       return;
     }
 
-    if (processing) return;
-    setProcessing(true);
-
-    googleCallback(code)
+    // Use fetch directly (not axios) to avoid any interceptor/redirect issues
+    fetch(`${API_BASE}/api/auth/google/callback?code=${encodeURIComponent(code)}`)
+      .then(res => {
+        if (!res.ok) return res.json().then(d => { throw new Error(d.detail || 'Login failed'); });
+        return res.json();
+      })
       .then(data => {
-        loginWithToken(data);
-        navigate('/');
+        if (data.token) {
+          localStorage.setItem('eidolum_token', data.token);
+          localStorage.setItem('eidolum_user', JSON.stringify({
+            id: data.user_id, user_id: data.user_id,
+            username: data.username, display_name: data.display_name,
+          }));
+          // Use window.location to force full page reload with fresh auth state
+          window.location.href = '/';
+        } else {
+          setError(data.detail || 'Login failed — no token received.');
+        }
       })
       .catch(err => {
-        const detail = err?.response?.data?.detail || '';
-        console.error('[GoogleCallback] Error:', detail || err);
-        setError(detail || 'Google sign-in failed. Please try again.');
+        console.error('[GoogleCallback]', err);
+        setError(err.message || 'Failed to complete Google sign-in.');
       });
   }, []);
 
@@ -54,7 +64,7 @@ export default function GoogleCallback() {
     return (
       <div className="max-w-md mx-auto px-4 py-20 text-center">
         <div className="bg-negative/10 border border-negative/20 rounded-lg px-4 py-3 mb-4 text-sm text-negative">{error}</div>
-        <button onClick={() => navigate('/login')} className="btn-primary">Back to Login</button>
+        <a href="/login" className="btn-primary inline-block">Back to Login</a>
       </div>
     );
   }
