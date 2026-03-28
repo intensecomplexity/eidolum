@@ -24,31 +24,58 @@ CRYPTO_TICKERS = {"BTC": "BINANCE:BTCUSDT", "ETH": "BINANCE:ETHUSDT", "SOL": "BI
 
 
 def _fetch_price(ticker: str) -> float | None:
+    """Fetch current price with multiple fallbacks: Finnhub → evaluator → yfinance."""
     if ticker in _price_cache:
         return _price_cache[ticker]
+
+    # Attempt 1: Finnhub
     if FINNHUB_KEY:
-        # Try crypto symbol mapping first
         symbols_to_try = [ticker]
         if ticker in CRYPTO_TICKERS:
             symbols_to_try.insert(0, CRYPTO_TICKERS[ticker])
         for sym in symbols_to_try:
             try:
                 r = httpx.get("https://finnhub.io/api/v1/quote", params={"symbol": sym, "token": FINNHUB_KEY}, timeout=10)
-                price = r.json().get("c")
-                if price and price > 0:
+                data = r.json()
+                price = data.get("c")
+                if price and float(price) > 0:
                     result = round(float(price), 2)
                     _price_cache[ticker] = result
+                    print(f"[UserEval] Price for {ticker} via Finnhub: ${result}")
                     return result
-            except Exception:
+            except Exception as e:
+                print(f"[UserEval] Finnhub failed for {sym}: {e}")
                 continue
+    else:
+        print("[UserEval] WARNING: FINNHUB_KEY not set")
+
+    # Attempt 2: evaluator module
     try:
         from jobs.evaluator import get_current_price
         result = get_current_price(ticker)
-        if result:
+        if result and float(result) > 0:
             _price_cache[ticker] = result
-        return result
-    except Exception:
-        return None
+            print(f"[UserEval] Price for {ticker} via evaluator: ${result}")
+            return result
+    except Exception as e:
+        print(f"[UserEval] Evaluator fallback failed for {ticker}: {e}")
+
+    # Attempt 3: yfinance direct
+    try:
+        import yfinance as yf
+        t = yf.Ticker(ticker)
+        hist = t.history(period="5d")
+        if not hist.empty:
+            result = round(float(hist['Close'].iloc[-1]), 2)
+            if result > 0:
+                _price_cache[ticker] = result
+                print(f"[UserEval] Price for {ticker} via yfinance: ${result}")
+                return result
+    except Exception as e:
+        print(f"[UserEval] yfinance fallback failed for {ticker}: {e}")
+
+    print(f"[UserEval] ALL price sources failed for {ticker}")
+    return None
 
 
 def _parse_target(target_str: str) -> float | None:

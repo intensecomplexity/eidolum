@@ -1388,7 +1388,7 @@ async def lifespan(app):
     scheduler.add_job(run_yfinance, "interval", hours=3, id="yfinance", next_run_time=datetime.utcnow() + timedelta(minutes=120))
     # Evaluator + leaderboard
     scheduler.add_job(run_15min_evaluator, "interval", minutes=15, id="evaluator")
-    scheduler.add_job(run_15min_user_evaluator, "interval", minutes=15, id="user_evaluator")
+    scheduler.add_job(run_15min_user_evaluator, "interval", minutes=15, id="user_evaluator", next_run_time=datetime.utcnow() + timedelta(seconds=30))
     scheduler.add_job(run_15min_duel_evaluator, "interval", minutes=15, id="duel_evaluator")
     scheduler.add_job(run_hourly_season_check, "interval", hours=1, id="season_check")
 

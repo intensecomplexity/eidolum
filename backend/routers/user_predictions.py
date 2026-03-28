@@ -461,3 +461,20 @@ def get_live_prices(request: Request, tickers: str = Query(""), db: Session = De
         if price:
             result[t] = price
     return result
+
+
+# ── POST /api/admin/evaluate-user-predictions ─────────────────────────────────
+
+
+@router.post("/admin/evaluate-user-predictions")
+@limiter.limit("5/minute")
+def admin_evaluate_predictions(request: Request, db: Session = Depends(get_db)):
+    """Manually trigger user prediction evaluation."""
+    import os as _os
+    secret = request.headers.get("X-Admin-Secret", "") or request.query_params.get("secret", "")
+    if not secret or secret != _os.getenv("ADMIN_SECRET", ""):
+        raise HTTPException(status_code=403, detail="Unauthorized")
+
+    from jobs.user_evaluator import evaluate_user_predictions
+    evaluate_user_predictions(db)
+    return {"status": "evaluation triggered"}
