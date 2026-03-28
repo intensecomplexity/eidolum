@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from 'react';
 import { Link } from 'react-router-dom';
-import { Crosshair, Check, Trophy, TrendingUp, TrendingDown, ArrowRight } from 'lucide-react';
+import { Crosshair, Check, Trophy, TrendingUp, TrendingDown, ArrowRight, ChevronDown } from 'lucide-react';
 import EidolumLogo from '../components/EidolumLogo';
 import TypeBadge from '../components/TypeBadge';
 import Footer from '../components/Footer';
@@ -105,28 +105,40 @@ export default function LandingPublic() {
         </div>
       </section>
 
-      {/* ── 2. HOW IT WORKS ────────────────────────────────────────────── */}
+      {/* ── 2. HOW SCORING WORKS ──────────────────────────────────────── */}
       <section className="max-w-4xl mx-auto px-4 sm:px-6 py-16 sm:py-24">
         <FadeIn>
-          <h2 className="headline-serif text-center mb-3" style={{ fontSize: 'clamp(1.8rem, 4vw, 2.8rem)' }}>How it works</h2>
-          <p className="text-text-secondary text-center mb-12">Three steps. No complexity.</p>
+          <h2 className="font-bold text-center mb-3" style={{ fontSize: 'clamp(1.8rem, 4vw, 2.8rem)' }}>How Scoring Works</h2>
+          <p className="text-text-secondary text-center mb-12">Four steps. Full transparency.</p>
         </FadeIn>
 
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
           {[
-            { num: '01', icon: <Crosshair className="w-8 h-8 text-accent" />, title: 'Make a Call', desc: 'Pick a stock, go bullish or bearish, set your target and timeframe.' },
-            { num: '02', icon: <Check className="w-8 h-8 text-positive" />, title: 'Get Scored', desc: 'We automatically compare your prediction to real market data when time\'s up.' },
-            { num: '03', icon: <Trophy className="w-8 h-8 text-warning" />, title: 'Build Your Reputation', desc: 'Climb the ranks, earn badges, prove you\'re not just noise.' },
+            { num: '01', title: 'We Collect Predictions', desc: 'Analyst upgrades, downgrades, and price targets are collected from verified financial sources with timestamps and archived proof.' },
+            { num: '02', title: 'We Wait for the Deadline', desc: 'Each prediction has a clear evaluation window. Every prediction is tracked — not just the ones that worked out.' },
+            { num: '03', title: 'We Check the Math', desc: 'When the window closes, we compare the prediction against actual market data. Right or wrong — no gray area.' },
+            { num: '04', title: 'We Rank by Results', desc: 'Forecasters are ranked by verified accuracy, not followers or reputation.' },
           ].map((step, i) => (
             <FadeIn key={step.num}>
-              <div className="card text-center py-8" style={{ animationDelay: `${i * 150}ms` }}>
-                <div className="text-[10px] text-accent font-mono font-bold tracking-widest mb-4">{step.num}</div>
-                <div className="flex justify-center mb-4">{step.icon}</div>
-                <h3 className="font-semibold mb-2">{step.title}</h3>
+              <div className="card py-6" style={{ animationDelay: `${i * 100}ms` }}>
+                <div className="text-[10px] text-accent font-mono font-bold tracking-widest mb-2">{step.num}</div>
+                <h3 className="font-semibold mb-1.5">{step.title}</h3>
                 <p className="text-sm text-text-secondary leading-relaxed">{step.desc}</p>
               </div>
             </FadeIn>
           ))}
+        </div>
+      </section>
+
+      {/* ── 2b. SEASONS EXPLAINER ────────────────────────────────────── */}
+      <section className="border-y border-border py-10 sm:py-14">
+        <div className="max-w-3xl mx-auto px-4 sm:px-6 text-center">
+          <FadeIn>
+            <span className="text-[10px] text-accent font-mono font-bold uppercase tracking-widest">Quarterly Competition</span>
+            <p className="text-text-secondary text-sm sm:text-base leading-relaxed mt-3 max-w-2xl mx-auto">
+              Compete in quarterly Seasons — each with a unique theme — where accuracy resets and everyone gets a fresh shot at the top. Climb the seasonal leaderboard and earn exclusive badges.
+            </p>
+          </FadeIn>
         </div>
       </section>
 
@@ -238,20 +250,37 @@ export default function LandingPublic() {
         </FadeIn>
       </section>
 
-      {/* ── 6. FINAL CTA ───────────────────────────────────────────────── */}
+      {/* ── 6. FAQ ─────────────────────────────────────────────────────── */}
+      <section className="max-w-3xl mx-auto px-4 sm:px-6 py-16 sm:py-24">
+        <FadeIn>
+          <h2 className="font-bold text-center mb-10" style={{ fontSize: 'clamp(1.6rem, 4vw, 2.4rem)' }}>Frequently Asked Questions</h2>
+        </FadeIn>
+        <div className="space-y-2">
+          <FaqItem q="How do you define a prediction?" a="A prediction is a specific, measurable financial forecast — like 'TSLA will reach $300 by June 2026' or 'UBS downgrades NKE to Sell with a $50 target.' Vague commentary like 'I'm bullish on tech' doesn't count. Every prediction needs a ticker, a direction, and a timeframe." />
+          <FaqItem q="How do you score correctness?" a="When a prediction's timeframe expires, we compare it against actual market data. For price targets, did the stock hit the target? For directional calls, did it move the right way? It's binary — correct or incorrect." />
+          <FaqItem q="Can users see the raw source?" a="Yes. Every scraped prediction links back to its original source with an archived proof link. You can verify every data point yourself." />
+          <FaqItem q="How do you avoid cherry-picking?" a="We track ALL predictions from each forecaster, not just their wins. Every prediction is timestamped and archived the moment we find it. There's no way to hide bad calls — your full track record is public." />
+          <FaqItem q="Are you rating conviction or popularity?" a="Pure accuracy. We don't care how many followers an analyst has. The only thing that matters is: were they right?" />
+        </div>
+      </section>
+
+      {/* ── 7. CTA — STOP GUESSING ────────────────────────────────────── */}
       <section className="border-t border-border py-16 sm:py-24 text-center">
         <FadeIn>
-          <h2 className="headline-serif mb-4" style={{ fontSize: 'clamp(1.8rem, 4vw, 2.6rem)' }}>
-            Ready to prove you're right?
+          <h2 className="font-bold mb-4" style={{ fontSize: 'clamp(1.8rem, 4vw, 2.6rem)' }}>
+            Stop guessing who to trust
           </h2>
-          <p className="text-text-secondary mb-8 max-w-md mx-auto">
-            No credit card. No paywall. Just predictions and results.
+          <p className="text-text-secondary mb-8 max-w-lg mx-auto">
+            Track predictions. Verify accuracy. Follow the forecasters who actually get it right.
           </p>
-          <Link to="/register" className="btn-primary px-10 py-4 text-base">Create your free account</Link>
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
+            <Link to="/leaderboard" className="btn-primary px-8 w-full sm:w-auto">See the Leaderboard</Link>
+            <Link to="/register" className="btn-secondary px-8 w-full sm:w-auto">Start Tracking</Link>
+          </div>
         </FadeIn>
       </section>
 
-      {/* ── FOOTER ─────────────────────────────────────────────────────── */}
+      {/* ── 8. FOOTER ────────────────────────────────────────────────── */}
       <footer className="border-t border-border py-8 text-center">
         <div className="max-w-4xl mx-auto px-4">
           <div className="flex items-center justify-center gap-2 mb-4">
@@ -259,13 +288,30 @@ export default function LandingPublic() {
             <span className="font-serif text-lg text-accent">Eidolum</span>
           </div>
           <div className="flex items-center justify-center gap-6 text-xs text-muted mb-4">
-            <Link to="/leaderboard" className="hover:text-text-secondary">Leaderboard</Link>
-            <Link to="/consensus" className="hover:text-text-secondary">Consensus</Link>
-            <Link to="/activity" className="hover:text-text-secondary">Activity</Link>
+            <Link to="/leaderboard" className="hover:text-accent">Leaderboard</Link>
+            <Link to="/consensus" className="hover:text-accent">Consensus</Link>
+            <Link to="/activity" className="hover:text-accent">Activity</Link>
           </div>
-          <p className="text-[10px] text-muted/60">Built by Nimrod</p>
+          <p className="text-[10px] text-muted/50">&copy; 2026 Eidolum. All data, scoring methodologies, and platform content are proprietary.</p>
         </div>
       </footer>
+    </div>
+  );
+}
+
+function FaqItem({ q, a }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="card py-0 overflow-hidden">
+      <button onClick={() => setOpen(!open)} className="w-full flex items-center justify-between px-5 py-4 text-left">
+        <span className="text-sm font-medium text-text-primary pr-4">{q}</span>
+        <ChevronDown className={`w-4 h-4 text-muted flex-shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} />
+      </button>
+      {open && (
+        <div className="px-5 pb-4 text-sm text-text-secondary leading-relaxed border-t border-border/50 pt-3">
+          {a}
+        </div>
+      )}
     </div>
   );
 }
