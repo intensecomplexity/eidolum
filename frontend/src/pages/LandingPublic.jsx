@@ -215,22 +215,23 @@ export default function LandingPublic() {
       <section className="max-w-4xl mx-auto px-4 sm:px-6 py-12 sm:py-20">
         <FadeIn>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <div className="card text-center py-6 border-border/50">
+            <div className="card text-center py-6 border-negative/20 bg-negative/[0.02]">
               <div className="text-lg mb-2">𝕏</div>
               <h3 className="font-semibold text-sm mb-1 text-text-secondary">Twitter / X</h3>
               <p className="text-xs text-muted">Opinions with no accountability</p>
             </div>
-            <div className="card text-center py-6 border-border/50">
+            <div className="card text-center py-6 border-negative/20 bg-negative/[0.02]">
               <div className="text-lg mb-2">🏦</div>
               <h3 className="font-semibold text-sm mb-1 text-text-secondary">Wall Street Research</h3>
               <p className="text-xs text-muted">Paywalled, no public track record</p>
             </div>
-            <div className="card text-center py-6 border-accent/30 bg-accent/[0.03]">
+            <div className="card text-center py-6" style={{ borderColor: '#22c55e40', background: 'rgba(34,197,94,0.03)' }}>
               <div className="flex items-center justify-center gap-1.5 mb-2">
                 <BarChart3 className="w-5 h-5 text-accent" />
                 <span className="font-serif text-lg"><span className="text-accent">eido</span><span className="text-muted">lum</span></span>
+                <span className="text-accent text-sm">✓</span>
               </div>
-              <p className="text-xs text-text-secondary">Every call tracked, scored, and ranked. Free.</p>
+              <p className="text-sm text-text-primary font-medium">Every call tracked, scored, and ranked. Free.</p>
             </div>
           </div>
         </FadeIn>
