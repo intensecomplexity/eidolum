@@ -207,6 +207,8 @@ class User(Base):
     return_streak_current = Column(Integer, default=0)
     return_streak_best = Column(Integer, default=0)
     last_active_date = Column(DateTime, nullable=True)
+    last_seen_at = Column(DateTime, nullable=True)
+    notification_preferences = Column(Text, nullable=True)  # JSON string
 
     predictions = relationship("UserPrediction", back_populates="user", cascade="all, delete-orphan")
     achievements = relationship("Achievement", back_populates="user", cascade="all, delete-orphan")

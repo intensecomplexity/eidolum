@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Settings as SettingsIcon, Bell, BellOff, Mail, User, Shield, AlertTriangle } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import Footer from '../components/Footer';
-import { setPriceAlerts, setEmailPreferences } from '../api';
+import { setPriceAlerts, setEmailPreferences, getNotificationPrefs, setNotificationPrefs } from '../api';
 
 export default function Settings() {
   const navigate = useNavigate();
@@ -11,11 +11,13 @@ export default function Settings() {
   const [priceAlerts, setPriceAlertsState] = useState(true);
   const [weeklyDigest, setWeeklyDigestState] = useState(true);
   const [saving, setSaving] = useState('');
+  const [notifPrefs, setNotifPrefsState] = useState(null);
 
   useEffect(() => {
     if (user) {
       setPriceAlertsState(user.price_alerts_enabled !== false);
       setWeeklyDigestState(user.weekly_digest_enabled !== false);
+      getNotificationPrefs().then(setNotifPrefsState).catch(() => {});
     }
   }, [user]);
 
@@ -96,6 +98,40 @@ export default function Settings() {
             </div>
           </div>
         </div>
+
+        {/* Notification Preferences */}
+        {notifPrefs && (
+          <div className="card mb-4">
+            <h2 className="text-xs text-muted uppercase tracking-wider mb-4 flex items-center gap-1.5"><Bell className="w-3.5 h-3.5" /> Notification Preferences</h2>
+            {[
+              { key: 'friends', label: 'Friend requests' },
+              { key: 'prediction_results', label: 'Prediction results' },
+              { key: 'comments', label: 'Comments on my predictions' },
+              { key: 'reactions', label: 'Reaction milestones' },
+              { key: 'duels', label: 'Duel updates' },
+              { key: 'badges', label: 'Badge unlocks' },
+              { key: 'daily_challenge', label: 'Daily Challenge' },
+              { key: 'seasons', label: 'Season updates' },
+              { key: 'watchlist', label: 'Watchlist alerts' },
+              { key: 'price_alerts', label: 'Price alerts' },
+              { key: 'leaderboard', label: 'Leaderboard changes' },
+            ].map(cat => (
+              <ToggleRow
+                key={cat.key}
+                icon={notifPrefs[cat.key] ? <Bell className="w-4 h-4 text-accent" /> : <BellOff className="w-4 h-4 text-muted" />}
+                title={cat.label}
+                desc=""
+                enabled={notifPrefs[cat.key] !== false}
+                onToggle={async () => {
+                  const updated = { ...notifPrefs, [cat.key]: !notifPrefs[cat.key] };
+                  setNotifPrefsState(updated);
+                  await setNotificationPrefs(updated).catch(() => {});
+                }}
+                loading={false}
+              />
+            ))}
+          </div>
+        )}
 
         {/* Danger Zone */}
         <div className="card border-negative/20">

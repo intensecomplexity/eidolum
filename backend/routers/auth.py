@@ -45,7 +45,19 @@ def _user_dict(user: User) -> dict:
         "weekly_digest_enabled": bool(user.weekly_digest_enabled) if hasattr(user, 'weekly_digest_enabled') else True,
         "prediction_streak_daily": user.return_streak_current or 0,
         "prediction_streak_daily_best": user.return_streak_best or 0,
+        "is_online": _is_user_online(user),
+        "last_seen": _last_seen(user),
     }
+
+
+def _is_user_online(user):
+    from online_status import is_online
+    return is_online(user)
+
+
+def _last_seen(user):
+    from online_status import last_seen_text
+    return last_seen_text(user)
 
 
 # ── POST /api/auth/register ──────────────────────────────────────────────────
@@ -178,6 +190,41 @@ def set_email_preferences(request: Request, req: EmailPreferences, current_user:
     user.weekly_digest_enabled = 1 if req.weekly_digest else 0
     db.commit()
     return {"weekly_digest_enabled": req.weekly_digest}
+
+
+# ── PUT /api/settings/notifications ───────────────────────────────────────────
+
+
+class NotificationPrefs(BaseModel):
+    preferences: dict
+
+
+@router.put("/settings/notifications")
+@limiter.limit("10/minute")
+def set_notification_prefs(request: Request, req: NotificationPrefs, current_user: dict = Depends(get_current_user_dep), db: Session = Depends(get_db)):
+    import json
+    user = db.query(User).filter(User.id == current_user["user_id"]).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    user.notification_preferences = json.dumps(req.preferences)
+    db.commit()
+    return {"notification_preferences": req.preferences}
+
+
+@router.get("/settings/notifications")
+@limiter.limit("30/minute")
+def get_notification_prefs(request: Request, current_user: dict = Depends(get_current_user_dep), db: Session = Depends(get_db)):
+    import json
+    from notifications import DEFAULT_PREFERENCES
+    user = db.query(User).filter(User.id == current_user["user_id"]).first()
+    if not user:
+        return DEFAULT_PREFERENCES
+    if user.notification_preferences:
+        try:
+            return {**DEFAULT_PREFERENCES, **json.loads(user.notification_preferences)}
+        except Exception:
+            pass
+    return DEFAULT_PREFERENCES
 
 
 # ── GET /api/nudges ───────────────────────────────────────────────────────────

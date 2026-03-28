@@ -196,6 +196,16 @@ export function markAllNotificationsRead() {
   return api.post('/notifications/read-all', {}, { headers: authHeaders() }).then(r => r.data);
 }
 
+// ——— Notification Preferences ———
+
+export function getNotificationPrefs() {
+  return api.get('/settings/notifications', { headers: authHeaders() }).then(r => r.data);
+}
+
+export function setNotificationPrefs(preferences) {
+  return api.put('/settings/notifications', { preferences }, { headers: authHeaders() }).then(r => r.data);
+}
+
 // ——— Sharing ———
 
 export function getPredictionShareData(predictionId) {

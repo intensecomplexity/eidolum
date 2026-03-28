@@ -17,6 +17,18 @@ def require_admin(credentials: HTTPAuthorizationCredentials = Security(security)
 
 
 def require_user(credentials: HTTPAuthorizationCredentials = Security(security)):
-    """Decode JWT and return user_id."""
+    """Decode JWT and return user_id. Updates online status."""
     data = get_current_user(credentials.credentials)
-    return data["user_id"]
+    uid = data["user_id"]
+
+    # Update online status (lightweight, cached)
+    try:
+        from database import SessionLocal
+        from online_status import update_last_seen
+        db = SessionLocal()
+        update_last_seen(uid, db)
+        db.close()
+    except Exception:
+        pass
+
+    return uid

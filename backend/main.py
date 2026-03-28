@@ -752,6 +752,14 @@ def run_phase2_migrations():
     except Exception:
         db.rollback()
 
+    # ── 28. online status + notification preferences ────────────────
+    for col in ["last_seen_at TIMESTAMP", "notification_preferences TEXT"]:
+        try:
+            db.execute(text(f"ALTER TABLE users ADD COLUMN {col}"))
+            db.commit()
+        except Exception:
+            db.rollback()
+
     print("[Phase2] All migrations complete")
     db.close()
 
