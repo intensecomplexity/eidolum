@@ -1,6 +1,7 @@
 import { useEffect, useState, useRef } from 'react';
 import { Link } from 'react-router-dom';
-import { BarChart3, Crosshair, Check, Trophy, TrendingUp, TrendingDown, ArrowRight } from 'lucide-react';
+import { Crosshair, Check, Trophy, TrendingUp, TrendingDown, ArrowRight } from 'lucide-react';
+import EidolumLogo from '../components/EidolumLogo';
 import TypeBadge from '../components/TypeBadge';
 import Footer from '../components/Footer';
 import { getLeaderboard, getGlobalStats } from '../api';
@@ -69,11 +70,11 @@ export default function LandingPublic() {
       <section className="relative overflow-hidden">
         {/* Background grid */}
         <div className="absolute inset-0 grid-bg opacity-50" />
-        <div className="absolute inset-0" style={{ background: 'radial-gradient(ellipse at 50% 0%, rgba(0,168,120,0.08) 0%, transparent 60%)' }} />
+        <div className="absolute inset-0" style={{ background: 'radial-gradient(ellipse at 50% 0%, rgba(212,160,23,0.08) 0%, transparent 60%)' }} />
 
         <div className="relative max-w-3xl mx-auto px-4 sm:px-6 pt-16 sm:pt-24 pb-12 sm:pb-20 text-center">
           <h1 className="headline-serif text-text-primary mb-5" style={{ fontSize: 'clamp(2.2rem, 6vw, 4rem)', lineHeight: 1.1 }}>
-            Who should you actually listen to?
+            Who should you <span className="font-serif italic text-accent">actually</span> listen to?
           </h1>
           <p className="text-text-secondary text-base sm:text-lg leading-relaxed max-w-xl mx-auto mb-8">
             We track analyst and investor predictions against real market data. No opinions. Just accuracy scores.
@@ -225,10 +226,10 @@ export default function LandingPublic() {
               <h3 className="font-semibold text-sm mb-1 text-text-secondary">Wall Street Research</h3>
               <p className="text-xs text-muted">Paywalled, no public track record</p>
             </div>
-            <div className="card text-center py-6" style={{ borderColor: '#22c55e40', background: 'rgba(34,197,94,0.03)' }}>
+            <div className="card text-center py-6" style={{ borderColor: 'rgba(212,160,23,0.3)', background: 'rgba(212,160,23,0.03)' }}>
               <div className="flex items-center justify-center gap-1.5 mb-2">
-                <BarChart3 className="w-5 h-5 text-accent" />
-                <span className="font-serif text-lg"><span className="text-accent">eido</span><span className="text-muted">lum</span></span>
+                <EidolumLogo size={20} />
+                <span className="font-serif text-lg text-accent">Eidolum</span>
                 <span className="text-accent text-sm">✓</span>
               </div>
               <p className="text-sm text-text-primary font-medium">Every call tracked, scored, and ranked. Free.</p>
@@ -254,8 +255,8 @@ export default function LandingPublic() {
       <footer className="border-t border-border py-8 text-center">
         <div className="max-w-4xl mx-auto px-4">
           <div className="flex items-center justify-center gap-2 mb-4">
-            <BarChart3 className="w-5 h-5 text-accent" />
-            <span className="font-serif text-lg"><span className="text-accent">eido</span><span className="text-muted">lum</span></span>
+            <EidolumLogo size={20} />
+            <span className="font-serif text-lg text-accent">Eidolum</span>
           </div>
           <div className="flex items-center justify-center gap-6 text-xs text-muted mb-4">
             <Link to="/leaderboard" className="hover:text-text-secondary">Leaderboard</Link>

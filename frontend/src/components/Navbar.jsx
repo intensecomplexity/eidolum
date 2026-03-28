@@ -1,5 +1,6 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { BarChart3, Menu, X, Crosshair, HelpCircle, LogOut, Settings, Award, Swords, Users, Eye, User, Target, Search } from 'lucide-react';
+import { Menu, X, Crosshair, HelpCircle, LogOut, Settings, Award, Swords, Users, Eye, User, Target, Search } from 'lucide-react';
+import EidolumLogo from './EidolumLogo';
 import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
 import UniversalSearch from './UniversalSearch';
@@ -89,10 +90,8 @@ export default function Navbar() {
             {/* ── LEFT GROUP: Logo + nav links ─────────────────────── */}
             <div className="flex items-center gap-6">
               <Link to="/" className="flex items-center gap-2 min-h-[44px]">
-                <BarChart3 className="w-5 h-5 sm:w-6 sm:h-6 text-accent" />
-                <span className="font-serif text-lg sm:text-xl" style={{ letterSpacing: '-0.01em' }}>
-                  <span className="text-accent">eido</span><span className="text-muted">lum</span>
-                </span>
+                <EidolumLogo size={24} />
+                <span className="font-serif text-lg sm:text-xl text-accent">Eidolum</span>
               </Link>
               <Link to="/leaderboard" className={`hidden sm:flex ${linkClass('/leaderboard')}`}>Leaderboard</Link>
               <Link to="/consensus" className={`hidden sm:flex ${linkClass('/consensus')}`}>Consensus</Link>

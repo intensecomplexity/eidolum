@@ -32,7 +32,7 @@ export default function PredictionOfTheDay() {
       borderRadius: '10px',
       border: '1px solid rgba(255,255,255,0.08)',
       borderLeftWidth: '3px',
-      borderLeftColor: '#00a878',
+      borderLeftColor: '#D4A017',
       padding: '20px 24px',
     }}>
       <div className="flex items-center justify-between mb-3">

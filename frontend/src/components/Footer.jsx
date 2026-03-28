@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { BarChart3 } from 'lucide-react';
+import EidolumLogo from './EidolumLogo';
 import { useAuth } from '../context/AuthContext';
 
 export default function Footer() {
@@ -10,28 +10,25 @@ export default function Footer() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-10">
         <div className="flex flex-col items-center gap-4 sm:flex-row sm:justify-between sm:gap-4">
           <div className="flex items-center gap-2">
-            <BarChart3 className="w-5 h-5 text-accent" />
-            <span className="font-mono font-semibold">
-              <span className="text-accent">eido</span>
-              <span className="text-muted">lum</span>
-            </span>
+            <EidolumLogo size={20} />
+            <span className="font-serif text-base text-accent">Eidolum</span>
           </div>
           <nav className="flex items-center gap-1.5 text-xs text-muted">
-            <Link to="/" className="hover:text-text-primary transition-colors">Home</Link>
-            <span className="text-border">·</span>
-            <Link to="/leaderboard" className="hover:text-text-primary transition-colors">Leaderboard</Link>
-            <span className="text-border">·</span>
+            <Link to="/" className="hover:text-accent transition-colors">Home</Link>
+            <span className="opacity-30">·</span>
+            <Link to="/leaderboard" className="hover:text-accent transition-colors">Leaderboard</Link>
+            <span className="opacity-30">·</span>
             {isAuthenticated ? (
               <>
-                <Link to="/submit" className="hover:text-text-primary transition-colors">Submit</Link>
-                <span className="text-border">·</span>
-                <Link to="/profile" className="hover:text-text-primary transition-colors">Profile</Link>
+                <Link to="/submit" className="hover:text-accent transition-colors">Submit</Link>
+                <span className="opacity-30">·</span>
+                <Link to="/profile" className="hover:text-accent transition-colors">Profile</Link>
               </>
             ) : (
               <>
-                <Link to="/consensus" className="hover:text-text-primary transition-colors">Consensus</Link>
-                <span className="text-border">·</span>
-                <Link to="/login" className="hover:text-text-primary transition-colors">Log In</Link>
+                <Link to="/consensus" className="hover:text-accent transition-colors">Consensus</Link>
+                <span className="opacity-30">·</span>
+                <Link to="/login" className="hover:text-accent transition-colors">Log In</Link>
               </>
             )}
           </nav>

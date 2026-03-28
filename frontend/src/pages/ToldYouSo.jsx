@@ -7,7 +7,7 @@ import { getToldYouSo, trackReferral } from '../api';
 
 function spawnConfetti(container) {
   if (!container) return;
-  const colors = ['#22c55e', '#fbbf24', '#00a878', '#34d399'];
+  const colors = ['#D4A017', '#FDE68A', '#B8860B', '#22c55e'];
   for (let i = 0; i < 25; i++) {
     const el = document.createElement('div');
     el.style.cssText = `position:absolute;width:${4+Math.random()*4}px;height:${4+Math.random()*4}px;border-radius:${Math.random()>.5?'50%':'1px'};background:${colors[Math.floor(Math.random()*colors.length)]};pointer-events:none;left:${20+Math.random()*60}%;top:${10+Math.random()*10}%`;

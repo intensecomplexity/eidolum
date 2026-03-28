@@ -64,7 +64,7 @@ export default function Landing() {
         <div className="flex items-center gap-2 mb-4">
           <span style={{
             width: 8, height: 8, borderRadius: '50%',
-            background: '#22c55e',
+            background: '#D4A017',
             display: 'inline-block',
             animation: 'pulse 2s ease-in-out infinite',
           }} />
@@ -216,7 +216,7 @@ export default function Landing() {
             { num: '03', icon: CheckCircle, title: 'Verify', desc: 'After 30/60/90 days we compare predictions to actual market data and score each forecaster.' },
           ].map(step => (
             <div key={step.num} style={{ padding: '28px', background: '#0e1212', border: '1px solid rgba(255,255,255,0.07)', borderRadius: '12px' }}>
-              <div style={{ fontSize: '0.75rem', color: '#00a878', fontWeight: 700, letterSpacing: '0.1em', marginBottom: '12px' }}>{step.num}</div>
+              <div style={{ fontSize: '0.75rem', color: '#D4A017', fontWeight: 700, letterSpacing: '0.1em', marginBottom: '12px' }}>{step.num}</div>
               <h3 style={{ fontSize: '1.1rem', fontWeight: 600, marginBottom: '10px' }}>{step.title}</h3>
               <p style={{ color: '#7a8a7a', fontSize: '0.9rem', lineHeight: 1.6, margin: 0 }}>{step.desc}</p>
             </div>

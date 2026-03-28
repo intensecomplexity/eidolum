@@ -37,8 +37,8 @@ SECTOR_MAP = {
 
 # ── Level colors ──────────────────────────────────────────────────────────────
 
-_LEVEL_COLORS = {1: "#6b7280", 2: "#94a3b8", 3: "#22c55e", 4: "#22c55e", 5: "#0ea5e9",
-                 6: "#0ea5e9", 7: "#a855f7", 8: "#a855f7", 9: "#f59e0b", 10: "#f59e0b"}
+_LEVEL_COLORS = {1: "#52525b", 2: "#a1a1aa", 3: "#D4A017", 4: "#D4A017", 5: "#D4A017",
+                 6: "#B8860B", 7: "#B8860B", 8: "#92710A", 9: "#FDE68A", 10: "#FDE68A"}
 
 def _level_color(level: int) -> str:
     return _LEVEL_COLORS.get(level, "#6b7280")

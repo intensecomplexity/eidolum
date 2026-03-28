@@ -1,4 +1,13 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
-  <rect width="32" height="32" rx="6" fill="#05080f"/>
-  <text x="16" y="22" text-anchor="middle" font-family="monospace" font-size="18" font-weight="bold" fill="#00e5a0">E</text>
+<svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="32" height="32" rx="6" fill="#07090a"/>
+  <line x1="6" y1="4" x2="6" y2="28" stroke="#D4A017" stroke-width="3" stroke-linecap="round"/>
+  <line x1="6" y1="5" x2="20" y2="5" stroke="#D4A017" stroke-width="2.5" stroke-linecap="round"/>
+  <line x1="20" y1="5" x2="24" y2="5" stroke="#D4A017" stroke-width="1.5" stroke-linecap="round" opacity="0.5"/>
+  <circle cx="26" cy="5" r="1" fill="#D4A017" opacity="0.3"/>
+  <line x1="6" y1="16" x2="17" y2="16" stroke="#D4A017" stroke-width="2.5" stroke-linecap="round"/>
+  <line x1="17" y1="16" x2="21" y2="16" stroke="#D4A017" stroke-width="1.5" stroke-linecap="round" opacity="0.5"/>
+  <circle cx="23" cy="16" r="1" fill="#D4A017" opacity="0.3"/>
+  <line x1="6" y1="27" x2="20" y2="27" stroke="#D4A017" stroke-width="2.5" stroke-linecap="round"/>
+  <line x1="20" y1="27" x2="24" y2="27" stroke="#D4A017" stroke-width="1.5" stroke-linecap="round" opacity="0.5"/>
+  <circle cx="26" cy="27" r="1" fill="#D4A017" opacity="0.3"/>
 </svg>

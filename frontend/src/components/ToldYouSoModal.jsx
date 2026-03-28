@@ -4,7 +4,7 @@ import { getToldYouSo } from '../api';
 
 function spawnConfetti(container) {
   if (!container) return;
-  const colors = ['#22c55e', '#fbbf24', '#00a878', '#34d399', '#f59e0b', '#22d3ee'];
+  const colors = ['#D4A017', '#FDE68A', '#B8860B', '#22c55e', '#f59e0b', '#0ea5e9'];
   for (let i = 0; i < 35; i++) {
     const el = document.createElement('div');
     el.style.cssText = `position:absolute;width:${4+Math.random()*5}px;height:${4+Math.random()*5}px;border-radius:${Math.random()>.5?'50%':'1px'};background:${colors[Math.floor(Math.random()*colors.length)]};pointer-events:none;left:${20+Math.random()*60}%;top:${5+Math.random()*15}%`;
