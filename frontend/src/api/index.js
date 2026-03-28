@@ -206,6 +206,156 @@ export function getProfileShareData(userId) {
   return api.get(`/profiles/${userId}/share-data`).then(r => r.data);
 }
 
+// ——— Reactions ———
+
+export function getReactions(predictionId, source) {
+  return api.get(`/reactions/${predictionId}/${source}`, { headers: authHeaders() }).then(r => r.data);
+}
+
+export function addReaction(predictionId, source, reaction) {
+  return api.post('/reactions', { prediction_id: predictionId, prediction_source: source, reaction }, { headers: authHeaders() }).then(r => r.data);
+}
+
+export function removeReaction(predictionId, source) {
+  return api.delete(`/reactions/${predictionId}/${source}`, { headers: authHeaders() }).then(r => r.data);
+}
+
+// ——— Daily Challenge ———
+
+export function getTodayChallenge() {
+  return api.get('/daily-challenge/today', { headers: authHeaders() }).then(r => r.data);
+}
+
+export function enterDailyChallenge(direction) {
+  return api.post('/daily-challenge/enter', { direction }, { headers: authHeaders() }).then(r => r.data);
+}
+
+export function getChallengeHistory() {
+  return api.get('/daily-challenge/history', { headers: authHeaders() }).then(r => r.data);
+}
+
+export function getChallengeLeaderboard() {
+  return api.get('/daily-challenge/leaderboard').then(r => r.data);
+}
+
+// ——— Nudges ———
+
+export function getNudges() {
+  return api.get('/nudges', { headers: authHeaders() }).then(r => r.data);
+}
+
+// ——— Earnings ———
+
+export function getUpcomingEarnings() {
+  return api.get('/earnings/upcoming').then(r => r.data);
+}
+
+export function getTickerEarnings(symbol) {
+  return api.get(`/earnings/ticker/${symbol}`).then(r => r.data);
+}
+
+// ——— Heatmap ———
+
+export function getSectorHeatmap() {
+  return api.get('/heatmap/sectors').then(r => r.data);
+}
+
+export function getTickerHeatmap() {
+  return api.get('/heatmap/tickers').then(r => r.data);
+}
+
+// ——— Accuracy History ———
+
+export function getUserAccuracyHistory(userId) {
+  return api.get(`/users/${userId}/accuracy-history`).then(r => r.data);
+}
+
+export function getUserAccuracyByCategory(userId) {
+  return api.get(`/users/${userId}/accuracy-by-category`).then(r => r.data);
+}
+
+export function getAnalystAccuracyHistory(name) {
+  return api.get(`/analysts/${encodeURIComponent(name)}/accuracy-history`).then(r => r.data);
+}
+
+// ——— Analysts ———
+
+export function getAnalysts(q) {
+  const params = {};
+  if (q) params.q = q;
+  return api.get('/analysts', { params }).then(r => r.data);
+}
+
+export function getAnalystProfile(name) {
+  return api.get(`/analysts/${encodeURIComponent(name)}`).then(r => r.data);
+}
+
+export function getAnalystPredictions(name, params = {}) {
+  return api.get(`/analysts/${encodeURIComponent(name)}/predictions`, { params }).then(r => r.data);
+}
+
+export function getAnalystRankings() {
+  return api.get('/analysts/rankings').then(r => r.data);
+}
+
+// ——— Controversial ———
+
+export function getControversialPredictions() {
+  return api.get('/predictions/controversial').then(r => r.data);
+}
+
+export function getMostDebatedTickers() {
+  return api.get('/predictions/most-debated-tickers').then(r => r.data);
+}
+
+export function getBoldCalls() {
+  return api.get('/predictions/bold-calls').then(r => r.data);
+}
+
+// ——— Prediction Templates ———
+
+export function getPredictionTemplates() {
+  return api.get('/prediction-templates').then(r => r.data);
+}
+
+// ——— Settings ———
+
+export function setPriceAlerts(enabled) {
+  return api.put('/settings/price-alerts', { enabled }, { headers: authHeaders() }).then(r => r.data);
+}
+
+export function setEmailPreferences(weeklyDigest) {
+  return api.put('/settings/email-preferences', { weekly_digest: weeklyDigest }, { headers: authHeaders() }).then(r => r.data);
+}
+
+// ——— Watchlist ———
+
+export function getWatchlist() {
+  return api.get('/watchlist', { headers: authHeaders() }).then(r => r.data);
+}
+
+export function getWatchlistFeed() {
+  return api.get('/watchlist/feed', { headers: authHeaders() }).then(r => r.data);
+}
+
+export function addToWatchlist(ticker) {
+  return api.post(`/watchlist/${ticker}`, {}, { headers: authHeaders() }).then(r => r.data);
+}
+
+export function removeFromWatchlist(ticker) {
+  return api.delete(`/watchlist/${ticker}`, { headers: authHeaders() }).then(r => r.data);
+}
+
+// ——— I Told You So ———
+
+export function getToldYouSo(predictionId) {
+  return api.get(`/predictions/${predictionId}/told-you-so`).then(r => r.data);
+}
+
+export function trackReferral(ref, predictionId) {
+  return api.post('/referrals/track', null, { params: { ref, prediction_id: predictionId } }).then(r => r.data);
+}
+
 // ——— Global Stats ———
 
 export function getGlobalStats() {

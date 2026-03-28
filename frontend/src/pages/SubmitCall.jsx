@@ -4,6 +4,7 @@ import { Crosshair, TrendingUp, TrendingDown, AlertCircle, Lock, Calendar } from
 import { useAuth } from '../context/AuthContext';
 import TimeframeSlider from '../components/TimeframeSlider';
 import TickerSearch from '../components/TickerSearch';
+import TemplateSelector, { REASONING_PLACEHOLDERS } from '../components/TemplateSelector';
 import Footer from '../components/Footer';
 import { submitUserPrediction, getDeletionStatus, searchTickers } from '../api';
 
@@ -80,6 +81,7 @@ export default function SubmitCall() {
   const [priceTarget, setPriceTarget] = useState('');
   const [windowDays, setWindowDays] = useState(30);
   const [reasoning, setReasoning] = useState('');
+  const [template, setTemplate] = useState('custom');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(null);
@@ -137,6 +139,7 @@ export default function SubmitCall() {
         price_target: priceTarget.trim(),
         evaluation_window_days: windowDays,
         reasoning: reasoning.trim() || undefined,
+        template: template,
       });
       // Attach the display name we had before reset
       result._tickerName = tickerName;
@@ -146,6 +149,7 @@ export default function SubmitCall() {
       setTickerName('');
       setDirection('');
       setPriceTarget('');
+      setTemplate('custom');
       setWindowDays(30);
       setReasoning('');
     } catch (err) {
@@ -294,6 +298,18 @@ export default function SubmitCall() {
 
         {/* Form */}
         <form onSubmit={handleSubmit} className="space-y-6">
+          {/* Template selector */}
+          <div className="card">
+            <label className="block text-xs text-muted uppercase tracking-wider mb-2">Prediction Type</label>
+            <TemplateSelector
+              value={template}
+              onChange={(key, tmpl) => {
+                setTemplate(key);
+                if (tmpl && tmpl.default_window_days) setWindowDays(tmpl.default_window_days);
+              }}
+            />
+          </div>
+
           <div className="card">
             <label className="block text-xs text-muted uppercase tracking-wider mb-2">Ticker or Company Name</label>
             <TickerSearch
@@ -334,7 +350,7 @@ export default function SubmitCall() {
               Reasoning <span className="text-muted/50">(optional)</span>
             </label>
             <textarea value={reasoning} onChange={e => setReasoning(e.target.value)}
-              placeholder="Why do you think this will happen?" rows={3}
+              placeholder={REASONING_PLACEHOLDERS[template] || REASONING_PLACEHOLDERS.custom} rows={3}
               className="w-full px-4 py-3 bg-surface-2 border border-border rounded-lg text-text-primary placeholder:text-muted focus:outline-none focus:border-accent/50 resize-none" />
           </div>
 

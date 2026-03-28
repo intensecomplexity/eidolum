@@ -33,6 +33,7 @@ export default function Navbar() {
   };
 
   const streak = user?.streak_current || 0;
+  const returnStreak = user?.return_streak_current || 0;
 
   return (
     <>
@@ -68,6 +69,7 @@ export default function Navbar() {
                     {(user?.username || '?')[0].toUpperCase()}
                   </div>
                   {streak >= 3 && <span className="text-orange-400 text-xs font-mono flex items-center gap-0.5"><Flame className="w-3 h-3" />{streak}</span>}
+                  {returnStreak >= 3 && <span className="text-muted text-[10px] font-mono" title={`${returnStreak} days in a row`}>📅{returnStreak}</span>}
                 </Link>
               ) : (
                 <Link to="/login" className="btn-primary text-xs px-4 py-2">Log In</Link>

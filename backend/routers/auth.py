@@ -41,6 +41,10 @@ def _user_dict(user: User) -> dict:
         "streak_current": user.streak_current,
         "streak_best": user.streak_best,
         "onboarding_completed": bool(user.onboarding_completed),
+        "price_alerts_enabled": bool(user.price_alerts_enabled) if hasattr(user, 'price_alerts_enabled') else True,
+        "weekly_digest_enabled": bool(user.weekly_digest_enabled) if hasattr(user, 'weekly_digest_enabled') else True,
+        "return_streak_current": user.return_streak_current or 0,
+        "return_streak_best": user.return_streak_best or 0,
     }
 
 
@@ -138,3 +142,89 @@ def complete_onboarding(request: Request, current_user: dict = Depends(get_curre
     user.onboarding_completed = 1
     db.commit()
     return {"status": "completed"}
+
+
+# ── PUT /api/settings/price-alerts ────────────────────────────────────────────
+
+
+class PriceAlertSetting(BaseModel):
+    enabled: bool
+
+
+@router.put("/settings/price-alerts")
+@limiter.limit("10/minute")
+def set_price_alerts(request: Request, req: PriceAlertSetting, current_user: dict = Depends(get_current_user_dep), db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.id == current_user["user_id"]).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    user.price_alerts_enabled = 1 if req.enabled else 0
+    db.commit()
+    return {"price_alerts_enabled": req.enabled}
+
+
+# ── PUT /api/settings/email-preferences ───────────────────────────────────────
+
+
+class EmailPreferences(BaseModel):
+    weekly_digest: bool
+
+
+@router.put("/settings/email-preferences")
+@limiter.limit("10/minute")
+def set_email_preferences(request: Request, req: EmailPreferences, current_user: dict = Depends(get_current_user_dep), db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.id == current_user["user_id"]).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    user.weekly_digest_enabled = 1 if req.weekly_digest else 0
+    db.commit()
+    return {"weekly_digest_enabled": req.weekly_digest}
+
+
+# ── GET /api/nudges ───────────────────────────────────────────────────────────
+
+
+@router.get("/nudges")
+@limiter.limit("30/minute")
+def get_nudges(request: Request, current_user: dict = Depends(get_current_user_dep), db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.id == current_user["user_id"]).first()
+    if not user:
+        return []
+
+    from badge_engine import compute_progress, BADGE_INFO
+
+    progress = compute_progress(user.id, db)
+
+    nudges = []
+
+    # Badge proximity nudges
+    for badge_id, prog in progress.items():
+        if prog["current"] >= prog["target"]:
+            continue
+        remaining = prog["target"] - prog["current"]
+        pct = prog["current"] / prog["target"]
+        info = BADGE_INFO.get(badge_id, {})
+        nudges.append({
+            "type": "badge",
+            "message": f"{remaining} more to earn {info.get('name', badge_id)}!",
+            "progress": prog["current"],
+            "target": prog["target"],
+            "pct": round(pct * 100),
+            "badge_id": badge_id,
+            "icon": info.get("icon", "🏅"),
+        })
+
+    # Return streak nudge
+    ret = user.return_streak_current or 0
+    if ret > 0:
+        nudges.append({
+            "type": "streak",
+            "message": f"You've visited {ret} days in a row. Come back tomorrow!",
+            "progress": ret,
+            "target": ret + 1,
+            "pct": 95,
+            "icon": "📅",
+        })
+
+    # Sort by closest to completion (highest pct first), take top 3
+    nudges.sort(key=lambda x: x["pct"], reverse=True)
+    return nudges[:3]

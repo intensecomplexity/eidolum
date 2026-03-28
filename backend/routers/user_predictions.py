@@ -32,12 +32,24 @@ ALLOWED_TICKERS = {
 }
 
 
+PREDICTION_TEMPLATES = {
+    "custom": {"name": "Custom", "description": "Fully custom prediction", "icon": "✏️", "default_window_days": 30, "suggested_windows": [7, 14, 30, 90, 180, 365], "color": "#6b7280"},
+    "earnings_play": {"name": "Earnings Play", "description": "Call the direction around an earnings report", "icon": "📊", "default_window_days": 14, "suggested_windows": [3, 7, 14], "color": "#4A9EFF"},
+    "momentum_trade": {"name": "Momentum Trade", "description": "Ride a short-term price trend", "icon": "🚀", "default_window_days": 7, "suggested_windows": [1, 3, 7], "color": "#22c55e"},
+    "macro_thesis": {"name": "Macro Thesis", "description": "Long-term conviction based on fundamentals", "icon": "🌍", "default_window_days": 180, "suggested_windows": [90, 180, 365], "color": "#A855F7"},
+    "technical_breakout": {"name": "Technical Breakout", "description": "Price breaking through a key level", "icon": "📈", "default_window_days": 30, "suggested_windows": [7, 14, 30], "color": "#F59E0B"},
+    "contrarian_bet": {"name": "Contrarian Bet", "description": "Going against the crowd consensus", "icon": "🔮", "default_window_days": 90, "suggested_windows": [30, 60, 90], "color": "#EF4444"},
+    "sector_rotation": {"name": "Sector Rotation", "description": "Betting on money flowing between sectors", "icon": "🔄", "default_window_days": 60, "suggested_windows": [30, 60, 90], "color": "#f97316"},
+}
+
+
 class SubmitPredictionRequest(BaseModel):
     ticker: str
     direction: str
     price_target: str
     evaluation_window_days: int
     reasoning: Optional[str] = None
+    template: Optional[str] = "custom"
 
 
 def _prediction_to_dict(p: UserPrediction) -> dict:
@@ -55,6 +67,7 @@ def _prediction_to_dict(p: UserPrediction) -> dict:
         "evaluated_at": p.evaluated_at.isoformat() if p.evaluated_at else None,
         "outcome": p.outcome,
         "current_price": float(p.current_price) if p.current_price else None,
+        "template": p.template or "custom",
     }
 
 
@@ -125,6 +138,15 @@ def _deletions_this_month(user_id: int, db: Session) -> int:
     )
 
 
+# ── GET /api/prediction-templates ──────────────────────────────────────────────
+
+
+@router.get("/prediction-templates")
+@limiter.limit("60/minute")
+def get_prediction_templates(request: Request):
+    return PREDICTION_TEMPLATES
+
+
 # ── GET /api/tickers/search ──────────────────────────────────────────────────
 
 
@@ -158,6 +180,10 @@ def submit_prediction(
     if req.evaluation_window_days < 1 or req.evaluation_window_days > 365:
         raise HTTPException(status_code=400, detail="Evaluation window must be 1-365 days")
 
+    template = req.template or "custom"
+    if template not in PREDICTION_TEMPLATES:
+        template = "custom"
+
     current_price = _fetch_finnhub_price(ticker)
     now = datetime.datetime.utcnow()
 
@@ -169,6 +195,7 @@ def submit_prediction(
         price_at_call=Decimal(str(current_price)) if current_price else None,
         evaluation_window_days=req.evaluation_window_days,
         reasoning=req.reasoning,
+        template=template,
         created_at=now,
         expires_at=now + timedelta(days=req.evaluation_window_days),
     )
@@ -186,6 +213,21 @@ def submit_prediction(
         data={"prediction_id": None, "direction": req.direction, "ticker": ticker, "target": req.price_target.strip()},
         db=db,
     )
+
+    # Notify watchers
+    try:
+        from models import WatchlistItem
+        from notifications import create_notification
+        watchers = db.query(WatchlistItem).filter(WatchlistItem.ticker == ticker, WatchlistItem.notify == 1, WatchlistItem.user_id != user_id).all()
+        for w in watchers:
+            create_notification(
+                user_id=w.user_id, type="prediction_scored",
+                title=f"New prediction on {ticker}",
+                message=f"{_uname} went {req.direction} on {ticker}",
+                data={"prediction_id": None, "ticker": ticker}, db=db,
+            )
+    except Exception:
+        pass
 
     db.commit()
     db.refresh(prediction)
@@ -271,6 +313,7 @@ def get_user_predictions(
     request: Request,
     user_id: int,
     outcome: Optional[str] = Query(None),
+    template: Optional[str] = Query(None),
     db: Session = Depends(get_db),
 ):
     user = db.query(User).filter(User.id == user_id).first()
@@ -283,6 +326,8 @@ def get_user_predictions(
     )
     if outcome and outcome in ("pending", "correct", "incorrect"):
         query = query.filter(UserPrediction.outcome == outcome)
+    if template and template in PREDICTION_TEMPLATES:
+        query = query.filter(UserPrediction.template == template)
 
     predictions = query.order_by(UserPrediction.created_at.desc()).all()
     return [_prediction_to_dict(p) for p in predictions]

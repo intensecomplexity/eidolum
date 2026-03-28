@@ -1,5 +1,5 @@
 import os
-from fastapi import HTTPException, Security
+from fastapi import HTTPException, Security, Depends
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
 from auth import get_current_user, JWT_SECRET, JWT_ALGORITHM  # noqa: re-export
@@ -17,6 +17,18 @@ def require_admin(credentials: HTTPAuthorizationCredentials = Security(security)
 
 
 def require_user(credentials: HTTPAuthorizationCredentials = Security(security)):
-    """Decode JWT and return user_id. Raises 401 on invalid/expired token."""
+    """Decode JWT and return user_id. Also updates return streak (lightweight, cached)."""
     data = get_current_user(credentials.credentials)
-    return data["user_id"]
+    uid = data["user_id"]
+
+    # Update return streak (uses module-level cache, only hits DB once per day per user)
+    try:
+        from database import SessionLocal
+        from return_streak import update_return_streak
+        db = SessionLocal()
+        update_return_streak(uid, db)
+        db.close()
+    except Exception:
+        pass
+
+    return uid

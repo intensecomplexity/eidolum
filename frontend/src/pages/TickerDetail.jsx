@@ -6,6 +6,7 @@ import ConsensusBar from '../components/ConsensusBar';
 import TypeBadge from '../components/TypeBadge';
 import DuelModal from '../components/DuelModal';
 import LiveActivityFeed from '../components/LiveActivityFeed';
+import WatchToggle from '../components/WatchToggle';
 import Footer from '../components/Footer';
 import { getTickerPrice, getTickerPredictions, getTickerTopCallers, getTickerStats } from '../api';
 
@@ -61,6 +62,7 @@ export default function TickerDetail() {
               <div className="flex items-center gap-3 mb-1">
                 <span className="font-mono text-3xl sm:text-4xl font-bold tracking-wider text-text-primary">{ticker}</span>
                 <span className="text-text-secondary text-lg">{price?.name || stats?.name || ticker}</span>
+                <WatchToggle ticker={ticker} />
               </div>
               {price?.current_price && (
                 <div className="flex items-center gap-3 mt-2">

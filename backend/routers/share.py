@@ -178,3 +178,136 @@ def get_profile_share_data(request: Request, user_id: int, db: Session = Depends
 def _url_encode(text: str) -> str:
     import urllib.parse
     return urllib.parse.quote(text, safe='')
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# "I Told You So" — brag sharing for correct predictions
+# ══════════════════════════════════════════════════════════════════════════════
+
+
+@router.get("/predictions/{prediction_id}/told-you-so")
+@limiter.limit("60/minute")
+def told_you_so_data(request: Request, prediction_id: int, db: Session = Depends(get_db)):
+    from middleware.auth import require_user
+    from auth import get_current_user_dep
+
+    pred = db.query(UserPrediction).filter(UserPrediction.id == prediction_id, UserPrediction.deleted_at.is_(None)).first()
+    if not pred:
+        raise HTTPException(status_code=404, detail="Prediction not found")
+    if pred.outcome != "correct":
+        raise HTTPException(status_code=400, detail="Only correct predictions can use I Told You So")
+
+    user = db.query(User).filter(User.id == pred.user_id).first()
+    username = user.username if user else "Unknown"
+    ticker_name = TICKER_INFO.get(pred.ticker, pred.ticker)
+
+    from sqlalchemy import func
+    scored_count = db.query(func.count(UserPrediction.id)).filter(
+        UserPrediction.user_id == pred.user_id,
+        UserPrediction.outcome.in_(["correct", "incorrect"]),
+        UserPrediction.deleted_at.is_(None),
+    ).scalar() or 0
+    correct_count = db.query(func.count(UserPrediction.id)).filter(
+        UserPrediction.user_id == pred.user_id,
+        UserPrediction.outcome == "correct",
+        UserPrediction.deleted_at.is_(None),
+    ).scalar() or 0
+    accuracy = round(correct_count / scored_count * 100, 1) if scored_count > 0 else 0
+
+    share_url = f"{SITE_URL}/prediction/{prediction_id}/told-you-so?ref={username}"
+
+    price_entry = float(pred.price_at_call) if pred.price_at_call else None
+    price_final = float(pred.current_price) if pred.current_price else None
+    price_change = None
+    if price_entry and price_final:
+        price_change = round((price_final - price_entry) / price_entry * 100, 2)
+
+    called_date = pred.created_at.strftime("%b %d, %Y") if pred.created_at else None
+    scored_date = pred.evaluated_at.strftime("%b %d, %Y") if pred.evaluated_at else None
+
+    tweet_text = f"I called {pred.ticker} {pred.direction} on {called_date} and I was right."
+    if price_entry and price_final:
+        tweet_text += f" ${price_entry} \u2192 ${price_final}."
+    tweet_text += f" Receipts don't lie. \U0001F4C8 #IToldYouSo @Eidolum {share_url}"
+
+    linkedin_url = f"https://www.linkedin.com/sharing/share-offsite/?url={_url_encode(share_url)}"
+
+    return {
+        "prediction_id": pred.id,
+        "ticker": pred.ticker,
+        "ticker_name": ticker_name,
+        "direction": pred.direction,
+        "price_target": pred.price_target,
+        "price_entry": price_entry,
+        "price_final": price_final,
+        "price_change_percent": price_change,
+        "called_date": called_date,
+        "scored_date": scored_date,
+        "outcome": "correct",
+        "username": username,
+        "accuracy": accuracy,
+        "scored_count": scored_count,
+        "rank": _rank_name(scored_count),
+        "streak": user.streak_current if user else 0,
+        "share_url": share_url,
+        "tweet_text": tweet_text,
+        "tweet_url": f"https://twitter.com/intent/tweet?text={_url_encode(tweet_text)}",
+        "linkedin_url": linkedin_url,
+    }
+
+
+# ── OG meta page for told-you-so ──────────────────────────────────────────────
+
+
+@router.get("/predictions/{prediction_id}/told-you-so-page", response_class=HTMLResponse)
+@limiter.limit("60/minute")
+def told_you_so_page(request: Request, prediction_id: int, db: Session = Depends(get_db)):
+    pred = db.query(UserPrediction).filter(UserPrediction.id == prediction_id, UserPrediction.deleted_at.is_(None)).first()
+    if not pred:
+        return HTMLResponse("<html><body>Not found</body></html>", status_code=404)
+
+    user = db.query(User).filter(User.id == pred.user_id).first()
+    username = user.username if user else "Unknown"
+
+    og_title = f"{username} called {pred.ticker} correctly on Eidolum"
+    og_desc = f"I TOLD YOU SO \u2014 {pred.direction.capitalize()} on {pred.ticker} at {pred.price_target}. Verified correct."
+    share_url = f"{SITE_URL}/prediction/{prediction_id}/told-you-so"
+
+    html = f"""<!DOCTYPE html>
+<html><head>
+<meta charset="utf-8">
+<title>{og_title}</title>
+<meta property="og:title" content="{og_title}">
+<meta property="og:description" content="{og_desc}">
+<meta property="og:url" content="{share_url}">
+<meta property="og:site_name" content="Eidolum">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="{og_title}">
+<meta name="twitter:description" content="{og_desc}">
+<meta http-equiv="refresh" content="0;url={share_url}">
+</head><body style="background:#0a0a0f;color:#e8e8e6;text-align:center;padding:40px">
+<p>Redirecting...</p>
+</body></html>"""
+    return HTMLResponse(html)
+
+
+# ── Referral tracking ─────────────────────────────────────────────────────────
+
+
+@router.post("/referrals/track")
+@limiter.limit("30/minute")
+def track_referral(request: Request, ref: str = "", prediction_id: int = 0, db: Session = Depends(get_db)):
+    if not ref:
+        return {"status": "skipped"}
+    from models import ActivityEvent
+    # Simple: log as activity event for now
+    from activity import log_activity
+    user = db.query(User).filter(User.username == ref).first()
+    if user:
+        log_activity(
+            user_id=user.id, event_type="referral_click",
+            description=f"Someone clicked {ref}'s shared prediction",
+            data={"ref": ref, "prediction_id": prediction_id}, db=db,
+        )
+        db.commit()
+    return {"status": "tracked"}

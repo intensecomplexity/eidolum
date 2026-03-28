@@ -5,6 +5,9 @@ import { useAuth } from '../context/AuthContext';
 import Footer from '../components/Footer';
 import TickerLink from '../components/TickerLink';
 import ShareButton from '../components/ShareButton';
+import ReactionBar from '../components/ReactionBar';
+import ToldYouSoModal from '../components/ToldYouSoModal';
+import PnLBadge from '../components/PnLBadge';
 import { getUserPredictions, deletePrediction, getDeletionStatus } from '../api';
 
 const OUTCOME_FILTERS = [
@@ -210,6 +213,7 @@ function DeleteButton({ prediction, onDelete }) {
 function PredictionCard({ p, onDelete }) {
   const remaining = p.outcome === 'pending' ? daysRemaining(p.created_at, p.evaluation_window_days) : null;
   const canDelete = isDeletable(p);
+  const [showBrag, setShowBrag] = useState(false);
 
   return (
     <div className="bg-surface border border-border rounded-xl p-4">
@@ -219,6 +223,9 @@ function PredictionCard({ p, onDelete }) {
           <span className={p.direction === 'bullish' ? 'badge-bull' : 'badge-bear'}>{p.direction}</span>
         </div>
         <div className="flex items-center gap-2">
+          {p.outcome === 'pending' && p.price_at_call && p.current_price && (
+            <PnLBadge direction={p.direction} priceAtCall={p.price_at_call} currentPrice={p.current_price} />
+          )}
           <ShareButton predictionId={p.id} />
           {canDelete && <DeleteButton prediction={p} onDelete={onDelete} />}
           {!canDelete && p.outcome === 'pending' && <Lock className="w-3 h-3 text-muted/30" />}
@@ -239,6 +246,13 @@ function PredictionCard({ p, onDelete }) {
         {remaining !== null && remaining > 0 && <span className="font-mono text-warning">{remaining}d left</span>}
         {remaining === 0 && p.outcome === 'pending' && <span className="font-mono text-accent">Evaluating...</span>}
       </div>
+      <ReactionBar predictionId={p.id} source="user" isOwn={true} outcome={p.outcome} />
+      {p.outcome === 'correct' && (
+        <button onClick={() => setShowBrag(true)} className="mt-2 w-full flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-bold text-warning bg-warning/10 border border-warning/20 hover:bg-warning/15 transition-colors min-h-[36px]">
+          I Told You So
+        </button>
+      )}
+      {showBrag && <ToldYouSoModal predictionId={p.id} onClose={() => setShowBrag(false)} />}
     </div>
   );
 }

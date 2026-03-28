@@ -21,7 +21,7 @@ from database import engine, Base, SessionLocal
 from models import Forecaster, Prediction, Config
 from rate_limit import limiter
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
-from routers import leaderboard, forecasters, assets, sync, activity, admin, platforms, follows, newsletter, saved, positions, contrarian, power_rankings, inverse, subscribers, predictions, auth, user_predictions, community, user_follows, duels, seasons_router, notifications as notifications_router, ticker_detail, activity_feed, share
+from routers import leaderboard, forecasters, assets, sync, activity, admin, platforms, follows, newsletter, saved, positions, contrarian, power_rankings, inverse, subscribers, predictions, auth, user_predictions, community, user_follows, duels, seasons_router, notifications as notifications_router, ticker_detail, activity_feed, share, daily_challenge as daily_challenge_router, reactions, watchlist as watchlist_router, controversial
 from jobs.scraper import run_scraper
 from jobs.evaluator import run_evaluator
 from jobs.user_evaluator import evaluate_user_predictions, evaluate_duels, check_season_completion
@@ -552,6 +552,150 @@ def run_phase2_migrations():
         if "already exists" in str(e).lower():
             pass
 
+    # ── 16. daily_challenges + daily_challenge_entries ───────────────────
+    try:
+        db.execute(text("""
+            CREATE TABLE IF NOT EXISTS daily_challenges (
+                id SERIAL PRIMARY KEY,
+                ticker VARCHAR(10) NOT NULL,
+                ticker_name VARCHAR(100),
+                price_at_open DECIMAL(20,2),
+                price_at_close DECIMAL(20,2),
+                correct_direction VARCHAR(10),
+                challenge_date DATE NOT NULL UNIQUE,
+                status VARCHAR(20) DEFAULT 'active',
+                created_at TIMESTAMP DEFAULT NOW()
+            )
+        """))
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        if "already exists" not in str(e).lower(): print(f"[Phase2] daily_challenges: {e}")
+
+    try:
+        db.execute(text("""
+            CREATE TABLE IF NOT EXISTS daily_challenge_entries (
+                id SERIAL PRIMARY KEY,
+                challenge_id INTEGER REFERENCES daily_challenges(id) ON DELETE CASCADE,
+                user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+                direction VARCHAR(10) NOT NULL,
+                submitted_at TIMESTAMP DEFAULT NOW(),
+                outcome VARCHAR(20),
+                UNIQUE(challenge_id, user_id)
+            )
+        """))
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        if "already exists" not in str(e).lower(): print(f"[Phase2] daily_challenge_entries: {e}")
+
+    # ── 17. users daily streak columns ────────────────────────────────
+    for col in ["daily_streak_current INTEGER DEFAULT 0", "daily_streak_best INTEGER DEFAULT 0"]:
+        try:
+            db.execute(text(f"ALTER TABLE users ADD COLUMN {col}"))
+            db.commit()
+        except Exception:
+            db.rollback()
+
+    # ── 18. prediction_reactions table ───────────────────────────────
+    try:
+        db.execute(text("""
+            CREATE TABLE IF NOT EXISTS prediction_reactions (
+                id SERIAL PRIMARY KEY,
+                prediction_id INTEGER NOT NULL,
+                prediction_source VARCHAR(20) NOT NULL CHECK (prediction_source IN ('user', 'analyst')),
+                user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+                reaction VARCHAR(20) NOT NULL CHECK (reaction IN ('agree', 'disagree', 'bold_call', 'no_way')),
+                created_at TIMESTAMP DEFAULT NOW(),
+                UNIQUE(prediction_id, prediction_source, user_id)
+            )
+        """))
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        if "already exists" not in str(e).lower(): print(f"[Phase2] prediction_reactions: {e}")
+
+    try:
+        db.execute(text("CREATE INDEX IF NOT EXISTS idx_reactions_pred ON prediction_reactions(prediction_id, prediction_source)"))
+        db.commit()
+    except Exception:
+        db.rollback()
+
+    # ── 19. watchlist table ─────────────────────────────────────────
+    try:
+        db.execute(text("""
+            CREATE TABLE IF NOT EXISTS watchlist (
+                id SERIAL PRIMARY KEY,
+                user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+                ticker VARCHAR(10) NOT NULL,
+                notify INTEGER DEFAULT 1,
+                added_at TIMESTAMP DEFAULT NOW(),
+                UNIQUE(user_id, ticker)
+            )
+        """))
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        if "already exists" not in str(e).lower(): print(f"[Phase2] watchlist: {e}")
+
+    # ── 20. price alert columns ─────────────────────────────────────
+    for col, defn in [
+        ("last_checked_price", "DECIMAL(20,2)"),
+        ("last_alert_type", "VARCHAR(20)"),
+    ]:
+        try:
+            db.execute(text(f"ALTER TABLE user_predictions ADD COLUMN {col} {defn}"))
+            db.commit()
+        except Exception:
+            db.rollback()
+
+    try:
+        db.execute(text("ALTER TABLE users ADD COLUMN price_alerts_enabled INTEGER DEFAULT 1"))
+        db.commit()
+    except Exception:
+        db.rollback()
+
+    # ── 21. user_predictions.template column ─────────────────────────
+    try:
+        db.execute(text("ALTER TABLE user_predictions ADD COLUMN template VARCHAR(50) DEFAULT 'custom'"))
+        db.commit()
+    except Exception:
+        db.rollback()
+
+    # ── 22. users.weekly_digest_enabled ──────────────────────────────
+    try:
+        db.execute(text("ALTER TABLE users ADD COLUMN weekly_digest_enabled INTEGER DEFAULT 1"))
+        db.commit()
+    except Exception:
+        db.rollback()
+
+    # ── 23. earnings_calendar table ─────────────────────────────────
+    try:
+        db.execute(text("""
+            CREATE TABLE IF NOT EXISTS earnings_calendar (
+                id SERIAL PRIMARY KEY,
+                ticker VARCHAR(10) NOT NULL,
+                earnings_date DATE NOT NULL,
+                earnings_time VARCHAR(20),
+                fiscal_quarter VARCHAR(10),
+                fiscal_year INTEGER,
+                created_at TIMESTAMP DEFAULT NOW(),
+                UNIQUE(ticker, earnings_date)
+            )
+        """))
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        if "already exists" not in str(e).lower(): print(f"[Phase2] earnings_calendar: {e}")
+
+    # ── 24. return streak columns ───────────────────────────────────
+    for col in ["return_streak_current INTEGER DEFAULT 0", "return_streak_best INTEGER DEFAULT 0", "last_active_date DATE"]:
+        try:
+            db.execute(text(f"ALTER TABLE users ADD COLUMN {col}"))
+            db.commit()
+        except Exception:
+            db.rollback()
+
     print("[Phase2] All migrations complete")
     db.close()
 
@@ -1048,6 +1192,55 @@ async def lifespan(app):
     scheduler.add_job(run_15min_user_evaluator, "interval", minutes=15, id="user_evaluator")
     scheduler.add_job(run_15min_duel_evaluator, "interval", minutes=15, id="duel_evaluator")
     scheduler.add_job(run_hourly_season_check, "interval", hours=1, id="season_check")
+
+    # Daily challenge jobs (EST times)
+    def run_create_daily_challenge():
+        from datetime import datetime as _dt
+        print(f"[Scheduler] Creating daily challenge at {_dt.utcnow()}")
+        scheduler_last_run["daily_challenge_create"] = _dt.utcnow()
+        db = SessionLocal()
+        try:
+            from jobs.daily_challenge import create_daily_challenge
+            create_daily_challenge(db)
+        except Exception as e:
+            print(f"[DailyChallenge] Create error: {e}")
+        finally:
+            db.close()
+
+    def run_score_daily_challenge():
+        from datetime import datetime as _dt
+        print(f"[Scheduler] Scoring daily challenge at {_dt.utcnow()}")
+        scheduler_last_run["daily_challenge_score"] = _dt.utcnow()
+        db = SessionLocal()
+        try:
+            from jobs.daily_challenge import score_daily_challenge
+            score_daily_challenge(db)
+        except Exception as e:
+            print(f"[DailyChallenge] Score error: {e}")
+        finally:
+            db.close()
+
+    # 9:00 AM EST = 14:00 UTC (standard) / 13:00 UTC (daylight)
+    scheduler.add_job(run_create_daily_challenge, "cron", hour=14, minute=0, id="daily_challenge_create", day_of_week="mon-fri")
+    # 4:30 PM EST = 21:30 UTC (standard) / 20:30 UTC (daylight)
+    scheduler.add_job(run_score_daily_challenge, "cron", hour=21, minute=30, id="daily_challenge_score", day_of_week="mon-fri")
+
+    # Price alerts — every 30 min during market hours
+    def run_price_alerts():
+        from datetime import datetime as _dt
+        print(f"[Scheduler] Running price alerts at {_dt.utcnow()}")
+        scheduler_last_run["price_alerts"] = _dt.utcnow()
+        db = SessionLocal()
+        try:
+            from jobs.price_alerts import check_price_alerts
+            check_price_alerts(db)
+        except Exception as e:
+            print(f"[PriceAlerts] Error: {e}")
+        finally:
+            db.close()
+
+    scheduler.add_job(run_price_alerts, "interval", minutes=30, id="price_alerts")
+
     def run_hourly_leaderboard():
         from datetime import datetime as _dt
         scheduler_last_run["leaderboard"] = _dt.utcnow()
@@ -1059,6 +1252,38 @@ async def lifespan(app):
 
     scheduler.add_job(run_hourly_leaderboard, "interval", hours=1, id="leaderboard")
     scheduler.add_job(lambda: run_newsletter(SessionLocal()), "cron", hour=8, minute=0, id="newsletter")
+
+    # Weekly digest — Sundays at 10:00 UTC
+    def run_weekly_digest():
+        from datetime import datetime as _dt
+        print(f"[Scheduler] Running weekly digest at {_dt.utcnow()}")
+        scheduler_last_run["weekly_digest"] = _dt.utcnow()
+        db = SessionLocal()
+        try:
+            from jobs.weekly_digest import send_weekly_digest
+            send_weekly_digest(db)
+        except Exception as e:
+            print(f"[WeeklyDigest] Error: {e}")
+        finally:
+            db.close()
+
+    scheduler.add_job(run_weekly_digest, "cron", day_of_week="sun", hour=10, minute=0, id="weekly_digest")
+
+    # Earnings calendar — daily at midnight UTC
+    def run_earnings_update():
+        from datetime import datetime as _dt
+        print(f"[Scheduler] Updating earnings at {_dt.utcnow()}")
+        scheduler_last_run["earnings"] = _dt.utcnow()
+        db = SessionLocal()
+        try:
+            from jobs.earnings import update_earnings_calendar
+            update_earnings_calendar(db)
+        except Exception as e:
+            print(f"[Earnings] Error: {e}")
+        finally:
+            db.close()
+
+    scheduler.add_job(run_earnings_update, "cron", hour=0, minute=15, id="earnings_update")
     scheduler.start()
     job_ids = [j.id for j in scheduler.get_jobs()]
     print(f"[STARTUP] Active scrapers: {', '.join(job_ids)}")
@@ -1124,6 +1349,15 @@ app.include_router(notifications_router.router, prefix="/api")
 app.include_router(ticker_detail.router, prefix="/api")
 app.include_router(activity_feed.router, prefix="/api")
 app.include_router(share.router, prefix="/api")
+app.include_router(daily_challenge_router.router, prefix="/api")
+app.include_router(reactions.router, prefix="/api")
+app.include_router(watchlist_router.router, prefix="/api")
+app.include_router(controversial.router, prefix="/api")
+from routers import analysts as analysts_router, heatmap
+app.include_router(analysts_router.router, prefix="/api")
+app.include_router(heatmap.router, prefix="/api")
+from routers import earnings as earnings_router
+app.include_router(earnings_router.router, prefix="/api")
 app.include_router(admin_panel_router)  # /admin HTML + /api/admin/* endpoints
 
 

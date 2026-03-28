@@ -8,7 +8,9 @@ import OnboardingBanner from '../components/OnboardingBanner';
 import Onboarding from '../components/Onboarding';
 import StreakCalendar from '../components/StreakCalendar';
 import TrackRecordCard from '../components/TrackRecordCard';
-import { getUserProfile, getUserAchievements, getUserPredictions, followUser, unfollowUser, getFollowers } from '../api';
+import AccuracyChart from '../components/AccuracyChart';
+import AccuracyBreakdown from '../components/AccuracyBreakdown';
+import { getUserProfile, getUserAchievements, getUserPredictions, followUser, unfollowUser, getFollowers, getUserAccuracyHistory, getUserAccuracyByCategory } from '../api';
 
 export default function Profile() {
   const navigate = useNavigate();
@@ -21,6 +23,8 @@ export default function Profile() {
   const [profile, setProfile] = useState(null);
   const [badges, setBadges] = useState([]);
   const [predictions, setPredictions] = useState([]);
+  const [accuracyHistory, setAccuracyHistory] = useState([]);
+  const [categories, setCategories] = useState(null);
   const [loading, setLoading] = useState(true);
   const [isFollowing, setIsFollowing] = useState(false);
   const [followLoading, setFollowLoading] = useState(false);
@@ -33,9 +37,13 @@ export default function Profile() {
       getUserProfile(targetId),
       getUserAchievements(targetId),
       getUserPredictions(targetId),
-    ]).then(([p, b, preds]) => {
+      getUserAccuracyHistory(targetId).catch(() => []),
+      getUserAccuracyByCategory(targetId).catch(() => null),
+    ]).then(([p, b, preds, hist, cats]) => {
       setProfile(p);
       setBadges(b);
+      setAccuracyHistory(hist);
+      setCategories(cats);
       setPredictions(preds);
       // Check if current user follows this profile
       if (!isOwnProfile && user) {
@@ -131,6 +139,21 @@ export default function Profile() {
           <StatCard label="Best Streak" value={profile.streak_best} />
           {profile.fastest_correct_days !== null && <StatCard label="Fastest Win" value={`${profile.fastest_correct_days}d`} />}
         </div>
+
+        {/* Accuracy Trend Chart */}
+        {accuracyHistory.length > 0 && (
+          <div className="card mb-6">
+            <h3 className="text-xs text-muted uppercase tracking-wider mb-3">Accuracy Trend</h3>
+            <AccuracyChart data={accuracyHistory} />
+          </div>
+        )}
+
+        {/* Accuracy Breakdown */}
+        {categories && (
+          <div className="mb-6">
+            <AccuracyBreakdown data={categories} />
+          </div>
+        )}
 
         {/* Streak Calendar */}
         {predictions.length > 0 && (

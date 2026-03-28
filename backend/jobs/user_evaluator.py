@@ -133,14 +133,14 @@ def evaluate_user_predictions(db: Session):
 
         # Prediction scored notification
         if outcome == "correct":
-            msg = f"Your {p.direction} call on {p.ticker} was correct! Target: {p.price_target}, Final price: ${price}"
+            msg = f"Your {p.direction} call on {p.ticker} was correct! Target: {p.price_target}, Final price: ${price}. Share your win \u2192"
         else:
             msg = f"Your {p.direction} call on {p.ticker} was incorrect. Target: {p.price_target}, Final price: ${price}"
         create_notification(
             user_id=p.user_id, type="prediction_scored",
-            title="Prediction Scored!",
+            title="You Called It!" if outcome == "correct" else "Prediction Scored",
             message=msg,
-            data={"prediction_id": p.id, "outcome": outcome, "ticker": p.ticker}, db=db,
+            data={"prediction_id": p.id, "outcome": outcome, "ticker": p.ticker, "told_you_so": outcome == "correct"}, db=db,
         )
         _uname = user.username if user else "Someone"
         log_activity(

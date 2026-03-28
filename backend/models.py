@@ -200,6 +200,13 @@ class User(Base):
     paper_balance = Column(Numeric(20, 2), default=0)
     user_type = Column(String(20), default="player")  # "player" | "analyst"
     onboarding_completed = Column(Integer, default=0)  # 0=false, 1=true
+    daily_streak_current = Column(Integer, default=0)
+    daily_streak_best = Column(Integer, default=0)
+    price_alerts_enabled = Column(Integer, default=1)  # 0=false, 1=true
+    weekly_digest_enabled = Column(Integer, default=1)  # 0=false, 1=true
+    return_streak_current = Column(Integer, default=0)
+    return_streak_best = Column(Integer, default=0)
+    last_active_date = Column(DateTime, nullable=True)
 
     predictions = relationship("UserPrediction", back_populates="user", cascade="all, delete-orphan")
     achievements = relationship("Achievement", back_populates="user", cascade="all, delete-orphan")
@@ -222,6 +229,9 @@ class UserPrediction(Base):
     outcome = Column(String(20), default="pending", index=True)  # "pending" | "correct" | "incorrect"
     current_price = Column(Numeric(20, 2), nullable=True)
     deleted_at = Column(DateTime, nullable=True)
+    last_checked_price = Column(Numeric(20, 2), nullable=True)
+    last_alert_type = Column(String(20), nullable=True)
+    template = Column(String(50), default="custom")
 
     __table_args__ = (
         CheckConstraint("direction IN ('bullish', 'bearish')", name="ck_up_direction"),
@@ -230,6 +240,81 @@ class UserPrediction(Base):
     )
 
     user = relationship("User", back_populates="predictions")
+
+
+class DailyChallenge(Base):
+    __tablename__ = "daily_challenges"
+
+    id = Column(Integer, primary_key=True, index=True)
+    ticker = Column(String(10), nullable=False)
+    ticker_name = Column(String(100), nullable=True)
+    price_at_open = Column(Numeric(20, 2), nullable=True)
+    price_at_close = Column(Numeric(20, 2), nullable=True)
+    correct_direction = Column(String(10), nullable=True)
+    challenge_date = Column(DateTime, nullable=False, unique=True)
+    status = Column(String(20), default="active")
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+    entries = relationship("DailyChallengeEntry", back_populates="challenge", cascade="all, delete-orphan")
+
+
+class DailyChallengeEntry(Base):
+    __tablename__ = "daily_challenge_entries"
+
+    id = Column(Integer, primary_key=True, index=True)
+    challenge_id = Column(Integer, ForeignKey("daily_challenges.id", ondelete="CASCADE"), nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    direction = Column(String(10), nullable=False)
+    submitted_at = Column(DateTime, default=datetime.datetime.utcnow)
+    outcome = Column(String(20), nullable=True)
+
+    __table_args__ = (UniqueConstraint("challenge_id", "user_id", name="uq_challenge_user"),)
+
+    challenge = relationship("DailyChallenge", back_populates="entries")
+    user = relationship("User")
+
+
+class EarningsCalendar(Base):
+    __tablename__ = "earnings_calendar"
+
+    id = Column(Integer, primary_key=True, index=True)
+    ticker = Column(String(10), nullable=False)
+    earnings_date = Column(DateTime, nullable=False)
+    earnings_time = Column(String(20), nullable=True)
+    fiscal_quarter = Column(String(10), nullable=True)
+    fiscal_year = Column(Integer, nullable=True)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+    __table_args__ = (UniqueConstraint("ticker", "earnings_date", name="uq_earnings"),)
+
+
+class WatchlistItem(Base):
+    __tablename__ = "watchlist"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    ticker = Column(String(10), nullable=False)
+    notify = Column(Integer, default=1)  # 0=false, 1=true
+    added_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+    __table_args__ = (UniqueConstraint("user_id", "ticker", name="uq_watchlist"),)
+
+
+class PredictionReaction(Base):
+    __tablename__ = "prediction_reactions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    prediction_id = Column(Integer, nullable=False)
+    prediction_source = Column(String(20), nullable=False)  # "user" | "analyst"
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    reaction = Column(String(20), nullable=False)  # "agree" | "disagree" | "bold_call" | "no_way"
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+    __table_args__ = (
+        UniqueConstraint("prediction_id", "prediction_source", "user_id", name="uq_reaction"),
+        CheckConstraint("prediction_source IN ('user', 'analyst')", name="ck_reaction_source"),
+        CheckConstraint("reaction IN ('agree', 'disagree', 'bold_call', 'no_way')", name="ck_reaction_type"),
+    )
 
 
 class ActivityEvent(Base):

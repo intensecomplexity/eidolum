@@ -12,6 +12,7 @@ import Platforms from './pages/Platforms';
 import PlatformDetail from './pages/PlatformDetail';
 import SavedPredictions from './pages/SavedPredictions';
 import Watchlist from './pages/Watchlist';
+import WatchlistPage from './pages/WatchlistPage';
 import PredictionOfTheDayPage from './pages/PredictionOfTheDayPage';
 import ReportCards from './pages/ReportCards';
 import ContrarianSignals from './pages/ContrarianSignals';
@@ -36,6 +37,14 @@ import Notifications from './pages/Notifications';
 import TickerDetail from './pages/TickerDetail';
 import Activity from './pages/Activity';
 import PredictionView from './pages/PredictionView';
+import DailyChallengePage from './pages/DailyChallenge';
+import ToldYouSo from './pages/ToldYouSo';
+import SettingsPage from './pages/Settings';
+import ControversialPage from './pages/Controversial';
+import AnalystsPage from './pages/Analysts';
+import AnalystProfilePage from './pages/AnalystProfile';
+import HeatmapPage from './pages/Heatmap';
+import EarningsPage from './pages/Earnings';
 import Onboarding from './components/Onboarding';
 import { useAuth } from './context/AuthContext';
 import { useState } from 'react';
@@ -66,7 +75,7 @@ export default function App() {
         <Route path="/forecaster/:id" element={<ForecasterProfile />} />
         <Route path="/asset/:ticker" element={<AssetConsensus />} />
         <Route path="/saved" element={<SavedPredictions />} />
-        <Route path="/watchlist" element={<Watchlist />} />
+        <Route path="/watchlist" element={<WatchlistPage />} />
         <Route path="/prediction-of-the-day" element={<PredictionOfTheDayPage />} />
         <Route path="/contrarian" element={<ContrarianSignals />} />
         <Route path="/power-rankings" element={<PowerRankings />} />
@@ -92,6 +101,14 @@ export default function App() {
         <Route path="/ticker/:symbol" element={<TickerDetail />} />
         <Route path="/activity" element={<Activity />} />
         <Route path="/prediction/:predictionId" element={<PredictionView />} />
+        <Route path="/daily-challenge" element={<DailyChallengePage />} />
+        <Route path="/prediction/:predictionId/told-you-so" element={<ToldYouSo />} />
+        <Route path="/settings" element={<SettingsPage />} />
+        <Route path="/controversial" element={<ControversialPage />} />
+        <Route path="/analysts" element={<AnalystsPage />} />
+        <Route path="/analyst/:name" element={<AnalystProfilePage />} />
+        <Route path="/heatmap" element={<HeatmapPage />} />
+        <Route path="/earnings" element={<EarningsPage />} />
       </Routes>
       <SaveToast />
       <BottomNav />

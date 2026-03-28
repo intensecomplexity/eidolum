@@ -84,6 +84,16 @@ BADGE_INFO = {
     "summit":            {"name": "The Summit",        "description": "Reach #1 on community leaderboard",        "icon": "🏔️", "category": "Prestige"},
     "duel-win":          {"name": "Duelist",           "description": "Win 10 duels",                             "icon": "⚔️", "category": "Prestige"},
     "season-top5":       {"name": "Season Contender",  "description": "Finish top 5 in a completed season",       "icon": "🥇", "category": "Prestige"},
+    "crowd-favorite":    {"name": "Crowd Favorite",    "description": "Get 50 total reactions across your predictions", "icon": "❤️", "category": "Conviction"},
+    "against-the-grain": {"name": "Against the Grain", "description": "Correct prediction where 70% disagreed",        "icon": "🏊", "category": "Conviction"},
+    "earnings-whisper":  {"name": "Earnings Whisper",  "description": "5 correct earnings play predictions",              "icon": "📊", "category": "Timing"},
+    "momentum-master":   {"name": "Momentum Master",   "description": "10 correct momentum trade predictions",            "icon": "🚀", "category": "Timing"},
+    "thesis-proven":     {"name": "Thesis Proven",     "description": "3 correct macro thesis predictions",               "icon": "🌍", "category": "Conviction"},
+    "debate-starter":    {"name": "Debate Starter",    "description": "3 predictions each reaching 20 reactions",          "icon": "💬", "category": "Conviction"},
+    "return-3":          {"name": "Curious",           "description": "3-day return streak",                                "icon": "📅", "category": "Prestige"},
+    "return-7":          {"name": "Committed",         "description": "7-day return streak",                                "icon": "📅", "category": "Prestige"},
+    "return-30":         {"name": "Dedicated",         "description": "30-day return streak",                               "icon": "📅", "category": "Prestige"},
+    "return-100":        {"name": "Obsessed",          "description": "100-day return streak",                              "icon": "🔥", "category": "Prestige"},
 }
 
 ALL_BADGE_IDS = list(BADGE_INFO.keys())
@@ -388,6 +398,81 @@ def evaluate_badges(user_id: int, db: Session) -> list[str]:
                 _award("season-top5")
                 break
 
+    # ── REACTIONS ─────────────────────────────────────────────────────────
+
+    from models import PredictionReaction
+
+    # crowd-favorite: 50 total reactions on your predictions
+    if "crowd-favorite" not in existing:
+        total_reactions = (
+            db.query(func.count(PredictionReaction.id))
+            .filter(PredictionReaction.prediction_source == "user")
+            .join(UserPrediction, UserPrediction.id == PredictionReaction.prediction_id)
+            .filter(UserPrediction.user_id == user_id)
+            .scalar() or 0
+        )
+        if total_reactions >= 50:
+            _award("crowd-favorite")
+
+    # against-the-grain: correct prediction with 70%+ disagree/no_way reactions
+    if "against-the-grain" not in existing:
+        for p in correct:
+            rxns = (
+                db.query(PredictionReaction)
+                .filter(PredictionReaction.prediction_id == p.id, PredictionReaction.prediction_source == "user")
+                .all()
+            )
+            if len(rxns) < 5:
+                continue
+            negative = sum(1 for r in rxns if r.reaction in ("disagree", "no_way"))
+            if negative / len(rxns) >= 0.70:
+                _award("against-the-grain")
+                break
+
+    # ── TEMPLATE BADGES ───────────────────────────────────────────────────
+
+    if "earnings-whisper" not in existing:
+        ec = sum(1 for p in correct if getattr(p, 'template', None) == 'earnings_play')
+        if ec >= 5:
+            _award("earnings-whisper")
+
+    if "momentum-master" not in existing:
+        mc = sum(1 for p in correct if getattr(p, 'template', None) == 'momentum_trade')
+        if mc >= 10:
+            _award("momentum-master")
+
+    if "thesis-proven" not in existing:
+        tc = sum(1 for p in correct if getattr(p, 'template', None) == 'macro_thesis')
+        if tc >= 3:
+            _award("thesis-proven")
+
+    # debate-starter: 3 predictions with 20+ reactions each
+    if "debate-starter" not in existing:
+        hot_count = 0
+        for p in all_preds:
+            rxn_count = (
+                db.query(func.count(PredictionReaction.id))
+                .filter(PredictionReaction.prediction_id == p.id, PredictionReaction.prediction_source == "user")
+                .scalar() or 0
+            )
+            if rxn_count >= 20:
+                hot_count += 1
+            if hot_count >= 3:
+                _award("debate-starter")
+                break
+
+    # ── RETURN STREAK BADGES ─────────────────────────────────────────────
+
+    ret_best = user.return_streak_best or 0
+    if "return-3" not in existing and ret_best >= 3:
+        _award("return-3")
+    if "return-7" not in existing and ret_best >= 7:
+        _award("return-7")
+    if "return-30" not in existing and ret_best >= 30:
+        _award("return-30")
+    if "return-100" not in existing and ret_best >= 100:
+        _award("return-100")
+
     # ── Persist ───────────────────────────────────────────────────────────
 
     if newly_awarded:
@@ -522,6 +607,14 @@ def compute_progress(user_id: int, db: Session) -> dict[str, dict]:
         "rank-oracle":       {"current": scored_preds,     "target": 100},
         "rank-legendary":    {"current": scored_preds,     "target": 250},
         "duel-win":          {"current": duel_wins,        "target": 10},
+        "crowd-favorite":    {"current": 0,                "target": 50},
+        "earnings-whisper":  {"current": sum(1 for p in correct if getattr(p, 'template', None) == 'earnings_play'), "target": 5},
+        "momentum-master":   {"current": sum(1 for p in correct if getattr(p, 'template', None) == 'momentum_trade'), "target": 10},
+        "thesis-proven":     {"current": sum(1 for p in correct if getattr(p, 'template', None) == 'macro_thesis'), "target": 3},
+        "return-3":          {"current": user.return_streak_best or 0, "target": 3},
+        "return-7":          {"current": user.return_streak_best or 0, "target": 7},
+        "return-30":         {"current": user.return_streak_best or 0, "target": 30},
+        "return-100":        {"current": user.return_streak_best or 0, "target": 100},
     }
 
     return progress

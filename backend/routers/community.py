@@ -132,6 +132,122 @@ def get_user_profile(request: Request, user_id: int, db: Session = Depends(get_d
     }
 
 
+# ── GET /api/users/{user_id}/accuracy-history ─────────────────────────────────
+
+
+@router.get("/users/{user_id}/accuracy-history")
+@limiter.limit("60/minute")
+def user_accuracy_history(request: Request, user_id: int, db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    scored = (
+        db.query(UserPrediction)
+        .filter(
+            UserPrediction.user_id == user_id,
+            UserPrediction.outcome.in_(["correct", "incorrect"]),
+            UserPrediction.deleted_at.is_(None),
+            UserPrediction.evaluated_at.isnot(None),
+        )
+        .order_by(UserPrediction.evaluated_at.asc())
+        .all()
+    )
+
+    # Group by month
+    months = defaultdict(lambda: {"scored": 0, "correct": 0})
+    for p in scored:
+        key = p.evaluated_at.strftime("%Y-%m")
+        months[key]["scored"] += 1
+        if p.outcome == "correct":
+            months[key]["correct"] += 1
+
+    # Last 12 months
+    import datetime as _dt
+    now = _dt.datetime.utcnow()
+    result = []
+    cumulative_scored = 0
+    cumulative_correct = 0
+
+    for i in range(11, -1, -1):
+        d = now - _dt.timedelta(days=i * 30)
+        key = d.strftime("%Y-%m")
+        data = months.get(key, {"scored": 0, "correct": 0})
+        cumulative_scored += data["scored"]
+        cumulative_correct += data["correct"]
+        result.append({
+            "month": key,
+            "scored": data["scored"],
+            "correct": data["correct"],
+            "accuracy": round(data["correct"] / data["scored"] * 100, 1) if data["scored"] > 0 else None,
+            "rolling_accuracy": round(cumulative_correct / cumulative_scored * 100, 1) if cumulative_scored > 0 else None,
+        })
+
+    return result
+
+
+# ── GET /api/users/{user_id}/accuracy-by-category ─────────────────────────────
+
+
+@router.get("/users/{user_id}/accuracy-by-category")
+@limiter.limit("60/minute")
+def user_accuracy_by_category(request: Request, user_id: int, db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    scored = (
+        db.query(UserPrediction)
+        .filter(
+            UserPrediction.user_id == user_id,
+            UserPrediction.outcome.in_(["correct", "incorrect"]),
+            UserPrediction.deleted_at.is_(None),
+        )
+        .all()
+    )
+
+    def _acc(items):
+        total = len(items)
+        correct = sum(1 for p in items if p.outcome == "correct")
+        return {"scored": total, "correct": correct, "accuracy": round(correct / total * 100, 1) if total > 0 else 0}
+
+    # By direction
+    bull = [p for p in scored if p.direction == "bullish"]
+    bear = [p for p in scored if p.direction == "bearish"]
+
+    # By timeframe bucket
+    sprint = [p for p in scored if p.evaluation_window_days <= 7]
+    swing = [p for p in scored if 8 <= p.evaluation_window_days <= 30]
+    medium = [p for p in scored if 31 <= p.evaluation_window_days <= 90]
+    long_ = [p for p in scored if p.evaluation_window_days > 90]
+
+    # By template
+    templates = defaultdict(list)
+    for p in scored:
+        templates[getattr(p, 'template', None) or 'custom'].append(p)
+
+    # By sector (using SECTOR_MAP)
+    sectors = defaultdict(list)
+    for p in scored:
+        s = SECTOR_MAP.get(p.ticker, "Other")
+        sectors[s].append(p)
+
+    return {
+        "direction": {
+            "bullish": {"name": "Bullish", **_acc(bull)},
+            "bearish": {"name": "Bearish", **_acc(bear)},
+        },
+        "timeframe": {
+            "sprint": {"name": "Sprint (1-7d)", **_acc(sprint)},
+            "swing": {"name": "Swing (8-30d)", **_acc(swing)},
+            "medium": {"name": "Medium (31-90d)", **_acc(medium)},
+            "long": {"name": "Long (91-365d)", **_acc(long_)},
+        },
+        "template": {k: {"name": k, **_acc(v)} for k, v in templates.items()},
+        "sector": {k: {"name": k, **_acc(v)} for k, v in sectors.items()},
+    }
+
+
 # ── GET /api/leaderboard/community ───────────────────────────────────────────
 
 
