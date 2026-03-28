@@ -1512,8 +1512,11 @@ async def lifespan(app):
 
     scheduler.start()
     job_ids = [j.id for j in scheduler.get_jobs()]
-    print(f"[STARTUP] Active scrapers: {', '.join(job_ids)}")
-    print(f"[STARTUP] {len(job_ids)} jobs registered")
+    print(f"[STARTUP] {len(job_ids)} jobs registered: {', '.join(job_ids)}")
+    for j in scheduler.get_jobs():
+        print(f"[STARTUP]   {j.id}: next_run={j.next_run_time}")
+    print(f"[STARTUP] FINNHUB_KEY set: {bool(os.getenv('FINNHUB_KEY', '').strip())}")
+    print(f"[STARTUP] User evaluator will run in ~30s")
     yield
     scheduler.shutdown()
 
@@ -1601,6 +1604,41 @@ app.include_router(admin_panel_router)  # /admin HTML + /api/admin/* endpoints
 @app.get("/api/health")
 def health():
     return {"status": "ok", "app": "Eidolum API"}
+
+
+@app.get("/api/scheduler-status")
+def scheduler_status():
+    """Show all scheduled jobs and their last run times."""
+    from admin_panel import scheduler_last_run
+    jobs = []
+    try:
+        for job in scheduler.get_jobs():
+            jobs.append({
+                "id": job.id,
+                "next_run": job.next_run_time.isoformat() if job.next_run_time else None,
+            })
+    except Exception as e:
+        jobs = [{"error": str(e)}]
+    return {
+        "jobs": jobs,
+        "last_runs": {k: v.isoformat() if v else None for k, v in scheduler_last_run.items()},
+        "finnhub_key_set": bool(os.getenv("FINNHUB_KEY", "").strip()),
+    }
+
+
+@app.post("/api/admin/run-user-evaluator")
+def run_user_evaluator_now():
+    """Run the user prediction evaluator immediately and return results."""
+    import traceback as _tb
+    db = SessionLocal()
+    try:
+        from jobs.user_evaluator import evaluate_user_predictions
+        results = evaluate_user_predictions(db)
+        return {"status": "ok", "evaluated": len(results or []), "results": results or []}
+    except Exception as e:
+        return {"status": "error", "error": str(e), "traceback": _tb.format_exc()}
+    finally:
+        db.close()
 
 
 @app.get("/api/debug")
