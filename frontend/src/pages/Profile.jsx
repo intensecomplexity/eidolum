@@ -25,7 +25,7 @@ export default function Profile() {
   const [accuracyHistory, setAccuracyHistory] = useState([]);
   const [categories, setCategories] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [isFollowing, setIsFollowing] = useState(false);
+  const [friendshipStatus, setFriendshipStatus] = useState('none'); // none, pending_sent, pending_received, accepted
   const [followLoading, setFollowLoading] = useState(false);
 
   useEffect(() => {
@@ -43,11 +43,9 @@ export default function Profile() {
       setAccuracyHistory(hist);
       setCategories(cats);
       setPredictions(preds);
-      // Check if current user follows this profile
-      if (!isOwnProfile && user) {
-        getFollowers(targetId).then(followers => {
-          setIsFollowing(followers.some(f => f.user_id === (user.id || user.user_id)));
-        }).catch(() => {});
+      // Set friendship status from profile response
+      if (p.friendship_status) {
+        setFriendshipStatus(p.friendship_status);
       }
     }).catch(() => {}).finally(() => setLoading(false));
   }, [targetId]);
@@ -72,17 +70,25 @@ export default function Profile() {
 
   const earnedBadges = badges.filter(b => b.earned);
 
-  async function toggleFollow() {
+  async function handleFriendAction(action) {
     setFollowLoading(true);
     try {
-      if (isFollowing) {
-        await unfollowUser(targetId);
-        setIsFollowing(false);
-        setProfile(p => ({ ...p, followers_count: (p.followers_count || 1) - 1 }));
-      } else {
+      if (action === 'send') {
         await followUser(targetId);
-        setIsFollowing(true);
+        setFriendshipStatus('pending_sent');
+      } else if (action === 'accept') {
+        const { acceptFriendRequest } = await import('../api');
+        await acceptFriendRequest(targetId);
+        setFriendshipStatus('accepted');
         setProfile(p => ({ ...p, followers_count: (p.followers_count || 0) + 1 }));
+      } else if (action === 'decline') {
+        const { declineFriendRequest } = await import('../api');
+        await declineFriendRequest(targetId);
+        setFriendshipStatus('none');
+      } else if (action === 'unfriend') {
+        await unfollowUser(targetId);
+        setFriendshipStatus('none');
+        setProfile(p => ({ ...p, followers_count: Math.max(0, (p.followers_count || 1) - 1) }));
       }
     } catch {} finally { setFollowLoading(false); }
   }
@@ -112,10 +118,7 @@ export default function Profile() {
             </div>
             <div className="flex items-center gap-2">
               {!isOwnProfile && isAuthenticated && (
-                <button onClick={toggleFollow} disabled={followLoading}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${isFollowing ? 'bg-surface-2 text-text-secondary border border-border' : 'bg-accent/15 text-accent border border-accent/30'}`}>
-                  {isFollowing ? <><UserMinus className="w-3.5 h-3.5" /> Remove Friend</> : <><UserPlus className="w-3.5 h-3.5" /> Add Friend</>}
-                </button>
+                <FriendButton status={friendshipStatus} loading={followLoading} onAction={handleFriendAction} />
               )}
               {isOwnProfile && (
                 <>
@@ -237,5 +240,47 @@ function StatCard({ label, value, accent, icon }) {
       <div className={`font-mono text-xl sm:text-2xl font-bold ${accent ? 'text-accent' : 'text-text-primary'}`}>{value}</div>
       <div className="text-xs text-muted mt-0.5">{label}</div>
     </div>
+  );
+}
+
+function FriendButton({ status, loading, onAction }) {
+  if (status === 'accepted') {
+    return (
+      <div className="relative group">
+        <span className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium text-positive bg-positive/10 border border-positive/20">
+          <UserPlus className="w-3.5 h-3.5" /> Friends
+        </span>
+        <button onClick={() => onAction('unfriend')} disabled={loading}
+          className="absolute inset-0 opacity-0 group-hover:opacity-100 flex items-center justify-center rounded-lg text-xs font-medium text-negative bg-negative/10 border border-negative/20 transition-opacity">
+          Unfriend
+        </button>
+      </div>
+    );
+  }
+  if (status === 'pending_sent') {
+    return (
+      <span className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium text-muted bg-surface-2 border border-border">
+        Request Sent
+      </span>
+    );
+  }
+  if (status === 'pending_received') {
+    return (
+      <div className="flex items-center gap-2">
+        <button onClick={() => onAction('accept')} disabled={loading}
+          className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium text-positive bg-positive/10 border border-positive/20 hover:bg-positive/15">
+          Accept
+        </button>
+        <button onClick={() => onAction('decline')} disabled={loading} className="text-xs text-muted hover:text-negative">
+          Decline
+        </button>
+      </div>
+    );
+  }
+  return (
+    <button onClick={() => onAction('send')} disabled={loading}
+      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-accent/15 text-accent border border-accent/30 hover:bg-accent/20 transition-colors">
+      <UserPlus className="w-3.5 h-3.5" /> Add Friend
+    </button>
   );
 }

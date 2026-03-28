@@ -1,5 +1,6 @@
 import datetime
 from collections import defaultdict
+from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy.orm import Session
 from sqlalchemy import func
@@ -48,9 +49,40 @@ from badge_engine import BADGE_INFO, ALL_BADGE_IDS, compute_progress
 # ── GET /api/users/{user_id}/profile ──────────────────────────────────────────
 
 
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from auth import get_current_user as _decode_token
+_optional_bearer = HTTPBearer(auto_error=False)
+
+
+def _get_friendship_status(profile_user_id: int, credentials, db) -> str:
+    """Returns: 'none', 'pending_sent', 'pending_received', 'accepted'"""
+    if not credentials or not credentials.credentials:
+        return "none"
+    try:
+        me = _decode_token(credentials.credentials).get("user_id")
+    except Exception:
+        return "none"
+    if not me or me == profile_user_id:
+        return "none"
+
+    # Check if I sent them a request
+    sent = db.query(Follow).filter(Follow.follower_id == me, Follow.following_id == profile_user_id).first()
+    if sent:
+        if sent.status == "accepted": return "accepted"
+        if sent.status == "pending": return "pending_sent"
+
+    # Check if they sent me a request
+    received = db.query(Follow).filter(Follow.follower_id == profile_user_id, Follow.following_id == me).first()
+    if received:
+        if received.status == "accepted": return "accepted"
+        if received.status == "pending": return "pending_received"
+
+    return "none"
+
+
 @router.get("/users/{user_id}/profile")
 @limiter.limit("60/minute")
-def get_user_profile(request: Request, user_id: int, db: Session = Depends(get_db)):
+def get_user_profile(request: Request, user_id: int, credentials: Optional[HTTPAuthorizationCredentials] = Depends(_optional_bearer), db: Session = Depends(get_db)):
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
@@ -64,9 +96,9 @@ def get_user_profile(request: Request, user_id: int, db: Session = Depends(get_d
     correct_count = len(correct)
     accuracy = round(correct_count / scored_count * 100, 1) if scored_count > 0 else 0.0
 
-    # Follow counts
-    followers_count = db.query(func.count(Follow.id)).filter(Follow.following_id == user_id).scalar() or 0
-    following_count = db.query(func.count(Follow.id)).filter(Follow.follower_id == user_id).scalar() or 0
+    # Follow counts (accepted only)
+    followers_count = db.query(func.count(Follow.id)).filter(Follow.following_id == user_id, Follow.status == "accepted").scalar() or 0
+    following_count = db.query(func.count(Follow.id)).filter(Follow.follower_id == user_id, Follow.status == "accepted").scalar() or 0
 
     # Rank
     rank = _rank_info(scored_count)
@@ -124,6 +156,7 @@ def get_user_profile(request: Request, user_id: int, db: Session = Depends(get_d
         "accuracy_percentage": accuracy,
         "followers_count": followers_count,
         "following_count": following_count,
+        "friendship_status": _get_friendship_status(user_id, credentials, db),
         "rank_name": rank["rank_name"],
         "rank_color": rank["rank_color"],
         "sector_accuracy": sector_accuracy,

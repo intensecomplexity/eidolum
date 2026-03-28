@@ -206,6 +206,24 @@ export function getProfileShareData(userId) {
   return api.get(`/profiles/${userId}/share-data`).then(r => r.data);
 }
 
+// ——— Friend Requests ———
+
+export function acceptFriendRequest(userId) {
+  return api.post(`/follows/${userId}/accept`, {}, { headers: authHeaders() }).then(r => r.data);
+}
+
+export function declineFriendRequest(userId) {
+  return api.post(`/follows/${userId}/decline`, {}, { headers: authHeaders() }).then(r => r.data);
+}
+
+export function getFriendRequests() {
+  return api.get('/follows/requests', { headers: authHeaders() }).then(r => r.data);
+}
+
+export function getSentRequests() {
+  return api.get('/follows/sent', { headers: authHeaders() }).then(r => r.data);
+}
+
 // ——— Comments ———
 
 export function getComments(predictionId, source, limit = 20, offset = 0) {

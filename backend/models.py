@@ -381,6 +381,7 @@ class Follow(Base):
     id = Column(Integer, primary_key=True, index=True)
     follower_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     following_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    status = Column(String(20), default="accepted")  # "pending" | "accepted" | "declined"
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
 
     __table_args__ = (

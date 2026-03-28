@@ -739,6 +739,19 @@ def run_phase2_migrations():
     except Exception:
         db.rollback()
 
+    # ── 27. follows.status column ───────────────────────────────────
+    try:
+        db.execute(text("ALTER TABLE follows ADD COLUMN status VARCHAR(20) DEFAULT 'accepted'"))
+        db.commit()
+    except Exception:
+        db.rollback()
+    # Set all existing rows to accepted
+    try:
+        db.execute(text("UPDATE follows SET status = 'accepted' WHERE status IS NULL"))
+        db.commit()
+    except Exception:
+        db.rollback()
+
     print("[Phase2] All migrations complete")
     db.close()
 
