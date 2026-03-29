@@ -1939,40 +1939,60 @@ def resume_jobs():
 
 @app.post("/api/admin/backfill-alpha")
 def backfill_alpha():
-    """Calculate alpha for all evaluated predictions missing it."""
-    import threading
+    """Calculate alpha for all evaluated predictions missing it. Runs synchronously (small batch)."""
     from sqlalchemy import text as _t
+    from jobs.historical_evaluator import _calc_spy_return
 
-    def _run():
-        from jobs.historical_evaluator import _calc_spy_return
-        dbs = BgSessionLocal()
-        try:
-            rows = dbs.execute(_t("""
-                SELECT id, actual_return, prediction_date, evaluation_date
-                FROM predictions
-                WHERE outcome IN ('correct','incorrect') AND alpha IS NULL AND actual_return IS NOT NULL
-                LIMIT 10000
-            """)).fetchall()
-            print(f"[AlphaBackfill] {len(rows)} predictions to update")
-            for r in rows:
-                spy_ret = _calc_spy_return(r[2], r[3])
-                if spy_ret is not None:
-                    alpha = round(r[1] - spy_ret, 2)
-                    dbs.execute(_t("UPDATE predictions SET sp500_return=:s, alpha=:a WHERE id=:id"),
-                                {"s": spy_ret, "a": alpha, "id": r[0]})
-            dbs.commit()
-            print(f"[AlphaBackfill] Done")
-            # Update forecaster alphas
+    dbs = BgSessionLocal()
+    try:
+        # Set longer timeout for this operation
+        dbs.execute(_t("SET statement_timeout = '60000'"))
+
+        rows = dbs.execute(_t("""
+            SELECT id, actual_return, prediction_date, evaluation_date
+            FROM predictions
+            WHERE outcome IN ('correct','incorrect')
+              AND alpha IS NULL
+              AND actual_return IS NOT NULL
+            LIMIT 10000
+        """)).fetchall()
+
+        updated = 0
+        skipped = 0
+        sample = []
+        for r in rows:
+            spy_ret = _calc_spy_return(r[2], r[3])
+            if spy_ret is not None:
+                alpha = round(float(r[1]) - spy_ret, 2)
+                dbs.execute(_t("UPDATE predictions SET sp500_return=:s, alpha=:a WHERE id=:id"),
+                            {"s": spy_ret, "a": alpha, "id": r[0]})
+                updated += 1
+                if len(sample) < 3:
+                    sample.append({"id": r[0], "actual_return": float(r[1]), "spy_return": spy_ret, "alpha": alpha,
+                                   "pred_date": str(r[2]), "eval_date": str(r[3])})
+            else:
+                skipped += 1
+                if len(sample) < 3:
+                    sample.append({"id": r[0], "actual_return": float(r[1]), "pred_date": str(r[2]),
+                                   "eval_date": str(r[3]), "spy_return": None, "skipped": True})
+
+        dbs.commit()
+
+        # Refresh forecaster stats
+        if updated > 0:
             from jobs.historical_evaluator import refresh_all_forecaster_stats
             refresh_all_forecaster_stats()
-        except Exception as e:
-            dbs.rollback()
-            print(f"[AlphaBackfill] Error: {e}")
-        finally:
-            dbs.close()
 
-    threading.Thread(target=_run, daemon=True).start()
-    return {"status": "started"}
+        return {
+            "status": "done", "found": len(rows), "updated": updated,
+            "skipped_no_spy": skipped, "sample": sample,
+        }
+    except Exception as e:
+        dbs.rollback()
+        import traceback
+        return {"status": "error", "error": str(e), "traceback": traceback.format_exc()}
+    finally:
+        dbs.close()
 
 
 @app.post("/api/admin/backfill-sectors")
