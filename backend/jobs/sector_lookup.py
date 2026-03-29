@@ -141,7 +141,7 @@ def _cache_to_db(ticker: str, sector: str, db=None):
 
 def backfill_sectors_batch(max_tickers: int = 200) -> dict:
     """Look up and set sectors for predictions missing sector data."""
-    from database import SessionLocal
+    from database import BgSessionLocal as SessionLocal
 
     db = SessionLocal()
     try:

@@ -1,5 +1,5 @@
 import os
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, event
 from sqlalchemy.orm import sessionmaker, DeclarativeBase
 
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./eidolum.db")
@@ -12,27 +12,44 @@ connect_args = {"check_same_thread": False} if DATABASE_URL.startswith("sqlite")
 
 if DATABASE_URL.startswith("sqlite"):
     engine = create_engine(DATABASE_URL, connect_args=connect_args)
+    bg_engine = engine  # Same engine for SQLite
 else:
+    # User-facing pool: fast timeout, strict limits
     engine = create_engine(
         DATABASE_URL,
         connect_args=connect_args,
         pool_size=5,
-        max_overflow=10,
-        pool_timeout=10,
+        max_overflow=5,
+        pool_timeout=5,
         pool_recycle=300,
         pool_pre_ping=True,
     )
 
-    # Set statement timeout on every new connection
-    from sqlalchemy import event
-
     @event.listens_for(engine, "connect")
-    def _set_timeout(dbapi_conn, connection_record):
+    def _set_user_timeout(dbapi_conn, connection_record):
         cursor = dbapi_conn.cursor()
-        cursor.execute("SET statement_timeout = '8000'")  # 8 seconds
+        cursor.execute("SET statement_timeout = '5000'")  # 5 seconds for user queries
+        cursor.close()
+
+    # Background job pool: longer timeout, smaller pool
+    bg_engine = create_engine(
+        DATABASE_URL,
+        connect_args=connect_args,
+        pool_size=2,
+        max_overflow=2,
+        pool_timeout=30,
+        pool_recycle=300,
+        pool_pre_ping=True,
+    )
+
+    @event.listens_for(bg_engine, "connect")
+    def _set_bg_timeout(dbapi_conn, connection_record):
+        cursor = dbapi_conn.cursor()
+        cursor.execute("SET statement_timeout = '30000'")  # 30 seconds for background jobs
         cursor.close()
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+BgSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=bg_engine)
 
 
 class Base(DeclarativeBase):

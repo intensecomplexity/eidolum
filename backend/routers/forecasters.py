@@ -1,81 +1,24 @@
 import datetime
+import time as _time
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy.orm import Session
+from sqlalchemy import text as sql_text
 from database import get_db
 from models import Forecaster, Prediction, format_timestamp, get_youtube_timestamp_url
 from rate_limit import limiter
 
 router = APIRouter()
 
+_forecaster_cache: dict[int, tuple] = {}
+FORECASTER_CACHE_TTL = 300
+
 
 @router.get("/forecasters")
 @limiter.limit("60/minute")
 def list_forecasters(request: Request, limit: int = Query(50, ge=1, le=200), db: Session = Depends(get_db)):
     forecasters = db.query(Forecaster).filter(Forecaster.total_predictions > 0).order_by(Forecaster.name).limit(limit).all()
-    return [
-        {
-            "id": f.id,
-            "name": f.name,
-            "handle": f.handle,
-            "channel_url": f.channel_url,
-            "subscriber_count": f.subscriber_count,
-            "profile_image_url": f.profile_image_url,
-        }
-        for f in forecasters
-    ]
-
-
-from fastapi import Query as Q
-
-
-@router.get("/forecasters/all")
-@limiter.limit("60/minute")
-def list_all_forecasters(
-    request: Request,
-    letter: str = Q(None),
-    search: str = Q(None),
-    db: Session = Depends(get_db),
-):
-    """List all forecasters A-Z with stats. Optional letter/search filter."""
-    query = db.query(Forecaster)
-    if letter and len(letter) == 1:
-        query = query.filter(Forecaster.name.ilike(f"{letter}%"))
-    if search:
-        query = query.filter(Forecaster.name.ilike(f"%{search}%"))
-    forecasters = query.order_by(Forecaster.name).all()
-
-    results = []
-    for f in forecasters:
-        total = db.query(Prediction).filter(Prediction.forecaster_id == f.id).count()
-        scored = db.query(Prediction).filter(
-            Prediction.forecaster_id == f.id,
-            Prediction.outcome.in_(["correct", "incorrect"]),
-        ).count()
-        correct = db.query(Prediction).filter(
-            Prediction.forecaster_id == f.id,
-            Prediction.outcome == "correct",
-        ).count()
-        accuracy = round(correct / scored * 100, 1) if scored > 0 else None
-
-        results.append({
-            "id": f.id,
-            "name": f.name,
-            "handle": f.handle,
-            "platform": f.platform or "institutional",
-            "profile_image_url": f.profile_image_url,
-            "total_predictions": total,
-            "scored_predictions": scored,
-            "accuracy": accuracy,
-            "is_ranked": scored >= 10,
-        })
-
-    return results
-
-
-import time as _time
-
-_forecaster_cache: dict[int, tuple] = {}  # id → (data, timestamp)
-FORECASTER_CACHE_TTL = 300  # 5 minutes
+    return [{"id": f.id, "name": f.name, "handle": f.handle, "channel_url": f.channel_url,
+             "subscriber_count": f.subscriber_count, "profile_image_url": f.profile_image_url} for f in forecasters]
 
 
 @router.get("/forecaster/{forecaster_id}")
@@ -85,89 +28,54 @@ def get_forecaster(
     forecaster_id: int,
     page: int = Query(1, ge=1),
     limit: int = Query(20, ge=1, le=100),
-    filter: str = Query(None),  # all, evaluated, pending, correct, incorrect
-    sector: str = Query(None),  # filter by sector name
+    filter: str = Query(None),
+    sector: str = Query(None),
     db: Session = Depends(get_db),
 ):
-    # Check cache for base stats (sector_strengths always computed fresh)
+    # Fast path: return cached stats + fresh predictions (1 DB query)
     cached = _forecaster_cache.get(forecaster_id)
     if cached and (_time.time() - cached[1]) < FORECASTER_CACHE_TTL:
         result = dict(cached[0])
-        result["predictions"] = _get_predictions_page(forecaster_id, page, limit, filter, sector, db)
-        result["sector_strengths"] = _get_sector_strengths(forecaster_id, db)
-        result["prediction_counts"] = _get_prediction_counts(forecaster_id, db, sector)
+        result["predictions"] = _get_preds(forecaster_id, page, limit, filter, sector, db)
         return result
 
+    # Uncached: 1 query for forecaster + 1 for predictions
     f = db.query(Forecaster).filter(Forecaster.id == forecaster_id).first()
     if not f:
         raise HTTPException(status_code=404, detail="Forecaster not found")
 
-    # Use pre-computed stats from Forecaster table (fast)
-    total = f.total_predictions or 0
-    correct_count = f.correct_predictions or 0
-    accuracy = f.accuracy_score or 0
-
-    sector_strengths = _get_sector_strengths(forecaster_id, db)
-
-    # Accuracy over time — single SQL query, last 50 scored predictions
-    accuracy_over_time = []
-    try:
-        aot_rows = db.execute(sql_text("""
-            SELECT prediction_date, ticker, direction, outcome
-            FROM predictions
-            WHERE forecaster_id = :fid AND outcome IN ('correct','incorrect')
-            ORDER BY prediction_date ASC
-            LIMIT 50
-        """), {"fid": forecaster_id}).fetchall()
-        cum_correct = 0
-        cum_total = 0
-        for r in aot_rows:
-            cum_total += 1
-            if r[3] == "correct":
-                cum_correct += 1
-            accuracy_over_time.append({
-                "date": r[0].strftime("%Y-%m-%d") if r[0] else "",
-                "cumulative_accuracy": round(cum_correct / cum_total * 100, 1),
-                "ticker": r[1], "direction": r[2], "outcome": r[3],
-            })
-    except Exception:
-        pass
-
     result = {
-        "id": f.id,
-        "name": f.name,
-        "handle": f.handle,
-        "platform": f.platform or "youtube",
-        "channel_url": f.channel_url,
-        "subscriber_count": f.subscriber_count,
-        "profile_image_url": f.profile_image_url,
+        "id": f.id, "name": f.name, "handle": f.handle,
+        "platform": f.platform or "youtube", "channel_url": f.channel_url,
+        "subscriber_count": f.subscriber_count, "profile_image_url": f.profile_image_url,
         "bio": f.bio,
         "streak": {"type": "none", "count": 0},
-        "sector_strengths": sector_strengths,
-        "accuracy_rate": accuracy,
-        "total_predictions": total,
-        "evaluated_predictions": total,
-        "correct_predictions": correct_count,
+        "accuracy_rate": float(f.accuracy_score or 0),
+        "total_predictions": f.total_predictions or 0,
+        "evaluated_predictions": f.total_predictions or 0,
+        "correct_predictions": f.correct_predictions or 0,
         "alpha": float(f.alpha or 0),
-        "accuracy_over_time": accuracy_over_time,
-        "prediction_counts": _get_prediction_counts(forecaster_id, db, sector),
-        "predictions": _get_predictions_page(forecaster_id, page, limit, filter, sector, db),
+        "sector_strengths": [],
+        "accuracy_over_time": [],
+        "prediction_counts": {"all": 0, "evaluated": 0, "pending": 0, "correct": 0, "incorrect": 0},
+        "predictions": _get_preds(forecaster_id, page, limit, filter, sector, db),
         "disclosed_positions": [],
-        "conflict_stats": {"total": total, "conflicts": 0, "rate": 0},
+        "conflict_stats": {"total": 0, "conflicts": 0, "rate": 0},
     }
 
-    # Cache the stats (without predictions — those are paginated)
+    # Cache the base stats (without predictions)
     cache_data = {k: v for k, v in result.items() if k != "predictions"}
     _forecaster_cache[forecaster_id] = (cache_data, _time.time())
 
     return result
 
 
-def _get_sector_strengths(forecaster_id: int, db) -> list:
-    """Compute sector accuracy breakdown for a forecaster."""
+@router.get("/forecaster/{forecaster_id}/sectors")
+@limiter.limit("30/minute")
+def get_forecaster_sectors(request: Request, forecaster_id: int, db: Session = Depends(get_db)):
+    """Lazy-loaded sector strengths and prediction counts."""
     try:
-        from sqlalchemy import text as sql_text
-        rows = db.execute(sql_text("""
+        sector_rows = db.execute(sql_text("""
             SELECT sector, COUNT(*) as total,
                    SUM(CASE WHEN outcome='correct' THEN 1 ELSE 0 END) as correct
             FROM predictions
@@ -175,102 +83,111 @@ def _get_sector_strengths(forecaster_id: int, db) -> list:
               AND sector IS NOT NULL AND sector != ''
             GROUP BY sector ORDER BY total DESC
         """), {"fid": forecaster_id}).fetchall()
-        result = [
-            {"sector": r[0], "accuracy": round(r[2] / r[1] * 100, 1) if r[1] > 0 else 0, "count": r[1]}
-            for r in rows if r[0] != "Other" or len(rows) == 1
-        ]
-        return result
-    except Exception as e:
-        print(f"[ForecasterDetail] Sector query error: {e}")
-        return []
+        sectors = [{"sector": r[0], "accuracy": round(r[2] / r[1] * 100, 1) if r[1] > 0 else 0, "count": r[1]}
+                   for r in sector_rows if r[0] != "Other" or len(sector_rows) == 1]
+    except Exception:
+        sectors = []
 
-
-def _get_prediction_counts(forecaster_id: int, db, sector: str = None) -> dict:
-    """Get prediction counts by outcome for filter tabs."""
-    from sqlalchemy import text as sql_text
     try:
-        sector_filter = "AND sector = :sec" if sector else ""
-        params = {"fid": forecaster_id}
-        if sector:
-            params["sec"] = sector
-        rows = db.execute(sql_text(f"""
+        count_rows = db.execute(sql_text("""
             SELECT outcome, COUNT(*) FROM predictions
-            WHERE forecaster_id = :fid {sector_filter} GROUP BY outcome
-        """), params).fetchall()
-        counts = {r[0]: r[1] for r in rows}
-        return {
+            WHERE forecaster_id = :fid GROUP BY outcome
+        """), {"fid": forecaster_id}).fetchall()
+        counts = {r[0]: r[1] for r in count_rows}
+    except Exception:
+        counts = {}
+
+    return {
+        "sector_strengths": sectors,
+        "prediction_counts": {
             "all": sum(counts.values()),
             "evaluated": counts.get("correct", 0) + counts.get("incorrect", 0),
             "pending": counts.get("pending", 0),
             "correct": counts.get("correct", 0),
             "incorrect": counts.get("incorrect", 0),
-        }
+        },
+    }
+
+
+@router.get("/forecaster/{forecaster_id}/accuracy-chart")
+@limiter.limit("30/minute")
+def get_accuracy_chart(request: Request, forecaster_id: int, db: Session = Depends(get_db)):
+    """Lazy-loaded accuracy over time chart data."""
+    try:
+        rows = db.execute(sql_text("""
+            SELECT prediction_date, ticker, direction, outcome
+            FROM predictions
+            WHERE forecaster_id = :fid AND outcome IN ('correct','incorrect')
+            ORDER BY prediction_date ASC LIMIT 50
+        """), {"fid": forecaster_id}).fetchall()
+        cum_c = cum_t = 0
+        data = []
+        for r in rows:
+            cum_t += 1
+            if r[3] == "correct":
+                cum_c += 1
+            data.append({"date": r[0].strftime("%Y-%m-%d") if r[0] else "", "cumulative_accuracy": round(cum_c / cum_t * 100, 1),
+                         "ticker": r[1], "direction": r[2], "outcome": r[3]})
+        return data
     except Exception:
-        return {"all": 0, "evaluated": 0, "pending": 0, "correct": 0, "incorrect": 0}
+        return []
 
 
-def _get_predictions_page(forecaster_id: int, page: int, limit: int, filter_type: str, sector: str, db) -> list:
-    """Get paginated predictions with filter, sector, and smart sort."""
-    from sqlalchemy import text as sql_text
+def _get_preds(fid, page, limit, filter_type, sector, db):
+    """Single fast query for paginated predictions."""
     offset = (page - 1) * limit
-
-    # Build WHERE clause based on filter
-    where_extra = ""
-    params = {"fid": forecaster_id, "lim": limit, "off": offset}
+    where = ""
+    params = {"fid": fid, "lim": limit, "off": offset}
     if filter_type == "evaluated":
-        where_extra += " AND outcome IN ('correct','incorrect')"
+        where += " AND outcome IN ('correct','incorrect')"
     elif filter_type == "pending":
-        where_extra += " AND outcome = 'pending'"
+        where += " AND outcome = 'pending'"
     elif filter_type == "correct":
-        where_extra += " AND outcome = 'correct'"
+        where += " AND outcome = 'correct'"
     elif filter_type == "incorrect":
-        where_extra += " AND outcome = 'incorrect'"
+        where += " AND outcome = 'incorrect'"
     if sector:
-        where_extra += " AND sector = :sec"
+        where += " AND sector = :sec"
         params["sec"] = sector
 
-    # Sort: evaluated first (by eval date DESC), then pending (by eval date ASC)
-    order = """
-        CASE WHEN outcome IN ('correct','incorrect') THEN 0 ELSE 1 END,
-        CASE WHEN outcome IN ('correct','incorrect') THEN evaluation_date END DESC,
-        CASE WHEN outcome = 'pending' THEN evaluation_date END ASC
-    """
-
-    rows = db.execute(sql_text(f"""
-        SELECT id, ticker, direction, target_price, entry_price,
-               prediction_date, evaluation_date, window_days,
-               outcome, actual_return, evaluation_summary,
-               sector, context, exact_quote, source_url, archive_url,
-               source_type, source_platform_id, video_timestamp_sec,
-               verified_by, has_conflict, conflict_note
-        FROM predictions
-        WHERE forecaster_id = :fid {where_extra}
-        ORDER BY {order}
-        LIMIT :lim OFFSET :off
-    """), params).fetchall()
+    try:
+        rows = db.execute(sql_text(f"""
+            SELECT id, ticker, direction, target_price, entry_price,
+                   prediction_date, evaluation_date, window_days,
+                   outcome, actual_return, evaluation_summary,
+                   sector, context, exact_quote, source_url, archive_url,
+                   source_type, source_platform_id, video_timestamp_sec,
+                   verified_by, has_conflict, conflict_note
+            FROM predictions
+            WHERE forecaster_id = :fid {where}
+            ORDER BY CASE WHEN outcome IN ('correct','incorrect') THEN 0 ELSE 1 END,
+                     prediction_date DESC
+            LIMIT :lim OFFSET :off
+        """), params).fetchall()
+    except Exception:
+        return []
 
     results = []
     for p in rows:
-        pred_date = p[5]
-        eval_date = p[6]
-        window = p[7] or 90
-        if not eval_date and pred_date:
-            eval_date = pred_date + datetime.timedelta(days=window)
-        horizon = "short" if window <= 30 else ("long" if window >= 365 else "medium")
+        pd = p[5]
+        ed = p[6]
+        w = p[7] or 90
+        if not ed and pd:
+            ed = pd + datetime.timedelta(days=w)
         results.append({
             "id": p[0], "ticker": p[1], "direction": p[2],
             "target_price": p[3], "entry_price": p[4],
-            "prediction_date": pred_date.isoformat() if pred_date else None,
-            "evaluation_date": eval_date.isoformat() if eval_date else None,
-            "window_days": window, "time_horizon": horizon,
-            "outcome": p[8], "actual_return": p[9],
-            "evaluation_summary": p[10],
+            "prediction_date": pd.isoformat() if pd else None,
+            "evaluation_date": ed.isoformat() if ed else None,
+            "window_days": w,
+            "time_horizon": "short" if w <= 30 else ("long" if w >= 365 else "medium"),
+            "outcome": p[8], "actual_return": p[9], "evaluation_summary": p[10],
             "sector": p[11], "context": p[12], "exact_quote": p[13],
             "source_url": p[14], "archive_url": p[15],
             "source_type": p[16], "source_platform_id": p[17],
             "video_timestamp_sec": p[18], "verified_by": p[19],
             "has_conflict": bool(p[20]), "conflict_note": p[21],
-            "has_source": bool(p[14] and ('/status/' in (p[14] or '') or '/watch?v=' in (p[14] or '') or '/comments/' in (p[14] or ''))),
+            "has_source": bool(p[14] and ('/status/' in (p[14] or '') or '/watch?v=' in (p[14] or ''))),
             "timestamp_display": format_timestamp(p[18]),
             "timestamp_url": get_youtube_timestamp_url(p[17], p[18]),
         })

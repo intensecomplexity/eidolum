@@ -79,7 +79,7 @@ def run_evaluation_background():
 
 def evaluate_batch(max_tickers: int = 50) -> dict:
     """Evaluate one batch of tickers. Connection-safe."""
-    from database import SessionLocal
+    from database import BgSessionLocal as SessionLocal
 
     now = datetime.utcnow()
 
@@ -369,7 +369,7 @@ def _closest_price(prices: dict, target_date) -> float | None:
 
 def _update_stats(fids: set):
     """Update forecaster cached stats including alpha. Short DB connection."""
-    from database import SessionLocal
+    from database import BgSessionLocal as SessionLocal
     db = SessionLocal()
     updated = 0
     try:
@@ -403,7 +403,7 @@ def _update_stats(fids: set):
 
 def refresh_all_forecaster_stats():
     """Recalculate stats for ALL forecasters from scratch."""
-    from database import SessionLocal
+    from database import BgSessionLocal as SessionLocal
     db = SessionLocal()
     updated = 0
     try:
