@@ -1577,7 +1577,7 @@ async def lifespan(app):
         print(f"[Scheduler] Running auto-evaluate at {datetime.utcnow()}")
         try:
             from jobs.historical_evaluator import evaluate_batch
-            result = evaluate_batch(max_tickers=100)
+            result = evaluate_batch(max_tickers=200)
             scored = result.get('predictions_scored', 0)
             remaining = result.get('remaining_tickers', 0)
             print(f"[AutoEval] {scored} scored, {remaining} remaining")

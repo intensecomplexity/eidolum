@@ -151,7 +151,7 @@ export default function ForecasterProfile() {
             </div>
           </div>
 
-          <NotificationBanner text={`Get notified when ${data.name} makes a new prediction.`} />
+          <NotificationBanner text={`Get notified when ${data.name} makes a new prediction.`} forecasterName={data.name} />
         </div>
 
         {/* Chart + Sector */}
