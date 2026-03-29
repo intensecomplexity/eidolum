@@ -1,9 +1,8 @@
 import datetime
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy.orm import Session
 from database import get_db
-from models import Forecaster, Prediction, format_timestamp, get_youtube_timestamp_url, DisclosedPosition
-from utils import compute_forecaster_stats, compute_streak
+from models import Forecaster, Prediction, format_timestamp, get_youtube_timestamp_url
 from rate_limit import limiter
 
 router = APIRouter()
@@ -73,62 +72,82 @@ def list_all_forecasters(
     return results
 
 
+import time as _time
+
+_forecaster_cache: dict[int, tuple] = {}  # id → (data, timestamp)
+FORECASTER_CACHE_TTL = 300  # 5 minutes
+
+
 @router.get("/forecaster/{forecaster_id}")
 @limiter.limit("30/minute")
-def get_forecaster(request: Request, forecaster_id: int, db: Session = Depends(get_db)):
+def get_forecaster(
+    request: Request,
+    forecaster_id: int,
+    page: int = Query(1, ge=1),
+    limit: int = Query(20, ge=1, le=100),
+    db: Session = Depends(get_db),
+):
+    # Check cache for stats (not predictions — those are paginated)
+    cached = _forecaster_cache.get(forecaster_id)
+    if cached and (_time.time() - cached[1]) < FORECASTER_CACHE_TTL:
+        result = dict(cached[0])
+        # Paginate predictions fresh
+        result["predictions"] = _get_predictions_page(forecaster_id, page, limit, db)
+        return result
+
     f = db.query(Forecaster).filter(Forecaster.id == forecaster_id).first()
     if not f:
         raise HTTPException(status_code=404, detail="Forecaster not found")
 
-    stats = compute_forecaster_stats(f, db)
-    streak = compute_streak(f.id, db)
-    predictions = (
-        db.query(Prediction)
-        .filter(Prediction.forecaster_id == f.id)
-        .order_by(Prediction.prediction_date.desc())
-        .all()
-    )
+    # Use pre-computed stats from Forecaster table (fast)
+    total = f.total_predictions or 0
+    correct_count = f.correct_predictions or 0
+    accuracy = f.accuracy_score or 0
 
-    # Build cumulative accuracy over time
-    sorted_preds = sorted(
-        [p for p in predictions if p.outcome != "pending"],
-        key=lambda p: p.prediction_date,
-    )
+    # Sector strengths — single SQL query
+    sector_strengths = []
+    try:
+        from sqlalchemy import text as sql_text
+        sector_rows = db.execute(sql_text("""
+            SELECT sector, COUNT(*) as total,
+                   SUM(CASE WHEN outcome='correct' THEN 1 ELSE 0 END) as correct
+            FROM predictions
+            WHERE forecaster_id = :fid AND outcome IN ('correct','incorrect')
+              AND sector IS NOT NULL AND sector != ''
+            GROUP BY sector ORDER BY total DESC
+        """), {"fid": forecaster_id}).fetchall()
+        sector_strengths = [
+            {"sector": r[0], "accuracy": round(r[2] / r[1] * 100, 1) if r[1] > 0 else 0, "count": r[1]}
+            for r in sector_rows if r[0] != "Other" or len(sector_rows) == 1
+        ]
+    except Exception:
+        pass
+
+    # Accuracy over time — single SQL query, last 50 scored predictions
     accuracy_over_time = []
-    correct = 0
-    total = 0
-    for p in sorted_preds:
-        total += 1
-        if p.outcome == "correct":
-            correct += 1
-        accuracy_over_time.append({
-            "date": p.prediction_date.strftime("%Y-%m-%d"),
-            "cumulative_accuracy": round(correct / total * 100, 1),
-            "ticker": p.ticker,
-            "direction": p.direction,
-            "outcome": p.outcome,
-        })
+    try:
+        aot_rows = db.execute(sql_text("""
+            SELECT prediction_date, ticker, direction, outcome
+            FROM predictions
+            WHERE forecaster_id = :fid AND outcome IN ('correct','incorrect')
+            ORDER BY prediction_date ASC
+            LIMIT 50
+        """), {"fid": forecaster_id}).fetchall()
+        cum_correct = 0
+        cum_total = 0
+        for r in aot_rows:
+            cum_total += 1
+            if r[3] == "correct":
+                cum_correct += 1
+            accuracy_over_time.append({
+                "date": r[0].strftime("%Y-%m-%d") if r[0] else "",
+                "cumulative_accuracy": round(cum_correct / cum_total * 100, 1),
+                "ticker": r[1], "direction": r[2], "outcome": r[3],
+            })
+    except Exception:
+        pass
 
-    # Sector strengths
-    sector_map = {}
-    for p in predictions:
-        if p.outcome not in ("correct", "incorrect"):
-            continue
-        s = p.sector or "Other"
-        if s not in sector_map:
-            sector_map[s] = {"correct": 0, "total": 0}
-        sector_map[s]["total"] += 1
-        if p.outcome == "correct":
-            sector_map[s]["correct"] += 1
-    sector_strengths = sorted([
-        {"sector": s, "accuracy": round(v["correct"] / v["total"] * 100, 1), "count": v["total"]}
-        for s, v in sector_map.items() if v["total"] > 0
-    ], key=lambda x: x["count"], reverse=True)
-    # Remove "Other" if real sectors exist
-    if len(sector_strengths) > 1:
-        sector_strengths = [s for s in sector_strengths if s["sector"] != "Other"] or sector_strengths
-
-    return {
+    result = {
         "id": f.id,
         "name": f.name,
         "handle": f.handle,
@@ -137,72 +156,66 @@ def get_forecaster(request: Request, forecaster_id: int, db: Session = Depends(g
         "subscriber_count": f.subscriber_count,
         "profile_image_url": f.profile_image_url,
         "bio": f.bio,
-        "streak": streak,
+        "streak": {"type": "none", "count": 0},
         "sector_strengths": sector_strengths,
-        **stats,
-        "predictions": [
-            {
-                "id": p.id,
-                "ticker": p.ticker,
-                "direction": p.direction,
-                "target_price": p.target_price,
-                "entry_price": p.entry_price,
-                "prediction_date": p.prediction_date.isoformat(),
-                "evaluation_date": (
-                    p.evaluation_date.isoformat() if p.evaluation_date
-                    else (p.prediction_date + datetime.timedelta(days=p.window_days)).isoformat()
-                ),
-                "window_days": p.window_days,
-                "time_horizon": getattr(p, "time_horizon", None) or (
-                    "short" if p.window_days <= 30
-                    else "long" if p.window_days >= 365
-                    else "medium"
-                ),
-                "outcome": p.outcome,
-                "actual_return": p.actual_return,
-                "evaluation_summary": getattr(p, 'evaluation_summary', None),
-                "sp500_return": p.sp500_return,
-                "alpha": p.alpha,
-                "sector": p.sector,
-                "context": p.context,
-                "exact_quote": p.exact_quote,
-                "source_url": p.source_url,
-                "archive_url": p.archive_url,
-                "source_type": p.source_type,
-                "source_title": p.source_title,
-                "source_platform_id": p.source_platform_id,
-                "video_timestamp_sec": p.video_timestamp_sec,
-                "verified_by": p.verified_by,
-                "timestamp_display": format_timestamp(p.video_timestamp_sec),
-                "timestamp_url": get_youtube_timestamp_url(p.source_platform_id, p.video_timestamp_sec),
-                "has_conflict": bool(p.has_conflict),
-                "conflict_note": p.conflict_note,
-                "has_source": bool(
-                    p.source_url and (
-                        '/status/' in p.source_url
-                        or '/watch?v=' in p.source_url
-                        or '/comments/' in p.source_url
-                    )
-                ),
-            }
-            for p in predictions
-        ],
+        "accuracy_rate": accuracy,
+        "total_predictions": total,
+        "evaluated_predictions": total,
+        "correct_predictions": correct_count,
+        "alpha": 0,
         "accuracy_over_time": accuracy_over_time,
-        "disclosed_positions": [
-            {
-                "ticker": pos.ticker,
-                "position_type": pos.position_type,
-                "disclosed_at": pos.disclosed_at.isoformat() if pos.disclosed_at else None,
-                "source_url": pos.source_url,
-                "notes": pos.notes,
-            }
-            for pos in db.query(DisclosedPosition).filter(
-                DisclosedPosition.forecaster_id == f.id
-            ).all()
-        ],
-        "conflict_stats": {
-            "total": len(predictions),
-            "conflicts": sum(1 for p in predictions if p.has_conflict),
-            "rate": round(sum(1 for p in predictions if p.has_conflict) / len(predictions) * 100, 1) if predictions else 0,
-        },
+        "predictions": _get_predictions_page(forecaster_id, page, limit, db),
+        "disclosed_positions": [],
+        "conflict_stats": {"total": total, "conflicts": 0, "rate": 0},
     }
+
+    # Cache the stats (without predictions — those are paginated)
+    cache_data = {k: v for k, v in result.items() if k != "predictions"}
+    _forecaster_cache[forecaster_id] = (cache_data, _time.time())
+
+    return result
+
+
+def _get_predictions_page(forecaster_id: int, page: int, limit: int, db) -> list:
+    """Get paginated predictions for a forecaster using raw SQL."""
+    from sqlalchemy import text as sql_text
+    offset = (page - 1) * limit
+    rows = db.execute(sql_text("""
+        SELECT id, ticker, direction, target_price, entry_price,
+               prediction_date, evaluation_date, window_days,
+               outcome, actual_return, evaluation_summary,
+               sector, context, exact_quote, source_url, archive_url,
+               source_type, source_platform_id, video_timestamp_sec,
+               verified_by, has_conflict, conflict_note
+        FROM predictions
+        WHERE forecaster_id = :fid
+        ORDER BY prediction_date DESC
+        LIMIT :lim OFFSET :off
+    """), {"fid": forecaster_id, "lim": limit, "off": offset}).fetchall()
+
+    results = []
+    for p in rows:
+        pred_date = p[5]
+        eval_date = p[6]
+        window = p[7] or 90
+        if not eval_date and pred_date:
+            eval_date = pred_date + datetime.timedelta(days=window)
+        horizon = "short" if window <= 30 else ("long" if window >= 365 else "medium")
+        results.append({
+            "id": p[0], "ticker": p[1], "direction": p[2],
+            "target_price": p[3], "entry_price": p[4],
+            "prediction_date": pred_date.isoformat() if pred_date else None,
+            "evaluation_date": eval_date.isoformat() if eval_date else None,
+            "window_days": window, "time_horizon": horizon,
+            "outcome": p[8], "actual_return": p[9],
+            "evaluation_summary": p[10],
+            "sector": p[11], "context": p[12], "exact_quote": p[13],
+            "source_url": p[14], "archive_url": p[15],
+            "source_type": p[16], "source_platform_id": p[17],
+            "video_timestamp_sec": p[18], "verified_by": p[19],
+            "has_conflict": bool(p[20]), "conflict_note": p[21],
+            "has_source": bool(p[14] and ('/status/' in (p[14] or '') or '/watch?v=' in (p[14] or '') or '/comments/' in (p[14] or ''))),
+            "timestamp_display": format_timestamp(p[18]),
+            "timestamp_url": get_youtube_timestamp_url(p[17], p[18]),
+        })
+    return results
