@@ -221,19 +221,27 @@ def evaluate_batch(max_tickers: int = 50) -> dict:
 
 def _fetch_history(ticker: str, start, end) -> dict:
     """Fetch historical prices via yfinance. Returns {date_str: close_price}."""
+    s = start.strftime("%Y-%m-%d") if hasattr(start, 'strftime') else str(start)[:10]
+    e = end.strftime("%Y-%m-%d") if hasattr(end, 'strftime') else str(end)[:10]
+
     try:
         def _f():
             import yfinance as yf
-            s = start.strftime("%Y-%m-%d") if hasattr(start, 'strftime') else str(start)[:10]
-            e = end.strftime("%Y-%m-%d") if hasattr(end, 'strftime') else str(end)[:10]
-            h = yf.Ticker(ticker).history(start=s, end=e)
+            t = yf.Ticker(ticker)
+            h = t.history(start=s, end=e)
             if h is None or h.empty:
+                print(f"[HistEval] yfinance {ticker} ({s} to {e}): EMPTY")
                 return {}
-            return {str(idx.date()): round(float(row['Close']), 2) for idx, row in h.iterrows()}
+            result = {str(idx.date()): round(float(row['Close']), 2) for idx, row in h.iterrows()}
+            return result
 
         with ThreadPoolExecutor(max_workers=1) as ex:
-            return ex.submit(_f).result(timeout=10)
-    except (FT, Exception) as e:
+            return ex.submit(_f).result(timeout=15)
+    except FT:
+        print(f"[HistEval] yfinance TIMEOUT for {ticker}")
+        return {}
+    except Exception as exc:
+        print(f"[HistEval] yfinance ERROR for {ticker}: {exc}")
         return {}
 
 

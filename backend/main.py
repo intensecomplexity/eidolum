@@ -1907,13 +1907,27 @@ def evaluate_test_one():
     eval_date = row[1]
     pred_date = row[2]
 
-    # Test yfinance
+    # Test yfinance DIRECTLY (no wrapper)
     min_d = pred_date - timedelta(days=5) if pred_date else eval_date - timedelta(days=95)
     max_d = eval_date + timedelta(days=3) if eval_date else datetime.utcnow()
-    prices = _fetch_history(ticker, min_d, max_d)
+    s = min_d.strftime("%Y-%m-%d")
+    e = max_d.strftime("%Y-%m-%d")
 
-    eval_price = _closest_price(prices, eval_date) if prices else None
-    pred_price = _closest_price(prices, pred_date) if prices else None
+    yf_error = None
+    yf_raw = None
+    try:
+        import yfinance as yf
+        t = yf.Ticker(ticker)
+        h = t.history(start=s, end=e)
+        if h is not None and not h.empty:
+            yf_raw = {str(idx.date()): round(float(row_data['Close']), 2) for idx, row_data in h.iterrows()}
+        else:
+            yf_error = f"empty dataframe, shape={h.shape if h is not None else 'None'}"
+    except Exception as exc:
+        yf_error = str(exc)
+
+    # Also try the wrapped version
+    prices = _fetch_history(ticker, min_d, max_d)
 
     sys.stdout = old_stdout
     logs = buffer.getvalue()
@@ -1925,11 +1939,11 @@ def evaluate_test_one():
         "entry_price": float(row[3]) if row[3] else None,
         "target_price": float(row[4]) if row[4] else None,
         "direction": row[5],
-        "yfinance_date_range": f"{min_d} to {max_d}",
-        "yfinance_price_count": len(prices) if prices else 0,
-        "yfinance_sample": dict(list(prices.items())[:3]) if prices else None,
-        "eval_date_price": eval_price,
-        "pred_date_price": pred_price,
+        "yfinance_date_range": f"{s} to {e}",
+        "yfinance_direct_count": len(yf_raw) if yf_raw else 0,
+        "yfinance_direct_sample": dict(list(yf_raw.items())[:3]) if yf_raw else None,
+        "yfinance_direct_error": yf_error,
+        "yfinance_wrapped_count": len(prices) if prices else 0,
         "logs": logs,
     }
     return {"status": "stopping"}
