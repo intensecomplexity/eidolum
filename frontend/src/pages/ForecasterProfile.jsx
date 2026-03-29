@@ -14,7 +14,7 @@ import NotificationBanner from '../components/NotificationBanner';
 import FollowButton from '../components/FollowButton';
 import Footer from '../components/Footer';
 import { getForecaster, getForecasterSectors, getPlatformDetail, getReportCards } from '../api';
-import { annotateContext, simpleExplainer } from '../utils/predictionExplainer';
+import { annotateContext, ExplainerLine } from '../utils/predictionExplainer';
 
 export default function ForecasterProfile() {
   const { id } = useParams();
@@ -495,11 +495,7 @@ function PredictionRow({ p, forecaster: fc }) {
             </blockquote>
 
             {/* Simple explainer */}
-            {simpleExplainer(p) && (
-              <p className="text-xs text-muted mb-3 ml-4">
-                {simpleExplainer(p)}
-              </p>
-            )}
+            <ExplainerLine prediction={p} className="mb-3 ml-4" />
 
             {/* Platform-specific proof */}
             <ProofBlock p={p} />

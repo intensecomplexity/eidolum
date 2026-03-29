@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Play, ExternalLink, X as XIcon, Search, Archive } from 'lucide-react';
 import getSourceUrl from '../utils/getSourceUrl';
-import { annotateContext, simpleExplainer } from '../utils/predictionExplainer';
+import { annotateContext, ExplainerLine } from '../utils/predictionExplainer';
 
 const SOURCE_BADGES = {
   youtube: { label: 'VIDEO', extra: null, color: 'text-positive', bg: 'bg-positive/10', border: 'border-positive/20' },
@@ -75,9 +75,7 @@ export default function EvidenceCard({ prediction: p, forecaster = null, expanda
             <p className="text-text-secondary text-xs italic leading-relaxed truncate">
               &ldquo;{annotateContext(p.exact_quote.slice(0, 100))}{p.exact_quote.length > 100 ? '...' : ''}&rdquo;
             </p>
-            {simpleExplainer(p) && (
-              <p className="text-[11px] text-muted mt-0.5">{simpleExplainer(p)}</p>
-            )}
+            <ExplainerLine prediction={p} className="mt-0.5" />
           </>
         )}
         {hasRealVideo && p.source_type === 'youtube' && (
@@ -137,9 +135,7 @@ export default function EvidenceCard({ prediction: p, forecaster = null, expanda
           {expanded && p.exact_quote.length > 10 && (
             <span className="absolute bottom-1 right-3 text-warning/30 text-3xl font-serif leading-none select-none">&rdquo;</span>
           )}
-          {simpleExplainer(p) && (
-            <p className="text-xs text-muted mt-2 pl-4 not-italic">{simpleExplainer(p)}</p>
-          )}
+          <ExplainerLine prediction={p} className="mt-2 pl-4 not-italic" />
         </div>
       )}
 

@@ -3,7 +3,7 @@ import PredictionBadge from './PredictionBadge';
 import ConflictBadge from './ConflictBadge';
 import BookmarkButton from './BookmarkButton';
 import PlatformBadge from './PlatformBadge';
-import { annotateContext, simpleExplainer } from '../utils/predictionExplainer';
+import { annotateContext, ExplainerLine } from '../utils/predictionExplainer';
 
 const HORIZON_LABELS = { short: '30d', medium: '90d', long: '1y', custom: 'Custom' };
 
@@ -166,11 +166,7 @@ export default function PredictionCard({ prediction: p, showForecaster = false, 
       )}
 
       {/* Simple explainer */}
-      {simpleExplainer(p) && (
-        <p className="text-[11px] text-muted mt-1 leading-relaxed">
-          {simpleExplainer(p)}
-        </p>
-      )}
+      <ExplainerLine prediction={p} className="mt-1" />
 
       {/* Evaluation summary */}
       {p.evaluation_summary && (

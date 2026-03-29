@@ -128,3 +128,20 @@ export function simpleExplainer(prediction) {
 
   return null;
 }
+
+/**
+ * Render the explainer with styled "In simple terms:" prefix.
+ * Returns a React element or null.
+ */
+export function ExplainerLine({ prediction, className = '' }) {
+  const text = simpleExplainer(prediction);
+  if (!text) return null;
+  // Split off the "In simple terms: " prefix
+  const prefix = 'In simple terms:';
+  const body = text.startsWith(prefix) ? text.slice(prefix.length).trim() : text;
+  return (
+    <p className={`text-sm leading-relaxed ${className}`} style={{ color: '#D4A843' }}>
+      <span className="font-medium">In simple terms:</span>{' '}{body}
+    </p>
+  );
+}
