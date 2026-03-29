@@ -66,37 +66,39 @@ export default function Expiring() {
               const livePrice = prices[p.ticker] || p.current_price;
               return (
                 <div key={p.id} className={`card ${urgent ? 'border-negative/30' : ''}`}>
-                  <div className="flex items-center justify-between">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1">
-                        <TickerLink ticker={p.ticker} className="text-sm" />
-                        <span className={p.direction === 'bullish' ? 'badge-bull' : 'badge-bear'}>{p.direction}</span>
-                      </div>
-                      <div className="flex items-center gap-1 text-xs text-muted">
-                        <span>by</span>
-                        <span className="text-text-secondary">@{p.username}</span>
-                        <TypeBadge type={p.user_type} size={12} />
-                        <span>&middot; Target: <span className="font-mono">{p.price_target}</span></span>
-                      </div>
+                  {/* Top row: ticker + direction + countdown */}
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                      <TickerLink ticker={p.ticker} className="text-sm" />
+                      <span className={p.direction === 'bullish' ? 'badge-bull' : 'badge-bear'}>{p.direction}</span>
                     </div>
-                    <div className="flex items-center gap-4 ml-4 flex-shrink-0">
-                      {p.price_at_call && livePrice && (
-                        <LivePnL
-                          direction={p.direction}
-                          priceAtCall={parseFloat(p.price_at_call)}
-                          currentPrice={livePrice}
-                        />
+                    <div className="text-right flex-shrink-0">
+                      {p.expires_at ? (
+                        <Countdown expiresAt={p.expires_at} className="text-base sm:text-lg" />
+                      ) : (
+                        <span className="font-mono text-base text-muted">?</span>
                       )}
-                      <div className="text-right">
-                        {p.expires_at ? (
-                          <Countdown expiresAt={p.expires_at} className="text-lg" />
-                        ) : (
-                          <span className="font-mono text-lg text-muted">?</span>
-                        )}
-                        <div className="text-[10px] text-muted">remaining</div>
-                      </div>
                     </div>
                   </div>
+                  {/* Meta row: user + target */}
+                  <div className="flex items-center gap-1 text-xs text-muted mb-2">
+                    <span className="text-text-secondary whitespace-nowrap">@{p.username}</span>
+                    <TypeBadge type={p.user_type} size={12} />
+                    <span className="whitespace-nowrap">&middot; Target: <span className="font-mono">{p.price_target}</span></span>
+                  </div>
+                  {/* Price row: entry + current + PnL */}
+                  {p.price_at_call && livePrice && (
+                    <div className="flex items-center gap-3 text-xs font-mono">
+                      <span className="text-muted whitespace-nowrap">Entry: ${parseFloat(p.price_at_call).toFixed(2)}</span>
+                      <span className="whitespace-nowrap">Now: ${livePrice.toFixed(2)}</span>
+                      <LivePnL
+                        direction={p.direction}
+                        priceAtCall={parseFloat(p.price_at_call)}
+                        currentPrice={livePrice}
+                        compact
+                      />
+                    </div>
+                  )}
                   <ReactionBar predictionId={p.id} source="user" outcome={p.outcome} />
                   <CommentSection predictionId={p.id} source="user" />
                 </div>
