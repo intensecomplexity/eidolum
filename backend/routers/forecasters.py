@@ -86,14 +86,16 @@ def get_forecaster(
     page: int = Query(1, ge=1),
     limit: int = Query(20, ge=1, le=100),
     filter: str = Query(None),  # all, evaluated, pending, correct, incorrect
+    sector: str = Query(None),  # filter by sector name
     db: Session = Depends(get_db),
 ):
     # Check cache for base stats (sector_strengths always computed fresh)
     cached = _forecaster_cache.get(forecaster_id)
     if cached and (_time.time() - cached[1]) < FORECASTER_CACHE_TTL:
         result = dict(cached[0])
-        result["predictions"] = _get_predictions_page(forecaster_id, page, limit, filter, db)
+        result["predictions"] = _get_predictions_page(forecaster_id, page, limit, filter, sector, db)
         result["sector_strengths"] = _get_sector_strengths(forecaster_id, db)
+        result["prediction_counts"] = _get_prediction_counts(forecaster_id, db, sector)
         return result
 
     f = db.query(Forecaster).filter(Forecaster.id == forecaster_id).first()
@@ -148,8 +150,8 @@ def get_forecaster(
         "correct_predictions": correct_count,
         "alpha": float(f.alpha or 0),
         "accuracy_over_time": accuracy_over_time,
-        "prediction_counts": _get_prediction_counts(forecaster_id, db),
-        "predictions": _get_predictions_page(forecaster_id, page, limit, filter, db),
+        "prediction_counts": _get_prediction_counts(forecaster_id, db, sector),
+        "predictions": _get_predictions_page(forecaster_id, page, limit, filter, sector, db),
         "disclosed_positions": [],
         "conflict_stats": {"total": total, "conflicts": 0, "rate": 0},
     }
@@ -183,14 +185,18 @@ def _get_sector_strengths(forecaster_id: int, db) -> list:
         return []
 
 
-def _get_prediction_counts(forecaster_id: int, db) -> dict:
+def _get_prediction_counts(forecaster_id: int, db, sector: str = None) -> dict:
     """Get prediction counts by outcome for filter tabs."""
     from sqlalchemy import text as sql_text
     try:
-        rows = db.execute(sql_text("""
+        sector_filter = "AND sector = :sec" if sector else ""
+        params = {"fid": forecaster_id}
+        if sector:
+            params["sec"] = sector
+        rows = db.execute(sql_text(f"""
             SELECT outcome, COUNT(*) FROM predictions
-            WHERE forecaster_id = :fid GROUP BY outcome
-        """), {"fid": forecaster_id}).fetchall()
+            WHERE forecaster_id = :fid {sector_filter} GROUP BY outcome
+        """), params).fetchall()
         counts = {r[0]: r[1] for r in rows}
         return {
             "all": sum(counts.values()),
@@ -203,21 +209,25 @@ def _get_prediction_counts(forecaster_id: int, db) -> dict:
         return {"all": 0, "evaluated": 0, "pending": 0, "correct": 0, "incorrect": 0}
 
 
-def _get_predictions_page(forecaster_id: int, page: int, limit: int, filter_type: str, db) -> list:
-    """Get paginated predictions with filter and smart sort."""
+def _get_predictions_page(forecaster_id: int, page: int, limit: int, filter_type: str, sector: str, db) -> list:
+    """Get paginated predictions with filter, sector, and smart sort."""
     from sqlalchemy import text as sql_text
     offset = (page - 1) * limit
 
     # Build WHERE clause based on filter
     where_extra = ""
+    params = {"fid": forecaster_id, "lim": limit, "off": offset}
     if filter_type == "evaluated":
-        where_extra = "AND outcome IN ('correct','incorrect')"
+        where_extra += " AND outcome IN ('correct','incorrect')"
     elif filter_type == "pending":
-        where_extra = "AND outcome = 'pending'"
+        where_extra += " AND outcome = 'pending'"
     elif filter_type == "correct":
-        where_extra = "AND outcome = 'correct'"
+        where_extra += " AND outcome = 'correct'"
     elif filter_type == "incorrect":
-        where_extra = "AND outcome = 'incorrect'"
+        where_extra += " AND outcome = 'incorrect'"
+    if sector:
+        where_extra += " AND sector = :sec"
+        params["sec"] = sector
 
     # Sort: evaluated first (by eval date DESC), then pending (by eval date ASC)
     order = """
@@ -237,7 +247,7 @@ def _get_predictions_page(forecaster_id: int, page: int, limit: int, filter_type
         WHERE forecaster_id = :fid {where_extra}
         ORDER BY {order}
         LIMIT :lim OFFSET :off
-    """), {"fid": forecaster_id, "lim": limit, "off": offset}).fetchall()
+    """), params).fetchall()
 
     results = []
     for p in rows:
