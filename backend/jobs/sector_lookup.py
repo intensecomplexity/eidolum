@@ -139,7 +139,7 @@ def _cache_to_db(ticker: str, sector: str, db=None):
             pass
 
 
-def backfill_sectors_batch(max_tickers: int = 50) -> dict:
+def backfill_sectors_batch(max_tickers: int = 200) -> dict:
     """Look up and set sectors for predictions missing sector data."""
     from database import SessionLocal
 
@@ -159,7 +159,7 @@ def backfill_sectors_batch(max_tickers: int = 50) -> dict:
     tickers = [r[0] for r in rows]
     updated = 0
 
-    for ticker in tickers:
+    for i, ticker in enumerate(tickers):
         db = SessionLocal()
         try:
             sector = get_sector(ticker, db)
@@ -173,6 +173,7 @@ def backfill_sectors_batch(max_tickers: int = 50) -> dict:
             db.rollback()
         finally:
             db.close()
-        time.sleep(0.3)
+        if (i + 1) % 20 == 0:
+            time.sleep(0.5)  # Brief pause every 20 tickers
 
     return {"tickers_processed": len(tickers), "updated": updated, "remaining": "check again"}

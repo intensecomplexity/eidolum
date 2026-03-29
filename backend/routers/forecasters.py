@@ -87,12 +87,12 @@ def get_forecaster(
     limit: int = Query(20, ge=1, le=100),
     db: Session = Depends(get_db),
 ):
-    # Check cache for stats (not predictions — those are paginated)
+    # Check cache for base stats (sector_strengths always computed fresh)
     cached = _forecaster_cache.get(forecaster_id)
     if cached and (_time.time() - cached[1]) < FORECASTER_CACHE_TTL:
         result = dict(cached[0])
-        # Paginate predictions fresh
         result["predictions"] = _get_predictions_page(forecaster_id, page, limit, db)
+        result["sector_strengths"] = _get_sector_strengths(forecaster_id, db)
         return result
 
     f = db.query(Forecaster).filter(Forecaster.id == forecaster_id).first()
@@ -104,24 +104,7 @@ def get_forecaster(
     correct_count = f.correct_predictions or 0
     accuracy = f.accuracy_score or 0
 
-    # Sector strengths — single SQL query
-    sector_strengths = []
-    try:
-        from sqlalchemy import text as sql_text
-        sector_rows = db.execute(sql_text("""
-            SELECT sector, COUNT(*) as total,
-                   SUM(CASE WHEN outcome='correct' THEN 1 ELSE 0 END) as correct
-            FROM predictions
-            WHERE forecaster_id = :fid AND outcome IN ('correct','incorrect')
-              AND sector IS NOT NULL AND sector != ''
-            GROUP BY sector ORDER BY total DESC
-        """), {"fid": forecaster_id}).fetchall()
-        sector_strengths = [
-            {"sector": r[0], "accuracy": round(r[2] / r[1] * 100, 1) if r[1] > 0 else 0, "count": r[1]}
-            for r in sector_rows if r[0] != "Other" or len(sector_rows) == 1
-        ]
-    except Exception:
-        pass
+    sector_strengths = _get_sector_strengths(forecaster_id, db)
 
     # Accuracy over time — single SQL query, last 50 scored predictions
     accuracy_over_time = []
@@ -174,6 +157,28 @@ def get_forecaster(
     _forecaster_cache[forecaster_id] = (cache_data, _time.time())
 
     return result
+
+
+def _get_sector_strengths(forecaster_id: int, db) -> list:
+    """Compute sector accuracy breakdown for a forecaster."""
+    try:
+        from sqlalchemy import text as sql_text
+        rows = db.execute(sql_text("""
+            SELECT sector, COUNT(*) as total,
+                   SUM(CASE WHEN outcome='correct' THEN 1 ELSE 0 END) as correct
+            FROM predictions
+            WHERE forecaster_id = :fid AND outcome IN ('correct','incorrect')
+              AND sector IS NOT NULL AND sector != ''
+            GROUP BY sector ORDER BY total DESC
+        """), {"fid": forecaster_id}).fetchall()
+        result = [
+            {"sector": r[0], "accuracy": round(r[2] / r[1] * 100, 1) if r[1] > 0 else 0, "count": r[1]}
+            for r in rows if r[0] != "Other" or len(rows) == 1
+        ]
+        return result
+    except Exception as e:
+        print(f"[ForecasterDetail] Sector query error: {e}")
+        return []
 
 
 def _get_predictions_page(forecaster_id: int, page: int, limit: int, db) -> list:
