@@ -137,27 +137,23 @@ export default function PredictionCard({ prediction: p, showForecaster = false, 
         </Link>
       )}
 
-      {/* Price + return row */}
-      <div className="flex items-center justify-between text-sm mb-1">
-        <span className="text-muted font-mono text-xs">
-          {formatDate(p.prediction_date)}
+      {/* Price + return data */}
+      <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-xs font-mono mb-1">
+        <span className="text-muted">{formatDate(p.prediction_date)}</span>
+        <span className="text-right">
+          {p.actual_return !== null && p.actual_return !== undefined ? (
+            <span className={`font-semibold ${p.actual_return >= 0 ? 'text-positive' : 'text-negative'}`}>
+              {p.actual_return >= 0 ? '+' : ''}{p.actual_return.toFixed(1)}%
+            </span>
+          ) : (
+            <span className="text-muted">Pending</span>
+          )}
         </span>
         {p.entry_price != null && (
-          <span className="text-text-secondary font-mono text-xs">
-            Entry ${p.entry_price.toFixed(2)}
-          </span>
+          <span className="text-text-secondary whitespace-nowrap">Entry ${p.entry_price.toFixed(2)}</span>
         )}
         {p.target_price != null && (
-          <span className="text-text-secondary font-mono text-xs">
-            Target ${p.target_price.toFixed(0)}
-          </span>
-        )}
-        {p.actual_return !== null && p.actual_return !== undefined ? (
-          <span className={`font-mono text-sm font-semibold ${p.actual_return >= 0 ? 'text-positive' : 'text-negative'}`}>
-            {p.actual_return >= 0 ? '+' : ''}{p.actual_return.toFixed(1)}%
-          </span>
-        ) : (
-          <span className="text-muted text-xs">Pending</span>
+          <span className="text-text-secondary text-right whitespace-nowrap">Target ${p.target_price.toFixed(0)}</span>
         )}
       </div>
 
