@@ -1202,6 +1202,7 @@ async def lifespan(app):
                 "ALTER TABLE users ADD COLUMN linkedin_url VARCHAR(255)",
                 "ALTER TABLE users ADD COLUMN youtube_url VARCHAR(255)",
                 "ALTER TABLE users ADD COLUMN website_url VARCHAR(255)",
+                "ALTER TABLE predictions ADD COLUMN call_type VARCHAR(50)",
             ]:
                 try:
                     db.execute(_t(col_sql))
@@ -1237,6 +1238,33 @@ async def lifespan(app):
             db.close()
         except Exception as e:
             print(f"[Startup] Daily challenge error: {e}")
+
+        # Backfill call_type for existing predictions
+        try:
+            db = BgSessionLocal()
+            updated = db.execute(_t("""
+                UPDATE predictions SET call_type = CASE
+                    WHEN context ILIKE '%upgrade%' THEN 'upgrade'
+                    WHEN context ILIKE '%downgrade%' THEN 'downgrade'
+                    WHEN context ILIKE '%initiat%coverage%' THEN 'new_coverage'
+                    WHEN target_price IS NOT NULL THEN 'price_target'
+                    ELSE 'rating'
+                END
+                WHERE call_type IS NULL AND outcome != 'pending_review'
+            """)).rowcount
+            db.commit()
+            if updated:
+                print(f"[Startup] Backfilled call_type for {updated} predictions")
+            db.close()
+        except Exception as e:
+            print(f"[Startup] call_type backfill error: {e}")
+
+        # Auto-resume Benzinga backfill if not caught up
+        try:
+            from jobs.benzinga_backfill import auto_resume_backfill
+            auto_resume_backfill()
+        except Exception as e:
+            print(f"[Startup] Backfill auto-resume error: {e}")
 
         print("[Startup] All background DB init complete")
 
@@ -1361,7 +1389,7 @@ async def lifespan(app):
         if scored > 0:
             refresh_all_forecaster_stats()
     run_auto_evaluate = _guarded_job("auto_evaluate", _auto_evaluate)
-    scheduler.add_job(run_auto_evaluate, "interval", hours=4, id="auto_evaluate", next_run_time=datetime.utcnow() + timedelta(minutes=10))
+    scheduler.add_job(run_auto_evaluate, "interval", hours=1, id="auto_evaluate", next_run_time=datetime.utcnow() + timedelta(minutes=10))
 
     # Auto-refresh forecaster stats
     def _refresh_stats(db):
@@ -1681,6 +1709,50 @@ def run_massive_benzinga_now():
         db.close()
 
 
+@app.get("/api/admin/scraper-health")
+def scraper_health():
+    """Health check for all background jobs."""
+    from admin_panel import scheduler_last_run
+    from jobs.benzinga_backfill import get_backfill_status
+    from jobs.historical_evaluator import get_eval_status
+
+    db = BgSessionLocal()
+    try:
+        pending_overdue = db.execute(sql_text(
+            "SELECT COUNT(*) FROM predictions WHERE outcome = 'pending' AND evaluation_date IS NOT NULL AND evaluation_date < NOW()"
+        )).scalar() or 0
+        total_scored = db.execute(sql_text(
+            "SELECT COUNT(*) FROM predictions WHERE outcome IN ('correct','incorrect')"
+        )).scalar() or 0
+    finally:
+        db.close()
+
+    bf = get_backfill_status()
+    ev = get_eval_status()
+
+    return {
+        "backfill": {
+            "running": bf.get("running", False),
+            "last_date": bf.get("current_date"),
+            "days_completed": bf.get("days_completed", 0),
+            "predictions_inserted": bf.get("predictions_inserted", 0),
+            "last_error": bf.get("last_error"),
+        },
+        "scraper": {
+            "massive_benzinga_last_run": scheduler_last_run.get("massive_benzinga", "").isoformat() if scheduler_last_run.get("massive_benzinga") else None,
+            "benzinga_api_last_run": scheduler_last_run.get("benzinga_api", "").isoformat() if scheduler_last_run.get("benzinga_api") else None,
+            "fmp_upgrades_last_run": scheduler_last_run.get("fmp_upgrades", "").isoformat() if scheduler_last_run.get("fmp_upgrades") else None,
+        },
+        "evaluator": {
+            "running": ev.get("running", False),
+            "predictions_scored": ev.get("predictions_scored", 0),
+            "pending_overdue": pending_overdue,
+            "total_scored": total_scored,
+            "last_run": scheduler_last_run.get("auto_evaluate", "").isoformat() if scheduler_last_run.get("auto_evaluate") else None,
+        },
+    }
+
+
 @app.post("/api/admin/backfill-benzinga")
 def start_backfill():
     """Start the day-by-day historical backfill as a background task."""
@@ -1691,17 +1763,7 @@ def start_backfill():
     if status["running"]:
         return {"status": "already_running", **status}
 
-    def _run():
-        db = BgSessionLocal()
-        try:
-            run_backfill(db)
-        except Exception as e:
-            print(f"[Backfill] Thread error: {e}")
-        finally:
-            db.close()
-
-    thread = threading.Thread(target=_run, daemon=True)
-    thread.start()
+    threading.Thread(target=run_backfill, daemon=True).start()
     return {"status": "started", "start_date": "2024-03-29", "end_date": str(date.today())}
 
 

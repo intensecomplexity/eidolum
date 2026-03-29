@@ -1,14 +1,12 @@
 """
 Benzinga historical backfill — crawls day by day from 2 years ago to today.
 Stores progress in the config table so it resumes after restart.
-Evaluates expired predictions using yfinance historical prices.
+Connection-safe: opens/closes DB per batch, never holds connections during API calls.
 """
 import os
 import time
 import httpx
 from datetime import datetime, timedelta, date
-from decimal import Decimal
-from sqlalchemy.orm import Session
 from sqlalchemy import text as sql_text
 from models import Prediction, Forecaster, Config
 from jobs.prediction_validator import (
@@ -36,7 +34,6 @@ _backfill_status = {
     "days_completed": 0,
     "total_days": 0,
     "predictions_inserted": 0,
-    "predictions_evaluated": 0,
     "last_error": None,
 }
 
@@ -50,14 +47,10 @@ def stop_backfill():
     _backfill_stop = True
 
 
-def run_backfill(db: Session, start_date: date = None, end_date: date = None):
-    """Day-by-day backfill from start_date to end_date.
-    TEMPORARILY DISABLED — was causing DB connection exhaustion.
-    Re-enable after adding connection pooling and proper timeouts."""
-    print("[Backfill] DISABLED — use scheduled massive_benzinga scraper instead")
-    return
-
+def run_backfill(start_date: date = None, end_date: date = None):
+    """Day-by-day backfill. Connection-safe: opens/closes DB per batch of 30 days."""
     global _backfill_running, _backfill_stop, _backfill_status
+    from database import BgSessionLocal
 
     if _backfill_running:
         print("[Backfill] Already running")
@@ -75,29 +68,37 @@ def run_backfill(db: Session, start_date: date = None, end_date: date = None):
         end_date = date.today()
 
     # Check for resume point
-    resume = db.query(Config).filter(Config.key == "backfill_last_date").first()
-    if resume and resume.value:
-        try:
-            resumed_date = datetime.strptime(resume.value, "%Y-%m-%d").date()
-            if resumed_date > start_date:
-                start_date = resumed_date + timedelta(days=1)
-                print(f"[Backfill] Resuming from {start_date}")
-        except Exception:
-            pass
+    db = BgSessionLocal()
+    try:
+        resume = db.query(Config).filter(Config.key == "backfill_last_date").first()
+        if resume and resume.value:
+            try:
+                resumed_date = datetime.strptime(resume.value, "%Y-%m-%d").date()
+                if resumed_date > start_date:
+                    start_date = resumed_date + timedelta(days=1)
+                    print(f"[Backfill] Resuming from {start_date}")
+            except Exception:
+                pass
+    finally:
+        db.close()
 
     total_days = (end_date - start_date).days + 1
+    if total_days <= 0:
+        print(f"[Backfill] Already caught up (last={start_date - timedelta(days=1)}, today={end_date})")
+        _backfill_running = False
+        return
+
     _backfill_status.update({
         "running": True, "current_date": str(start_date),
         "days_completed": 0, "total_days": total_days,
-        "predictions_inserted": 0, "predictions_evaluated": 0, "last_error": None,
+        "predictions_inserted": 0, "last_error": None,
     })
 
-    print(f"[Backfill] Starting: {start_date} → {end_date} ({total_days} days)")
+    print(f"[Backfill] Starting: {start_date} -> {end_date} ({total_days} days)")
     total_inserted = 0
-    total_evaluated = 0
-
-    current = start_date
     days_done = 0
+    current = start_date
+    batch_days = 0
 
     try:
         while current <= end_date:
@@ -108,38 +109,74 @@ def run_backfill(db: Session, start_date: date = None, end_date: date = None):
             day_str = current.strftime("%Y-%m-%d")
             _backfill_status["current_date"] = day_str
 
-            inserted, fetched = _process_day(day_str, db)
-            total_inserted += inserted
+            # Open a fresh DB connection per day
+            db = BgSessionLocal()
+            try:
+                inserted, fetched = _process_day(day_str, db)
+                total_inserted += inserted
 
-            # Skip evaluation during backfill — do it separately after backfill completes
-            evaluated = 0
+                if inserted > 0 or fetched > 0:
+                    print(f"[Backfill] {day_str}: fetched={fetched} inserted={inserted}")
 
-            if inserted > 0 or fetched > 0:
-                print(f"[Backfill] {day_str}: fetched={fetched} inserted={inserted} evaluated={evaluated}")
-
-            # Save progress
-            _save_progress(db, day_str)
+                # Save progress
+                _save_progress(db, day_str)
+            except Exception as e:
+                _backfill_status["last_error"] = f"{day_str}: {e}"
+                print(f"[Backfill] Error on {day_str}: {e}")
+                # Don't stop, skip this day and continue
+            finally:
+                db.close()
 
             days_done += 1
+            batch_days += 1
             _backfill_status["days_completed"] = days_done
             _backfill_status["predictions_inserted"] = total_inserted
-            _backfill_status["predictions_evaluated"] = total_evaluated
 
             current += timedelta(days=1)
-            time.sleep(0.5)  # Be nice to the API
+
+            # Pause between days (0.5s) and longer pause every 30 days
+            time.sleep(0.5)
+            if batch_days >= 30:
+                print(f"[Backfill] Batch of 30 days complete. {days_done}/{total_days} done, {total_inserted} inserted. Pausing 10s.")
+                time.sleep(10)
+                batch_days = 0
 
     except Exception as e:
         _backfill_status["last_error"] = str(e)
-        print(f"[Backfill] Error at {current}: {e}")
+        print(f"[Backfill] Fatal error at {current}: {e}")
         import traceback
         traceback.print_exc()
     finally:
         _backfill_running = False
         _backfill_status["running"] = False
-        print(f"[Backfill] Complete: {days_done} days, {total_inserted} inserted, {total_evaluated} evaluated")
+        print(f"[Backfill] Complete: {days_done} days, {total_inserted} inserted")
 
 
-def _process_day(day_str: str, db: Session) -> tuple[int, int]:
+def auto_resume_backfill():
+    """Called on startup. If backfill isn't caught up to today, resume in background."""
+    import threading
+    if not MASSIVE_KEY:
+        return
+
+    from database import BgSessionLocal
+    db = BgSessionLocal()
+    try:
+        resume = db.query(Config).filter(Config.key == "backfill_last_date").first()
+        if resume and resume.value:
+            last = datetime.strptime(resume.value, "%Y-%m-%d").date()
+            if last >= date.today() - timedelta(days=1):
+                print(f"[Backfill] Already caught up (last={last})")
+                return
+            print(f"[Backfill] Auto-resuming from {last + timedelta(days=1)}")
+        else:
+            print("[Backfill] No previous progress, starting fresh")
+    finally:
+        db.close()
+
+    threading.Thread(target=run_backfill, daemon=True).start()
+
+
+def _process_day(day_str: str, db) -> tuple:
     """Fetch and insert all ratings for a single day. Returns (inserted, fetched)."""
     inserted = 0
     fetched = 0
@@ -166,7 +203,8 @@ def _process_day(day_str: str, db: Session) -> tuple[int, int]:
             if r.status_code != 200:
                 break
             data = r.json()
-        except Exception:
+        except Exception as e:
+            print(f"[Backfill] API error for {day_str} page {page}: {e}")
             break
 
         if isinstance(data, list):
@@ -189,8 +227,12 @@ def _process_day(day_str: str, db: Session) -> tuple[int, int]:
         fetched += len(ratings)
 
         for rating in ratings:
-            if _insert_rating(rating, db):
-                inserted += 1
+            try:
+                if _insert_rating(rating, db):
+                    inserted += 1
+            except Exception as e:
+                # Log and skip individual rating errors
+                continue
 
         if not next_url or page >= 10:
             break
@@ -201,7 +243,7 @@ def _process_day(day_str: str, db: Session) -> tuple[int, int]:
     return inserted, fetched
 
 
-def _insert_rating(rating: dict, db: Session) -> bool:
+def _insert_rating(rating: dict, db) -> bool:
     """Validate and insert a single rating. Returns True if inserted."""
     ticker = (rating.get("ticker") or "").strip().upper()
     firm = (rating.get("analyst") or rating.get("firm") or rating.get("analyst_firm") or "").strip()
@@ -218,7 +260,6 @@ def _insert_rating(rating: dict, db: Session) -> bool:
     if len(firm) > 50:
         return False
 
-    # Layer 1: external_id dedup
     if benzinga_id:
         ext_id = f"bz_{benzinga_id}"
         if db.execute(sql_text("SELECT 1 FROM predictions WHERE external_id = :eid LIMIT 1"), {"eid": ext_id}).first():
@@ -231,6 +272,9 @@ def _insert_rating(rating: dict, db: Session) -> bool:
     direction = _get_direction(action_lower, rating_current.lower(), pt_current, pt_prior)
     if not direction:
         return False
+
+    # Derive call_type from action
+    call_type = _get_call_type(action_lower, rating_current.lower(), pt_current)
 
     canonical = resolve_forecaster_alias(firm)
     if _is_self_analysis(canonical, ticker):
@@ -245,7 +289,6 @@ def _insert_rating(rating: dict, db: Session) -> bool:
     except Exception:
         return False
 
-    # Layer 3: cross-scraper dedup
     if prediction_exists_cross_scraper(ticker, forecaster.id, direction, pred_date, db):
         return False
 
@@ -275,7 +318,7 @@ def _insert_rating(rating: dict, db: Session) -> bool:
     if not is_valid:
         return False
 
-    pred = Prediction(
+    db.add(Prediction(
         forecaster_id=forecaster.id, ticker=ticker, direction=direction,
         prediction_date=pred_date,
         evaluation_date=pred_date + timedelta(days=window_days),
@@ -286,8 +329,8 @@ def _insert_rating(rating: dict, db: Session) -> bool:
         sector=_get_sector_safe(ticker, db),
         context=context[:500], exact_quote=context,
         outcome="pending", verified_by="massive_benzinga",
-    )
-    db.add(pred)
+        call_type=call_type,
+    ))
     return True
 
 
@@ -297,85 +340,6 @@ def _get_sector_safe(ticker, db):
         return get_sector(ticker, db)
     except Exception:
         return "Other"
-
-
-def _evaluate_day(day_str: str, db: Session) -> int:
-    """Evaluate predictions from this day whose window has already passed."""
-    now = datetime.utcnow()
-    preds = db.query(Prediction).filter(
-        Prediction.outcome == "pending",
-        Prediction.verified_by == "massive_benzinga",
-        Prediction.evaluation_date.isnot(None),
-        Prediction.evaluation_date <= now,
-        Prediction.prediction_date >= datetime.strptime(day_str, "%Y-%m-%d"),
-        Prediction.prediction_date < datetime.strptime(day_str, "%Y-%m-%d") + timedelta(days=1),
-    ).all()
-
-    if not preds:
-        return 0
-
-    evaluated = 0
-    for i, p in enumerate(preds):
-        try:
-            price = _get_historical_price(p.ticker, p.evaluation_date)
-            if price is None:
-                continue
-
-            entry = p.entry_price or p.target_price
-            if not entry:
-                continue
-
-            if p.direction == "bullish":
-                outcome = "correct" if price > entry else "incorrect"
-            else:
-                outcome = "correct" if price < entry else "incorrect"
-
-            p.outcome = outcome
-            p.evaluated_at = now
-            p.actual_return = round((price - entry) / entry * 100, 2) if entry else None
-            evaluated += 1
-
-        except Exception:
-            continue
-
-        # Batch: commit + sleep every 50
-        if (i + 1) % 50 == 0:
-            db.commit()
-            time.sleep(1)
-
-    db.commit()
-    return evaluated
-
-
-_hist_cache: dict[str, dict] = {}
-
-
-def _get_historical_price(ticker: str, eval_date) -> float | None:
-    """Get closing price at evaluation date using yfinance."""
-    cache_key = f"{ticker}_{eval_date.strftime('%Y-%m-%d')}"
-    if cache_key in _hist_cache:
-        return _hist_cache[cache_key]
-
-    try:
-        import yfinance as yf
-        from concurrent.futures import ThreadPoolExecutor, TimeoutError as FT
-        def _fetch():
-            t = yf.Ticker(ticker)
-            start = (eval_date - timedelta(days=5)).strftime("%Y-%m-%d")
-            end = (eval_date + timedelta(days=1)).strftime("%Y-%m-%d")
-            h = t.history(start=start, end=end)
-            if h is not None and not h.empty:
-                return round(float(h['Close'].iloc[-1]), 2)
-            return None
-
-        with ThreadPoolExecutor(max_workers=1) as ex:
-            result = ex.submit(_fetch).result(timeout=10)
-
-        if result:
-            _hist_cache[cache_key] = result
-        return result
-    except Exception:
-        return None
 
 
 def _get_direction(action_lower, rating_lower, pt_current, pt_prior):
@@ -398,7 +362,20 @@ def _get_direction(action_lower, rating_lower, pt_current, pt_prior):
     return None
 
 
-def _save_progress(db: Session, day_str: str):
+def _get_call_type(action_lower: str, rating_lower: str, pt_current) -> str:
+    """Derive call_type from action and rating."""
+    if "upgrade" in action_lower:
+        return "upgrade"
+    if "downgrade" in action_lower:
+        return "downgrade"
+    if "initiate" in action_lower:
+        return "new_coverage"
+    if pt_current and str(pt_current).strip():
+        return "price_target"
+    return "rating"
+
+
+def _save_progress(db, day_str: str):
     row = db.query(Config).filter(Config.key == "backfill_last_date").first()
     if row:
         row.value = day_str

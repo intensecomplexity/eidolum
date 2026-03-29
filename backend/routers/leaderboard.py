@@ -317,6 +317,104 @@ def _week_leaderboard_impl(db: Session) -> dict:
     return {"scored_this_week": scored_lb, "new_calls_this_week": new_calls[:100]}
 
 
+# ── Filtered leaderboard cache: key = frozenset of params ─────────────────────
+_filtered_cache: dict[str, tuple] = {}  # cache_key -> (results, timestamp)
+FILTERED_CACHE_TTL = 600
+
+CALL_TYPE_MAP = {
+    "upgrades": "upgrade",
+    "downgrades": "downgrade",
+    "new_coverage": "new_coverage",
+    "price_targets": "price_target",
+    "bullish": None,  # filter by direction instead
+    "bearish": None,
+}
+
+
+def _build_filtered_leaderboard(db: Session, sector=None, call_type=None, sort="accuracy",
+                                 limit=100, min_predictions=10, direction=None) -> list:
+    """SQL-based filtered leaderboard. Returns ranked list."""
+    where_clauses = ["p.outcome IN ('correct','incorrect')"]
+    params = {}
+
+    if sector:
+        where_clauses.append("p.sector = :sector")
+        params["sector"] = sector
+    if call_type and call_type in CALL_TYPE_MAP:
+        ct_val = CALL_TYPE_MAP[call_type]
+        if ct_val:
+            where_clauses.append("p.call_type = :call_type")
+            params["call_type"] = ct_val
+        elif call_type == "bullish":
+            where_clauses.append("p.direction = 'bullish'")
+        elif call_type == "bearish":
+            where_clauses.append("p.direction = 'bearish'")
+    if direction and direction != "All":
+        where_clauses.append("p.direction = :direction")
+        params["direction"] = direction
+
+    where_sql = " AND ".join(where_clauses)
+    params["min_preds"] = min_predictions
+    params["lim"] = min(limit, 100)
+
+    # Sort order
+    if sort == "volume":
+        order_sql = "total DESC, accuracy DESC"
+    elif sort == "alpha":
+        order_sql = "avg_alpha DESC NULLS LAST, accuracy DESC"
+    elif sort == "recent":
+        where_clauses.append("COALESCE(p.evaluated_at, p.evaluation_date) >= NOW() - INTERVAL '30 days'")
+        where_sql = " AND ".join(where_clauses)
+        order_sql = "accuracy DESC, total DESC"
+        params["min_preds"] = max(min_predictions // 2, 1)  # lower threshold for recent
+    else:
+        order_sql = "accuracy DESC, total DESC"
+
+    rows = db.execute(sql_text(f"""
+        SELECT f.id, f.name, f.handle, f.platform, f.channel_url,
+               f.profile_image_url, f.streak, f.firm,
+               COUNT(*) as total,
+               SUM(CASE WHEN p.outcome = 'correct' THEN 1 ELSE 0 END) as correct,
+               ROUND(SUM(CASE WHEN p.outcome='correct' THEN 1 ELSE 0 END)::numeric
+                     / NULLIF(COUNT(*), 0) * 100, 1) as accuracy,
+               COALESCE(AVG(p.alpha), 0) as avg_alpha,
+               COALESCE(AVG(p.actual_return), 0) as avg_return
+        FROM predictions p
+        JOIN forecasters f ON f.id = p.forecaster_id
+        WHERE {where_sql}
+        GROUP BY f.id, f.name, f.handle, f.platform, f.channel_url,
+                 f.profile_image_url, f.streak, f.firm
+        HAVING COUNT(*) >= :min_preds
+        ORDER BY {order_sql}
+        LIMIT :lim
+    """), params).fetchall()
+
+    results = []
+    for i, r in enumerate(rows):
+        streak_val = r[6] or 0
+        results.append({
+            "id": r[0], "name": r[1], "handle": r[2],
+            "platform": r[3] or "youtube", "channel_url": r[4],
+            "profile_image_url": r[5],
+            "streak": {"type": "winning" if streak_val > 0 else "losing" if streak_val < 0 else "none", "count": abs(streak_val)},
+            "firm": r[7],
+            "accuracy_rate": float(r[10] or 0),
+            "total_predictions": r[8] or 0,
+            "evaluated_predictions": r[8] or 0,
+            "correct_predictions": r[9] or 0,
+            "scored_count": r[8] or 0,
+            "alpha": round(float(r[11] or 0), 2),
+            "avg_return": round(float(r[12] or 0), 2),
+            "rank": i + 1,
+            "rank_movement": {"direction": "none", "change": 0},
+            "has_disclosed_positions": False,
+            "conflict_count": 0, "conflict_rate": 0,
+            "verified_predictions": 0,
+            "sector_strengths": [],
+        })
+    return results
+
+
 @router.get("/leaderboard")
 @limiter.limit("60/minute")
 def get_leaderboard(
@@ -327,39 +425,31 @@ def get_leaderboard(
     direction: str = Query(None),
     tab: str = Query(None),
     filter: str = Query(None),
+    call_type: str = Query(None),
+    sort: str = Query(None),
+    limit: int = Query(100, ge=1, le=100),
+    min_predictions: int = Query(None),
 ):
     global _leaderboard_cache, _cache_time
 
-    # "This Week" tab: predictions EVALUATED in the last 7 days
+    # "This Week" tab
     if tab == "week":
         return _week_leaderboard(db)
 
-    # For filtered views (sector, direction), compute on demand
-    if sector or direction:
-        from utils import compute_forecaster_stats
-        forecasters = db.query(Forecaster).filter(Forecaster.total_predictions >= 10).all()
-        results = []
-        for f in forecasters:
-            stats = compute_forecaster_stats(f, db, sector=sector, period_days=period_days, direction=direction)
-            min_evaluated = 3 if sector else 10
-            if stats.get("evaluated_predictions", 0) < min_evaluated:
-                continue
-            results.append({
-                "id": f.id, "name": f.name, "handle": f.handle,
-                "platform": f.platform or "youtube", "channel_url": f.channel_url,
-                "subscriber_count": f.subscriber_count, "profile_image_url": f.profile_image_url,
-                "streak": {"type": "none", "count": 0},
-                "rank_movement": {"direction": "none", "change": 0},
-                "has_disclosed_positions": False,
-                "conflict_count": 0, "conflict_rate": 0, "verified_predictions": 0,
-                "sector_strengths": [],
-                **stats,
-            })
-        results.sort(key=lambda x: (x["accuracy_rate"], x.get("alpha", 0)), reverse=True)
-        results = results[:100]
-        for i, r in enumerate(results):
-            r["rank"] = i + 1
-            r["scored_count"] = r.get("evaluated_predictions", 0)
+    # Any filter/sort beyond default -> use SQL-based filtered leaderboard
+    has_filter = sector or call_type or direction or (sort and sort != "accuracy")
+    if has_filter:
+        cache_key = f"{sector}|{call_type}|{sort}|{limit}|{min_predictions}|{direction}"
+        cached = _filtered_cache.get(cache_key)
+        if cached and (_time.time() - cached[1]) < FILTERED_CACHE_TTL:
+            return cached[0]
+
+        min_preds = min_predictions or (5 if sector or call_type else 10)
+        results = _build_filtered_leaderboard(
+            db, sector=sector, call_type=call_type, sort=sort or "accuracy",
+            limit=limit, min_predictions=min_preds, direction=direction,
+        )
+        _filtered_cache[cache_key] = (results, _time.time())
         return results
 
     # Periodic stats integrity check
@@ -369,10 +459,8 @@ def get_leaderboard(
     if _leaderboard_cache and (_time.time() - _cache_time) < CACHE_TTL:
         return _leaderboard_cache
 
-    # Non-blocking: try to refresh, return empty if DB is slow
     try:
         result = _refresh_leaderboard(db)
-        # _refresh_leaderboard returns a dict when truly empty (with message)
         if isinstance(result, dict):
             return result
         _leaderboard_cache = result

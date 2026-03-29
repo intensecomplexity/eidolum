@@ -105,6 +105,7 @@ class Prediction(Base):
     archive_url = Column(Text, nullable=True)
     archived_at = Column(DateTime, nullable=True)
     evaluated_at = Column(DateTime, nullable=True)  # when the system actually scored this prediction
+    call_type = Column(String, nullable=True)  # upgrade|downgrade|new_coverage|price_target|rating
 
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
 

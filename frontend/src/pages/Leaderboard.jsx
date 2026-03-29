@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from 'react';
 import { Link } from 'react-router-dom';
-import { ChevronDown, Filter, Trophy, Flame } from 'lucide-react';
+import { ChevronDown, Filter, Trophy, Flame, BarChart3, TrendingUp, Clock } from 'lucide-react';
 import Footer from '../components/Footer';
 import PlatformBadge from '../components/PlatformBadge';
 import RankBadge from '../components/RankBadge';
@@ -32,9 +32,23 @@ function SectorBadge({ sector, accuracy, count }) {
 }
 
 const TABS = [
-  { key: 'alltime', label: 'All Time', mobileLabel: 'All', icon: Trophy },
-  { key: 'week', label: 'This Week', mobileLabel: 'Week', icon: Flame },
+  { key: 'alltime', label: 'Top 100', mobileLabel: 'Top', icon: Trophy },
   { key: 'sector', label: 'By Sector', mobileLabel: 'Sector', icon: Filter },
+  { key: 'calltype', label: 'By Call Type', mobileLabel: 'Calls', icon: BarChart3 },
+  { key: 'volume', label: 'Most Active', mobileLabel: 'Active', icon: TrendingUp },
+  { key: 'alpha', label: 'Highest Alpha', mobileLabel: 'Alpha', icon: TrendingUp },
+  { key: 'recent', label: 'Recently Scored', mobileLabel: 'Recent', icon: Clock },
+  { key: 'week', label: 'This Week', mobileLabel: 'Week', icon: Flame },
+];
+
+const CALL_TYPES = [
+  { key: 'All', label: 'All Types' },
+  { key: 'upgrades', label: 'Upgrades' },
+  { key: 'downgrades', label: 'Downgrades' },
+  { key: 'new_coverage', label: 'New Coverage' },
+  { key: 'price_targets', label: 'Price Targets' },
+  { key: 'bullish', label: 'Bullish Calls' },
+  { key: 'bearish', label: 'Bearish Calls' },
 ];
 
 const METRICS = [
@@ -64,6 +78,7 @@ export default function Leaderboard() {
   const [emptyMessage, setEmptyMessage] = useState(null);
   const [sector, setSector] = useState('All');
   const [direction, setDirection] = useState('All');
+  const [callType, setCallType] = useState('All');
   const [sectorData, setSectorData] = useState([]);
   const [metric, setMetric] = useState(() => localStorage.getItem('eidolum_metric') || 'avg_return');
   const [metricOpen, setMetricOpen] = useState(false);
@@ -73,13 +88,27 @@ export default function Leaderboard() {
     setActiveTab(key);
   }
 
-  useEffect(() => {
-    setLoading(true);
-    setEmptyMessage(null);
+  function buildParams() {
     const params = {};
     if (activeTab === 'week') params.tab = 'week';
-    if (sector !== 'All') params.sector = sector;
+    else if (activeTab === 'volume') params.sort = 'volume';
+    else if (activeTab === 'alpha') params.sort = 'alpha';
+    else if (activeTab === 'recent') params.sort = 'recent';
+    if (activeTab === 'sector' && sector !== 'All') params.sector = sector;
+    if (activeTab === 'calltype' && callType !== 'All') params.call_type = callType;
     if (direction !== 'All') params.direction = direction;
+    return params;
+  }
+
+  useEffect(() => {
+    if (activeTab === 'sector' && sector === 'All') {
+      // Show sector grid instead of fetching leaderboard
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+    setEmptyMessage(null);
+    const params = buildParams();
     getLeaderboard(params)
       .then(result => {
         if (activeTab === 'week' && result && !Array.isArray(result)) {
@@ -87,7 +116,6 @@ export default function Leaderboard() {
           setData(result.scored_this_week || []);
           setEmptyMessage(null);
         } else if (result && result.message && result.forecasters) {
-          // Backend returned empty-state dict with message
           setWeekData(null);
           setData([]);
           setEmptyMessage(result.message);
@@ -102,36 +130,26 @@ export default function Leaderboard() {
         setEmptyMessage('Could not load leaderboard. Retrying...');
       })
       .finally(() => setLoading(false));
-  }, [activeTab, sector, direction]);
+  }, [activeTab, sector, direction, callType]);
 
   // Auto-retry every 30 seconds when leaderboard is empty
   useEffect(() => {
     if (!emptyMessage || loading) return;
     const timer = setInterval(() => {
-      const params = {};
-      if (activeTab === 'week') params.tab = 'week';
-      if (sector !== 'All') params.sector = sector;
-      if (direction !== 'All') params.direction = direction;
-      getLeaderboard(params)
+      getLeaderboard(buildParams())
         .then(result => {
-          if (activeTab === 'week' && result && !Array.isArray(result) && result.scored_this_week) {
-            setWeekData(result);
-            setData(result.scored_this_week || []);
+          if (result && result.message && result.forecasters) return;
+          const arr = Array.isArray(result) ? result : (result?.scored_this_week || []);
+          if (arr.length > 0) {
+            if (activeTab === 'week') setWeekData(result);
+            setData(arr);
             setEmptyMessage(null);
-          } else if (result && result.message && result.forecasters) {
-            // Still empty
-          } else {
-            const arr = Array.isArray(result) ? result : [];
-            if (arr.length > 0) {
-              setData(arr);
-              setEmptyMessage(null);
-            }
           }
         })
         .catch(() => {});
     }, 30000);
     return () => clearInterval(timer);
-  }, [emptyMessage, loading, activeTab, sector, direction]);
+  }, [emptyMessage, loading, activeTab, sector, direction, callType]);
 
   useEffect(() => {
     if (activeTab === 'sector') {
@@ -188,74 +206,48 @@ export default function Leaderboard() {
         <div className="flex items-center gap-2 mb-4 sm:mb-6 overflow-x-auto pills-scroll pb-1">
               <Filter className="w-4 h-4 text-muted shrink-0 hidden sm:block" />
 
-              {(activeTab === 'sector' || activeTab === 'alltime') && (
-                <>
-                  {/* Mobile: pill buttons */}
-                  <div className="flex gap-1.5 sm:hidden">
+              {/* Sector dropdown for sector tab */}
+              {activeTab === 'sector' && (
+                <div className="relative">
+                  <select
+                    value={sector}
+                    onChange={(e) => setSector(e.target.value)}
+                    className="appearance-none bg-surface border border-border rounded-lg px-3 py-1.5 pr-8 text-sm text-text-primary focus:outline-none focus:border-accent/50 cursor-pointer"
+                  >
                     {SECTORS.map((s) => (
-                      <button
-                        key={s}
-                        onClick={() => setSector(s)}
-                        className={`px-3 py-2 rounded-lg text-xs font-medium whitespace-nowrap min-h-[36px] transition-colors ${
-                          sector === s
-                            ? 'bg-accent/10 text-accent border border-accent/20'
-                            : 'bg-surface border border-border text-text-secondary active:text-text-primary'
-                        }`}
-                      >
-                        {s === 'All' ? 'All Sectors' : s}
-                      </button>
+                      <option key={s} value={s}>{s === 'All' ? 'Select a sector...' : s}</option>
                     ))}
-                  </div>
-                  {/* Desktop: dropdown */}
-                  <div className="relative hidden sm:block">
-                    <select
-                      value={sector}
-                      onChange={(e) => setSector(e.target.value)}
-                      className="appearance-none bg-surface border border-border rounded-lg px-3 py-1.5 pr-8 text-sm text-text-primary focus:outline-none focus:border-accent/50 cursor-pointer"
-                    >
-                      {SECTORS.map((s) => (
-                        <option key={s} value={s}>{s === 'All' ? 'All Sectors' : s}</option>
-                      ))}
-                    </select>
-                    <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-muted pointer-events-none" />
-                  </div>
-                </>
+                  </select>
+                  <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-muted pointer-events-none" />
+                </div>
               )}
 
-              {activeTab !== 'sector' && (
-                <>
-                  {/* Direction pills (mobile) */}
-                  <div className="flex gap-1.5 sm:hidden">
-                    {DIRECTIONS.map((d) => (
-                      <button
-                        key={d}
-                        onClick={() => setDirection(d)}
-                        className={`px-3 py-2 rounded-lg text-xs font-medium whitespace-nowrap min-h-[36px] transition-colors ${
-                          direction === d
-                            ? 'bg-accent/10 text-accent border border-accent/20'
-                            : 'bg-surface border border-border text-text-secondary active:text-text-primary'
-                        }`}
-                      >
-                        {d === 'All' ? 'All Calls' : d === 'bullish' ? 'Bull' : 'Bear'}
-                      </button>
+              {/* Call type dropdown for calltype tab */}
+              {activeTab === 'calltype' && (
+                <div className="relative">
+                  <select
+                    value={callType}
+                    onChange={(e) => setCallType(e.target.value)}
+                    className="appearance-none bg-surface border border-border rounded-lg px-3 py-1.5 pr-8 text-sm text-text-primary focus:outline-none focus:border-accent/50 cursor-pointer"
+                  >
+                    {CALL_TYPES.map((ct) => (
+                      <option key={ct.key} value={ct.key}>{ct.label}</option>
                     ))}
-                  </div>
-                  {/* Direction dropdown (desktop) */}
-                  <div className="relative hidden sm:block">
-                    <select
-                      value={direction}
-                      onChange={(e) => setDirection(e.target.value)}
-                      className="appearance-none bg-surface border border-border rounded-lg px-3 py-1.5 pr-8 text-sm text-text-primary focus:outline-none focus:border-accent/50 cursor-pointer"
-                    >
-                      {DIRECTIONS.map((d) => (
-                        <option key={d} value={d}>{d === 'All' ? 'All Calls' : d === 'bullish' ? 'Bullish Only' : 'Bearish Only'}</option>
-                      ))}
-                    </select>
-                    <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-muted pointer-events-none" />
-                  </div>
-                </>
+                  </select>
+                  <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-muted pointer-events-none" />
+                </div>
               )}
 
+              {/* Tab description */}
+              {activeTab === 'volume' && (
+                <span className="text-muted text-xs ml-1 shrink-0">Ranked by total predictions made</span>
+              )}
+              {activeTab === 'alpha' && (
+                <span className="text-muted text-xs ml-1 shrink-0">Ranked by excess return vs S&P 500</span>
+              )}
+              {activeTab === 'recent' && (
+                <span className="text-muted text-xs ml-1 shrink-0">Scored in the last 30 days</span>
+              )}
               {activeTab === 'week' && (
                 <span className="text-muted text-xs font-mono ml-1 sm:ml-2 shrink-0">
                   Resets Monday
@@ -276,12 +268,12 @@ export default function Leaderboard() {
               </div>
             ) : activeTab === 'week' ? (
               <WeekView weekData={weekData} data={data} />
-            ) : activeTab === 'sector' ? (
+            ) : activeTab === 'sector' && sector === 'All' ? (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 {sectorData.map((s) => (
                   <div
                     key={s.sector}
-                    onClick={() => { setSector(s.sector); setActiveTab('alltime'); }}
+                    onClick={() => { setSector(s.sector); }}
                     className="card cursor-pointer hover:border-accent/30 transition-colors"
                   >
                     <div className="flex items-center justify-between mb-3">
@@ -306,6 +298,12 @@ export default function Leaderboard() {
                     </div>
                   </div>
                 ))}
+              </div>
+            ) : activeTab === 'calltype' && callType === 'All' ? (
+              <div className="card text-center py-12">
+                <BarChart3 className="w-8 h-8 text-muted/30 mx-auto mb-3" />
+                <p className="text-text-secondary mb-1">Select a call type above to see rankings</p>
+                <p className="text-muted text-xs">See who is best at upgrades, downgrades, new coverage, and more.</p>
               </div>
             ) : (
               <>

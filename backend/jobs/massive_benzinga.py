@@ -183,6 +183,9 @@ def _process_rating(rating: dict, db: Session) -> bool:
     if not direction:
         return False
 
+    # Derive call_type
+    call_type = _get_call_type(action_lower, rating_current.lower(), pt_current)
+
     # Resolve firm name
     canonical = resolve_forecaster_alias(firm)
     if _is_self_analysis(canonical, ticker):
@@ -259,8 +262,22 @@ def _process_rating(rating: dict, db: Session) -> bool:
         sector=_get_sector_safe(ticker, db),
         context=context[:500], exact_quote=context,
         outcome="pending", verified_by="massive_benzinga",
+        call_type=call_type,
     ))
     return True
+
+
+def _get_call_type(action_lower: str, rating_lower: str, pt_current) -> str:
+    """Derive call_type from action and rating."""
+    if "upgrade" in action_lower:
+        return "upgrade"
+    if "downgrade" in action_lower:
+        return "downgrade"
+    if "initiate" in action_lower:
+        return "new_coverage"
+    if pt_current and str(pt_current).strip():
+        return "price_target"
+    return "rating"
 
 
 def _get_sector_safe(ticker: str, db) -> str:
