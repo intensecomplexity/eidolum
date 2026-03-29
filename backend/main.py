@@ -1091,6 +1091,69 @@ async def lifespan(app):
     except Exception as e:
         print(f"[Startup Cleanup] Error (non-fatal): {e}")
 
+    # Auto-resume backfill in background thread
+    import threading
+
+    def _auto_backfill():
+        """Resume backfill from last DB-stored date. Processes 30 days, pauses, repeats."""
+        import time as _t
+        from sqlalchemy import text as _txt
+        while True:
+            dbs = SessionLocal()
+            try:
+                last = dbs.execute(_txt("SELECT value FROM config WHERE key = 'backfill_last_date'")).scalar()
+                if not last:
+                    last = "2024-03-28"
+                from datetime import datetime as _dt2, date as _d
+                last_date = _dt2.strptime(last, "%Y-%m-%d").date()
+                today = _d.today()
+                if last_date >= today:
+                    print(f"[AutoBackfill] Caught up to {today}, stopping")
+                    break
+            except Exception as e:
+                print(f"[AutoBackfill] State check error: {e}")
+                break
+            finally:
+                dbs.close()
+
+            # Process 30 days
+            try:
+                from jobs.benzinga_backfill import _process_day, _save_progress
+                days_done = 0
+                current = last_date + timedelta(days=1)
+                while current <= today and days_done < 30:
+                    dbs = SessionLocal()
+                    try:
+                        day_str = current.strftime("%Y-%m-%d")
+                        inserted, fetched = _process_day(day_str, dbs)
+                        _save_progress(dbs, day_str)
+                        if inserted > 0:
+                            print(f"[AutoBackfill] {day_str}: +{inserted}")
+                    except Exception as e:
+                        print(f"[AutoBackfill] Day {current} error: {e}")
+                    finally:
+                        dbs.close()
+                    current += timedelta(days=1)
+                    days_done += 1
+                    _t.sleep(0.5)
+
+                # Evaluate expired from this chunk
+                try:
+                    from jobs.historical_evaluator import evaluate_batch, refresh_all_forecaster_stats
+                    result = evaluate_batch(max_tickers=100)
+                    if result.get('predictions_scored', 0) > 0:
+                        refresh_all_forecaster_stats()
+                except Exception:
+                    pass
+
+                print(f"[AutoBackfill] Chunk done ({days_done} days). Pausing 10 min...")
+                _t.sleep(600)  # 10 minute pause between chunks
+            except Exception as e:
+                print(f"[AutoBackfill] Chunk error: {e}")
+                _t.sleep(60)
+
+    threading.Thread(target=_auto_backfill, daemon=True).start()
+
     # Predictions persist between deploys — Layer 3 cleanup handles invalid ones hourly
     # Seed forecasters (keep existing, add missing)
     try:
@@ -1430,7 +1493,7 @@ async def lifespan(app):
     # DISABLED: benzinga_web produces garbage data (bad firm names, duplicates of API data)
     # scheduler.add_job(run_benzinga_web, "interval", hours=2, id="benzinga_web", next_run_time=datetime.utcnow() + timedelta(minutes=25))
 
-    # Massive API — Benzinga ratings
+    # Massive API — Benzinga ratings + auto-evaluate expired predictions after scrape
     def run_massive_benzinga():
         from datetime import datetime as _dt
         print(f"[Scheduler] Running Massive Benzinga at {_dt.utcnow()}")
@@ -1444,6 +1507,18 @@ async def lifespan(app):
             traceback.print_exc()
         finally:
             db.close()
+
+        # After scraping, evaluate any expired pending predictions
+        try:
+            from jobs.historical_evaluator import evaluate_batch, refresh_all_forecaster_stats
+            print(f"[PostScrape] Evaluating expired predictions...")
+            result = evaluate_batch(max_tickers=200)
+            scored = result.get('predictions_scored', 0)
+            print(f"[PostScrape] Scored {scored} predictions")
+            if scored > 0:
+                refresh_all_forecaster_stats()
+        except Exception as e:
+            print(f"[PostScrape] Eval error: {e}")
 
     scheduler.add_job(run_massive_benzinga, "interval", hours=2, id="massive_benzinga", next_run_time=datetime.utcnow() + timedelta(minutes=20))
 
