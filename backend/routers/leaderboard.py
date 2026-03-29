@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, Query, Request
 from sqlalchemy.orm import Session
 from sqlalchemy import func, text as sql_text
 from database import get_db
-from models import Forecaster, Prediction, format_timestamp, DisclosedPosition
+from models import Forecaster, Prediction
 from rate_limit import limiter
 
 router = APIRouter()
