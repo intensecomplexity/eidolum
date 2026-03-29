@@ -1873,6 +1873,68 @@ def stop_evaluation():
     return {"status": "stopping"}
 
 
+@app.get("/api/admin/evaluate-test-one")
+def evaluate_test_one():
+    """Test evaluating a single ticker to see what happens."""
+    from jobs.historical_evaluator import evaluate_batch, _fetch_history, _closest_price
+    from database import SessionLocal
+    from sqlalchemy import text as _t
+    from datetime import datetime, timedelta
+    import io, sys
+
+    # Capture print output
+    old_stdout = sys.stdout
+    sys.stdout = buffer = io.StringIO()
+
+    db = SessionLocal()
+    try:
+        # Get one popular ticker that has pending expired predictions
+        row = db.execute(_t("""
+            SELECT p.ticker, p.evaluation_date, p.prediction_date, p.entry_price, p.target_price, p.direction
+            FROM predictions p
+            WHERE p.outcome = 'pending' AND p.evaluation_date < NOW()
+              AND p.ticker IN ('AAPL','TSLA','NVDA','MSFT','AMZN','META','GOOGL')
+            LIMIT 1
+        """)).first()
+    finally:
+        db.close()
+
+    if not row:
+        sys.stdout = old_stdout
+        return {"error": "No pending predictions for major tickers"}
+
+    ticker = row[0]
+    eval_date = row[1]
+    pred_date = row[2]
+
+    # Test yfinance
+    min_d = pred_date - timedelta(days=5) if pred_date else eval_date - timedelta(days=95)
+    max_d = eval_date + timedelta(days=3) if eval_date else datetime.utcnow()
+    prices = _fetch_history(ticker, min_d, max_d)
+
+    eval_price = _closest_price(prices, eval_date) if prices else None
+    pred_price = _closest_price(prices, pred_date) if prices else None
+
+    sys.stdout = old_stdout
+    logs = buffer.getvalue()
+
+    return {
+        "ticker": ticker,
+        "prediction_date": str(pred_date),
+        "evaluation_date": str(eval_date),
+        "entry_price": float(row[3]) if row[3] else None,
+        "target_price": float(row[4]) if row[4] else None,
+        "direction": row[5],
+        "yfinance_date_range": f"{min_d} to {max_d}",
+        "yfinance_price_count": len(prices) if prices else 0,
+        "yfinance_sample": dict(list(prices.items())[:3]) if prices else None,
+        "eval_date_price": eval_price,
+        "pred_date_price": pred_price,
+        "logs": logs,
+    }
+    return {"status": "stopping"}
+
+
 @app.post("/api/admin/run-user-evaluator")
 def run_user_evaluator_now():
     """Run the user prediction evaluator immediately and return results."""
