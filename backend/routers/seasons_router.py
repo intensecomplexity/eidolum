@@ -1,6 +1,7 @@
 import datetime
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
+from sqlalchemy import text as sql_text
 
 from database import get_db
 from models import Season, SeasonEntry, User
@@ -74,4 +75,36 @@ def season_leaderboard(request: Request, season_id: int, db: Session = Depends(g
     for i, r in enumerate(results):
         r["rank"] = i + 1
 
-    return {"season": _season_dict(season), "leaderboard": results}
+    # Also include analyst predictions scored during this season
+    analyst_lb = []
+    if season.starts_at and season.ends_at:
+        try:
+            analyst_rows = db.execute(sql_text("""
+                SELECT f.id, f.name, f.handle,
+                       COUNT(*) as total,
+                       SUM(CASE WHEN p.outcome = 'correct' THEN 1 ELSE 0 END) as correct
+                FROM predictions p
+                JOIN forecasters f ON f.id = p.forecaster_id
+                WHERE p.outcome IN ('correct','incorrect')
+                  AND p.evaluated_at >= :start AND p.evaluated_at < :end
+                GROUP BY f.id, f.name, f.handle
+                HAVING COUNT(*) >= 2
+                ORDER BY SUM(CASE WHEN p.outcome='correct' THEN 1 ELSE 0 END)::float / COUNT(*) DESC, COUNT(*) DESC
+                LIMIT 10
+            """), {"start": season.starts_at, "end": season.ends_at}).fetchall()
+
+            for i, r in enumerate(analyst_rows):
+                acc = round(r[4] / r[3] * 100, 1) if r[3] > 0 else 0
+                analyst_lb.append({
+                    "forecaster_id": r[0], "name": r[1], "handle": r[2],
+                    "predictions_scored": r[3], "predictions_correct": r[4],
+                    "accuracy": acc, "rank": i + 1, "user_type": "analyst",
+                })
+        except Exception:
+            pass
+
+    return {
+        "season": _season_dict(season),
+        "leaderboard": results,
+        "analyst_leaderboard": analyst_lb,
+    }

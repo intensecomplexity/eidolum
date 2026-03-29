@@ -58,6 +58,7 @@ function getMetricValue(f, metricKey) {
 
 export default function Leaderboard() {
   const [data, setData] = useState([]);
+  const [weekData, setWeekData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('alltime');
   const [sector, setSector] = useState('All');
@@ -78,7 +79,15 @@ export default function Leaderboard() {
     if (sector !== 'All') params.sector = sector;
     if (direction !== 'All') params.direction = direction;
     getLeaderboard(params)
-      .then(setData)
+      .then(result => {
+        if (activeTab === 'week' && result && !Array.isArray(result)) {
+          setWeekData(result);
+          setData(result.scored_this_week || []);
+        } else {
+          setWeekData(null);
+          setData(Array.isArray(result) ? result : []);
+        }
+      })
       .catch(() => {})
       .finally(() => setLoading(false));
   }, [activeTab, sector, direction]);
@@ -218,6 +227,8 @@ export default function Leaderboard() {
               <div className="flex items-center justify-center py-20">
                 <div className="w-6 h-6 border-2 border-accent border-t-transparent rounded-full animate-spin" />
               </div>
+            ) : activeTab === 'week' ? (
+              <WeekView weekData={weekData} data={data} />
             ) : activeTab === 'sector' ? (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 {sectorData.map((s) => (
@@ -369,6 +380,84 @@ export default function Leaderboard() {
       </div>
 
       <Footer />
+    </div>
+  );
+}
+
+
+function WeekView({ weekData, data }) {
+  const scored = weekData?.scored_this_week || data || [];
+  const newCalls = weekData?.new_calls_this_week || [];
+
+  return (
+    <div>
+      {/* Scored This Week */}
+      <div className="mb-8">
+        <h2 className="text-sm font-semibold text-muted uppercase tracking-wider mb-3">
+          Results This Week
+        </h2>
+        {scored.length === 0 ? (
+          <div className="card text-center py-8">
+            <p className="text-text-secondary mb-1">No predictions resolved this week yet.</p>
+            <p className="text-muted text-xs">Short-term calls (1-14 days) get scored fastest.</p>
+          </div>
+        ) : (
+          <div className="card overflow-hidden p-0">
+            <table className="w-full">
+              <thead>
+                <tr className="text-left text-muted text-xs uppercase tracking-wider border-b border-border">
+                  <th className="px-5 py-3 w-12">#</th>
+                  <th className="px-5 py-3">Analyst</th>
+                  <th className="px-5 py-3 text-right">This Week</th>
+                  <th className="px-5 py-3 text-right hidden sm:table-cell">All-Time</th>
+                </tr>
+              </thead>
+              <tbody>
+                {scored.map(f => (
+                  <tr key={f.id} className="border-b border-border/50 hover:bg-surface-2/30 transition-colors">
+                    <td className="px-5 py-3">
+                      <span className="font-mono font-bold text-text-secondary">{f.rank}</span>
+                    </td>
+                    <td className="px-5 py-3">
+                      <Link to={`/forecaster/${f.id}`} className="font-medium text-sm hover:text-accent transition-colors">{f.name}</Link>
+                    </td>
+                    <td className="px-5 py-3 text-right">
+                      <span className={`font-mono font-semibold ${f.accuracy_rate >= 60 ? 'text-positive' : 'text-negative'}`}>
+                        {f.accuracy_rate.toFixed(0)}%
+                      </span>
+                      <span className="text-muted text-xs ml-1">({f.correct_predictions}/{f.total_predictions})</span>
+                    </td>
+                    <td className="px-5 py-3 text-right hidden sm:table-cell">
+                      <span className="font-mono text-text-secondary text-sm">{(f.alltime_accuracy || 0).toFixed(0)}%</span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {/* New Calls This Week */}
+      {newCalls.length > 0 && (
+        <div>
+          <h2 className="text-sm font-semibold text-muted uppercase tracking-wider mb-3">
+            New Calls This Week
+          </h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+            {newCalls.map(f => (
+              <Link key={f.id} to={`/forecaster/${f.id}`}
+                className="card py-3 flex items-center justify-between hover:border-accent/20 transition-colors">
+                <div>
+                  <span className="text-sm font-medium">{f.name}</span>
+                  <span className="text-muted text-xs ml-1.5 font-mono">({(f.alltime_accuracy || 0).toFixed(0)}% acc)</span>
+                </div>
+                <span className="font-mono text-accent text-sm font-semibold">{f.new_predictions} new</span>
+              </Link>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

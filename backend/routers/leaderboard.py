@@ -96,6 +96,64 @@ def _refresh_leaderboard(db: Session) -> list:
     return results
 
 
+def _week_leaderboard(db: Session) -> dict:
+    """Return predictions SCORED in the last 7 days + new calls submitted this week."""
+    # Scored this week: group by forecaster
+    scored_rows = db.execute(sql_text("""
+        SELECT f.id, f.name, f.handle, f.platform, f.accuracy_score,
+               COUNT(*) as total,
+               SUM(CASE WHEN p.outcome = 'correct' THEN 1 ELSE 0 END) as correct
+        FROM predictions p
+        JOIN forecasters f ON f.id = p.forecaster_id
+        WHERE p.outcome IN ('correct','incorrect')
+          AND p.evaluated_at >= NOW() - INTERVAL '7 days'
+        GROUP BY f.id, f.name, f.handle, f.platform, f.accuracy_score
+        HAVING COUNT(*) >= 1
+        ORDER BY SUM(CASE WHEN p.outcome='correct' THEN 1 ELSE 0 END)::float / COUNT(*) DESC, COUNT(*) DESC
+        LIMIT 30
+    """)).fetchall()
+
+    scored_lb = []
+    for i, r in enumerate(scored_rows):
+        acc = round(r[6] / r[5] * 100, 1) if r[5] > 0 else 0
+        scored_lb.append({
+            "id": r[0], "name": r[1], "handle": r[2],
+            "platform": r[3] or "youtube",
+            "accuracy_rate": acc,
+            "total_predictions": r[5],
+            "evaluated_predictions": r[5],
+            "correct_predictions": r[6],
+            "alltime_accuracy": float(r[4] or 0),
+            "alpha": 0, "avg_return": 0,
+            "rank": i + 1,
+            "streak": {"type": "none", "count": 0},
+            "rank_movement": {"direction": "none", "change": 0},
+            "sector_strengths": [], "scored_count": r[5],
+            "has_disclosed_positions": False,
+            "conflict_count": 0, "conflict_rate": 0,
+            "verified_predictions": 0,
+        })
+
+    # New calls this week
+    new_rows = db.execute(sql_text("""
+        SELECT f.id, f.name, f.handle, f.platform, f.accuracy_score, COUNT(*) as cnt
+        FROM predictions p
+        JOIN forecasters f ON f.id = p.forecaster_id
+        WHERE p.prediction_date >= NOW() - INTERVAL '7 days'
+        GROUP BY f.id, f.name, f.handle, f.platform, f.accuracy_score
+        ORDER BY cnt DESC
+        LIMIT 15
+    """)).fetchall()
+
+    new_calls = [
+        {"id": r[0], "name": r[1], "handle": r[2], "platform": r[3] or "youtube",
+         "alltime_accuracy": float(r[4] or 0), "new_predictions": r[5]}
+        for r in new_rows
+    ]
+
+    return {"scored_this_week": scored_lb, "new_calls_this_week": new_calls}
+
+
 @router.get("/leaderboard")
 @limiter.limit("60/minute")
 def get_leaderboard(
@@ -109,14 +167,17 @@ def get_leaderboard(
 ):
     global _leaderboard_cache, _cache_time
 
-    # For filtered views, compute on demand (rare, acceptable latency)
-    if tab == "week" or sector or direction:
+    # "This Week" tab: predictions EVALUATED in the last 7 days
+    if tab == "week":
+        return _week_leaderboard(db)
+
+    # For filtered views (sector, direction), compute on demand
+    if sector or direction:
         from utils import compute_forecaster_stats
         forecasters = db.query(Forecaster).filter(Forecaster.total_predictions >= 10).all()
-        effective_period = 7 if tab == "week" else period_days
         results = []
         for f in forecasters:
-            stats = compute_forecaster_stats(f, db, sector=sector, period_days=effective_period, direction=direction)
+            stats = compute_forecaster_stats(f, db, sector=sector, period_days=period_days, direction=direction)
             min_evaluated = 3 if sector else 10
             if stats.get("evaluated_predictions", 0) < min_evaluated:
                 continue
