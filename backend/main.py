@@ -1572,6 +1572,35 @@ async def lifespan(app):
 
     scheduler.add_job(run_weekly_challenge, "cron", day_of_week="mon", hour=0, minute=1, id="weekly_challenge")
 
+    # Auto-evaluate expired predictions every hour (connection-safe, 100 tickers per run)
+    def run_auto_evaluate():
+        print(f"[Scheduler] Running auto-evaluate at {datetime.utcnow()}")
+        try:
+            from jobs.historical_evaluator import evaluate_batch
+            result = evaluate_batch(max_tickers=100)
+            scored = result.get('predictions_scored', 0)
+            remaining = result.get('remaining_tickers', 0)
+            print(f"[AutoEval] {scored} scored, {remaining} remaining")
+            # Auto-refresh stats if we scored anything
+            if scored > 0:
+                from jobs.historical_evaluator import refresh_all_forecaster_stats
+                refresh_all_forecaster_stats()
+        except Exception as e:
+            print(f"[AutoEval] Error: {e}")
+
+    scheduler.add_job(run_auto_evaluate, "interval", hours=1, id="auto_evaluate", next_run_time=datetime.utcnow() + timedelta(minutes=3))
+
+    # Auto-refresh forecaster stats every 2 hours
+    def run_refresh_stats():
+        print(f"[Scheduler] Refreshing forecaster stats at {datetime.utcnow()}")
+        try:
+            from jobs.historical_evaluator import refresh_all_forecaster_stats
+            refresh_all_forecaster_stats()
+        except Exception as e:
+            print(f"[StatsRefresh] Error: {e}")
+
+    scheduler.add_job(run_refresh_stats, "interval", hours=2, id="refresh_stats", next_run_time=datetime.utcnow() + timedelta(minutes=8))
+
     scheduler.start()
     job_ids = [j.id for j in scheduler.get_jobs()]
     print(f"[STARTUP] {len(job_ids)} jobs registered: {', '.join(job_ids)}")
