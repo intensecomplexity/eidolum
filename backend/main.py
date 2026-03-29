@@ -2111,6 +2111,44 @@ def reformat_contexts():
     return {"status": "started"}
 
 
+@app.get("/api/admin/db-health")
+def db_health():
+    """Check if the database responds at all."""
+    import time as _t
+    start = _t.time()
+    try:
+        from sqlalchemy import text as _text
+        db = SessionLocal()
+        r = db.execute(_text("SELECT 1")).scalar()
+        elapsed = round(_t.time() - start, 3)
+        db.close()
+        return {"status": "ok", "query_time_ms": elapsed * 1000, "result": r}
+    except Exception as e:
+        elapsed = round(_t.time() - start, 3)
+        return {"status": "error", "query_time_ms": elapsed * 1000, "error": str(e)}
+
+
+@app.post("/api/admin/kill-locks")
+def kill_locks():
+    """Kill any long-running queries/transactions blocking the database."""
+    try:
+        from sqlalchemy import text as _text
+        db = SessionLocal()
+        # Cancel all queries running longer than 5 seconds
+        db.execute(_text("""
+            SELECT pg_cancel_backend(pid)
+            FROM pg_stat_activity
+            WHERE state = 'active'
+              AND query_start < NOW() - INTERVAL '5 seconds'
+              AND pid != pg_backend_pid()
+        """))
+        db.commit()
+        db.close()
+        return {"status": "killed"}
+    except Exception as e:
+        return {"error": str(e)}
+
+
 @app.post("/api/admin/backfill-alpha")
 def backfill_alpha():
     """Calculate alpha for all evaluated predictions missing it."""
