@@ -4,6 +4,7 @@ import { Swords, Calendar, Trophy, Zap, TrendingUp, TrendingDown, ChevronRight, 
 import Footer from '../components/Footer';
 import DailyChallengeCard from '../components/DailyChallengeCard';
 import TypeBadge from '../components/TypeBadge';
+import RankNumber from '../components/RankNumber';
 import { getCurrentSeason, getSeasonLeaderboard, getHomepageStats } from '../api';
 import { useAuth } from '../context/AuthContext';
 
@@ -101,9 +102,7 @@ export default function Seasons() {
                 {leaderboard.slice(0, 5).map(e => (
                   <div key={e.user_id} className="flex items-center justify-between py-1.5">
                     <div className="flex items-center gap-2">
-                      <span className={`font-mono font-bold text-sm w-6 ${e.rank <= 3 ? 'text-warning' : 'text-text-secondary'}`}>
-                        {e.rank <= 3 ? [null, '\uD83E\uDD47', '\uD83E\uDD48', '\uD83E\uDD49'][e.rank] : `#${e.rank}`}
-                      </span>
+                      <RankNumber rank={e.rank} />
                       <span className="font-medium text-sm">{e.username}</span>
                       <TypeBadge type={e.user_type} size={12} />
                     </div>

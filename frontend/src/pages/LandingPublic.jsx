@@ -2,6 +2,7 @@ import { useEffect, useState, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowRight, ChevronDown, TrendingUp, TrendingDown } from 'lucide-react';
 import EidolumLogo from '../components/EidolumLogo';
+import RankNumber from '../components/RankNumber';
 import Footer from '../components/Footer';
 import { getLeaderboard, getHomepageStats, getTrendingTickers, getPendingPredictions } from '../api';
 
@@ -112,7 +113,7 @@ export default function LandingPublic() {
               <div className="card p-0 overflow-hidden border-accent/10">
                 {top5.slice(0, 3).map((f, i) => (
                   <div key={f.id} className="flex items-center gap-3 px-4 py-3 border-b border-border/50 last:border-b-0">
-                    <span className="font-mono font-bold text-warning text-sm w-6">{['\uD83E\uDD47','\uD83E\uDD48','\uD83E\uDD49'][i]}</span>
+                    <RankNumber rank={i + 1} />
                     <div className="flex-1 min-w-0">
                       <span className="text-sm font-medium">{f.name}</span>
                     </div>
@@ -227,9 +228,7 @@ export default function LandingPublic() {
                   {top5.map(f => (
                     <tr key={f.id} className="border-b border-border/50 hover:bg-surface-2/30 transition-colors">
                       <td className="px-5 py-3.5">
-                        <span className={`font-mono font-bold ${f.rank <= 3 ? 'text-warning' : 'text-text-secondary'}`}>
-                          {f.rank <= 3 ? [null, '\uD83E\uDD47', '\uD83E\uDD48', '\uD83E\uDD49'][f.rank] : f.rank}
-                        </span>
+                        <RankNumber rank={f.rank} />
                       </td>
                       <td className="px-5 py-3.5">
                         <Link to={`/forecaster/${f.id}`} className="font-medium hover:text-accent transition-colors">{f.name}</Link>
