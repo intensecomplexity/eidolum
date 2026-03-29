@@ -139,8 +139,16 @@ def evaluate_all_pending(db):
                 p.outcome = outcome
                 p.entry_price = entry
                 p.actual_return = adjusted
-                p.alpha = adjusted
                 p.evaluation_date = end_date
+
+                # Calculate alpha vs S&P 500 benchmark
+                from jobs.historical_evaluator import _calc_spy_return
+                spy_ret = _calc_spy_return(p.prediction_date, end_date)
+                if spy_ret is not None:
+                    p.sp500_return = spy_ret
+                    p.alpha = round(adjusted - spy_ret, 2)
+                else:
+                    p.alpha = adjusted
                 evaluated += 1
                 ticker_total += 1
                 if outcome == "correct":

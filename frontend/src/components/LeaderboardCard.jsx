@@ -41,7 +41,7 @@ export default function LeaderboardCard({ forecaster: f }) {
             <div className={`font-mono text-[15px] font-semibold leading-tight mt-1.5 ${f.alpha >= 0 ? 'text-positive' : 'text-negative'}`}>
               {f.alpha >= 0 ? '+' : ''}{f.alpha.toFixed(2)}%
             </div>
-            <div className="text-muted text-[11px]">alpha vs S&P</div>
+            <div className="text-muted text-[11px]">alpha vs S&P 500</div>
           </div>
           <div>
             <div className="font-mono text-[15px] font-semibold text-text-secondary leading-tight mt-1.5">

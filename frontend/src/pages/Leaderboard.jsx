@@ -171,7 +171,7 @@ export default function Leaderboard() {
                           <th className="px-6 py-3 w-24">Rank</th>
                           <th className="px-6 py-3">Forecaster</th>
                           <th className="px-6 py-3 text-right">Accuracy</th>
-                          <th className="px-6 py-3 text-right">Alpha vs S&P</th>
+                          <th className="px-6 py-3 text-right">Alpha vs S&P 500</th>
                           <th className="px-6 py-3 text-right">Predictions</th>
                           <th className="px-6 py-3 text-center hidden md:table-cell">Streak</th>
                           <th className="px-6 py-3 hidden xl:table-cell">Sector Strengths</th>

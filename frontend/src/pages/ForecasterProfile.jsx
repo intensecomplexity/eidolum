@@ -142,7 +142,7 @@ export default function ForecasterProfile() {
                 <div className={`font-mono text-xl sm:text-3xl font-bold ${data.alpha >= 0 ? 'text-positive' : 'text-negative'}`}>
                   {data.alpha >= 0 ? '+' : ''}{data.alpha.toFixed(2)}%
                 </div>
-                <div className="text-muted text-[11px] sm:text-xs">Alpha</div>
+                <div className="text-muted text-[11px] sm:text-xs">Alpha vs S&amp;P 500</div>
               </div>
               <div className="text-center bg-surface-2 sm:bg-transparent rounded-lg p-3 sm:p-0">
                 <div className="font-mono text-xl sm:text-3xl font-bold text-accent">{data.total_predictions}</div>

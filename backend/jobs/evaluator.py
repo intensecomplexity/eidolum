@@ -105,6 +105,14 @@ def run_evaluator(db: Session):
 
         p.actual_return = actual_return
         p.evaluation_date = now
+
+        # Calculate alpha vs S&P 500 benchmark
+        from jobs.historical_evaluator import _calc_spy_return
+        spy_ret = _calc_spy_return(p.prediction_date, now)
+        if spy_ret is not None:
+            p.sp500_return = spy_ret
+            p.alpha = round(actual_return - spy_ret, 2)
+
         count += 1
 
     db.commit()
