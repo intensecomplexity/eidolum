@@ -200,7 +200,8 @@ def evaluate_batch(max_tickers: int = 50) -> dict:
                 else:
                     outcome = "correct" if eval_price < ref else "incorrect"
 
-            updates.append({"id": p["id"], "outcome": outcome, "ret": ret, "ep": ref, "fid": p["forecaster_id"], "direction": direction})
+            summary = _build_summary(p["ticker"], direction, outcome, ref, eval_price, target, ret)
+            updates.append({"id": p["id"], "outcome": outcome, "ret": ret, "ep": ref, "fid": p["forecaster_id"], "direction": direction, "summary": summary})
             affected_forecasters.add(p["forecaster_id"])
             if outcome == "correct":
                 total_correct += 1
@@ -217,8 +218,8 @@ def evaluate_batch(max_tickers: int = 50) -> dict:
             try:
                 for u in updates:
                     db.execute(sql_text("""
-                        UPDATE predictions SET outcome=:o, actual_return=:r, direction=:d, entry_price=COALESCE(entry_price,:ep) WHERE id=:id
-                    """), {"o": u["outcome"], "r": u["ret"], "d": u["direction"], "ep": u["ep"], "id": u["id"]})
+                        UPDATE predictions SET outcome=:o, actual_return=:r, direction=:d, entry_price=COALESCE(entry_price,:ep), evaluation_summary=:s WHERE id=:id
+                    """), {"o": u["outcome"], "r": u["ret"], "d": u["direction"], "ep": u["ep"], "s": u["summary"], "id": u["id"]})
                 db.commit()
                 total_scored += len(updates)
             except Exception as e:
@@ -240,6 +241,26 @@ def evaluate_batch(max_tickers: int = 50) -> dict:
         "incorrect": total_incorrect,
         "remaining_tickers": max(remaining, 0),
     }
+
+
+def _build_summary(ticker, direction, outcome, entry, eval_price, target, ret):
+    """Generate a plain English summary of the evaluation result."""
+    dir_label = "BULL" if direction == "bullish" else "BEAR"
+    entry_str = f"${entry:,.2f}" if entry else "?"
+    eval_str = f"${eval_price:,.2f}" if eval_price else "?"
+    ret_str = f"{'+' if ret >= 0 else ''}{ret:.1f}%" if ret is not None else ""
+
+    if target and target > 0:
+        target_str = f"${target:,.0f}"
+        if outcome == "correct":
+            return f"Target {target_str} on {ticker} — entry {entry_str}, reached {eval_str} {ret_str} ✓"
+        else:
+            return f"Target {target_str} on {ticker} — entry {entry_str}, ended at {eval_str} {ret_str}, target not reached"
+    else:
+        if outcome == "correct":
+            return f"Called {dir_label} on {ticker} at {entry_str}, stock moved to {eval_str} ({ret_str}) ✓"
+        else:
+            return f"Called {dir_label} on {ticker} at {entry_str}, stock moved to {eval_str} ({ret_str})"
 
 
 FINNHUB_KEY = os.getenv("FINNHUB_KEY", "").strip()

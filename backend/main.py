@@ -925,6 +925,13 @@ def run_phase2_migrations():
     except Exception as e:
         db.rollback()
 
+    # ── 38. predictions.evaluation_summary column ──────────────────
+    try:
+        db.execute(text("ALTER TABLE predictions ADD COLUMN evaluation_summary TEXT"))
+        db.commit()
+    except Exception:
+        db.rollback()
+
     print("[Phase2] All migrations complete")
     db.close()
 

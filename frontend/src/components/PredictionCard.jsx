@@ -157,6 +157,13 @@ export default function PredictionCard({ prediction: p, showForecaster = false, 
         )}
       </div>
 
+      {/* Evaluation summary */}
+      {p.evaluation_summary && (
+        <p className={`text-xs italic mt-1.5 leading-relaxed ${p.outcome === 'correct' ? 'text-positive/80' : 'text-negative/80'}`}>
+          {p.evaluation_summary}
+        </p>
+      )}
+
       {/* Platform-specific proof */}
       <ProofBlock p={p} />
 

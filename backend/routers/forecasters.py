@@ -160,6 +160,7 @@ def get_forecaster(request: Request, forecaster_id: int, db: Session = Depends(g
                 ),
                 "outcome": p.outcome,
                 "actual_return": p.actual_return,
+                "evaluation_summary": getattr(p, 'evaluation_summary', None),
                 "sp500_return": p.sp500_return,
                 "alpha": p.alpha,
                 "sector": p.sector,

@@ -98,6 +98,7 @@ class Prediction(Base):
     external_id = Column(String, nullable=True, unique=True, index=True)  # benzinga_id for dedup
     video_timestamp_sec = Column(Integer, nullable=True)
     verified_by = Column(String, nullable=True)  # 'ai_parsed'|'manual'|'auto_title'
+    evaluation_summary = Column(Text, nullable=True)
     archive_url = Column(Text, nullable=True)
     archived_at = Column(DateTime, nullable=True)
 
