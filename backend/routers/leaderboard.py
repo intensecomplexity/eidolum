@@ -108,46 +108,101 @@ def _week_leaderboard(db: Session) -> dict:
 
 
 def _week_leaderboard_impl(db: Session) -> dict:
-    # Scored this week: predictions whose evaluation window expired in the last 7 days
-    scored_rows = db.execute(sql_text("""
-        SELECT f.id, f.name, f.handle, f.platform, f.accuracy_score,
-               COUNT(*) as total,
-               SUM(CASE WHEN p.outcome = 'correct' THEN 1 ELSE 0 END) as correct
+    # ── Scored This Week ──
+    # Combine analyst predictions + community player predictions that were
+    # EVALUATED (scored) in the last 7 days, using evaluated_at timestamp.
+    # Fallback to evaluation_date for analyst predictions that were scored
+    # before the evaluated_at column was backfilled.
+
+    # 1) Analyst predictions scored this week
+    analyst_scored = db.execute(sql_text("""
+        SELECT 'analyst' as source, f.id as fid, f.name, f.handle, f.platform,
+               f.accuracy_score as alltime_acc, p.outcome
         FROM predictions p
         JOIN forecasters f ON f.id = p.forecaster_id
         WHERE p.outcome IN ('correct','incorrect')
-          AND p.evaluation_date >= NOW() - INTERVAL '7 days'
-          AND p.evaluation_date <= NOW()
-        GROUP BY f.id, f.name, f.handle, f.platform, f.accuracy_score
-        HAVING COUNT(*) >= 1
-        ORDER BY ROUND(SUM(CASE WHEN p.outcome='correct' THEN 1 ELSE 0 END)::numeric / NULLIF(COUNT(*), 0) * 100, 1) DESC, COUNT(*) DESC
-        LIMIT 30
+          AND COALESCE(p.evaluated_at, p.evaluation_date) >= NOW() - INTERVAL '7 days'
+          AND COALESCE(p.evaluated_at, p.evaluation_date) <= NOW()
     """)).fetchall()
 
+    # 2) Community player predictions scored this week
+    player_scored = db.execute(sql_text("""
+        SELECT 'player' as source, u.id as uid, u.username as name,
+               u.username as handle, 'player' as platform,
+               NULL as alltime_acc, up.outcome
+        FROM user_predictions up
+        JOIN users u ON u.id = up.user_id
+        WHERE up.outcome IN ('correct','incorrect')
+          AND up.evaluated_at >= NOW() - INTERVAL '7 days'
+          AND up.evaluated_at <= NOW()
+          AND up.deleted_at IS NULL
+    """)).fetchall()
+
+    # Aggregate by forecaster/player
+    scored_map = {}  # key -> {name, handle, platform, source, alltime_acc, correct, total}
+    for r in analyst_scored:
+        key = f"analyst_{r[1]}"
+        if key not in scored_map:
+            scored_map[key] = {
+                "id": r[1], "name": r[2], "handle": r[3],
+                "platform": r[4] or "youtube", "source": "analyst",
+                "alltime_accuracy": float(r[5] or 0),
+                "correct": 0, "total": 0,
+            }
+        scored_map[key]["total"] += 1
+        if r[6] == "correct":
+            scored_map[key]["correct"] += 1
+
+    for r in player_scored:
+        key = f"player_{r[1]}"
+        if key not in scored_map:
+            # Compute all-time accuracy for this player
+            alltime = db.execute(sql_text("""
+                SELECT COUNT(*) FILTER (WHERE outcome = 'correct') as c,
+                       COUNT(*) as t
+                FROM user_predictions
+                WHERE user_id = :uid AND outcome IN ('correct','incorrect') AND deleted_at IS NULL
+            """), {"uid": r[1]}).fetchone()
+            alltime_acc = round(alltime[0] / alltime[1] * 100, 1) if alltime and alltime[1] > 0 else 0
+            scored_map[key] = {
+                "id": r[1], "name": r[2], "handle": r[3],
+                "platform": "player", "source": "player",
+                "alltime_accuracy": alltime_acc,
+                "correct": 0, "total": 0,
+            }
+        scored_map[key]["total"] += 1
+        if r[6] == "correct":
+            scored_map[key]["correct"] += 1
+
+    # Build sorted leaderboard
+    scored_list = sorted(scored_map.values(), key=lambda x: (x["correct"] / x["total"] if x["total"] > 0 else 0, x["total"]), reverse=True)
+
     scored_lb = []
-    for i, r in enumerate(scored_rows):
-        acc = round(r[6] / r[5] * 100, 1) if r[5] > 0 else 0
+    for i, s in enumerate(scored_list[:30]):
+        acc = round(s["correct"] / s["total"] * 100, 1) if s["total"] > 0 else 0
         scored_lb.append({
-            "id": r[0], "name": r[1], "handle": r[2],
-            "platform": r[3] or "youtube",
+            "id": s["id"], "name": s["name"], "handle": s["handle"],
+            "platform": s["platform"], "source": s["source"],
             "accuracy_rate": acc,
-            "total_predictions": r[5],
-            "evaluated_predictions": r[5],
-            "correct_predictions": r[6],
-            "alltime_accuracy": float(r[4] or 0),
+            "total_predictions": s["total"],
+            "evaluated_predictions": s["total"],
+            "correct_predictions": s["correct"],
+            "alltime_accuracy": s["alltime_accuracy"],
             "alpha": 0, "avg_return": 0,
             "rank": i + 1,
             "streak": {"type": "none", "count": 0},
             "rank_movement": {"direction": "none", "change": 0},
-            "sector_strengths": [], "scored_count": r[5],
+            "sector_strengths": [], "scored_count": s["total"],
             "has_disclosed_positions": False,
             "conflict_count": 0, "conflict_rate": 0,
             "verified_predictions": 0,
         })
 
-    # New calls this week
-    new_rows = db.execute(sql_text("""
-        SELECT f.id, f.name, f.handle, f.platform, f.accuracy_score, COUNT(*) as cnt
+    # ── New Calls This Week ──
+    # Analyst predictions submitted this week
+    new_analyst = db.execute(sql_text("""
+        SELECT 'analyst' as source, f.id, f.name, f.handle, f.platform,
+               f.accuracy_score, COUNT(*) as cnt
         FROM predictions p
         JOIN forecasters f ON f.id = p.forecaster_id
         WHERE p.prediction_date >= NOW() - INTERVAL '7 days'
@@ -156,13 +211,44 @@ def _week_leaderboard_impl(db: Session) -> dict:
         LIMIT 15
     """)).fetchall()
 
-    new_calls = [
-        {"id": r[0], "name": r[1], "handle": r[2], "platform": r[3] or "youtube",
-         "alltime_accuracy": float(r[4] or 0), "new_predictions": r[5]}
-        for r in new_rows
-    ]
+    # Player predictions submitted this week
+    new_player = db.execute(sql_text("""
+        SELECT 'player' as source, u.id, u.username, u.username, 'player' as platform,
+               NULL as acc, COUNT(*) as cnt
+        FROM user_predictions up
+        JOIN users u ON u.id = up.user_id
+        WHERE up.created_at >= NOW() - INTERVAL '7 days'
+          AND up.deleted_at IS NULL
+        GROUP BY u.id, u.username
+        ORDER BY cnt DESC
+        LIMIT 15
+    """)).fetchall()
 
-    return {"scored_this_week": scored_lb, "new_calls_this_week": new_calls}
+    new_calls = []
+    for r in new_analyst:
+        new_calls.append({
+            "id": r[1], "name": r[2], "handle": r[3],
+            "platform": r[4] or "youtube", "source": "analyst",
+            "alltime_accuracy": float(r[5] or 0), "new_predictions": r[6],
+        })
+    for r in new_player:
+        # Compute all-time accuracy
+        alltime = db.execute(sql_text("""
+            SELECT COUNT(*) FILTER (WHERE outcome = 'correct') as c,
+                   COUNT(*) as t
+            FROM user_predictions
+            WHERE user_id = :uid AND outcome IN ('correct','incorrect') AND deleted_at IS NULL
+        """), {"uid": r[1]}).fetchone()
+        alltime_acc = round(alltime[0] / alltime[1] * 100, 1) if alltime and alltime[1] > 0 else 0
+        new_calls.append({
+            "id": r[1], "name": r[2], "handle": r[3],
+            "platform": "player", "source": "player",
+            "alltime_accuracy": alltime_acc, "new_predictions": r[6],
+        })
+
+    new_calls.sort(key=lambda x: x["new_predictions"], reverse=True)
+
+    return {"scored_this_week": scored_lb, "new_calls_this_week": new_calls[:20]}
 
 
 @router.get("/leaderboard")

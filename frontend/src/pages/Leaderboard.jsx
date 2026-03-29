@@ -407,19 +407,26 @@ function WeekView({ weekData, data }) {
               <thead>
                 <tr className="text-left text-muted text-xs uppercase tracking-wider border-b border-border">
                   <th className="px-5 py-3 w-12">#</th>
-                  <th className="px-5 py-3">Analyst</th>
+                  <th className="px-5 py-3">Forecaster</th>
                   <th className="px-5 py-3 text-right">This Week</th>
                   <th className="px-5 py-3 text-right hidden sm:table-cell">All-Time</th>
                 </tr>
               </thead>
               <tbody>
                 {scored.map(f => (
-                  <tr key={f.id} className="border-b border-border/50 hover:bg-surface-2/30 transition-colors">
+                  <tr key={`${f.source || 'analyst'}_${f.id}`} className="border-b border-border/50 hover:bg-surface-2/30 transition-colors">
                     <td className="px-5 py-3">
                       <span className="font-mono font-bold text-text-secondary">{f.rank}</span>
                     </td>
                     <td className="px-5 py-3">
-                      <Link to={`/forecaster/${f.id}`} className="font-medium text-sm hover:text-accent transition-colors">{f.name}</Link>
+                      <Link to={f.source === 'player' ? `/profile/${f.handle}` : `/forecaster/${f.id}`} className="font-medium text-sm hover:text-accent transition-colors">
+                        {f.name}
+                      </Link>
+                      {f.source === 'player' ? (
+                        <span className="ml-1.5 text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-accent/10 text-accent">Player</span>
+                      ) : (
+                        <span className="ml-1.5 text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-warning/10 text-warning">Analyst</span>
+                      )}
                     </td>
                     <td className="px-5 py-3 text-right">
                       <span className={`font-mono font-semibold ${f.accuracy_rate >= 60 ? 'text-positive' : 'text-negative'}`}>
@@ -446,10 +453,15 @@ function WeekView({ weekData, data }) {
           </h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
             {newCalls.map(f => (
-              <Link key={f.id} to={`/forecaster/${f.id}`}
+              <Link key={`${f.source || 'analyst'}_${f.id}`} to={f.source === 'player' ? `/profile/${f.handle}` : `/forecaster/${f.id}`}
                 className="card py-3 flex items-center justify-between hover:border-accent/20 transition-colors">
                 <div>
                   <span className="text-sm font-medium">{f.name}</span>
+                  {f.source === 'player' ? (
+                    <span className="ml-1 text-[10px] font-semibold px-1 py-0.5 rounded-full bg-accent/10 text-accent">Player</span>
+                  ) : (
+                    <span className="ml-1 text-[10px] font-semibold px-1 py-0.5 rounded-full bg-warning/10 text-warning">Analyst</span>
+                  )}
                   <span className="text-muted text-xs ml-1.5 font-mono">({(f.alltime_accuracy || 0).toFixed(0)}% acc)</span>
                 </div>
                 <span className="font-mono text-accent text-sm font-semibold">{f.new_predictions} new</span>

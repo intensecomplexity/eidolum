@@ -45,16 +45,26 @@ def get_ticker_detail(request: Request, ticker: str, db: Session = Depends(get_d
 
     # ── Sector + company name ─────────────────────────────────────────────
     sector = None
+    company_name = None
+    industry = None
     try:
-        sector = db.execute(sql_text(
-            "SELECT sector FROM ticker_sectors WHERE ticker = :t"
-        ), {"t": ticker}).scalar()
+        ts_row = db.execute(sql_text(
+            "SELECT sector, company_name, industry FROM ticker_sectors WHERE ticker = :t"
+        ), {"t": ticker}).first()
+        if ts_row:
+            sector = ts_row[0]
+            company_name = ts_row[1]
+            industry = ts_row[2]
     except Exception:
         pass
     if not sector:
         sector = db.execute(sql_text(
             "SELECT sector FROM predictions WHERE ticker = :t AND sector IS NOT NULL AND sector != 'Other' LIMIT 1"
         ), {"t": ticker}).scalar()
+    # Fallback company name from hardcoded lookup
+    if not company_name:
+        from ticker_lookup import TICKER_INFO
+        company_name = TICKER_INFO.get(ticker)
 
     # ── Pending predictions (sorted by eval date, soonest first) ──────────
     pending_rows = db.execute(sql_text("""
@@ -137,6 +147,8 @@ def get_ticker_detail(request: Request, ticker: str, db: Session = Depends(get_d
 
     result = {
         "ticker": ticker,
+        "company_name": company_name,
+        "industry": industry,
         "sector": sector,
         "total_predictions": total,
         "consensus": {

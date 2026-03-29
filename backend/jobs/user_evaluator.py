@@ -255,7 +255,16 @@ def evaluate_user_predictions(db: Session) -> list[dict]:
 
 
 def _update_season_scored(user_id: int, outcome: str, db: Session):
-    season = db.query(Season).filter(Season.status == "active").first()
+    """Credit the season that covers the current scoring time."""
+    now = datetime.utcnow()
+    season = (
+        db.query(Season)
+        .filter(Season.starts_at <= now, Season.ends_at > now)
+        .first()
+    )
+    if not season:
+        # Fallback to active season
+        season = db.query(Season).filter(Season.status == "active").first()
     if not season:
         return
     entry = (
@@ -263,10 +272,12 @@ def _update_season_scored(user_id: int, outcome: str, db: Session):
         .filter(SeasonEntry.season_id == season.id, SeasonEntry.user_id == user_id)
         .first()
     )
-    if entry:
-        entry.predictions_scored = (entry.predictions_scored or 0) + 1
-        if outcome == "correct":
-            entry.predictions_correct = (entry.predictions_correct or 0) + 1
+    if not entry:
+        entry = SeasonEntry(season_id=season.id, user_id=user_id)
+        db.add(entry)
+    entry.predictions_scored = (entry.predictions_scored or 0) + 1
+    if outcome == "correct":
+        entry.predictions_correct = (entry.predictions_correct or 0) + 1
 
 
 # ══════════════════════════════════════════════════════════════════════════════

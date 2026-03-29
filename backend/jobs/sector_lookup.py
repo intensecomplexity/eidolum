@@ -80,10 +80,11 @@ def get_sector(ticker: str, db=None) -> str:
             )
             data = r.json()
             industry = data.get("finnhubIndustry", "")
+            company_name = data.get("name", "")
             if industry:
                 sector = _normalize_sector(industry)
                 _mem_cache[ticker] = sector
-                _cache_to_db(ticker, sector, db)
+                _cache_to_db(ticker, sector, db, company_name=company_name, industry=industry)
                 return sector
         except Exception:
             pass
@@ -122,15 +123,24 @@ def _normalize_sector(raw: str) -> str:
     return raw or "Other"
 
 
-def _cache_to_db(ticker: str, sector: str, db=None):
-    """Cache sector to DB table."""
+def _cache_to_db(ticker: str, sector: str, db=None, company_name: str = "", industry: str = ""):
+    """Cache sector, company name, and industry to DB table."""
     if not db:
         return
     try:
-        db.execute(sql_text("""
-            INSERT INTO ticker_sectors (ticker, sector) VALUES (:t, :s)
-            ON CONFLICT (ticker) DO UPDATE SET sector = :s
-        """), {"t": ticker, "s": sector})
+        if company_name:
+            db.execute(sql_text("""
+                INSERT INTO ticker_sectors (ticker, sector, company_name, industry)
+                VALUES (:t, :s, :cn, :ind)
+                ON CONFLICT (ticker) DO UPDATE SET sector = :s,
+                    company_name = COALESCE(NULLIF(:cn, ''), ticker_sectors.company_name),
+                    industry = COALESCE(NULLIF(:ind, ''), ticker_sectors.industry)
+            """), {"t": ticker, "s": sector, "cn": company_name, "ind": industry})
+        else:
+            db.execute(sql_text("""
+                INSERT INTO ticker_sectors (ticker, sector) VALUES (:t, :s)
+                ON CONFLICT (ticker) DO UPDATE SET sector = :s
+            """), {"t": ticker, "s": sector})
         db.commit()
     except Exception:
         try:

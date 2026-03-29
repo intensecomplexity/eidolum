@@ -1195,6 +1195,8 @@ async def lifespan(app):
                 "ALTER TABLE forecasters ADD COLUMN streak INTEGER DEFAULT 0",
                 "ALTER TABLE forecasters ADD COLUMN avg_return FLOAT",
                 "ALTER TABLE predictions ADD COLUMN evaluated_at TIMESTAMP",
+                "ALTER TABLE ticker_sectors ADD COLUMN company_name VARCHAR(200)",
+                "ALTER TABLE ticker_sectors ADD COLUMN industry VARCHAR(100)",
             ]:
                 try:
                     db.execute(_t(col_sql))

@@ -58,7 +58,13 @@ export default function TickerDetail() {
                   </span>
                 )}
               </div>
-              <div className="text-muted text-sm">{data.total_predictions} predictions tracked</div>
+              {data.company_name && (
+                <div className="text-text-secondary text-base sm:text-lg">{data.company_name}</div>
+              )}
+              {data.industry && (
+                <div className="text-muted text-xs">{data.industry}</div>
+              )}
+              <div className="text-muted text-sm mt-1">{data.total_predictions} predictions tracked</div>
             </div>
 
             {/* Consensus bar */}
