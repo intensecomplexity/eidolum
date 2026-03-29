@@ -899,6 +899,19 @@ def run_phase2_migrations():
     except Exception:
         db.rollback()
 
+    # ── 36. Performance indexes ────────────────────────────────────
+    for idx_sql in [
+        "CREATE INDEX IF NOT EXISTS idx_pred_forecaster_outcome ON predictions(forecaster_id, outcome)",
+        "CREATE INDEX IF NOT EXISTS idx_pred_evaluation_date ON predictions(evaluation_date)",
+        "CREATE INDEX IF NOT EXISTS idx_pred_outcome ON predictions(outcome)",
+        "CREATE INDEX IF NOT EXISTS idx_forecasters_total ON forecasters(total_predictions)",
+    ]:
+        try:
+            db.execute(text(idx_sql))
+            db.commit()
+        except Exception:
+            db.rollback()
+
     print("[Phase2] All migrations complete")
     db.close()
 
