@@ -14,7 +14,12 @@ function AnimatedNumber({ target, duration = 1500, suffix = '' }) {
   const started = useRef(false);
 
   useEffect(() => {
-    if (!target) return;
+    if (!target || target <= 0) {
+      setValue(0);
+      return;
+    }
+    // Reset so re-animation triggers when target changes
+    started.current = false;
     const observer = new IntersectionObserver(([entry]) => {
       if (entry.isIntersecting && !started.current) {
         started.current = true;
@@ -28,7 +33,7 @@ function AnimatedNumber({ target, duration = 1500, suffix = '' }) {
         };
         tick();
       }
-    }, { threshold: 0.3 });
+    }, { threshold: 0.1 });
     if (ref.current) observer.observe(ref.current);
     return () => observer.disconnect();
   }, [target, duration]);
@@ -277,15 +282,16 @@ export default function LandingPublic() {
                     <span className={`shrink-0 ${p.direction === 'bullish' ? 'text-positive' : 'text-negative'}`}>
                       {p.direction === 'bullish' ? <TrendingUp className="w-4 h-4" /> : <TrendingDown className="w-4 h-4" />}
                     </span>
-                    <div className="flex-1 min-w-0 text-sm">
-                      <span className="text-text-secondary">{p.forecaster?.name}</span>
-                      <span className="text-muted"> — </span>
-                      <span className={p.direction === 'bullish' ? 'text-positive font-medium' : 'text-negative font-medium'}>
-                        {p.direction === 'bullish' ? 'Bullish' : 'Bearish'}
-                      </span>
-                      <span className="text-muted"> on </span>
-                      <span className="font-mono text-accent font-semibold">{p.ticker}</span>
-                      {p.target_price && <span className="text-muted">, target ${p.target_price.toFixed(0)}</span>}
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm font-medium text-text-primary">{p.forecaster?.name}</div>
+                      <div className="text-xs">
+                        <span className={p.direction === 'bullish' ? 'text-positive' : 'text-negative'}>
+                          {p.direction === 'bullish' ? 'Bullish' : 'Bearish'}
+                        </span>
+                        <span className="text-muted"> on </span>
+                        <span className="font-mono text-accent font-semibold">{p.ticker}</span>
+                        {p.target_price && <span className="text-muted">, target ${p.target_price.toFixed(0)}</span>}
+                      </div>
                     </div>
                     <span className="text-muted text-xs font-mono shrink-0">{timeAgo(p.prediction_date)}</span>
                   </Link>
