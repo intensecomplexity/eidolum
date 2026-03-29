@@ -1053,6 +1053,33 @@ async def lifespan(app):
         log_archive_status()
     except Exception:
         pass
+    # One-time data cleanup: remove garbage forecasters, duplicates, benzinga_web junk
+    try:
+        db = SessionLocal()
+        from sqlalchemy import text as _text
+        # Delete predictions from garbage forecasters (name > 50 chars)
+        r1 = db.execute(_text("DELETE FROM predictions WHERE forecaster_id IN (SELECT id FROM forecasters WHERE LENGTH(name) > 50)"))
+        # Delete the garbage forecasters themselves
+        r2 = db.execute(_text("DELETE FROM forecasters WHERE LENGTH(name) > 50"))
+        # Delete cross-scraper duplicates (keep oldest per ticker+forecaster+direction+date)
+        r3 = db.execute(_text("""
+            DELETE FROM predictions WHERE id IN (
+                SELECT p2.id FROM predictions p1
+                JOIN predictions p2 ON p1.ticker = p2.ticker
+                    AND p1.forecaster_id = p2.forecaster_id
+                    AND p1.direction = p2.direction
+                    AND DATE(p1.prediction_date) = DATE(p2.prediction_date)
+                    AND p1.id < p2.id
+            )
+        """))
+        db.commit()
+        total_cleaned = (r1.rowcount or 0) + (r3.rowcount or 0)
+        if total_cleaned > 0:
+            print(f"[Startup Cleanup] Removed {r1.rowcount} garbage predictions, {r2.rowcount} garbage forecasters, {r3.rowcount} duplicates")
+        db.close()
+    except Exception as e:
+        print(f"[Startup Cleanup] Error (non-fatal): {e}")
+
     # Predictions persist between deploys — Layer 3 cleanup handles invalid ones hourly
     # Seed forecasters (keep existing, add missing)
     try:
@@ -1134,13 +1161,13 @@ async def lifespan(app):
                 active_scrapers.append("fmp_daily_grades")
             except Exception as e:
                 print(f"[Background] FMP daily grades error: {e}")
-            # Benzinga web scraper
-            try:
-                from jobs.benzinga_web_scraper import scrape_benzinga_web
-                scrape_benzinga_web(db)
-                active_scrapers.append("benzinga_web")
-            except Exception as e:
-                print(f"[Background] Benzinga web error: {e}")
+            # Benzinga web scraper — DISABLED (produces garbage data)
+            # try:
+            #     from jobs.benzinga_web_scraper import scrape_benzinga_web
+            #     scrape_benzinga_web(db)
+            #     active_scrapers.append("benzinga_web")
+            # except Exception as e:
+            #     print(f"[Background] Benzinga web error: {e}")
             # NewsAPI
             try:
                 from jobs.news_scraper import scrape_newsapi
@@ -1389,7 +1416,8 @@ async def lifespan(app):
     scheduler.add_job(run_fast_scraper, "interval", minutes=15, id="fast_scraper")
     scheduler.add_job(run_benzinga_api, "interval", hours=2, id="benzinga_api", next_run_time=datetime.utcnow() + timedelta(minutes=15))
     scheduler.add_job(run_newsapi, "interval", hours=4, id="newsapi", next_run_time=datetime.utcnow() + timedelta(minutes=10))
-    scheduler.add_job(run_benzinga_web, "interval", hours=2, id="benzinga_web", next_run_time=datetime.utcnow() + timedelta(minutes=25))
+    # DISABLED: benzinga_web produces garbage data (bad firm names, duplicates of API data)
+    # scheduler.add_job(run_benzinga_web, "interval", hours=2, id="benzinga_web", next_run_time=datetime.utcnow() + timedelta(minutes=25))
 
     # Massive API — Benzinga ratings
     def run_massive_benzinga():
