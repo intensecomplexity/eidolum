@@ -1997,6 +1997,43 @@ def refresh_stats():
     return refresh_all_forecaster_stats()
 
 
+@app.post("/api/admin/re-evaluate-all")
+def re_evaluate_all():
+    """Reset all scored predictions to pending and re-run evaluator with fixed logic."""
+    import threading
+    from sqlalchemy import text as _t
+
+    # Reset scored predictions back to pending
+    db = SessionLocal()
+    try:
+        count = db.execute(_t(
+            "UPDATE predictions SET outcome='pending', actual_return=NULL WHERE outcome IN ('correct','incorrect')"
+        )).rowcount
+        db.commit()
+        print(f"[ReEval] Reset {count} predictions to pending")
+    finally:
+        db.close()
+
+    # Trigger background evaluation
+    def _run():
+        from jobs.historical_evaluator import evaluate_batch, refresh_all_forecaster_stats
+        total = 0
+        while True:
+            result = evaluate_batch(max_tickers=200)
+            scored = result.get('predictions_scored', 0)
+            total += scored
+            print(f"[ReEval] Batch: {scored} scored, total: {total}, remaining: {result.get('remaining_tickers', 0)}")
+            if scored == 0 or result.get('remaining_tickers', 0) == 0:
+                break
+            import time
+            time.sleep(5)
+        refresh_all_forecaster_stats()
+        print(f"[ReEval] Complete: {total} predictions re-evaluated")
+
+    threading.Thread(target=_run, daemon=True).start()
+    return {"status": "started", "predictions_reset": count}
+
+
 @app.post("/api/admin/backfill-sectors")
 def backfill_sectors():
     """Look up and assign sectors for predictions missing sector data. 50 tickers per call."""

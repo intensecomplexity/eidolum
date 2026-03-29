@@ -169,16 +169,38 @@ def evaluate_batch(max_tickers: int = 50) -> dict:
                     skipped_no_ref += 1
                     continue
 
-            ret = round(((eval_price - ref) / ref) * 100, 2)
+            target = p["target_price"]
 
-            if p["direction"] == "bullish":
-                outcome = "correct" if (eval_price >= p["target_price"] if p["target_price"] and p["target_price"] > 0 else ret > 0) else "incorrect"
-            elif p["direction"] == "bearish":
-                outcome = "correct" if (eval_price <= p["target_price"] if p["target_price"] and p["target_price"] > 0 else ret < 0) else "incorrect"
+            # Determine effective direction from price target when available
+            # A "bullish" rating with target BELOW entry is actually bearish
+            direction = p["direction"]
+            if target and target > 0 and ref > 0:
+                if target > ref:
+                    direction = "bullish"  # Target above entry = expects stock to rise
+                elif target < ref:
+                    direction = "bearish"  # Target below entry = expects stock to fall
+
+            # Calculate return based on direction
+            raw_move = round(((eval_price - ref) / ref) * 100, 2)
+            if direction == "bearish":
+                ret = -raw_move  # For bearish, positive return = stock went down
             else:
-                continue
+                ret = raw_move
 
-            updates.append({"id": p["id"], "outcome": outcome, "ret": ret, "ep": ref, "fid": p["forecaster_id"]})
+            # Score: did the stock move in the predicted direction?
+            if target and target > 0:
+                if direction == "bullish":
+                    outcome = "correct" if eval_price >= target else "incorrect"
+                else:
+                    outcome = "correct" if eval_price <= target else "incorrect"
+            else:
+                # No price target — pure directional
+                if direction == "bullish":
+                    outcome = "correct" if eval_price > ref else "incorrect"
+                else:
+                    outcome = "correct" if eval_price < ref else "incorrect"
+
+            updates.append({"id": p["id"], "outcome": outcome, "ret": ret, "ep": ref, "fid": p["forecaster_id"], "direction": direction})
             affected_forecasters.add(p["forecaster_id"])
             if outcome == "correct":
                 total_correct += 1
@@ -195,8 +217,8 @@ def evaluate_batch(max_tickers: int = 50) -> dict:
             try:
                 for u in updates:
                     db.execute(sql_text("""
-                        UPDATE predictions SET outcome=:o, actual_return=:r, entry_price=COALESCE(entry_price,:ep) WHERE id=:id
-                    """), {"o": u["outcome"], "r": u["ret"], "ep": u["ep"], "id": u["id"]})
+                        UPDATE predictions SET outcome=:o, actual_return=:r, direction=:d, entry_price=COALESCE(entry_price,:ep) WHERE id=:id
+                    """), {"o": u["outcome"], "r": u["ret"], "d": u["direction"], "ep": u["ep"], "id": u["id"]})
                 db.commit()
                 total_scored += len(updates)
             except Exception as e:
