@@ -64,8 +64,8 @@ def run_evaluation_background():
 
             print(f"[HistEval] Progress: {_eval_status['tickers_processed']} tickers, {_eval_status['predictions_scored']} scored, {result['remaining_tickers']} remaining")
 
-            # 10 second break between batches — give user-facing queries priority
-            time.sleep(10)
+            # 3 second break between batches
+            time.sleep(3)
 
     except Exception as e:
         _eval_status["last_error"] = str(e)
@@ -77,7 +77,7 @@ def run_evaluation_background():
         _eval_status["running"] = False
 
 
-def evaluate_batch(max_tickers: int = 50) -> dict:
+def evaluate_batch(max_tickers: int = 200) -> dict:
     """Evaluate one batch of tickers. Connection-safe."""
     from database import BgSessionLocal as SessionLocal
 
@@ -135,8 +135,8 @@ def evaluate_batch(max_tickers: int = 50) -> dict:
         prices = _fetch_history(ticker, None, None)  # Just gets current quote
         if prices:
             all_prices[ticker] = prices
-        if (i + 1) % 20 == 0:
-            time.sleep(0.5)  # Brief pause every 20 tickers
+        if (i + 1) % 50 == 0:
+            time.sleep(1)  # Respect Finnhub rate limit (~60/min)
 
     print(f"[HistEval] Got prices for {len(all_prices)}/{len(tickers)} tickers")
 
