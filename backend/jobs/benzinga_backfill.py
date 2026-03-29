@@ -283,11 +283,20 @@ def _insert_rating(rating: dict, db: Session) -> bool:
         source_type="article", source_platform_id=f"mbz_{ticker}_{canonical}_{date_str}",
         external_id=f"bz_{benzinga_id}" if benzinga_id else None,
         target_price=target_price, entry_price=entry_price,
+        sector=_get_sector_safe(ticker, db),
         context=context[:500], exact_quote=context,
         outcome="pending", verified_by="massive_benzinga",
     )
     db.add(pred)
     return True
+
+
+def _get_sector_safe(ticker, db):
+    try:
+        from jobs.sector_lookup import get_sector
+        return get_sector(ticker, db)
+    except Exception:
+        return "Other"
 
 
 def _evaluate_day(day_str: str, db: Session) -> int:

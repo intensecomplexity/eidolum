@@ -912,6 +912,19 @@ def run_phase2_migrations():
         except Exception:
             db.rollback()
 
+    # ── 37. ticker_sectors cache table ─────────────────────────────
+    try:
+        db.execute(text("""
+            CREATE TABLE IF NOT EXISTS ticker_sectors (
+                ticker VARCHAR(10) PRIMARY KEY,
+                sector VARCHAR(50),
+                last_updated TIMESTAMP DEFAULT NOW()
+            )
+        """))
+        db.commit()
+    except Exception as e:
+        db.rollback()
+
     print("[Phase2] All migrations complete")
     db.close()
 
@@ -1982,6 +1995,26 @@ def refresh_stats():
     """Recalculate ALL forecaster stats from predictions table."""
     from jobs.historical_evaluator import refresh_all_forecaster_stats
     return refresh_all_forecaster_stats()
+
+
+@app.post("/api/admin/backfill-sectors")
+def backfill_sectors():
+    """Look up and assign sectors for predictions missing sector data. 50 tickers per call."""
+    import threading
+    from jobs.sector_lookup import backfill_sectors_batch
+
+    def _run():
+        while True:
+            result = backfill_sectors_batch(max_tickers=50)
+            print(f"[SectorBackfill] {result}")
+            if result.get("tickers_processed", 0) == 0:
+                break
+            import time
+            time.sleep(2)
+        print("[SectorBackfill] Complete")
+
+    threading.Thread(target=_run, daemon=True).start()
+    return {"status": "started"}
 
 
 @app.get("/api/admin/evaluate-test-one")

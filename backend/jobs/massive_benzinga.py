@@ -256,10 +256,19 @@ def _process_rating(rating: dict, db: Session) -> bool:
         source_type="article", source_platform_id=source_id,
         external_id=f"bz_{benzinga_id}" if benzinga_id else None,
         target_price=target_price, entry_price=entry_price,
+        sector=_get_sector_safe(ticker, db),
         context=context[:500], exact_quote=context,
         outcome="pending", verified_by="massive_benzinga",
     ))
     return True
+
+
+def _get_sector_safe(ticker: str, db) -> str:
+    try:
+        from jobs.sector_lookup import get_sector
+        return get_sector(ticker, db)
+    except Exception:
+        return "Other"
 
 
 def _get_direction(action_lower: str, rating_lower: str, pt_current, pt_prior) -> str | None:
