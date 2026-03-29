@@ -20,27 +20,46 @@ INTEGRITY_CHECK_TTL = 600
 _last_forecaster_count: int = 0
 
 
-def _refresh_leaderboard(db: Session) -> list:
-    """Compute the full leaderboard using a single SQL query."""
-    try:
-        # Set a statement timeout to prevent hanging
-        db.execute(sql_text("SET statement_timeout = '5000'"))  # 5 seconds max
-    except Exception:
-        pass  # SQLite doesn't support this
+def _refresh_leaderboard(db: Session) -> list | dict:
+    """Compute the full leaderboard. Falls back to lower thresholds if empty."""
+    global _last_forecaster_count
 
-    rows = db.execute(sql_text("""
-        SELECT
-            f.id, f.name, f.handle, f.platform, f.channel_url,
-            f.subscriber_count, f.profile_image_url, f.streak,
-            f.total_predictions, f.correct_predictions, f.accuracy_score,
-            COALESCE(f.alpha, 0) as alpha,
-            COALESCE(f.avg_return, 0) as avg_return
-        FROM forecasters f
-        WHERE COALESCE(f.total_predictions, 0) >= 10
-          AND COALESCE(f.accuracy_score, 0) > 0
-        ORDER BY f.accuracy_score DESC, f.total_predictions DESC
-        LIMIT 100
-    """)).fetchall()
+    try:
+        db.execute(sql_text("SET statement_timeout = '5000'"))
+    except Exception:
+        pass
+
+    # Try descending thresholds so the leaderboard is NEVER empty without explanation
+    for min_preds in [10, 5, 3, 1]:
+        rows = db.execute(sql_text("""
+            SELECT
+                f.id, f.name, f.handle, f.platform, f.channel_url,
+                f.subscriber_count, f.profile_image_url, f.streak,
+                f.total_predictions, f.correct_predictions, f.accuracy_score,
+                COALESCE(f.alpha, 0) as alpha,
+                COALESCE(f.avg_return, 0) as avg_return
+            FROM forecasters f
+            WHERE COALESCE(f.total_predictions, 0) >= :min_preds
+              AND COALESCE(f.accuracy_score, 0) > 0
+            ORDER BY f.accuracy_score DESC, f.total_predictions DESC
+            LIMIT 100
+        """), {"min_preds": min_preds}).fetchall()
+
+        if rows:
+            if min_preds < 10:
+                print(f"[Leaderboard] WARNING: fell back to {min_preds}+ threshold ({len(rows)} results)")
+            break
+
+    if not rows:
+        # Truly empty — return stats so frontend can show a message
+        total_preds = db.execute(sql_text("SELECT COUNT(*) FROM predictions")).scalar() or 0
+        pending = db.execute(sql_text("SELECT COUNT(*) FROM predictions WHERE outcome = 'pending'")).scalar() or 0
+        print(f"[Leaderboard] WARNING: 0 forecasters qualify! {total_preds} total, {pending} pending")
+        return {
+            "forecasters": [],
+            "message": "Predictions are being evaluated. Check back soon.",
+            "stats": {"total_predictions": total_preds, "being_evaluated": pending},
+        }
 
     results = []
     for i, r in enumerate(rows):
@@ -64,6 +83,12 @@ def _refresh_leaderboard(db: Session) -> list:
             "verified_predictions": r[8] or 0,
             "sector_strengths": [],
         })
+
+    # Detect count drop — possible stats sync issue
+    new_count = len(results)
+    if _last_forecaster_count > 0 and new_count < _last_forecaster_count * 0.5:
+        print(f"[Leaderboard] WARNING: forecaster count dropped from {_last_forecaster_count} to {new_count} — possible stats sync issue")
+    _last_forecaster_count = new_count
 
     # Batch-fetch sector strengths for all forecasters in one query
     if results:
@@ -99,6 +124,42 @@ def _refresh_leaderboard(db: Session) -> list:
             print(f"[Leaderboard] Sector query error: {e}")
 
     return results
+
+
+def _check_stats_integrity(db: Session):
+    """Periodic sanity check: compare cached stats to actual prediction counts for a sample."""
+    global _integrity_check_time
+    now = _time.time()
+    if (now - _integrity_check_time) < INTEGRITY_CHECK_TTL:
+        return
+    _integrity_check_time = now
+
+    try:
+        sample = db.execute(sql_text("""
+            SELECT f.id, f.name, f.total_predictions,
+                   (SELECT COUNT(*) FROM predictions p
+                    WHERE p.forecaster_id = f.id AND p.outcome IN ('correct','incorrect')) as actual
+            FROM forecasters f
+            WHERE f.total_predictions > 0
+            ORDER BY RANDOM() LIMIT 5
+        """)).fetchall()
+
+        mismatches = 0
+        for r in sample:
+            cached, actual = r[2] or 0, r[3] or 0
+            if cached != actual:
+                mismatches += 1
+                print(f"[Integrity] MISMATCH: {r[1]} (id={r[0]}): cached={cached}, actual={actual}")
+
+        if mismatches > 0:
+            print(f"[Integrity] {mismatches}/5 mismatches — triggering stats refresh")
+            from utils import recalculate_forecaster_stats
+            # Refresh the mismatched ones plus a broader sweep
+            fids = [r[0] for r in sample if (r[2] or 0) != (r[3] or 0)]
+            for fid in fids:
+                recalculate_forecaster_stats(fid, db)
+    except Exception as e:
+        print(f"[Integrity] Check error: {e}")
 
 
 def _week_leaderboard(db: Session) -> dict:
@@ -300,13 +361,20 @@ def get_leaderboard(
             r["scored_count"] = r.get("evaluated_predictions", 0)
         return results
 
+    # Periodic stats integrity check
+    _check_stats_integrity(db)
+
     # Default all-time: use cache
     if _leaderboard_cache and (_time.time() - _cache_time) < CACHE_TTL:
         return _leaderboard_cache
 
     # Non-blocking: try to refresh, return empty if DB is slow
     try:
-        _leaderboard_cache = _refresh_leaderboard(db)
+        result = _refresh_leaderboard(db)
+        # _refresh_leaderboard returns a dict when truly empty (with message)
+        if isinstance(result, dict):
+            return result
+        _leaderboard_cache = result
         _cache_time = _time.time()
     except Exception as e:
         print(f"[Leaderboard] Query error: {e}")
