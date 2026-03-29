@@ -445,8 +445,8 @@ function NewsletterSignupSection() {
       {/* What's inside */}
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mb-8 max-w-lg mx-auto text-left">
         {[
-          'Top Movers', 'Biggest Calls', 'Expiring Soon',
-          'Accuracy Spotlight', 'Community Pick', 'Weekly Stats',
+          'Top Movers', 'Biggest Calls', 'Accuracy Spotlight',
+          'Community Pick', 'Weekly Stats',
         ].map(item => (
           <div key={item} className="flex items-center gap-1.5 text-xs text-muted">
             <Check className="w-3 h-3 text-accent shrink-0" />
