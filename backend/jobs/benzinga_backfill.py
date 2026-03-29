@@ -106,9 +106,8 @@ def run_backfill(db: Session, start_date: date = None, end_date: date = None):
             inserted, fetched = _process_day(day_str, db)
             total_inserted += inserted
 
-            # Evaluate expired predictions from this day
-            evaluated = _evaluate_day(day_str, db)
-            total_evaluated += evaluated
+            # Skip evaluation during backfill — do it separately after backfill completes
+            evaluated = 0
 
             if inserted > 0 or fetched > 0:
                 print(f"[Backfill] {day_str}: fetched={fetched} inserted={inserted} evaluated={evaluated}")
