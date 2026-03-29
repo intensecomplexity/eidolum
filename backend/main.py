@@ -17,7 +17,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
-from database import engine, Base, SessionLocal, BgSessionLocal
+from database import engine, bg_engine, Base, SessionLocal, BgSessionLocal
 from models import Forecaster, Prediction, Config
 from rate_limit import limiter
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
@@ -39,6 +39,37 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
         response.headers["Permissions-Policy"] = "geolocation=(), microphone=(), camera=()"
         return response
+
+
+class RequestTimeoutMiddleware(BaseHTTPMiddleware):
+    """Kill any API request that takes longer than 8 seconds.
+    Returns 504 Gateway Timeout so hanging requests don't pile up and exhaust connections."""
+
+    TIMEOUT_SECONDS = 8
+
+    async def dispatch(self, request: Request, call_next):
+        import asyncio
+
+        # Skip timeout for admin endpoints (they can be slow by design)
+        if request.url.path.startswith("/api/admin/"):
+            return await call_next(request)
+        # Skip for non-API routes (static files, health checks)
+        if not request.url.path.startswith("/api/"):
+            return await call_next(request)
+
+        try:
+            response = await asyncio.wait_for(
+                call_next(request),
+                timeout=self.TIMEOUT_SECONDS,
+            )
+            return response
+        except asyncio.TimeoutError:
+            from starlette.responses import JSONResponse
+            print(f"[TIMEOUT] {request.method} {request.url.path} exceeded {self.TIMEOUT_SECONDS}s")
+            return JSONResponse(
+                status_code=504,
+                content={"error": "timeout", "message": f"Request took longer than {self.TIMEOUT_SECONDS}s"},
+            )
 
 
 def safety_check(db):
@@ -1100,6 +1131,13 @@ def archive_missing_proofs(db):
 _scheduler = None  # module-level reference for diagnostic endpoints
 
 
+# ┌──────────────────────────────────────────────────────────────────────────────┐
+# │ CRITICAL: Do NOT add synchronous DB operations to lifespan().              │
+# │ All DB work must go in _startup_all() background thread below.             │
+# │ Adding blocking DB calls here WILL crash the site on deploy.               │
+# │ The app must bind its port and start serving within seconds.               │
+# │ See incident 2026-03-29: startup hung → Railway couldn't deploy new code.  │
+# └──────────────────────────────────────────────────────────────────────────────┘
 @asynccontextmanager
 async def lifespan(app):
     global _scheduler
@@ -1201,152 +1239,43 @@ async def lifespan(app):
         print("[WARNING] ADMIN_SECRET not set — admin routes are unprotected!")
     # Start background job scheduler
     from admin_panel import scheduler_last_run
+    from circuit_breaker import db_is_healthy, mark_job_running, mark_job_done
 
-    def run_fast_scraper():
-        from datetime import datetime as _dt
-        print(f"[Scheduler] Running fast scraper at {_dt.utcnow()}")
-        scheduler_last_run["fast_scraper"] = _dt.utcnow()
-        from jobs.news_scraper import scrape_fast_predictions
-        db = BgSessionLocal()
-        try:
-            scrape_fast_predictions(db)
-        except Exception as e:
-            print(f"[FastScraper] Error: {e}")
-        finally:
-            db.close()
+    def _guarded_job(job_name, job_fn):
+        """Wrap a background job with circuit breaker + tracking."""
+        def wrapper():
+            from datetime import datetime as _dt
+            scheduler_last_run[job_name] = _dt.utcnow()
+            if not db_is_healthy(job_name):
+                return
+            mark_job_running(job_name)
+            db = BgSessionLocal()
+            try:
+                job_fn(db)
+            except Exception as e:
+                print(f"[{job_name}] Error: {e}")
+            finally:
+                db.close()
+                mark_job_done(job_name)
+        return wrapper
 
-    def run_hourly_scraper():
-        from datetime import datetime as _dt
-        print(f"[Scheduler] Running full scraper at {_dt.utcnow()}")
-        scheduler_last_run["full_scraper"] = _dt.utcnow()
-        db = BgSessionLocal()
-        try:
-            run_scraper(db)
-        finally:
-            db.close()
+    run_fast_scraper = _guarded_job("fast_scraper", lambda db: __import__('jobs.news_scraper', fromlist=['scrape_fast_predictions']).scrape_fast_predictions(db))
+    run_hourly_scraper = _guarded_job("full_scraper", lambda db: run_scraper(db))
+    run_15min_evaluator = _guarded_job("evaluator", lambda db: run_evaluator(db))
 
-    def run_15min_evaluator():
-        from datetime import datetime as _dt
-        print(f"[Scheduler] Running evaluator at {_dt.utcnow()}")
-        scheduler_last_run["evaluator"] = _dt.utcnow()
-        db = BgSessionLocal()
-        try:
-            run_evaluator(db)
-        finally:
-            db.close()
+    def _user_evaluator(db):
+        results = evaluate_user_predictions(db)
+        print(f"[Scheduler] User evaluator completed: {len(results or [])} predictions scored")
+    run_15min_user_evaluator = _guarded_job("user_evaluator", _user_evaluator)
 
-    def run_15min_user_evaluator():
-        from datetime import datetime as _dt
-        print(f"[Scheduler] Running user evaluator at {_dt.utcnow()}")
-        scheduler_last_run["user_evaluator"] = _dt.utcnow()
-        db = BgSessionLocal()
-        try:
-            results = evaluate_user_predictions(db)
-            print(f"[Scheduler] User evaluator completed: {len(results or [])} predictions scored")
-        except Exception as e:
-            print(f"[Scheduler] USER EVALUATOR FAILED: {e}")
-            import traceback
-            traceback.print_exc()
-        finally:
-            db.close()
-
-    def run_15min_duel_evaluator():
-        from datetime import datetime as _dt
-        print(f"[Scheduler] Running duel evaluator at {_dt.utcnow()}")
-        scheduler_last_run["duel_evaluator"] = _dt.utcnow()
-        db = BgSessionLocal()
-        try:
-            evaluate_duels(db)
-        finally:
-            db.close()
-
-    def run_hourly_season_check():
-        from datetime import datetime as _dt
-        print(f"[Scheduler] Running season check at {_dt.utcnow()}")
-        scheduler_last_run["season_check"] = _dt.utcnow()
-        db = BgSessionLocal()
-        try:
-            check_season_completion(db)
-        finally:
-            db.close()
-
-    def run_fmp_upgrades():
-        from datetime import datetime as _dt
-        print(f"[Scheduler] Running FMP upgrades at {_dt.utcnow()}")
-        scheduler_last_run["fmp_upgrades"] = _dt.utcnow()
-        db = BgSessionLocal()
-        try:
-            from jobs.upgrade_scrapers import scrape_fmp_upgrades
-            scrape_fmp_upgrades(db)
-        except Exception as e:
-            print(f"[FMP] Error: {e}")
-        finally:
-            db.close()
-
-    def run_fmp_price_targets():
-        from datetime import datetime as _dt
-        print(f"[Scheduler] Running FMP price targets at {_dt.utcnow()}")
-        scheduler_last_run["fmp_price_targets"] = _dt.utcnow()
-        db = BgSessionLocal()
-        try:
-            from jobs.upgrade_scrapers import scrape_fmp_price_targets
-            scrape_fmp_price_targets(db)
-        except Exception as e:
-            print(f"[FMP-PT] Error: {e}")
-        finally:
-            db.close()
-
-    def run_fmp_daily_grades():
-        from datetime import datetime as _dt
-        print(f"[Scheduler] Running FMP daily grades at {_dt.utcnow()}")
-        scheduler_last_run["fmp_daily_grades"] = _dt.utcnow()
-        db = BgSessionLocal()
-        try:
-            from jobs.upgrade_scrapers import scrape_fmp_daily_grades
-            scrape_fmp_daily_grades(db)
-        except Exception as e:
-            print(f"[FMP-Daily] Error: {e}")
-        finally:
-            db.close()
-
-    def run_yfinance():
-        from datetime import datetime as _dt
-        print(f"[Scheduler] Running yfinance at {_dt.utcnow()}")
-        scheduler_last_run["yfinance"] = _dt.utcnow()
-        db = BgSessionLocal()
-        try:
-            from jobs.rss_scrapers import scrape_yfinance_recommendations
-            scrape_yfinance_recommendations(db)
-        except Exception as e:
-            print(f"[yfinance] Error: {e}")
-        finally:
-            db.close()
-
-    def run_benzinga_api():
-        from datetime import datetime as _dt
-        print(f"[Scheduler] Running Benzinga API at {_dt.utcnow()}")
-        scheduler_last_run["benzinga_api"] = _dt.utcnow()
-        db = BgSessionLocal()
-        try:
-            from jobs.benzinga_scraper import scrape_benzinga_ratings
-            scrape_benzinga_ratings(db)
-        except Exception as e:
-            print(f"[Benzinga] Error: {e}")
-        finally:
-            db.close()
-
-    def run_newsapi():
-        from datetime import datetime as _dt
-        print(f"[Scheduler] Running NewsAPI at {_dt.utcnow()}")
-        scheduler_last_run["newsapi"] = _dt.utcnow()
-        db = BgSessionLocal()
-        try:
-            from jobs.news_scraper import scrape_newsapi
-            scrape_newsapi(db)
-        except Exception as e:
-            print(f"[NewsAPI] Error: {e}")
-        finally:
-            db.close()
+    run_15min_duel_evaluator = _guarded_job("duel_evaluator", lambda db: evaluate_duels(db))
+    run_hourly_season_check = _guarded_job("season_check", lambda db: check_season_completion(db))
+    run_fmp_upgrades = _guarded_job("fmp_upgrades", lambda db: __import__('jobs.upgrade_scrapers', fromlist=['scrape_fmp_upgrades']).scrape_fmp_upgrades(db))
+    run_fmp_price_targets = _guarded_job("fmp_price_targets", lambda db: __import__('jobs.upgrade_scrapers', fromlist=['scrape_fmp_price_targets']).scrape_fmp_price_targets(db))
+    run_fmp_daily_grades = _guarded_job("fmp_daily_grades", lambda db: __import__('jobs.upgrade_scrapers', fromlist=['scrape_fmp_daily_grades']).scrape_fmp_daily_grades(db))
+    run_yfinance = _guarded_job("yfinance", lambda db: __import__('jobs.rss_scrapers', fromlist=['scrape_yfinance_recommendations']).scrape_yfinance_recommendations(db))
+    run_benzinga_api = _guarded_job("benzinga_api", lambda db: __import__('jobs.benzinga_scraper', fromlist=['scrape_benzinga_ratings']).scrape_benzinga_ratings(db))
+    run_newsapi = _guarded_job("newsapi", lambda db: __import__('jobs.news_scraper', fromlist=['scrape_newsapi']).scrape_newsapi(db))
 
     print("[STARTUP] Scheduler starting...")
     scheduler = AsyncIOScheduler()
@@ -1359,25 +1288,8 @@ async def lifespan(app):
     # DISABLED: benzinga_web produces garbage data (bad firm names, duplicates of API data)
     # scheduler.add_job(run_benzinga_web, "interval", hours=2, id="benzinga_web", next_run_time=datetime.utcnow() + timedelta(minutes=25))
 
-    # Massive API — Benzinga ratings + auto-evaluate expired predictions after scrape
-    def run_massive_benzinga():
-        from datetime import datetime as _dt
-        print(f"[Scheduler] Running Massive Benzinga at {_dt.utcnow()}")
-        db = BgSessionLocal()
-        try:
-            from jobs.massive_benzinga import scrape_massive_ratings
-            scrape_massive_ratings(db)
-        except Exception as e:
-            print(f"[MassiveBZ] Scheduler error: {e}")
-            import traceback
-            traceback.print_exc()
-        finally:
-            db.close()
-
-        # DISABLED: Post-scrape evaluation was overloading the database
-        # Evaluation now runs on a separate schedule (every 4 hours)
-        pass
-
+    # Massive API — Benzinga ratings
+    run_massive_benzinga = _guarded_job("massive_benzinga", lambda db: __import__('jobs.massive_benzinga', fromlist=['scrape_massive_ratings']).scrape_massive_ratings(db))
     scheduler.add_job(run_massive_benzinga, "interval", hours=2, id="massive_benzinga", next_run_time=datetime.utcnow() + timedelta(minutes=20))
 
     # FMP structured data
@@ -1393,31 +1305,8 @@ async def lifespan(app):
     scheduler.add_job(run_hourly_season_check, "interval", hours=1, id="season_check")
 
     # Daily challenge jobs (EST times)
-    def run_create_daily_challenge():
-        from datetime import datetime as _dt
-        print(f"[Scheduler] Creating daily challenge at {_dt.utcnow()}")
-        scheduler_last_run["daily_challenge_create"] = _dt.utcnow()
-        db = BgSessionLocal()
-        try:
-            from jobs.daily_challenge import create_daily_challenge
-            create_daily_challenge(db)
-        except Exception as e:
-            print(f"[DailyChallenge] Create error: {e}")
-        finally:
-            db.close()
-
-    def run_score_daily_challenge():
-        from datetime import datetime as _dt
-        print(f"[Scheduler] Scoring daily challenge at {_dt.utcnow()}")
-        scheduler_last_run["daily_challenge_score"] = _dt.utcnow()
-        db = BgSessionLocal()
-        try:
-            from jobs.daily_challenge import score_daily_challenge
-            score_daily_challenge(db)
-        except Exception as e:
-            print(f"[DailyChallenge] Score error: {e}")
-        finally:
-            db.close()
+    run_create_daily_challenge = _guarded_job("daily_challenge_create", lambda db: __import__('jobs.daily_challenge', fromlist=['create_daily_challenge']).create_daily_challenge(db))
+    run_score_daily_challenge = _guarded_job("daily_challenge_score", lambda db: __import__('jobs.daily_challenge', fromlist=['score_daily_challenge']).score_daily_challenge(db))
 
     # Weekday: create at 14:30 UTC (9:30 AM EST)
     scheduler.add_job(run_create_daily_challenge, "cron", hour=14, minute=30, id="daily_challenge_create_weekday", day_of_week="mon-fri")
@@ -1428,111 +1317,55 @@ async def lifespan(app):
     # Crypto scoring (weekdays + weekends): 23:55 UTC
     scheduler.add_job(run_score_daily_challenge, "cron", hour=23, minute=55, id="daily_challenge_score_crypto")
 
-    # Price alerts — every 30 min during market hours
-    def run_price_alerts():
-        from datetime import datetime as _dt
-        print(f"[Scheduler] Running price alerts at {_dt.utcnow()}")
-        scheduler_last_run["price_alerts"] = _dt.utcnow()
-        db = BgSessionLocal()
-        try:
-            from jobs.price_alerts import check_price_alerts
-            check_price_alerts(db)
-        except Exception as e:
-            print(f"[PriceAlerts] Error: {e}")
-        finally:
-            db.close()
-
+    # Price alerts
+    run_price_alerts = _guarded_job("price_alerts", lambda db: __import__('jobs.price_alerts', fromlist=['check_price_alerts']).check_price_alerts(db))
     scheduler.add_job(run_price_alerts, "interval", minutes=30, id="price_alerts")
 
-    def run_hourly_leaderboard():
-        from datetime import datetime as _dt
-        scheduler_last_run["leaderboard"] = _dt.utcnow()
-        db = BgSessionLocal()
-        try:
-            run_leaderboard_refresh(db)
-        finally:
-            db.close()
-
+    # Leaderboard refresh
+    run_hourly_leaderboard = _guarded_job("leaderboard", lambda db: run_leaderboard_refresh(db))
     scheduler.add_job(run_hourly_leaderboard, "interval", hours=1, id="leaderboard")
     scheduler.add_job(lambda: run_newsletter(SessionLocal()), "cron", hour=8, minute=0, id="newsletter")
 
-    # Weekly digest — Sundays at 10:00 UTC
-    def run_weekly_digest():
-        from datetime import datetime as _dt
-        print(f"[Scheduler] Running weekly digest at {_dt.utcnow()}")
-        scheduler_last_run["weekly_digest"] = _dt.utcnow()
-        db = BgSessionLocal()
-        try:
-            from jobs.weekly_digest import send_weekly_digest
-            send_weekly_digest(db)
-        except Exception as e:
-            print(f"[WeeklyDigest] Error: {e}")
-        finally:
-            db.close()
-
+    # Weekly digest
+    run_weekly_digest = _guarded_job("weekly_digest", lambda db: __import__('jobs.weekly_digest', fromlist=['send_weekly_digest']).send_weekly_digest(db))
     scheduler.add_job(run_weekly_digest, "cron", day_of_week="sun", hour=10, minute=0, id="weekly_digest")
 
-    # Earnings calendar — daily at midnight UTC
-    def run_earnings_update():
-        from datetime import datetime as _dt
-        print(f"[Scheduler] Updating earnings at {_dt.utcnow()}")
-        scheduler_last_run["earnings"] = _dt.utcnow()
-        db = BgSessionLocal()
-        try:
-            from jobs.earnings import update_earnings_calendar
-            update_earnings_calendar(db)
-        except Exception as e:
-            print(f"[Earnings] Error: {e}")
-        finally:
-            db.close()
-
+    # Earnings calendar
+    run_earnings_update = _guarded_job("earnings", lambda db: __import__('jobs.earnings', fromlist=['update_earnings_calendar']).update_earnings_calendar(db))
     scheduler.add_job(run_earnings_update, "cron", hour=0, minute=15, id="earnings_update")
 
-    # Analyst subscription notifications — every hour
+    # Analyst subscription notifications
     from jobs.analyst_notifications import run_analyst_notifications
     scheduler.add_job(run_analyst_notifications, "interval", hours=1, id="analyst_notifications", next_run_time=datetime.utcnow() + timedelta(minutes=45))
 
-    # Weekly challenge — create every Monday at 00:01 UTC
-    def run_weekly_challenge():
-        db = BgSessionLocal()
-        try:
-            from weekly_challenges import create_weekly_challenge
-            create_weekly_challenge(db)
-        except Exception as e:
-            print(f"[WeeklyChallenge] Error: {e}")
-        finally:
-            db.close()
-
+    # Weekly challenge
+    run_weekly_challenge = _guarded_job("weekly_challenge", lambda db: __import__('weekly_challenges', fromlist=['create_weekly_challenge']).create_weekly_challenge(db))
     scheduler.add_job(run_weekly_challenge, "cron", day_of_week="mon", hour=0, minute=1, id="weekly_challenge")
 
-    # Auto-evaluate expired predictions every hour (connection-safe, 100 tickers per run)
-    def run_auto_evaluate():
-        print(f"[Scheduler] Running auto-evaluate at {datetime.utcnow()}")
-        try:
-            from jobs.historical_evaluator import evaluate_batch
-            result = evaluate_batch(max_tickers=500)
-            scored = result.get('predictions_scored', 0)
-            remaining = result.get('remaining_tickers', 0)
-            print(f"[AutoEval] {scored} scored, {remaining} remaining")
-            # Auto-refresh stats if we scored anything
-            if scored > 0:
-                from jobs.historical_evaluator import refresh_all_forecaster_stats
-                refresh_all_forecaster_stats()
-        except Exception as e:
-            print(f"[AutoEval] Error: {e}")
-
+    # Auto-evaluate expired predictions (circuit breaker built-in via _guarded_job)
+    def _auto_evaluate(db):
+        from jobs.historical_evaluator import evaluate_batch, refresh_all_forecaster_stats
+        result = evaluate_batch(max_tickers=500)
+        scored = result.get('predictions_scored', 0)
+        remaining = result.get('remaining_tickers', 0)
+        print(f"[AutoEval] {scored} scored, {remaining} remaining")
+        if scored > 0:
+            refresh_all_forecaster_stats()
+    run_auto_evaluate = _guarded_job("auto_evaluate", _auto_evaluate)
     scheduler.add_job(run_auto_evaluate, "interval", hours=4, id="auto_evaluate", next_run_time=datetime.utcnow() + timedelta(minutes=10))
 
-    # Auto-refresh forecaster stats every 2 hours
-    def run_refresh_stats():
-        print(f"[Scheduler] Refreshing forecaster stats at {datetime.utcnow()}")
-        try:
-            from jobs.historical_evaluator import refresh_all_forecaster_stats
-            refresh_all_forecaster_stats()
-        except Exception as e:
-            print(f"[StatsRefresh] Error: {e}")
-
+    # Auto-refresh forecaster stats
+    def _refresh_stats(db):
+        from jobs.historical_evaluator import refresh_all_forecaster_stats
+        refresh_all_forecaster_stats()
+    run_refresh_stats = _guarded_job("refresh_stats", _refresh_stats)
     scheduler.add_job(run_refresh_stats, "interval", hours=2, id="refresh_stats", next_run_time=datetime.utcnow() + timedelta(minutes=8))
+
+    # ── Safeguard #4: Auto-pause jobs when site is slow ──────────────────────
+    def _site_health_watchdog():
+        from circuit_breaker import check_site_health_and_pause
+        check_site_health_and_pause()
+    scheduler.add_job(_site_health_watchdog, "interval", minutes=5, id="site_health_watchdog")
 
     scheduler.start()
     job_ids = [j.id for j in scheduler.get_jobs()]
@@ -1550,6 +1383,9 @@ app = FastAPI(title="Eidolum API", version="1.0.0", lifespan=lifespan)
 # Rate limiting
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+# Request timeout — kill any API request that hangs beyond 8 seconds
+app.add_middleware(RequestTimeoutMiddleware)
 
 # Security headers
 app.add_middleware(SecurityHeadersMiddleware)
@@ -1628,6 +1464,77 @@ app.include_router(admin_panel_router)  # /admin HTML + /api/admin/* endpoints
 @app.get("/api/health")
 def health():
     return {"status": "ok", "app": "Eidolum API"}
+
+
+@app.get("/api/health/detailed")
+def health_detailed():
+    """Detailed health check — detects DB problems early.
+    Returns status: "ok", "degraded", or "down"."""
+    import time as _t
+    from sqlalchemy import text as _text
+    import circuit_breaker
+
+    checks = {}
+    status = "ok"
+
+    # 1. Database connectivity + query time
+    try:
+        start = _t.time()
+        db = SessionLocal()
+        r = db.execute(_text("SELECT 1")).scalar()
+        db_elapsed = round((_t.time() - start) * 1000, 1)
+        db.close()
+        checks["database"] = {"status": "ok", "query_ms": db_elapsed, "result": r}
+        if db_elapsed > 2000:
+            checks["database"]["status"] = "slow"
+            status = "degraded"
+    except Exception as e:
+        checks["database"] = {"status": "down", "error": str(e)}
+        status = "down"
+
+    # 2. Connection pool stats
+    try:
+        pool = engine.pool
+        checks["connection_pool"] = {
+            "size": pool.size(),
+            "checked_in": pool.checkedin(),
+            "checked_out": pool.checkedout(),
+            "overflow": pool.overflow(),
+            "status": "ok" if pool.checkedout() < pool.size() + 3 else "high",
+        }
+        if pool.checkedout() >= pool.size() + pool._max_overflow:
+            status = "degraded"
+    except Exception as e:
+        checks["connection_pool"] = {"error": str(e)}
+
+    # 3. Background job pool stats
+    try:
+        bg_pool = bg_engine.pool
+        checks["bg_connection_pool"] = {
+            "size": bg_pool.size(),
+            "checked_in": bg_pool.checkedin(),
+            "checked_out": bg_pool.checkedout(),
+            "overflow": bg_pool.overflow(),
+        }
+    except Exception:
+        pass
+
+    # 4. Circuit breaker state + running jobs
+    cb_status = circuit_breaker.get_status()
+    checks["circuit_breaker"] = cb_status
+    if cb_status["jobs_paused"]:
+        status = "degraded"
+
+    # 5. Scheduler
+    if _scheduler:
+        try:
+            checks["scheduler"] = {"jobs": len(_scheduler.get_jobs()), "running": True}
+        except Exception:
+            checks["scheduler"] = {"running": False}
+    else:
+        checks["scheduler"] = {"running": False}
+
+    return {"status": status, "checks": checks}
 
 
 @app.get("/api/scheduler-status")
@@ -1946,19 +1853,51 @@ def reformat_contexts():
 
 @app.get("/api/admin/db-health")
 def db_health():
-    """Check if the database responds at all."""
+    """Database health with connection pool stats and circuit breaker status."""
     import time as _t
+    import circuit_breaker
+
     start = _t.time()
+    result = {"status": "ok"}
+
+    # Query test
     try:
         from sqlalchemy import text as _text
         db = SessionLocal()
         r = db.execute(_text("SELECT 1")).scalar()
-        elapsed = round(_t.time() - start, 3)
+        elapsed = round((_t.time() - start) * 1000, 1)
         db.close()
-        return {"status": "ok", "query_time_ms": elapsed * 1000, "result": r}
+        result["query_time_ms"] = elapsed
+        result["query_result"] = r
     except Exception as e:
-        elapsed = round(_t.time() - start, 3)
-        return {"status": "error", "query_time_ms": elapsed * 1000, "error": str(e)}
+        result["status"] = "error"
+        result["query_time_ms"] = round((_t.time() - start) * 1000, 1)
+        result["error"] = str(e)
+
+    # User pool
+    try:
+        pool = engine.pool
+        result["user_pool"] = {
+            "size": pool.size(), "checked_in": pool.checkedin(),
+            "checked_out": pool.checkedout(), "overflow": pool.overflow(),
+        }
+    except Exception:
+        pass
+
+    # Background pool
+    try:
+        bg_pool = bg_engine.pool
+        result["bg_pool"] = {
+            "size": bg_pool.size(), "checked_in": bg_pool.checkedin(),
+            "checked_out": bg_pool.checkedout(), "overflow": bg_pool.overflow(),
+        }
+    except Exception:
+        pass
+
+    # Circuit breaker
+    result["circuit_breaker"] = circuit_breaker.get_status()
+
+    return result
 
 
 @app.post("/api/admin/kill-locks")
@@ -1980,6 +1919,22 @@ def kill_locks():
         return {"status": "killed"}
     except Exception as e:
         return {"error": str(e)}
+
+
+@app.post("/api/admin/pause-jobs")
+def pause_jobs():
+    """Manually pause all background jobs for 15 minutes."""
+    import circuit_breaker
+    circuit_breaker.pause_all_jobs("manual admin request")
+    return circuit_breaker.get_status()
+
+
+@app.post("/api/admin/resume-jobs")
+def resume_jobs():
+    """Resume background jobs after a pause."""
+    import circuit_breaker
+    circuit_breaker.resume_all_jobs()
+    return circuit_breaker.get_status()
 
 
 @app.post("/api/admin/backfill-alpha")
