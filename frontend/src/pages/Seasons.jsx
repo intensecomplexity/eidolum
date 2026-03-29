@@ -1,36 +1,37 @@
 import { useEffect, useState } from 'react';
-import { Calendar, Trophy } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { Swords, Calendar, Trophy, Zap, TrendingUp, TrendingDown, ChevronRight, Target } from 'lucide-react';
 import Footer from '../components/Footer';
+import DailyChallengeCard from '../components/DailyChallengeCard';
 import TypeBadge from '../components/TypeBadge';
-import { getSeasons, getCurrentSeason, getSeasonLeaderboard } from '../api';
+import { getCurrentSeason, getSeasonLeaderboard, getHomepageStats } from '../api';
+import { useAuth } from '../context/AuthContext';
 
 
 export default function Seasons() {
+  const { isAuthenticated, user } = useAuth();
   const [current, setCurrent] = useState(null);
-  const [allSeasons, setAllSeasons] = useState([]);
   const [leaderboard, setLeaderboard] = useState([]);
-  const [seasonMeta, setSeasonMeta] = useState(null);
-  const [selectedId, setSelectedId] = useState(null);
   const [loading, setLoading] = useState(true);
   const [countdown, setCountdown] = useState('');
+  const [stats, setStats] = useState(null);
 
   useEffect(() => {
-    Promise.all([getCurrentSeason(), getSeasons()])
-      .then(([c, all]) => {
-        setCurrent(c);
-        setAllSeasons(all);
-        if (c?.id) {
-          setSelectedId(c.id);
-          getSeasonLeaderboard(c.id).then(data => {
-            setLeaderboard(data.leaderboard || data);
-            setSeasonMeta(data.season || c);
-          }).catch(() => {});
-        }
-      })
-      .catch(() => {})
-      .finally(() => setLoading(false));
+    Promise.all([
+      getCurrentSeason().catch(() => null),
+      getHomepageStats().catch(() => null),
+    ]).then(([c, s]) => {
+      setCurrent(c);
+      setStats(s);
+      if (c?.id) {
+        getSeasonLeaderboard(c.id).then(data => {
+          setLeaderboard(data.leaderboard || data || []);
+        }).catch(() => {});
+      }
+    }).finally(() => setLoading(false));
   }, []);
 
+  // Countdown timer
   useEffect(() => {
     if (!current?.ends_at) return;
     const tick = () => {
@@ -45,16 +46,6 @@ export default function Seasons() {
     return () => clearInterval(i);
   }, [current]);
 
-  function handleSelectSeason(id) {
-    setSelectedId(id);
-    setLeaderboard([]);
-    setSeasonMeta(allSeasons.find(s => s.id === id) || null);
-    getSeasonLeaderboard(id).then(data => {
-      setLeaderboard(data.leaderboard || data);
-      if (data.season) setSeasonMeta(data.season);
-    }).catch(() => {});
-  }
-
   if (loading) return (
     <div className="flex items-center justify-center min-h-[60vh]">
       <div className="w-8 h-8 border-2 border-accent border-t-transparent rounded-full animate-spin" />
@@ -62,123 +53,164 @@ export default function Seasons() {
   );
 
   const activeColor = current?.theme_color || '#D4A843';
-  const selectedSeason = seasonMeta || allSeasons.find(s => s.id === selectedId);
-  const selectedColor = selectedSeason?.theme_color || '#D4A843';
 
   return (
     <div>
       <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-10">
+
+        {/* Page header */}
         <div className="flex items-center gap-2 mb-6">
-          <Calendar className="w-6 h-6 text-accent" />
-          <h1 className="font-bold" style={{ fontSize: 'clamp(24px, 5vw, 36px)' }}>Seasons</h1>
+          <Swords className="w-6 h-6 text-accent" />
+          <h1 className="font-bold" style={{ fontSize: 'clamp(24px, 5vw, 36px)' }}>Compete</h1>
         </div>
 
-        {/* Current season card */}
-        {current && (
-          <div className="card mb-6 relative overflow-hidden" style={{ borderColor: `${activeColor}30` }}>
-            <div className="absolute inset-0 opacity-[0.06]" style={{ background: `linear-gradient(135deg, ${activeColor}, transparent 70%)` }} />
-            <div className="relative">
-              <div className="flex items-center justify-between mb-1">
-                <span className="text-[10px] font-bold uppercase tracking-widest" style={{ color: activeColor }}>Active Season</span>
-                <span className="font-mono text-sm" style={{ color: activeColor }}>{countdown}</span>
-              </div>
-              <h2 className="headline-serif text-2xl sm:text-3xl mb-1" style={{ color: activeColor }}>{current.name}</h2>
-              <p className="text-sm text-muted mb-2">
+        {/* ── SECTION 1: Current Season ──────────────────────────────────── */}
+        <div className="card mb-6 relative overflow-hidden" style={{ borderColor: `${activeColor}30` }}>
+          <div className="absolute inset-0 opacity-[0.06]" style={{ background: `linear-gradient(135deg, ${activeColor}, transparent 70%)` }} />
+          <div className="relative">
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-[10px] font-bold uppercase tracking-widest" style={{ color: activeColor }}>
+                {current ? 'Active Season' : 'Current Quarter'}
+              </span>
+              {countdown && <span className="font-mono text-sm" style={{ color: activeColor }}>{countdown} left</span>}
+            </div>
+
+            <h2 className="headline-serif text-2xl sm:text-3xl mb-1" style={{ color: activeColor }}>
+              {current?.name || 'Q1 2026'}
+            </h2>
+
+            {current && (
+              <p className="text-sm text-muted mb-3">
                 <span className="font-mono text-text-secondary text-xs">{current.quarter_label}</span>
                 {current.subtitle && <> &middot; {current.subtitle}</>}
               </p>
-              <div className="text-xs text-muted">
-                Ends in <span className="font-mono" style={{ color: activeColor }}>{countdown}</span>
-                <span className="ml-2">{new Date(current.starts_at).toLocaleDateString()} — {new Date(current.ends_at).toLocaleDateString()}</span>
-              </div>
-            </div>
-          </div>
-        )}
+            )}
 
-        {/* Past season tabs (only show non-active seasons) */}
-        {allSeasons.filter(s => s.status !== 'active').length > 0 && (
-          <div className="flex gap-2 mb-6 overflow-x-auto pills-scroll">
-            {allSeasons.filter(s => s.status !== 'active').map(s => {
-              const isSelected = selectedId === s.id;
-              const c = s.theme_color || '#D4A843';
-              return (
-                <button key={s.id} onClick={() => handleSelectSeason(s.id)}
-                  className={`px-4 py-2 rounded-lg text-xs font-bold whitespace-nowrap transition-colors uppercase tracking-wider ${isSelected ? 'border' : 'bg-surface text-text-secondary border border-border'}`}
-                  style={isSelected ? { color: c, borderColor: `${c}40`, background: `${c}15` } : {}}>
-                  {s.name} <span className="font-normal normal-case tracking-normal opacity-60">&middot; {s.quarter_label}</span>
-                </button>
-              );
-            })}
-          </div>
-        )}
-
-        {/* Leaderboard */}
-        {leaderboard.length === 0 ? (
-          <div className="text-center py-12">
-            <Trophy className="w-10 h-10 text-muted/30 mx-auto mb-3" />
-            <p className="text-text-secondary">No entries with 5 or more scored predictions yet.</p>
-          </div>
-        ) : (
-          <>
-          {/* Mobile cards */}
-          <div className="sm:hidden space-y-2">
-            {leaderboard.map(e => (
-              <div key={e.user_id} className="card py-3">
-                <div className="flex items-center justify-between mb-1">
-                  <div className="flex items-center gap-2">
-                    <span className={`font-mono font-bold ${e.rank <= 3 ? 'text-warning' : 'text-text-secondary'}`}>
-                      {e.rank <= 3 ? [null, '\uD83E\uDD47', '\uD83E\uDD48', '\uD83E\uDD49'][e.rank] : `#${e.rank}`}
-                    </span>
-                    <span className="font-medium text-sm">{e.username}</span>
-                    <TypeBadge type={e.user_type} size={12} />
-                  </div>
-                  <span className={`font-mono font-semibold ${e.accuracy >= 60 ? 'text-positive' : 'text-negative'}`}>{e.accuracy}%</span>
-                </div>
-                <div className="flex gap-3 text-xs text-muted">
-                  <span>{e.predictions_scored} scored</span>
-                  <span>{e.predictions_correct} correct</span>
-                </div>
+            {/* Season activity stats */}
+            {stats && (
+              <div className="flex gap-4 sm:gap-6 text-xs text-muted mb-4">
+                <span><span className="font-mono text-text-secondary">{stats.verified_predictions?.toLocaleString()}</span> predictions tracked this season</span>
+                <span><span className="font-mono text-text-secondary">{stats.forecasters_tracked?.toLocaleString()}</span> analysts</span>
               </div>
-            ))}
-          </div>
-          {/* Desktop table */}
-          <div className="hidden sm:block card overflow-hidden p-0">
-            <table className="w-full">
-              <thead>
-                <tr className="text-left text-muted text-xs uppercase tracking-wider border-b border-border">
-                  <th className="px-6 py-3 w-16">Rank</th>
-                  <th className="px-6 py-3">User</th>
-                  <th className="px-6 py-3 text-right">Accuracy</th>
-                  <th className="px-6 py-3 text-right">Scored</th>
-                  <th className="px-6 py-3 text-right">Correct</th>
-                </tr>
-              </thead>
-              <tbody>
-                {leaderboard.map(e => (
-                  <tr key={e.user_id} className="border-b border-border/50 hover:bg-surface-2/50 transition-colors">
-                    <td className="px-6 py-3">
-                      <span className={`font-mono font-bold ${e.rank <= 3 ? 'text-warning' : 'text-text-secondary'}`}>
+            )}
+
+            {/* Season leaderboard top 5 */}
+            {leaderboard.length > 0 ? (
+              <div className="space-y-2 mb-4">
+                <div className="text-xs font-semibold text-muted uppercase tracking-wider mb-2">Season Leaderboard</div>
+                {leaderboard.slice(0, 5).map(e => (
+                  <div key={e.user_id} className="flex items-center justify-between py-1.5">
+                    <div className="flex items-center gap-2">
+                      <span className={`font-mono font-bold text-sm w-6 ${e.rank <= 3 ? 'text-warning' : 'text-text-secondary'}`}>
                         {e.rank <= 3 ? [null, '\uD83E\uDD47', '\uD83E\uDD48', '\uD83E\uDD49'][e.rank] : `#${e.rank}`}
                       </span>
-                    </td>
-                    <td className="px-6 py-3">
-                      <div className="flex items-center gap-1.5">
-                        <span className="font-medium">{e.username}</span>
-                        <TypeBadge type={e.user_type} size={12} />
-                      </div>
-                    </td>
-                    <td className="px-6 py-3 text-right">
-                      <span className={`font-mono font-semibold ${e.accuracy >= 60 ? 'text-positive' : 'text-negative'}`}>{e.accuracy}%</span>
-                    </td>
-                    <td className="px-6 py-3 text-right font-mono text-text-secondary">{e.predictions_scored}</td>
-                    <td className="px-6 py-3 text-right font-mono text-positive">{e.predictions_correct}</td>
-                  </tr>
+                      <span className="font-medium text-sm">{e.username}</span>
+                      <TypeBadge type={e.user_type} size={12} />
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <span className={`font-mono text-sm font-semibold ${e.accuracy >= 60 ? 'text-positive' : 'text-negative'}`}>{e.accuracy}%</span>
+                      <span className="text-xs text-muted">{e.predictions_scored} scored</span>
+                    </div>
+                  </div>
                 ))}
-              </tbody>
-            </table>
+              </div>
+            ) : (
+              <div className="py-4 text-center">
+                <Trophy className="w-8 h-8 text-muted/30 mx-auto mb-2" />
+                <p className="text-text-secondary text-sm mb-1">Be the first to compete this season.</p>
+                <p className="text-muted text-xs">Submit your first prediction to join the leaderboard.</p>
+              </div>
+            )}
+
+            {/* CTA */}
+            {isAuthenticated ? (
+              <Link to="/submit"
+                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-semibold bg-accent/15 text-accent border border-accent/30 hover:bg-accent/25 transition-colors">
+                <Target className="w-4 h-4" /> Submit a Prediction
+              </Link>
+            ) : (
+              <Link to="/login"
+                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-semibold bg-accent/15 text-accent border border-accent/30 hover:bg-accent/25 transition-colors">
+                Sign up to compete
+              </Link>
+            )}
           </div>
-          </>
+        </div>
+
+        {/* ── SECTION 2: Daily Challenge ─────────────────────────────────── */}
+        <div className="mb-6">
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
+              <Zap className="w-5 h-5 text-warning" />
+              <h2 className="font-semibold text-lg">Daily Challenge</h2>
+            </div>
+            <Link to="/daily-challenge" className="text-accent text-xs font-medium hover:underline flex items-center gap-0.5">
+              History <ChevronRight className="w-3 h-3" />
+            </Link>
+          </div>
+          <p className="text-muted text-xs mb-3">One stock, one call. Bull or bear? Takes 5 seconds.</p>
+          <DailyChallengeCard />
+        </div>
+
+        {/* ── SECTION 3: Quick Stats / CTA ───────────────────────────────── */}
+        {isAuthenticated ? (
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
+            <Link to="/my-calls" className="card text-center hover:border-accent/30 transition-colors">
+              <div className="font-mono text-xl font-bold text-accent">{user?.predictions_count || '—'}</div>
+              <div className="text-muted text-xs">Your Predictions</div>
+            </Link>
+            <Link to="/community" className="card text-center hover:border-accent/30 transition-colors">
+              <div className="font-mono text-xl font-bold text-text-secondary">—</div>
+              <div className="text-muted text-xs">Season Rank</div>
+            </Link>
+            <Link to="/duels" className="card text-center hover:border-accent/30 transition-colors">
+              <div className="font-mono text-xl font-bold text-text-secondary">{user?.active_duels || '—'}</div>
+              <div className="text-muted text-xs">Active Duels</div>
+            </Link>
+            <Link to="/badges" className="card text-center hover:border-accent/30 transition-colors">
+              <div className="font-mono text-xl font-bold text-warning">{user?.badges_count || '—'}</div>
+              <div className="text-muted text-xs">Badges</div>
+            </Link>
+          </div>
+        ) : (
+          <div className="card text-center py-8 mb-6">
+            <Swords className="w-10 h-10 text-muted/30 mx-auto mb-3" />
+            <h3 className="font-semibold text-lg mb-1">Join the Competition</h3>
+            <p className="text-text-secondary text-sm mb-4 max-w-md mx-auto">
+              Track your predictions, earn XP, climb the seasonal leaderboard, and challenge friends to duels.
+            </p>
+            <Link to="/login"
+              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-semibold bg-accent text-bg hover:bg-accent/90 transition-colors">
+              Sign Up Free
+            </Link>
+          </div>
         )}
+
+        {/* Quick links */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+          <Link to="/leaderboard" className="card flex items-center gap-3 hover:border-accent/30 transition-colors py-3">
+            <Trophy className="w-5 h-5 text-accent shrink-0" />
+            <div>
+              <div className="text-sm font-medium">Leaderboard</div>
+              <div className="text-muted text-xs">Top analysts ranked by accuracy</div>
+            </div>
+          </Link>
+          <Link to="/duels" className="card flex items-center gap-3 hover:border-accent/30 transition-colors py-3">
+            <Swords className="w-5 h-5 text-accent shrink-0" />
+            <div>
+              <div className="text-sm font-medium">Duels</div>
+              <div className="text-muted text-xs">Challenge a friend head-to-head</div>
+            </div>
+          </Link>
+          <Link to="/daily-challenge" className="card flex items-center gap-3 hover:border-accent/30 transition-colors py-3">
+            <Zap className="w-5 h-5 text-warning shrink-0" />
+            <div>
+              <div className="text-sm font-medium">Daily Challenges</div>
+              <div className="text-muted text-xs">Full history and streaks</div>
+            </div>
+          </Link>
+        </div>
+
       </div>
       <Footer />
     </div>

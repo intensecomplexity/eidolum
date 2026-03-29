@@ -96,7 +96,7 @@ export default function Navbar() {
               <Link to="/leaderboard" className={`hidden sm:flex ${linkClass('/leaderboard')}`}>Leaderboard</Link>
               <Link to="/consensus" className={`hidden sm:flex ${linkClass('/consensus')}`}>Consensus</Link>
               <Link to="/expiring" className={`hidden sm:flex ${linkClass('/expiring')}`}>Expiring</Link>
-              <Link to="/seasons" className={`hidden sm:flex ${linkClass('/seasons')}`}>Seasons</Link>
+              <Link to="/compete" className={`hidden sm:flex ${linkClass('/compete')}`}>Compete</Link>
               {isAuthenticated && (
                 <Link to="/submit" className="hidden sm:flex items-center gap-1 px-3 py-1.5 rounded-lg text-sm font-medium bg-accent/10 text-accent border border-accent/30 hover:bg-accent/15 transition-colors min-h-[36px]">
                   <Crosshair className="w-3.5 h-3.5" /> Submit
@@ -238,7 +238,7 @@ export default function Navbar() {
               <MobileLink to="/leaderboard">Leaderboard</MobileLink>
               <MobileLink to="/consensus">Consensus</MobileLink>
               <MobileLink to="/expiring">Expiring</MobileLink>
-              <MobileLink to="/seasons">Seasons</MobileLink>
+              <MobileLink to="/compete">Compete</MobileLink>
               {isAuthenticated && (
                 <MobileLink to="/submit" accent><Crosshair className="w-4 h-4 inline mr-1" />Submit Call</MobileLink>
               )}

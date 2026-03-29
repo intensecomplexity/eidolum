@@ -88,6 +88,7 @@ export default function App() {
         <Route path="/consensus" element={<Consensus />} />
         <Route path="/expiring" element={<Expiring />} />
         <Route path="/duels" element={<Duels />} />
+        <Route path="/compete" element={<Seasons />} />
         <Route path="/seasons" element={<Seasons />} />
         <Route path="/friends" element={<Friends />} />
         <Route path="/notifications" element={<Notifications />} />
