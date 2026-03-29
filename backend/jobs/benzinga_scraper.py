@@ -125,8 +125,9 @@ def _benzinga_inner(db: Session):
                 continue
 
             # Build context
-            pt_str = f", PT ${pt_current}" if pt_current else ""
-            context = f"{canonical} {action} {rating_current} on {ticker}{pt_str}"
+            from jobs.context_formatter import format_context
+            context = format_context(canonical, action, rating_current, ticker.upper(),
+                                     float(str(pt_current).replace("$","").replace(",","")) if pt_current else None)
 
             # Source URL
             source_url = url_news or url_calendar or f"https://www.benzinga.com/quote/{ticker}/analyst-ratings"

@@ -265,8 +265,8 @@ def _insert_rating(rating: dict, db: Session) -> bool:
 
     window_days = 365 if target_price else 90
     source_url = url_news or f"https://www.benzinga.com/quote/{ticker}/analyst-ratings"
-    pt_str = f", PT ${pt_current}" if pt_current else ""
-    context = f"{canonical} {action} {rating_current} on {ticker}{pt_str}"
+    from jobs.context_formatter import format_context
+    context = format_context(canonical, action, rating_current, ticker, target_price)
 
     is_valid, _ = validate_prediction(
         ticker=ticker, direction=direction, source_url=source_url,

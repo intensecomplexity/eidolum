@@ -232,8 +232,8 @@ def _process_rating(rating: dict, db: Session) -> bool:
     window_days = 365 if target_price else 90
 
     # Build context
-    pt_str = f", PT ${pt_current}" if pt_current else ""
-    context = f"{canonical} {action} {rating_current} on {ticker}{pt_str}"
+    from jobs.context_formatter import format_context
+    context = format_context(canonical, action, rating_current, ticker, target_price)
 
     # Cross-scraper dedup
     if prediction_exists_cross_scraper(ticker, forecaster.id, direction, pred_date, db):

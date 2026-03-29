@@ -2062,6 +2062,71 @@ def re_evaluate_all():
     return {"status": "started", "predictions_reset": count}
 
 
+@app.post("/api/admin/reformat-contexts")
+def reformat_contexts():
+    """Rewrite prediction context strings to human-readable format."""
+    import threading
+    from sqlalchemy import text as _t
+
+    def _run():
+        from jobs.context_formatter import format_context
+        dbs = SessionLocal()
+        try:
+            # Get predictions with raw-format contexts (contain underscores or jargon patterns)
+            rows = dbs.execute(_t("""
+                SELECT id, context, ticker, direction, target_price
+                FROM predictions
+                WHERE context IS NOT NULL
+                  AND (context LIKE '%initiates_coverage%'
+                    OR context LIKE '%maintains %'
+                    OR context LIKE '%upgrades %'
+                    OR context LIKE '%downgrades %'
+                    OR context LIKE '%reiterates %'
+                    OR context LIKE '%, PT $%')
+                LIMIT 20000
+            """)).fetchall()
+            print(f"[ReformatCtx] {len(rows)} predictions to reformat")
+            updated = 0
+            for r in rows:
+                old_ctx = r[1] or ""
+                # Parse firm and action from old format: "Firm action rating on TICKER, PT $X"
+                parts = old_ctx.split(" on ")
+                if len(parts) < 2:
+                    continue
+                before = parts[0].strip()
+                # Split "Firm action rating" into components
+                words = before.split()
+                if len(words) < 2:
+                    continue
+                # Find the action word
+                action_idx = None
+                for i, w in enumerate(words):
+                    if w.lower() in ("upgrades", "downgrades", "maintains", "reiterates", "initiates_coverage_on", "initiates"):
+                        action_idx = i
+                        break
+                if action_idx is None:
+                    continue
+                firm = " ".join(words[:action_idx])
+                action = words[action_idx]
+                rating = " ".join(words[action_idx+1:]) if action_idx + 1 < len(words) else ""
+                new_ctx = format_context(firm, action, rating, r[2], r[4])
+                dbs.execute(_t("UPDATE predictions SET context=:c, exact_quote=:c WHERE id=:id"),
+                            {"c": new_ctx, "id": r[0]})
+                updated += 1
+            dbs.commit()
+            print(f"[ReformatCtx] Updated {updated} predictions")
+        except Exception as e:
+            dbs.rollback()
+            print(f"[ReformatCtx] Error: {e}")
+            import traceback
+            traceback.print_exc()
+        finally:
+            dbs.close()
+
+    threading.Thread(target=_run, daemon=True).start()
+    return {"status": "started"}
+
+
 @app.post("/api/admin/backfill-alpha")
 def backfill_alpha():
     """Calculate alpha for all evaluated predictions missing it."""
