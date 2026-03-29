@@ -2342,3 +2342,4 @@ def debug():
         info["db_connected"] = False
         info["db_error"] = str(e)
     return info
+
