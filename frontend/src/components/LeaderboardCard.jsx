@@ -64,15 +64,9 @@ export default function LeaderboardCard({ forecaster: f, metric = 'avg_return' }
           </div>
           <div>
             <div className="font-mono text-[15px] font-semibold text-text-secondary leading-tight mt-1.5">
-              {f.evaluated_predictions}/{f.total_predictions}
+              {f.evaluated_predictions} scored
             </div>
-            <div className="text-muted text-[11px]">predictions</div>
-            {f.verified_predictions > 0 && (
-              <div className="text-[10px] font-semibold mt-0.5"
-                style={{ color: '#00c896' }}>
-                {f.verified_predictions} verified
-              </div>
-            )}
+            <div className="text-muted text-[11px]">{f.total_predictions} total</div>
           </div>
         </div>
         <StreakBadge streak={f.streak} />

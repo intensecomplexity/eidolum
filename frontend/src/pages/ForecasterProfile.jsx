@@ -155,6 +155,13 @@ export default function ForecasterProfile() {
                 </Link>
               )}
               {data.bio && <p className="text-text-secondary text-sm mt-2 sm:mt-3 max-w-xl">{data.bio}</p>}
+              {['institutional', 'congress'].includes(data.platform) ? (
+                <p className="text-muted text-xs mt-2 italic">Predictions auto-tracked from published analyst reports</p>
+              ) : data.platform === 'player' ? (
+                <p className="text-muted text-xs mt-2 italic">Predictions submitted by this player</p>
+              ) : (
+                <p className="text-muted text-xs mt-2 italic">Predictions auto-tracked from public content</p>
+              )}
             </div>
 
             {/* Stats — 2x2 grid on mobile, row on desktop */}
