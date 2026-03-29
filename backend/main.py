@@ -1812,6 +1812,60 @@ def evaluate_status():
     return get_eval_status()
 
 
+@app.get("/api/admin/evaluate-debug")
+def evaluate_debug():
+    """Show exactly what the evaluator sees — pending prediction stats."""
+    from sqlalchemy import text as _t
+    db = SessionLocal()
+    try:
+        # Check evaluation_date distribution
+        stats = db.execute(_t("""
+            SELECT
+                COUNT(*) as total_pending,
+                COUNT(CASE WHEN evaluation_date < NOW() THEN 1 END) as expired,
+                COUNT(CASE WHEN evaluation_date >= NOW() THEN 1 END) as not_expired,
+                COUNT(CASE WHEN evaluation_date IS NULL THEN 1 END) as null_eval_date,
+                COUNT(CASE WHEN entry_price IS NULL THEN 1 END) as null_entry_price,
+                COUNT(CASE WHEN target_price IS NULL THEN 1 END) as null_target_price,
+                MIN(evaluation_date) as earliest_eval,
+                MAX(evaluation_date) as latest_eval
+            FROM predictions
+            WHERE outcome = 'pending'
+        """)).first()
+
+        # 5 example pending predictions
+        examples = db.execute(_t("""
+            SELECT id, ticker, direction, target_price, entry_price,
+                   evaluation_date, prediction_date, window_days
+            FROM predictions
+            WHERE outcome = 'pending' AND evaluation_date IS NOT NULL
+            ORDER BY evaluation_date ASC
+            LIMIT 5
+        """)).fetchall()
+
+        return {
+            "total_pending": stats[0],
+            "expired_eval_date": stats[1],
+            "future_eval_date": stats[2],
+            "null_eval_date": stats[3],
+            "null_entry_price": stats[4],
+            "null_target_price": stats[5],
+            "earliest_eval_date": str(stats[6]) if stats[6] else None,
+            "latest_eval_date": str(stats[7]) if stats[7] else None,
+            "examples": [
+                {"id": r[0], "ticker": r[1], "direction": r[2], "target_price": float(r[3]) if r[3] else None,
+                 "entry_price": float(r[4]) if r[4] else None, "evaluation_date": str(r[5]) if r[5] else None,
+                 "prediction_date": str(r[6]) if r[6] else None, "window_days": r[7]}
+                for r in examples
+            ],
+        }
+    except Exception as e:
+        import traceback
+        return {"error": str(e), "traceback": traceback.format_exc()}
+    finally:
+        db.close()
+
+
 @app.post("/api/admin/stop-evaluation")
 def stop_evaluation():
     from jobs.historical_evaluator import stop_evaluation

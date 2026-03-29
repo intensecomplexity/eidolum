@@ -103,6 +103,11 @@ def evaluate_batch(max_tickers: int = 50) -> dict:
     finally:
         db.close()
 
+    print(f"[HistEval] Query returned {len(rows)} rows, {remaining_count} total remaining")
+    if rows:
+        r0 = rows[0]
+        print(f"[HistEval] First row: id={r0[0]} ticker={r0[1]} dir={r0[2]} tp={r0[3]} ep={r0[4]} eval_date={r0[5]} pred_date={r0[6]}")
+
     if not rows:
         return {"tickers_processed": 0, "predictions_scored": 0, "remaining_tickers": 0, "correct": 0, "incorrect": 0}
 
@@ -141,19 +146,26 @@ def evaluate_batch(max_tickers: int = 50) -> dict:
         # ── STEP 3: Fetch prices (NO DB connection held) ────────────────
         prices = _fetch_history(ticker, min_d, max_d)
         if not prices:
+            print(f"[HistEval] {ticker}: NO PRICES from yfinance (range {min_d} to {max_d}), skipping {len(preds)} preds")
             continue
+
+        print(f"[HistEval] {ticker}: {len(prices)} price points, {len(preds)} preds to score")
 
         # ── STEP 4: Score predictions ───────────────────────────────────
         updates = []
+        skipped_no_eval_price = 0
+        skipped_no_ref = 0
         for p in preds:
             eval_price = _closest_price(prices, p["evaluation_date"])
             if eval_price is None:
+                skipped_no_eval_price += 1
                 continue
 
             ref = p["entry_price"]
             if not ref or ref <= 0:
                 ref = _closest_price(prices, p["prediction_date"])
                 if not ref or ref <= 0:
+                    skipped_no_ref += 1
                     continue
 
             ret = round(((eval_price - ref) / ref) * 100, 2)
@@ -171,6 +183,10 @@ def evaluate_batch(max_tickers: int = 50) -> dict:
                 total_correct += 1
             else:
                 total_incorrect += 1
+
+        if skipped_no_eval_price > 0 or skipped_no_ref > 0:
+            print(f"[HistEval] {ticker}: skipped {skipped_no_eval_price} (no eval price) + {skipped_no_ref} (no ref price)")
+        print(f"[HistEval] {ticker}: {len(updates)} to update out of {len(preds)}")
 
         # ── STEP 5: Write results (short DB connection) ─────────────────
         if updates:
