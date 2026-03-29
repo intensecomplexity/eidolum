@@ -51,7 +51,7 @@ def run_evaluation_background():
 
     try:
         while not _eval_stop:
-            result = evaluate_batch(max_tickers=50)
+            result = evaluate_batch(max_tickers=500)
             _eval_status["tickers_processed"] += result["tickers_processed"]
             _eval_status["predictions_scored"] += result["predictions_scored"]
             _eval_status["correct"] += result.get("correct", 0)
@@ -126,6 +126,20 @@ def evaluate_batch(max_tickers: int = 50) -> dict:
     tickers = list(ticker_preds.keys())[:max_tickers]
     remaining = len(ticker_preds) - len(tickers)
 
+    # ── STEP 3: Batch-fetch ALL prices (NO DB connection held) ──────────
+    print(f"[HistEval] Fetching prices for {len(tickers)} tickers...")
+    all_prices = {}
+    for i, ticker in enumerate(tickers):
+        if _eval_stop:
+            break
+        prices = _fetch_history(ticker, None, None)  # Just gets current quote
+        if prices:
+            all_prices[ticker] = prices
+        if (i + 1) % 20 == 0:
+            time.sleep(0.5)  # Brief pause every 20 tickers
+
+    print(f"[HistEval] Got prices for {len(all_prices)}/{len(tickers)} tickers")
+
     total_scored = 0
     total_correct = 0
     total_incorrect = 0
@@ -135,22 +149,11 @@ def evaluate_batch(max_tickers: int = 50) -> dict:
         if _eval_stop:
             break
 
-        preds = ticker_preds[ticker]
-        all_dates = [p["evaluation_date"] for p in preds if p["evaluation_date"]]
-        all_dates += [p["prediction_date"] for p in preds if p["prediction_date"]]
-        if not all_dates:
-            continue
-
-        min_d = min(all_dates) - timedelta(days=5)
-        max_d = max(all_dates) + timedelta(days=3)
-
-        # ── STEP 3: Fetch prices (NO DB connection held) ────────────────
-        prices = _fetch_history(ticker, min_d, max_d)
+        prices = all_prices.get(ticker)
         if not prices:
-            print(f"[HistEval] {ticker}: NO PRICES from yfinance (range {min_d} to {max_d}), skipping {len(preds)} preds")
             continue
 
-        print(f"[HistEval] {ticker}: {len(prices)} price points, {len(preds)} preds to score")
+        preds = ticker_preds[ticker]
 
         # ── STEP 4: Score predictions ───────────────────────────────────
         updates = []
@@ -228,7 +231,6 @@ def evaluate_batch(max_tickers: int = 50) -> dict:
             finally:
                 db.close()
 
-        time.sleep(2)
 
     # ── STEP 6: Update forecaster stats ─────────────────────────────────
     if affected_forecasters:

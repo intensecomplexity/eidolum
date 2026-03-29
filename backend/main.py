@@ -1546,7 +1546,7 @@ async def lifespan(app):
         try:
             from jobs.historical_evaluator import evaluate_batch, refresh_all_forecaster_stats
             print(f"[PostScrape] Evaluating expired predictions...")
-            result = evaluate_batch(max_tickers=200)
+            result = evaluate_batch(max_tickers=500)
             scored = result.get('predictions_scored', 0)
             print(f"[PostScrape] Scored {scored} predictions")
             if scored > 0:
@@ -1686,7 +1686,7 @@ async def lifespan(app):
         print(f"[Scheduler] Running auto-evaluate at {datetime.utcnow()}")
         try:
             from jobs.historical_evaluator import evaluate_batch
-            result = evaluate_batch(max_tickers=200)
+            result = evaluate_batch(max_tickers=500)
             scored = result.get('predictions_scored', 0)
             remaining = result.get('remaining_tickers', 0)
             print(f"[AutoEval] {scored} scored, {remaining} remaining")
@@ -1697,7 +1697,7 @@ async def lifespan(app):
         except Exception as e:
             print(f"[AutoEval] Error: {e}")
 
-    scheduler.add_job(run_auto_evaluate, "interval", hours=1, id="auto_evaluate", next_run_time=datetime.utcnow() + timedelta(minutes=3))
+    scheduler.add_job(run_auto_evaluate, "interval", minutes=30, id="auto_evaluate", next_run_time=datetime.utcnow() + timedelta(minutes=3))
 
     # Auto-refresh forecaster stats every 2 hours
     def run_refresh_stats():
@@ -2040,7 +2040,7 @@ def re_evaluate_all():
         from jobs.historical_evaluator import evaluate_batch, refresh_all_forecaster_stats
         total = 0
         while True:
-            result = evaluate_batch(max_tickers=200)
+            result = evaluate_batch(max_tickers=500)
             scored = result.get('predictions_scored', 0)
             total += scored
             print(f"[ReEval] Batch: {scored} scored, total: {total}, remaining: {result.get('remaining_tickers', 0)}")
