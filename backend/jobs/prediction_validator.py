@@ -597,6 +597,25 @@ def validate_prediction(ticker, direction, source_url, archive_url, context, for
     return True, "Valid"
 
 
+def prediction_exists_cross_scraper(ticker: str, forecaster_id: int, direction: str, prediction_date, db) -> bool:
+    """Check if a similar prediction already exists from ANY scraper within 24 hours."""
+    from sqlalchemy import text as sql_text
+    from datetime import timedelta
+    if not prediction_date:
+        return False
+    date_start = prediction_date - timedelta(hours=24)
+    date_end = prediction_date + timedelta(hours=24)
+    result = db.execute(sql_text("""
+        SELECT 1 FROM predictions
+        WHERE ticker = :ticker
+          AND forecaster_id = :fid
+          AND direction = :direction
+          AND prediction_date BETWEEN :ds AND :de
+        LIMIT 1
+    """), {"ticker": ticker, "fid": forecaster_id, "direction": direction, "ds": date_start, "de": date_end}).first()
+    return result is not None
+
+
 def cleanup_invalid_predictions(db):
     """Layer 3: Hourly cleanup — delete rule violators."""
     from sqlalchemy import text as sql_text
@@ -694,7 +713,35 @@ def cleanup_invalid_predictions(db):
     """))
     deleted += r.rowcount
 
+    # Remove predictions with garbage forecaster names (over 50 chars = parsing error)
+    r = db.execute(sql_text("""
+        DELETE FROM predictions WHERE forecaster_id IN (
+            SELECT id FROM forecasters WHERE LENGTH(name) > 50
+        )
+    """))
+    deleted += r.rowcount
+
+    # Remove the garbage forecaster entries themselves
+    r = db.execute(sql_text("""
+        DELETE FROM forecasters WHERE LENGTH(name) > 50
+          AND id NOT IN (SELECT DISTINCT forecaster_id FROM predictions WHERE forecaster_id IS NOT NULL)
+    """))
+
+    # Remove cross-scraper duplicates: keep oldest, delete newer copies
+    # Same ticker + forecaster + direction + same day
+    r = db.execute(sql_text("""
+        DELETE FROM predictions WHERE id IN (
+            SELECT p2.id FROM predictions p1
+            JOIN predictions p2 ON p1.ticker = p2.ticker
+                AND p1.forecaster_id = p2.forecaster_id
+                AND p1.direction = p2.direction
+                AND DATE(p1.prediction_date) = DATE(p2.prediction_date)
+                AND p1.id < p2.id
+        )
+    """))
+    deleted += r.rowcount
+
     db.commit()
     if deleted > 0:
-        print(f"[Defense L3] Cleaned up {deleted} invalid predictions")
+        print(f"[Defense L3] Cleaned up {deleted} invalid/duplicate predictions")
     return deleted

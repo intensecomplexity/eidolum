@@ -12,6 +12,7 @@ from models import Prediction, Forecaster
 from jobs.prediction_validator import (
     validate_prediction,
     resolve_forecaster_alias,
+    prediction_exists_cross_scraper,
     TICKER_COMPANY_NAMES,
 )
 from jobs.news_scraper import find_forecaster, SCRAPER_LOCK
@@ -159,6 +160,10 @@ def _benzinga_inner(db: Session):
                     pass
 
             window_days = 365 if target_price else 90
+
+            # Cross-scraper dedup
+            if prediction_exists_cross_scraper(ticker.upper(), forecaster.id, direction, pred_date, db):
+                continue
 
             is_valid, _ = validate_prediction(
                 ticker=ticker.upper(), direction=direction, source_url=source_url,

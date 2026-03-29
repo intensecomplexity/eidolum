@@ -12,6 +12,7 @@ from models import Prediction, Forecaster
 from jobs.prediction_validator import (
     validate_prediction,
     resolve_forecaster_alias,
+    prediction_exists_cross_scraper,
 )
 from jobs.news_scraper import find_forecaster, SCRAPER_LOCK
 from jobs.upgrade_scrapers import _is_self_analysis
@@ -125,9 +126,20 @@ def _inner(db: Session):
             if not match:
                 continue
 
-            firm = match.group(1).strip()
+            firm_raw = match.group(1).strip()
             action = match.group(3).strip().lower()
             ticker = match.group(4).strip().upper()
+
+            # Clean firm name — remove page chrome, limit length
+            # The regex can capture page elements before the firm name
+            firm = firm_raw
+            # If firm contains known junk prefixes, try to clean
+            for prefix in ["PRO", "Price Target", "Analyst Rating"]:
+                if prefix in firm:
+                    firm = firm.split(prefix)[-1].strip()
+            # Reject garbage names (too long = parsed wrong)
+            if len(firm) > 50 or len(firm) < 2:
+                continue
 
             # Extract rating
             after_match = snippet_text[match.end():]
@@ -203,6 +215,10 @@ def _inner(db: Session):
             context = snippet_text[:500]
             pred_date = datetime.utcnow()
             window_days = 365 if new_pt else 90
+
+            # Cross-scraper dedup
+            if prediction_exists_cross_scraper(ticker, forecaster.id, direction, pred_date, db):
+                continue
 
             is_valid, _ = validate_prediction(
                 ticker=ticker, direction=direction, source_url=source_url,

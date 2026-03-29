@@ -15,6 +15,7 @@ from models import Prediction, Forecaster
 from jobs.prediction_validator import (
     validate_prediction,
     resolve_forecaster_alias,
+    prediction_exists_cross_scraper,
 )
 from jobs.news_scraper import find_forecaster, SCRAPER_LOCK
 from jobs.upgrade_scrapers import _is_self_analysis
@@ -216,6 +217,10 @@ def _process_rating(rating: dict, db: Session) -> bool:
     # Build context
     pt_str = f", PT ${pt_current}" if pt_current else ""
     context = f"{canonical} {action} {rating_current} on {ticker}{pt_str}"
+
+    # Cross-scraper dedup
+    if prediction_exists_cross_scraper(ticker, forecaster.id, direction, pred_date, db):
+        return False
 
     # Validate
     is_valid, _ = validate_prediction(
