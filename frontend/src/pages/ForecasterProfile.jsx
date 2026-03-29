@@ -12,7 +12,6 @@ import EvidenceCard from '../components/EvidenceCard';
 import BookmarkButton from '../components/BookmarkButton';
 import NotificationBanner from '../components/NotificationBanner';
 import FollowButton from '../components/FollowButton';
-import ViewerCount from '../components/ViewerCount';
 import Footer from '../components/Footer';
 import { getForecaster, getForecasterSectors, getPlatformDetail, getReportCards } from '../api';
 import { annotateContext, simpleExplainer } from '../utils/predictionExplainer';
@@ -120,7 +119,6 @@ export default function ForecasterProfile() {
                 <StreakBadge streak={data.streak} />
                 <FollowButton forecaster={data} />
               </div>
-              <ViewerCount type="forecaster-top" id={data.id} className="mb-1" />
               <div className="flex items-center gap-2 sm:gap-3 text-text-secondary text-sm flex-wrap">
                 <span className="font-mono text-xs sm:text-sm">{data.handle}</span>
                 {data.channel_url && (
@@ -129,8 +127,19 @@ export default function ForecasterProfile() {
                     {platformLabel} <ExternalLink className="w-3 h-3" />
                   </a>
                 )}
-                {data.subscriber_count > 0 && (
-                  <span className="text-xs sm:text-sm">{(data.subscriber_count / 1_000_000).toFixed(1)}M followers</span>
+              </div>
+              {/* Real stats row */}
+              <div className="flex items-center gap-3 text-muted text-xs mt-1.5 flex-wrap">
+                {data.first_prediction_date && (
+                  <span>Since {new Date(data.first_prediction_date).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}</span>
+                )}
+                {data.first_prediction_date && <span className="text-border">·</span>}
+                <span>{data.total_all_predictions || data.total_predictions || 0} predictions</span>
+                {data.sector_count > 0 && (
+                  <>
+                    <span className="text-border">·</span>
+                    <span>{data.sector_count} {data.sector_count === 1 ? 'sector' : 'sectors'}</span>
+                  </>
                 )}
               </div>
               {platformInfo && (

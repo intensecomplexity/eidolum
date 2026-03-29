@@ -8,7 +8,6 @@ import EvidenceCard from '../components/EvidenceCard';
 import BookmarkButton from '../components/BookmarkButton';
 import NotificationBanner from '../components/NotificationBanner';
 import WatchButton from '../components/WatchButton';
-import ViewerCount from '../components/ViewerCount';
 import RareSignalBanner from '../components/RareSignalBanner';
 import Footer from '../components/Footer';
 import { getAssetConsensus } from '../api';
@@ -63,7 +62,7 @@ export default function AssetConsensus() {
               </h1>
               <WatchButton ticker={ticker.toUpperCase()} />
             </div>
-            <ViewerCount type={['NVDA','AAPL','TSLA','META','MSFT'].includes(ticker.toUpperCase()) ? 'ticker-high' : 'ticker-low'} id={ticker} />
+            {/* Real data shown via consensus stats below */}
           </div>
 
           <form onSubmit={handleSearch} className="relative w-full sm:w-auto">

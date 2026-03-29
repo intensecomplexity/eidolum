@@ -1,6 +1,5 @@
 import { Link } from 'react-router-dom';
-import { Flame } from 'lucide-react';
-import ViewerCount from './ViewerCount';
+import { Flame, ChevronRight } from 'lucide-react';
 
 const TRENDING_ITEMS = [
   { type: 'ticker', id: 'NVDA', label: 'NVDA consensus', path: '/asset/NVDA', viewType: 'ticker-high' },
@@ -40,7 +39,7 @@ export default function TrendingNow({ forecasters = [] }) {
               <span className="text-muted text-xs font-mono w-4">{i + 1}.</span>
               <span className="text-text-primary text-sm font-medium">{item.label}</span>
             </div>
-            <ViewerCount type={item.viewType} id={item.id} />
+            <ChevronRight className="w-4 h-4 text-muted" />
           </Link>
         ))}
       </div>

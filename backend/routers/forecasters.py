@@ -44,6 +44,22 @@ def get_forecaster(
     if not f:
         raise HTTPException(status_code=404, detail="Forecaster not found")
 
+    # Quick stats: earliest prediction date + sector count
+    try:
+        extra = db.execute(sql_text("""
+            SELECT MIN(prediction_date),
+                   COUNT(DISTINCT CASE WHEN sector IS NOT NULL AND sector != '' AND sector != 'Other' THEN sector END),
+                   COUNT(*)
+            FROM predictions WHERE forecaster_id = :fid
+        """), {"fid": forecaster_id}).first()
+        first_pred_date = extra[0].isoformat() if extra and extra[0] else None
+        sector_count = extra[1] if extra else 0
+        total_all = extra[2] if extra else 0
+    except Exception:
+        first_pred_date = None
+        sector_count = 0
+        total_all = f.total_predictions or 0
+
     result = {
         "id": f.id, "name": f.name, "handle": f.handle,
         "platform": f.platform or "youtube", "channel_url": f.channel_url,
@@ -55,6 +71,9 @@ def get_forecaster(
         "evaluated_predictions": f.total_predictions or 0,
         "correct_predictions": f.correct_predictions or 0,
         "alpha": float(f.alpha or 0),
+        "first_prediction_date": first_pred_date,
+        "sector_count": sector_count,
+        "total_all_predictions": total_all,
         "sector_strengths": [],
         "accuracy_over_time": [],
         "prediction_counts": {"all": 0, "evaluated": 0, "pending": 0, "correct": 0, "incorrect": 0},
