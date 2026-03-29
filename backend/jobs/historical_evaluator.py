@@ -247,6 +247,7 @@ def _fetch_history(ticker: str, start, end) -> dict:
         data = r.json()
 
         if data.get("s") != "ok" or not data.get("c") or not data.get("t"):
+            print(f"[HistEval] Finnhub {ticker} ({s} to {e}): status={data.get('s')} keys={list(data.keys())} from={start_ts} to={end_ts}")
             return {}
 
         result = {}

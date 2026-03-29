@@ -1913,8 +1913,11 @@ def evaluate_test_one():
     s = min_d.strftime("%Y-%m-%d")
     e = max_d.strftime("%Y-%m-%d")
 
-    # Test Finnhub candles
+    # Test Finnhub candles — also test with a short 30-day range around eval_date
     prices = _fetch_history(ticker, min_d, max_d)
+    short_start = eval_date - timedelta(days=15)
+    short_end = eval_date + timedelta(days=3)
+    prices_short = _fetch_history(ticker, short_start, short_end)
 
     eval_price = _closest_price(prices, eval_date) if prices else None
     pred_price = _closest_price(prices, pred_date) if prices else None
@@ -1931,8 +1934,9 @@ def evaluate_test_one():
         "direction": row[5],
         "date_range": f"{s} to {e}",
         "price_source": "finnhub_candles",
-        "price_count": len(prices) if prices else 0,
-        "price_sample": dict(list(prices.items())[:5]) if prices else None,
+        "price_count_full": len(prices) if prices else 0,
+        "price_count_short": len(prices_short) if prices_short else 0,
+        "price_sample": dict(list((prices_short or prices or {}).items())[:5]) if (prices or prices_short) else None,
         "eval_date_price": eval_price,
         "pred_date_price": pred_price,
         "logs": logs,
