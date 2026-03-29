@@ -1697,6 +1697,50 @@ def scheduler_status():
     }
 
 
+@app.get("/api/admin/db-diagnostics")
+def db_diagnostics():
+    """Show prediction counts, date ranges, and breakdowns for debugging."""
+    from sqlalchemy import text as _t
+    db = SessionLocal()
+    try:
+        # Total counts
+        total = db.execute(_t("SELECT COUNT(*) FROM predictions")).scalar()
+        total_forecasters = db.execute(_t("SELECT COUNT(*) FROM forecasters")).scalar()
+
+        # Date range
+        dates = db.execute(_t("SELECT MIN(prediction_date), MAX(prediction_date) FROM predictions")).first()
+
+        # By verified_by (source)
+        by_source = db.execute(_t("SELECT verified_by, outcome, COUNT(*) as cnt FROM predictions GROUP BY verified_by, outcome ORDER BY cnt DESC")).fetchall()
+        source_breakdown = [{"source": r[0], "outcome": r[1], "count": r[2]} for r in by_source]
+
+        # Forecasters with 0 predictions
+        empty_forecasters = db.execute(_t("SELECT COUNT(*) FROM forecasters WHERE id NOT IN (SELECT DISTINCT forecaster_id FROM predictions WHERE forecaster_id IS NOT NULL)")).scalar()
+
+        # Backfill progress
+        backfill_date = db.execute(_t("SELECT value FROM config WHERE key = 'backfill_last_date'")).scalar()
+
+        # Recent predictions
+        recent = db.execute(_t("SELECT id, ticker, direction, outcome, verified_by, prediction_date FROM predictions ORDER BY id DESC LIMIT 5")).fetchall()
+        recent_list = [{"id": r[0], "ticker": r[1], "direction": r[2], "outcome": r[3], "source": r[4], "date": str(r[5])} for r in recent]
+
+        return {
+            "total_predictions": total,
+            "total_forecasters": total_forecasters,
+            "empty_forecasters": empty_forecasters,
+            "earliest_prediction": str(dates[0]) if dates[0] else None,
+            "latest_prediction": str(dates[1]) if dates[1] else None,
+            "source_breakdown": source_breakdown,
+            "backfill_last_date": backfill_date,
+            "recent_predictions": recent_list,
+        }
+    except Exception as e:
+        import traceback
+        return {"error": str(e), "traceback": traceback.format_exc()}
+    finally:
+        db.close()
+
+
 @app.post("/api/admin/run-massive-benzinga")
 def run_massive_benzinga_now():
     """Run the Massive Benzinga scraper immediately and return results."""
