@@ -17,15 +17,22 @@ CACHE_TTL = 600
 
 def _refresh_leaderboard(db: Session) -> list:
     """Compute the full leaderboard using a single SQL query."""
+    try:
+        # Set a statement timeout to prevent hanging
+        db.execute(sql_text("SET statement_timeout = '5000'"))  # 5 seconds max
+    except Exception:
+        pass  # SQLite doesn't support this
+
     rows = db.execute(sql_text("""
         SELECT
             f.id, f.name, f.handle, f.platform, f.channel_url,
             f.subscriber_count, f.profile_image_url, f.streak,
             f.total_predictions, f.correct_predictions, f.accuracy_score
         FROM forecasters f
-        WHERE f.total_predictions >= 10
+        WHERE COALESCE(f.total_predictions, 0) >= 10
+          AND COALESCE(f.accuracy_score, 0) > 0
         ORDER BY f.accuracy_score DESC, f.total_predictions DESC
-        LIMIT 200
+        LIMIT 100
     """)).fetchall()
 
     results = []
@@ -130,30 +137,35 @@ def get_pending_predictions(request: Request, db: Session = Depends(get_db)):
     return results
 
 
+_stats_cache = None
+_stats_cache_time: float = 0
+
 @router.get("/homepage-stats")
 @limiter.limit("60/minute")
 def get_homepage_stats(request: Request, db: Session = Depends(get_db)):
-    row = db.execute(sql_text("""
-        SELECT
-            (SELECT COUNT(*) FROM forecasters WHERE total_predictions > 0),
-            (SELECT COUNT(*) FROM predictions WHERE outcome != 'pending'),
-            (SELECT COUNT(*) FROM predictions WHERE outcome = 'correct'),
-            (SELECT COUNT(*) FROM predictions WHERE outcome IN ('correct', 'incorrect'))
-    """)).first()
-    total_fc = row[0] or 0
-    evaluated = row[1] or 0
-    correct_count = row[2] or 0
-    scored = row[3] or 0
+    global _stats_cache, _stats_cache_time
+    if _stats_cache and (_time.time() - _stats_cache_time) < 300:
+        return _stats_cache
+
+    try:
+        total_fc = db.execute(sql_text("SELECT COUNT(*) FROM forecasters WHERE COALESCE(total_predictions,0) > 0")).scalar() or 0
+        scored = db.execute(sql_text("SELECT COUNT(*) FROM predictions WHERE outcome IN ('correct','incorrect')")).scalar() or 0
+        correct_count = db.execute(sql_text("SELECT COUNT(*) FROM predictions WHERE outcome = 'correct'")).scalar() or 0
+    except Exception:
+        total_fc = scored = correct_count = 0
+
     avg_acc = round(correct_count / scored * 100, 1) if scored > 0 else 0
-    return {
+    _stats_cache = {
         "forecasters_tracked": total_fc,
-        "verified_predictions": evaluated,
-        "total_predictions": evaluated,
+        "verified_predictions": scored,
+        "total_predictions": scored,
         "avg_accuracy": avg_acc,
         "months_of_data": 24,
         "conflict_flags": 0,
         "transparency_tracked": 0,
     }
+    _stats_cache_time = _time.time()
+    return _stats_cache
 
 
 @router.get("/trending-tickers")
