@@ -1390,6 +1390,24 @@ async def lifespan(app):
     scheduler.add_job(run_benzinga_api, "interval", hours=2, id="benzinga_api", next_run_time=datetime.utcnow() + timedelta(minutes=15))
     scheduler.add_job(run_newsapi, "interval", hours=4, id="newsapi", next_run_time=datetime.utcnow() + timedelta(minutes=10))
     scheduler.add_job(run_benzinga_web, "interval", hours=2, id="benzinga_web", next_run_time=datetime.utcnow() + timedelta(minutes=25))
+
+    # Massive API — Benzinga ratings
+    def run_massive_benzinga():
+        from datetime import datetime as _dt
+        print(f"[Scheduler] Running Massive Benzinga at {_dt.utcnow()}")
+        db = SessionLocal()
+        try:
+            from jobs.massive_benzinga import scrape_massive_ratings
+            scrape_massive_ratings(db)
+        except Exception as e:
+            print(f"[MassiveBZ] Scheduler error: {e}")
+            import traceback
+            traceback.print_exc()
+        finally:
+            db.close()
+
+    scheduler.add_job(run_massive_benzinga, "interval", hours=2, id="massive_benzinga", next_run_time=datetime.utcnow() + timedelta(minutes=20))
+
     # FMP structured data
     scheduler.add_job(run_fmp_upgrades, "interval", hours=2, id="fmp_upgrades", next_run_time=datetime.utcnow() + timedelta(minutes=30))
     scheduler.add_job(run_fmp_price_targets, "interval", hours=2, id="fmp_price_targets", next_run_time=datetime.utcnow() + timedelta(minutes=60))
