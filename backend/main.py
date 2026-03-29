@@ -1560,6 +1560,56 @@ def scheduler_status():
     }
 
 
+@app.get("/api/admin/alpha-debug")
+def alpha_debug():
+    """Check exact state of alpha column in predictions table."""
+    from sqlalchemy import text as _t
+    db = BgSessionLocal()
+    try:
+        db.execute(_t("SET statement_timeout = '10000'"))
+        # Count alpha states for evaluated predictions
+        stats = db.execute(_t("""
+            SELECT
+                COUNT(*) as total_evaluated,
+                COUNT(CASE WHEN alpha IS NULL THEN 1 END) as alpha_null,
+                COUNT(CASE WHEN alpha IS NOT NULL THEN 1 END) as alpha_set,
+                COUNT(CASE WHEN alpha = 0 THEN 1 END) as alpha_zero,
+                COUNT(CASE WHEN actual_return IS NULL THEN 1 END) as return_null,
+                COUNT(CASE WHEN actual_return IS NOT NULL THEN 1 END) as return_set,
+                COUNT(CASE WHEN evaluation_date IS NULL THEN 1 END) as eval_date_null,
+                COUNT(CASE WHEN prediction_date IS NULL THEN 1 END) as pred_date_null
+            FROM predictions
+            WHERE outcome IN ('correct','incorrect')
+        """)).first()
+        # Sample 3 evaluated predictions with their raw column values
+        samples = db.execute(_t("""
+            SELECT id, ticker, outcome, actual_return, alpha, sp500_return,
+                   prediction_date, evaluation_date
+            FROM predictions
+            WHERE outcome IN ('correct','incorrect')
+            ORDER BY id DESC LIMIT 5
+        """)).fetchall()
+        return {
+            "total_evaluated": stats[0], "alpha_null": stats[1], "alpha_set": stats[2],
+            "alpha_zero": stats[3], "return_null": stats[4], "return_set": stats[5],
+            "eval_date_null": stats[6], "pred_date_null": stats[7],
+            "samples": [
+                {"id": r[0], "ticker": r[1], "outcome": r[2],
+                 "actual_return": float(r[3]) if r[3] is not None else None,
+                 "alpha": float(r[4]) if r[4] is not None else None,
+                 "sp500_return": float(r[5]) if r[5] is not None else None,
+                 "prediction_date": str(r[6]) if r[6] else None,
+                 "evaluation_date": str(r[7]) if r[7] else None}
+                for r in samples
+            ],
+        }
+    except Exception as e:
+        import traceback
+        return {"error": str(e), "traceback": traceback.format_exc()}
+    finally:
+        db.close()
+
+
 @app.get("/api/admin/db-diagnostics")
 def db_diagnostics():
     """Show prediction counts, date ranges, and breakdowns for debugging."""
