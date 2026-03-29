@@ -17,7 +17,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
-from database import engine, Base, SessionLocal
+from database import engine, Base, SessionLocal, BgSessionLocal
 from models import Forecaster, Prediction, Config
 from rate_limit import limiter
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
@@ -1112,7 +1112,7 @@ async def lifespan(app):
         pass
     # Lightweight startup cleanup — only garbage names, NOT heavy dedup queries
     try:
-        db = SessionLocal()
+        db = BgSessionLocal()
         from sqlalchemy import text as _text
         r1 = db.execute(_text("DELETE FROM predictions WHERE forecaster_id IN (SELECT id FROM forecasters WHERE LENGTH(name) > 50)"))
         r2 = db.execute(_text("DELETE FROM forecasters WHERE LENGTH(name) > 50"))
@@ -1131,7 +1131,7 @@ async def lifespan(app):
         import time as _t
         from sqlalchemy import text as _txt
         while True:
-            dbs = SessionLocal()
+            dbs = BgSessionLocal()
             try:
                 last = dbs.execute(_txt("SELECT value FROM config WHERE key = 'backfill_last_date'")).scalar()
                 if not last:
@@ -1154,7 +1154,7 @@ async def lifespan(app):
                 days_done = 0
                 current = last_date + timedelta(days=1)
                 while current <= today and days_done < 30:
-                    dbs = SessionLocal()
+                    dbs = BgSessionLocal()
                     try:
                         day_str = current.strftime("%Y-%m-%d")
                         inserted, fetched = _process_day(day_str, dbs)
@@ -1189,7 +1189,7 @@ async def lifespan(app):
     # Predictions persist between deploys — Layer 3 cleanup handles invalid ones hourly
     # Seed forecasters (keep existing, add missing)
     try:
-        db = SessionLocal()
+        db = BgSessionLocal()
         from jobs.seed_magazines import seed_magazine_forecasters
         seed_magazine_forecasters(db)
         db.close()
@@ -1197,7 +1197,7 @@ async def lifespan(app):
         print(f"[Eidolum] Magazine seed error (non-fatal): {e}")
     # Merge duplicate forecasters (same firm, different names)
     try:
-        db = SessionLocal()
+        db = BgSessionLocal()
         from jobs.news_scraper import merge_duplicate_forecasters
         merge_duplicate_forecasters(db)
         db.close()
@@ -1206,7 +1206,7 @@ async def lifespan(app):
     # Add cached stats columns to forecasters if missing
     try:
         from sqlalchemy import text as _t
-        db = SessionLocal()
+        db = BgSessionLocal()
         for col_sql in [
             "ALTER TABLE forecasters ADD COLUMN accuracy_score FLOAT",
             "ALTER TABLE forecasters ADD COLUMN total_predictions INTEGER DEFAULT 0",
@@ -1228,7 +1228,7 @@ async def lifespan(app):
         import time
         time.sleep(10)
         try:
-            db = SessionLocal()
+            db = BgSessionLocal()
             pred_count = db.query(Prediction).count()
             print(f"[Eidolum] Background import starting — {pred_count} predictions exist")
             active_scrapers = []
@@ -1311,7 +1311,7 @@ async def lifespan(app):
     print("[Eidolum] Historical import started in background thread")
     # Add archive columns if missing
     try:
-        db = SessionLocal()
+        db = BgSessionLocal()
         migrate_add_archive_columns(db)
         db.close()
     except Exception as e:
@@ -1324,7 +1324,7 @@ async def lifespan(app):
     # Ensure a season exists for the current quarter
     try:
         from seasons import ensure_current_season as _ecs
-        _db = SessionLocal()
+        _db = BgSessionLocal()
         _ecs(_db)
         _db.close()
     except Exception as e:
@@ -1332,7 +1332,7 @@ async def lifespan(app):
     # Ensure daily challenge exists on startup
     try:
         from jobs.daily_challenge import ensure_daily_challenge_exists
-        _db = SessionLocal()
+        _db = BgSessionLocal()
         ensure_daily_challenge_exists(_db)
         _db.close()
     except Exception as e:
@@ -1360,7 +1360,7 @@ async def lifespan(app):
         print(f"[Scheduler] Running fast scraper at {_dt.utcnow()}")
         scheduler_last_run["fast_scraper"] = _dt.utcnow()
         from jobs.news_scraper import scrape_fast_predictions
-        db = SessionLocal()
+        db = BgSessionLocal()
         try:
             scrape_fast_predictions(db)
         except Exception as e:
@@ -1372,7 +1372,7 @@ async def lifespan(app):
         from datetime import datetime as _dt
         print(f"[Scheduler] Running full scraper at {_dt.utcnow()}")
         scheduler_last_run["full_scraper"] = _dt.utcnow()
-        db = SessionLocal()
+        db = BgSessionLocal()
         try:
             run_scraper(db)
         finally:
@@ -1382,7 +1382,7 @@ async def lifespan(app):
         from datetime import datetime as _dt
         print(f"[Scheduler] Running evaluator at {_dt.utcnow()}")
         scheduler_last_run["evaluator"] = _dt.utcnow()
-        db = SessionLocal()
+        db = BgSessionLocal()
         try:
             run_evaluator(db)
         finally:
@@ -1392,7 +1392,7 @@ async def lifespan(app):
         from datetime import datetime as _dt
         print(f"[Scheduler] Running user evaluator at {_dt.utcnow()}")
         scheduler_last_run["user_evaluator"] = _dt.utcnow()
-        db = SessionLocal()
+        db = BgSessionLocal()
         try:
             results = evaluate_user_predictions(db)
             print(f"[Scheduler] User evaluator completed: {len(results or [])} predictions scored")
@@ -1407,7 +1407,7 @@ async def lifespan(app):
         from datetime import datetime as _dt
         print(f"[Scheduler] Running duel evaluator at {_dt.utcnow()}")
         scheduler_last_run["duel_evaluator"] = _dt.utcnow()
-        db = SessionLocal()
+        db = BgSessionLocal()
         try:
             evaluate_duels(db)
         finally:
@@ -1417,7 +1417,7 @@ async def lifespan(app):
         from datetime import datetime as _dt
         print(f"[Scheduler] Running season check at {_dt.utcnow()}")
         scheduler_last_run["season_check"] = _dt.utcnow()
-        db = SessionLocal()
+        db = BgSessionLocal()
         try:
             check_season_completion(db)
         finally:
@@ -1427,7 +1427,7 @@ async def lifespan(app):
         from datetime import datetime as _dt
         print(f"[Scheduler] Running FMP upgrades at {_dt.utcnow()}")
         scheduler_last_run["fmp_upgrades"] = _dt.utcnow()
-        db = SessionLocal()
+        db = BgSessionLocal()
         try:
             from jobs.upgrade_scrapers import scrape_fmp_upgrades
             scrape_fmp_upgrades(db)
@@ -1440,7 +1440,7 @@ async def lifespan(app):
         from datetime import datetime as _dt
         print(f"[Scheduler] Running FMP price targets at {_dt.utcnow()}")
         scheduler_last_run["fmp_price_targets"] = _dt.utcnow()
-        db = SessionLocal()
+        db = BgSessionLocal()
         try:
             from jobs.upgrade_scrapers import scrape_fmp_price_targets
             scrape_fmp_price_targets(db)
@@ -1453,7 +1453,7 @@ async def lifespan(app):
         from datetime import datetime as _dt
         print(f"[Scheduler] Running FMP daily grades at {_dt.utcnow()}")
         scheduler_last_run["fmp_daily_grades"] = _dt.utcnow()
-        db = SessionLocal()
+        db = BgSessionLocal()
         try:
             from jobs.upgrade_scrapers import scrape_fmp_daily_grades
             scrape_fmp_daily_grades(db)
@@ -1466,7 +1466,7 @@ async def lifespan(app):
         from datetime import datetime as _dt
         print(f"[Scheduler] Running yfinance at {_dt.utcnow()}")
         scheduler_last_run["yfinance"] = _dt.utcnow()
-        db = SessionLocal()
+        db = BgSessionLocal()
         try:
             from jobs.rss_scrapers import scrape_yfinance_recommendations
             scrape_yfinance_recommendations(db)
@@ -1479,7 +1479,7 @@ async def lifespan(app):
         from datetime import datetime as _dt
         print(f"[Scheduler] Running Benzinga API at {_dt.utcnow()}")
         scheduler_last_run["benzinga_api"] = _dt.utcnow()
-        db = SessionLocal()
+        db = BgSessionLocal()
         try:
             from jobs.benzinga_scraper import scrape_benzinga_ratings
             scrape_benzinga_ratings(db)
@@ -1492,7 +1492,7 @@ async def lifespan(app):
         from datetime import datetime as _dt
         print(f"[Scheduler] Running Benzinga Web at {_dt.utcnow()}")
         scheduler_last_run["benzinga_web"] = _dt.utcnow()
-        db = SessionLocal()
+        db = BgSessionLocal()
         try:
             from jobs.benzinga_web_scraper import scrape_benzinga_web
             scrape_benzinga_web(db)
@@ -1505,7 +1505,7 @@ async def lifespan(app):
         from datetime import datetime as _dt
         print(f"[Scheduler] Running NewsAPI at {_dt.utcnow()}")
         scheduler_last_run["newsapi"] = _dt.utcnow()
-        db = SessionLocal()
+        db = BgSessionLocal()
         try:
             from jobs.news_scraper import scrape_newsapi
             scrape_newsapi(db)
@@ -1529,7 +1529,7 @@ async def lifespan(app):
     def run_massive_benzinga():
         from datetime import datetime as _dt
         print(f"[Scheduler] Running Massive Benzinga at {_dt.utcnow()}")
-        db = SessionLocal()
+        db = BgSessionLocal()
         try:
             from jobs.massive_benzinga import scrape_massive_ratings
             scrape_massive_ratings(db)
@@ -1580,7 +1580,7 @@ async def lifespan(app):
         from datetime import datetime as _dt
         print(f"[Scheduler] Creating daily challenge at {_dt.utcnow()}")
         scheduler_last_run["daily_challenge_create"] = _dt.utcnow()
-        db = SessionLocal()
+        db = BgSessionLocal()
         try:
             from jobs.daily_challenge import create_daily_challenge
             create_daily_challenge(db)
@@ -1593,7 +1593,7 @@ async def lifespan(app):
         from datetime import datetime as _dt
         print(f"[Scheduler] Scoring daily challenge at {_dt.utcnow()}")
         scheduler_last_run["daily_challenge_score"] = _dt.utcnow()
-        db = SessionLocal()
+        db = BgSessionLocal()
         try:
             from jobs.daily_challenge import score_daily_challenge
             score_daily_challenge(db)
@@ -1616,7 +1616,7 @@ async def lifespan(app):
         from datetime import datetime as _dt
         print(f"[Scheduler] Running price alerts at {_dt.utcnow()}")
         scheduler_last_run["price_alerts"] = _dt.utcnow()
-        db = SessionLocal()
+        db = BgSessionLocal()
         try:
             from jobs.price_alerts import check_price_alerts
             check_price_alerts(db)
@@ -1630,7 +1630,7 @@ async def lifespan(app):
     def run_hourly_leaderboard():
         from datetime import datetime as _dt
         scheduler_last_run["leaderboard"] = _dt.utcnow()
-        db = SessionLocal()
+        db = BgSessionLocal()
         try:
             run_leaderboard_refresh(db)
         finally:
@@ -1644,7 +1644,7 @@ async def lifespan(app):
         from datetime import datetime as _dt
         print(f"[Scheduler] Running weekly digest at {_dt.utcnow()}")
         scheduler_last_run["weekly_digest"] = _dt.utcnow()
-        db = SessionLocal()
+        db = BgSessionLocal()
         try:
             from jobs.weekly_digest import send_weekly_digest
             send_weekly_digest(db)
@@ -1660,7 +1660,7 @@ async def lifespan(app):
         from datetime import datetime as _dt
         print(f"[Scheduler] Updating earnings at {_dt.utcnow()}")
         scheduler_last_run["earnings"] = _dt.utcnow()
-        db = SessionLocal()
+        db = BgSessionLocal()
         try:
             from jobs.earnings import update_earnings_calendar
             update_earnings_calendar(db)
@@ -1677,7 +1677,7 @@ async def lifespan(app):
 
     # Weekly challenge — create every Monday at 00:01 UTC
     def run_weekly_challenge():
-        db = SessionLocal()
+        db = BgSessionLocal()
         try:
             from weekly_challenges import create_weekly_challenge
             create_weekly_challenge(db)
@@ -1840,7 +1840,7 @@ def scheduler_status():
 def db_diagnostics():
     """Show prediction counts, date ranges, and breakdowns for debugging."""
     from sqlalchemy import text as _t
-    db = SessionLocal()
+    db = BgSessionLocal()
     try:
         # Total counts
         total = db.execute(_t("SELECT COUNT(*) FROM predictions")).scalar()
@@ -1884,7 +1884,7 @@ def db_diagnostics():
 def run_massive_benzinga_now():
     """Run the Massive Benzinga scraper immediately and return results."""
     import traceback as _tb
-    db = SessionLocal()
+    db = BgSessionLocal()
     try:
         from jobs.massive_benzinga import scrape_massive_ratings
         from models import Prediction
@@ -1909,7 +1909,7 @@ def start_backfill():
         return {"status": "already_running", **status}
 
     def _run():
-        db = SessionLocal()
+        db = BgSessionLocal()
         try:
             run_backfill(db)
         except Exception as e:
@@ -1961,7 +1961,7 @@ def evaluate_status():
 def evaluate_debug():
     """Show exactly what the evaluator sees — pending prediction stats."""
     from sqlalchemy import text as _t
-    db = SessionLocal()
+    db = BgSessionLocal()
     try:
         # Check evaluation_date distribution
         stats = db.execute(_t("""
@@ -2032,7 +2032,7 @@ def re_evaluate_all():
     from sqlalchemy import text as _t
 
     # Reset scored predictions back to pending
-    db = SessionLocal()
+    db = BgSessionLocal()
     try:
         count = db.execute(_t(
             "UPDATE predictions SET outcome='pending', actual_return=NULL WHERE outcome IN ('correct','incorrect')"
@@ -2070,7 +2070,7 @@ def reformat_contexts():
 
     def _run():
         from jobs.context_formatter import format_context
-        dbs = SessionLocal()
+        dbs = BgSessionLocal()
         try:
             # Get predictions with raw-format contexts (contain underscores or jargon patterns)
             rows = dbs.execute(_t("""
@@ -2135,7 +2135,7 @@ def backfill_alpha():
 
     def _run():
         from jobs.historical_evaluator import _calc_spy_return
-        dbs = SessionLocal()
+        dbs = BgSessionLocal()
         try:
             rows = dbs.execute(_t("""
                 SELECT id, actual_return, prediction_date, evaluation_date
@@ -2189,7 +2189,7 @@ def backfill_sectors():
 def sector_status():
     """Show sector backfill progress."""
     from sqlalchemy import text as _t
-    db = SessionLocal()
+    db = BgSessionLocal()
     try:
         total = db.execute(_t("SELECT COUNT(DISTINCT ticker) FROM predictions")).scalar() or 0
         mapped = db.execute(_t("SELECT COUNT(DISTINCT ticker) FROM predictions WHERE sector IS NOT NULL AND sector != '' AND sector != 'Other'")).scalar() or 0
@@ -2216,7 +2216,7 @@ def evaluate_test_one():
     old_stdout = sys.stdout
     sys.stdout = buffer = io.StringIO()
 
-    db = SessionLocal()
+    db = BgSessionLocal()
     try:
         # Get one popular ticker that has pending expired predictions
         row = db.execute(_t("""
@@ -2278,7 +2278,7 @@ def evaluate_test_one():
 def run_user_evaluator_now():
     """Run the user prediction evaluator immediately and return results."""
     import traceback as _tb
-    db = SessionLocal()
+    db = BgSessionLocal()
     try:
         from jobs.user_evaluator import evaluate_user_predictions
         results = evaluate_user_predictions(db)
@@ -2304,7 +2304,7 @@ def debug():
     }
     try:
         from sqlalchemy import func
-        db = SessionLocal()
+        db = BgSessionLocal()
         count = db.query(Forecaster).count()
         pred_count = db.query(Prediction).count()
         info["db_connected"] = True
