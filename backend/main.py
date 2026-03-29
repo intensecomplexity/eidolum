@@ -1730,13 +1730,32 @@ def scraper_health():
     bf = get_backfill_status()
     ev = get_eval_status()
 
+    # Read forward/reverse progress from Config
+    fwd_last = None
+    rev_last = None
+    fwd_done = False
+    try:
+        from models import Config as _Cfg
+        fwd_row = db.query(_Cfg).filter(_Cfg.key == "backfill_last_date").first()
+        fwd_last = fwd_row.value if fwd_row else None
+        rev_row = db.query(_Cfg).filter(_Cfg.key == "backfill_reverse_last_date").first()
+        rev_last = rev_row.value if rev_row else None
+        done_row = db.query(_Cfg).filter(_Cfg.key == "backfill_forward_done").first()
+        fwd_done = done_row.value == "true" if done_row else False
+    except Exception:
+        pass
+
     return {
         "backfill": {
             "running": bf.get("running", False),
-            "last_date": bf.get("current_date"),
+            "phase": bf.get("phase"),
+            "current_date": bf.get("current_date"),
             "days_completed": bf.get("days_completed", 0),
             "predictions_inserted": bf.get("predictions_inserted", 0),
             "last_error": bf.get("last_error"),
+            "forward_last_date": fwd_last,
+            "forward_done": fwd_done,
+            "reverse_last_date": rev_last,
         },
         "scraper": {
             "massive_benzinga_last_run": scheduler_last_run.get("massive_benzinga", "").isoformat() if scheduler_last_run.get("massive_benzinga") else None,

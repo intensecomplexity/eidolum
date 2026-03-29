@@ -1,7 +1,16 @@
 """
-Benzinga historical backfill — crawls day by day from 2 years ago to today.
-Stores progress in the config table so it resumes after restart.
-Connection-safe: opens/closes DB per batch, never holds connections during API calls.
+Benzinga historical backfill: forward + reverse.
+
+Phase 1 (forward): 2024-03-29 -> today, day by day
+Phase 2 (reverse): 2024-03-28 -> backwards indefinitely until 30 consecutive empty days
+Phase 3 (ongoing): 2-hour incremental scraper runs in parallel (separate job)
+
+Progress stored in Config table:
+  - backfill_last_date: last completed forward date
+  - backfill_reverse_last_date: last completed reverse date
+  - backfill_forward_done: "true" when forward reached today
+
+Connection-safe: opens/closes DB per day, never holds connections during API calls.
 """
 import os
 import time
@@ -25,16 +34,22 @@ SKIP_ACTIONS = {
     "terminates coverage on", "removes coverage", "suspends coverage",
 }
 
-# Backfill state
+FORWARD_START = date(2024, 3, 29)
+REVERSE_START = date(2024, 3, 28)
+MAX_EMPTY_DAYS_REVERSE = 30  # stop reverse after 30 consecutive empty days
+
+# ── Global state ─────────────────────────────────────────────────────────────
 _backfill_running = False
 _backfill_stop = False
 _backfill_status = {
     "running": False,
+    "phase": None,         # "forward" | "reverse" | None
     "current_date": None,
     "days_completed": 0,
-    "total_days": 0,
     "predictions_inserted": 0,
     "last_error": None,
+    "forward_done": False,
+    "reverse_last_date": None,
 }
 
 
@@ -47,10 +62,25 @@ def stop_backfill():
     _backfill_stop = True
 
 
-def run_backfill(start_date: date = None, end_date: date = None):
-    """Day-by-day backfill. Connection-safe: opens/closes DB per batch of 30 days."""
+# ── Config helpers ───────────────────────────────────────────────────────────
+def _get_config(db, key: str) -> str | None:
+    row = db.query(Config).filter(Config.key == key).first()
+    return row.value if row else None
+
+
+def _set_config(db, key: str, value: str):
+    row = db.query(Config).filter(Config.key == key).first()
+    if row:
+        row.value = value
+    else:
+        db.add(Config(key=key, value=value))
+    db.commit()
+
+
+# ── Main entry point ────────────────────────────────────────────────────────
+def run_backfill():
+    """Run forward backfill to today, then reverse backfill indefinitely."""
     global _backfill_running, _backfill_stop, _backfill_status
-    from database import BgSessionLocal
 
     if _backfill_running:
         print("[Backfill] Already running")
@@ -62,98 +92,204 @@ def run_backfill(start_date: date = None, end_date: date = None):
     _backfill_running = True
     _backfill_stop = False
 
-    if not start_date:
-        start_date = date(2024, 3, 29)
-    if not end_date:
-        end_date = date.today()
+    try:
+        # Phase 1: Forward
+        forward_done = _run_forward()
 
-    # Check for resume point
+        # Phase 2: Reverse (only if forward completed)
+        if forward_done and not _backfill_stop:
+            _run_reverse()
+    finally:
+        _backfill_running = False
+        _backfill_status["running"] = False
+        _backfill_status["phase"] = None
+        print("[Backfill] All phases complete")
+
+
+def _run_forward() -> bool:
+    """Phase 1: Forward backfill from FORWARD_START to today. Returns True if caught up."""
+    from database import BgSessionLocal
+
     db = BgSessionLocal()
     try:
-        resume = db.query(Config).filter(Config.key == "backfill_last_date").first()
-        if resume and resume.value:
+        # Check if already done
+        if _get_config(db, "backfill_forward_done") == "true":
+            last = _get_config(db, "backfill_last_date")
+            print(f"[Forward] Already complete (last={last})")
+            _backfill_status["forward_done"] = True
+            return True
+
+        # Resume point
+        start = FORWARD_START
+        resume = _get_config(db, "backfill_last_date")
+        if resume:
             try:
-                resumed_date = datetime.strptime(resume.value, "%Y-%m-%d").date()
-                if resumed_date > start_date:
-                    start_date = resumed_date + timedelta(days=1)
-                    print(f"[Backfill] Resuming from {start_date}")
+                resumed = datetime.strptime(resume, "%Y-%m-%d").date()
+                if resumed >= start:
+                    start = resumed + timedelta(days=1)
             except Exception:
                 pass
     finally:
         db.close()
 
-    total_days = (end_date - start_date).days + 1
-    if total_days <= 0:
-        print(f"[Backfill] Already caught up (last={start_date - timedelta(days=1)}, today={end_date})")
-        _backfill_running = False
-        return
+    end = date.today()
+    if start > end:
+        # Mark forward as done
+        db = BgSessionLocal()
+        try:
+            _set_config(db, "backfill_forward_done", "true")
+        finally:
+            db.close()
+        _backfill_status["forward_done"] = True
+        print(f"[Forward] Already caught up to {end}")
+        return True
 
+    total_days = (end - start).days + 1
     _backfill_status.update({
-        "running": True, "current_date": str(start_date),
-        "days_completed": 0, "total_days": total_days,
-        "predictions_inserted": 0, "last_error": None,
+        "running": True, "phase": "forward", "current_date": str(start),
+        "days_completed": 0, "predictions_inserted": 0, "last_error": None,
+        "forward_done": False,
     })
 
-    print(f"[Backfill] Starting: {start_date} -> {end_date} ({total_days} days)")
+    print(f"[Forward] {start} -> {end} ({total_days} days)")
     total_inserted = 0
     days_done = 0
-    current = start_date
     batch_days = 0
+    current = start
 
+    while current <= end:
+        if _backfill_stop:
+            print(f"[Forward] Stopped at {current}")
+            return False
+
+        inserted = _process_one_day(current, "backfill_last_date", "Forward")
+        total_inserted += inserted
+        days_done += 1
+        batch_days += 1
+        _backfill_status["days_completed"] = days_done
+        _backfill_status["predictions_inserted"] = total_inserted
+        _backfill_status["current_date"] = str(current)
+
+        current += timedelta(days=1)
+        time.sleep(0.5)
+
+        if batch_days >= 30:
+            _refresh_stats_if_needed()
+            print(f"[Forward] Batch done. {days_done}/{total_days} days, {total_inserted} inserted. Pausing 10s.")
+            time.sleep(10)
+            batch_days = 0
+
+    # Mark forward complete
+    db = BgSessionLocal()
     try:
-        while current <= end_date:
-            if _backfill_stop:
-                print(f"[Backfill] Stopped at {current}")
-                break
-
-            day_str = current.strftime("%Y-%m-%d")
-            _backfill_status["current_date"] = day_str
-
-            # Open a fresh DB connection per day
-            db = BgSessionLocal()
-            try:
-                inserted, fetched = _process_day(day_str, db)
-                total_inserted += inserted
-
-                if inserted > 0 or fetched > 0:
-                    print(f"[Backfill] {day_str}: fetched={fetched} inserted={inserted}")
-
-                # Save progress
-                _save_progress(db, day_str)
-            except Exception as e:
-                _backfill_status["last_error"] = f"{day_str}: {e}"
-                print(f"[Backfill] Error on {day_str}: {e}")
-                # Don't stop, skip this day and continue
-            finally:
-                db.close()
-
-            days_done += 1
-            batch_days += 1
-            _backfill_status["days_completed"] = days_done
-            _backfill_status["predictions_inserted"] = total_inserted
-
-            current += timedelta(days=1)
-
-            # Pause between days (0.5s) and longer pause every 30 days
-            time.sleep(0.5)
-            if batch_days >= 30:
-                print(f"[Backfill] Batch of 30 days complete. {days_done}/{total_days} done, {total_inserted} inserted. Pausing 10s.")
-                time.sleep(10)
-                batch_days = 0
-
-    except Exception as e:
-        _backfill_status["last_error"] = str(e)
-        print(f"[Backfill] Fatal error at {current}: {e}")
-        import traceback
-        traceback.print_exc()
+        _set_config(db, "backfill_forward_done", "true")
     finally:
-        _backfill_running = False
-        _backfill_status["running"] = False
-        print(f"[Backfill] Complete: {days_done} days, {total_inserted} inserted")
+        db.close()
+
+    _backfill_status["forward_done"] = True
+    _refresh_stats_if_needed()
+    print(f"[Forward] Complete: {days_done} days, {total_inserted} predictions")
+    return True
 
 
+def _run_reverse():
+    """Phase 2: Reverse backfill from REVERSE_START backwards until data runs out."""
+    from database import BgSessionLocal
+
+    db = BgSessionLocal()
+    try:
+        resume = _get_config(db, "backfill_reverse_last_date")
+        if resume:
+            try:
+                start = datetime.strptime(resume, "%Y-%m-%d").date() - timedelta(days=1)
+            except Exception:
+                start = REVERSE_START
+        else:
+            start = REVERSE_START
+    finally:
+        db.close()
+
+    _backfill_status.update({
+        "phase": "reverse", "current_date": str(start),
+        "days_completed": 0, "predictions_inserted": 0, "last_error": None,
+    })
+
+    print(f"[Reverse] Starting from {start}, going backwards")
+    total_inserted = 0
+    days_done = 0
+    batch_days = 0
+    consecutive_empty = 0
+    current = start
+
+    while True:
+        if _backfill_stop:
+            print(f"[Reverse] Stopped at {current}")
+            break
+
+        inserted = _process_one_day(current, "backfill_reverse_last_date", "Reverse")
+        total_inserted += inserted
+        days_done += 1
+        batch_days += 1
+        _backfill_status["days_completed"] = days_done
+        _backfill_status["predictions_inserted"] = total_inserted
+        _backfill_status["current_date"] = str(current)
+        _backfill_status["reverse_last_date"] = str(current)
+
+        if inserted == 0:
+            consecutive_empty += 1
+        else:
+            consecutive_empty = 0
+
+        if consecutive_empty >= MAX_EMPTY_DAYS_REVERSE:
+            print(f"[Reverse] {MAX_EMPTY_DAYS_REVERSE} consecutive empty days at {current}. No more data. Stopping.")
+            break
+
+        current -= timedelta(days=1)
+        time.sleep(0.5)
+
+        if batch_days >= 30:
+            _refresh_stats_if_needed()
+            print(f"[Reverse] Batch done. {days_done} days back, {total_inserted} inserted, at {current}. Pausing 10s.")
+            time.sleep(10)
+            batch_days = 0
+
+    _refresh_stats_if_needed()
+    print(f"[Reverse] Complete: {days_done} days, {total_inserted} predictions, reached {current}")
+
+
+# ── Process a single day ─────────────────────────────────────────────────────
+def _process_one_day(day: date, config_key: str, label: str) -> int:
+    """Fetch and insert all ratings for one day. Returns number inserted."""
+    from database import BgSessionLocal
+
+    day_str = day.strftime("%Y-%m-%d")
+    db = BgSessionLocal()
+    try:
+        inserted, fetched = _fetch_and_insert_day(day_str, db)
+        _set_config(db, config_key, day_str)
+        if inserted > 0 or fetched > 0:
+            print(f"[{label}] {day_str}: fetched={fetched} inserted={inserted}")
+        return inserted
+    except Exception as e:
+        _backfill_status["last_error"] = f"{day_str}: {e}"
+        print(f"[{label}] Error on {day_str}: {e}")
+        return 0
+    finally:
+        db.close()
+
+
+def _refresh_stats_if_needed():
+    """Refresh forecaster stats after a batch."""
+    try:
+        from jobs.historical_evaluator import refresh_all_forecaster_stats
+        refresh_all_forecaster_stats()
+    except Exception as e:
+        print(f"[Backfill] Stats refresh error: {e}")
+
+
+# ── Auto-resume on startup ──────────────────────────────────────────────────
 def auto_resume_backfill():
-    """Called on startup. If backfill isn't caught up to today, resume in background."""
+    """Called on startup. Resumes whichever phase is needed."""
     import threading
     if not MASSIVE_KEY:
         return
@@ -161,23 +297,38 @@ def auto_resume_backfill():
     from database import BgSessionLocal
     db = BgSessionLocal()
     try:
-        resume = db.query(Config).filter(Config.key == "backfill_last_date").first()
-        if resume and resume.value:
-            last = datetime.strptime(resume.value, "%Y-%m-%d").date()
-            if last >= date.today() - timedelta(days=1):
-                print(f"[Backfill] Already caught up (last={last})")
-                return
-            print(f"[Backfill] Auto-resuming from {last + timedelta(days=1)}")
+        forward_done = _get_config(db, "backfill_forward_done") == "true"
+        fwd_last = _get_config(db, "backfill_last_date")
+        rev_last = _get_config(db, "backfill_reverse_last_date")
+
+        if forward_done:
+            # Check if forward needs refreshing (new days since last run)
+            if fwd_last:
+                last_fwd = datetime.strptime(fwd_last, "%Y-%m-%d").date()
+                if last_fwd < date.today() - timedelta(days=1):
+                    # Need to catch up forward first, then continue reverse
+                    _set_config(db, "backfill_forward_done", "false")
+                    print(f"[Backfill] Forward needs catch-up from {last_fwd} to today")
+                elif rev_last:
+                    print(f"[Backfill] Resuming reverse from {rev_last}")
+                else:
+                    print(f"[Backfill] Starting reverse from {REVERSE_START}")
+            else:
+                print(f"[Backfill] Starting reverse from {REVERSE_START}")
         else:
-            print("[Backfill] No previous progress, starting fresh")
+            if fwd_last:
+                print(f"[Backfill] Resuming forward from {fwd_last}")
+            else:
+                print(f"[Backfill] Starting fresh forward from {FORWARD_START}")
     finally:
         db.close()
 
     threading.Thread(target=run_backfill, daemon=True).start()
 
 
-def _process_day(day_str: str, db) -> tuple:
-    """Fetch and insert all ratings for a single day. Returns (inserted, fetched)."""
+# ── API fetch + insert ───────────────────────────────────────────────────────
+def _fetch_and_insert_day(day_str: str, db) -> tuple:
+    """Fetch all ratings for a single day from the API. Returns (inserted, fetched)."""
     inserted = 0
     fetched = 0
     next_url = None
@@ -230,8 +381,7 @@ def _process_day(day_str: str, db) -> tuple:
             try:
                 if _insert_rating(rating, db):
                     inserted += 1
-            except Exception as e:
-                # Log and skip individual rating errors
+            except Exception:
                 continue
 
         if not next_url or page >= 10:
@@ -273,7 +423,6 @@ def _insert_rating(rating: dict, db) -> bool:
     if not direction:
         return False
 
-    # Derive call_type from action
     call_type = _get_call_type(action_lower, rating_current.lower(), pt_current)
 
     canonical = resolve_forecaster_alias(firm)
@@ -363,7 +512,6 @@ def _get_direction(action_lower, rating_lower, pt_current, pt_prior):
 
 
 def _get_call_type(action_lower: str, rating_lower: str, pt_current) -> str:
-    """Derive call_type from action and rating."""
     if "upgrade" in action_lower:
         return "upgrade"
     if "downgrade" in action_lower:
@@ -373,12 +521,3 @@ def _get_call_type(action_lower: str, rating_lower: str, pt_current) -> str:
     if pt_current and str(pt_current).strip():
         return "price_target"
     return "rating"
-
-
-def _save_progress(db, day_str: str):
-    row = db.query(Config).filter(Config.key == "backfill_last_date").first()
-    if row:
-        row.value = day_str
-    else:
-        db.add(Config(key="backfill_last_date", value=day_str))
-    db.commit()
