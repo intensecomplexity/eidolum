@@ -1,11 +1,161 @@
+import time as _time
 from fastapi import APIRouter, Depends, Query, Request
 from sqlalchemy.orm import Session
+from sqlalchemy import text as sql_text
 from database import get_db
 from models import Prediction, Forecaster, format_timestamp, get_youtube_timestamp_url
 from utils import compute_forecaster_stats
 from rate_limit import limiter
 
 router = APIRouter()
+
+# ── Ticker detail cache ──────────────────────────────────────────────────────
+_ticker_cache: dict[str, tuple] = {}
+_TICKER_TTL = 300  # 5 minutes
+
+
+@router.get("/ticker/{ticker}/detail")
+@limiter.limit("60/minute")
+def get_ticker_detail(request: Request, ticker: str, db: Session = Depends(get_db)):
+    """Full ticker detail page data: consensus, pending predictions, recent scored, stats."""
+    ticker = ticker.upper().strip()
+
+    cached = _ticker_cache.get(ticker)
+    if cached and (_time.time() - cached[1]) < _TICKER_TTL:
+        return cached[0]
+
+    # ── Consensus + counts ────────────────────────────────────────────────
+    counts = db.execute(sql_text("""
+        SELECT
+            COUNT(*) as total,
+            SUM(CASE WHEN direction='bullish' THEN 1 ELSE 0 END) as bullish,
+            SUM(CASE WHEN direction='bearish' THEN 1 ELSE 0 END) as bearish,
+            SUM(CASE WHEN outcome IN ('correct','incorrect') THEN 1 ELSE 0 END) as evaluated,
+            SUM(CASE WHEN outcome='correct' THEN 1 ELSE 0 END) as correct,
+            AVG(CASE WHEN target_price IS NOT NULL THEN target_price END) as avg_target
+        FROM predictions WHERE ticker = :t
+    """), {"t": ticker}).first()
+
+    total = counts[0] or 0
+    bullish = counts[1] or 0
+    bearish = counts[2] or 0
+    evaluated = counts[3] or 0
+    correct_count = counts[4] or 0
+    avg_target = round(float(counts[5]), 2) if counts[5] else None
+
+    # ── Sector + company name ─────────────────────────────────────────────
+    sector = None
+    try:
+        sector = db.execute(sql_text(
+            "SELECT sector FROM ticker_sectors WHERE ticker = :t"
+        ), {"t": ticker}).scalar()
+    except Exception:
+        pass
+    if not sector:
+        sector = db.execute(sql_text(
+            "SELECT sector FROM predictions WHERE ticker = :t AND sector IS NOT NULL AND sector != 'Other' LIMIT 1"
+        ), {"t": ticker}).scalar()
+
+    # ── Pending predictions (sorted by eval date, soonest first) ──────────
+    pending_rows = db.execute(sql_text("""
+        SELECT p.id, p.direction, p.target_price, p.entry_price,
+               p.prediction_date, p.evaluation_date, p.window_days,
+               p.context, p.exact_quote, p.source_url,
+               f.id, f.name, f.handle, f.accuracy_score
+        FROM predictions p
+        JOIN forecasters f ON f.id = p.forecaster_id
+        WHERE p.ticker = :t AND p.outcome = 'pending'
+        ORDER BY p.evaluation_date ASC NULLS LAST
+        LIMIT 30
+    """), {"t": ticker}).fetchall()
+
+    pending = []
+    for r in pending_rows:
+        eval_date = r[5]
+        pred_date = r[4]
+        days_rem = None
+        if eval_date:
+            from datetime import datetime
+            days_rem = max(0, (eval_date - datetime.utcnow()).days)
+        pending.append({
+            "id": r[0], "direction": r[1], "target_price": float(r[2]) if r[2] else None,
+            "entry_price": float(r[3]) if r[3] else None,
+            "prediction_date": pred_date.isoformat() if pred_date else None,
+            "evaluation_date": eval_date.isoformat() if eval_date else None,
+            "window_days": r[6], "context": r[7], "exact_quote": r[8],
+            "source_url": r[9], "days_remaining": days_rem, "ticker": ticker,
+            "outcome": "pending",
+            "forecaster": {"id": r[10], "name": r[11], "handle": r[12],
+                           "accuracy_rate": float(r[13]) if r[13] else 0},
+        })
+
+    # ── Recent evaluated (last 15) ────────────────────────────────────────
+    scored_rows = db.execute(sql_text("""
+        SELECT p.id, p.direction, p.target_price, p.entry_price,
+               p.prediction_date, p.evaluation_date, p.outcome, p.actual_return,
+               p.context, p.exact_quote,
+               f.id, f.name, f.handle, f.accuracy_score
+        FROM predictions p
+        JOIN forecasters f ON f.id = p.forecaster_id
+        WHERE p.ticker = :t AND p.outcome IN ('correct','incorrect')
+        ORDER BY p.evaluation_date DESC NULLS LAST
+        LIMIT 15
+    """), {"t": ticker}).fetchall()
+
+    recent_scored = []
+    for r in scored_rows:
+        recent_scored.append({
+            "id": r[0], "direction": r[1], "target_price": float(r[2]) if r[2] else None,
+            "entry_price": float(r[3]) if r[3] else None,
+            "prediction_date": r[4].isoformat() if r[4] else None,
+            "evaluation_date": r[5].isoformat() if r[5] else None,
+            "outcome": r[6], "actual_return": float(r[7]) if r[7] is not None else None,
+            "context": r[8], "exact_quote": r[9], "ticker": ticker,
+            "forecaster": {"id": r[10], "name": r[11], "handle": r[12],
+                           "accuracy_rate": float(r[13]) if r[13] else 0},
+        })
+
+    # ── Top forecaster on this ticker ─────────────────────────────────────
+    top_fc = None
+    try:
+        top_row = db.execute(sql_text("""
+            SELECT f.id, f.name,
+                   SUM(CASE WHEN p.outcome='correct' THEN 1 ELSE 0 END) as c,
+                   COUNT(*) as t
+            FROM predictions p JOIN forecasters f ON f.id = p.forecaster_id
+            WHERE p.ticker = :t AND p.outcome IN ('correct','incorrect')
+            GROUP BY f.id, f.name HAVING COUNT(*) >= 2
+            ORDER BY ROUND(SUM(CASE WHEN p.outcome='correct' THEN 1 ELSE 0 END)::numeric / COUNT(*) * 100, 1) DESC
+            LIMIT 1
+        """), {"t": ticker}).first()
+        if top_row:
+            top_fc = {"id": top_row[0], "name": top_row[1],
+                      "accuracy": round(top_row[2] / top_row[3] * 100, 1) if top_row[3] > 0 else 0,
+                      "predictions": top_row[3]}
+    except Exception:
+        pass
+
+    result = {
+        "ticker": ticker,
+        "sector": sector,
+        "total_predictions": total,
+        "consensus": {
+            "bullish_count": bullish, "bearish_count": bearish,
+            "bullish_pct": round(bullish / total * 100, 1) if total > 0 else 0,
+            "bearish_pct": round(bearish / total * 100, 1) if total > 0 else 0,
+        },
+        "stats": {
+            "evaluated": evaluated, "correct": correct_count,
+            "historical_accuracy": round(correct_count / evaluated * 100, 1) if evaluated > 0 else 0,
+            "avg_target_price": avg_target,
+            "top_forecaster": top_fc,
+        },
+        "pending_predictions": pending,
+        "recent_evaluated": recent_scored,
+    }
+
+    _ticker_cache[ticker] = (result, _time.time())
+    return result
 
 
 @router.get("/asset/{ticker}/consensus")

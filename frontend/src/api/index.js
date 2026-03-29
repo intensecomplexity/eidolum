@@ -43,6 +43,10 @@ export function getTrendingTickers() {
   return api.get('/trending-tickers').then(r => r.data);
 }
 
+export function getTickerDetail(ticker) {
+  return api.get(`/ticker/${ticker}/detail`).then(r => r.data);
+}
+
 export function getControversial() {
   return api.get('/controversial').then(r => r.data);
 }
