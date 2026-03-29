@@ -221,49 +221,52 @@ def evaluate_batch(max_tickers: int = 50) -> dict:
 
 
 FINNHUB_KEY = os.getenv("FINNHUB_KEY", "").strip()
+_quote_cache: dict[str, dict] = {}
 
 
 def _fetch_history(ticker: str, start, end) -> dict:
-    """Fetch historical prices via Finnhub candles. Returns {date_str: close_price}."""
+    """Fetch current quote from Finnhub. Returns {today_str: current_price, 'prev_close': pc}.
+    Finnhub free tier doesn't support historical candles, so we use the current quote
+    as an approximation for scoring expired predictions."""
     import httpx
 
-    s = start.date() if hasattr(start, 'date') and not isinstance(start, _date) else start
-    e = end.date() if hasattr(end, 'date') and not isinstance(end, _date) else end
+    if ticker in _quote_cache:
+        return _quote_cache[ticker]
 
     if not FINNHUB_KEY:
-        print(f"[HistEval] No FINNHUB_KEY, cannot fetch history for {ticker}")
         return {}
 
     try:
-        from datetime import timezone
-        start_ts = int(datetime(s.year, s.month, s.day, tzinfo=timezone.utc).timestamp())
-        end_ts = int(datetime(e.year, e.month, e.day, tzinfo=timezone.utc).timestamp())
-
         r = httpx.get(
-            "https://finnhub.io/api/v1/stock/candle",
-            params={"symbol": ticker, "resolution": "D", "from": start_ts, "to": end_ts, "token": FINNHUB_KEY},
-            timeout=10,
+            "https://finnhub.io/api/v1/quote",
+            params={"symbol": ticker, "token": FINNHUB_KEY},
+            timeout=8,
         )
         data = r.json()
+        current = float(data.get("c", 0) or 0)
+        prev_close = float(data.get("pc", 0) or 0)
+        price = current if current > 0 else prev_close
 
-        if data.get("s") != "ok" or not data.get("c") or not data.get("t"):
-            print(f"[HistEval] Finnhub {ticker} ({s} to {e}): status={data.get('s')} keys={list(data.keys())} from={start_ts} to={end_ts}")
+        if price <= 0:
             return {}
 
-        result = {}
-        for i, ts in enumerate(data["t"]):
-            d = datetime.utcfromtimestamp(ts).strftime("%Y-%m-%d")
-            result[d] = round(float(data["c"][i]), 2)
-
+        today = datetime.utcnow().strftime("%Y-%m-%d")
+        result = {today: price, "_current": price}
+        _quote_cache[ticker] = result
         return result
 
     except Exception as exc:
-        print(f"[HistEval] Finnhub candle error for {ticker}: {exc}")
+        print(f"[HistEval] Finnhub quote error for {ticker}: {exc}")
         return {}
 
 
 def _closest_price(prices: dict, target_date) -> float | None:
-    if not prices or not target_date:
+    if not prices:
+        return None
+    # If we only have the current quote, return it
+    if "_current" in prices:
+        return prices["_current"]
+    if not target_date:
         return None
     target = target_date.date() if hasattr(target_date, 'date') else target_date
     ts = str(target)
@@ -271,6 +274,8 @@ def _closest_price(prices: dict, target_date) -> float | None:
         return prices[ts]
     best, best_diff = None, 999
     for ds, price in prices.items():
+        if ds.startswith("_"):
+            continue
         try:
             parts = ds.split("-")
             d = _date(int(parts[0]), int(parts[1]), int(parts[2]))
