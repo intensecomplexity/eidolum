@@ -57,7 +57,17 @@ def safety_check(db):
 
 
 def init_db():
-    """Create tables — single attempt, no blocking retries."""
+    """Create tables — single attempt, skip if DB is slow."""
+    try:
+        # Quick connectivity test first
+        from sqlalchemy import text as _t
+        with engine.connect() as conn:
+            conn.execute(_t("SELECT 1"))
+        print("[Eidolum] DB connection OK")
+    except Exception as e:
+        print(f"[Eidolum] WARNING: DB not reachable, skipping init: {e}")
+        return
+
     try:
         Base.metadata.create_all(bind=engine)
         print("[Eidolum] Database tables ready.")
@@ -67,9 +77,7 @@ def init_db():
 
     try:
         db = SessionLocal()
-        fc = db.query(Forecaster).count()
-        pc = db.query(Prediction).count()
-        print(f"[Eidolum] DB state: {fc} forecasters, {pc} predictions")
+        print(f"[Eidolum] DB state: connected")
         db.close()
     except Exception as e:
         print(f"[Eidolum] DB check error (non-fatal): {e}")
