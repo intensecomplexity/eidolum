@@ -158,21 +158,27 @@ export default function ForecasterProfile() {
             </div>
 
             {/* Stats — 2x2 grid on mobile, row on desktop */}
-            <div className="grid grid-cols-3 sm:flex gap-3 sm:gap-6 shrink-0">
+            <div className="grid grid-cols-2 sm:flex gap-3 sm:gap-5 shrink-0">
               <div className="text-center bg-surface-2 sm:bg-transparent rounded-lg p-3 sm:p-0">
-                <div className={`font-mono text-xl sm:text-3xl font-bold ${data.accuracy_rate >= 60 ? 'text-positive' : 'text-negative'}`}>
+                <div className={`font-mono text-xl sm:text-2xl font-bold ${data.accuracy_rate >= 60 ? 'text-positive' : 'text-negative'}`}>
                   {data.accuracy_rate.toFixed(1)}%
                 </div>
                 <div className="text-muted text-[11px] sm:text-xs">Accuracy</div>
               </div>
               <div className="text-center bg-surface-2 sm:bg-transparent rounded-lg p-3 sm:p-0">
-                <div className={`font-mono text-xl sm:text-3xl font-bold ${data.alpha >= 0 ? 'text-positive' : 'text-negative'}`}>
+                <div className={`font-mono text-xl sm:text-2xl font-bold ${(data.avg_return ?? 0) >= 0 ? 'text-positive' : 'text-negative'}`}>
+                  {(data.avg_return ?? 0) >= 0 ? '+' : ''}{(data.avg_return ?? 0).toFixed(2)}%
+                </div>
+                <div className="text-muted text-[11px] sm:text-xs">Avg Return</div>
+              </div>
+              <div className="text-center bg-surface-2 sm:bg-transparent rounded-lg p-3 sm:p-0">
+                <div className={`font-mono text-xl sm:text-2xl font-bold ${data.alpha >= 0 ? 'text-positive' : 'text-negative'}`}>
                   {data.alpha >= 0 ? '+' : ''}{data.alpha.toFixed(2)}%
                 </div>
                 <div className="text-muted text-[11px] sm:text-xs">Alpha vs S&amp;P 500</div>
               </div>
               <div className="text-center bg-surface-2 sm:bg-transparent rounded-lg p-3 sm:p-0">
-                <div className="font-mono text-xl sm:text-3xl font-bold text-accent">{data.total_predictions}</div>
+                <div className="font-mono text-xl sm:text-2xl font-bold text-accent">{data.total_predictions}</div>
                 <div className="text-muted text-[11px] sm:text-xs">Predictions</div>
               </div>
             </div>

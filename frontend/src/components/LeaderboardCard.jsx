@@ -4,7 +4,19 @@ import PlatformBadge from './PlatformBadge';
 import RankBadge from './RankBadge';
 import StreakBadge from './StreakBadge';
 
-export default function LeaderboardCard({ forecaster: f }) {
+function getMetricValue(f, metricKey) {
+  if (metricKey === 'avg_return') {
+    const v = f.avg_return ?? 0;
+    return { text: `${v >= 0 ? '+' : ''}${v.toFixed(2)}%`, positive: v >= 0, label: 'avg return' };
+  }
+  if (metricKey === 'alpha') {
+    const v = f.alpha ?? 0;
+    return { text: `${v >= 0 ? '+' : ''}${v.toFixed(2)}%`, positive: v >= 0, label: 'alpha vs S&P 500' };
+  }
+  return { text: `${f.correct_predictions}/${f.total_predictions}`, positive: true, label: 'hit rate' };
+}
+
+export default function LeaderboardCard({ forecaster: f, metric = 'avg_return' }) {
   return (
     <Link
       to={`/forecaster/${f.id}`}
@@ -38,10 +50,17 @@ export default function LeaderboardCard({ forecaster: f }) {
             <div className="text-muted text-[11px]">accuracy</div>
           </div>
           <div>
-            <div className={`font-mono text-[15px] font-semibold leading-tight mt-1.5 ${f.alpha >= 0 ? 'text-positive' : 'text-negative'}`}>
-              {f.alpha >= 0 ? '+' : ''}{f.alpha.toFixed(2)}%
-            </div>
-            <div className="text-muted text-[11px]">alpha vs S&P 500</div>
+            {(() => {
+              const mv = getMetricValue(f, metric);
+              return (
+                <>
+                  <div className={`font-mono text-[15px] font-semibold leading-tight mt-1.5 ${metric === 'hit_rate' ? 'text-text-secondary' : mv.positive ? 'text-positive' : 'text-negative'}`}>
+                    {mv.text}
+                  </div>
+                  <div className="text-muted text-[11px]">{mv.label}</div>
+                </>
+              );
+            })()}
           </div>
           <div>
             <div className="font-mono text-[15px] font-semibold text-text-secondary leading-tight mt-1.5">

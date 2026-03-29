@@ -25,6 +25,7 @@ class Forecaster(Base):
     correct_predictions = Column(Integer, default=0)
     streak = Column(Integer, default=0)
     alpha = Column(Float, nullable=True)  # avg prediction return - avg SPY return
+    avg_return = Column(Float, nullable=True)  # avg actual_return across evaluated predictions
 
     # Quota-safe sync fields
     uploads_playlist_id = Column(String, nullable=True)

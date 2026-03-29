@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { ChevronDown, Filter, Trophy, Flame } from 'lucide-react';
 import Footer from '../components/Footer';
@@ -19,6 +19,25 @@ const TABS = [
   { key: 'sector', label: 'By Sector', mobileLabel: 'Sector', icon: Filter },
 ];
 
+const METRICS = [
+  { key: 'avg_return', label: 'Avg Return', shortLabel: 'avg return' },
+  { key: 'alpha', label: 'Alpha vs S&P 500', shortLabel: 'alpha vs S&P 500' },
+  { key: 'hit_rate', label: 'Hit Rate', shortLabel: 'hit rate' },
+];
+
+function getMetricValue(f, metricKey) {
+  if (metricKey === 'avg_return') {
+    const v = f.avg_return ?? 0;
+    return { text: `${v >= 0 ? '+' : ''}${v.toFixed(2)}%`, positive: v >= 0 };
+  }
+  if (metricKey === 'alpha') {
+    const v = f.alpha ?? 0;
+    return { text: `${v >= 0 ? '+' : ''}${v.toFixed(2)}%`, positive: v >= 0 };
+  }
+  // hit_rate
+  return { text: `${f.correct_predictions}/${f.total_predictions}`, positive: true };
+}
+
 export default function Leaderboard() {
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -26,6 +45,9 @@ export default function Leaderboard() {
   const [sector, setSector] = useState('All');
   const [direction, setDirection] = useState('All');
   const [sectorData, setSectorData] = useState([]);
+  const [metric, setMetric] = useState(() => localStorage.getItem('eidolum_metric') || 'avg_return');
+  const [metricOpen, setMetricOpen] = useState(false);
+  const metricRef = useRef(null);
 
   function handleTabClick(key) {
     setActiveTab(key);
@@ -48,6 +70,20 @@ export default function Leaderboard() {
       getSectors().then(setSectorData).catch(() => {});
     }
   }, [activeTab]);
+
+  // Persist metric choice
+  useEffect(() => {
+    localStorage.setItem('eidolum_metric', metric);
+  }, [metric]);
+
+  // Close metric dropdown on outside click
+  useEffect(() => {
+    function handleClick(e) {
+      if (metricRef.current && !metricRef.current.contains(e.target)) setMetricOpen(false);
+    }
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, []);
 
   return (
     <div>
@@ -200,7 +236,7 @@ export default function Leaderboard() {
                 {/* Mobile: card list */}
                 <div className="sm:hidden space-y-3">
                   {data.map((f) => (
-                    <LeaderboardCard key={f.id} forecaster={f} />
+                    <LeaderboardCard key={f.id} forecaster={f} metric={metric} />
                   ))}
                 </div>
 
@@ -213,7 +249,32 @@ export default function Leaderboard() {
                           <th className="px-6 py-3 w-24">Rank</th>
                           <th className="px-6 py-3">Forecaster</th>
                           <th className="px-6 py-3 text-right">Accuracy</th>
-                          <th className="px-6 py-3 text-right">Alpha vs S&P 500</th>
+                          <th className="px-6 py-3 text-right">
+                            <div className="relative inline-block" ref={metricRef}>
+                              <button
+                                onClick={(e) => { e.stopPropagation(); setMetricOpen(!metricOpen); }}
+                                className="inline-flex items-center gap-1 hover:text-accent transition-colors cursor-pointer"
+                              >
+                                {METRICS.find(m => m.key === metric)?.label}
+                                <ChevronDown className={`w-3 h-3 transition-transform ${metricOpen ? 'rotate-180' : ''}`} />
+                              </button>
+                              {metricOpen && (
+                                <div className="absolute right-0 top-full mt-1 bg-surface border border-accent/20 rounded-lg shadow-lg z-50 min-w-[180px] py-1">
+                                  {METRICS.map(m => (
+                                    <button
+                                      key={m.key}
+                                      onClick={(e) => { e.stopPropagation(); setMetric(m.key); setMetricOpen(false); }}
+                                      className={`block w-full text-left px-3 py-2 text-xs font-normal normal-case tracking-normal ${
+                                        metric === m.key ? 'text-accent bg-accent/10' : 'text-text-secondary hover:text-text-primary hover:bg-surface-2'
+                                      }`}
+                                    >
+                                      {m.label}
+                                    </button>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          </th>
                           <th className="px-6 py-3 text-right">Predictions</th>
                           <th className="px-6 py-3 text-center hidden md:table-cell">Streak</th>
                           <th className="px-6 py-3 hidden xl:table-cell">Sector Strengths</th>
@@ -247,9 +308,11 @@ export default function Leaderboard() {
                               </div>
                             </td>
                             <td className="px-6 py-4 text-right">
-                              <span className={`font-mono ${f.total_predictions === 0 ? 'text-muted' : f.alpha >= 0 ? 'text-positive' : 'text-negative'}`}>
-                                {f.total_predictions === 0 ? '—' : `${f.alpha >= 0 ? '+' : ''}${f.alpha.toFixed(2)}%`}
-                              </span>
+                              {(() => {
+                                if (f.total_predictions === 0) return <span className="font-mono text-muted">—</span>;
+                                const mv = getMetricValue(f, metric);
+                                return <span className={`font-mono ${metric === 'hit_rate' ? 'text-text-secondary' : mv.positive ? 'text-positive' : 'text-negative'}`}>{mv.text}</span>;
+                              })()}
                             </td>
                             <td className="px-6 py-4 text-right">
                               <div className="font-mono text-text-secondary">{f.evaluated_predictions}/{f.total_predictions}</div>

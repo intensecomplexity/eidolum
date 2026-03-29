@@ -28,7 +28,8 @@ def _refresh_leaderboard(db: Session) -> list:
             f.id, f.name, f.handle, f.platform, f.channel_url,
             f.subscriber_count, f.profile_image_url, f.streak,
             f.total_predictions, f.correct_predictions, f.accuracy_score,
-            COALESCE(f.alpha, 0) as alpha
+            COALESCE(f.alpha, 0) as alpha,
+            COALESCE(f.avg_return, 0) as avg_return
         FROM forecasters f
         WHERE COALESCE(f.total_predictions, 0) >= 10
           AND COALESCE(f.accuracy_score, 0) > 0
@@ -49,7 +50,9 @@ def _refresh_leaderboard(db: Session) -> list:
             "evaluated_predictions": r[8] or 0,
             "correct_predictions": r[9] or 0,
             "scored_count": r[8] or 0,
-            "alpha": float(r[11] or 0), "rank": i + 1,
+            "alpha": float(r[11] or 0),
+            "avg_return": float(r[12] or 0),
+            "rank": i + 1,
             "rank_movement": {"direction": "none", "change": 0},
             "has_disclosed_positions": False,
             "conflict_count": 0, "conflict_rate": 0,

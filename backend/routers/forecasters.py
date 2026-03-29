@@ -71,6 +71,7 @@ def get_forecaster(
         "evaluated_predictions": f.total_predictions or 0,
         "correct_predictions": f.correct_predictions or 0,
         "alpha": float(f.alpha or 0),
+        "avg_return": float(f.avg_return or 0),
         "first_prediction_date": first_pred_date,
         "sector_count": sector_count,
         "total_all_predictions": total_all,

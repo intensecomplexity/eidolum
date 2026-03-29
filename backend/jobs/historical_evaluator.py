@@ -368,7 +368,7 @@ def _closest_price(prices: dict, target_date) -> float | None:
 
 
 def _update_stats(fids: set):
-    """Update forecaster cached stats including alpha. Short DB connection."""
+    """Update forecaster cached stats including alpha and avg_return. Short DB connection."""
     from database import BgSessionLocal as SessionLocal
     db = SessionLocal()
     updated = 0
@@ -380,15 +380,18 @@ def _update_stats(fids: set):
             correct = db.execute(sql_text(
                 "SELECT COUNT(*) FROM predictions WHERE forecaster_id = :f AND outcome = 'correct'"
             ), {"f": fid}).scalar() or 0
-            avg_alpha = db.execute(sql_text(
-                "SELECT AVG(alpha) FROM predictions WHERE forecaster_id = :f AND alpha IS NOT NULL"
-            ), {"f": fid}).scalar()
+            agg = db.execute(sql_text(
+                "SELECT AVG(alpha), AVG(actual_return) FROM predictions WHERE forecaster_id = :f AND outcome IN ('correct','incorrect') AND actual_return IS NOT NULL"
+            ), {"f": fid}).first()
+            avg_alpha = agg[0] if agg else None
+            avg_ret = agg[1] if agg else None
             if total > 0:
                 acc = round(correct / total * 100, 1)
                 alp = round(float(avg_alpha), 2) if avg_alpha is not None else 0
+                ar = round(float(avg_ret), 2) if avg_ret is not None else 0
                 db.execute(sql_text(
-                    "UPDATE forecasters SET total_predictions=:t, correct_predictions=:c, accuracy_score=:a, alpha=:alp WHERE id=:f"
-                ), {"t": total, "c": correct, "a": acc, "alp": alp, "f": fid})
+                    "UPDATE forecasters SET total_predictions=:t, correct_predictions=:c, accuracy_score=:a, alpha=:alp, avg_return=:ar WHERE id=:f"
+                ), {"t": total, "c": correct, "a": acc, "alp": alp, "ar": ar, "f": fid})
                 updated += 1
         db.commit()
         print(f"[HistEval] Updated stats for {updated}/{len(fids)} forecasters")
@@ -418,15 +421,18 @@ def refresh_all_forecaster_stats():
             correct = db.execute(sql_text(
                 "SELECT COUNT(*) FROM predictions WHERE forecaster_id = :f AND outcome = 'correct'"
             ), {"f": fid}).scalar() or 0
-            avg_alpha = db.execute(sql_text(
-                "SELECT AVG(alpha) FROM predictions WHERE forecaster_id = :f AND alpha IS NOT NULL"
-            ), {"f": fid}).scalar()
+            agg = db.execute(sql_text(
+                "SELECT AVG(alpha), AVG(actual_return) FROM predictions WHERE forecaster_id = :f AND outcome IN ('correct','incorrect') AND actual_return IS NOT NULL"
+            ), {"f": fid}).first()
+            avg_alpha = agg[0] if agg else None
+            avg_ret = agg[1] if agg else None
             if total > 0:
                 acc = round(correct / total * 100, 1)
                 alp = round(float(avg_alpha), 2) if avg_alpha is not None else 0
+                ar = round(float(avg_ret), 2) if avg_ret is not None else 0
                 db.execute(sql_text(
-                    "UPDATE forecasters SET total_predictions=:t, correct_predictions=:c, accuracy_score=:a, alpha=:alp WHERE id=:f"
-                ), {"t": total, "c": correct, "a": acc, "alp": alp, "f": fid})
+                    "UPDATE forecasters SET total_predictions=:t, correct_predictions=:c, accuracy_score=:a, alpha=:alp, avg_return=:ar WHERE id=:f"
+                ), {"t": total, "c": correct, "a": acc, "alp": alp, "ar": ar, "f": fid})
                 updated += 1
         db.commit()
         print(f"[StatsRefresh] Updated {updated} forecasters (with alpha)")
