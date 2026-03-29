@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Settings as SettingsIcon, Bell, BellOff, Mail, User, Shield, AlertTriangle } from 'lucide-react';
+import { Settings as SettingsIcon, Bell, BellOff, Mail, User, Shield, AlertTriangle, Globe, ExternalLink } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import Footer from '../components/Footer';
-import { setPriceAlerts, setEmailPreferences, getNotificationPrefs, setNotificationPrefs } from '../api';
+import { setPriceAlerts, setEmailPreferences, getNotificationPrefs, setNotificationPrefs, updateSocialLinks } from '../api';
 
 export default function Settings() {
   const navigate = useNavigate();
@@ -12,12 +12,21 @@ export default function Settings() {
   const [weeklyDigest, setWeeklyDigestState] = useState(true);
   const [saving, setSaving] = useState('');
   const [notifPrefs, setNotifPrefsState] = useState(null);
+  const [social, setSocial] = useState({ twitter_url: '', linkedin_url: '', youtube_url: '', website_url: '' });
+  const [socialSaving, setSocialSaving] = useState(false);
+  const [socialMsg, setSocialMsg] = useState('');
 
   useEffect(() => {
     if (user) {
       setPriceAlertsState(user.price_alerts_enabled !== false);
       setWeeklyDigestState(user.weekly_digest_enabled !== false);
       getNotificationPrefs().then(setNotifPrefsState).catch(() => {});
+      setSocial({
+        twitter_url: user.twitter_url || '',
+        linkedin_url: user.linkedin_url || '',
+        youtube_url: user.youtube_url || '',
+        website_url: user.website_url || '',
+      });
     }
   }, [user]);
 
@@ -143,6 +152,42 @@ export default function Settings() {
           </div>
         )}
 
+        {/* Social Links */}
+        <div className="card mb-4">
+          <h2 className="text-xs text-muted uppercase tracking-wider mb-4 flex items-center gap-1.5"><Globe className="w-3.5 h-3.5" /> Social Links</h2>
+          <div className="space-y-3">
+            <SocialInput label="Twitter / X" placeholder="https://x.com/yourusername" value={social.twitter_url}
+              onChange={v => setSocial(s => ({ ...s, twitter_url: v }))} icon={<span className="text-sm font-bold">𝕏</span>} />
+            <SocialInput label="LinkedIn" placeholder="https://linkedin.com/in/yourusername" value={social.linkedin_url}
+              onChange={v => setSocial(s => ({ ...s, linkedin_url: v }))} icon={<span className="text-sm font-bold text-blue-400">in</span>} />
+            <SocialInput label="YouTube" placeholder="https://youtube.com/@yourchannel" value={social.youtube_url}
+              onChange={v => setSocial(s => ({ ...s, youtube_url: v }))} icon={<span className="text-sm">▶</span>} />
+            <SocialInput label="Website" placeholder="https://yoursite.com" value={social.website_url}
+              onChange={v => setSocial(s => ({ ...s, website_url: v }))} icon={<Globe className="w-4 h-4" />} />
+          </div>
+          <div className="flex items-center gap-3 mt-4">
+            <button
+              onClick={async () => {
+                setSocialSaving(true); setSocialMsg('');
+                try {
+                  await updateSocialLinks(social);
+                  setSocialMsg('Saved');
+                  setTimeout(() => setSocialMsg(''), 3000);
+                } catch (e) {
+                  setSocialMsg(e.response?.data?.detail ? JSON.stringify(e.response.data.detail) : 'Error saving');
+                } finally { setSocialSaving(false); }
+              }}
+              disabled={socialSaving}
+              className="px-4 py-2 rounded-lg text-sm font-medium bg-accent text-bg hover:bg-accent/90 transition-colors disabled:opacity-50"
+            >
+              {socialSaving ? 'Saving...' : 'Save Links'}
+            </button>
+            {socialMsg && (
+              <span className={`text-xs font-medium ${socialMsg === 'Saved' ? 'text-positive' : 'text-negative'}`}>{socialMsg}</span>
+            )}
+          </div>
+        </div>
+
         {/* Danger Zone */}
         <div className="card border-negative/20">
           <h2 className="text-xs text-negative uppercase tracking-wider mb-4 flex items-center gap-1.5"><AlertTriangle className="w-3.5 h-3.5" /> Danger Zone</h2>
@@ -171,6 +216,26 @@ function ToggleRow({ icon, title, desc, enabled, onToggle, loading }) {
         className={`relative w-11 h-6 rounded-full transition-colors flex-shrink-0 ${enabled ? 'bg-accent' : 'bg-surface-2'}`}>
         <span className={`absolute top-0.5 w-5 h-5 rounded-full bg-white transition-transform ${enabled ? 'left-[22px]' : 'left-0.5'}`} />
       </button>
+    </div>
+  );
+}
+
+function SocialInput({ label, placeholder, value, onChange, icon }) {
+  return (
+    <div>
+      <label className="text-xs text-muted mb-1 block">{label}</label>
+      <div className="flex items-center gap-2">
+        <span className="w-8 h-8 flex items-center justify-center rounded bg-surface-2 border border-border shrink-0 text-muted">
+          {icon}
+        </span>
+        <input
+          type="url"
+          value={value}
+          onChange={e => onChange(e.target.value)}
+          placeholder={placeholder}
+          className="flex-1 bg-surface border border-border rounded-lg px-3 py-2 text-sm text-text-primary placeholder:text-muted/50 focus:outline-none focus:border-accent/50 font-mono"
+        />
+      </div>
     </div>
   );
 }

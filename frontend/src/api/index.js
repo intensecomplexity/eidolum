@@ -427,6 +427,10 @@ export function setEmailPreferences(weeklyDigest) {
   return api.put('/settings/email-preferences', { weekly_digest: weeklyDigest }, { headers: authHeaders() }).then(r => r.data);
 }
 
+export function updateSocialLinks(links) {
+  return api.put('/profile/social', links, { headers: authHeaders() }).then(r => r.data);
+}
+
 // ——— Watchlist ———
 
 export function getWatchlist() {

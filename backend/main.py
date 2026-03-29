@@ -1197,6 +1197,10 @@ async def lifespan(app):
                 "ALTER TABLE predictions ADD COLUMN evaluated_at TIMESTAMP",
                 "ALTER TABLE ticker_sectors ADD COLUMN company_name VARCHAR(200)",
                 "ALTER TABLE ticker_sectors ADD COLUMN industry VARCHAR(100)",
+                "ALTER TABLE users ADD COLUMN twitter_url VARCHAR(255)",
+                "ALTER TABLE users ADD COLUMN linkedin_url VARCHAR(255)",
+                "ALTER TABLE users ADD COLUMN youtube_url VARCHAR(255)",
+                "ALTER TABLE users ADD COLUMN website_url VARCHAR(255)",
             ]:
                 try:
                     db.execute(_t(col_sql))

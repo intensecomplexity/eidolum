@@ -63,6 +63,10 @@ def _user_dict(user: User) -> dict:
         "xp_total": getattr(user, 'xp_total', 0) or 0,
         "xp_level": getattr(user, 'xp_level', 1) or 1,
         "level_name": _get_level_name(user),
+        "twitter_url": getattr(user, 'twitter_url', None),
+        "linkedin_url": getattr(user, 'linkedin_url', None),
+        "youtube_url": getattr(user, 'youtube_url', None),
+        "website_url": getattr(user, 'website_url', None),
     }
 
 
@@ -323,6 +327,56 @@ def me(request: Request, current_user: dict = Depends(get_current_user_dep), db:
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
+    return _user_dict(user)
+
+
+# ── PUT /api/profile/social ──────────────────────────────────────────────────
+
+import re as _re
+
+_SOCIAL_VALIDATORS = {
+    "twitter_url": lambda u: _re.match(r'^https://(x\.com|twitter\.com)/', u),
+    "linkedin_url": lambda u: _re.match(r'^https://(www\.)?linkedin\.com/', u),
+    "youtube_url": lambda u: _re.match(r'^https://(www\.)?youtube\.com/', u),
+    "website_url": lambda u: _re.match(r'^https://', u),
+}
+
+
+@router.put("/profile/social")
+@limiter.limit("10/minute")
+def update_social_links(request: Request, body: dict, current_user: dict = Depends(get_current_user_dep), db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.id == current_user["user_id"]).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    errors = {}
+    for field in ("twitter_url", "linkedin_url", "youtube_url", "website_url"):
+        val = body.get(field)
+        if val is None:
+            continue
+        val = str(val).strip()[:255]
+        if not val:
+            setattr(user, field, None)
+            continue
+        # Security: only allow https
+        if not val.startswith("https://"):
+            errors[field] = "Must start with https://"
+            continue
+        # Block dangerous schemes
+        if "javascript:" in val.lower() or "data:" in val.lower():
+            errors[field] = "Invalid URL"
+            continue
+        # Domain validation
+        validator = _SOCIAL_VALIDATORS.get(field)
+        if validator and not validator(val):
+            errors[field] = f"Invalid URL for {field.replace('_url', '')}"
+            continue
+        setattr(user, field, val)
+
+    if errors:
+        raise HTTPException(status_code=422, detail=errors)
+
+    db.commit()
     return _user_dict(user)
 
 

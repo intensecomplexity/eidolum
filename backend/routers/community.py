@@ -172,6 +172,10 @@ def get_user_profile(request: Request, user_id: int, credentials: Optional[HTTPA
         "profile_border": _get_perks(user).get("profile_border", "none"),
         "comment_highlight": _get_perks(user).get("comment_highlight", False),
         "rival": _get_rival(user_id, db),
+        "twitter_url": getattr(user, 'twitter_url', None),
+        "linkedin_url": getattr(user, 'linkedin_url', None),
+        "youtube_url": getattr(user, 'youtube_url', None),
+        "website_url": getattr(user, 'website_url', None),
     }
 
 

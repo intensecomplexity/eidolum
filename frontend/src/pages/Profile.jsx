@@ -137,6 +137,31 @@ export default function Profile() {
                   <TypeBadge type={profile.user_type} showLabel size={14} />
                 </div>
                 <p className="text-muted text-sm font-mono">@{profile.username}{profile.custom_title && <span className="text-text-secondary ml-1">· {profile.custom_title}</span>}</p>
+                {/* Social links */}
+                {(profile.twitter_url || profile.linkedin_url || profile.youtube_url || profile.website_url) && (
+                  <div className="flex items-center gap-2 mt-1">
+                    {profile.twitter_url && (
+                      <a href={profile.twitter_url} target="_blank" rel="noopener noreferrer" className="text-muted hover:text-accent transition-colors" title="Twitter / X">
+                        <span className="text-xs font-bold">𝕏</span>
+                      </a>
+                    )}
+                    {profile.linkedin_url && (
+                      <a href={profile.linkedin_url} target="_blank" rel="noopener noreferrer" className="text-muted hover:text-accent transition-colors" title="LinkedIn">
+                        <span className="text-xs font-bold">in</span>
+                      </a>
+                    )}
+                    {profile.youtube_url && (
+                      <a href={profile.youtube_url} target="_blank" rel="noopener noreferrer" className="text-muted hover:text-accent transition-colors" title="YouTube">
+                        <span className="text-xs">▶</span>
+                      </a>
+                    )}
+                    {profile.website_url && (
+                      <a href={profile.website_url} target="_blank" rel="noopener noreferrer" className="text-muted hover:text-accent transition-colors" title="Website">
+                        <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+                      </a>
+                    )}
+                  </div>
+                )}
                 <div className="flex items-center gap-3 mt-1">
                   <span className="text-xs font-mono font-bold" style={{ color: profile.rank_color || '#D4A843' }}>Lv.{profile.xp_level || 1}</span>
                   <span className="text-[10px]" style={{ color: profile.rank_color || '#6b7280' }}>{profile.level_name || profile.rank_name || 'Newcomer'}</span>
