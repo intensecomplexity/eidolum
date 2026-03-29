@@ -1873,6 +1873,13 @@ def stop_evaluation():
     return {"status": "stopping"}
 
 
+@app.post("/api/admin/refresh-forecaster-stats")
+def refresh_stats():
+    """Recalculate ALL forecaster stats from predictions table."""
+    from jobs.historical_evaluator import refresh_all_forecaster_stats
+    return refresh_all_forecaster_stats()
+
+
 @app.get("/api/admin/evaluate-test-one")
 def evaluate_test_one():
     """Test evaluating a single ticker to see what happens."""

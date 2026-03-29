@@ -291,20 +291,61 @@ def _update_stats(fids: set):
     """Update forecaster cached stats. Short DB connection."""
     from database import SessionLocal
     db = SessionLocal()
+    updated = 0
     try:
         for fid in fids:
-            r = db.execute(sql_text("""
-                SELECT COUNT(*) FILTER (WHERE outcome IN ('correct','incorrect')),
-                       COUNT(*) FILTER (WHERE outcome = 'correct')
-                FROM predictions WHERE forecaster_id = :f
-            """), {"f": fid}).first()
-            if r and r[0] > 0:
-                db.execute(sql_text("""
-                    UPDATE forecasters SET total_predictions=:t, correct_predictions=:c, accuracy_score=:a WHERE id=:f
-                """), {"t": r[0], "c": r[1], "a": round(r[1]/r[0]*100, 1), "f": fid})
+            total = db.execute(sql_text(
+                "SELECT COUNT(*) FROM predictions WHERE forecaster_id = :f AND outcome IN ('correct','incorrect')"
+            ), {"f": fid}).scalar() or 0
+            correct = db.execute(sql_text(
+                "SELECT COUNT(*) FROM predictions WHERE forecaster_id = :f AND outcome = 'correct'"
+            ), {"f": fid}).scalar() or 0
+            if total > 0:
+                acc = round(correct / total * 100, 1)
+                db.execute(sql_text(
+                    "UPDATE forecasters SET total_predictions=:t, correct_predictions=:c, accuracy_score=:a WHERE id=:f"
+                ), {"t": total, "c": correct, "a": acc, "f": fid})
+                updated += 1
         db.commit()
+        print(f"[HistEval] Updated stats for {updated}/{len(fids)} forecasters")
     except Exception as e:
         db.rollback()
-        print(f"[HistEval] Stats error: {e}")
+        print(f"[HistEval] Stats update error: {e}")
+        import traceback
+        traceback.print_exc()
+    finally:
+        db.close()
+
+
+def refresh_all_forecaster_stats():
+    """Recalculate stats for ALL forecasters from scratch."""
+    from database import SessionLocal
+    db = SessionLocal()
+    updated = 0
+    try:
+        fids = [r[0] for r in db.execute(sql_text(
+            "SELECT DISTINCT forecaster_id FROM predictions WHERE outcome IN ('correct','incorrect')"
+        )).fetchall()]
+        print(f"[StatsRefresh] Refreshing {len(fids)} forecasters")
+        for fid in fids:
+            total = db.execute(sql_text(
+                "SELECT COUNT(*) FROM predictions WHERE forecaster_id = :f AND outcome IN ('correct','incorrect')"
+            ), {"f": fid}).scalar() or 0
+            correct = db.execute(sql_text(
+                "SELECT COUNT(*) FROM predictions WHERE forecaster_id = :f AND outcome = 'correct'"
+            ), {"f": fid}).scalar() or 0
+            if total > 0:
+                acc = round(correct / total * 100, 1)
+                db.execute(sql_text(
+                    "UPDATE forecasters SET total_predictions=:t, correct_predictions=:c, accuracy_score=:a WHERE id=:f"
+                ), {"t": total, "c": correct, "a": acc, "f": fid})
+                updated += 1
+        db.commit()
+        print(f"[StatsRefresh] Updated {updated} forecasters")
+        return {"updated": updated, "total_forecasters_with_scored": len(fids)}
+    except Exception as e:
+        db.rollback()
+        print(f"[StatsRefresh] Error: {e}")
+        return {"error": str(e)}
     finally:
         db.close()
