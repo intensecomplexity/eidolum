@@ -48,7 +48,20 @@ def _massive_inner(db: Session):
         print("[MassiveBZ] No MASSIVE_API_KEY set, skipping")
         return
 
-    print(f"[MassiveBZ] Starting fetch...")
+    # Check if this is a first run (backfill needed)
+    is_backfill = _LAST_UPDATED is None
+    if is_backfill:
+        existing = db.execute(text("SELECT COUNT(*) FROM predictions WHERE verified_by = 'massive_benzinga'")).scalar() or 0
+        if existing > 0:
+            is_backfill = False  # Already have data, just do incremental
+
+    if is_backfill:
+        backfill_date = (datetime.utcnow() - timedelta(days=90)).strftime("%Y-%m-%d")
+        print(f"[MassiveBZ] BACKFILL MODE — fetching 90 days from {backfill_date}")
+        max_pages = 20  # Up to 10,000 ratings for backfill
+    else:
+        print(f"[MassiveBZ] Incremental fetch since {_LAST_UPDATED}")
+        max_pages = 5
 
     added = 0
     skipped = 0
@@ -69,7 +82,9 @@ def _massive_inner(db: Session):
                 "sort": "last_updated.desc",
                 "limit": 500,
             }
-            if _LAST_UPDATED:
+            if is_backfill:
+                params["date.gte"] = backfill_date
+            elif _LAST_UPDATED:
                 params["last_updated.gte"] = _LAST_UPDATED
 
         try:
@@ -115,8 +130,8 @@ def _massive_inner(db: Session):
             else:
                 skipped += 1
 
-        # Stop after 5 pages max (2500 ratings) to avoid runaway pagination
-        if not next_url or page >= 5:
+        # Stop at max pages to avoid runaway pagination
+        if not next_url or page >= max_pages:
             break
 
     if added > 0:

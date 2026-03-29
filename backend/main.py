@@ -1072,10 +1072,15 @@ async def lifespan(app):
                     AND p1.id < p2.id
             )
         """))
+        # Delete forecasters with 0 predictions (empty/orphan entries)
+        r4 = db.execute(_text("""
+            DELETE FROM forecasters WHERE id NOT IN (
+                SELECT DISTINCT forecaster_id FROM predictions WHERE forecaster_id IS NOT NULL
+            )
+        """))
         db.commit()
         total_cleaned = (r1.rowcount or 0) + (r3.rowcount or 0)
-        if total_cleaned > 0:
-            print(f"[Startup Cleanup] Removed {r1.rowcount} garbage predictions, {r2.rowcount} garbage forecasters, {r3.rowcount} duplicates")
+        print(f"[Startup Cleanup] Removed {r1.rowcount} garbage predictions, {r2.rowcount} garbage forecasters, {r3.rowcount} duplicates, {r4.rowcount} empty forecasters")
         db.close()
     except Exception as e:
         print(f"[Startup Cleanup] Error (non-fatal): {e}")
