@@ -252,12 +252,14 @@ export default function Leaderboard() {
                               </span>
                             </td>
                             <td className="px-6 py-4 text-right">
-                              <span className="font-mono text-text-secondary">{f.evaluated_predictions}/{f.total_predictions}</span>
+                              <div className="font-mono text-text-secondary">{f.evaluated_predictions}/{f.total_predictions}</div>
                               {f.verified_predictions > 0 && (
-                                <span className="ml-1.5 text-[10px] font-semibold px-1.5 py-0.5 rounded-full"
-                                  style={{ backgroundColor: 'rgba(0, 200, 150, 0.12)', color: '#00c896' }}>
-                                  {f.verified_predictions} verified
-                                </span>
+                                <div className="mt-0.5">
+                                  <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full"
+                                    style={{ backgroundColor: 'rgba(0, 200, 150, 0.12)', color: '#00c896' }}>
+                                    {f.verified_predictions} verified
+                                  </span>
+                                </div>
                               )}
                             </td>
                             <td className="px-6 py-4 text-center hidden md:table-cell"><StreakBadge streak={f.streak} /></td>
