@@ -1,179 +1,264 @@
 """
-Historical prediction evaluator — scores expired predictions using historical prices.
-Uses yfinance for price lookups at the evaluation date, not current price.
-Processes in batches with rate limiting to avoid API throttling.
+Safe historical prediction evaluator — scores expired predictions using
+historical prices WITHOUT holding DB connections during yfinance calls.
+
+Pattern: read → close → fetch prices → open → write → close
+Runs as background task, processes 50 tickers at a time with 5s breaks.
 """
 import time
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date as _date
+from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor, TimeoutError as FT
-from sqlalchemy.orm import Session
-from sqlalchemy import func
-from models import Prediction, Forecaster
+from sqlalchemy import text as sql_text
 
-_hist_cache: dict[str, float] = {}
-
-
-def evaluate_historical_predictions(db: Session, batch_size: int = 50, max_batches: int = 100) -> dict:
-    """Evaluate ALL pending predictions where evaluation_date has passed."""
-    now = datetime.utcnow()
-    print(f"[HistEval] Starting at {now.isoformat()}")
-
-    total_pending = db.query(func.count(Prediction.id)).filter(
-        Prediction.outcome == "pending",
-        Prediction.evaluation_date.isnot(None),
-        Prediction.evaluation_date <= now,
-    ).scalar() or 0
-
-    print(f"[HistEval] {total_pending} pending predictions to evaluate")
-    if total_pending == 0:
-        return {"evaluated": 0, "correct": 0, "incorrect": 0, "skipped": 0}
-
-    evaluated = 0
-    correct = 0
-    incorrect = 0
-    skipped = 0
-    affected_forecaster_ids = set()
-
-    for batch_num in range(max_batches):
-        preds = (
-            db.query(Prediction)
-            .filter(
-                Prediction.outcome == "pending",
-                Prediction.evaluation_date.isnot(None),
-                Prediction.evaluation_date <= now,
-            )
-            .limit(batch_size)
-            .all()
-        )
-
-        if not preds:
-            break
-
-        for p in preds:
-            if not p.ticker or p.ticker == "UNKNOWN":
-                p.outcome = "incorrect"
-                skipped += 1
-                continue
-
-            # Get historical price at evaluation date
-            price = _get_historical_price(p.ticker, p.evaluation_date)
-            if price is None:
-                skipped += 1
-                continue
-
-            # Need a reference price (entry_price or look up prediction_date price)
-            ref_price = p.entry_price
-            if not ref_price or ref_price <= 0:
-                ref_price_hist = _get_historical_price(p.ticker, p.prediction_date)
-                if ref_price_hist and ref_price_hist > 0:
-                    ref_price = ref_price_hist
-                    p.entry_price = ref_price
-                else:
-                    skipped += 1
-                    continue
-
-            # Calculate return
-            actual_return = round(((price - ref_price) / ref_price) * 100, 2)
-
-            # Evaluate
-            if p.direction == "bullish":
-                if p.target_price and p.target_price > 0:
-                    p.outcome = "correct" if price >= p.target_price else "incorrect"
-                else:
-                    p.outcome = "correct" if actual_return > 0 else "incorrect"
-            elif p.direction == "bearish":
-                if p.target_price and p.target_price > 0:
-                    p.outcome = "correct" if price <= p.target_price else "incorrect"
-                else:
-                    p.outcome = "correct" if actual_return < 0 else "incorrect"
-            else:
-                skipped += 1
-                continue
-
-            p.actual_return = actual_return
-            p.evaluation_date = p.evaluation_date or now
-            evaluated += 1
-            affected_forecaster_ids.add(p.forecaster_id)
-
-            if p.outcome == "correct":
-                correct += 1
-            else:
-                incorrect += 1
-
-        db.commit()
-        print(f"[HistEval] Batch {batch_num + 1}: {evaluated} evaluated, {skipped} skipped")
-
-        # Rate limit
-        time.sleep(1)
-
-    # Update forecaster cached stats
-    _update_forecaster_stats(affected_forecaster_ids, db)
-
-    print(f"[HistEval] Done: {evaluated} evaluated ({correct} correct, {incorrect} incorrect), {skipped} skipped")
-    return {"evaluated": evaluated, "correct": correct, "incorrect": incorrect, "skipped": skipped, "forecasters_updated": len(affected_forecaster_ids)}
+# Global state for background task
+_eval_running = False
+_eval_stop = False
+_eval_status = {
+    "running": False,
+    "tickers_processed": 0,
+    "predictions_scored": 0,
+    "correct": 0,
+    "incorrect": 0,
+    "remaining": 0,
+    "last_error": None,
+}
 
 
-def _get_historical_price(ticker: str, target_date) -> float | None:
-    """Get closing price near target_date using yfinance with cache and timeout."""
-    if not target_date:
-        return None
+def get_eval_status() -> dict:
+    return dict(_eval_status)
 
-    if isinstance(target_date, datetime):
-        d = target_date.date()
-    else:
-        d = target_date
 
-    cache_key = f"{ticker}_{d.isoformat()}"
-    if cache_key in _hist_cache:
-        return _hist_cache[cache_key]
+def stop_evaluation():
+    global _eval_stop
+    _eval_stop = True
+
+
+def run_evaluation_background():
+    """Run full evaluation as background task. Processes all pending predictions."""
+    global _eval_running, _eval_stop, _eval_status
+
+    if _eval_running:
+        return
+
+    _eval_running = True
+    _eval_stop = False
+    _eval_status.update({
+        "running": True, "tickers_processed": 0, "predictions_scored": 0,
+        "correct": 0, "incorrect": 0, "remaining": 0, "last_error": None,
+    })
 
     try:
-        def _fetch():
-            import yfinance as yf
-            t = yf.Ticker(ticker)
-            start = (d - timedelta(days=5)).isoformat()
-            end = (d + timedelta(days=3)).isoformat()
-            h = t.history(start=start, end=end)
-            if h is not None and not h.empty:
-                # Find closest date to target
-                closest_idx = min(range(len(h)), key=lambda i: abs((h.index[i].date() - d).days))
-                return round(float(h['Close'].iloc[closest_idx]), 2)
-            return None
+        while not _eval_stop:
+            result = evaluate_batch(max_tickers=50)
+            _eval_status["tickers_processed"] += result["tickers_processed"]
+            _eval_status["predictions_scored"] += result["predictions_scored"]
+            _eval_status["correct"] += result.get("correct", 0)
+            _eval_status["incorrect"] += result.get("incorrect", 0)
+            _eval_status["remaining"] = result["remaining_tickers"]
 
-        with ThreadPoolExecutor(max_workers=1) as ex:
-            result = ex.submit(_fetch).result(timeout=10)
+            if result["remaining_tickers"] == 0 or result["tickers_processed"] == 0:
+                print(f"[HistEval] All done! Total: {_eval_status['predictions_scored']} scored")
+                break
 
-        if result and result > 0:
-            _hist_cache[cache_key] = result
-        return result
-    except FT:
-        return None
-    except Exception:
-        return None
+            print(f"[HistEval] Progress: {_eval_status['tickers_processed']} tickers, {_eval_status['predictions_scored']} scored, {result['remaining_tickers']} remaining")
+
+            # 5 second break between batches — release all connections
+            time.sleep(5)
+
+    except Exception as e:
+        _eval_status["last_error"] = str(e)
+        print(f"[HistEval] Background error: {e}")
+        import traceback
+        traceback.print_exc()
+    finally:
+        _eval_running = False
+        _eval_status["running"] = False
 
 
-def _update_forecaster_stats(forecaster_ids: set, db: Session):
-    """Recalculate cached stats for affected forecasters."""
-    for fid in forecaster_ids:
-        try:
-            f = db.query(Forecaster).filter(Forecaster.id == fid).first()
-            if not f:
-                continue
+def evaluate_batch(max_tickers: int = 50) -> dict:
+    """Evaluate one batch of tickers. Connection-safe."""
+    from database import SessionLocal
 
-            scored = db.query(Prediction).filter(
-                Prediction.forecaster_id == fid,
-                Prediction.outcome.in_(["correct", "incorrect"]),
-            ).all()
+    now = datetime.utcnow()
 
-            total = len(scored)
-            correct_count = sum(1 for p in scored if p.outcome == "correct")
+    # ── STEP 1: Read pending predictions (short DB connection) ──────────
+    db = SessionLocal()
+    try:
+        rows = db.execute(sql_text("""
+            SELECT p.id, p.ticker, p.direction, p.target_price, p.entry_price,
+                   p.evaluation_date, p.prediction_date, p.forecaster_id
+            FROM predictions p
+            WHERE p.outcome = 'pending'
+              AND p.evaluation_date IS NOT NULL
+              AND p.evaluation_date < :now
+            ORDER BY p.ticker
+            LIMIT 5000
+        """), {"now": now}).fetchall()
 
-            f.total_predictions = total
-            f.correct_predictions = correct_count
-            f.accuracy_score = round(correct_count / total * 100, 1) if total > 0 else 0
+        remaining_count = db.execute(sql_text("""
+            SELECT COUNT(*) FROM predictions
+            WHERE outcome = 'pending' AND evaluation_date IS NOT NULL AND evaluation_date < :now
+        """), {"now": now}).scalar() or 0
+    finally:
+        db.close()
 
-        except Exception:
+    if not rows:
+        return {"tickers_processed": 0, "predictions_scored": 0, "remaining_tickers": 0, "correct": 0, "incorrect": 0}
+
+    # ── STEP 2: Group by ticker ─────────────────────────────────────────
+    ticker_preds = defaultdict(list)
+    for r in rows:
+        ticker_preds[r[1]].append({
+            "id": r[0], "ticker": r[1], "direction": r[2],
+            "target_price": float(r[3]) if r[3] else None,
+            "entry_price": float(r[4]) if r[4] else None,
+            "evaluation_date": r[5], "prediction_date": r[6],
+            "forecaster_id": r[7],
+        })
+
+    tickers = list(ticker_preds.keys())[:max_tickers]
+    remaining = len(ticker_preds) - len(tickers)
+
+    total_scored = 0
+    total_correct = 0
+    total_incorrect = 0
+    affected_forecasters = set()
+
+    for ticker in tickers:
+        if _eval_stop:
+            break
+
+        preds = ticker_preds[ticker]
+        all_dates = [p["evaluation_date"] for p in preds if p["evaluation_date"]]
+        all_dates += [p["prediction_date"] for p in preds if p["prediction_date"]]
+        if not all_dates:
             continue
 
-    db.commit()
-    print(f"[HistEval] Updated stats for {len(forecaster_ids)} forecasters")
+        min_d = min(all_dates) - timedelta(days=5)
+        max_d = max(all_dates) + timedelta(days=3)
+
+        # ── STEP 3: Fetch prices (NO DB connection held) ────────────────
+        prices = _fetch_history(ticker, min_d, max_d)
+        if not prices:
+            continue
+
+        # ── STEP 4: Score predictions ───────────────────────────────────
+        updates = []
+        for p in preds:
+            eval_price = _closest_price(prices, p["evaluation_date"])
+            if eval_price is None:
+                continue
+
+            ref = p["entry_price"]
+            if not ref or ref <= 0:
+                ref = _closest_price(prices, p["prediction_date"])
+                if not ref or ref <= 0:
+                    continue
+
+            ret = round(((eval_price - ref) / ref) * 100, 2)
+
+            if p["direction"] == "bullish":
+                outcome = "correct" if (eval_price >= p["target_price"] if p["target_price"] and p["target_price"] > 0 else ret > 0) else "incorrect"
+            elif p["direction"] == "bearish":
+                outcome = "correct" if (eval_price <= p["target_price"] if p["target_price"] and p["target_price"] > 0 else ret < 0) else "incorrect"
+            else:
+                continue
+
+            updates.append({"id": p["id"], "outcome": outcome, "ret": ret, "ep": ref, "fid": p["forecaster_id"]})
+            affected_forecasters.add(p["forecaster_id"])
+            if outcome == "correct":
+                total_correct += 1
+            else:
+                total_incorrect += 1
+
+        # ── STEP 5: Write results (short DB connection) ─────────────────
+        if updates:
+            db = SessionLocal()
+            try:
+                for u in updates:
+                    db.execute(sql_text("""
+                        UPDATE predictions SET outcome=:o, actual_return=:r, entry_price=COALESCE(entry_price,:ep) WHERE id=:id
+                    """), {"o": u["outcome"], "r": u["ret"], "ep": u["ep"], "id": u["id"]})
+                db.commit()
+                total_scored += len(updates)
+            except Exception as e:
+                db.rollback()
+                print(f"[HistEval] Write error {ticker}: {e}")
+            finally:
+                db.close()
+
+        time.sleep(2)
+
+    # ── STEP 6: Update forecaster stats ─────────────────────────────────
+    if affected_forecasters:
+        _update_stats(affected_forecasters)
+
+    return {
+        "tickers_processed": len(tickers),
+        "predictions_scored": total_scored,
+        "correct": total_correct,
+        "incorrect": total_incorrect,
+        "remaining_tickers": max(remaining, 0),
+    }
+
+
+def _fetch_history(ticker: str, start, end) -> dict:
+    """Fetch historical prices via yfinance. Returns {date_str: close_price}."""
+    try:
+        def _f():
+            import yfinance as yf
+            s = start.strftime("%Y-%m-%d") if hasattr(start, 'strftime') else str(start)[:10]
+            e = end.strftime("%Y-%m-%d") if hasattr(end, 'strftime') else str(end)[:10]
+            h = yf.Ticker(ticker).history(start=s, end=e)
+            if h is None or h.empty:
+                return {}
+            return {str(idx.date()): round(float(row['Close']), 2) for idx, row in h.iterrows()}
+
+        with ThreadPoolExecutor(max_workers=1) as ex:
+            return ex.submit(_f).result(timeout=10)
+    except (FT, Exception) as e:
+        return {}
+
+
+def _closest_price(prices: dict, target_date) -> float | None:
+    if not prices or not target_date:
+        return None
+    target = target_date.date() if hasattr(target_date, 'date') else target_date
+    ts = str(target)
+    if ts in prices:
+        return prices[ts]
+    best, best_diff = None, 999
+    for ds, price in prices.items():
+        try:
+            parts = ds.split("-")
+            d = _date(int(parts[0]), int(parts[1]), int(parts[2]))
+            diff = abs((d - target).days)
+            if diff < best_diff:
+                best_diff, best = diff, price
+        except Exception:
+            continue
+    return best if best_diff <= 5 else None
+
+
+def _update_stats(fids: set):
+    """Update forecaster cached stats. Short DB connection."""
+    from database import SessionLocal
+    db = SessionLocal()
+    try:
+        for fid in fids:
+            r = db.execute(sql_text("""
+                SELECT COUNT(*) FILTER (WHERE outcome IN ('correct','incorrect')),
+                       COUNT(*) FILTER (WHERE outcome = 'correct')
+                FROM predictions WHERE forecaster_id = :f
+            """), {"f": fid}).first()
+            if r and r[0] > 0:
+                db.execute(sql_text("""
+                    UPDATE forecasters SET total_predictions=:t, correct_predictions=:c, accuracy_score=:a WHERE id=:f
+                """), {"t": r[0], "c": r[1], "a": round(r[1]/r[0]*100, 1), "f": fid})
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        print(f"[HistEval] Stats error: {e}")
+    finally:
+        db.close()
