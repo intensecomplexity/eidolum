@@ -37,20 +37,23 @@ def _refresh_leaderboard(db: Session) -> list:
 
     results = []
     for i, r in enumerate(rows):
+        streak_val = r[7] or 0
         results.append({
             "id": r[0], "name": r[1], "handle": r[2],
             "platform": r[3] or "youtube", "channel_url": r[4],
             "subscriber_count": r[5], "profile_image_url": r[6],
-            "streak": r[7] or 0,
+            "streak": {"type": "winning" if streak_val > 0 else "losing" if streak_val < 0 else "none", "count": abs(streak_val)},
             "accuracy_rate": float(r[10] or 0),
             "total_predictions": r[8] or 0,
             "evaluated_predictions": r[8] or 0,
             "correct_predictions": r[9] or 0,
             "scored_count": r[8] or 0,
-            "alpha": 0, "rank": i + 1, "rank_movement": 0,
+            "alpha": 0, "rank": i + 1,
+            "rank_movement": {"direction": "none", "change": 0},
             "has_disclosed_positions": False,
             "conflict_count": 0, "conflict_rate": 0,
             "verified_predictions": r[8] or 0,
+            "sector_strengths": [],
         })
     return results
 
@@ -82,8 +85,11 @@ def get_leaderboard(
                 "id": f.id, "name": f.name, "handle": f.handle,
                 "platform": f.platform or "youtube", "channel_url": f.channel_url,
                 "subscriber_count": f.subscriber_count, "profile_image_url": f.profile_image_url,
-                "streak": 0, "rank_movement": 0, "has_disclosed_positions": False,
+                "streak": {"type": "none", "count": 0},
+                "rank_movement": {"direction": "none", "change": 0},
+                "has_disclosed_positions": False,
                 "conflict_count": 0, "conflict_rate": 0, "verified_predictions": 0,
+                "sector_strengths": [],
                 **stats,
             })
         results.sort(key=lambda x: (x["accuracy_rate"], x.get("alpha", 0)), reverse=True)
