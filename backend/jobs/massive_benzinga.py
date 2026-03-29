@@ -137,7 +137,7 @@ def _massive_inner(db: Session):
     if added > 0:
         db.commit()
 
-    _LAST_UPDATED = datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%S")
+    _LAST_UPDATED = datetime.utcnow().strftime("%Y-%m-%d")
     print(f"[MassiveBZ] Done: {added} added, {skipped} skipped (pages: {page})")
 
 
