@@ -96,16 +96,13 @@ def get_leaderboard(
     if _leaderboard_cache and (_time.time() - _cache_time) < CACHE_TTL:
         return _leaderboard_cache
 
+    # Non-blocking: try to refresh, return empty if DB is slow
     try:
-        import concurrent.futures
-        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as ex:
-            future = ex.submit(_refresh_leaderboard, db)
-            _leaderboard_cache = future.result(timeout=5)  # 5s hard limit
+        _leaderboard_cache = _refresh_leaderboard(db)
+        _cache_time = _time.time()
     except Exception as e:
-        print(f"[Leaderboard] Query failed/timeout: {e}")
-        return _leaderboard_cache or []
-    _cache_time = _time.time()
-    return _leaderboard_cache
+        print(f"[Leaderboard] Query error: {e}")
+    return _leaderboard_cache or []
 
 
 @router.get("/pending-predictions")
