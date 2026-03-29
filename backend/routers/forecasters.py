@@ -109,6 +109,25 @@ def get_forecaster(request: Request, forecaster_id: int, db: Session = Depends(g
             "outcome": p.outcome,
         })
 
+    # Sector strengths
+    sector_map = {}
+    for p in predictions:
+        if p.outcome not in ("correct", "incorrect"):
+            continue
+        s = p.sector or "Other"
+        if s not in sector_map:
+            sector_map[s] = {"correct": 0, "total": 0}
+        sector_map[s]["total"] += 1
+        if p.outcome == "correct":
+            sector_map[s]["correct"] += 1
+    sector_strengths = sorted([
+        {"sector": s, "accuracy": round(v["correct"] / v["total"] * 100, 1), "count": v["total"]}
+        for s, v in sector_map.items() if v["total"] > 0
+    ], key=lambda x: x["count"], reverse=True)
+    # Remove "Other" if real sectors exist
+    if len(sector_strengths) > 1:
+        sector_strengths = [s for s in sector_strengths if s["sector"] != "Other"] or sector_strengths
+
     return {
         "id": f.id,
         "name": f.name,
@@ -119,6 +138,7 @@ def get_forecaster(request: Request, forecaster_id: int, db: Session = Depends(g
         "profile_image_url": f.profile_image_url,
         "bio": f.bio,
         "streak": streak,
+        "sector_strengths": sector_strengths,
         **stats,
         "predictions": [
             {

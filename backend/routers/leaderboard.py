@@ -55,6 +55,40 @@ def _refresh_leaderboard(db: Session) -> list:
             "verified_predictions": r[8] or 0,
             "sector_strengths": [],
         })
+
+    # Batch-fetch sector strengths for all forecasters in one query
+    if results:
+        fids = [r["id"] for r in results]
+        try:
+            sector_rows = db.execute(sql_text("""
+                SELECT forecaster_id, sector,
+                       COUNT(*) as total,
+                       SUM(CASE WHEN outcome='correct' THEN 1 ELSE 0 END) as correct
+                FROM predictions
+                WHERE forecaster_id = ANY(:fids)
+                  AND outcome IN ('correct','incorrect')
+                  AND sector IS NOT NULL AND sector != '' AND sector != 'Other'
+                GROUP BY forecaster_id, sector
+                ORDER BY total DESC
+            """), {"fids": fids}).fetchall()
+
+            sector_by_fid = {}
+            for row in sector_rows:
+                fid = row[0]
+                if fid not in sector_by_fid:
+                    sector_by_fid[fid] = []
+                if len(sector_by_fid[fid]) < 3:
+                    sector_by_fid[fid].append({
+                        "sector": row[1],
+                        "accuracy": round(row[3] / row[2] * 100, 1) if row[2] > 0 else 0,
+                        "count": row[2],
+                    })
+
+            for r in results:
+                r["sector_strengths"] = sector_by_fid.get(r["id"], [])
+        except Exception as e:
+            print(f"[Leaderboard] Sector query error: {e}")
+
     return results
 
 

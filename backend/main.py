@@ -1521,7 +1521,16 @@ async def lifespan(app):
         finally:
             db.close()
 
-        # After scraping, evaluate any expired pending predictions
+        # After scraping, backfill sectors for any new tickers
+        try:
+            from jobs.sector_lookup import backfill_sectors_batch
+            sr = backfill_sectors_batch(max_tickers=30)
+            if sr.get("updated", 0) > 0:
+                print(f"[PostScrape] Mapped sectors for {sr['updated']} tickers")
+        except Exception:
+            pass
+
+        # Then evaluate any expired pending predictions
         try:
             from jobs.historical_evaluator import evaluate_batch, refresh_all_forecaster_stats
             print(f"[PostScrape] Evaluating expired predictions...")
@@ -2052,6 +2061,24 @@ def backfill_sectors():
 
     threading.Thread(target=_run, daemon=True).start()
     return {"status": "started"}
+
+
+@app.get("/api/admin/sector-status")
+def sector_status():
+    """Show sector backfill progress."""
+    from sqlalchemy import text as _t
+    db = SessionLocal()
+    try:
+        total = db.execute(_t("SELECT COUNT(DISTINCT ticker) FROM predictions")).scalar() or 0
+        mapped = db.execute(_t("SELECT COUNT(DISTINCT ticker) FROM predictions WHERE sector IS NOT NULL AND sector != '' AND sector != 'Other'")).scalar() or 0
+        breakdown = db.execute(_t("SELECT sector, COUNT(*) FROM predictions WHERE sector IS NOT NULL AND sector != '' GROUP BY sector ORDER BY COUNT(*) DESC")).fetchall()
+        return {
+            "total_tickers": total,
+            "tickers_mapped": mapped,
+            "sectors": {r[0]: r[1] for r in breakdown},
+        }
+    finally:
+        db.close()
 
 
 @app.get("/api/admin/evaluate-test-one")
