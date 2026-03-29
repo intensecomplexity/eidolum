@@ -36,6 +36,9 @@ def compute_forecaster_stats(
     alphas = [p.alpha for p in evaluated if p.alpha is not None]
     avg_alpha = round(sum(alphas) / len(alphas), 2) if alphas else 0.0
 
+    returns = [p.actual_return for p in evaluated if p.actual_return is not None]
+    avg_ret = round(sum(returns) / len(returns), 2) if returns else 0.0
+
     # Sector breakdown
     sector_map = defaultdict(lambda: {"correct": 0, "total": 0})
     for p in evaluated:
@@ -64,6 +67,7 @@ def compute_forecaster_stats(
         "evaluated_predictions": len(evaluated),
         "correct_predictions": len(correct),
         "alpha": avg_alpha,
+        "avg_return": avg_ret,
         "sector_strengths": sector_strengths[:4],
     }
 
