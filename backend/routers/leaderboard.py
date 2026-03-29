@@ -265,18 +265,17 @@ def get_homepage_stats(request: Request, db: Session = Depends(get_db)):
         total_fc = db.execute(sql_text("SELECT COUNT(*) FROM forecasters WHERE COALESCE(total_predictions,0) > 0")).scalar() or 0
         scored = db.execute(sql_text("SELECT COUNT(*) FROM predictions WHERE outcome IN ('correct','incorrect')")).scalar() or 0
         correct_count = db.execute(sql_text("SELECT COUNT(*) FROM predictions WHERE outcome = 'correct'")).scalar() or 0
+        all_preds = db.execute(sql_text("SELECT COUNT(*) FROM predictions")).scalar() or 0
     except Exception:
-        total_fc = scored = correct_count = 0
+        total_fc = scored = correct_count = all_preds = 0
 
     avg_acc = round(correct_count / scored * 100, 1) if scored > 0 else 0
     _stats_cache = {
         "forecasters_tracked": total_fc,
         "verified_predictions": scored,
-        "total_predictions": scored,
+        "total_predictions": all_preds,
         "avg_accuracy": avg_acc,
         "months_of_data": 24,
-        "conflict_flags": 0,
-        "transparency_tracked": 0,
     }
     _stats_cache_time = _time.time()
     return _stats_cache
