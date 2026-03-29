@@ -80,13 +80,17 @@ export default function LeaderboardCard({ forecaster: f, metric = 'avg_return' }
 
       {/* Sector tags */}
       {f.sector_strengths?.length > 0 && (
-        <div className="flex gap-1.5 flex-wrap mt-3">
+        <div className="flex gap-2 flex-wrap mt-3">
           {f.sector_strengths.slice(0, 2).map((s) => {
-            const color = s.accuracy >= 60 ? '#00c896' : s.accuracy >= 40 ? '#e5a100' : '#ef4444';
+            const color = s.accuracy >= 60 ? '#00c896' : s.accuracy >= 30 ? '#e5a100' : '#ef4444';
+            const SHORT = { 'Financial Services': 'Finance', 'Communication Services': 'Comms', 'Consumer Cyclical': 'Consumer', 'Consumer Defensive': 'Staples', 'Basic Materials': 'Materials' };
+            const label = SHORT[s.sector] || s.sector;
+            const correct = s.count > 0 ? Math.round(s.accuracy * s.count / 100) : 0;
+            const stat = s.accuracy === 0 ? `${correct}/${s.count}` : `${s.accuracy.toFixed(0)}%`;
             return (
-              <span key={s.sector} className="px-2 py-0.5 rounded text-[11px] font-mono font-medium"
+              <span key={s.sector} className="inline-block px-2 py-0.5 rounded text-[11px] font-mono font-medium whitespace-nowrap"
                 style={{ backgroundColor: `${color}15`, color, border: `1px solid ${color}30` }}>
-                {s.sector.replace('Financial Services', 'Finance').replace('Communication Services', 'Comms').replace('Consumer Cyclical', 'Consumer').replace('Consumer Defensive', 'Staples')} {s.accuracy.toFixed(0)}%
+                {label} {stat}
               </span>
             );
           })}

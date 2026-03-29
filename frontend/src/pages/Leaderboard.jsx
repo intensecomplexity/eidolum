@@ -13,6 +13,26 @@ import { getLeaderboard, getSectors } from '../api';
 const SECTORS = ['All', 'Technology', 'Healthcare', 'Financial Services', 'Consumer Cyclical', 'Consumer Defensive', 'Energy', 'Industrials', 'Communication Services', 'Crypto'];
 const DIRECTIONS = ['All', 'bullish', 'bearish'];
 
+const SHORT_SECTOR = {
+  'Financial Services': 'Finance', 'Communication Services': 'Comms',
+  'Consumer Cyclical': 'Consumer', 'Consumer Defensive': 'Staples',
+  'Basic Materials': 'Materials', 'Real Estate': 'RE',
+};
+
+function SectorBadge({ sector, accuracy, count }) {
+  const color = accuracy >= 60 ? '#00c896' : accuracy >= 30 ? '#e5a100' : '#ef4444';
+  const label = SHORT_SECTOR[sector] || sector;
+  // Show fraction for 0% accuracy (more informative than "0%")
+  const correct = count > 0 ? Math.round(accuracy * count / 100) : 0;
+  const stat = accuracy === 0 ? `${correct}/${count}` : `${accuracy.toFixed(0)}%`;
+  return (
+    <span className="inline-block px-2 py-0.5 rounded text-[11px] font-mono font-medium whitespace-nowrap"
+      style={{ backgroundColor: `${color}15`, color, border: `1px solid ${color}30` }}>
+      {label} {stat}
+    </span>
+  );
+}
+
 const TABS = [
   { key: 'alltime', label: 'All Time', mobileLabel: 'All', icon: Trophy },
   { key: 'week', label: 'This Week', mobileLabel: 'Week', icon: Flame },
@@ -327,16 +347,10 @@ export default function Leaderboard() {
                             </td>
                             <td className="px-6 py-4 text-center hidden md:table-cell"><StreakBadge streak={f.streak} /></td>
                             <td className="px-6 py-4 hidden xl:table-cell">
-                              <div className="flex gap-1.5 flex-wrap">
-                                {f.sector_strengths.slice(0, 2).map((s) => {
-                                  const color = s.accuracy >= 60 ? '#00c896' : s.accuracy >= 40 ? '#e5a100' : '#ef4444';
-                                  return (
-                                    <span key={s.sector} className="px-2 py-0.5 rounded text-[11px] font-mono font-medium"
-                                      style={{ backgroundColor: `${color}15`, color, border: `1px solid ${color}30` }}>
-                                      {s.sector.replace('Financial Services', 'Finance').replace('Communication Services', 'Comms').replace('Consumer Cyclical', 'Consumer').replace('Consumer Defensive', 'Staples')} {s.accuracy.toFixed(0)}%
-                                    </span>
-                                  );
-                                })}
+                              <div className="flex gap-2 flex-wrap">
+                                {f.sector_strengths.slice(0, 2).map((s) => (
+                                  <SectorBadge key={s.sector} sector={s.sector} accuracy={s.accuracy} count={s.count} />
+                                ))}
                               </div>
                             </td>
                             <td className="px-6 py-4 text-center hidden lg:table-cell">
