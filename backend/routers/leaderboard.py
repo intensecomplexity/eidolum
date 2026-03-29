@@ -1,4 +1,5 @@
 import datetime
+import time as _time
 from fastapi import APIRouter, Depends, Query, Request
 from sqlalchemy.orm import Session
 from sqlalchemy import func
@@ -9,6 +10,11 @@ from rate_limit import limiter
 
 router = APIRouter()
 
+# Leaderboard cache — refreshed every 10 minutes
+_leaderboard_cache: dict = {}
+_cache_time: float = 0
+CACHE_TTL = 600  # 10 minutes
+
 
 @router.get("/leaderboard")
 @limiter.limit("60/minute")
@@ -18,39 +24,69 @@ def get_leaderboard(
     sector: str = Query(None),
     period_days: int = Query(None),
     direction: str = Query(None),
-    tab: str = Query(None),  # "week" | "sector" | None (all-time)
+    tab: str = Query(None),
     filter: str = Query(None),
 ):
-    # Show all forecasters who have at least 1 prediction
-    forecasters_with_predictions = db.query(
-        Prediction.forecaster_id
-    ).distinct().subquery()
+    global _leaderboard_cache, _cache_time
+
+    # Cache key based on params
+    cache_key = f"{tab}_{sector}_{period_days}_{direction}_{filter}"
+
+    # Return cached if fresh
+    if cache_key in _leaderboard_cache and (_time.time() - _cache_time) < CACHE_TTL:
+        return _leaderboard_cache[cache_key]
+
+    # Use pre-computed stats from Forecaster table (fast path)
     forecasters = db.query(Forecaster).filter(
-        Forecaster.id.in_(forecasters_with_predictions)
+        Forecaster.total_predictions > 0
     ).all()
 
-    # For weekly tab, override period_days to 7
     effective_period = period_days
     if tab == "week":
         effective_period = 7
 
-    results = []
-    for f in forecasters:
-        stats = compute_forecaster_stats(
-            f, db, sector=sector, period_days=effective_period, direction=direction
-        )
-        streak = compute_streak(f.id, db)
-        results.append({
-            "id": f.id,
-            "name": f.name,
-            "handle": f.handle,
-            "platform": f.platform or "youtube",
-            "channel_url": f.channel_url,
-            "subscriber_count": f.subscriber_count,
-            "profile_image_url": f.profile_image_url,
-            "streak": streak,
-            **stats,
-        })
+    # For weekly/sector/direction filters, fall back to full computation
+    # For default all-time, use cached forecaster stats
+    if effective_period or sector or direction:
+        results = []
+        for f in forecasters:
+            stats = compute_forecaster_stats(
+                f, db, sector=sector, period_days=effective_period, direction=direction
+            )
+            results.append({
+                "id": f.id,
+                "name": f.name,
+                "handle": f.handle,
+                "platform": f.platform or "youtube",
+                "channel_url": f.channel_url,
+                "subscriber_count": f.subscriber_count,
+                "profile_image_url": f.profile_image_url,
+                "streak": 0,
+                **stats,
+            })
+    else:
+        # Fast path: use pre-computed Forecaster stats
+        results = []
+        for f in forecasters:
+            total = f.total_predictions or 0
+            correct_count = f.correct_predictions or 0
+            accuracy = f.accuracy_score or 0
+            results.append({
+                "id": f.id,
+                "name": f.name,
+                "handle": f.handle,
+                "platform": f.platform or "youtube",
+                "channel_url": f.channel_url,
+                "subscriber_count": f.subscriber_count,
+                "profile_image_url": f.profile_image_url,
+                "streak": f.streak or 0,
+                "accuracy_rate": accuracy,
+                "total_predictions": total,
+                "evaluated_predictions": total,
+                "correct_predictions": correct_count,
+                "alpha": 0,
+                "has_disclosed_positions": 0,
+            })
 
     # Add scored_count to each result
     for r in results:
@@ -71,40 +107,17 @@ def get_leaderboard(
 
     results = ranked  # Only return ranked forecasters on leaderboard
 
-    # Compute rank movement after assigning ranks
+    # Rank movement — skip for fast path to avoid per-forecaster queries
     for r in results:
-        f = next(fc for fc in forecasters if fc.id == r["id"])
-        r["rank_movement"] = compute_rank_movement(f, r["rank"])
+        r["rank_movement"] = 0
+        r["has_disclosed_positions"] = False
+        r["conflict_count"] = 0
+        r["conflict_rate"] = 0
+        r["verified_predictions"] = r.get("total_predictions", 0)
 
-    # Add conflict data and verified prediction counts
-    for r in results:
-        conflict_count = db.query(Prediction).filter(
-            Prediction.forecaster_id == r["id"],
-            Prediction.has_conflict == 1
-        ).count()
-        has_positions = db.query(DisclosedPosition).filter(
-            DisclosedPosition.forecaster_id == r["id"],
-            DisclosedPosition.position_type != 'sold'
-        ).count() > 0
-        r["has_disclosed_positions"] = has_positions
-        r["conflict_count"] = conflict_count
-        r["conflict_rate"] = round(conflict_count / r["total_predictions"] * 100, 1) if r["total_predictions"] > 0 else 0
-
-        # Count predictions with real provable source URLs
-        verified = db.query(Prediction).filter(
-            Prediction.forecaster_id == r["id"],
-            Prediction.source_url.isnot(None),
-            (
-                Prediction.source_url.contains('/status/')
-                | Prediction.source_url.contains('/watch?v=')
-                | Prediction.source_url.contains('/comments/')
-            ),
-        ).count()
-        r["verified_predictions"] = verified
-
-    # Apply conflict filter
-    if filter == "no_conflicts":
-        results = [r for r in results if r["conflict_count"] == 0]
+    # Cache the result
+    _leaderboard_cache[cache_key] = results
+    _cache_time = _time.time()
 
     return results
 

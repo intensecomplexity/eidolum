@@ -1796,6 +1796,28 @@ def stop_backfill_endpoint():
     return {"status": "stopping"}
 
 
+@app.post("/api/admin/evaluate-historical")
+def evaluate_historical():
+    """Evaluate ALL pending scraped predictions where evaluation window passed. Background thread."""
+    import threading
+    from jobs.historical_evaluator import evaluate_historical_predictions
+
+    def _run():
+        db = SessionLocal()
+        try:
+            evaluate_historical_predictions(db, batch_size=50, max_batches=500)
+        except Exception as e:
+            print(f"[HistEval] Thread error: {e}")
+            import traceback
+            traceback.print_exc()
+        finally:
+            db.close()
+
+    thread = threading.Thread(target=_run, daemon=True)
+    thread.start()
+    return {"status": "started", "message": "Historical evaluation running in background. Check logs for progress."}
+
+
 @app.post("/api/admin/run-user-evaluator")
 def run_user_evaluator_now():
     """Run the user prediction evaluator immediately and return results."""
