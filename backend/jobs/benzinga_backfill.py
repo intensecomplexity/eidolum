@@ -51,7 +51,12 @@ def stop_backfill():
 
 
 def run_backfill(db: Session, start_date: date = None, end_date: date = None):
-    """Day-by-day backfill from start_date to end_date."""
+    """Day-by-day backfill from start_date to end_date.
+    TEMPORARILY DISABLED — was causing DB connection exhaustion.
+    Re-enable after adding connection pooling and proper timeouts."""
+    print("[Backfill] DISABLED — use scheduled massive_benzinga scraper instead")
+    return
+
     global _backfill_running, _backfill_stop, _backfill_status
 
     if _backfill_running:
