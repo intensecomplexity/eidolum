@@ -1652,6 +1652,24 @@ def scheduler_status():
     }
 
 
+@app.post("/api/admin/run-massive-benzinga")
+def run_massive_benzinga_now():
+    """Run the Massive Benzinga scraper immediately and return results."""
+    import traceback as _tb
+    db = SessionLocal()
+    try:
+        from jobs.massive_benzinga import scrape_massive_ratings
+        from models import Prediction
+        before = db.query(Prediction).filter(Prediction.verified_by == "massive_benzinga").count()
+        scrape_massive_ratings(db)
+        after = db.query(Prediction).filter(Prediction.verified_by == "massive_benzinga").count()
+        return {"status": "ok", "before": before, "after": after, "new_predictions": after - before}
+    except Exception as e:
+        return {"status": "error", "error": str(e), "traceback": _tb.format_exc()}
+    finally:
+        db.close()
+
+
 @app.post("/api/admin/run-user-evaluator")
 def run_user_evaluator_now():
     """Run the user prediction evaluator immediately and return results."""
