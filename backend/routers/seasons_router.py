@@ -86,10 +86,11 @@ def season_leaderboard(request: Request, season_id: int, db: Session = Depends(g
                 FROM predictions p
                 JOIN forecasters f ON f.id = p.forecaster_id
                 WHERE p.outcome IN ('correct','incorrect')
-                  AND p.evaluated_at >= :start AND p.evaluated_at < :end
+                  AND COALESCE(p.evaluated_at, p.evaluation_date) >= :start
+                  AND COALESCE(p.evaluated_at, p.evaluation_date) < :end
                 GROUP BY f.id, f.name, f.handle
                 HAVING COUNT(*) >= 2
-                ORDER BY SUM(CASE WHEN p.outcome='correct' THEN 1 ELSE 0 END)::float / COUNT(*) DESC, COUNT(*) DESC
+                ORDER BY ROUND(SUM(CASE WHEN p.outcome='correct' THEN 1 ELSE 0 END)::numeric / NULLIF(COUNT(*), 0) * 100, 1) DESC, COUNT(*) DESC
                 LIMIT 10
             """), {"start": season.starts_at, "end": season.ends_at}).fetchall()
 

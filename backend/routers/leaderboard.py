@@ -99,6 +99,7 @@ def _refresh_leaderboard(db: Session) -> list:
 def _week_leaderboard(db: Session) -> dict:
     """Return predictions SCORED in the last 7 days + new calls submitted this week."""
     # Scored this week: group by forecaster
+    # Use COALESCE(evaluated_at, evaluation_date) since evaluated_at may be NULL for older predictions
     scored_rows = db.execute(sql_text("""
         SELECT f.id, f.name, f.handle, f.platform, f.accuracy_score,
                COUNT(*) as total,
@@ -106,10 +107,10 @@ def _week_leaderboard(db: Session) -> dict:
         FROM predictions p
         JOIN forecasters f ON f.id = p.forecaster_id
         WHERE p.outcome IN ('correct','incorrect')
-          AND p.evaluated_at >= NOW() - INTERVAL '7 days'
+          AND COALESCE(p.evaluated_at, p.evaluation_date) >= NOW() - INTERVAL '7 days'
         GROUP BY f.id, f.name, f.handle, f.platform, f.accuracy_score
         HAVING COUNT(*) >= 1
-        ORDER BY SUM(CASE WHEN p.outcome='correct' THEN 1 ELSE 0 END)::float / COUNT(*) DESC, COUNT(*) DESC
+        ORDER BY ROUND(SUM(CASE WHEN p.outcome='correct' THEN 1 ELSE 0 END)::numeric / NULLIF(COUNT(*), 0) * 100, 1) DESC, COUNT(*) DESC
         LIMIT 30
     """)).fetchall()
 
