@@ -5,6 +5,7 @@ historical prices WITHOUT holding DB connections during yfinance calls.
 Pattern: read → close → fetch prices → open → write → close
 Runs as background task, processes 50 tickers at a time with 5s breaks.
 """
+import os
 import time
 from datetime import datetime, timedelta, date as _date
 from collections import defaultdict
@@ -219,29 +220,44 @@ def evaluate_batch(max_tickers: int = 50) -> dict:
     }
 
 
+FINNHUB_KEY = os.getenv("FINNHUB_KEY", "").strip()
+
+
 def _fetch_history(ticker: str, start, end) -> dict:
-    """Fetch historical prices via yfinance. Returns {date_str: close_price}."""
-    s = start.strftime("%Y-%m-%d") if hasattr(start, 'strftime') else str(start)[:10]
-    e = end.strftime("%Y-%m-%d") if hasattr(end, 'strftime') else str(end)[:10]
+    """Fetch historical prices via Finnhub candles. Returns {date_str: close_price}."""
+    import httpx
+
+    s = start.date() if hasattr(start, 'date') and not isinstance(start, _date) else start
+    e = end.date() if hasattr(end, 'date') and not isinstance(end, _date) else end
+
+    if not FINNHUB_KEY:
+        print(f"[HistEval] No FINNHUB_KEY, cannot fetch history for {ticker}")
+        return {}
 
     try:
-        def _f():
-            import yfinance as yf
-            t = yf.Ticker(ticker)
-            h = t.history(start=s, end=e)
-            if h is None or h.empty:
-                print(f"[HistEval] yfinance {ticker} ({s} to {e}): EMPTY")
-                return {}
-            result = {str(idx.date()): round(float(row['Close']), 2) for idx, row in h.iterrows()}
-            return result
+        from datetime import timezone
+        start_ts = int(datetime(s.year, s.month, s.day, tzinfo=timezone.utc).timestamp())
+        end_ts = int(datetime(e.year, e.month, e.day, tzinfo=timezone.utc).timestamp())
 
-        with ThreadPoolExecutor(max_workers=1) as ex:
-            return ex.submit(_f).result(timeout=15)
-    except FT:
-        print(f"[HistEval] yfinance TIMEOUT for {ticker}")
-        return {}
+        r = httpx.get(
+            "https://finnhub.io/api/v1/stock/candle",
+            params={"symbol": ticker, "resolution": "D", "from": start_ts, "to": end_ts, "token": FINNHUB_KEY},
+            timeout=10,
+        )
+        data = r.json()
+
+        if data.get("s") != "ok" or not data.get("c") or not data.get("t"):
+            return {}
+
+        result = {}
+        for i, ts in enumerate(data["t"]):
+            d = datetime.utcfromtimestamp(ts).strftime("%Y-%m-%d")
+            result[d] = round(float(data["c"][i]), 2)
+
+        return result
+
     except Exception as exc:
-        print(f"[HistEval] yfinance ERROR for {ticker}: {exc}")
+        print(f"[HistEval] Finnhub candle error for {ticker}: {exc}")
         return {}
 
 
