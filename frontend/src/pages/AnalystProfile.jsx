@@ -110,7 +110,7 @@ export default function AnalystProfile() {
                   <h1 className="font-bold text-xl">{profile.name}</h1>
                   <TypeBadge type="analyst" showLabel size={14} />
                 </div>
-                <p className="text-xs text-muted">Verified Analyst — predictions sourced from published research</p>
+                <p className="text-xs text-muted">Verified Analyst: predictions sourced from published research</p>
                 {profile.channel_url && (
                   <a href={profile.channel_url} target="_blank" rel="noopener noreferrer" className="text-xs text-accent flex items-center gap-1 mt-1">
                     Source <ExternalLink className="w-3 h-3" />

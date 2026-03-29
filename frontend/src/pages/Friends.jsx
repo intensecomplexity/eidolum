@@ -169,7 +169,7 @@ function InviteCard({ username }) {
   const [copied, setCopied] = useState(false);
   if (!username) return null;
   const link = `https://www.eidolum.com/join?ref=${username}`;
-  const tweetText = `I'm tracking my stock predictions on @Eidolum — verified accuracy, no BS. Join me: ${link}`;
+  const tweetText = `I'm tracking my stock predictions on @Eidolum. Verified accuracy, no BS. Join me: ${link}`;
   const tweetUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(tweetText)}`;
 
   function handleCopy() {

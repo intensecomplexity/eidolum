@@ -14,17 +14,17 @@ const GLOSSARY = [
   { pattern: /\bequal[\s-]?weight\b/gi, label: 'Equal-Weight', tip: 'The analyst thinks the stock will perform in line with the market. Similar to Hold.' },
   { pattern: /\bmarket[\s-]?perform\b/gi, label: 'Market Perform', tip: 'Expected to match overall market returns. Similar to Hold.' },
   { pattern: /\bsector[\s-]?perform\b/gi, label: 'Sector Perform', tip: 'Expected to match its sector average. Similar to Hold.' },
-  { pattern: /\bstrong buy\b/gi, label: 'Strong Buy', tip: 'The analyst is very bullish — expects the stock to significantly beat the market.' },
-  { pattern: /\bstrong sell\b/gi, label: 'Strong Sell', tip: 'The analyst is very bearish — expects the stock to significantly underperform.' },
+  { pattern: /\bstrong buy\b/gi, label: 'Strong Buy', tip: 'The analyst is very bullish and expects the stock to significantly beat the market.' },
+  { pattern: /\bstrong sell\b/gi, label: 'Strong Sell', tip: 'The analyst is very bearish and expects the stock to significantly underperform.' },
   { pattern: /\binitiates?[\s_]coverage[\s_]?on\b/gi, label: 'Initiates Coverage', tip: 'The analyst is covering this stock for the first time.' },
   { pattern: /\binitiates?[\s_]coverage\b/gi, label: 'Initiates Coverage', tip: 'The analyst is covering this stock for the first time.' },
   { pattern: /\bstarted coverage\b/gi, label: 'Started Coverage', tip: 'The analyst is covering this stock for the first time.' },
   { pattern: /\bmaintains\b/gi, label: 'Maintains', tip: 'The analyst is keeping their previous rating unchanged.' },
-  { pattern: /\breiterates?\b/gi, label: 'Reiterates', tip: 'The analyst is reaffirming their existing rating — nothing changed.' },
-  { pattern: /\breaffirms?\b/gi, label: 'Reaffirms', tip: 'The analyst is reaffirming their existing rating — nothing changed.' },
-  { pattern: /\bdowngrades?\b/gi, label: 'Downgrades', tip: 'The analyst lowered their rating — they became more negative.' },
-  { pattern: /\bupgrades?\b/gi, label: 'Upgrades', tip: 'The analyst raised their rating — they became more positive.' },
-  { pattern: /\bPT\b/g, label: 'PT', tip: 'Price Target — the price the analyst thinks the stock will reach.' },
+  { pattern: /\breiterates?\b/gi, label: 'Reiterates', tip: 'The analyst is reaffirming their existing rating. Nothing changed.' },
+  { pattern: /\breaffirms?\b/gi, label: 'Reaffirms', tip: 'The analyst is reaffirming their existing rating. Nothing changed.' },
+  { pattern: /\bdowngrades?\b/gi, label: 'Downgrades', tip: 'The analyst lowered their rating. They became more negative.' },
+  { pattern: /\bupgrades?\b/gi, label: 'Upgrades', tip: 'The analyst raised their rating. They became more positive.' },
+  { pattern: /\bPT\b/g, label: 'PT', tip: 'Price Target: the price the analyst thinks the stock will reach.' },
   { pattern: /\bprice target\b/gi, label: 'Price Target', tip: 'The price the analyst thinks the stock will reach.' },
   { pattern: /\btarget:\s?\$/gi, label: 'Target: $', tip: 'The price the analyst thinks the stock will reach.' },
 ];
@@ -135,16 +135,16 @@ export function simpleExplainer(prediction) {
 
   // No price target — directional only
   if (direction === 'bullish') {
-    if (isUpgrade) return `In simple terms: Turned more positive on ${ticker} — expects it to go up`;
+    if (isUpgrade) return `In simple terms: Turned more positive on ${ticker}, expects it to go up`;
     if (isInitiate) return `In simple terms: Started tracking ${ticker} with a positive outlook`;
-    if (isMaintain) return `In simple terms: Still positive on ${ticker} — expects it to go up`;
-    return `In simple terms: Positive on ${ticker} — expects it to go up`;
+    if (isMaintain) return `In simple terms: Still positive on ${ticker}, expects it to go up`;
+    return `In simple terms: Positive on ${ticker}, expects it to go up`;
   }
   if (direction === 'bearish') {
-    if (isDowngrade) return `In simple terms: Turned more negative on ${ticker} — expects it to go down`;
+    if (isDowngrade) return `In simple terms: Turned more negative on ${ticker}, expects it to go down`;
     if (isInitiate) return `In simple terms: Started tracking ${ticker} with a negative outlook`;
-    if (isMaintain) return `In simple terms: Still negative on ${ticker} — expects it to go down`;
-    return `In simple terms: Negative on ${ticker} — expects it to go down`;
+    if (isMaintain) return `In simple terms: Still negative on ${ticker}, expects it to go down`;
+    return `In simple terms: Negative on ${ticker}, expects it to go down`;
   }
 
   return null;

@@ -51,7 +51,7 @@ export default function GoogleCallback() {
           // Use window.location to force full page reload with fresh auth state
           window.location.href = '/';
         } else {
-          setError(data.detail || 'Login failed — no token received.');
+          setError(data.detail || 'Login failed. No token received.');
         }
       })
       .catch(err => {

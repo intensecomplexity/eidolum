@@ -87,7 +87,7 @@ export default function Controversial() {
         {/* Battle Tickers */}
         {debatedTickers.length > 0 && (
           <div className="mb-10">
-            <h2 className="text-xs text-muted uppercase tracking-wider font-bold mb-4">Battle Tickers — Community Divided</h2>
+            <h2 className="text-xs text-muted uppercase tracking-wider font-bold mb-4">Battle Tickers: Community Divided</h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
               {debatedTickers.map(t => (
                 <Link to={`/ticker/${t.ticker}`} key={t.ticker} className="card hover:border-accent/20 transition-colors">

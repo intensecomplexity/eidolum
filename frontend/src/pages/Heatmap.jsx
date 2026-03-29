@@ -69,7 +69,7 @@ export default function Heatmap() {
                   <Link to={`/ticker/${t.ticker}`} key={t.ticker}
                     className="rounded-lg p-2.5 text-center transition-all hover:scale-105"
                     style={{ background: bg, border: `1px solid ${color}30` }}
-                    title={`${t.name} — ${bull}% bullish, ${t.total_predictions} predictions`}>
+                    title={`${t.name}: ${bull}% bullish, ${t.total_predictions} predictions`}>
                     <div className="font-mono text-sm font-bold tracking-wider">{t.ticker}</div>
                     <div className="font-mono text-xs font-bold" style={{ color }}>{bull}%</div>
                     <div className="text-[9px] text-muted">{t.total_predictions}</div>

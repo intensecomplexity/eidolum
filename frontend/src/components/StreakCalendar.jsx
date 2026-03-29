@@ -24,16 +24,16 @@ export default function StreakCalendar({ predictions = [] }) {
       if (data) {
         if (data.correct > 0 && data.incorrect === 0) {
           color = 'bg-positive';
-          title += ` — ${data.correct} correct`;
+          title += `: ${data.correct} correct`;
         } else if (data.incorrect > 0 && data.correct === 0) {
           color = 'bg-negative';
-          title += ` — ${data.incorrect} incorrect`;
+          title += `: ${data.incorrect} incorrect`;
         } else if (data.correct > 0 && data.incorrect > 0) {
           color = 'bg-warning';
-          title += ` — ${data.correct} correct, ${data.incorrect} incorrect`;
+          title += `: ${data.correct} correct, ${data.incorrect} incorrect`;
         } else if (data.pending > 0) {
           color = 'bg-blue/40';
-          title += ` — ${data.pending} pending`;
+          title += `: ${data.pending} pending`;
         }
       }
       cells.push({ key, color, title });

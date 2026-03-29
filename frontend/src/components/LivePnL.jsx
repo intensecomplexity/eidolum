@@ -32,7 +32,7 @@ export default function LivePnL({ direction, priceAtCall, currentPrice, compact 
   if (compact) {
     return (
       <span
-        title={`Current: $${currentPrice} — Entry: $${priceAtCall}`}
+        title={`Current: $${currentPrice}, Entry: $${priceAtCall}`}
         className={`font-mono text-[11px] font-bold px-1.5 py-0.5 rounded ${flashClass} ${
           isWinning ? 'text-positive bg-positive/10' : 'text-negative bg-negative/10'
         }`}

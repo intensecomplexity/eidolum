@@ -179,8 +179,8 @@ export default function LandingPublic() {
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 mb-8">
           {[
             { num: '01', Icon: Satellite, title: 'We Collect Predictions', desc: 'Analyst upgrades, downgrades, and price targets are collected from verified financial sources with timestamps and archived proof.' },
-            { num: '02', Icon: Clock, title: 'We Wait for the Deadline', desc: 'Each prediction has a clear evaluation window. Every prediction is tracked — not just the ones that worked out.' },
-            { num: '03', Icon: BarChart3, title: 'We Check the Math', desc: 'When the window closes, we compare the prediction against actual market data. Right or wrong — no gray area.' },
+            { num: '02', Icon: Clock, title: 'We Wait for the Deadline', desc: 'Each prediction has a clear evaluation window. Every prediction is tracked, not just the ones that worked out.' },
+            { num: '03', Icon: BarChart3, title: 'We Check the Math', desc: 'When the window closes, we compare the prediction against actual market data. Right or wrong. No gray area.' },
             { num: '04', Icon: Trophy, title: 'We Rank by Results', desc: 'Forecasters are ranked by verified accuracy, not followers or reputation.' },
           ].map((step, i) => (
             <FadeIn key={step.num} delay={i * 80}>
@@ -325,7 +325,7 @@ export default function LandingPublic() {
             <div className="card py-6 text-center h-full">
               <TrendingUp className="w-7 h-7 text-accent mx-auto mb-3" />
               <h3 className="font-semibold mb-2">For Analysts</h3>
-              <p className="text-sm text-text-secondary leading-relaxed">Prove your track record. Let your accuracy speak for itself — not your follower count.</p>
+              <p className="text-sm text-text-secondary leading-relaxed">Prove your track record. Let your accuracy speak for itself, not your follower count.</p>
             </div>
           </FadeIn>
           <FadeIn delay={200}>
@@ -368,8 +368,8 @@ export default function LandingPublic() {
           <h2 className="font-bold text-center mb-10" style={{ fontSize: 'clamp(1.6rem, 4vw, 2.4rem)' }}>Frequently Asked Questions</h2>
         </FadeIn>
         <div className="space-y-2">
-          <FaqItem q="How do you define a prediction?" a="A prediction is a specific, measurable financial forecast — like 'TSLA will reach $300 by June 2026' or 'UBS downgrades NKE to Sell with a $50 target.' Vague commentary doesn't count. Every prediction needs a ticker, a direction, and a timeframe." />
-          <FaqItem q="How do you score correctness?" a="When a prediction's timeframe expires, we compare it against actual market data. For price targets, did the stock hit the target? For directional calls, did it move the right way? It's binary — correct or incorrect." />
+          <FaqItem q="How do you define a prediction?" a="A prediction is a specific, measurable financial forecast, like 'TSLA will reach $300 by June 2026' or 'UBS downgrades NKE to Sell with a $50 target.' Vague commentary doesn't count. Every prediction needs a ticker, a direction, and a timeframe." />
+          <FaqItem q="How do you score correctness?" a="When a prediction's timeframe expires, we compare it against actual market data. For price targets, did the stock hit the target? For directional calls, did it move the right way? It's binary: correct or incorrect." />
           <FaqItem q="Can users see the raw source?" a="Yes. Every scraped prediction links back to its original source with an archived proof link. You can verify every data point yourself." />
           <FaqItem q="How do you avoid cherry-picking?" a="We track ALL predictions from each forecaster, not just their wins. Every prediction is timestamped and archived the moment we find it." />
           <FaqItem q="Are you rating conviction or popularity?" a="Pure accuracy. We don't care how many followers an analyst has. The only thing that matters is: were they right?" />

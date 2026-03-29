@@ -108,7 +108,7 @@ export default function ForecastersList() {
                     </span>
                   ) : (
                     <span className="inline-block mt-2 text-[10px] text-muted">
-                      {f.scored_predictions}/10 scored — not yet ranked
+                      {f.scored_predictions}/10 scored, not yet ranked
                     </span>
                   )}
                 </Link>

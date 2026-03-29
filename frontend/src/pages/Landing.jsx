@@ -55,7 +55,7 @@ export default function Landing() {
           fontWeight: 400,
           margin: 0,
         }}>
-          We track every financial prediction from Wall Street analysts, banks, and research firms — and verify them against real market data.
+          We track every financial prediction from Wall Street analysts, banks, and research firms, and we verify them against real market data.
         </p>
       </div>
 
@@ -211,7 +211,7 @@ export default function Landing() {
         </p>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '32px' }}>
           {[
-            { num: '01', icon: Search, title: 'Collect', desc: 'We pull analyst predictions from financial news — upgrades, downgrades, and price target changes from real firms.' },
+            { num: '01', icon: Search, title: 'Collect', desc: 'We pull analyst predictions from financial news: upgrades, downgrades, and price target changes from real firms.' },
             { num: '02', icon: Filter, title: 'Parse', desc: 'NLP and keyword matching extract structured predictions: ticker, direction, and price targets.' },
             { num: '03', icon: CheckCircle, title: 'Verify', desc: 'After 30/60/90 days we compare predictions to actual market data and score each forecaster.' },
           ].map(step => (
@@ -227,7 +227,7 @@ export default function Landing() {
       {/* 6. STATS */}
       <section className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12 text-center">
         <p style={{ color: '#7a8a7a', fontSize: '0.9rem' }}>
-          Growing database of verified predictions — updated hourly.
+          Growing database of verified predictions, updated hourly.
         </p>
       </section>
 
@@ -237,7 +237,7 @@ export default function Landing() {
           Stay ahead of the market
         </h2>
         <p style={{ color: '#7a8a7a', marginBottom: '24px' }}>
-          Get the daily predictions digest — who called what, and whether they were right.
+          Get the daily predictions digest: who called what, and whether they were right.
         </p>
         <div className="max-w-md mx-auto">
           <NewsletterSignup />

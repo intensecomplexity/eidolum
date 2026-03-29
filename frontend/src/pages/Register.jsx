@@ -49,7 +49,7 @@ export default function Register() {
 
         {ref && (
           <div className="bg-accent/5 border border-accent/20 rounded-lg px-4 py-3 mb-4 text-sm text-accent">
-            Invited by <span className="font-mono font-bold">@{ref}</span> — you'll both get 25 XP!
+            Invited by <span className="font-mono font-bold">@{ref}</span>. You'll both get 25 XP!
           </div>
         )}
 

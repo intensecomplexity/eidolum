@@ -91,7 +91,7 @@ export default function ActivityFeed() {
                     <span className={`text-xs font-semibold uppercase ${isBull ? 'text-positive' : 'text-negative'}`}>
                       {isBull ? 'BULL' : 'BEAR'}
                     </span>
-                    {' — '}
+                    {' · '}
                     <Link to={`/forecaster/${p.forecaster_id}`} className="text-text-secondary active:text-accent">
                       {p.forecaster_name}
                     </Link>

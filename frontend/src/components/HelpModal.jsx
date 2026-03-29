@@ -13,7 +13,7 @@ const HOW_CARDS = [
 // ── Features guide accordion items ───────────────────────────────────────────
 
 const FEATURES = [
-  { title: 'Submit a Call', body: 'Pick any stock or crypto, choose bullish or bearish, set your price target and evaluation window. Your prediction gets locked and timestamped — no edits, no deletes after 5 minutes.' },
+  { title: 'Submit a Call', body: 'Pick any stock or crypto, choose bullish or bearish, set your price target and evaluation window. Your prediction gets locked and timestamped. No edits, no deletes after 5 minutes.' },
   { title: 'Leaderboard', body: 'All forecasters ranked by prediction accuracy. Minimum 10 scored predictions to appear. See who\'s actually right, not just who\'s loudest.' },
   { title: 'Badges & Achievements', body: 'Earn badges across 7 categories: Accuracy, Streaks, Volume, Timing, Sectors, Conviction, and Prestige. Track your progress and collect them all.' },
   { title: 'Daily Challenge', body: 'Every trading day, one stock is picked. Everyone calls bullish or bearish. Results at market close. Separate daily challenge streak and leaderboard.' },
@@ -33,7 +33,7 @@ const FEATURES = [
 const SCORING_RULES = [
   'Bullish predictions are correct if the price is higher than your entry when the timeframe expires.',
   'Bearish predictions are correct if the price is lower than your entry when the timeframe expires.',
-  'Predictions are scored automatically — no manual judging.',
+  'Predictions are scored automatically. No manual judging.',
   'You cannot edit or delete predictions after 5 minutes.',
 ];
 
