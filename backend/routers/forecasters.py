@@ -85,13 +85,14 @@ def get_forecaster(
     forecaster_id: int,
     page: int = Query(1, ge=1),
     limit: int = Query(20, ge=1, le=100),
+    filter: str = Query(None),  # all, evaluated, pending, correct, incorrect
     db: Session = Depends(get_db),
 ):
     # Check cache for base stats (sector_strengths always computed fresh)
     cached = _forecaster_cache.get(forecaster_id)
     if cached and (_time.time() - cached[1]) < FORECASTER_CACHE_TTL:
         result = dict(cached[0])
-        result["predictions"] = _get_predictions_page(forecaster_id, page, limit, db)
+        result["predictions"] = _get_predictions_page(forecaster_id, page, limit, filter, db)
         result["sector_strengths"] = _get_sector_strengths(forecaster_id, db)
         return result
 
@@ -147,7 +148,8 @@ def get_forecaster(
         "correct_predictions": correct_count,
         "alpha": float(f.alpha or 0),
         "accuracy_over_time": accuracy_over_time,
-        "predictions": _get_predictions_page(forecaster_id, page, limit, db),
+        "prediction_counts": _get_prediction_counts(forecaster_id, db),
+        "predictions": _get_predictions_page(forecaster_id, page, limit, filter, db),
         "disclosed_positions": [],
         "conflict_stats": {"total": total, "conflicts": 0, "rate": 0},
     }
@@ -181,11 +183,50 @@ def _get_sector_strengths(forecaster_id: int, db) -> list:
         return []
 
 
-def _get_predictions_page(forecaster_id: int, page: int, limit: int, db) -> list:
-    """Get paginated predictions for a forecaster using raw SQL."""
+def _get_prediction_counts(forecaster_id: int, db) -> dict:
+    """Get prediction counts by outcome for filter tabs."""
+    from sqlalchemy import text as sql_text
+    try:
+        rows = db.execute(sql_text("""
+            SELECT outcome, COUNT(*) FROM predictions
+            WHERE forecaster_id = :fid GROUP BY outcome
+        """), {"fid": forecaster_id}).fetchall()
+        counts = {r[0]: r[1] for r in rows}
+        return {
+            "all": sum(counts.values()),
+            "evaluated": counts.get("correct", 0) + counts.get("incorrect", 0),
+            "pending": counts.get("pending", 0),
+            "correct": counts.get("correct", 0),
+            "incorrect": counts.get("incorrect", 0),
+        }
+    except Exception:
+        return {"all": 0, "evaluated": 0, "pending": 0, "correct": 0, "incorrect": 0}
+
+
+def _get_predictions_page(forecaster_id: int, page: int, limit: int, filter_type: str, db) -> list:
+    """Get paginated predictions with filter and smart sort."""
     from sqlalchemy import text as sql_text
     offset = (page - 1) * limit
-    rows = db.execute(sql_text("""
+
+    # Build WHERE clause based on filter
+    where_extra = ""
+    if filter_type == "evaluated":
+        where_extra = "AND outcome IN ('correct','incorrect')"
+    elif filter_type == "pending":
+        where_extra = "AND outcome = 'pending'"
+    elif filter_type == "correct":
+        where_extra = "AND outcome = 'correct'"
+    elif filter_type == "incorrect":
+        where_extra = "AND outcome = 'incorrect'"
+
+    # Sort: evaluated first (by eval date DESC), then pending (by eval date ASC)
+    order = """
+        CASE WHEN outcome IN ('correct','incorrect') THEN 0 ELSE 1 END,
+        CASE WHEN outcome IN ('correct','incorrect') THEN evaluation_date END DESC,
+        CASE WHEN outcome = 'pending' THEN evaluation_date END ASC
+    """
+
+    rows = db.execute(sql_text(f"""
         SELECT id, ticker, direction, target_price, entry_price,
                prediction_date, evaluation_date, window_days,
                outcome, actual_return, evaluation_summary,
@@ -193,8 +234,8 @@ def _get_predictions_page(forecaster_id: int, page: int, limit: int, db) -> list
                source_type, source_platform_id, video_timestamp_sec,
                verified_by, has_conflict, conflict_note
         FROM predictions
-        WHERE forecaster_id = :fid
-        ORDER BY prediction_date DESC
+        WHERE forecaster_id = :fid {where_extra}
+        ORDER BY {order}
         LIMIT :lim OFFSET :off
     """), {"fid": forecaster_id, "lim": limit, "off": offset}).fetchall()
 
