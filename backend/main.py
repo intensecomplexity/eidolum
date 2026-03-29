@@ -1466,9 +1466,9 @@ def health():
     return {"status": "ok", "app": "Eidolum API"}
 
 
-@app.get("/api/health/detailed")
-def health_detailed():
-    """Detailed health check — detects DB problems early.
+@app.get("/api/health/infra")
+def health_infra():
+    """Infrastructure health check — DB connectivity, connection pools, circuit breaker.
     Returns status: "ok", "degraded", or "down"."""
     import time as _t
     from sqlalchemy import text as _text
