@@ -171,6 +171,16 @@ def _process_rating(rating: dict, db: Session) -> bool:
     if not date_str or len(date_str) < 8:
         return False
 
+    # Reject garbage firm names
+    if len(firm) > 50 or len(firm) < 2:
+        return False
+
+    # Layer 1: external_id dedup (benzinga_id is globally unique)
+    if benzinga_id:
+        ext_id = f"bz_{benzinga_id}"
+        if db.execute(text("SELECT 1 FROM predictions WHERE external_id = :eid LIMIT 1"), {"eid": ext_id}).first():
+            return False
+
     # Skip non-prediction actions
     action_lower = action.lower()
     if any(skip in action_lower for skip in SKIP_ACTIONS):
@@ -252,6 +262,7 @@ def _process_rating(rating: dict, db: Session) -> bool:
         evaluation_date=pred_date + timedelta(days=window_days),
         window_days=window_days, source_url=source_url, archive_url=source_url,
         source_type="article", source_platform_id=source_id,
+        external_id=f"bz_{benzinga_id}" if benzinga_id else None,
         target_price=target_price, entry_price=entry_price,
         context=context[:500], exact_quote=context,
         outcome="pending", verified_by="massive_benzinga",

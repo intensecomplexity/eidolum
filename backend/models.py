@@ -95,6 +95,7 @@ class Prediction(Base):
     source_type = Column(String, nullable=True)  # 'youtube'|'twitter'|'reddit'|'article'
     source_title = Column(Text, nullable=True)
     source_platform_id = Column(String, nullable=True)
+    external_id = Column(String, nullable=True, unique=True, index=True)  # benzinga_id for dedup
     video_timestamp_sec = Column(Integer, nullable=True)
     verified_by = Column(String, nullable=True)  # 'ai_parsed'|'manual'|'auto_title'
     archive_url = Column(Text, nullable=True)

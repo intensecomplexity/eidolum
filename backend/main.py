@@ -9,7 +9,7 @@ import os
 import sys
 import subprocess
 import time
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -887,6 +887,18 @@ def run_phase2_migrations():
     except Exception:
         db.rollback()
 
+    # ── 35. predictions.external_id column ─────────────────────────
+    try:
+        db.execute(text("ALTER TABLE predictions ADD COLUMN external_id VARCHAR UNIQUE"))
+        db.commit()
+    except Exception:
+        db.rollback()
+    try:
+        db.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS ix_predictions_external_id ON predictions(external_id) WHERE external_id IS NOT NULL"))
+        db.commit()
+    except Exception:
+        db.rollback()
+
     print("[Phase2] All migrations complete")
     db.close()
 
@@ -1701,6 +1713,43 @@ def run_massive_benzinga_now():
         return {"status": "error", "error": str(e), "traceback": _tb.format_exc()}
     finally:
         db.close()
+
+
+@app.post("/api/admin/backfill-benzinga")
+def start_backfill():
+    """Start the day-by-day historical backfill as a background task."""
+    import threading
+    from jobs.benzinga_backfill import run_backfill, get_backfill_status
+
+    status = get_backfill_status()
+    if status["running"]:
+        return {"status": "already_running", **status}
+
+    def _run():
+        db = SessionLocal()
+        try:
+            run_backfill(db)
+        except Exception as e:
+            print(f"[Backfill] Thread error: {e}")
+        finally:
+            db.close()
+
+    thread = threading.Thread(target=_run, daemon=True)
+    thread.start()
+    return {"status": "started", "start_date": "2024-03-29", "end_date": str(date.today())}
+
+
+@app.get("/api/admin/backfill-status")
+def backfill_status():
+    from jobs.benzinga_backfill import get_backfill_status
+    return get_backfill_status()
+
+
+@app.post("/api/admin/stop-backfill")
+def stop_backfill_endpoint():
+    from jobs.benzinga_backfill import stop_backfill
+    stop_backfill()
+    return {"status": "stopping"}
 
 
 @app.post("/api/admin/run-user-evaluator")
