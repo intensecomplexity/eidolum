@@ -15,6 +15,7 @@ import FollowButton from '../components/FollowButton';
 import ViewerCount from '../components/ViewerCount';
 import Footer from '../components/Footer';
 import { getForecaster, getForecasterSectors, getPlatformDetail, getReportCards } from '../api';
+import { annotateContext, simpleExplainer } from '../utils/predictionExplainer';
 
 export default function ForecasterProfile() {
   const { id } = useParams();
@@ -464,19 +465,26 @@ function PredictionRow({ p, forecaster: fc }) {
       {expanded && (
         <tr className="bg-surface-2/30">
           <td colSpan={9} className="px-6 py-4">
-            {/* Full quote — always shown */}
+            {/* Full quote with glossary tooltips */}
             <blockquote style={{
               borderLeft: '3px solid #00c896',
               background: 'rgba(255,255,255,0.03)',
               padding: '12px 16px',
-              margin: '0 0 12px 0',
+              margin: '0 0 4px 0',
               fontStyle: 'italic',
               fontSize: '0.95rem',
               borderRadius: '0 6px 6px 0',
               lineHeight: 1.6,
             }}>
-              &ldquo;{quoteText}&rdquo;
+              &ldquo;{annotateContext(quoteText)}&rdquo;
             </blockquote>
+
+            {/* Simple explainer */}
+            {simpleExplainer(p) && (
+              <p className="text-xs text-muted mb-3 ml-4">
+                {simpleExplainer(p)}
+              </p>
+            )}
 
             {/* Platform-specific proof */}
             <ProofBlock p={p} />

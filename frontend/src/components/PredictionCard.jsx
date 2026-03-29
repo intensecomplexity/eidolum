@@ -3,6 +3,7 @@ import PredictionBadge from './PredictionBadge';
 import ConflictBadge from './ConflictBadge';
 import BookmarkButton from './BookmarkButton';
 import PlatformBadge from './PlatformBadge';
+import { annotateContext, simpleExplainer } from '../utils/predictionExplainer';
 
 const HORIZON_LABELS = { short: '30d', medium: '90d', long: '1y', custom: 'Custom' };
 
@@ -156,6 +157,20 @@ export default function PredictionCard({ prediction: p, showForecaster = false, 
           <span className="text-text-secondary text-right whitespace-nowrap">Target ${p.target_price.toFixed(0)}</span>
         )}
       </div>
+
+      {/* Context with glossary tooltips */}
+      {(p.exact_quote || p.context) && (
+        <p className="text-xs text-text-secondary italic mt-1.5 leading-relaxed">
+          {annotateContext(p.exact_quote || p.context)}
+        </p>
+      )}
+
+      {/* Simple explainer */}
+      {simpleExplainer(p) && (
+        <p className="text-[11px] text-muted mt-1 leading-relaxed">
+          {simpleExplainer(p)}
+        </p>
+      )}
 
       {/* Evaluation summary */}
       {p.evaluation_summary && (

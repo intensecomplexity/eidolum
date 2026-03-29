@@ -384,3 +384,43 @@ tbody tr { border-bottom: 1px solid rgba(255,255,255,0.08); }
 .success-card-enter {
   animation: card-enter 0.4s ease-out forwards;
 }
+
+/* ── Glossary tooltips for analyst jargon ─────────────────────────────────── */
+.glossary-term {
+  position: relative;
+  border-bottom: 1px dotted rgba(212, 168, 67, 0.4);
+  cursor: help;
+}
+
+.glossary-term:hover::after,
+.glossary-term:focus::after {
+  content: attr(data-tip);
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: #0d1117;
+  color: #e6edf3;
+  border: 1px solid rgba(212, 168, 67, 0.3);
+  border-radius: 6px;
+  padding: 6px 10px;
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 400;
+  line-height: 1.4;
+  white-space: normal;
+  width: max-content;
+  max-width: 240px;
+  z-index: 50;
+  pointer-events: none;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+}
+
+/* On mobile, show tooltip below instead of above to avoid clipping */
+@media (max-width: 640px) {
+  .glossary-term:hover::after,
+  .glossary-term:focus::after {
+    bottom: auto;
+    top: calc(100% + 4px);
+  }
+}

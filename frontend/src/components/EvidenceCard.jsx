@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Play, ExternalLink, X as XIcon, Search, Archive } from 'lucide-react';
 import getSourceUrl from '../utils/getSourceUrl';
+import { annotateContext, simpleExplainer } from '../utils/predictionExplainer';
 
 const SOURCE_BADGES = {
   youtube: { label: 'VIDEO', extra: null, color: 'text-positive', bg: 'bg-positive/10', border: 'border-positive/20' },
@@ -70,9 +71,14 @@ export default function EvidenceCard({ prediction: p, forecaster = null, expanda
     return (
       <div className="mt-1.5">
         {hasQuote && (
-          <p className="text-text-secondary text-xs italic leading-relaxed truncate">
-            &ldquo;{p.exact_quote.slice(0, 100)}{p.exact_quote.length > 100 ? '...' : ''}&rdquo;
-          </p>
+          <>
+            <p className="text-text-secondary text-xs italic leading-relaxed truncate">
+              &ldquo;{annotateContext(p.exact_quote.slice(0, 100))}{p.exact_quote.length > 100 ? '...' : ''}&rdquo;
+            </p>
+            {simpleExplainer(p) && (
+              <p className="text-[11px] text-muted mt-0.5">{simpleExplainer(p)}</p>
+            )}
+          </>
         )}
         {hasRealVideo && p.source_type === 'youtube' && (
           <button
@@ -117,19 +123,22 @@ export default function EvidenceCard({ prediction: p, forecaster = null, expanda
       className={`${expandable ? 'cursor-pointer' : ''}`}
       onClick={expandable ? () => setExpanded(!expanded) : undefined}
     >
-      {/* Quote */}
+      {/* Quote with glossary tooltips */}
       {hasQuote && (
         <div className="mt-3 bg-warning/[0.06] border-l-[3px] border-warning/60 rounded-r-lg px-4 py-3 relative">
           <span className="absolute top-1 left-2 text-warning/30 text-3xl font-serif leading-none select-none">&ldquo;</span>
           <p className="text-text-primary text-sm italic leading-relaxed pl-4 font-serif">
-            {expanded ? p.exact_quote : (
+            {expanded ? annotateContext(p.exact_quote) : (
               p.exact_quote.length > 140
-                ? p.exact_quote.slice(0, 140) + '...'
-                : p.exact_quote
+                ? <>{annotateContext(p.exact_quote.slice(0, 140))}...</>
+                : annotateContext(p.exact_quote)
             )}
           </p>
           {expanded && p.exact_quote.length > 10 && (
             <span className="absolute bottom-1 right-3 text-warning/30 text-3xl font-serif leading-none select-none">&rdquo;</span>
+          )}
+          {simpleExplainer(p) && (
+            <p className="text-xs text-muted mt-2 pl-4 not-italic">{simpleExplainer(p)}</p>
           )}
         </div>
       )}
