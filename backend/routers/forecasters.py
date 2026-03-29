@@ -145,7 +145,7 @@ def get_forecaster(
         "total_predictions": total,
         "evaluated_predictions": total,
         "correct_predictions": correct_count,
-        "alpha": 0,
+        "alpha": float(f.alpha or 0),
         "accuracy_over_time": accuracy_over_time,
         "predictions": _get_predictions_page(forecaster_id, page, limit, db),
         "disclosed_positions": [],

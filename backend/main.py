@@ -937,6 +937,13 @@ def run_phase2_migrations():
     except Exception:
         db.rollback()
 
+    # ── 39. forecasters.alpha column ────────────────────────────────
+    try:
+        db.execute(text("ALTER TABLE forecasters ADD COLUMN alpha FLOAT"))
+        db.commit()
+    except Exception:
+        db.rollback()
+
     print("[Phase2] All migrations complete")
     db.close()
 
@@ -2053,6 +2060,44 @@ def re_evaluate_all():
 
     threading.Thread(target=_run, daemon=True).start()
     return {"status": "started", "predictions_reset": count}
+
+
+@app.post("/api/admin/backfill-alpha")
+def backfill_alpha():
+    """Calculate alpha for all evaluated predictions missing it."""
+    import threading
+    from sqlalchemy import text as _t
+
+    def _run():
+        from jobs.historical_evaluator import _calc_spy_return
+        dbs = SessionLocal()
+        try:
+            rows = dbs.execute(_t("""
+                SELECT id, actual_return, prediction_date, evaluation_date
+                FROM predictions
+                WHERE outcome IN ('correct','incorrect') AND alpha IS NULL AND actual_return IS NOT NULL
+                LIMIT 10000
+            """)).fetchall()
+            print(f"[AlphaBackfill] {len(rows)} predictions to update")
+            for r in rows:
+                spy_ret = _calc_spy_return(r[2], r[3])
+                if spy_ret is not None:
+                    alpha = round(r[1] - spy_ret, 2)
+                    dbs.execute(_t("UPDATE predictions SET sp500_return=:s, alpha=:a WHERE id=:id"),
+                                {"s": spy_ret, "a": alpha, "id": r[0]})
+            dbs.commit()
+            print(f"[AlphaBackfill] Done")
+            # Update forecaster alphas
+            from jobs.historical_evaluator import refresh_all_forecaster_stats
+            refresh_all_forecaster_stats()
+        except Exception as e:
+            dbs.rollback()
+            print(f"[AlphaBackfill] Error: {e}")
+        finally:
+            dbs.close()
+
+    threading.Thread(target=_run, daemon=True).start()
+    return {"status": "started"}
 
 
 @app.post("/api/admin/backfill-sectors")

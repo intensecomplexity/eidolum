@@ -203,8 +203,16 @@ def evaluate_batch(max_tickers: int = 50) -> dict:
                 else:
                     outcome = "correct" if eval_price < ref else "incorrect"
 
+            # Calculate benchmark (SPY) return for alpha
+            spy_return = _calc_spy_return(p.get("prediction_date"), p.get("evaluation_date"))
+            pred_alpha = round(ret - spy_return, 2) if spy_return is not None else None
+
             summary = _build_summary(p["ticker"], direction, outcome, ref, eval_price, target, ret)
-            updates.append({"id": p["id"], "outcome": outcome, "ret": ret, "ep": ref, "fid": p["forecaster_id"], "direction": direction, "summary": summary})
+            updates.append({
+                "id": p["id"], "outcome": outcome, "ret": ret, "ep": ref,
+                "fid": p["forecaster_id"], "direction": direction, "summary": summary,
+                "spy_return": spy_return, "alpha": pred_alpha,
+            })
             affected_forecasters.add(p["forecaster_id"])
             if outcome == "correct":
                 total_correct += 1
@@ -221,8 +229,15 @@ def evaluate_batch(max_tickers: int = 50) -> dict:
             try:
                 for u in updates:
                     db.execute(sql_text("""
-                        UPDATE predictions SET outcome=:o, actual_return=:r, direction=:d, entry_price=COALESCE(entry_price,:ep), evaluation_summary=:s WHERE id=:id
-                    """), {"o": u["outcome"], "r": u["ret"], "d": u["direction"], "ep": u["ep"], "s": u["summary"], "id": u["id"]})
+                        UPDATE predictions SET outcome=:o, actual_return=:r, direction=:d,
+                        entry_price=COALESCE(entry_price,:ep), evaluation_summary=:s,
+                        sp500_return=:spy, alpha=:alp WHERE id=:id
+                    """), {
+                        "o": u["outcome"], "r": u["ret"], "d": u["direction"],
+                        "ep": u["ep"], "s": u["summary"],
+                        "spy": u.get("spy_return"), "alp": u.get("alpha"),
+                        "id": u["id"],
+                    })
                 db.commit()
                 total_scored += len(updates)
             except Exception as e:
@@ -243,6 +258,26 @@ def evaluate_batch(max_tickers: int = 50) -> dict:
         "incorrect": total_incorrect,
         "remaining_tickers": max(remaining, 0),
     }
+
+
+def _calc_spy_return(pred_date, eval_date) -> float | None:
+    """Estimate S&P 500 return over the prediction window.
+    Uses SPY annualized avg of ~10%/year as benchmark since we can't
+    get historical prices on Railway (yfinance blocked, Finnhub candles blocked)."""
+    if not pred_date or not eval_date:
+        return None
+    try:
+        d1 = pred_date.date() if hasattr(pred_date, 'date') else pred_date
+        d2 = eval_date.date() if hasattr(eval_date, 'date') else eval_date
+        days = (d2 - d1).days
+        if days <= 0:
+            return 0.0
+        # SPY ~10% annual = ~0.038% daily (compound)
+        daily_return = 0.00038
+        spy_return = round(((1 + daily_return) ** days - 1) * 100, 2)
+        return spy_return
+    except Exception:
+        return None
 
 
 def _build_summary(ticker, direction, outcome, entry, eval_price, target, ret):
@@ -333,7 +368,7 @@ def _closest_price(prices: dict, target_date) -> float | None:
 
 
 def _update_stats(fids: set):
-    """Update forecaster cached stats. Short DB connection."""
+    """Update forecaster cached stats including alpha. Short DB connection."""
     from database import SessionLocal
     db = SessionLocal()
     updated = 0
@@ -345,11 +380,15 @@ def _update_stats(fids: set):
             correct = db.execute(sql_text(
                 "SELECT COUNT(*) FROM predictions WHERE forecaster_id = :f AND outcome = 'correct'"
             ), {"f": fid}).scalar() or 0
+            avg_alpha = db.execute(sql_text(
+                "SELECT AVG(alpha) FROM predictions WHERE forecaster_id = :f AND alpha IS NOT NULL"
+            ), {"f": fid}).scalar()
             if total > 0:
                 acc = round(correct / total * 100, 1)
+                alp = round(float(avg_alpha), 2) if avg_alpha is not None else 0
                 db.execute(sql_text(
-                    "UPDATE forecasters SET total_predictions=:t, correct_predictions=:c, accuracy_score=:a WHERE id=:f"
-                ), {"t": total, "c": correct, "a": acc, "f": fid})
+                    "UPDATE forecasters SET total_predictions=:t, correct_predictions=:c, accuracy_score=:a, alpha=:alp WHERE id=:f"
+                ), {"t": total, "c": correct, "a": acc, "alp": alp, "f": fid})
                 updated += 1
         db.commit()
         print(f"[HistEval] Updated stats for {updated}/{len(fids)} forecasters")
