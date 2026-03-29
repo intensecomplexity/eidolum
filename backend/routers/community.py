@@ -484,73 +484,73 @@ def get_ticker_consensus(request: Request, ticker: str, db: Session = Depends(ge
 
 # ── GET /api/consensus ───────────────────────────────────────────────────────
 
+import time as _consensus_time
+from sqlalchemy import text as _consensus_text
+
+_consensus_cache = None
+_consensus_cache_time: float = 0
+_CONSENSUS_TTL = 600  # 10 minutes
+
 
 @router.get("/consensus")
 @limiter.limit("30/minute")
 def get_all_consensus(request: Request, db: Session = Depends(get_db)):
-    # Find tickers with 5+ pending predictions
-    ticker_counts = (
-        db.query(UserPrediction.ticker, func.count(UserPrediction.id))
-        .filter(UserPrediction.outcome == "pending")
-        .group_by(UserPrediction.ticker)
-        .having(func.count(UserPrediction.id) >= 5)
-        .all()
-    )
+    global _consensus_cache, _consensus_cache_time
+
+    if _consensus_cache and (_consensus_time.time() - _consensus_cache_time) < _CONSENSUS_TTL:
+        return _consensus_cache
+
+    # Single query across ALL predictions (scraped + community)
+    rows = db.execute(_consensus_text("""
+        SELECT ticker,
+               COUNT(*) as total,
+               SUM(CASE WHEN direction = 'bullish' THEN 1 ELSE 0 END) as bullish,
+               SUM(CASE WHEN direction = 'bearish' THEN 1 ELSE 0 END) as bearish
+        FROM predictions
+        WHERE direction IN ('bullish', 'bearish')
+        GROUP BY ticker
+        HAVING COUNT(*) >= 5
+        ORDER BY COUNT(*) DESC
+        LIMIT 60
+    """)).fetchall()
+
+    # Batch-fetch top forecaster per ticker
+    tickers = [r[0] for r in rows]
+    top_by_ticker = {}
+    if tickers:
+        try:
+            top_rows = db.execute(_consensus_text("""
+                SELECT DISTINCT ON (p.ticker) p.ticker, f.name,
+                       ROUND(CAST(f.accuracy_score AS numeric), 1) as acc
+                FROM predictions p
+                JOIN forecasters f ON f.id = p.forecaster_id
+                WHERE p.ticker = ANY(:tickers)
+                  AND f.accuracy_score IS NOT NULL AND f.total_predictions >= 5
+                ORDER BY p.ticker, f.accuracy_score DESC
+            """), {"tickers": tickers}).fetchall()
+            for r in top_rows:
+                top_by_ticker[r[0]] = {"name": r[1], "accuracy": float(r[2]) if r[2] else None}
+        except Exception:
+            pass  # SQLite doesn't support DISTINCT ON
 
     results = []
-    for ticker, _ in ticker_counts:
-        pending = (
-            db.query(UserPrediction)
-            .filter(UserPrediction.ticker == ticker, UserPrediction.outcome == "pending")
-            .all()
-        )
-        total = len(pending)
-        bullish = sum(1 for p in pending if p.direction == "bullish")
-        bearish = total - bullish
-
-        # Top caller for this ticker
-        scored_on_ticker = (
-            db.query(UserPrediction)
-            .filter(
-                UserPrediction.ticker == ticker,
-                UserPrediction.outcome.in_(["correct", "incorrect"]),
-            )
-            .all()
-        )
-
-        user_stats = defaultdict(lambda: {"correct": 0, "total": 0})
-        for p in scored_on_ticker:
-            user_stats[p.user_id]["total"] += 1
-            if p.outcome == "correct":
-                user_stats[p.user_id]["correct"] += 1
-
-        top_caller = None
-        top_accuracy = 0.0
-        for uid, stats in user_stats.items():
-            if stats["total"] >= 3:
-                acc = round(stats["correct"] / stats["total"] * 100, 1)
-                if acc > top_accuracy:
-                    top_accuracy = acc
-                    top_caller = uid
-
-        top_caller_name = None
-        if top_caller:
-            u = db.query(User).filter(User.id == top_caller).first()
-            if u:
-                top_caller_name = u.username
-
+    for r in rows:
+        ticker, total, bullish, bearish = r[0], r[1], r[2], r[3]
+        bull_pct = round(bullish / total * 100, 1) if total > 0 else 0.0
+        top = top_by_ticker.get(ticker)
         results.append({
             "ticker": ticker,
             "total_predictions": total,
             "bullish_count": bullish,
             "bearish_count": bearish,
-            "bullish_percentage": round(bullish / total * 100, 1) if total > 0 else 0.0,
-            "bearish_percentage": round(bearish / total * 100, 1) if total > 0 else 0.0,
-            "top_caller": top_caller_name,
-            "top_caller_accuracy": top_accuracy if top_caller else None,
+            "bullish_percentage": bull_pct,
+            "bearish_percentage": round(100 - bull_pct, 1),
+            "top_caller": top["name"] if top else None,
+            "top_caller_accuracy": top["accuracy"] if top else None,
         })
 
-    results.sort(key=lambda x: x["total_predictions"], reverse=True)
+    _consensus_cache = results
+    _consensus_cache_time = _consensus_time.time()
     return results
 
 

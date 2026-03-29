@@ -50,10 +50,10 @@ export default function Consensus() {
           )}
         </div>
 
-        {display.length === 0 && (
+        {display.length === 0 && !loading && (
           <div className="text-center py-16">
-            <p className="text-text-secondary">The consensus meter activates with 5 or more active predictions per ticker.</p>
-            <p className="text-muted text-sm mt-1">Start submitting calls.</p>
+            <p className="text-text-secondary">No consensus data available yet.</p>
+            <p className="text-muted text-sm mt-1">Tickers need at least 5 predictions to show consensus.</p>
           </div>
         )}
 
