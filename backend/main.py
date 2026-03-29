@@ -1808,41 +1808,106 @@ def refresh_stats():
     return refresh_all_forecaster_stats()
 
 
+_re_eval_in_progress = False
+
+
+@app.get("/api/admin/re-evaluate-status")
+def re_evaluate_status():
+    """Check if a re-evaluation is in progress."""
+    return {"in_progress": _re_eval_in_progress}
+
+
 @app.post("/api/admin/re-evaluate-all")
 def re_evaluate_all():
-    """Reset all scored predictions to pending and re-run evaluator with fixed logic."""
+    """Re-evaluate all scored predictions in batches — NEVER wipes the leaderboard.
+    Resets 500 predictions at a time, re-evaluates them, then refreshes stats before
+    moving to the next batch. The leaderboard always has some scored predictions."""
     import threading
     from sqlalchemy import text as _t
+    global _re_eval_in_progress
 
-    # Reset scored predictions back to pending
+    if _re_eval_in_progress:
+        return {"status": "already_running"}
+
+    # Count how many need re-evaluation
     db = BgSessionLocal()
     try:
-        count = db.execute(_t(
-            "UPDATE predictions SET outcome='pending', actual_return=NULL WHERE outcome IN ('correct','incorrect')"
-        )).rowcount
-        db.commit()
-        print(f"[ReEval] Reset {count} predictions to pending")
+        total_scored = db.execute(_t(
+            "SELECT COUNT(*) FROM predictions WHERE outcome IN ('correct','incorrect')"
+        )).scalar() or 0
     finally:
         db.close()
 
-    # Trigger background evaluation
+    _re_eval_in_progress = True
+
     def _run():
-        from jobs.historical_evaluator import evaluate_batch, refresh_all_forecaster_stats
-        total = 0
-        while True:
-            result = evaluate_batch(max_tickers=500)
-            scored = result.get('predictions_scored', 0)
-            total += scored
-            print(f"[ReEval] Batch: {scored} scored, total: {total}, remaining: {result.get('remaining_tickers', 0)}")
-            if scored == 0 or result.get('remaining_tickers', 0) == 0:
-                break
-            import time
-            time.sleep(5)
-        refresh_all_forecaster_stats()
-        print(f"[ReEval] Complete: {total} predictions re-evaluated")
+        global _re_eval_in_progress
+        try:
+            from jobs.historical_evaluator import evaluate_batch, refresh_all_forecaster_stats
+            import time as _t_mod
+
+            total_re_scored = 0
+            batch_num = 0
+            BATCH_SIZE = 500
+
+            while True:
+                batch_num += 1
+                db = BgSessionLocal()
+                try:
+                    # Reset only a batch of 500 predictions to pending
+                    reset_ids = db.execute(_t("""
+                        SELECT id FROM predictions
+                        WHERE outcome IN ('correct','incorrect')
+                        ORDER BY id
+                        LIMIT :batch_size
+                    """), {"batch_size": BATCH_SIZE}).fetchall()
+
+                    if not reset_ids:
+                        print(f"[ReEval] No more predictions to re-evaluate")
+                        break
+
+                    ids = [r[0] for r in reset_ids]
+                    db.execute(_t("""
+                        UPDATE predictions
+                        SET outcome='pending', actual_return=NULL, evaluated_at=NULL
+                        WHERE id = ANY(:ids)
+                    """), {"ids": ids})
+                    db.commit()
+                    print(f"[ReEval] Batch {batch_num}: reset {len(ids)} predictions to pending")
+                finally:
+                    db.close()
+
+                # Re-evaluate the batch
+                batch_scored = 0
+                for _ in range(10):  # max 10 sub-batches per reset batch
+                    result = evaluate_batch(max_tickers=500)
+                    scored = result.get('predictions_scored', 0)
+                    batch_scored += scored
+                    if scored == 0 or result.get('remaining_tickers', 0) == 0:
+                        break
+                    _t_mod.sleep(3)
+
+                total_re_scored += batch_scored
+                print(f"[ReEval] Batch {batch_num}: re-scored {batch_scored}, total: {total_re_scored}")
+
+                # Refresh stats after each batch so the leaderboard stays populated
+                refresh_all_forecaster_stats()
+                print(f"[ReEval] Batch {batch_num}: stats refreshed")
+
+                _t_mod.sleep(2)
+
+            # Final stats refresh
+            refresh_all_forecaster_stats()
+            print(f"[ReEval] Complete: {total_re_scored} predictions re-evaluated across {batch_num} batches")
+        except Exception as e:
+            print(f"[ReEval] Error: {e}")
+            import traceback
+            traceback.print_exc()
+        finally:
+            _re_eval_in_progress = False
 
     threading.Thread(target=_run, daemon=True).start()
-    return {"status": "started", "predictions_reset": count}
+    return {"status": "started", "total_to_reevaluate": total_scored}
 
 
 @app.post("/api/admin/reformat-contexts")

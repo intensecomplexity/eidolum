@@ -61,6 +61,7 @@ export default function Leaderboard() {
   const [weekData, setWeekData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('alltime');
+  const [emptyMessage, setEmptyMessage] = useState(null);
   const [sector, setSector] = useState('All');
   const [direction, setDirection] = useState('All');
   const [sectorData, setSectorData] = useState([]);
@@ -74,6 +75,7 @@ export default function Leaderboard() {
 
   useEffect(() => {
     setLoading(true);
+    setEmptyMessage(null);
     const params = {};
     if (activeTab === 'week') params.tab = 'week';
     if (sector !== 'All') params.sector = sector;
@@ -83,14 +85,53 @@ export default function Leaderboard() {
         if (activeTab === 'week' && result && !Array.isArray(result)) {
           setWeekData(result);
           setData(result.scored_this_week || []);
+          setEmptyMessage(null);
+        } else if (result && result.message && result.forecasters) {
+          // Backend returned empty-state dict with message
+          setWeekData(null);
+          setData([]);
+          setEmptyMessage(result.message);
         } else {
           setWeekData(null);
-          setData(Array.isArray(result) ? result : []);
+          const arr = Array.isArray(result) ? result : [];
+          setData(arr);
+          setEmptyMessage(arr.length === 0 ? 'The leaderboard is being updated. Predictions are being scored.' : null);
         }
       })
-      .catch(() => {})
+      .catch(() => {
+        setEmptyMessage('Could not load leaderboard. Retrying...');
+      })
       .finally(() => setLoading(false));
   }, [activeTab, sector, direction]);
+
+  // Auto-retry every 30 seconds when leaderboard is empty
+  useEffect(() => {
+    if (!emptyMessage || loading) return;
+    const timer = setInterval(() => {
+      const params = {};
+      if (activeTab === 'week') params.tab = 'week';
+      if (sector !== 'All') params.sector = sector;
+      if (direction !== 'All') params.direction = direction;
+      getLeaderboard(params)
+        .then(result => {
+          if (activeTab === 'week' && result && !Array.isArray(result) && result.scored_this_week) {
+            setWeekData(result);
+            setData(result.scored_this_week || []);
+            setEmptyMessage(null);
+          } else if (result && result.message && result.forecasters) {
+            // Still empty
+          } else {
+            const arr = Array.isArray(result) ? result : [];
+            if (arr.length > 0) {
+              setData(arr);
+              setEmptyMessage(null);
+            }
+          }
+        })
+        .catch(() => {});
+    }, 30000);
+    return () => clearInterval(timer);
+  }, [emptyMessage, loading, activeTab, sector, direction]);
 
   useEffect(() => {
     if (activeTab === 'sector') {
@@ -226,6 +267,12 @@ export default function Leaderboard() {
             {loading ? (
               <div className="flex items-center justify-center py-20">
                 <div className="w-6 h-6 border-2 border-accent border-t-transparent rounded-full animate-spin" />
+              </div>
+            ) : emptyMessage && activeTab !== 'week' && activeTab !== 'sector' ? (
+              <div className="card text-center py-12">
+                <div className="w-8 h-8 border-2 border-accent border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+                <p className="text-text-secondary text-base mb-2">{emptyMessage}</p>
+                <p className="text-muted text-xs">Auto-refreshing every 30 seconds...</p>
               </div>
             ) : activeTab === 'week' ? (
               <WeekView weekData={weekData} data={data} />

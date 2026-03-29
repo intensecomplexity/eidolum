@@ -231,12 +231,12 @@ def evaluate_batch(max_tickers: int = 200) -> dict:
                     db.execute(sql_text("""
                         UPDATE predictions SET outcome=:o, actual_return=:r, direction=:d,
                         entry_price=COALESCE(entry_price,:ep), evaluation_summary=:s,
-                        sp500_return=:spy, alpha=:alp WHERE id=:id
+                        sp500_return=:spy, alpha=:alp, evaluated_at=:eval_at WHERE id=:id
                     """), {
                         "o": u["outcome"], "r": u["ret"], "d": u["direction"],
                         "ep": u["ep"], "s": u["summary"],
                         "spy": u.get("spy_return"), "alp": u.get("alpha"),
-                        "id": u["id"],
+                        "eval_at": now, "id": u["id"],
                     })
                 db.commit()
                 total_scored += len(updates)
