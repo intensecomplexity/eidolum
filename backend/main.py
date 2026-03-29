@@ -1078,34 +1078,15 @@ async def lifespan(app):
         log_archive_status()
     except Exception:
         pass
-    # One-time data cleanup: remove garbage forecasters, duplicates, benzinga_web junk
+    # Lightweight startup cleanup — only garbage names, NOT heavy dedup queries
     try:
         db = SessionLocal()
         from sqlalchemy import text as _text
-        # Delete predictions from garbage forecasters (name > 50 chars)
         r1 = db.execute(_text("DELETE FROM predictions WHERE forecaster_id IN (SELECT id FROM forecasters WHERE LENGTH(name) > 50)"))
-        # Delete the garbage forecasters themselves
         r2 = db.execute(_text("DELETE FROM forecasters WHERE LENGTH(name) > 50"))
-        # Delete cross-scraper duplicates (keep oldest per ticker+forecaster+direction+date)
-        r3 = db.execute(_text("""
-            DELETE FROM predictions WHERE id IN (
-                SELECT p2.id FROM predictions p1
-                JOIN predictions p2 ON p1.ticker = p2.ticker
-                    AND p1.forecaster_id = p2.forecaster_id
-                    AND p1.direction = p2.direction
-                    AND DATE(p1.prediction_date) = DATE(p2.prediction_date)
-                    AND p1.id < p2.id
-            )
-        """))
-        # Delete forecasters with 0 predictions (empty/orphan entries)
-        r4 = db.execute(_text("""
-            DELETE FROM forecasters WHERE id NOT IN (
-                SELECT DISTINCT forecaster_id FROM predictions WHERE forecaster_id IS NOT NULL
-            )
-        """))
         db.commit()
-        total_cleaned = (r1.rowcount or 0) + (r3.rowcount or 0)
-        print(f"[Startup Cleanup] Removed {r1.rowcount} garbage predictions, {r2.rowcount} garbage forecasters, {r3.rowcount} duplicates, {r4.rowcount} empty forecasters")
+        if (r1.rowcount or 0) + (r2.rowcount or 0) > 0:
+            print(f"[Startup Cleanup] Removed {r1.rowcount} garbage predictions, {r2.rowcount} garbage forecasters")
         db.close()
     except Exception as e:
         print(f"[Startup Cleanup] Error (non-fatal): {e}")
