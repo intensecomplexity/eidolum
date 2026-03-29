@@ -98,6 +98,16 @@ def _refresh_leaderboard(db: Session) -> list:
 
 def _week_leaderboard(db: Session) -> dict:
     """Return predictions SCORED in the last 7 days + new calls submitted this week."""
+    try:
+        return _week_leaderboard_impl(db)
+    except Exception as e:
+        print(f"[WeekLB] Error: {e}")
+        import traceback
+        traceback.print_exc()
+        return {"scored_this_week": [], "new_calls_this_week": [], "error": str(e)}
+
+
+def _week_leaderboard_impl(db: Session) -> dict:
     # Scored this week: group by forecaster
     # Use COALESCE(evaluated_at, evaluation_date) since evaluated_at may be NULL for older predictions
     scored_rows = db.execute(sql_text("""
