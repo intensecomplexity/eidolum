@@ -244,7 +244,7 @@ def _week_leaderboard_impl(db: Session) -> dict:
     scored_list = sorted(scored_map.values(), key=lambda x: (x["correct"] / x["total"] if x["total"] > 0 else 0, x["total"]), reverse=True)
 
     scored_lb = []
-    for i, s in enumerate(scored_list[:30]):
+    for i, s in enumerate(scored_list[:100]):
         acc = round(s["correct"] / s["total"] * 100, 1) if s["total"] > 0 else 0
         scored_lb.append({
             "id": s["id"], "name": s["name"], "handle": s["handle"],
@@ -274,7 +274,7 @@ def _week_leaderboard_impl(db: Session) -> dict:
         WHERE p.prediction_date >= NOW() - INTERVAL '7 days'
         GROUP BY f.id, f.name, f.handle, f.platform, f.accuracy_score
         ORDER BY cnt DESC
-        LIMIT 15
+        LIMIT 100
     """)).fetchall()
 
     # Player predictions submitted this week
@@ -287,7 +287,7 @@ def _week_leaderboard_impl(db: Session) -> dict:
           AND up.deleted_at IS NULL
         GROUP BY u.id, u.username
         ORDER BY cnt DESC
-        LIMIT 15
+        LIMIT 100
     """)).fetchall()
 
     new_calls = []
@@ -314,7 +314,7 @@ def _week_leaderboard_impl(db: Session) -> dict:
 
     new_calls.sort(key=lambda x: x["new_predictions"], reverse=True)
 
-    return {"scored_this_week": scored_lb, "new_calls_this_week": new_calls[:20]}
+    return {"scored_this_week": scored_lb, "new_calls_this_week": new_calls[:100]}
 
 
 @router.get("/leaderboard")
@@ -356,6 +356,7 @@ def get_leaderboard(
                 **stats,
             })
         results.sort(key=lambda x: (x["accuracy_rate"], x.get("alpha", 0)), reverse=True)
+        results = results[:100]
         for i, r in enumerate(results):
             r["rank"] = i + 1
             r["scored_count"] = r.get("evaluated_predictions", 0)

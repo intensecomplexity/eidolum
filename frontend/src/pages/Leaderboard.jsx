@@ -418,6 +418,12 @@ export default function Leaderboard() {
               </>
             )}
 
+            {data.length > 0 && activeTab !== 'sector' && activeTab !== 'week' && (
+              <div className="text-center text-muted text-xs mt-4 font-mono">
+                Showing {data.length} of top 100
+              </div>
+            )}
+
             {activeTab === 'week' && data.length > 0 && (
               <NotificationBanner text="Get weekly leaderboard updates delivered to your inbox every Monday." />
             )}
