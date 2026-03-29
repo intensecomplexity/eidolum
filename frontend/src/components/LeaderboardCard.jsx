@@ -86,11 +86,10 @@ export default function LeaderboardCard({ forecaster: f, metric = 'avg_return' }
             const SHORT = { 'Financial Services': 'Finance', 'Communication Services': 'Comms', 'Consumer Cyclical': 'Consumer', 'Consumer Defensive': 'Staples', 'Basic Materials': 'Materials' };
             const label = SHORT[s.sector] || s.sector;
             const correct = s.count > 0 ? Math.round(s.accuracy * s.count / 100) : 0;
-            const stat = s.accuracy === 0 ? `${correct}/${s.count}` : `${s.accuracy.toFixed(0)}%`;
             return (
               <span key={s.sector} className="inline-block px-2 py-0.5 rounded text-[11px] font-mono font-medium whitespace-nowrap"
                 style={{ backgroundColor: `${color}15`, color, border: `1px solid ${color}30` }}>
-                {label} {stat}
+                {label}: {correct}/{s.count}
               </span>
             );
           })}

@@ -22,13 +22,11 @@ const SHORT_SECTOR = {
 function SectorBadge({ sector, accuracy, count }) {
   const color = accuracy >= 60 ? '#00c896' : accuracy >= 30 ? '#e5a100' : '#ef4444';
   const label = SHORT_SECTOR[sector] || sector;
-  // Show fraction for 0% accuracy (more informative than "0%")
   const correct = count > 0 ? Math.round(accuracy * count / 100) : 0;
-  const stat = accuracy === 0 ? `${correct}/${count}` : `${accuracy.toFixed(0)}%`;
   return (
     <span className="inline-block px-2 py-0.5 rounded text-[11px] font-mono font-medium whitespace-nowrap"
       style={{ backgroundColor: `${color}15`, color, border: `1px solid ${color}30` }}>
-      {label} {stat}
+      {label}: {correct}/{count}
     </span>
   );
 }
