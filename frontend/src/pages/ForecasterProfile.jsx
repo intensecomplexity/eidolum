@@ -121,12 +121,19 @@ export default function ForecasterProfile() {
               </div>
               <div className="flex items-center gap-2 sm:gap-3 text-text-secondary text-sm flex-wrap">
                 <span className="font-mono text-xs sm:text-sm">{data.handle}</span>
-                {data.channel_url && (
+                {data.firm_url ? (
+                  <a href={data.firm_url} target="_blank" rel="noopener noreferrer"
+                     className="inline-flex items-center gap-1 text-warning active:underline min-h-[44px] sm:min-h-0 text-xs font-medium">
+                    {data.firm} <ExternalLink className="w-3 h-3" />
+                  </a>
+                ) : data.firm ? (
+                  <span className="text-muted text-xs">{data.firm}</span>
+                ) : data.channel_url ? (
                   <a href={data.channel_url} target="_blank" rel="noopener noreferrer"
                      className="inline-flex items-center gap-1 text-blue active:underline min-h-[44px] sm:min-h-0">
                     {platformLabel} <ExternalLink className="w-3 h-3" />
                   </a>
-                )}
+                ) : null}
               </div>
               {/* Real stats row */}
               <div className="flex items-center gap-3 text-muted text-xs mt-1.5 flex-wrap">

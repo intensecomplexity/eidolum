@@ -6,6 +6,7 @@ from sqlalchemy import text as sql_text
 from database import get_db
 from models import Forecaster, Prediction, format_timestamp, get_youtube_timestamp_url
 from rate_limit import limiter
+from firm_urls import get_firm_url
 
 router = APIRouter()
 
@@ -65,6 +66,8 @@ def get_forecaster(
         "platform": f.platform or "youtube", "channel_url": f.channel_url,
         "subscriber_count": f.subscriber_count, "profile_image_url": f.profile_image_url,
         "bio": f.bio,
+        "firm": f.firm,
+        "firm_url": get_firm_url(f.firm),
         "streak": {"type": "none", "count": 0},
         "accuracy_rate": float(f.accuracy_score or 0),
         "total_predictions": f.total_predictions or 0,

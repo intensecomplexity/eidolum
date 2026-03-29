@@ -16,6 +16,7 @@ class Forecaster(Base):
     subscriber_count = Column(Integer, default=0)
     profile_image_url = Column(String, nullable=True)
     bio = Column(Text, nullable=True)
+    firm = Column(String, nullable=True)  # e.g. "Goldman Sachs", "UBS" — for institutional analysts
     rank_last_week = Column(Integer, nullable=True)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
 
@@ -220,6 +221,10 @@ class User(Base):
     xp_today = Column(Integer, default=0)
     xp_last_reset = Column(DateTime, nullable=True)
     custom_title = Column(String(50), nullable=True)
+    twitter_url = Column(String(255), nullable=True)
+    linkedin_url = Column(String(255), nullable=True)
+    youtube_url = Column(String(255), nullable=True)
+    website_url = Column(String(255), nullable=True)
     subscription_tier = Column(String(20), default="free")  # "free" | "pro" | "institutional"
     referred_by = Column(Integer, ForeignKey("users.id"), nullable=True)
 

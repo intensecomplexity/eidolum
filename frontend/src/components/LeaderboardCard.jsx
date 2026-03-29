@@ -34,7 +34,11 @@ export default function LeaderboardCard({ forecaster: f, metric = 'avg_return' }
                 <span className="text-warning text-xs" title="Has disclosed personal positions in some predicted stocks">💼</span>
               )}
             </div>
-            <div className="text-muted text-xs font-mono">{f.handle}</div>
+            {f.firm ? (
+              <div className="text-muted text-xs">{f.firm}</div>
+            ) : (
+              <div className="text-muted text-xs font-mono">{f.handle}</div>
+            )}
           </div>
         </div>
         <ChevronRight className="w-5 h-5 text-muted shrink-0 mt-1" />

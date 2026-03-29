@@ -323,7 +323,11 @@ export default function Leaderboard() {
                                     <span className="text-warning text-xs" title="Has disclosed positions">💼</span>
                                   )}
                                 </div>
-                                <div className="text-muted text-xs font-mono">{f.handle}</div>
+                                {f.firm ? (
+                                  <div className="text-muted text-xs">{f.firm}</div>
+                                ) : (
+                                  <div className="text-muted text-xs font-mono">{f.handle}</div>
+                                )}
                               </Link>
                             </td>
                             <td className="px-6 py-4 text-right">

@@ -29,7 +29,8 @@ def _refresh_leaderboard(db: Session) -> list:
             f.subscriber_count, f.profile_image_url, f.streak,
             f.total_predictions, f.correct_predictions, f.accuracy_score,
             COALESCE(f.alpha, 0) as alpha,
-            COALESCE(f.avg_return, 0) as avg_return
+            COALESCE(f.avg_return, 0) as avg_return,
+            f.firm
         FROM forecasters f
         WHERE COALESCE(f.total_predictions, 0) >= 10
           AND COALESCE(f.accuracy_score, 0) > 0
@@ -57,6 +58,7 @@ def _refresh_leaderboard(db: Session) -> list:
             "has_disclosed_positions": False,
             "conflict_count": 0, "conflict_rate": 0,
             "verified_predictions": r[8] or 0,
+            "firm": r[13],
             "sector_strengths": [],
         })
 

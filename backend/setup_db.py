@@ -240,6 +240,56 @@ def setup():
     except Exception as e:
         print(f"[Eidolum] evaluated_at migration: {e}")
 
+    # Add firm column to forecasters if missing + backfill from prediction context
+    try:
+        db = SessionLocal()
+        db.execute(text("ALTER TABLE forecasters ADD COLUMN IF NOT EXISTS firm VARCHAR"))
+        db.commit()
+        print("[Eidolum] Ensured forecasters.firm column exists.")
+        # Backfill firm from prediction context for institutional analysts
+        # Context often contains "Analyst Name at FirmName" or "FirmName analyst..."
+        from models import Forecaster as _F
+        inst = db.query(_F).filter(_F.platform == "institutional", _F.firm.is_(None)).all()
+        KNOWN_FIRMS = [
+            "Goldman Sachs", "JPMorgan", "Morgan Stanley", "Bank of America",
+            "Citi Research", "Citi", "Barclays", "Deutsche Bank", "UBS",
+            "Wells Fargo", "Piper Sandler", "Raymond James", "BMO Capital", "BMO",
+            "RBC Capital", "RBC", "Jefferies", "Oppenheimer", "Needham",
+            "Wedbush", "Stifel", "Canaccord", "B. Riley", "Wolfe Research",
+            "Bernstein", "Cowen", "Evercore", "Mizuho", "HSBC", "Truist",
+            "KeyBanc", "Baird", "Guggenheim", "ARK Invest", "Hindenburg Research",
+            "Citron Research", "Motley Fool",
+        ]
+        backfilled = 0
+        for f in inst:
+            # Check if the forecaster name itself IS a firm
+            for firm in KNOWN_FIRMS:
+                if firm.lower() in (f.name or "").lower():
+                    f.firm = firm
+                    backfilled += 1
+                    break
+            if f.firm:
+                continue
+            # Try parsing from prediction context: "Name at Firm"
+            sample = db.execute(text(
+                "SELECT context FROM predictions WHERE forecaster_id = :fid AND context IS NOT NULL LIMIT 5"
+            ), {"fid": f.id}).fetchall()
+            for row in sample:
+                ctx = row[0] or ""
+                for firm in KNOWN_FIRMS:
+                    if firm.lower() in ctx.lower():
+                        f.firm = firm
+                        backfilled += 1
+                        break
+                if f.firm:
+                    break
+        if backfilled:
+            db.commit()
+            print(f"[Eidolum] Backfilled firm for {backfilled} institutional forecasters.")
+        db.close()
+    except Exception as e:
+        print(f"[Eidolum] firm migration: {e}")
+
     # Always run platform migration
     migrate_platform_types()
 
