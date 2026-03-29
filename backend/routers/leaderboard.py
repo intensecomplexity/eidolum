@@ -14,6 +14,11 @@ _leaderboard_cache: list = []
 _cache_time: float = 0
 CACHE_TTL = 600
 
+# Stats integrity check — runs every 10 minutes
+_integrity_check_time: float = 0
+INTEGRITY_CHECK_TTL = 600
+_last_forecaster_count: int = 0
+
 
 def _refresh_leaderboard(db: Session) -> list:
     """Compute the full leaderboard using a single SQL query."""

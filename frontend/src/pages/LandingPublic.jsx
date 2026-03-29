@@ -1,10 +1,11 @@
 import { useEffect, useState, useRef } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowRight, ChevronDown, TrendingUp, TrendingDown } from 'lucide-react';
+import { ArrowRight, ChevronDown, TrendingUp, TrendingDown, Satellite, Clock, BarChart3, Trophy, Briefcase, Target, Mail, Check } from 'lucide-react';
 import EidolumLogo from '../components/EidolumLogo';
 import RankNumber from '../components/RankNumber';
 import Footer from '../components/Footer';
-import { getLeaderboard, getHomepageStats, getTrendingTickers, getPendingPredictions } from '../api';
+import { useAuth } from '../context/AuthContext';
+import { getLeaderboard, getHomepageStats, getTrendingTickers, getPendingPredictions, subscribeNewsletter } from '../api';
 
 // ── Animated counter ─────────────────────────────────────────────────────────
 function AnimatedNumber({ target, duration = 1500, suffix = '' }) {
@@ -171,15 +172,15 @@ export default function LandingPublic() {
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 mb-8">
           {[
-            { num: '01', icon: '\uD83D\uDCE1', title: 'We Collect Predictions', desc: 'Analyst upgrades, downgrades, and price targets are collected from verified financial sources with timestamps and archived proof.' },
-            { num: '02', icon: '\u23F3', title: 'We Wait for the Deadline', desc: 'Each prediction has a clear evaluation window. Every prediction is tracked — not just the ones that worked out.' },
-            { num: '03', icon: '\uD83D\uDCCA', title: 'We Check the Math', desc: 'When the window closes, we compare the prediction against actual market data. Right or wrong — no gray area.' },
-            { num: '04', icon: '\uD83C\uDFC6', title: 'We Rank by Results', desc: 'Forecasters are ranked by verified accuracy, not followers or reputation.' },
+            { num: '01', Icon: Satellite, title: 'We Collect Predictions', desc: 'Analyst upgrades, downgrades, and price targets are collected from verified financial sources with timestamps and archived proof.' },
+            { num: '02', Icon: Clock, title: 'We Wait for the Deadline', desc: 'Each prediction has a clear evaluation window. Every prediction is tracked — not just the ones that worked out.' },
+            { num: '03', Icon: BarChart3, title: 'We Check the Math', desc: 'When the window closes, we compare the prediction against actual market data. Right or wrong — no gray area.' },
+            { num: '04', Icon: Trophy, title: 'We Rank by Results', desc: 'Forecasters are ranked by verified accuracy, not followers or reputation.' },
           ].map((step, i) => (
             <FadeIn key={step.num} delay={i * 80}>
               <div className="card py-6">
                 <div className="flex items-center gap-2 mb-2">
-                  <span className="text-lg">{step.icon}</span>
+                  <step.Icon className="w-5 h-5 text-accent" />
                   <span className="text-[10px] text-accent font-mono font-bold tracking-widest">{step.num}</span>
                 </div>
                 <h3 className="font-semibold mb-1.5">{step.title}</h3>
@@ -308,21 +309,21 @@ export default function LandingPublic() {
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <FadeIn delay={0}>
             <div className="card py-6 text-center h-full">
-              <div className="text-2xl mb-3">{'\uD83D\uDCB0'}</div>
+              <Briefcase className="w-7 h-7 text-accent mx-auto mb-3" />
               <h3 className="font-semibold mb-2">For Investors</h3>
               <p className="text-sm text-text-secondary leading-relaxed">Stop guessing which analyst to trust. See who's actually right before following their calls.</p>
             </div>
           </FadeIn>
           <FadeIn delay={100}>
             <div className="card py-6 text-center h-full">
-              <div className="text-2xl mb-3">{'\uD83D\uDCCA'}</div>
+              <TrendingUp className="w-7 h-7 text-accent mx-auto mb-3" />
               <h3 className="font-semibold mb-2">For Analysts</h3>
               <p className="text-sm text-text-secondary leading-relaxed">Prove your track record. Let your accuracy speak for itself — not your follower count.</p>
             </div>
           </FadeIn>
           <FadeIn delay={200}>
             <div className="card py-6 text-center h-full">
-              <div className="text-2xl mb-3">{'\u26BD'}</div>
+              <Target className="w-7 h-7 text-accent mx-auto mb-3" />
               <h3 className="font-semibold mb-2">For Everyone</h3>
               <p className="text-sm text-text-secondary leading-relaxed">Like sports stats, but for Wall Street. See who's winning, who's slumping, and who's on fire.</p>
             </div>
@@ -372,19 +373,10 @@ export default function LandingPublic() {
         </div>
       </section>
 
-      {/* ── 9. CTA — STOP GUESSING ────────────────────────────────────── */}
-      <section className="border-t border-border py-16 sm:py-24 text-center">
+      {/* ── 9. NEWSLETTER SIGNUP ─────────────────────────────────────── */}
+      <section className="border-t border-border py-16 sm:py-24">
         <FadeIn>
-          <h2 className="font-bold mb-4" style={{ fontSize: 'clamp(1.8rem, 4vw, 2.6rem)' }}>
-            Stop guessing who to trust
-          </h2>
-          <p className="text-text-secondary mb-8 max-w-lg mx-auto">
-            Track predictions. Verify accuracy. Follow the forecasters who actually get it right.
-          </p>
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
-            <Link to="/leaderboard" className="btn-primary px-8 w-full sm:w-auto">See the Leaderboard</Link>
-            <Link to="/register" className="btn-secondary px-8 w-full sm:w-auto">Start Tracking</Link>
-          </div>
+          <NewsletterSignupSection />
         </FadeIn>
       </section>
 
@@ -412,6 +404,85 @@ export default function LandingPublic() {
     </div>
   );
 }
+
+function NewsletterSignupSection() {
+  const { isAuthenticated, user } = useAuth();
+  const [email, setEmail] = useState('');
+  const [status, setStatus] = useState('idle'); // idle | loading | done | error
+  const [errorMsg, setErrorMsg] = useState('');
+
+  async function handleSubscribe(e) {
+    e?.preventDefault();
+    const subEmail = isAuthenticated ? user?.email : email.trim();
+    if (!subEmail) return;
+    setStatus('loading');
+    try {
+      await subscribeNewsletter(subEmail);
+      setStatus('done');
+    } catch (err) {
+      setStatus('error');
+      setErrorMsg(err.response?.data?.detail || 'Something went wrong');
+    }
+  }
+
+  return (
+    <div className="max-w-2xl mx-auto px-4 sm:px-6 text-center">
+      <Mail className="w-8 h-8 text-accent mx-auto mb-4" />
+      <h2 className="font-bold mb-3" style={{ fontSize: 'clamp(1.8rem, 4vw, 2.6rem)' }}>
+        Get the Weekly Edge
+      </h2>
+      <p className="text-text-secondary mb-6 max-w-lg mx-auto text-sm sm:text-base leading-relaxed">
+        Every Monday: top-performing analysts, biggest calls of the week, and predictions about to expire — straight to your inbox.
+      </p>
+
+      {/* What's inside */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mb-8 max-w-lg mx-auto text-left">
+        {[
+          'Top Movers', 'Biggest Calls', 'Expiring Soon',
+          'Accuracy Spotlight', 'Community Pick', 'Weekly Stats',
+        ].map(item => (
+          <div key={item} className="flex items-center gap-1.5 text-xs text-muted">
+            <Check className="w-3 h-3 text-accent shrink-0" />
+            {item}
+          </div>
+        ))}
+      </div>
+
+      {status === 'done' ? (
+        <div className="card border-accent/30 py-6 max-w-md mx-auto" style={{ background: 'rgba(212,168,67,0.05)' }}>
+          <Check className="w-6 h-6 text-accent mx-auto mb-2" />
+          <p className="text-accent font-medium">Subscribed</p>
+          <p className="text-muted text-xs mt-1">You'll get your first edition next Monday.</p>
+        </div>
+      ) : (
+        <form onSubmit={handleSubscribe} className="flex flex-col sm:flex-row items-center justify-center gap-2 max-w-md mx-auto">
+          {!isAuthenticated && (
+            <input
+              type="email"
+              required
+              value={email}
+              onChange={e => setEmail(e.target.value)}
+              placeholder="you@email.com"
+              className="flex-1 w-full sm:w-auto bg-surface border border-border rounded-lg px-4 py-2.5 text-sm text-text-primary placeholder:text-muted/50 focus:outline-none focus:border-accent/50 font-mono"
+            />
+          )}
+          <button
+            type="submit"
+            disabled={status === 'loading'}
+            className="w-full sm:w-auto px-6 py-2.5 rounded-lg text-sm font-semibold bg-accent text-bg hover:bg-accent/90 transition-colors disabled:opacity-50"
+          >
+            {status === 'loading' ? 'Subscribing...' : isAuthenticated ? 'Subscribe with my account' : 'Subscribe'}
+          </button>
+        </form>
+      )}
+      {status === 'error' && (
+        <p className="text-negative text-xs mt-2">{errorMsg}</p>
+      )}
+      <p className="text-muted/40 text-[10px] mt-3">Free. No spam. Unsubscribe anytime.</p>
+    </div>
+  );
+}
+
 
 function FaqItem({ q, a }) {
   const [open, setOpen] = useState(false);
