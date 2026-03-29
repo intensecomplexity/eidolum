@@ -1103,262 +1103,100 @@ _scheduler = None  # module-level reference for diagnostic endpoints
 @asynccontextmanager
 async def lifespan(app):
     global _scheduler
-    init_db()
-    try:
-        migrate_platform_types()
-    except Exception as e:
-        print(f"[Eidolum] Platform migration error (non-fatal): {e}")
-    try:
-        migrate_profile_urls()
-    except Exception as e:
-        print(f"[Eidolum] Profile URL migration error (non-fatal): {e}")
-    # Log archive capability
-    try:
-        from archiver.screenshot import log_archive_status
-        log_archive_status()
-    except Exception:
-        pass
-    # Lightweight startup cleanup — only garbage names, NOT heavy dedup queries
-    try:
-        db = BgSessionLocal()
-        from sqlalchemy import text as _text
-        r1 = db.execute(_text("DELETE FROM predictions WHERE forecaster_id IN (SELECT id FROM forecasters WHERE LENGTH(name) > 50)"))
-        r2 = db.execute(_text("DELETE FROM forecasters WHERE LENGTH(name) > 50"))
-        db.commit()
-        if (r1.rowcount or 0) + (r2.rowcount or 0) > 0:
-            print(f"[Startup Cleanup] Removed {r1.rowcount} garbage predictions, {r2.rowcount} garbage forecasters")
-        db.close()
-    except Exception as e:
-        print(f"[Startup Cleanup] Error (non-fatal): {e}")
-
-    # Auto-resume backfill in background thread
     import threading
 
-    def _auto_backfill():
-        """Resume backfill from last DB-stored date. Processes 30 days, pauses, repeats."""
-        import time as _t
-        from sqlalchemy import text as _txt
-        while True:
-            dbs = BgSessionLocal()
-            try:
-                last = dbs.execute(_txt("SELECT value FROM config WHERE key = 'backfill_last_date'")).scalar()
-                if not last:
-                    last = "2024-03-28"
-                from datetime import datetime as _dt2, date as _d
-                last_date = _dt2.strptime(last, "%Y-%m-%d").date()
-                today = _d.today()
-                if last_date >= today:
-                    print(f"[AutoBackfill] Caught up to {today}, stopping")
-                    break
-            except Exception as e:
-                print(f"[AutoBackfill] State check error: {e}")
-                break
-            finally:
-                dbs.close()
+    def _startup_all():
+        """ALL DB-touching startup work runs here — completely off the critical path."""
+        import time as _t2
+        _t2.sleep(3)  # Let the app bind its port first
 
-            # Process 30 days
-            try:
-                from jobs.benzinga_backfill import _process_day, _save_progress
-                days_done = 0
-                current = last_date + timedelta(days=1)
-                while current <= today and days_done < 30:
-                    dbs = BgSessionLocal()
-                    try:
-                        day_str = current.strftime("%Y-%m-%d")
-                        inserted, fetched = _process_day(day_str, dbs)
-                        _save_progress(dbs, day_str)
-                        if inserted > 0:
-                            print(f"[AutoBackfill] {day_str}: +{inserted}")
-                    except Exception as e:
-                        print(f"[AutoBackfill] Day {current} error: {e}")
-                    finally:
-                        dbs.close()
-                    current += timedelta(days=1)
-                    days_done += 1
-                    _t.sleep(0.5)
+        # Phase 1: Schema init + migrations
+        try:
+            init_db()
+        except Exception as e:
+            print(f"[Startup] init_db error: {e}")
+        try:
+            migrate_platform_types()
+        except Exception:
+            pass
+        try:
+            migrate_profile_urls()
+        except Exception:
+            pass
+        try:
+            run_phase2_migrations()
+        except Exception:
+            pass
 
-                # Evaluate expired from this chunk
-                try:
-                    from jobs.historical_evaluator import evaluate_batch, refresh_all_forecaster_stats
-                    result = evaluate_batch(max_tickers=100)
-                    if result.get('predictions_scored', 0) > 0:
-                        refresh_all_forecaster_stats()
-                except Exception:
-                    pass
-
-                print(f"[AutoBackfill] Chunk done ({days_done} days). Pausing 10 min...")
-                _t.sleep(600)  # 10 minute pause between chunks
-            except Exception as e:
-                print(f"[AutoBackfill] Chunk error: {e}")
-                _t.sleep(60)
-
-    # DISABLED: auto_backfill was saturating the database and blocking user queries
-    # threading.Thread(target=_auto_backfill, daemon=True).start()
-
-    # Predictions persist between deploys — Layer 3 cleanup handles invalid ones hourly
-    # Seed forecasters (keep existing, add missing)
-    try:
-        db = BgSessionLocal()
-        from jobs.seed_magazines import seed_magazine_forecasters
-        seed_magazine_forecasters(db)
-        db.close()
-    except Exception as e:
-        print(f"[Eidolum] Magazine seed error (non-fatal): {e}")
-    # Merge duplicate forecasters (same firm, different names)
-    try:
-        db = BgSessionLocal()
-        from jobs.news_scraper import merge_duplicate_forecasters
-        merge_duplicate_forecasters(db)
-        db.close()
-    except Exception as e:
-        print(f"[Eidolum] Forecaster merge error (non-fatal): {e}")
-    # Add cached stats columns to forecasters if missing
-    try:
-        from sqlalchemy import text as _t
-        db = BgSessionLocal()
-        for col_sql in [
-            "ALTER TABLE forecasters ADD COLUMN accuracy_score FLOAT",
-            "ALTER TABLE forecasters ADD COLUMN total_predictions INTEGER DEFAULT 0",
-            "ALTER TABLE forecasters ADD COLUMN correct_predictions INTEGER DEFAULT 0",
-            "ALTER TABLE forecasters ADD COLUMN streak INTEGER DEFAULT 0",
-        ]:
-            try:
-                db.execute(_t(col_sql))
-                db.commit()
-            except Exception:
-                db.rollback()
-        db.close()
-    except Exception as e:
-        print(f"[Eidolum] Stats column migration error (non-fatal): {e}")
-    # Run historical import in background thread so server starts immediately
-    import threading
-
-    def run_historical_import_background():
-        import time
-        time.sleep(10)
+        # Seed magazine forecasters
         try:
             db = BgSessionLocal()
-            pred_count = db.query(Prediction).count()
-            print(f"[Eidolum] Background import starting — {pred_count} predictions exist")
-            active_scrapers = []
-            # Finnhub news (primary)
-            try:
-                from jobs.news_scraper import scrape_news_predictions
-                scrape_news_predictions(db)
-                active_scrapers.append("news_scraper")
-            except Exception as e:
-                print(f"[Background] News scraper error: {e}")
-            # Benzinga API
-            try:
-                from jobs.benzinga_scraper import scrape_benzinga_ratings
-                scrape_benzinga_ratings(db)
-                active_scrapers.append("benzinga_api")
-            except Exception as e:
-                print(f"[Background] Benzinga error: {e}")
-            # FMP upgrades
-            try:
-                from jobs.upgrade_scrapers import scrape_fmp_upgrades
-                scrape_fmp_upgrades(db)
-                active_scrapers.append("fmp_upgrades")
-            except Exception as e:
-                print(f"[Background] FMP upgrades error: {e}")
-            # FMP price targets
-            try:
-                from jobs.upgrade_scrapers import scrape_fmp_price_targets
-                scrape_fmp_price_targets(db)
-                active_scrapers.append("fmp_price_targets")
-            except Exception as e:
-                print(f"[Background] FMP price targets error: {e}")
-            # FMP daily grades
-            try:
-                from jobs.upgrade_scrapers import scrape_fmp_daily_grades
-                scrape_fmp_daily_grades(db)
-                active_scrapers.append("fmp_daily_grades")
-            except Exception as e:
-                print(f"[Background] FMP daily grades error: {e}")
-            # Benzinga web scraper — DISABLED (produces garbage data)
-            # try:
-            #     from jobs.benzinga_web_scraper import scrape_benzinga_web
-            #     scrape_benzinga_web(db)
-            #     active_scrapers.append("benzinga_web")
-            # except Exception as e:
-            #     print(f"[Background] Benzinga web error: {e}")
-            # NewsAPI
-            try:
-                from jobs.news_scraper import scrape_newsapi
-                scrape_newsapi(db)
-                active_scrapers.append("newsapi")
-            except Exception as e:
-                print(f"[Background] NewsAPI error: {e}")
-            # yfinance recommendations
-            try:
-                from jobs.rss_scrapers import scrape_yfinance_recommendations
-                scrape_yfinance_recommendations(db)
-                active_scrapers.append("yfinance")
-            except Exception as e:
-                print(f"[Background] yfinance error: {e}")
-            # Layer 3 cleanup
-            try:
-                from jobs.prediction_validator import cleanup_invalid_predictions
-                cleanup_invalid_predictions(db)
-            except Exception as e:
-                print(f"[Background] L3 cleanup error: {e}")
-            pred_count = db.query(Prediction).count()
-            print(f"[Eidolum] Background import complete — {pred_count} predictions. Active: {', '.join(active_scrapers)}")
-            # Evaluate pending predictions
-            try:
-                from jobs.evaluate_predictions import evaluate_all_pending
-                evaluate_all_pending(db)
-            except Exception as e:
-                print(f"[Background] Evaluator error: {e}")
+            from jobs.seed_magazines import seed_magazine_forecasters
+            seed_magazine_forecasters(db)
             db.close()
         except Exception as e:
-            print(f"[Eidolum] Background import error: {e}")
+            print(f"[Startup] Magazine seed error: {e}")
 
-    thread = threading.Thread(target=run_historical_import_background, daemon=True)
-    thread.start()
-    print("[Eidolum] Historical import started in background thread")
-    # Add archive columns if missing
-    try:
-        db = BgSessionLocal()
-        migrate_add_archive_columns(db)
-        db.close()
-    except Exception as e:
-        print(f"[Eidolum] Archive column migration error (non-fatal): {e}")
-    # Phase 2 schema: users, predictions, achievements, follows, duels, seasons
-    try:
-        run_phase2_migrations()
-    except Exception as e:
-        print(f"[Eidolum] Phase 2 migration error (non-fatal): {e}")
-    # Ensure a season exists for the current quarter
-    try:
-        from seasons import ensure_current_season as _ecs
-        _db = BgSessionLocal()
-        _ecs(_db)
-        _db.close()
-    except Exception as e:
-        print(f"[Eidolum] Season init error (non-fatal): {e}")
-    # Ensure daily challenge exists on startup
-    try:
-        from jobs.daily_challenge import ensure_daily_challenge_exists
-        _db = BgSessionLocal()
-        ensure_daily_challenge_exists(_db)
-        _db.close()
-    except Exception as e:
-        print(f"[Eidolum] Daily challenge startup error (non-fatal): {e}")
-    # Safety check — scan for dangerous patterns
-    try:
-        from safety_check import check_safety
-        violations = check_safety()
-        if violations:
-            print(f"[SAFETY WARNING] {len(violations)} dangerous pattern(s) found in codebase:")
-            for v in violations:
-                print(f"  {v['file']}: '{v['pattern']}' — {v['reason']}")
-        else:
-            print("[Eidolum] Safety check passed.")
-    except Exception as e:
-        print(f"[Eidolum] Safety check error (non-fatal): {e}")
-    # Security warning
+        # Merge duplicate forecasters
+        try:
+            db = BgSessionLocal()
+            from jobs.news_scraper import merge_duplicate_forecasters
+            merge_duplicate_forecasters(db)
+            db.close()
+        except Exception as e:
+            print(f"[Startup] Forecaster merge error: {e}")
+
+        # Add cached stats columns if missing
+        try:
+            from sqlalchemy import text as _t
+            db = BgSessionLocal()
+            for col_sql in [
+                "ALTER TABLE forecasters ADD COLUMN accuracy_score FLOAT",
+                "ALTER TABLE forecasters ADD COLUMN total_predictions INTEGER DEFAULT 0",
+                "ALTER TABLE forecasters ADD COLUMN correct_predictions INTEGER DEFAULT 0",
+                "ALTER TABLE forecasters ADD COLUMN streak INTEGER DEFAULT 0",
+            ]:
+                try:
+                    db.execute(_t(col_sql))
+                    db.commit()
+                except Exception:
+                    db.rollback()
+            db.close()
+        except Exception as e:
+            print(f"[Startup] Stats column error: {e}")
+
+        # Archive columns
+        try:
+            db = BgSessionLocal()
+            migrate_add_archive_columns(db)
+            db.close()
+        except Exception as e:
+            print(f"[Startup] Archive column error: {e}")
+
+        # Season init
+        try:
+            from seasons import ensure_current_season as _ecs
+            db = BgSessionLocal()
+            _ecs(db)
+            db.close()
+        except Exception as e:
+            print(f"[Startup] Season init error: {e}")
+
+        # Daily challenge
+        try:
+            from jobs.daily_challenge import ensure_daily_challenge_exists
+            db = BgSessionLocal()
+            ensure_daily_challenge_exists(db)
+            db.close()
+        except Exception as e:
+            print(f"[Startup] Daily challenge error: {e}")
+
+        print("[Startup] All background DB init complete")
+
+    threading.Thread(target=_startup_all, daemon=True).start()
+    print("[Startup] App starting immediately — all DB init deferred to background thread")
+
+    # Security warning (no DB needed)
     if not os.getenv("ADMIN_SECRET"):
         print("[WARNING] ADMIN_SECRET not set — admin routes are unprotected!")
     # Start background job scheduler
@@ -1494,19 +1332,6 @@ async def lifespan(app):
             scrape_benzinga_ratings(db)
         except Exception as e:
             print(f"[Benzinga] Error: {e}")
-        finally:
-            db.close()
-
-    def run_benzinga_web():
-        from datetime import datetime as _dt
-        print(f"[Scheduler] Running Benzinga Web at {_dt.utcnow()}")
-        scheduler_last_run["benzinga_web"] = _dt.utcnow()
-        db = BgSessionLocal()
-        try:
-            from jobs.benzinga_web_scraper import scrape_benzinga_web
-            scrape_benzinga_web(db)
-        except Exception as e:
-            print(f"[BenzingaWeb] Error: {e}")
         finally:
             db.close()
 
