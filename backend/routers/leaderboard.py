@@ -96,7 +96,11 @@ def get_leaderboard(
     if _leaderboard_cache and (_time.time() - _cache_time) < CACHE_TTL:
         return _leaderboard_cache
 
-    _leaderboard_cache = _refresh_leaderboard(db)
+    try:
+        _leaderboard_cache = _refresh_leaderboard(db)
+    except Exception as e:
+        print(f"[Leaderboard] Query failed: {e}")
+        return _leaderboard_cache or []  # Return stale cache or empty
     _cache_time = _time.time()
     return _leaderboard_cache
 
