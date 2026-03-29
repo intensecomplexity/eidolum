@@ -160,16 +160,6 @@ export default function PredictionCard({ prediction: p, showForecaster = false, 
       {/* Platform-specific proof */}
       <ProofBlock p={p} />
 
-      {/* Evaluation date note */}
-      {evalDate && (
-        <div className="text-[10px] text-muted mt-1.5 italic">
-          {p.outcome === 'pending'
-            ? `Evaluates on ${formatDate(evalDate)}`
-            : `Evaluated at ${formatDate(evalDate)} \u2014 the date ${p.time_horizon === 'custom' ? 'specified' : 'defaulted'} at time of prediction`
-          }
-        </div>
-      )}
-
       {/* Conflict detail */}
       {p.has_conflict && p.conflict_note && (
         <div className="flex items-start gap-1.5 mt-2 pt-2 border-t border-border/30">
@@ -178,10 +168,20 @@ export default function PredictionCard({ prediction: p, showForecaster = false, 
         </div>
       )}
 
-      {/* Disclaimer */}
-      <p className="text-muted text-[10px] italic mt-2">
-        Eidolum does not provide investment advice. Verify all positions before acting.
-      </p>
+      {/* Disclaimer + evaluation date — stacked with clear spacing */}
+      <div className="mt-3 pt-2 border-t border-border/20 space-y-1.5">
+        <p className="text-muted text-[10px] italic leading-relaxed">
+          Quote sourced from public statement. Eidolum does not provide investment advice.
+        </p>
+        {evalDate && (
+          <p className="text-muted text-[10px] italic leading-relaxed">
+            {p.outcome === 'pending'
+              ? `⏱ Evaluates on ${formatDate(evalDate)}`
+              : `Evaluated at ${formatDate(evalDate)}`
+            }
+          </p>
+        )}
+      </div>
     </div>
   );
 }
