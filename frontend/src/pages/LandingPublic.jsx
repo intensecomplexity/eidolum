@@ -435,7 +435,7 @@ function NewsletterSignupSection() {
         Get the Weekly Edge
       </h2>
       <p className="text-text-secondary mb-6 max-w-lg mx-auto text-sm sm:text-base leading-relaxed">
-        Every Monday: top-performing analysts, biggest calls of the week, and accuracy spotlights. Straight to your inbox.
+        Every Monday: the best analysts, biggest calls of the week, and accuracy spotlights. Straight to your inbox.
       </p>
 
       {/* What's inside */}
