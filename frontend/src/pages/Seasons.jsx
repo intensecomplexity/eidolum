@@ -6,6 +6,7 @@ import DailyChallengeCard from '../components/DailyChallengeCard';
 import TypeBadge from '../components/TypeBadge';
 import RankNumber from '../components/RankNumber';
 import { getCurrentSeason, getSeasonLeaderboard, getHomepageStats } from '../api';
+import formatRoundNumber from '../utils/formatNumber';
 import { useAuth } from '../context/AuthContext';
 
 
@@ -90,8 +91,8 @@ export default function Seasons() {
             {/* Season activity stats */}
             {stats && (
               <div className="flex gap-4 sm:gap-6 text-xs text-muted mb-4">
-                <span><span className="font-mono text-text-secondary">{stats.verified_predictions?.toLocaleString()}</span> predictions tracked this season</span>
-                <span><span className="font-mono text-text-secondary">{stats.forecasters_tracked?.toLocaleString()}</span> analysts</span>
+                <span><span className="font-mono text-text-secondary">{formatRoundNumber(stats.verified_predictions)}</span> predictions tracked this season</span>
+                <span><span className="font-mono text-text-secondary">{formatRoundNumber(stats.forecasters_tracked)}</span> analysts</span>
               </div>
             )}
 

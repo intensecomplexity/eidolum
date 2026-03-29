@@ -6,6 +6,7 @@ import RankNumber from '../components/RankNumber';
 import Footer from '../components/Footer';
 import { useAuth } from '../context/AuthContext';
 import { getLeaderboard, getHomepageStats, getTrendingTickers, getPendingPredictions, subscribeNewsletter } from '../api';
+import formatRoundNumber from '../utils/formatNumber';
 
 // ── Animated counter ─────────────────────────────────────────────────────────
 function AnimatedNumber({ target, duration = 1500, suffix = '' }) {
@@ -108,8 +109,8 @@ export default function LandingPublic() {
           {/* Trust stat bar */}
           {stats && (
             <div className="mt-6 text-muted text-xs sm:text-sm font-mono">
-              Tracking <span className="text-accent font-semibold">{(stats.total_predictions || 0).toLocaleString()}+</span> predictions
-              {' '}from <span className="text-accent font-semibold">{(stats.forecasters_tracked || 0).toLocaleString()}+</span> analysts since 2024
+              Tracking <span className="text-accent font-semibold">{formatRoundNumber(stats.total_predictions)}</span> predictions
+              {' '}from <span className="text-accent font-semibold">{formatRoundNumber(stats.forecasters_tracked)}</span> analysts since 2024
             </div>
           )}
 
@@ -344,11 +345,11 @@ export default function LandingPublic() {
             <FadeIn>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-6 text-center">
                 <div>
-                  <div className="font-mono text-2xl sm:text-3xl font-bold text-accent"><AnimatedNumber target={stats.total_predictions} suffix="+" /></div>
+                  <div className="font-mono text-2xl sm:text-3xl font-bold text-accent">{formatRoundNumber(stats.total_predictions)}</div>
                   <div className="text-xs text-muted mt-1">Predictions Tracked</div>
                 </div>
                 <div>
-                  <div className="font-mono text-2xl sm:text-3xl font-bold text-text-primary"><AnimatedNumber target={stats.forecasters_tracked} suffix="+" /></div>
+                  <div className="font-mono text-2xl sm:text-3xl font-bold text-text-primary">{formatRoundNumber(stats.forecasters_tracked)}</div>
                   <div className="text-xs text-muted mt-1">Analysts Monitored</div>
                 </div>
                 <div>
