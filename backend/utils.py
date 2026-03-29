@@ -19,7 +19,7 @@ def compute_forecaster_stats(
     )
 
     if sector:
-        query = query.filter(Prediction.sector == sector)
+        query = query.filter(Prediction.sector.ilike(sector))
     if direction:
         query = query.filter(Prediction.direction == direction)
     if period_days:

@@ -70,7 +70,7 @@ def _refresh_leaderboard(db: Session) -> list:
                   AND outcome IN ('correct','incorrect')
                   AND sector IS NOT NULL AND sector != '' AND sector != 'Other'
                 GROUP BY forecaster_id, sector
-                ORDER BY total DESC
+                ORDER BY forecaster_id, total DESC
             """), {"fids": fids}).fetchall()
 
             sector_by_fid = {}
@@ -114,7 +114,8 @@ def get_leaderboard(
         results = []
         for f in forecasters:
             stats = compute_forecaster_stats(f, db, sector=sector, period_days=effective_period, direction=direction)
-            if stats.get("evaluated_predictions", 0) < 10:
+            min_evaluated = 3 if sector else 10
+            if stats.get("evaluated_predictions", 0) < min_evaluated:
                 continue
             results.append({
                 "id": f.id, "name": f.name, "handle": f.handle,
@@ -144,6 +145,71 @@ def get_leaderboard(
     except Exception as e:
         print(f"[Leaderboard] Query error: {e}")
     return _leaderboard_cache or []
+
+
+@router.get("/sectors")
+@limiter.limit("30/minute")
+def get_sectors(request: Request, db: Session = Depends(get_db)):
+    """Return a summary of all sectors for the 'By Sector' tab."""
+    sector_rows = db.execute(sql_text("""
+        SELECT sector, COUNT(*) as total,
+               SUM(CASE WHEN outcome='correct' THEN 1 ELSE 0 END) as correct,
+               SUM(CASE WHEN outcome IN ('correct','incorrect') THEN 1 ELSE 0 END) as evaluated
+        FROM predictions
+        WHERE sector IS NOT NULL AND sector != '' AND sector != 'Other'
+        GROUP BY sector
+        HAVING SUM(CASE WHEN outcome IN ('correct','incorrect') THEN 1 ELSE 0 END) >= 5
+        ORDER BY total DESC
+    """)).fetchall()
+
+    sectors = []
+    sector_names = []
+    for r in sector_rows:
+        accuracy = round(r[2] / r[3] * 100, 1) if r[3] > 0 else 0.0
+        sectors.append({
+            "sector": r[0],
+            "total_predictions": r[1],
+            "evaluated": r[3],
+            "correct": r[2],
+            "accuracy": accuracy,
+            "top_forecasters": [],
+        })
+        sector_names.append(r[0])
+
+    # Fetch top forecasters per sector in a single query
+    if sector_names:
+        forecaster_rows = db.execute(sql_text("""
+            SELECT p.sector, f.id, f.name,
+                   SUM(CASE WHEN p.outcome='correct' THEN 1 ELSE 0 END) as correct,
+                   SUM(CASE WHEN p.outcome IN ('correct','incorrect') THEN 1 ELSE 0 END) as evaluated
+            FROM predictions p
+            JOIN forecasters f ON f.id = p.forecaster_id
+            WHERE p.sector = ANY(:sectors)
+              AND p.outcome IN ('correct','incorrect')
+            GROUP BY p.sector, f.id, f.name
+            HAVING SUM(CASE WHEN p.outcome IN ('correct','incorrect') THEN 1 ELSE 0 END) >= 3
+            ORDER BY p.sector, correct DESC, evaluated DESC
+        """), {"sectors": sector_names}).fetchall()
+
+        # Group by sector and keep top 3
+        top_by_sector = {}
+        for row in forecaster_rows:
+            s = row[0]
+            if s not in top_by_sector:
+                top_by_sector[s] = []
+            if len(top_by_sector[s]) < 3:
+                acc = round(row[3] / row[4] * 100, 1) if row[4] > 0 else 0.0
+                top_by_sector[s].append({
+                    "id": row[1],
+                    "name": row[2],
+                    "accuracy": acc,
+                    "count": row[4],
+                })
+
+        for sector_item in sectors:
+            sector_item["top_forecasters"] = top_by_sector.get(sector_item["sector"], [])
+
+    return sectors
 
 
 @router.get("/pending-predictions")

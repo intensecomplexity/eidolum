@@ -11,8 +11,16 @@ export function getLeaderboard(params = {}) {
   return api.get('/leaderboard', { params }).then(r => r.data);
 }
 
-export function getForecaster(id) {
-  return api.get(`/forecaster/${id}`).then(r => r.data);
+export function getForecaster(id, params = {}) {
+  return api.get(`/forecaster/${id}`, { params }).then(r => r.data);
+}
+
+export function getSectors() {
+  return api.get('/sectors').then(r => r.data);
+}
+
+export function getForecasterSectors(id) {
+  return api.get(`/forecaster/${id}/sectors`).then(r => r.data);
 }
 
 export function getAssetConsensus(ticker, days = 90) {

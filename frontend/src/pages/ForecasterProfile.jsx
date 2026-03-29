@@ -14,7 +14,7 @@ import NotificationBanner from '../components/NotificationBanner';
 import FollowButton from '../components/FollowButton';
 import ViewerCount from '../components/ViewerCount';
 import Footer from '../components/Footer';
-import { getForecaster, getPlatformDetail, getReportCards } from '../api';
+import { getForecaster, getForecasterSectors, getPlatformDetail, getReportCards } from '../api';
 
 export default function ForecasterProfile() {
   const { id } = useParams();
@@ -22,6 +22,8 @@ export default function ForecasterProfile() {
   const [loading, setLoading] = useState(true);
   const [platformInfo, setPlatformInfo] = useState(null);
   const [reportCard, setReportCard] = useState(null);
+  const [activeSector, setActiveSector] = useState('All');
+  const [sectorCounts, setSectorCounts] = useState([]);
   // Map forecaster platform to platformId for routing
   const PLATFORM_ID_MAP = { youtube: 'youtube', x: 'twitter', reddit: 'reddit', congress: 'congress', institutional: 'institutional' };
 
@@ -52,10 +54,25 @@ export default function ForecasterProfile() {
             if (card) setReportCard({ ...card, month: rc.month });
           })
           .catch(() => {});
+        // Fetch sector counts
+        getForecasterSectors(id)
+          .then((r) => {
+            const sc = r.sector_strengths || [];
+            setSectorCounts(sc);
+          })
+          .catch(() => {});
       })
       .catch(() => {})
       .finally(() => setLoading(false));
   }, [id]);
+
+  useEffect(() => {
+    if (!id) return;
+    const params = activeSector !== 'All' ? { sector: activeSector } : {};
+    getForecaster(id, params).then(d => {
+      setData(d);
+    }).catch(() => {});
+  }, [activeSector]);
 
   if (loading) {
     return (
@@ -153,6 +170,35 @@ export default function ForecasterProfile() {
 
           <NotificationBanner text={`Get notified when ${data.name} makes a new prediction.`} forecasterName={data.name} />
         </div>
+
+        {/* Sector filter */}
+        {sectorCounts.length > 0 && (
+          <div className="flex gap-2 overflow-x-auto pills-scroll pb-1 mb-6 sm:mb-8 -mt-2">
+            <button
+              onClick={() => setActiveSector('All')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-colors ${
+                activeSector === 'All'
+                  ? 'bg-accent/10 text-accent border border-accent/20'
+                  : 'bg-surface border border-border text-text-secondary'
+              }`}
+            >
+              All ({data.total_predictions})
+            </button>
+            {sectorCounts.map((s) => (
+              <button
+                key={s.sector}
+                onClick={() => setActiveSector(s.sector)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-colors ${
+                  activeSector === s.sector
+                    ? 'bg-accent/10 text-accent border border-accent/20'
+                    : 'bg-surface border border-border text-text-secondary'
+                }`}
+              >
+                {s.sector} ({s.count})
+              </button>
+            ))}
+          </div>
+        )}
 
         {/* Chart + Sector */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6 mb-6 sm:mb-8">

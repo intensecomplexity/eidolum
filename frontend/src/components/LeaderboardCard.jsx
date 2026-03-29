@@ -62,14 +62,15 @@ export default function LeaderboardCard({ forecaster: f }) {
       {/* Sector tags */}
       {f.sector_strengths?.length > 0 && (
         <div className="flex gap-1.5 flex-wrap mt-3">
-          {f.sector_strengths.slice(0, 3).map((s) => (
-            <span
-              key={s.sector}
-              className="px-2 py-0.5 rounded text-[11px] font-mono bg-surface-2 text-text-secondary border border-border"
-            >
-              {s.sector} {s.accuracy.toFixed(0)}%
-            </span>
-          ))}
+          {f.sector_strengths.slice(0, 2).map((s) => {
+            const color = s.accuracy >= 60 ? '#00c896' : s.accuracy >= 40 ? '#e5a100' : '#ef4444';
+            return (
+              <span key={s.sector} className="px-2 py-0.5 rounded text-[11px] font-mono font-medium"
+                style={{ backgroundColor: `${color}15`, color, border: `1px solid ${color}30` }}>
+                {s.sector.replace('Financial Services', 'Finance').replace('Communication Services', 'Comms').replace('Consumer Cyclical', 'Consumer').replace('Consumer Defensive', 'Staples')} {s.accuracy.toFixed(0)}%
+              </span>
+            );
+          })}
         </div>
       )}
     </Link>
