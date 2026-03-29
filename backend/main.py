@@ -1184,7 +1184,8 @@ async def lifespan(app):
                 print(f"[AutoBackfill] Chunk error: {e}")
                 _t.sleep(60)
 
-    threading.Thread(target=_auto_backfill, daemon=True).start()
+    # DISABLED: auto_backfill was saturating the database and blocking user queries
+    # threading.Thread(target=_auto_backfill, daemon=True).start()
 
     # Predictions persist between deploys — Layer 3 cleanup handles invalid ones hourly
     # Seed forecasters (keep existing, add missing)
@@ -1540,26 +1541,9 @@ async def lifespan(app):
         finally:
             db.close()
 
-        # After scraping, backfill sectors for any new tickers
-        try:
-            from jobs.sector_lookup import backfill_sectors_batch
-            sr = backfill_sectors_batch(max_tickers=30)
-            if sr.get("updated", 0) > 0:
-                print(f"[PostScrape] Mapped sectors for {sr['updated']} tickers")
-        except Exception:
-            pass
-
-        # Then evaluate any expired pending predictions
-        try:
-            from jobs.historical_evaluator import evaluate_batch, refresh_all_forecaster_stats
-            print(f"[PostScrape] Evaluating expired predictions...")
-            result = evaluate_batch(max_tickers=500)
-            scored = result.get('predictions_scored', 0)
-            print(f"[PostScrape] Scored {scored} predictions")
-            if scored > 0:
-                refresh_all_forecaster_stats()
-        except Exception as e:
-            print(f"[PostScrape] Eval error: {e}")
+        # DISABLED: Post-scrape evaluation was overloading the database
+        # Evaluation now runs on a separate schedule (every 4 hours)
+        pass
 
     scheduler.add_job(run_massive_benzinga, "interval", hours=2, id="massive_benzinga", next_run_time=datetime.utcnow() + timedelta(minutes=20))
 
@@ -1704,7 +1688,7 @@ async def lifespan(app):
         except Exception as e:
             print(f"[AutoEval] Error: {e}")
 
-    scheduler.add_job(run_auto_evaluate, "interval", minutes=30, id="auto_evaluate", next_run_time=datetime.utcnow() + timedelta(minutes=3))
+    scheduler.add_job(run_auto_evaluate, "interval", hours=4, id="auto_evaluate", next_run_time=datetime.utcnow() + timedelta(minutes=10))
 
     # Auto-refresh forecaster stats every 2 hours
     def run_refresh_stats():
