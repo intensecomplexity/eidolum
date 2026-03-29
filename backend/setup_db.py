@@ -219,6 +219,27 @@ def setup():
         # Clean fake IDs from freshly seeded data too
         clean_fake_video_ids()
 
+    # Add evaluated_at column to predictions if missing
+    try:
+        db = SessionLocal()
+        db.execute(text("ALTER TABLE predictions ADD COLUMN IF NOT EXISTS evaluated_at TIMESTAMP"))
+        db.commit()
+        print("[Eidolum] Ensured predictions.evaluated_at column exists.")
+        # Backfill: set evaluated_at = evaluation_date for already-scored predictions
+        result = db.execute(text("""
+            UPDATE predictions
+            SET evaluated_at = evaluation_date
+            WHERE outcome IN ('correct', 'incorrect')
+              AND evaluated_at IS NULL
+              AND evaluation_date IS NOT NULL
+        """))
+        db.commit()
+        if result.rowcount > 0:
+            print(f"[Eidolum] Backfilled evaluated_at for {result.rowcount} scored predictions.")
+        db.close()
+    except Exception as e:
+        print(f"[Eidolum] evaluated_at migration: {e}")
+
     # Always run platform migration
     migrate_platform_types()
 

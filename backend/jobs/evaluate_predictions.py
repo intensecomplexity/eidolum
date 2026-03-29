@@ -140,6 +140,7 @@ def evaluate_all_pending(db):
                 p.entry_price = entry
                 p.actual_return = adjusted
                 p.evaluation_date = end_date
+                p.evaluated_at = now
 
                 # Calculate alpha vs S&P 500 benchmark
                 from jobs.historical_evaluator import _calc_spy_return

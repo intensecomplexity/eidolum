@@ -73,7 +73,7 @@ export default function EvidenceCard({ prediction: p, forecaster = null, expanda
         {hasQuote && (
           <>
             <p className="text-text-secondary text-xs italic leading-relaxed truncate">
-              &ldquo;{annotateContext(p.exact_quote.slice(0, 100))}{p.exact_quote.length > 100 ? '...' : ''}&rdquo;
+              &ldquo;{annotateContext(p.exact_quote.slice(0, 100), p.ticker)}{p.exact_quote.length > 100 ? '...' : ''}&rdquo;
             </p>
             <ExplainerLine prediction={p} className="mt-0.5" />
           </>
@@ -126,10 +126,10 @@ export default function EvidenceCard({ prediction: p, forecaster = null, expanda
         <div className="mt-3 bg-warning/[0.06] border-l-[3px] border-warning/60 rounded-r-lg px-4 py-3 relative">
           <span className="absolute top-1 left-2 text-warning/30 text-3xl font-serif leading-none select-none">&ldquo;</span>
           <p className="text-text-primary text-sm italic leading-relaxed pl-4 font-serif">
-            {expanded ? annotateContext(p.exact_quote) : (
+            {expanded ? annotateContext(p.exact_quote, p.ticker) : (
               p.exact_quote.length > 140
-                ? <>{annotateContext(p.exact_quote.slice(0, 140))}...</>
-                : annotateContext(p.exact_quote)
+                ? <>{annotateContext(p.exact_quote.slice(0, 140), p.ticker)}...</>
+                : annotateContext(p.exact_quote, p.ticker)
             )}
           </p>
           {expanded && p.exact_quote.length > 10 && (

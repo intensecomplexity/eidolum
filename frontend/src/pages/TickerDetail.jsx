@@ -199,7 +199,7 @@ function PredictionItem({ p, showOutcome = false }) {
       {/* Context with tooltips */}
       {quoteText && (
         <p className="text-xs text-text-secondary italic leading-relaxed">
-          {annotateContext(quoteText)}
+          {annotateContext(quoteText, p.ticker)}
         </p>
       )}
 

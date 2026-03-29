@@ -161,7 +161,7 @@ export default function PredictionCard({ prediction: p, showForecaster = false, 
       {/* Context with glossary tooltips */}
       {(p.exact_quote || p.context) && (
         <p className="text-xs text-text-secondary italic mt-1.5 leading-relaxed">
-          {annotateContext(p.exact_quote || p.context)}
+          {annotateContext(p.exact_quote || p.context, p.ticker)}
         </p>
       )}
 

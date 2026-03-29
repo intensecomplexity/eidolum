@@ -3,6 +3,7 @@
  * Used by PredictionCard, EvidenceCard, and PredictionRow.
  */
 import React from 'react';
+import { Link } from 'react-router-dom';
 
 // ── Glossary: analyst terms → plain-English tooltips ────────────────────────
 const GLOSSARY = [
@@ -32,7 +33,7 @@ const GLOSSARY = [
  * Wrap glossary terms in the text with tooltip spans.
  * Returns an array of React elements.
  */
-export function annotateContext(text) {
+export function annotateContext(text, ticker = null) {
   if (!text) return null;
 
   // Find all glossary matches with their positions
@@ -41,33 +42,53 @@ export function annotateContext(text) {
     let m;
     const regex = new RegExp(entry.pattern.source, entry.pattern.flags);
     while ((m = regex.exec(text)) !== null) {
-      // Avoid overlapping matches
       const overlaps = matches.some(
         (existing) => m.index < existing.end && m.index + m[0].length > existing.start
       );
       if (!overlaps) {
-        matches.push({ start: m.index, end: m.index + m[0].length, original: m[0], tip: entry.tip });
+        matches.push({ start: m.index, end: m.index + m[0].length, original: m[0], type: 'glossary', tip: entry.tip });
+      }
+    }
+  }
+
+  // Also match the ticker symbol as a link
+  if (ticker) {
+    const tickerRegex = new RegExp(`\\b${ticker}\\b`, 'g');
+    let m;
+    while ((m = tickerRegex.exec(text)) !== null) {
+      const overlaps = matches.some(
+        (existing) => m.index < existing.end && m.index + m[0].length > existing.start
+      );
+      if (!overlaps) {
+        matches.push({ start: m.index, end: m.index + m[0].length, original: m[0], type: 'ticker' });
       }
     }
   }
 
   if (matches.length === 0) return text;
 
-  // Sort by position
   matches.sort((a, b) => a.start - b.start);
 
-  // Build React elements
   const parts = [];
   let cursor = 0;
   for (const match of matches) {
     if (match.start > cursor) {
       parts.push(text.slice(cursor, match.start));
     }
-    parts.push(
-      <span key={match.start} className="glossary-term" data-tip={match.tip}>
-        {match.original}
-      </span>
-    );
+    if (match.type === 'ticker') {
+      parts.push(
+        <Link key={`t${match.start}`} to={`/ticker/${match.original}`}
+          className="font-semibold hover:underline" style={{ color: '#D4A843' }}>
+          {match.original}
+        </Link>
+      );
+    } else {
+      parts.push(
+        <span key={match.start} className="glossary-term" data-tip={match.tip}>
+          {match.original}
+        </span>
+      );
+    }
     cursor = match.end;
   }
   if (cursor < text.length) {
@@ -131,17 +152,27 @@ export function simpleExplainer(prediction) {
 
 /**
  * Render the explainer with styled "In simple terms:" prefix.
- * Returns a React element or null.
+ * Ticker symbols in the body become clickable links to /ticker/{TICKER}.
  */
 export function ExplainerLine({ prediction, className = '' }) {
   const text = simpleExplainer(prediction);
   if (!text) return null;
-  // Split off the "In simple terms: " prefix
+  const ticker = prediction.ticker || '';
   const prefix = 'In simple terms:';
   const body = text.startsWith(prefix) ? text.slice(prefix.length).trim() : text;
+
+  // Split body around the ticker to make it a link
+  let bodyEl = body;
+  if (ticker && body.includes(ticker)) {
+    const idx = body.indexOf(ticker);
+    const before = body.slice(0, idx);
+    const after = body.slice(idx + ticker.length);
+    bodyEl = <>{before}<Link to={`/ticker/${ticker}`} className="font-semibold hover:underline" style={{ color: '#D4A843' }}>{ticker}</Link>{after}</>;
+  }
+
   return (
     <p className={`text-sm leading-relaxed ${className}`} style={{ color: '#D4A843' }}>
-      <span className="font-medium">In simple terms:</span>{' '}{body}
+      <span className="font-medium">In simple terms:</span>{' '}{bodyEl}
     </p>
   );
 }

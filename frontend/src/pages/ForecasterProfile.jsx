@@ -491,7 +491,7 @@ function PredictionRow({ p, forecaster: fc }) {
               borderRadius: '0 6px 6px 0',
               lineHeight: 1.6,
             }}>
-              &ldquo;{annotateContext(quoteText)}&rdquo;
+              &ldquo;{annotateContext(quoteText, p.ticker)}&rdquo;
             </blockquote>
 
             {/* Simple explainer */}

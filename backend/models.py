@@ -103,6 +103,7 @@ class Prediction(Base):
     evaluation_summary = Column(Text, nullable=True)
     archive_url = Column(Text, nullable=True)
     archived_at = Column(DateTime, nullable=True)
+    evaluated_at = Column(DateTime, nullable=True)  # when the system actually scored this prediction
 
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
 
