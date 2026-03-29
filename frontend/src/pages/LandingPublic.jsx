@@ -343,7 +343,7 @@ export default function LandingPublic() {
         <section className="border-y border-border py-12 sm:py-16">
           <div className="max-w-4xl mx-auto px-4 sm:px-6">
             <FadeIn>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-6 text-center">
+              <div className="grid grid-cols-3 gap-6 text-center">
                 <div>
                   <div className="font-mono text-2xl sm:text-3xl font-bold text-accent">{formatRoundNumber(stats.total_predictions)}</div>
                   <div className="text-xs text-muted mt-1">Predictions Tracked</div>
@@ -355,10 +355,6 @@ export default function LandingPublic() {
                 <div>
                   <div className="font-mono text-2xl sm:text-3xl font-bold text-positive">2+</div>
                   <div className="text-xs text-muted mt-1">Years of Data</div>
-                </div>
-                <div>
-                  <div className="font-mono text-2xl sm:text-3xl font-bold text-warning">2h</div>
-                  <div className="text-xs text-muted mt-1">Update Frequency</div>
                 </div>
               </div>
             </FadeIn>
@@ -439,7 +435,7 @@ function NewsletterSignupSection() {
         Get the Weekly Edge
       </h2>
       <p className="text-text-secondary mb-6 max-w-lg mx-auto text-sm sm:text-base leading-relaxed">
-        Every Monday: top-performing analysts, biggest calls of the week, and predictions about to expire — straight to your inbox.
+        Every Monday: top-performing analysts, biggest calls of the week, and accuracy spotlights. Straight to your inbox.
       </p>
 
       {/* What's inside */}
