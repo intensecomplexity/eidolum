@@ -9,20 +9,38 @@ import { annotateContext } from '../utils/predictionExplainer';
 import { getTickerDetail } from '../api';
 
 export default function TickerDetail() {
-  const { symbol } = useParams();
-  const ticker = (symbol || '').toUpperCase();
+  const params = useParams();
+  const ticker = (params.ticker || params.symbol || '').toUpperCase();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
 
   useEffect(() => {
     if (!ticker) return;
     setLoading(true);
-    getTickerDetail(ticker).then(setData).catch(() => {}).finally(() => setLoading(false));
+    setError(false);
+    const timeout = setTimeout(() => {
+      setLoading(false);
+      setError(true);
+    }, 5000);
+    getTickerDetail(ticker)
+      .then(setData)
+      .catch(() => setError(true))
+      .finally(() => { clearTimeout(timeout); setLoading(false); });
+    return () => clearTimeout(timeout);
   }, [ticker]);
 
   if (loading) return (
     <div className="flex items-center justify-center min-h-[60vh]">
       <div className="w-8 h-8 border-2 border-accent border-t-transparent rounded-full animate-spin" />
+    </div>
+  );
+
+  if (error && !data) return (
+    <div className="max-w-5xl mx-auto px-4 py-20 text-center">
+      <p className="text-text-secondary text-lg">Could not load data for {ticker}.</p>
+      <p className="text-muted text-sm mt-1">The request timed out or the ticker was not found.</p>
+      <Link to="/consensus" className="text-accent mt-4 inline-block">Browse all tickers</Link>
     </div>
   );
 
