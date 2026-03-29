@@ -97,10 +97,13 @@ def get_leaderboard(
         return _leaderboard_cache
 
     try:
-        _leaderboard_cache = _refresh_leaderboard(db)
+        import concurrent.futures
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as ex:
+            future = ex.submit(_refresh_leaderboard, db)
+            _leaderboard_cache = future.result(timeout=5)  # 5s hard limit
     except Exception as e:
-        print(f"[Leaderboard] Query failed: {e}")
-        return _leaderboard_cache or []  # Return stale cache or empty
+        print(f"[Leaderboard] Query failed/timeout: {e}")
+        return _leaderboard_cache or []
     _cache_time = _time.time()
     return _leaderboard_cache
 
