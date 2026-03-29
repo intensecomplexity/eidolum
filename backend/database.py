@@ -16,10 +16,10 @@ else:
     engine = create_engine(
         DATABASE_URL,
         connect_args=connect_args,
-        pool_size=3,
-        max_overflow=5,
-        pool_timeout=5,         # Fail fast if no connection
-        pool_recycle=120,        # Recycle connections every 2 min
+        pool_size=5,
+        max_overflow=10,
+        pool_timeout=10,
+        pool_recycle=300,
         pool_pre_ping=True,
     )
 

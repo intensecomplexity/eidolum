@@ -901,10 +901,15 @@ def run_phase2_migrations():
 
     # ── 36. Performance indexes ────────────────────────────────────
     for idx_sql in [
+        "CREATE INDEX IF NOT EXISTS idx_pred_forecaster_id ON predictions(forecaster_id)",
         "CREATE INDEX IF NOT EXISTS idx_pred_forecaster_outcome ON predictions(forecaster_id, outcome)",
+        "CREATE INDEX IF NOT EXISTS idx_pred_ticker ON predictions(ticker)",
         "CREATE INDEX IF NOT EXISTS idx_pred_evaluation_date ON predictions(evaluation_date)",
         "CREATE INDEX IF NOT EXISTS idx_pred_outcome ON predictions(outcome)",
+        "CREATE INDEX IF NOT EXISTS idx_pred_date ON predictions(prediction_date)",
+        "CREATE INDEX IF NOT EXISTS idx_pred_verified ON predictions(verified_by)",
         "CREATE INDEX IF NOT EXISTS idx_forecasters_total ON forecasters(total_predictions)",
+        "CREATE INDEX IF NOT EXISTS idx_forecasters_accuracy ON forecasters(accuracy_score)",
     ]:
         try:
             db.execute(text(idx_sql))

@@ -10,8 +10,8 @@ router = APIRouter()
 
 @router.get("/forecasters")
 @limiter.limit("60/minute")
-def list_forecasters(request: Request, db: Session = Depends(get_db)):
-    forecasters = db.query(Forecaster).order_by(Forecaster.name).all()
+def list_forecasters(request: Request, limit: int = Query(50, ge=1, le=200), db: Session = Depends(get_db)):
+    forecasters = db.query(Forecaster).filter(Forecaster.total_predictions > 0).order_by(Forecaster.name).limit(limit).all()
     return [
         {
             "id": f.id,

@@ -64,8 +64,8 @@ def run_evaluation_background():
 
             print(f"[HistEval] Progress: {_eval_status['tickers_processed']} tickers, {_eval_status['predictions_scored']} scored, {result['remaining_tickers']} remaining")
 
-            # 5 second break between batches — release all connections
-            time.sleep(5)
+            # 10 second break between batches — give user-facing queries priority
+            time.sleep(10)
 
     except Exception as e:
         _eval_status["last_error"] = str(e)
