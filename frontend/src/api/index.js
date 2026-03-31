@@ -384,6 +384,10 @@ export function getUserAccuracyHistory(userId) {
   return api.get(`/users/${userId}/accuracy-history`).then(r => r.data);
 }
 
+export function getUserAccuracyTrend(userId) {
+  return api.get(`/users/${userId}/accuracy-trend`).then(r => r.data);
+}
+
 export function getUserAccuracyByCategory(userId) {
   return api.get(`/users/${userId}/accuracy-by-category`).then(r => r.data);
 }

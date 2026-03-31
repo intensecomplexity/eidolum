@@ -261,19 +261,43 @@ export default function ForecasterProfile() {
         {/* Chart + Sector */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6 mb-6 sm:mb-8">
           <div className="card lg:col-span-2">
-            <h2 className="text-base sm:text-lg font-semibold mb-3 sm:mb-4">Accuracy Over Time</h2>
+            <h2 className="text-base sm:text-lg font-semibold mb-3 sm:mb-4">Accuracy Trend</h2>
             {chartData.length > 0 ? (
-              <ResponsiveContainer width="100%" height={220}>
-                <LineChart data={chartData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#1e2d45" />
-                  <XAxis dataKey="date" tick={{ fill: '#64748b', fontSize: 10 }} tickFormatter={(v) => v.slice(5)} stroke="#1e2d45" />
-                  <YAxis domain={[0, 100]} tick={{ fill: '#64748b', fontSize: 10 }} stroke="#1e2d45" tickFormatter={(v) => `${v}%`} width={35} />
-                  <Tooltip contentStyle={{ backgroundColor: '#0b1120', border: '1px solid #1e2d45', borderRadius: 8, fontSize: 12 }} formatter={(val) => [`${val}%`, 'Accuracy']} />
-                  <Line type="monotone" dataKey="cumulative_accuracy" stroke="#00e5a0" strokeWidth={2} dot={false} />
-                </LineChart>
-              </ResponsiveContainer>
+              <>
+                <ResponsiveContainer width="100%" height={220}>
+                  <LineChart data={chartData} margin={{ top: 5, right: 5, bottom: 5, left: -15 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
+                    <XAxis dataKey="prediction_number" tick={{ fill: '#64748b', fontSize: 10 }} stroke="rgba(255,255,255,0.08)" tickLine={false} />
+                    <YAxis domain={[0, 100]} tick={{ fill: '#64748b', fontSize: 10 }} stroke="rgba(255,255,255,0.08)" tickLine={false} axisLine={false} tickFormatter={(v) => `${v}%`} width={35} />
+                    <Tooltip content={({ active, payload }) => {
+                      if (!active || !payload?.length) return null;
+                      const d = payload[0].payload;
+                      return (
+                        <div className="bg-surface border border-border rounded-lg px-3 py-2 text-xs shadow-lg">
+                          <div className="font-mono text-accent">After {d.total} predictions: {d.cumulative_accuracy}%</div>
+                          <div className="text-muted">{d.correct}/{d.total} correct</div>
+                        </div>
+                      );
+                    }} />
+                    {/* 50% reference line */}
+                    <Line type="monotone" dataKey={() => 50} stroke="rgba(255,255,255,0.1)" strokeWidth={1} strokeDasharray="4 4" dot={false} isAnimationActive={false} />
+                    <Line type="monotone" dataKey="cumulative_accuracy" stroke="#D4A843" strokeWidth={2} dot={{ r: 2.5, fill: '#D4A843', stroke: '#0a0a0a', strokeWidth: 1.5 }} activeDot={{ r: 5 }} />
+                  </LineChart>
+                </ResponsiveContainer>
+                <div className="text-center text-muted text-[10px] mt-1 font-mono">
+                  Based on {chartData[chartData.length - 1]?.total || 0} scored predictions
+                </div>
+              </>
             ) : (
-              <p className="text-muted text-sm">Not enough data yet.</p>
+              <div className="text-center py-8">
+                <p className="text-muted text-sm mb-2">Chart appears after 5 scored predictions</p>
+                <div className="flex items-center justify-center gap-2">
+                  <div className="w-24 h-1.5 bg-surface-2 rounded-full overflow-hidden">
+                    <div className="h-full bg-accent rounded-full" style={{ width: `${Math.min(100, (data.total_predictions || 0) / 5 * 100)}%` }} />
+                  </div>
+                  <span className="text-muted text-xs font-mono">{Math.min(data.total_predictions || 0, 5)}/5</span>
+                </div>
+              </div>
             )}
           </div>
 

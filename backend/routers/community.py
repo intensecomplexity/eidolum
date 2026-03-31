@@ -305,6 +305,48 @@ def user_accuracy_history(request: Request, user_id: int, db: Session = Depends(
     return result
 
 
+# ── GET /api/users/{user_id}/accuracy-trend ──────────────────────────────────
+
+
+@router.get("/users/{user_id}/accuracy-trend")
+@limiter.limit("60/minute")
+def user_accuracy_trend(request: Request, user_id: int, db: Session = Depends(get_db)):
+    """Prediction-by-prediction cumulative accuracy for community players."""
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    scored = (
+        db.query(UserPrediction)
+        .filter(
+            UserPrediction.user_id == user_id,
+            UserPrediction.outcome.in_(["correct", "incorrect"]),
+            UserPrediction.deleted_at.is_(None),
+        )
+        .order_by(func.coalesce(UserPrediction.evaluated_at, UserPrediction.created_at).asc())
+        .all()
+    )
+
+    if len(scored) < 5:
+        return []
+
+    trend = []
+    correct = 0
+    for i, p in enumerate(scored):
+        if p.outcome == "correct":
+            correct += 1
+        total = i + 1
+        if total <= 10 or total % max(1, len(scored) // 50) == 0 or total == len(scored):
+            trend.append({
+                "prediction_number": total,
+                "cumulative_accuracy": round(correct / total * 100, 1),
+                "correct": correct,
+                "total": total,
+            })
+
+    return trend
+
+
 # ── GET /api/users/{user_id}/accuracy-by-category ─────────────────────────────
 
 

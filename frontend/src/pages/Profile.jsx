@@ -9,7 +9,7 @@ import StreakCalendar from '../components/StreakCalendar';
 import AccuracyChart from '../components/AccuracyChart';
 import AccuracyBreakdown from '../components/AccuracyBreakdown';
 import ShareButton from '../components/ShareButton';
-import { getUserProfile, getUserAchievements, getUserPredictions, followUser, unfollowUser, getUserAccuracyHistory, getUserAccuracyByCategory } from '../api';
+import { getUserProfile, getUserAchievements, getUserPredictions, followUser, unfollowUser, getUserAccuracyHistory, getUserAccuracyByCategory, getUserAccuracyTrend } from '../api';
 
 export default function Profile() {
   const navigate = useNavigate();
@@ -36,12 +36,12 @@ export default function Profile() {
       getUserProfile(targetId),
       getUserAchievements(targetId),
       getUserPredictions(targetId),
-      getUserAccuracyHistory(targetId).catch(() => []),
+      getUserAccuracyTrend(targetId).catch(() => []),
       getUserAccuracyByCategory(targetId).catch(() => null),
-    ]).then(([p, b, preds, hist, cats]) => {
+    ]).then(([p, b, preds, trend, cats]) => {
       setProfile(p);
       setBadges(b);
-      setAccuracyHistory(hist);
+      setAccuracyHistory(trend);
       setCategories(cats);
       setPredictions(preds);
       // Set friendship status from profile response

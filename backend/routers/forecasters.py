@@ -14,6 +14,39 @@ _forecaster_cache: dict[int, tuple] = {}
 FORECASTER_CACHE_TTL = 300
 
 
+def _build_accuracy_trend(forecaster_id: int, db: Session) -> list:
+    """Build prediction-by-prediction cumulative accuracy trend."""
+    try:
+        rows = db.execute(sql_text("""
+            SELECT outcome
+            FROM predictions
+            WHERE forecaster_id = :fid AND outcome IN ('correct', 'incorrect')
+            ORDER BY COALESCE(evaluated_at, evaluation_date, prediction_date) ASC
+        """), {"fid": forecaster_id}).fetchall()
+    except Exception:
+        return []
+
+    if len(rows) < 5:
+        return []
+
+    trend = []
+    correct = 0
+    for i, r in enumerate(rows):
+        if r[0] == "correct":
+            correct += 1
+        total = i + 1
+        # Sample every few points to keep payload small
+        if total <= 10 or total % max(1, len(rows) // 50) == 0 or total == len(rows):
+            trend.append({
+                "prediction_number": total,
+                "cumulative_accuracy": round(correct / total * 100, 1),
+                "correct": correct,
+                "total": total,
+            })
+
+    return trend
+
+
 @router.get("/forecasters")
 @limiter.limit("60/minute")
 def list_forecasters(request: Request, limit: int = Query(50, ge=1, le=200), db: Session = Depends(get_db)):
