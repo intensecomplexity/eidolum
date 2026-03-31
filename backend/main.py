@@ -1290,6 +1290,22 @@ async def lifespan(app):
         except Exception as e:
             print(f"[Startup] call_type backfill error: {e}")
 
+        # VACUUM: reclaim dead rows from updates/deletes
+        try:
+            from sqlalchemy import text as _t
+            print("[Startup] Running VACUUM (non-FULL) to reclaim dead rows...")
+            raw_conn = bg_engine.raw_connection()
+            try:
+                raw_conn.set_isolation_level(0)  # AUTOCOMMIT required for VACUUM
+                cur = raw_conn.cursor()
+                cur.execute("VACUUM VERBOSE")
+                cur.close()
+            finally:
+                raw_conn.close()
+            print("[Startup] VACUUM complete")
+        except Exception as e:
+            print(f"[Startup] VACUUM error (non-fatal): {e}")
+
         # Auto-resume Benzinga backfill if not caught up
         if not _JOBS_DISABLED:
             try:
@@ -1862,6 +1878,57 @@ def scraper_health():
             "last_run": scheduler_last_run.get("auto_evaluate", "").isoformat() if scheduler_last_run.get("auto_evaluate") else None,
         },
     }
+
+
+@app.get("/api/admin/db-size")
+def db_size():
+    """Show database size, table sizes, and prediction counts."""
+    from sqlalchemy import text as _text
+    db = BgSessionLocal()
+    try:
+        # Total DB size
+        total = db.execute(_text(
+            "SELECT pg_size_pretty(pg_database_size(current_database()))"
+        )).scalar()
+        total_bytes = db.execute(_text(
+            "SELECT pg_database_size(current_database())"
+        )).scalar()
+
+        # Per-table sizes
+        tables = db.execute(_text("""
+            SELECT relname,
+                   pg_size_pretty(pg_total_relation_size(relname::regclass)) AS total_size,
+                   pg_total_relation_size(relname::regclass) AS size_bytes
+            FROM pg_stat_user_tables
+            ORDER BY pg_total_relation_size(relname::regclass) DESC
+        """)).fetchall()
+        table_sizes = [
+            {"table": r[0], "size": r[1], "bytes": r[2]}
+            for r in tables
+        ]
+
+        # Prediction count
+        pred_count = db.execute(_text("SELECT COUNT(*) FROM predictions")).scalar()
+
+        # Predictions by verified_by (source/scraper)
+        by_source = db.execute(_text(
+            "SELECT COALESCE(verified_by, 'unknown') AS source, COUNT(*) AS cnt "
+            "FROM predictions GROUP BY verified_by ORDER BY cnt DESC"
+        )).fetchall()
+        source_counts = [{"source": r[0], "count": r[1]} for r in by_source]
+
+        return {
+            "total_size": total,
+            "total_bytes": total_bytes,
+            "total_gb": round(total_bytes / (1024**3), 2),
+            "volume_limit_gb": 5.0,
+            "usage_pct": round(total_bytes / (5 * 1024**3) * 100, 1),
+            "tables": table_sizes,
+            "total_predictions": pred_count,
+            "predictions_by_source": source_counts,
+        }
+    finally:
+        db.close()
 
 
 @app.post("/api/admin/backfill-benzinga")
