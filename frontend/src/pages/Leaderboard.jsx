@@ -90,10 +90,20 @@ export default function Leaderboard() {
 
   function buildParams() {
     const params = {};
-    if (activeTab === 'week') params.tab = 'week';
-    else if (activeTab === 'volume') params.sort = 'volume';
-    else if (activeTab === 'alpha') params.sort = 'alpha';
-    else if (activeTab === 'recent') params.sort = 'recent';
+    if (activeTab === 'week') { params.tab = 'week'; return params; }
+
+    // Metric-based sort for standard tabs; volume/recent keep their own sort
+    if (activeTab === 'volume') {
+      params.sort = 'volume';
+    } else if (activeTab === 'recent') {
+      params.sort = 'recent';
+    } else {
+      // alltime, sector, calltype, alpha — sort by selected metric
+      if (metric === 'avg_return') params.sort = 'avg_return';
+      else if (metric === 'alpha') params.sort = 'alpha';
+      // hit_rate → default accuracy sort (no param needed)
+    }
+
     if (activeTab === 'sector' && sector !== 'All') params.sector = sector;
     if (activeTab === 'calltype' && callType !== 'All') params.call_type = callType;
     if (direction !== 'All') params.direction = direction;
@@ -130,7 +140,7 @@ export default function Leaderboard() {
         setEmptyMessage('Could not load leaderboard. Retrying...');
       })
       .finally(() => setLoading(false));
-  }, [activeTab, sector, direction, callType]);
+  }, [activeTab, sector, direction, callType, metric]);
 
   // Auto-retry every 30 seconds when leaderboard is empty
   useEffect(() => {
@@ -149,7 +159,7 @@ export default function Leaderboard() {
         .catch(() => {});
     }, 30000);
     return () => clearInterval(timer);
-  }, [emptyMessage, loading, activeTab, sector, direction, callType]);
+  }, [emptyMessage, loading, activeTab, sector, direction, callType, metric]);
 
   useEffect(() => {
     if (activeTab === 'sector') {
@@ -173,13 +183,14 @@ export default function Leaderboard() {
 
   return (
     <div>
+      <style>{`@keyframes leaderboardFadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }`}</style>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-10">
         <div className="mb-5 sm:mb-8">
           <h1 className="font-bold mb-1 sm:mb-2" style={{ fontSize: 'clamp(24px, 5vw, 36px)' }}>
             Forecaster Leaderboard
           </h1>
           <p className="text-text-secondary text-sm sm:text-base">
-            Ranked by prediction accuracy, verified against real market data.
+            Ranked by {metric === 'avg_return' ? 'average return' : metric === 'alpha' ? 'alpha vs S&P 500' : 'prediction accuracy'}, verified against real market data.
           </p>
         </div>
 
@@ -308,9 +319,11 @@ export default function Leaderboard() {
             ) : (
               <>
                 {/* Mobile: card list */}
-                <div className="sm:hidden space-y-3">
-                  {data.map((f) => (
-                    <LeaderboardCard key={f.id} forecaster={f} metric={metric} />
+                <div className="sm:hidden space-y-3" key={metric}>
+                  {data.map((f, idx) => (
+                    <div key={f.id} style={{ animation: `leaderboardFadeIn 0.3s ease-out ${idx * 0.03}s both` }}>
+                      <LeaderboardCard forecaster={f} metric={metric} />
+                    </div>
                   ))}
                 </div>
 
@@ -327,7 +340,7 @@ export default function Leaderboard() {
                             <div className="relative inline-block" ref={metricRef}>
                               <button
                                 onClick={(e) => { e.stopPropagation(); setMetricOpen(!metricOpen); }}
-                                className="inline-flex items-center gap-1 hover:text-accent transition-colors cursor-pointer"
+                                className="inline-flex items-center gap-1 hover:text-accent transition-colors cursor-pointer text-accent font-semibold"
                               >
                                 {METRICS.find(m => m.key === metric)?.label}
                                 <ChevronDown className={`w-3 h-3 transition-transform ${metricOpen ? 'rotate-180' : ''}`} />
@@ -355,9 +368,10 @@ export default function Leaderboard() {
                           <th className="px-6 py-3 text-center hidden lg:table-cell">Follow</th>
                         </tr>
                       </thead>
-                      <tbody>
-                        {data.map((f) => (
-                          <tr key={f.id} className="border-b border-border/50 hover:bg-surface-2/50 transition-colors cursor-pointer">
+                      <tbody key={metric}>
+                        {data.map((f, idx) => (
+                          <tr key={f.id} className="border-b border-border/50 hover:bg-surface-2/50 transition-colors cursor-pointer"
+                            style={{ animation: `leaderboardFadeIn 0.3s ease-out ${idx * 0.02}s both` }}>
                             <td className="px-6 py-4"><RankBadge rank={f.rank} movement={f.rank_movement} /></td>
                             <td className="px-6 py-4">
                               <Link to={`/forecaster/${f.id}`} className="hover:text-accent transition-colors">

@@ -362,6 +362,8 @@ def _build_filtered_leaderboard(db: Session, sector=None, call_type=None, sort="
         order_sql = "total DESC, accuracy DESC"
     elif sort == "alpha":
         order_sql = "avg_alpha DESC NULLS LAST, accuracy DESC"
+    elif sort == "avg_return":
+        order_sql = "avg_return DESC NULLS LAST, accuracy DESC"
     elif sort == "recent":
         where_clauses.append("COALESCE(p.evaluated_at, p.evaluation_date) >= NOW() - INTERVAL '30 days'")
         where_sql = " AND ".join(where_clauses)
