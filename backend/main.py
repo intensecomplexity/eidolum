@@ -1352,66 +1352,62 @@ async def lifespan(app):
         except Exception as e:
             print(f"[Startup] Admin promote error: {e}")
 
-        # Reclassify predictions to neutral where the target rating is hold/neutral.
-        # This includes: "Downgraded to Hold" (was bearish), "Upgraded to Neutral" (was bullish),
-        # "Maintains Hold", "Maintains Equal-Weight", etc.
+        # Neutral reclassification — runs every startup until neutrals exist
         try:
             from sqlalchemy import text as _rcl_t
             _rcl_db = BgSessionLocal()
-            result = _rcl_db.execute(_rcl_t("""
-                UPDATE predictions
-                SET direction = 'neutral'
-                WHERE direction IN ('bullish', 'bearish')
-                  AND (
-                    -- "Firm: Neutral — ..." pattern from context_formatter
-                    context LIKE '%: Neutral —%'
-                    OR exact_quote LIKE '%: Neutral —%'
-                    -- Downgrades/upgrades TO a neutral rating
-                    OR context ILIKE '%Downgraded to Hold%'
-                    OR context ILIKE '%Downgraded to Neutral%'
-                    OR context ILIKE '%Downgraded to Equal%Weight%'
-                    OR context ILIKE '%Downgraded to Market Perform%'
-                    OR context ILIKE '%Downgraded to Sector Perform%'
-                    OR context ILIKE '%Downgraded to In-Line%'
-                    OR context ILIKE '%Downgraded to Peer Perform%'
-                    OR context ILIKE '%Upgraded to Hold%'
-                    OR context ILIKE '%Upgraded to Neutral%'
-                    OR context ILIKE '%Upgraded to Equal%Weight%'
-                    OR context ILIKE '%Upgraded to Market Perform%'
-                    OR context ILIKE '%Upgraded to Sector Perform%'
-                    -- Maintains/reiterates neutral ratings
-                    OR context ILIKE '%Maintains Hold%'
-                    OR context ILIKE '%Maintains Neutral%'
-                    OR context ILIKE '%Maintains Equal%Weight%'
-                    OR context ILIKE '%Maintains Market Perform%'
-                    OR context ILIKE '%Maintains Sector Perform%'
-                    OR context ILIKE '%Maintains In-Line%'
-                    OR context ILIKE '%Maintains Peer Perform%'
-                    OR context ILIKE '%Maintains Market Weight%'
-                    OR context ILIKE '%Reaffirms Hold%'
-                    OR context ILIKE '%Reaffirms Neutral%'
-                    OR context ILIKE '%Reaffirms Equal%Weight%'
-                    -- Standalone neutral ratings
-                    OR context ILIKE '%Hold rating on%'
-                    OR context ILIKE '%Neutral rating on%'
-                    OR context ILIKE '%Equal%Weight rating on%'
-                    OR context ILIKE '%Market Perform rating on%'
-                    OR context ILIKE '%Sector Perform rating on%'
-                    OR context ILIKE '%In-Line rating on%'
-                    OR context ILIKE '%coverage with Hold%'
-                    OR context ILIKE '%coverage with Neutral%'
-                    OR context ILIKE '%coverage with Equal%Weight%'
-                    OR context ILIKE '%coverage with Market Perform%'
-                  )
-            """))
-            _rcl_db.commit()
-            if result.rowcount > 0:
-                print(f"[Startup] Reclassified {result.rowcount} predictions to neutral")
+            count_before = _rcl_db.execute(_rcl_t(
+                "SELECT COUNT(*) FROM predictions WHERE direction = 'neutral'"
+            )).scalar() or 0
+            print(f"[Startup] Neutral predictions before: {count_before}")
+
+            if count_before < 100:
+                result = _rcl_db.execute(_rcl_t("""
+                    UPDATE predictions SET direction = 'neutral'
+                    WHERE direction != 'neutral' AND (
+                        LOWER(context) LIKE '%maintains hold%'
+                        OR LOWER(context) LIKE '%maintains neutral%'
+                        OR LOWER(context) LIKE '%maintains equal%'
+                        OR LOWER(context) LIKE '%maintains market perform%'
+                        OR LOWER(context) LIKE '%maintains sector perform%'
+                        OR LOWER(context) LIKE '%maintains in-line%'
+                        OR LOWER(context) LIKE '%maintains peer perform%'
+                        OR LOWER(context) LIKE '%reaffirms hold%'
+                        OR LOWER(context) LIKE '%reaffirms neutral%'
+                        OR LOWER(context) LIKE '%reaffirms equal%'
+                        OR LOWER(context) LIKE '%to hold%'
+                        OR LOWER(context) LIKE '%to neutral%'
+                        OR LOWER(context) LIKE '%to equal-weight%'
+                        OR LOWER(context) LIKE '%to equal weight%'
+                        OR LOWER(context) LIKE '%to market perform%'
+                        OR LOWER(context) LIKE '%to sector perform%'
+                        OR LOWER(context) LIKE '%to in-line%'
+                        OR LOWER(context) LIKE '%to peer perform%'
+                        OR LOWER(context) LIKE '%hold rating%'
+                        OR LOWER(context) LIKE '%neutral rating%'
+                        OR LOWER(context) LIKE '%equal-weight rating%'
+                        OR LOWER(context) LIKE '%equal weight rating%'
+                        OR LOWER(context) LIKE '% hold on %'
+                        OR LOWER(context) LIKE '% neutral on %'
+                        OR LOWER(context) LIKE '% equal-weight on %'
+                        OR LOWER(context) LIKE '% market perform on %'
+                        OR LOWER(context) LIKE '%: neutral —%'
+                        OR LOWER(context) LIKE '%coverage with hold%'
+                        OR LOWER(context) LIKE '%coverage with neutral%'
+                        OR LOWER(context) LIKE '%coverage with equal%'
+                        OR LOWER(context) LIKE '%coverage with market perform%'
+                    )
+                """))
+                _rcl_db.commit()
+                count_after = _rcl_db.execute(_rcl_t(
+                    "SELECT COUNT(*) FROM predictions WHERE direction = 'neutral'"
+                )).scalar() or 0
+                print(f"[Startup] Neutral reclassified: {count_after - count_before} new, {count_after} total")
             else:
-                print("[Startup] No predictions to reclassify (all already correct)")
+                print(f"[Startup] Neutral predictions already exist: {count_before}")
             _rcl_db.close()
         except Exception as e:
-            print(f"[Startup] Reclassification error: {e}")
+            print(f"[Startup] Neutral reclassification error: {e}")
 
         # Run migrations (add columns that models.py defines but create_all might miss)
         try:

@@ -104,16 +104,16 @@ def _build_ticker_detail(ticker: str, db) -> dict:
             SELECT
                 COUNT(*) as total_all,
                 SUM(CASE WHEN outcome = 'pending' THEN 1 ELSE 0 END) as pending_count,
-                SUM(CASE WHEN outcome IN ('correct','incorrect') THEN 1 ELSE 0 END) as eval_count,
-                SUM(CASE WHEN outcome = 'correct' THEN 1 ELSE 0 END) as correct_count,
-                SUM(CASE WHEN outcome IN ('correct','incorrect') AND direction='bullish' THEN 1 ELSE 0 END) as bull_eval,
-                SUM(CASE WHEN outcome='correct' AND direction='bullish' THEN 1 ELSE 0 END) as bull_correct,
-                SUM(CASE WHEN outcome IN ('correct','incorrect') AND direction='bearish' THEN 1 ELSE 0 END) as bear_eval,
-                SUM(CASE WHEN outcome='correct' AND direction='bearish' THEN 1 ELSE 0 END) as bear_correct,
+                SUM(CASE WHEN outcome IN ('hit','near','miss','correct','incorrect') THEN 1 ELSE 0 END) as eval_count,
+                SUM(CASE WHEN outcome IN ('hit','correct') THEN 1 ELSE 0 END) as hit_count,
+                SUM(CASE WHEN outcome IN ('hit','near','miss','correct','incorrect') AND direction='bullish' THEN 1 ELSE 0 END) as bull_eval,
+                SUM(CASE WHEN outcome IN ('hit','correct') AND direction='bullish' THEN 1 ELSE 0 END) as bull_hit,
+                SUM(CASE WHEN outcome IN ('hit','near','miss','correct','incorrect') AND direction='bearish' THEN 1 ELSE 0 END) as bear_eval,
+                SUM(CASE WHEN outcome IN ('hit','correct') AND direction='bearish' THEN 1 ELSE 0 END) as bear_hit,
                 AVG(CASE WHEN target_price IS NOT NULL THEN target_price END) as avg_target,
-                SUM(CASE WHEN direction='bullish' THEN 1 ELSE 0 END) as all_bullish,
-                SUM(CASE WHEN direction='bearish' THEN 1 ELSE 0 END) as all_bearish,
-                SUM(CASE WHEN direction='neutral' THEN 1 ELSE 0 END) as all_neutral
+                SUM(CASE WHEN outcome = 'near' THEN 1 ELSE 0 END) as near_count,
+                SUM(CASE WHEN outcome = 'near' AND direction='bullish' THEN 1 ELSE 0 END) as bull_near,
+                SUM(CASE WHEN outcome = 'near' AND direction='bearish' THEN 1 ELSE 0 END) as bear_near
             FROM predictions WHERE ticker = :t
         """), {"t": ticker}).first()
     except Exception as e:
@@ -123,9 +123,9 @@ def _build_ticker_detail(ticker: str, db) -> dict:
 
     total_all = (counts_row[0] or 0) if counts_row else 0
     hist_total = (counts_row[2] or 0) if counts_row else 0
-    hist_correct = (counts_row[3] or 0) if counts_row else 0
+    hist_hits = (counts_row[3] or 0) if counts_row else 0
     hist_bull_total = (counts_row[4] or 0) if counts_row else 0
-    hist_bull_correct = (counts_row[5] or 0) if counts_row else 0
+    hist_bull_hits = (counts_row[5] or 0) if counts_row else 0
     hist_bear_total = (counts_row[6] or 0) if counts_row else 0
     hist_bear_correct = (counts_row[7] or 0) if counts_row else 0
     hist_avg_target = round(float(counts_row[8]), 2) if counts_row and counts_row[8] else None
@@ -310,13 +310,17 @@ def get_asset_consensus(
             "total_predictions": 0,
             "bullish_count": 0,
             "bearish_count": 0,
+            "neutral_count": 0,
             "bullish_pct": 0.0,
+            "bearish_pct": 0.0,
+            "neutral_pct": 0.0,
             "recent_predictions": [],
             "top_accurate_forecasters": [],
         }
 
     bull = [p for p in predictions if p.direction == "bullish"]
     bear = [p for p in predictions if p.direction == "bearish"]
+    neutral = [p for p in predictions if p.direction == "neutral"]
     total = len(predictions)
 
     # Enrich with forecaster info
@@ -389,7 +393,10 @@ def get_asset_consensus(
         "total_predictions": total,
         "bullish_count": len(bull),
         "bearish_count": len(bear),
+        "neutral_count": len(neutral),
         "bullish_pct": round(len(bull) / total * 100, 1) if total else 0.0,
+        "bearish_pct": round(len(bear) / total * 100, 1) if total else 0.0,
+        "neutral_pct": round(len(neutral) / total * 100, 1) if total else 0.0,
         "recent_predictions": recent,
         "top_accurate_forecasters": top[:5],
     }
