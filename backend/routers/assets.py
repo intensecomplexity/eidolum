@@ -42,7 +42,8 @@ def _empty_ticker_result(ticker: str, company_name: str = None) -> dict:
 @router.get("/ticker/{ticker}/detail")
 @limiter.limit("60/minute")
 def get_ticker_detail(request: Request, ticker: str, db: Session = Depends(get_db)):
-    """Full ticker detail page data: current consensus, historical track record, predictions."""
+    """Full ticker detail page data: current consensus, historical track record, predictions.
+    Pure DB queries only — no external API calls. Wrapped in try/except for resilience."""
     ticker = ticker.upper().strip()
     if not ticker or len(ticker) > 10:
         return _empty_ticker_result(ticker)
@@ -51,24 +52,35 @@ def get_ticker_detail(request: Request, ticker: str, db: Session = Depends(get_d
     if cached and (_time.time() - cached[1]) < _TICKER_TTL:
         return cached[0]
 
+    try:
+        return _build_ticker_detail(ticker, db)
+    except Exception as e:
+        print(f"[TickerDetail] Error for {ticker}: {e}")
+        from ticker_lookup import TICKER_INFO
+        return _empty_ticker_result(ticker, TICKER_INFO.get(ticker))
+
+
+def _build_ticker_detail(ticker: str, db) -> dict:
     from datetime import datetime
 
-    # Quick check: does this ticker have ANY predictions?
+    # Set statement timeout (5s) for PostgreSQL
     try:
-        exists = db.execute(sql_text(
-            "SELECT 1 FROM predictions WHERE ticker = :t LIMIT 1"
-        ), {"t": ticker}).first()
+        db.execute(sql_text("SET LOCAL statement_timeout = '5000'"))
     except Exception:
-        exists = None
+        pass  # SQLite doesn't support this
+
+    # Quick check: does this ticker have ANY predictions?
+    exists = db.execute(sql_text(
+        "SELECT 1 FROM predictions WHERE ticker = :t LIMIT 1"
+    ), {"t": ticker}).first()
 
     if not exists:
-        # No predictions — return immediately without heavy queries
         from ticker_lookup import TICKER_INFO
         result = _empty_ticker_result(ticker, TICKER_INFO.get(ticker))
         _ticker_cache[ticker] = (result, _time.time())
         return result
 
-    # ── Sector + company name ─────────────────────────────────────────────
+    # ── Sector + company name (from DB only, no external calls) ──────────
     sector = None
     company_name = None
     industry = None
@@ -93,89 +105,32 @@ def get_ticker_detail(request: Request, ticker: str, db: Session = Depends(get_d
         from ticker_lookup import TICKER_INFO
         company_name = TICKER_INFO.get(ticker)
 
-    # ── Pending predictions with forecaster details ───────────────────────
-    pending_rows = db.execute(sql_text("""
-        SELECT p.id, p.direction, p.target_price, p.entry_price,
-               p.prediction_date, p.evaluation_date, p.window_days,
-               p.context, p.exact_quote, p.source_url,
-               f.id, f.name, f.handle, f.accuracy_score, f.firm
-        FROM predictions p
-        JOIN forecasters f ON f.id = p.forecaster_id
-        WHERE p.ticker = :t AND p.outcome = 'pending'
-        ORDER BY p.evaluation_date ASC NULLS LAST
-        LIMIT 50
-    """), {"t": ticker}).fetchall()
+    # ── Combined counts query (one round-trip instead of two) ────────────
+    try:
+        counts_row = db.execute(sql_text("""
+            SELECT
+                COUNT(*) as total_all,
+                SUM(CASE WHEN outcome = 'pending' THEN 1 ELSE 0 END) as pending_count,
+                SUM(CASE WHEN outcome IN ('correct','incorrect') THEN 1 ELSE 0 END) as eval_count,
+                SUM(CASE WHEN outcome = 'correct' THEN 1 ELSE 0 END) as correct_count,
+                SUM(CASE WHEN outcome IN ('correct','incorrect') AND direction='bullish' THEN 1 ELSE 0 END) as bull_eval,
+                SUM(CASE WHEN outcome='correct' AND direction='bullish' THEN 1 ELSE 0 END) as bull_correct,
+                SUM(CASE WHEN outcome IN ('correct','incorrect') AND direction='bearish' THEN 1 ELSE 0 END) as bear_eval,
+                SUM(CASE WHEN outcome='correct' AND direction='bearish' THEN 1 ELSE 0 END) as bear_correct,
+                AVG(CASE WHEN outcome IN ('correct','incorrect') AND target_price IS NOT NULL THEN target_price END) as avg_target
+            FROM predictions WHERE ticker = :t
+        """), {"t": ticker}).first()
+    except Exception:
+        counts_row = None
 
-    pending = []
-    bulls = []
-    bears = []
-    for r in pending_rows:
-        eval_date = r[5]
-        pred_date = r[4]
-        days_rem = None
-        if eval_date:
-            days_rem = max(0, (eval_date - datetime.utcnow()).days)
-        acc = round(float(r[13]), 1) if r[13] else 0
-        target = float(r[2]) if r[2] else None
-        pred = {
-            "id": r[0], "direction": r[1], "target_price": target,
-            "entry_price": float(r[3]) if r[3] else None,
-            "prediction_date": pred_date.isoformat() if pred_date else None,
-            "evaluation_date": eval_date.isoformat() if eval_date else None,
-            "window_days": r[6], "context": r[7], "exact_quote": r[8],
-            "source_url": r[9], "days_remaining": days_rem, "ticker": ticker,
-            "outcome": "pending",
-            "forecaster": {"id": r[10], "name": r[11], "handle": r[12],
-                           "accuracy_rate": acc, "firm": r[14] or None},
-        }
-        pending.append(pred)
-
-        entry = {"forecaster_id": r[10], "name": r[11], "firm": r[14] or None,
-                 "accuracy": acc, "target": target}
-        if r[1] == "bullish":
-            bulls.append(entry)
-        else:
-            bears.append(entry)
-
-    # Sort by accuracy descending within each group
-    bulls.sort(key=lambda x: x["accuracy"], reverse=True)
-    bears.sort(key=lambda x: x["accuracy"], reverse=True)
-
-    pending_total = len(pending)
-    pending_bullish = len(bulls)
-    pending_bearish = len(bears)
-
-    current_consensus = {
-        "total": pending_total,
-        "bullish_count": pending_bullish,
-        "bearish_count": pending_bearish,
-        "bullish_pct": round(pending_bullish / pending_total * 100, 1) if pending_total > 0 else 0,
-        "bearish_pct": round(pending_bearish / pending_total * 100, 1) if pending_total > 0 else 0,
-        "bulls": bulls,
-        "bears": bears,
-    }
-
-    # ── Historical (evaluated predictions) ────────────────────────────────
-    hist_row = db.execute(sql_text("""
-        SELECT
-            COUNT(*) as total,
-            SUM(CASE WHEN outcome='correct' THEN 1 ELSE 0 END) as correct,
-            SUM(CASE WHEN direction='bullish' THEN 1 ELSE 0 END) as bull_total,
-            SUM(CASE WHEN direction='bullish' AND outcome='correct' THEN 1 ELSE 0 END) as bull_correct,
-            SUM(CASE WHEN direction='bearish' THEN 1 ELSE 0 END) as bear_total,
-            SUM(CASE WHEN direction='bearish' AND outcome='correct' THEN 1 ELSE 0 END) as bear_correct,
-            AVG(CASE WHEN target_price IS NOT NULL THEN target_price END) as avg_target
-        FROM predictions
-        WHERE ticker = :t AND outcome IN ('correct', 'incorrect')
-    """), {"t": ticker}).first()
-
-    hist_total = hist_row[0] or 0
-    hist_correct = hist_row[1] or 0
-    hist_bull_total = hist_row[2] or 0
-    hist_bull_correct = hist_row[3] or 0
-    hist_bear_total = hist_row[4] or 0
-    hist_bear_correct = hist_row[5] or 0
-    hist_avg_target = round(float(hist_row[6]), 2) if hist_row[6] else None
+    total_all = (counts_row[0] or 0) if counts_row else 0
+    hist_total = (counts_row[2] or 0) if counts_row else 0
+    hist_correct = (counts_row[3] or 0) if counts_row else 0
+    hist_bull_total = (counts_row[4] or 0) if counts_row else 0
+    hist_bull_correct = (counts_row[5] or 0) if counts_row else 0
+    hist_bear_total = (counts_row[6] or 0) if counts_row else 0
+    hist_bear_correct = (counts_row[7] or 0) if counts_row else 0
+    hist_avg_target = round(float(counts_row[8]), 2) if counts_row and counts_row[8] else None
 
     historical = {
         "total_evaluated": hist_total,
@@ -190,39 +145,96 @@ def get_ticker_detail(request: Request, ticker: str, db: Session = Depends(get_d
         "avg_target": hist_avg_target,
     }
 
-    # ── Total count across all predictions ────────────────────────────────
-    total_all = db.execute(sql_text(
-        "SELECT COUNT(*) FROM predictions WHERE ticker = :t"
-    ), {"t": ticker}).scalar() or 0
+    # ── Pending predictions with forecaster details ───────────────────────
+    pending = []
+    bulls = []
+    bears = []
+    try:
+        pending_rows = db.execute(sql_text("""
+            SELECT p.id, p.direction, p.target_price, p.entry_price,
+                   p.prediction_date, p.evaluation_date, p.window_days,
+                   p.context, p.exact_quote, p.source_url,
+                   f.id, f.name, f.handle, f.accuracy_score, f.firm
+            FROM predictions p
+            JOIN forecasters f ON f.id = p.forecaster_id
+            WHERE p.ticker = :t AND p.outcome = 'pending'
+            ORDER BY p.evaluation_date ASC NULLS LAST
+            LIMIT 50
+        """), {"t": ticker}).fetchall()
+
+        now = datetime.utcnow()
+        for r in pending_rows:
+            eval_date = r[5]
+            pred_date = r[4]
+            days_rem = max(0, (eval_date - now).days) if eval_date else None
+            acc = round(float(r[13]), 1) if r[13] else 0
+            target = float(r[2]) if r[2] else None
+            pred = {
+                "id": r[0], "direction": r[1], "target_price": target,
+                "entry_price": float(r[3]) if r[3] else None,
+                "prediction_date": pred_date.isoformat() if pred_date else None,
+                "evaluation_date": eval_date.isoformat() if eval_date else None,
+                "window_days": r[6], "context": r[7], "exact_quote": r[8],
+                "source_url": r[9], "days_remaining": days_rem, "ticker": ticker,
+                "outcome": "pending",
+                "forecaster": {"id": r[10], "name": r[11], "handle": r[12],
+                               "accuracy_rate": acc, "firm": r[14] or None},
+            }
+            pending.append(pred)
+            entry = {"forecaster_id": r[10], "name": r[11], "firm": r[14] or None,
+                     "accuracy": acc, "target": target}
+            if r[1] == "bullish":
+                bulls.append(entry)
+            else:
+                bears.append(entry)
+    except Exception as e:
+        print(f"[TickerDetail] Pending query failed for {ticker}: {e}")
+
+    bulls.sort(key=lambda x: x["accuracy"], reverse=True)
+    bears.sort(key=lambda x: x["accuracy"], reverse=True)
+
+    pending_total = len(pending)
+    current_consensus = {
+        "total": pending_total,
+        "bullish_count": len(bulls),
+        "bearish_count": len(bears),
+        "bullish_pct": round(len(bulls) / pending_total * 100, 1) if pending_total > 0 else 0,
+        "bearish_pct": round(len(bears) / pending_total * 100, 1) if pending_total > 0 else 0,
+        "bulls": bulls,
+        "bears": bears,
+    }
 
     # ── Recent evaluated (last 15) ────────────────────────────────────────
-    scored_rows = db.execute(sql_text("""
-        SELECT p.id, p.direction, p.target_price, p.entry_price,
-               p.prediction_date, p.evaluation_date, p.outcome, p.actual_return,
-               p.context, p.exact_quote,
-               f.id, f.name, f.handle, f.accuracy_score, f.firm
-        FROM predictions p
-        JOIN forecasters f ON f.id = p.forecaster_id
-        WHERE p.ticker = :t AND p.outcome IN ('correct','incorrect')
-        ORDER BY p.evaluation_date DESC NULLS LAST
-        LIMIT 15
-    """), {"t": ticker}).fetchall()
-
     recent_scored = []
-    for r in scored_rows:
-        recent_scored.append({
-            "id": r[0], "direction": r[1], "target_price": float(r[2]) if r[2] else None,
-            "entry_price": float(r[3]) if r[3] else None,
-            "prediction_date": r[4].isoformat() if r[4] else None,
-            "evaluation_date": r[5].isoformat() if r[5] else None,
-            "outcome": r[6], "actual_return": float(r[7]) if r[7] is not None else None,
-            "context": r[8], "exact_quote": r[9], "ticker": ticker,
-            "forecaster": {"id": r[10], "name": r[11], "handle": r[12],
-                           "accuracy_rate": float(r[13]) if r[13] else 0,
-                           "firm": r[14] or None},
-        })
+    try:
+        scored_rows = db.execute(sql_text("""
+            SELECT p.id, p.direction, p.target_price, p.entry_price,
+                   p.prediction_date, p.evaluation_date, p.outcome, p.actual_return,
+                   p.context, p.exact_quote,
+                   f.id, f.name, f.handle, f.accuracy_score, f.firm
+            FROM predictions p
+            JOIN forecasters f ON f.id = p.forecaster_id
+            WHERE p.ticker = :t AND p.outcome IN ('correct','incorrect')
+            ORDER BY p.evaluation_date DESC NULLS LAST
+            LIMIT 15
+        """), {"t": ticker}).fetchall()
 
-    # ── Top forecaster on this ticker ─────────────────────────────────────
+        for r in scored_rows:
+            recent_scored.append({
+                "id": r[0], "direction": r[1], "target_price": float(r[2]) if r[2] else None,
+                "entry_price": float(r[3]) if r[3] else None,
+                "prediction_date": r[4].isoformat() if r[4] else None,
+                "evaluation_date": r[5].isoformat() if r[5] else None,
+                "outcome": r[6], "actual_return": float(r[7]) if r[7] is not None else None,
+                "context": r[8], "exact_quote": r[9], "ticker": ticker,
+                "forecaster": {"id": r[10], "name": r[11], "handle": r[12],
+                               "accuracy_rate": float(r[13]) if r[13] else 0,
+                               "firm": r[14] or None},
+            })
+    except Exception as e:
+        print(f"[TickerDetail] Scored query failed for {ticker}: {e}")
+
+    # ── Top forecaster on this ticker (simplified, no ::numeric cast) ────
     top_fc = None
     try:
         top_row = db.execute(sql_text("""
@@ -232,7 +244,7 @@ def get_ticker_detail(request: Request, ticker: str, db: Session = Depends(get_d
             FROM predictions p JOIN forecasters f ON f.id = p.forecaster_id
             WHERE p.ticker = :t AND p.outcome IN ('correct','incorrect')
             GROUP BY f.id, f.name HAVING COUNT(*) >= 2
-            ORDER BY ROUND(SUM(CASE WHEN p.outcome='correct' THEN 1 ELSE 0 END)::numeric / COUNT(*) * 100, 1) DESC
+            ORDER BY SUM(CASE WHEN p.outcome='correct' THEN 1 ELSE 0 END) * 1.0 / COUNT(*) DESC
             LIMIT 1
         """), {"t": ticker}).first()
         if top_row:
