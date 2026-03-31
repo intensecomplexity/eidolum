@@ -7,7 +7,25 @@ const api = axios.create({
   baseURL: `${API_BASE}/api`,
 });
 
+// Simple response cache to prevent re-fetches on navigation (2 min TTL)
+const _responseCache = {};
+function cachedGet(url, ttlMs = 120000) {
+  const now = Date.now();
+  const entry = _responseCache[url];
+  if (entry && (now - entry.time) < ttlMs) {
+    return Promise.resolve({ data: entry.data });
+  }
+  return api.get(url).then(r => {
+    _responseCache[url] = { data: r.data, time: now };
+    return r;
+  });
+}
+
 export function getLeaderboard(params = {}) {
+  // Cache default leaderboard (no filters) for 2 minutes
+  if (Object.keys(params).length === 0) {
+    return cachedGet('/leaderboard').then(r => r.data);
+  }
   return api.get('/leaderboard', { params }).then(r => r.data);
 }
 
@@ -44,7 +62,7 @@ export function getHomepageStats() {
 }
 
 export function getHomepageData() {
-  return api.get('/homepage-data').then(r => r.data);
+  return cachedGet('/homepage-data').then(r => r.data);
 }
 
 export function getTrendingTickers() {
