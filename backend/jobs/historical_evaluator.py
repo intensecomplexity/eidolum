@@ -167,10 +167,10 @@ def evaluate_batch(max_tickers: int = 200) -> dict:
 
             ref = p["entry_price"]
             if not ref or ref <= 0:
-                ref = _closest_price(prices, p["prediction_date"])
-                if not ref or ref <= 0:
-                    skipped_no_ref += 1
-                    continue
+                # Without a stored entry_price, we can't calculate accurate returns
+                # (_closest_price only has the current quote, not historical data)
+                skipped_no_ref += 1
+                continue
 
             target = p["target_price"]
 
