@@ -1305,51 +1305,8 @@ async def lifespan(app):
     except Exception as _ae:
         print(f"[STARTUP] Admin promote FAILED: {type(_ae).__name__}: {_ae}")
 
-    # ── Migrate outcome values: correct→hit, incorrect→miss ──────────────
-    try:
-        with engine.connect() as _mc:
-            migrated = _mc.execute(sql_text(
-                "UPDATE predictions SET outcome = 'hit' WHERE outcome = 'correct'"
-            )).rowcount
-            migrated2 = _mc.execute(sql_text(
-                "UPDATE predictions SET outcome = 'miss' WHERE outcome = 'incorrect'"
-            )).rowcount
-            _mc.commit()
-            if migrated or migrated2:
-                print(f"[STARTUP] Migrated outcomes: {migrated} correct→hit, {migrated2} incorrect→miss")
-    except Exception as _me:
-        print(f"[STARTUP] Outcome migration error: {_me}")
-
-    # ── Reclassify hold/neutral predictions from context text ────────────
-    # The scraper used to classify holds as bullish. The context text still
-    # contains the original rating ("Maintains Hold", "Equal-Weight", etc.)
-    try:
-        with engine.connect() as _nc:
-            # Context format: "Firm: Neutral — Maintains Hold rating on TICKER"
-            # or rating name appears directly in the context/exact_quote
-            neutral_patterns = [
-                "Neutral —", "Neutral—",
-                "Maintains Hold", "Maintains Neutral", "Maintains Market Perform",
-                "Maintains Equal Weight", "Maintains Equal-Weight",
-                "Maintains Sector Perform", "Maintains In-Line", "Maintains In Line",
-                "Maintains Peer Perform", "Maintains Market Weight", "Maintains Sector Weight",
-                "Reaffirms Hold", "Reaffirms Neutral", "Reaffirms Market Perform",
-                "Reaffirms Equal Weight", "Reaffirms Equal-Weight",
-                "Started coverage with Hold", "Started coverage with Neutral",
-                "Hold rating", "Neutral rating", "Market Perform rating",
-                "Equal Weight rating", "Equal-Weight rating",
-                "Sector Perform rating", "In-Line rating", "In Line rating",
-                "Peer Perform rating", "Market Weight rating", "Sector Weight rating",
-            ]
-            conditions = " OR ".join(f"context LIKE '%{p}%'" for p in neutral_patterns)
-            reclassified = _nc.execute(sql_text(
-                f"UPDATE predictions SET direction = 'neutral' WHERE direction != 'neutral' AND ({conditions})"
-            )).rowcount
-            _nc.commit()
-            if reclassified:
-                print(f"[STARTUP] Reclassified {reclassified} predictions to neutral")
-    except Exception as _ne:
-        print(f"[STARTUP] Neutral reclassification error: {_ne}")
+    # NOTE: Outcome migration and neutral reclassification moved to _startup_init()
+    # background thread to avoid blocking healthcheck on Railway.
 
     if _disable:
         print("[STARTUP] Jobs disabled via DISABLE_BACKGROUND_JOBS. Only serving API requests.")
@@ -1369,6 +1326,40 @@ async def lifespan(app):
         except Exception as e:
             print(f"[Startup] Table creation error: {e}")
             return  # Can't continue without tables
+
+        # ── Migrate outcome values: correct→hit, incorrect→miss ──────────
+        try:
+            with engine.connect() as _mc:
+                migrated = _mc.execute(sql_text("UPDATE predictions SET outcome = 'hit' WHERE outcome = 'correct'")).rowcount
+                migrated2 = _mc.execute(sql_text("UPDATE predictions SET outcome = 'miss' WHERE outcome = 'incorrect'")).rowcount
+                _mc.commit()
+                if migrated or migrated2:
+                    print(f"[Startup] Migrated outcomes: {migrated} correct→hit, {migrated2} incorrect→miss")
+        except Exception as _me:
+            print(f"[Startup] Outcome migration error: {_me}")
+
+        # ── Reclassify hold/neutral predictions from context text ──────────
+        try:
+            with engine.connect() as _nc:
+                neutral_patterns = [
+                    "Neutral —", "Neutral—",
+                    "Maintains Hold", "Maintains Neutral", "Maintains Market Perform",
+                    "Maintains Equal Weight", "Maintains Equal-Weight",
+                    "Maintains Sector Perform", "Maintains In-Line", "Maintains In Line",
+                    "Reaffirms Hold", "Reaffirms Neutral",
+                    "Hold rating", "Neutral rating", "Market Perform rating",
+                    "Equal Weight rating", "Equal-Weight rating",
+                    "Sector Perform rating", "In-Line rating",
+                ]
+                conditions = " OR ".join(f"context LIKE '%{p}%'" for p in neutral_patterns)
+                reclassified = _nc.execute(sql_text(
+                    f"UPDATE predictions SET direction = 'neutral' WHERE direction != 'neutral' AND ({conditions})"
+                )).rowcount
+                _nc.commit()
+                if reclassified:
+                    print(f"[Startup] Reclassified {reclassified} predictions to neutral")
+        except Exception as _ne:
+            print(f"[Startup] Neutral reclassification error: {_ne}")
 
         # Critical indexes for ticker detail page performance
         try:
