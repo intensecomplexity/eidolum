@@ -79,7 +79,7 @@ def get_forecaster(
         "sector_count": sector_count,
         "total_all_predictions": total_all,
         "sector_strengths": [],
-        "accuracy_over_time": [],
+        "accuracy_over_time": _build_accuracy_trend(forecaster_id, db),
         "prediction_counts": {"all": 0, "evaluated": 0, "pending": 0, "correct": 0, "incorrect": 0},
         "predictions": _get_preds(forecaster_id, page, limit, filter, sector, db),
         "disclosed_positions": [],

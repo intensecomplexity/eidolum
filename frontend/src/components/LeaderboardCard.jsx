@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import { ChevronRight, Briefcase } from 'lucide-react';
+import MiniPieChart from './MiniPieChart';
 import PlatformBadge from './PlatformBadge';
 import RankBadge from './RankBadge';
 import StreakBadge from './StreakBadge';
@@ -48,8 +49,17 @@ export default function LeaderboardCard({ forecaster: f, metric = 'avg_return' }
       <div className="flex items-end justify-between">
         <div className="flex gap-5">
           <div>
-            <div className={`font-mono text-[22px] font-bold leading-tight ${f.accuracy_rate >= 60 ? 'text-positive' : 'text-negative'}`}>
-              {f.accuracy_rate.toFixed(1)}%
+            <div className="flex items-center gap-1.5">
+              {f.total_predictions > 0 && (
+                <MiniPieChart
+                  correct={f.correct_predictions || 0}
+                  incorrect={(f.total_predictions || 0) - (f.correct_predictions || 0)}
+                  size={28}
+                />
+              )}
+              <div className={`font-mono text-[22px] font-bold leading-tight ${f.accuracy_rate >= 60 ? 'text-positive' : 'text-negative'}`}>
+                {f.accuracy_rate.toFixed(1)}%
+              </div>
             </div>
             <div className="text-muted text-[11px]">accuracy</div>
           </div>

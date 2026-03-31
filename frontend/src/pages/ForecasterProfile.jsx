@@ -13,6 +13,7 @@ import BookmarkButton from '../components/BookmarkButton';
 import NotificationBanner from '../components/NotificationBanner';
 import FollowButton from '../components/FollowButton';
 import Footer from '../components/Footer';
+import MiniPieChart from '../components/MiniPieChart';
 import { getForecaster, getForecasterSectors, getPlatformDetail, getReportCards } from '../api';
 import { annotateContext, ExplainerLine, ratingChangeLabel } from '../utils/predictionExplainer';
 
@@ -171,29 +172,56 @@ export default function ForecasterProfile() {
               )}
             </div>
 
-            {/* Stats — 2x2 grid on mobile, row on desktop */}
-            <div className="grid grid-cols-2 sm:flex gap-3 sm:gap-5 shrink-0">
-              <div className="text-center bg-surface-2 sm:bg-transparent rounded-lg p-3 sm:p-0">
-                <div className={`font-mono text-xl sm:text-2xl font-bold ${data.accuracy_rate >= 60 ? 'text-positive' : 'text-negative'}`}>
-                  {data.accuracy_rate.toFixed(1)}%
+            {/* Stats — pie chart + 2x2 grid on mobile, row on desktop */}
+            <div className="flex items-center gap-4 sm:gap-6 shrink-0">
+              {/* Pie chart */}
+              {(data.prediction_counts?.correct > 0 || data.prediction_counts?.incorrect > 0) && (
+                <div className="hidden sm:block">
+                  <MiniPieChart
+                    correct={data.prediction_counts?.correct || data.correct_predictions || 0}
+                    incorrect={data.prediction_counts?.incorrect || 0}
+                    pending={data.prediction_counts?.pending || 0}
+                    size={100}
+                    showCenter
+                  />
                 </div>
-                <div className="text-muted text-[11px] sm:text-xs">Accuracy</div>
-              </div>
-              <div className="text-center bg-surface-2 sm:bg-transparent rounded-lg p-3 sm:p-0">
-                <div className={`font-mono text-xl sm:text-2xl font-bold ${(data.avg_return ?? 0) >= 0 ? 'text-positive' : 'text-negative'}`}>
-                  {(data.avg_return ?? 0) >= 0 ? '+' : ''}{(data.avg_return ?? 0).toFixed(2)}%
+              )}
+              <div className="grid grid-cols-2 sm:flex gap-3 sm:gap-5 shrink-0">
+                <div className="text-center bg-surface-2 sm:bg-transparent rounded-lg p-3 sm:p-0">
+                  <div className="flex items-center justify-center gap-2">
+                    {/* Tiny pie on mobile only */}
+                    {(data.prediction_counts?.correct > 0 || data.prediction_counts?.incorrect > 0) && (
+                      <div className="sm:hidden">
+                        <MiniPieChart
+                          correct={data.prediction_counts?.correct || data.correct_predictions || 0}
+                          incorrect={data.prediction_counts?.incorrect || 0}
+                          pending={data.prediction_counts?.pending || 0}
+                          size={28}
+                        />
+                      </div>
+                    )}
+                    <div className={`font-mono text-xl sm:text-2xl font-bold ${data.accuracy_rate >= 60 ? 'text-positive' : 'text-negative'}`}>
+                      {data.accuracy_rate.toFixed(1)}%
+                    </div>
+                  </div>
+                  <div className="text-muted text-[11px] sm:text-xs">Accuracy</div>
                 </div>
-                <div className="text-muted text-[11px] sm:text-xs">Avg Return</div>
-              </div>
-              <div className="text-center bg-surface-2 sm:bg-transparent rounded-lg p-3 sm:p-0">
-                <div className={`font-mono text-xl sm:text-2xl font-bold ${data.alpha >= 0 ? 'text-positive' : 'text-negative'}`}>
-                  {data.alpha >= 0 ? '+' : ''}{data.alpha.toFixed(2)}%
+                <div className="text-center bg-surface-2 sm:bg-transparent rounded-lg p-3 sm:p-0">
+                  <div className={`font-mono text-xl sm:text-2xl font-bold ${(data.avg_return ?? 0) >= 0 ? 'text-positive' : 'text-negative'}`}>
+                    {(data.avg_return ?? 0) >= 0 ? '+' : ''}{(data.avg_return ?? 0).toFixed(2)}%
+                  </div>
+                  <div className="text-muted text-[11px] sm:text-xs">Avg Return</div>
                 </div>
-                <div className="text-muted text-[11px] sm:text-xs">Alpha vs S&amp;P 500</div>
-              </div>
-              <div className="text-center bg-surface-2 sm:bg-transparent rounded-lg p-3 sm:p-0">
-                <div className="font-mono text-xl sm:text-2xl font-bold text-accent">{data.total_predictions}</div>
-                <div className="text-muted text-[11px] sm:text-xs">Predictions</div>
+                <div className="text-center bg-surface-2 sm:bg-transparent rounded-lg p-3 sm:p-0">
+                  <div className={`font-mono text-xl sm:text-2xl font-bold ${data.alpha >= 0 ? 'text-positive' : 'text-negative'}`}>
+                    {data.alpha >= 0 ? '+' : ''}{data.alpha.toFixed(2)}%
+                  </div>
+                  <div className="text-muted text-[11px] sm:text-xs">Alpha vs S&amp;P 500</div>
+                </div>
+                <div className="text-center bg-surface-2 sm:bg-transparent rounded-lg p-3 sm:p-0">
+                  <div className="font-mono text-xl sm:text-2xl font-bold text-accent">{data.total_predictions}</div>
+                  <div className="text-muted text-[11px] sm:text-xs">Predictions</div>
+                </div>
               </div>
             </div>
           </div>

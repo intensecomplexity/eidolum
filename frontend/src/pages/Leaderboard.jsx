@@ -2,6 +2,7 @@ import { useEffect, useState, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { ChevronDown, Filter, Trophy, Flame, Clock } from 'lucide-react';
 import Footer from '../components/Footer';
+import MiniPieChart from '../components/MiniPieChart';
 import PlatformBadge from '../components/PlatformBadge';
 import RankBadge from '../components/RankBadge';
 import StreakBadge from '../components/StreakBadge';
@@ -322,9 +323,14 @@ export default function Leaderboard() {
                             </td>
                             <td className="px-6 py-4 text-right">
                               <div className="flex items-center justify-end gap-2">
-                                <div className="w-16 h-1 bg-surface-2 rounded-full overflow-hidden hidden lg:block">
-                                  <div className={`h-full rounded-full ${f.accuracy_rate >= 60 ? 'bg-positive' : 'bg-negative'}`} style={{ width: `${Math.min(f.accuracy_rate, 100)}%` }} />
-                                </div>
+                                {f.total_predictions > 0 && (
+                                  <MiniPieChart
+                                    correct={f.correct_predictions || 0}
+                                    incorrect={(f.total_predictions || 0) - (f.correct_predictions || 0)}
+                                    size={28}
+                                    className="hidden lg:block"
+                                  />
+                                )}
                                 <span className={`font-mono font-medium ${f.total_predictions === 0 ? 'text-muted' : f.accuracy_rate >= 60 ? 'text-positive' : 'text-negative'}`} style={{ letterSpacing: '-0.01em' }}>
                                   {f.total_predictions === 0 ? '—' : `${f.accuracy_rate.toFixed(1)}%`}
                                 </span>
