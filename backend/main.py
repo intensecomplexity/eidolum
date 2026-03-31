@@ -2009,6 +2009,24 @@ def stop_backfill_endpoint():
     return {"status": "stopping"}
 
 
+@app.post("/api/admin/backfill-fmp")
+def start_fmp_backfill():
+    """Start FMP historical backfill as a background task."""
+    import threading
+    from jobs.fmp_scraper import backfill_fmp_ratings
+    from database import BgSessionLocal
+
+    def _run():
+        db = BgSessionLocal()
+        try:
+            backfill_fmp_ratings(db)
+        finally:
+            db.close()
+
+    threading.Thread(target=_run, daemon=True).start()
+    return {"status": "started", "source": "fmp", "from": "2020-01-01"}
+
+
 @app.post("/api/admin/evaluate-historical")
 def evaluate_historical():
     """Start background evaluation of all pending historical predictions.
