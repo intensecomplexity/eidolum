@@ -1572,7 +1572,13 @@ async def lifespan(app):
         scrape_fmp_ratings(db)
     run_fmp = _guarded_job("fmp_ratings", _fmp_scrape)
 
-    # JOB 5: daily sweep for stuck predictions (no_data cleanup)
+    # JOB 5a: FMP per-ticker grades (/stable/grades — works, unlike the RSS endpoints)
+    def _fmp_grades(db):
+        from jobs.upgrade_scrapers import scrape_fmp_grades
+        scrape_fmp_grades(db)
+    run_fmp_grades = _guarded_job("fmp_grades", _fmp_grades)
+
+    # JOB 6: daily sweep for stuck predictions (no_data cleanup)
     def _sweep_stuck(db):
         from jobs.evaluator import sweep_stuck_predictions
         sweep_stuck_predictions(db)
@@ -1580,6 +1586,7 @@ async def lifespan(app):
 
     scheduler.add_job(run_massive_benzinga, "interval", hours=2, id="massive_benzinga", next_run_time=_first_run)
     scheduler.add_job(run_fmp, "interval", hours=4, id="fmp_ratings", next_run_time=_first_run + timedelta(minutes=3))
+    scheduler.add_job(run_fmp_grades, "interval", hours=4, id="fmp_grades", next_run_time=_first_run + timedelta(minutes=20))
     scheduler.add_job(run_auto_evaluate, "interval", hours=1, id="auto_evaluate", next_run_time=_first_run + timedelta(minutes=5))
     scheduler.add_job(run_refresh_stats, "interval", hours=2, id="refresh_stats", next_run_time=_first_run + timedelta(minutes=10))
     scheduler.add_job(run_sweep, "interval", hours=24, id="sweep_stuck", next_run_time=_first_run + timedelta(minutes=15))
