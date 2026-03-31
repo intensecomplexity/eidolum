@@ -357,34 +357,41 @@ def get_asset_consensus(
         from ticker_lookup import TICKER_INFO
         _company = TICKER_INFO.get(ticker)
 
-    predictions = (
+    all_predictions = (
         db.query(Prediction)
         .filter(Prediction.ticker == ticker)
-        .filter(Prediction.outcome != "pending")
         .order_by(Prediction.prediction_date.desc())
         .all()
     )
 
-    if not predictions:
+    if not all_predictions:
         return {
             "ticker": ticker,
             "company_name": _company,
             "sector": _sector,
             "total_predictions": 0,
+            "total_all_predictions": 0,
             "bullish_count": 0,
             "bearish_count": 0,
             "neutral_count": 0,
             "bullish_pct": 0.0,
             "bearish_pct": 0.0,
             "neutral_pct": 0.0,
+            "pending_count": 0,
             "recent_predictions": [],
             "top_accurate_forecasters": [],
+            "pending_predictions": [],
+            "bulls": [],
+            "bears": [],
         }
 
-    bull = [p for p in predictions if p.direction == "bullish"]
-    bear = [p for p in predictions if p.direction == "bearish"]
-    neutral = [p for p in predictions if p.direction == "neutral"]
-    total = len(predictions)
+    scored_outcomes = {"hit", "near", "miss", "correct", "incorrect"}
+    predictions = [p for p in all_predictions if p.outcome in scored_outcomes]
+    pending_preds = [p for p in all_predictions if p.outcome == "pending"]
+    bull = [p for p in all_predictions if p.direction == "bullish"]
+    bear = [p for p in all_predictions if p.direction == "bearish"]
+    neutral = [p for p in all_predictions if p.direction == "neutral"]
+    total = len(all_predictions)
 
     # Enrich with forecaster info
     recent = []
@@ -425,13 +432,11 @@ def get_asset_consensus(
     # Top forecasters on this ticker by accuracy
     forecaster_stats = {}
     for p in predictions:
-        if p.outcome == "pending":
-            continue
         fid = p.forecaster_id
         if fid not in forecaster_stats:
             forecaster_stats[fid] = {"correct": 0, "total": 0}
         forecaster_stats[fid]["total"] += 1
-        if p.outcome == "correct":
+        if p.outcome in ("correct", "hit"):
             forecaster_stats[fid]["correct"] += 1
 
     top = []
@@ -451,17 +456,57 @@ def get_asset_consensus(
 
     top.sort(key=lambda x: x["ticker_accuracy"], reverse=True)
 
+    # Build pending predictions with forecaster details for bull/bear lists
+    pending_list = []
+    bulls_list = []
+    bears_list = []
+    fid_cache = {}
+    for p in pending_preds[:50]:
+        if p.forecaster_id not in fid_cache:
+            f = db.query(Forecaster).filter(Forecaster.id == p.forecaster_id).first()
+            fid_cache[p.forecaster_id] = f
+        f = fid_cache.get(p.forecaster_id)
+        if not f:
+            continue
+        acc = float(f.accuracy_score) if f.accuracy_score else 0
+        entry = {
+            "forecaster_id": f.id, "name": f.name, "firm": getattr(f, 'firm', None),
+            "accuracy": round(acc, 1), "target": float(p.target_price) if p.target_price else None,
+        }
+        if p.direction == "bullish":
+            bulls_list.append(entry)
+        elif p.direction == "bearish":
+            bears_list.append(entry)
+        pending_list.append({
+            "id": p.id, "direction": p.direction, "target_price": float(p.target_price) if p.target_price else None,
+            "entry_price": float(p.entry_price) if p.entry_price else None,
+            "prediction_date": p.prediction_date.isoformat() if p.prediction_date else None,
+            "evaluation_date": p.evaluation_date.isoformat() if p.evaluation_date else None,
+            "window_days": p.window_days, "context": p.context, "exact_quote": p.exact_quote,
+            "source_url": p.source_url, "outcome": "pending", "ticker": ticker,
+            "forecaster": {"id": f.id, "name": f.name, "handle": f.handle,
+                           "accuracy_rate": round(acc, 1), "firm": getattr(f, 'firm', None)},
+        })
+
+    bulls_list.sort(key=lambda x: x["accuracy"], reverse=True)
+    bears_list.sort(key=lambda x: x["accuracy"], reverse=True)
+
     return {
         "ticker": ticker,
         "company_name": _company,
         "sector": _sector,
         "total_predictions": total,
+        "total_all_predictions": len(all_predictions),
         "bullish_count": len(bull),
         "bearish_count": len(bear),
         "neutral_count": len(neutral),
         "bullish_pct": round(len(bull) / total * 100, 1) if total else 0.0,
         "bearish_pct": round(len(bear) / total * 100, 1) if total else 0.0,
         "neutral_pct": round(len(neutral) / total * 100, 1) if total else 0.0,
+        "pending_count": len(pending_preds),
         "recent_predictions": recent,
         "top_accurate_forecasters": top[:5],
+        "pending_predictions": pending_list,
+        "bulls": bulls_list,
+        "bears": bears_list,
     }

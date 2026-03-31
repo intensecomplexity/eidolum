@@ -48,62 +48,59 @@ export function getTrendingTickers() {
 }
 
 export function getTickerDetail(ticker) {
-  // Try the detail endpoint first; fall back to the consensus endpoint which always works
-  return api.get(`/ticker/${ticker}/detail`).then(r => {
-    // If detail returned 0 predictions, try consensus as fallback
-    if (r.data && r.data.total_predictions === 0) {
-      return api.get(`/asset/${ticker}/consensus`).then(c => _mergeConsensus(ticker, c.data));
-    }
-    return r.data;
-  }).catch(() => {
-    // Detail endpoint failed entirely — use consensus
-    return api.get(`/asset/${ticker}/consensus`).then(c => _mergeConsensus(ticker, c.data)).catch(() => null);
-  });
+  // Use the consensus endpoint directly — it always works and has all the data
+  return api.get(`/asset/${ticker}/consensus`).then(c => _mergeConsensus(ticker, c.data)).catch(() => null);
 }
 
 function _mergeConsensus(ticker, c) {
   if (!c) return null;
-  const total = c.total_predictions || 0;
+  const totalAll = c.total_all_predictions || c.total_predictions || 0;
   const bull = c.bullish_count || 0;
   const bear = c.bearish_count || 0;
   const neutral = c.neutral_count || 0;
-  // Build evaluated predictions from recent_predictions
+  const pendingCount = c.pending_count || 0;
+
+  // Evaluated predictions from recent_predictions
   const recent = (c.recent_predictions || []).map(p => ({
     ...p,
     id: p.prediction_id || p.id,
     ticker,
     forecaster: p.forecaster || { name: 'Unknown', id: 0, accuracy_rate: 0 },
   }));
-  const evaluated = recent.filter(p => p.outcome !== 'pending');
-  const correct = evaluated.filter(p => p.outcome === 'correct' || p.outcome === 'hit').length;
-  const pending = recent.filter(p => p.outcome === 'pending');
+  const correct = recent.filter(p => p.outcome === 'correct' || p.outcome === 'hit').length;
+
+  // Pending predictions from the endpoint
+  const pendingPreds = (c.pending_predictions || []).map(p => ({ ...p, ticker }));
+
   return {
     ticker,
     company_name: c.company_name || null,
     sector: c.sector || null,
     industry: null,
-    total_predictions: total,
+    total_predictions: totalAll,
     current_consensus: {
-      total, bullish_count: bull, bearish_count: bear, neutral_count: neutral,
-      bullish_pct: total > 0 ? Math.round(bull / total * 100 * 10) / 10 : 0,
-      bearish_pct: total > 0 ? Math.round(bear / total * 100 * 10) / 10 : 0,
-      neutral_pct: total > 0 ? Math.round(neutral / total * 100 * 10) / 10 : 0,
-      bulls: [], bears: [],
+      total: pendingCount || totalAll,
+      bullish_count: bull, bearish_count: bear, neutral_count: neutral,
+      bullish_pct: c.bullish_pct || 0,
+      bearish_pct: c.bearish_pct || 0,
+      neutral_pct: c.neutral_pct || 0,
+      bulls: c.bulls || [],
+      bears: c.bears || [],
     },
     historical: {
-      total_evaluated: evaluated.length, correct,
-      accuracy: evaluated.length > 0 ? Math.round(correct / evaluated.length * 1000) / 10 : 0,
+      total_evaluated: recent.length, correct,
+      accuracy: recent.length > 0 ? Math.round(correct / recent.length * 1000) / 10 : 0,
       bullish_total: 0, bullish_accuracy: 0, bearish_total: 0, bearish_accuracy: 0,
       avg_target: null,
     },
     stats: {
-      evaluated: evaluated.length, correct,
-      historical_accuracy: evaluated.length > 0 ? Math.round(correct / evaluated.length * 1000) / 10 : 0,
+      evaluated: recent.length, correct,
+      historical_accuracy: recent.length > 0 ? Math.round(correct / recent.length * 1000) / 10 : 0,
       avg_target_price: null,
       top_forecaster: c.top_accurate_forecasters?.[0] || null,
     },
-    pending_predictions: pending,
-    recent_evaluated: evaluated,
+    pending_predictions: pendingPreds,
+    recent_evaluated: recent,
   };
 }
 
