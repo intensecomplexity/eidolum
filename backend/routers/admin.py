@@ -282,3 +282,32 @@ def run_safety_check(request: Request, admin: bool = Depends(require_admin)):
         "status": "clean" if not violations else "warnings",
         "violations": violations,
     }
+
+
+@router.get("/admin/security-report")
+@limiter.limit("10/minute")
+def security_report(request: Request, admin: bool = Depends(require_admin), db: Session = Depends(get_db)):
+    """Security dashboard: top IPs, new accounts, blocked registrations, rate limit hits."""
+    from spam_protection import get_security_report
+    from models import User
+
+    report = get_security_report()
+
+    # Accounts created in last 24 hours
+    cutoff = datetime.datetime.utcnow() - datetime.timedelta(hours=24)
+    new_accounts = (
+        db.query(User.id, User.username, User.email, User.created_at, User.auth_provider)
+        .filter(User.created_at >= cutoff)
+        .order_by(User.created_at.desc())
+        .limit(50)
+        .all()
+    )
+    report["new_accounts_24h"] = [
+        {"id": u[0], "username": u[1], "email": u[2],
+         "created_at": u[3].isoformat() if u[3] else None,
+         "provider": u[4] or "email"}
+        for u in new_accounts
+    ]
+    report["new_accounts_count"] = len(new_accounts)
+
+    return report

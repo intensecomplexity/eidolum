@@ -38,7 +38,24 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         response.headers["X-XSS-Protection"] = "1; mode=block"
         response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
         response.headers["Permissions-Policy"] = "geolocation=(), microphone=(), camera=()"
+        response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
         return response
+
+
+class AdminAuthMiddleware(BaseHTTPMiddleware):
+    """Block all /api/admin/* requests without valid ADMIN_SECRET header."""
+
+    async def dispatch(self, request: Request, call_next):
+        if request.url.path.startswith("/api/admin/"):
+            admin_secret = os.getenv("ADMIN_SECRET", "")
+            token = request.headers.get("Authorization", "").replace("Bearer ", "")
+            query_secret = request.query_params.get("secret", "")
+            header_secret = request.headers.get("X-Admin-Secret", "")
+            provided = token or header_secret or query_secret
+            if not admin_secret or provided != admin_secret:
+                from starlette.responses import JSONResponse
+                return JSONResponse({"detail": "Forbidden"}, status_code=403)
+        return await call_next(request)
 
 
 class RequestTimeoutMiddleware(BaseHTTPMiddleware):
@@ -70,6 +87,40 @@ class RequestTimeoutMiddleware(BaseHTTPMiddleware):
                 status_code=504,
                 content={"error": "timeout", "message": f"Request took longer than {self.TIMEOUT_SECONDS}s"},
             )
+
+
+class PayloadSizeLimitMiddleware(BaseHTTPMiddleware):
+    """Reject POST/PUT requests with payloads over 10KB for prediction endpoints."""
+
+    MAX_BYTES = 10240  # 10KB
+
+    async def dispatch(self, request: Request, call_next):
+        if request.method in ("POST", "PUT") and request.url.path.startswith("/api/"):
+            # Skip admin and file upload endpoints
+            if not request.url.path.startswith("/api/admin/"):
+                content_length = request.headers.get("content-length")
+                if content_length and int(content_length) > self.MAX_BYTES:
+                    from starlette.responses import JSONResponse
+                    return JSONResponse(
+                        status_code=413,
+                        content={"error": "Payload too large", "max_bytes": self.MAX_BYTES},
+                    )
+        return await call_next(request)
+
+
+class RequestTrackingMiddleware(BaseHTTPMiddleware):
+    """Track requests per IP for security monitoring."""
+
+    async def dispatch(self, request: Request, call_next):
+        if request.url.path.startswith("/api/"):
+            try:
+                from slowapi.util import get_remote_address
+                from spam_protection import track_request
+                ip = get_remote_address(request)
+                track_request(ip)
+            except Exception:
+                pass
+        return await call_next(request)
 
 
 def safety_check(db):
@@ -1306,6 +1357,15 @@ app = FastAPI(title="Eidolum API", version="1.0.0", lifespan=lifespan)
 # Rate limiting
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+# Request tracking for security reports
+app.add_middleware(RequestTrackingMiddleware)
+
+# Payload size limit (10KB for API POST/PUT)
+app.add_middleware(PayloadSizeLimitMiddleware)
+
+# Admin auth — blocks /api/admin/* without ADMIN_SECRET
+app.add_middleware(AdminAuthMiddleware)
 
 # Request timeout — kill any API request that hangs beyond 8 seconds
 app.add_middleware(RequestTimeoutMiddleware)
