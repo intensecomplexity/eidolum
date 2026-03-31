@@ -1261,6 +1261,8 @@ async def lifespan(app):
     print("[STARTUP] Eidolum API starting")
     print(f"[STARTUP] Background jobs: {'DISABLED' if _disable else 'ENABLED (default)'}")
     print(f"[STARTUP] MASSIVE_API_KEY set: {bool(os.getenv('MASSIVE_API_KEY', '').strip())}")
+    _fmp = os.getenv("FMP_KEY", "").strip()
+    print(f"[STARTUP] FMP_KEY set: {bool(_fmp)}{' (first 5: ' + _fmp[:5] + '...)' if _fmp else ''}")
     print("[STARTUP] ════════════════════════════════════════")
 
     # ── Admin promote — runs ALWAYS, unconditionally ────────────────────────

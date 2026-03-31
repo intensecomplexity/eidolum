@@ -70,8 +70,11 @@ def _set_config(db, key: str, value: str):
 
 
 # ── Main entry point ────────────────────────────────────────────────────────
+REVERSE_STOP = date(2011, 1, 1)  # Don't go further back than 2011
+
+
 def run_backfill():
-    """Run forward backfill to today. Reverse backfill is permanently disabled."""
+    """Run forward backfill to today, then reverse backfill to 2011."""
     global _backfill_running, _backfill_stop, _backfill_status
 
     if _backfill_running:
@@ -85,14 +88,14 @@ def run_backfill():
     _backfill_stop = False
 
     try:
-        _run_forward()
-        # REVERSE BACKFILL PERMANENTLY DISABLED (2026-03-31)
-        # Was filling postgres volume to 96% by pulling years of unneeded data.
+        forward_done = _run_forward()
+        if forward_done and not _backfill_stop:
+            _run_reverse()
     finally:
         _backfill_running = False
         _backfill_status["running"] = False
         _backfill_status["phase"] = None
-        print("[Backfill] Forward backfill complete")
+        print("[Backfill] All backfill phases complete")
 
 
 def _run_forward() -> bool:
@@ -190,9 +193,91 @@ def _run_forward() -> bool:
     return True
 
 
-# _run_reverse() — PERMANENTLY DISABLED (2026-03-31)
-# Reverse backfill filled the postgres volume to 96% capacity.
-# Only forward backfill is needed (last ~2 years of data).
+def _run_reverse() -> bool:
+    """Phase 2: Reverse backfill from 2019-12-31 backwards to 2011-01-01."""
+    from database import BgSessionLocal
+
+    db = BgSessionLocal()
+    try:
+        # Check if already done
+        if _get_config(db, "backfill_reverse_done") == "true":
+            print("[Reverse] Already complete")
+            return True
+
+        # Resume point (going backwards)
+        start = date(2019, 12, 31)
+        resume = _get_config(db, "benzinga_reverse_backfill_last_date")
+        if resume:
+            try:
+                resumed = datetime.strptime(resume, "%Y-%m-%d").date()
+                if resumed < start:
+                    start = resumed - timedelta(days=1)
+            except Exception:
+                pass
+    finally:
+        db.close()
+
+    if start <= REVERSE_STOP:
+        db = BgSessionLocal()
+        try:
+            _set_config(db, "backfill_reverse_done", "true")
+        finally:
+            db.close()
+        print(f"[Reverse] Already reached {REVERSE_STOP}")
+        return True
+
+    total_days = (start - REVERSE_STOP).days + 1
+    _backfill_status.update({
+        "running": True, "phase": "reverse", "current_date": str(start),
+        "days_completed": 0, "predictions_inserted": 0,
+    })
+
+    print(f"[Reverse] {start} -> {REVERSE_STOP} ({total_days} days)")
+    total_inserted = 0
+    days_done = 0
+    batch_days = 0
+    current = start
+
+    while current >= REVERSE_STOP:
+        if _backfill_stop:
+            print(f"[Reverse] Stopped at {current}")
+            return False
+
+        # Storage guard
+        try:
+            from circuit_breaker import db_storage_ok
+            if not db_storage_ok("reverse_backfill"):
+                print(f"[Reverse] Paused at {current}: storage limit approaching")
+                return False
+        except Exception:
+            pass
+
+        inserted = _process_one_day(current, "benzinga_reverse_backfill_last_date", "Reverse")
+        total_inserted += inserted
+        days_done += 1
+        batch_days += 1
+        _backfill_status["days_completed"] = days_done
+        _backfill_status["predictions_inserted"] = total_inserted
+        _backfill_status["current_date"] = str(current)
+
+        current -= timedelta(days=1)
+        time.sleep(0.5)
+
+        if batch_days >= 30:
+            _refresh_stats_if_needed()
+            print(f"[Reverse] Batch done. {days_done}/{total_days} days, {total_inserted} inserted. Pausing 10s.")
+            time.sleep(10)
+            batch_days = 0
+
+    db = BgSessionLocal()
+    try:
+        _set_config(db, "backfill_reverse_done", "true")
+    finally:
+        db.close()
+
+    _refresh_stats_if_needed()
+    print(f"[Reverse] Complete: {days_done} days, {total_inserted} predictions")
+    return True
 
 
 # ── Process a single day ─────────────────────────────────────────────────────
@@ -227,8 +312,7 @@ def _refresh_stats_if_needed():
 
 # ── Auto-resume on startup ──────────────────────────────────────────────────
 def auto_resume_backfill():
-    """Called on startup. Resumes forward backfill if not caught up.
-    Reverse backfill is permanently disabled (2026-03-31)."""
+    """Called on startup. Resumes forward backfill, then reverse to 2011."""
     import threading
     if not MASSIVE_KEY:
         print("[Backfill] MASSIVE_API_KEY not set — backfill cannot run")

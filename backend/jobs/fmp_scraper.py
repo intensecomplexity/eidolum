@@ -233,7 +233,7 @@ def _fmp_incremental(db: Session):
 
 
 def backfill_fmp_ratings(db: Session, start_date: str = None):
-    """Pull FMP historical data month by month from 2020-01-01."""
+    """Pull FMP historical data month by month from 2018-01-01."""
     if not SCRAPER_LOCK.acquire(blocking=False):
         print("[FMP-Backfill] Another scraper running, skipping")
         return {"status": "locked"}
@@ -257,7 +257,7 @@ def _fmp_backfill_inner(db: Session, start_date: str = None) -> dict:
         except Exception:
             pass
     if not start_date:
-        start_date = "2020-01-01"
+        start_date = "2018-01-01"
 
     start = datetime.strptime(start_date, "%Y-%m-%d")
     today = datetime.utcnow()

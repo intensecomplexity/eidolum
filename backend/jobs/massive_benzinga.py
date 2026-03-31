@@ -74,9 +74,7 @@ def _massive_inner(db: Session):
                 "sort": "last_updated.desc",
                 "limit": 500,
             }
-            if is_backfill:
-                params["date.gte"] = backfill_date
-            elif _LAST_UPDATED:
+            if _LAST_UPDATED:
                 params["last_updated.gte"] = _LAST_UPDATED
 
         try:
