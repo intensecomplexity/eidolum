@@ -331,6 +331,14 @@ export function compareUsers(id1, id2) {
   return api.get(`/compare/${id1}/${id2}`).then(r => r.data);
 }
 
+export function compareForecasters(aId, bId) {
+  return api.get('/compare/forecasters', { params: { a: aId, b: bId } }).then(r => r.data);
+}
+
+export function searchForecasters(q) {
+  return api.get('/forecasters/all', { params: { q } }).then(r => r.data);
+}
+
 // ——— Prediction Detail ———
 
 export function getPredictionDetail(predictionId, source = 'user') {

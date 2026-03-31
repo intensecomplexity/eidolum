@@ -50,6 +50,7 @@ import AnalystProfilePage from './pages/AnalystProfile';
 import HeatmapPage from './pages/Heatmap';
 import EarningsPage from './pages/Earnings';
 import ComparePage from './pages/Compare';
+import CompareForecasters from './pages/CompareForecasters';
 import Discover from './pages/Discover';
 import HowItWorks from './pages/HowItWorks';
 import OnboardingOverlay from './components/OnboardingOverlay';
@@ -116,6 +117,7 @@ export default function App() {
         <Route path="/settings" element={<SettingsPage />} />
         <Route path="/controversial" element={<ControversialPage />} />
         <Route path="/compare/:id1/:id2" element={<ComparePage />} />
+        <Route path="/compare" element={<CompareForecasters />} />
         <Route path="/analysts" element={<AnalystsPage />} />
         <Route path="/analyst/:name" element={<AnalystProfilePage />} />
         <Route path="/heatmap" element={<HeatmapPage />} />
