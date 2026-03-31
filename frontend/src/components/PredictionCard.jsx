@@ -4,7 +4,7 @@ import PredictionBadge from './PredictionBadge';
 import ConflictBadge from './ConflictBadge';
 import BookmarkButton from './BookmarkButton';
 import PlatformBadge from './PlatformBadge';
-import { annotateContext, ExplainerLine } from '../utils/predictionExplainer';
+import { annotateContext, ExplainerLine, ratingChangeLabel } from '../utils/predictionExplainer';
 
 const HORIZON_LABELS = { short: '30d', medium: '90d', long: '1y', custom: 'Custom' };
 
@@ -120,7 +120,13 @@ export default function PredictionCard({ prediction: p, showForecaster = false, 
       )}
 
       {/* Simple explainer (gold) */}
-      <ExplainerLine prediction={p} className="mb-2" />
+      <ExplainerLine prediction={p} className="mb-1" />
+
+      {/* Rating change context */}
+      {(() => {
+        const rc = ratingChangeLabel(p);
+        return rc ? <p className="text-[10px] text-muted italic mb-2">{rc}</p> : null;
+      })()}
 
       {/* Price + return data */}
       <div className="grid grid-cols-2 gap-x-3 gap-y-0.5 text-xs font-mono mb-2">

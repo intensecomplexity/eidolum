@@ -100,40 +100,62 @@ export function annotateContext(text, ticker = null) {
 
 /**
  * Generate a simple one-line explanation of what the prediction means.
- * Returns a plain string or null if we can't generate one.
+ * Handles the nuance of rating action vs price target direction.
  */
 export function simpleExplainer(prediction) {
   const p = prediction;
   const ticker = p.ticker || '';
-  const direction = (p.direction || '').toLowerCase();
   const entry = p.entry_price;
   const target = p.target_price;
   const context = (p.exact_quote || p.context || '').toLowerCase();
+  const callType = (p.call_type || '').toLowerCase();
 
-  // Determine the action type from context
-  const isUpgrade = /upgrade/i.test(context);
-  const isDowngrade = /downgrade/i.test(context);
-  const isInitiate = /initiat|started coverage/i.test(context);
+  const isUpgrade = callType === 'upgrade' || /upgrade/i.test(context);
+  const isDowngrade = callType === 'downgrade' || /downgrade/i.test(context);
+  const isInitiate = callType === 'new_coverage' || /initiat|started coverage/i.test(context);
   const isMaintain = /maintain|reiterat|reaffirm/i.test(context);
+
+  // Extract rating from context (e.g. "downgrades neutral" → "Neutral")
+  const ratingMatch = context.match(/(?:to|with)\s+(buy|sell|hold|neutral|outperform|underperform|overweight|underweight|equal[\s-]?weight|market[\s-]?perform|strong buy|strong sell)/i);
+  const rating = ratingMatch ? ratingMatch[1].replace(/[\s-]+/g, ' ').trim() : '';
+  const ratingCap = rating ? rating.charAt(0).toUpperCase() + rating.slice(1) : '';
 
   if (target && entry && entry > 0) {
     const pctChange = ((target - entry) / entry * 100).toFixed(1);
     const sign = target >= entry ? '+' : '';
+    const priceInfo = `Target $${target.toFixed(0)} (currently $${entry.toFixed(0)}, ${sign}${pctChange}%)`;
+    const targetAbove = target > entry;
 
-    if (direction === 'bullish') {
-      if (isMaintain) {
-        return `In simple terms: Still expects ${ticker} to rise to $${target.toFixed(0)} from $${entry.toFixed(0)} (${sign}${pctChange}%)`;
-      }
-      return `In simple terms: Expects ${ticker} to rise from $${entry.toFixed(0)} to $${target.toFixed(0)} (${sign}${pctChange}%)`;
-    } else if (direction === 'bearish') {
-      if (isMaintain) {
-        return `In simple terms: Still expects ${ticker} to fall to $${target.toFixed(0)} from $${entry.toFixed(0)} (${sign}${pctChange}%)`;
-      }
-      return `In simple terms: Expects ${ticker} to drop from $${entry.toFixed(0)} to $${target.toFixed(0)} (${sign}${pctChange}%)`;
+    // CASE 1: Downgrade but target ABOVE current (less optimistic, still sees upside)
+    if (isDowngrade && targetAbove) {
+      return `In simple terms: Less optimistic on ${ticker}, but still sees upside. ${ratingCap ? `Lowered rating to ${ratingCap}. ` : ''}${priceInfo}`;
     }
+    // CASE 2: Upgrade but target BELOW current (more positive, but target still below)
+    if (isUpgrade && !targetAbove) {
+      return `In simple terms: More positive on ${ticker}, but target is still below current price. ${ratingCap ? `Raised rating to ${ratingCap}. ` : ''}${priceInfo}`;
+    }
+    // CASE 3: Downgrade and target BELOW current (straightforward bearish)
+    if (isDowngrade && !targetAbove) {
+      return `In simple terms: Bearish on ${ticker}. Downgraded and expects a drop. ${priceInfo}`;
+    }
+    // CASE 4: Upgrade and target ABOVE current (straightforward bullish)
+    if (isUpgrade && targetAbove) {
+      return `In simple terms: Bullish on ${ticker}. Upgraded and expects a rise. ${priceInfo}`;
+    }
+    // CASE 5: Maintains with target
+    if (isMaintain) {
+      return `In simple terms: Still ${targetAbove ? 'positive' : 'cautious'} on ${ticker}. Maintains rating. ${priceInfo}`;
+    }
+    // CASE 6: Initiates coverage
+    if (isInitiate) {
+      return `In simple terms: Started covering ${ticker}${ratingCap ? ` with a ${ratingCap} rating` : ''}. ${priceInfo}`;
+    }
+    // Default with target
+    return `In simple terms: ${targetAbove ? 'Sees upside' : 'Sees downside'} on ${ticker}. ${priceInfo}`;
   }
 
   // No price target — directional only
+  const direction = (p.direction || '').toLowerCase();
   if (direction === 'bullish') {
     if (isUpgrade) return `In simple terms: Turned more positive on ${ticker}, expects it to go up`;
     if (isInitiate) return `In simple terms: Started tracking ${ticker} with a positive outlook`;
@@ -147,6 +169,33 @@ export function simpleExplainer(prediction) {
     return `In simple terms: Negative on ${ticker}, expects it to go down`;
   }
 
+  return null;
+}
+
+/**
+ * Extract a short rating change description from the context.
+ * e.g. "Downgraded to Neutral" or "Upgraded to Buy"
+ */
+export function ratingChangeLabel(prediction) {
+  const ctx = (prediction.exact_quote || prediction.context || '');
+  const callType = (prediction.call_type || '').toLowerCase();
+
+  if (callType === 'upgrade' || /upgrade/i.test(ctx)) {
+    const m = ctx.match(/upgrade[sd]?\s+(?:to\s+)?(\w[\w\s-]*?)(?:\s+on\s|\s*,|\s*\.|\s+rating)/i);
+    return m ? `Upgraded to ${m[1].trim()}` : 'Upgraded';
+  }
+  if (callType === 'downgrade' || /downgrade/i.test(ctx)) {
+    const m = ctx.match(/downgrade[sd]?\s+(?:to\s+)?(\w[\w\s-]*?)(?:\s+on\s|\s*,|\s*\.|\s+rating)/i);
+    return m ? `Downgraded to ${m[1].trim()}` : 'Downgraded';
+  }
+  if (callType === 'new_coverage' || /initiat|started coverage/i.test(ctx)) {
+    const m = ctx.match(/(?:with|at)\s+(?:a\s+)?(\w[\w\s-]*?)\s+rating/i);
+    return m ? `Initiated: ${m[1].trim()}` : 'New coverage';
+  }
+  if (/maintain|reiterat|reaffirm/i.test(ctx)) {
+    const m = ctx.match(/(?:maintains?|reiterates?|reaffirms?)\s+(\w[\w\s-]*?)(?:\s+on\s|\s*,|\s*\.|\s+rating)/i);
+    return m ? `Maintains ${m[1].trim()}` : 'Maintains rating';
+  }
   return null;
 }
 
