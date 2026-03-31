@@ -76,18 +76,53 @@ def _build_ticker_detail(ticker: str, db) -> dict:
         _ticker_cache[ticker] = (result, _time.time())
         return result
 
-    # ── Sector + company name (from DB only, no external calls) ──────────
+    # ── Sector + company name + industry (from DB, with on-the-fly lookup) ──
     sector = None
     company_name = None
     industry = None
     try:
         ts_row = db.execute(sql_text(
-            "SELECT sector FROM ticker_sectors WHERE ticker = :t"
+            "SELECT sector, company_name, industry FROM ticker_sectors WHERE ticker = :t"
         ), {"t": ticker}).first()
         if ts_row:
             sector = ts_row[0]
+            company_name = ts_row[1]
+            industry = ts_row[2]
     except Exception:
         db.rollback()
+
+    # If ticker_sectors has no entry or no company_name, look up via Finnhub and cache
+    if not company_name:
+        try:
+            from jobs.sector_lookup import get_sector, _cache_to_db, FINNHUB_KEY, KNOWN_SECTORS
+            import httpx as _httpx
+            if FINNHUB_KEY:
+                r = _httpx.get(
+                    "https://finnhub.io/api/v1/stock/profile2",
+                    params={"symbol": ticker, "token": FINNHUB_KEY},
+                    timeout=5,
+                )
+                data = r.json()
+                _cn = data.get("name", "")
+                _ind = data.get("finnhubIndustry", "")
+                if _cn:
+                    company_name = _cn
+                    industry = _ind
+                    if not sector:
+                        from jobs.sector_lookup import _normalize_sector
+                        sector = _normalize_sector(_ind) if _ind else KNOWN_SECTORS.get(ticker, "Other")
+                    _cache_to_db(ticker, sector or "Other", db, company_name=_cn, industry=_ind)
+        except Exception:
+            try:
+                db.rollback()
+            except Exception:
+                pass
+
+    # Fallback: use static TICKER_INFO for company name
+    if not company_name:
+        from ticker_lookup import TICKER_INFO
+        company_name = TICKER_INFO.get(ticker)
+
     if not sector:
         try:
             sector = db.execute(sql_text(
@@ -95,8 +130,6 @@ def _build_ticker_detail(ticker: str, db) -> dict:
             ), {"t": ticker}).scalar()
         except Exception:
             db.rollback()
-    from ticker_lookup import TICKER_INFO
-    company_name = TICKER_INFO.get(ticker)
 
     # ── Combined counts query (one round-trip instead of multiple) ──────
     try:

@@ -187,3 +187,71 @@ def backfill_sectors_batch(max_tickers: int = 200) -> dict:
             time.sleep(0.5)  # Brief pause every 20 tickers
 
     return {"tickers_processed": len(tickers), "updated": updated, "remaining": "check again"}
+
+
+def backfill_company_names():
+    """Populate ticker_sectors with company_name for all unique tickers in predictions.
+    Uses Finnhub for lookup, caches in ticker_sectors. Runs once at startup."""
+    from database import BgSessionLocal as SessionLocal
+
+    db = SessionLocal()
+    try:
+        # Find tickers missing company_name in ticker_sectors
+        rows = db.execute(sql_text("""
+            SELECT DISTINCT p.ticker
+            FROM predictions p
+            LEFT JOIN ticker_sectors ts ON ts.ticker = p.ticker
+            WHERE ts.company_name IS NULL OR ts.company_name = ''
+        """)).fetchall()
+    finally:
+        db.close()
+
+    if not rows:
+        print("[CompanyBackfill] All tickers already have company names")
+        return
+
+    tickers = [r[0] for r in rows]
+    updated = 0
+
+    for i, ticker in enumerate(tickers):
+        db = SessionLocal()
+        try:
+            # Try Finnhub profile lookup
+            company_name = ""
+            industry = ""
+            sector = KNOWN_SECTORS.get(ticker, "Other")
+
+            if FINNHUB_KEY:
+                try:
+                    r = httpx.get(
+                        "https://finnhub.io/api/v1/stock/profile2",
+                        params={"symbol": ticker, "token": FINNHUB_KEY},
+                        timeout=5,
+                    )
+                    data = r.json()
+                    company_name = data.get("name", "")
+                    industry = data.get("finnhubIndustry", "")
+                    if industry:
+                        sector = _normalize_sector(industry)
+                except Exception:
+                    pass
+
+            if company_name:
+                _cache_to_db(ticker, sector, db, company_name=company_name, industry=industry)
+                updated += 1
+            elif not company_name:
+                # Ensure at least the sector row exists
+                _cache_to_db(ticker, sector, db)
+        except Exception:
+            try:
+                db.rollback()
+            except Exception:
+                pass
+        finally:
+            db.close()
+
+        # Rate limit: Finnhub free tier is 60/min
+        if (i + 1) % 30 == 0:
+            time.sleep(1)
+
+    print(f"[CompanyBackfill] Processed {len(tickers)} tickers, updated {updated} company names")

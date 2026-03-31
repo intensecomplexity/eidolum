@@ -12,8 +12,7 @@ import RankNumber from '../components/RankNumber';
 import Footer from '../components/Footer';
 import {
   getUserProfile, getUserPredictions, getLivePrices,
-  getLeaderboard, getHomepageStats, getTrendingTickers,
-  getPendingPredictions, getExpiringPredictions, getWatchlistFeed,
+  getHomepageData, getWatchlistFeed,
 } from '../api';
 import formatRoundNumber from '../utils/formatNumber';
 
@@ -47,23 +46,26 @@ export default function Dashboard() {
   const [expiring, setExpiring] = useState([]);
   const [watchlistFeed, setWatchlistFeed] = useState([]);
 
+  // Single API call for all public homepage content
   useEffect(() => {
-    // Personal
-    if (uid) {
+    getHomepageData().then(d => {
+      if (d.stats) setHomeStats(d.stats);
+      if (d.top_analysts) setTop5(d.top_analysts);
+      if (d.trending_tickers) setTrending(d.trending_tickers);
+      if (d.recent_calls) setRecentCalls(d.recent_calls);
+      if (d.expiring_soon) setExpiring(d.expiring_soon);
+    }).catch(() => {});
+  }, []);
+
+  // Personal data — deferred, loads after public content
+  useEffect(() => {
+    if (!uid) return;
+    const timer = setTimeout(() => {
       getUserProfile(uid).then(setProfile).catch(() => {});
       getUserPredictions(uid, 'pending').then(p => setPending(p || [])).catch(() => {});
       getWatchlistFeed().then(d => setWatchlistFeed((d || []).slice(0, 10))).catch(() => {});
-    }
-    // Public content
-    getLeaderboard().then(d => setTop5((d || []).slice(0, 5))).catch(() => {});
-    getHomepageStats().then(setHomeStats).catch(() => {});
-    getTrendingTickers().then(d => setTrending((d || []).slice(0, 8))).catch(() => {});
-    getPendingPredictions().then(d => setRecentCalls((d || []).slice(0, 5))).catch(() => {});
-    getExpiringPredictions().then(d => {
-      // Filter to within 7 days
-      const soon = (d || []).filter(p => p.days_remaining != null && p.days_remaining <= 7);
-      setExpiring(soon.slice(0, 8));
-    }).catch(() => {});
+    }, 100);
+    return () => clearTimeout(timer);
   }, [uid]);
 
   // Fetch live prices for pending predictions + poll every 2 minutes

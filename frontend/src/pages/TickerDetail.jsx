@@ -80,23 +80,19 @@ export default function TickerDetail() {
 
         {/* ── HEADER ────────────────────────────────────────────────────── */}
         <div className="card mb-6">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-            <div>
-              <div className="flex items-center gap-3 mb-1">
-                <span className="font-mono text-3xl sm:text-4xl font-bold tracking-wider text-text-primary">{ticker}</span>
-                {data.sector && (
-                  <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-accent/10 text-accent border border-accent/20">
-                    {data.sector}
-                  </span>
-                )}
-              </div>
-              {data.company_name && (
-                <div className="text-text-secondary text-base sm:text-lg">{data.company_name}</div>
-              )}
-              {data.industry && (
-                <div className="text-muted text-xs">{data.industry}</div>
-              )}
-            </div>
+          <div>
+            <span className="font-mono text-3xl sm:text-4xl font-bold tracking-wider text-text-primary">{ticker}</span>
+            {data.company_name && (
+              <div className="text-text-primary text-base sm:text-lg font-medium mt-1">{data.company_name}</div>
+            )}
+            {data.industry && (
+              <div className="text-muted text-sm mt-0.5">{data.industry}</div>
+            )}
+            {data.sector && (
+              <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-accent/10 text-accent border border-accent/20 inline-block mt-2">
+                {data.sector}
+              </span>
+            )}
           </div>
         </div>
 

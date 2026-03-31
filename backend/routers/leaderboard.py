@@ -597,8 +597,8 @@ def get_homepage_stats(request: Request, db: Session = Depends(get_db)):
 
     try:
         total_fc = db.execute(sql_text("SELECT COUNT(*) FROM forecasters WHERE COALESCE(total_predictions,0) > 0")).scalar() or 0
-        scored = db.execute(sql_text("SELECT COUNT(*) FROM predictions WHERE outcome IN ('correct','incorrect')")).scalar() or 0
-        correct_count = db.execute(sql_text("SELECT COUNT(*) FROM predictions WHERE outcome = 'correct'")).scalar() or 0
+        scored = db.execute(sql_text("SELECT COUNT(*) FROM predictions WHERE outcome IN ('hit','near','miss','correct','incorrect')")).scalar() or 0
+        correct_count = db.execute(sql_text("SELECT COUNT(*) FROM predictions WHERE outcome IN ('hit','correct')")).scalar() or 0
         all_preds = db.execute(sql_text("SELECT COUNT(*) FROM predictions")).scalar() or 0
     except Exception:
         total_fc = scored = correct_count = all_preds = 0
@@ -613,6 +613,69 @@ def get_homepage_stats(request: Request, db: Session = Depends(get_db)):
     }
     _stats_cache_time = _time.time()
     return _stats_cache
+
+
+# ── Combined homepage data endpoint ──────────────────────────────────────────
+
+_homepage_data_cache = None
+_homepage_data_cache_time = 0
+
+
+@router.get("/homepage-data")
+@limiter.limit("60/minute")
+def get_homepage_data(request: Request, db: Session = Depends(get_db)):
+    """Combined endpoint for the homepage. Returns stats, trending, top 5, recent calls,
+    and expiring predictions in one response. Cached for 5 minutes."""
+    global _homepage_data_cache, _homepage_data_cache_time
+    if _homepage_data_cache and (_time.time() - _homepage_data_cache_time) < 300:
+        return _homepage_data_cache
+
+    # Stats
+    stats = get_homepage_stats(request, db)
+
+    # Top 5 leaderboard (reuse the main leaderboard function with defaults)
+    top5 = []
+    try:
+        all_lb = get_leaderboard(request, db)
+        if isinstance(all_lb, list):
+            top5 = all_lb[:5]
+        elif isinstance(all_lb, dict) and "data" in all_lb:
+            top5 = all_lb["data"][:5]
+    except Exception:
+        pass
+
+    # Trending tickers
+    trending = []
+    try:
+        trending = get_trending_tickers(request, db)[:8]
+    except Exception:
+        pass
+
+    # Recent calls (pending predictions)
+    recent = []
+    try:
+        recent = get_pending_predictions(request, db)[:5]
+    except Exception:
+        pass
+
+    # Expiring soon (within 7 days)
+    expiring = []
+    try:
+        from routers.user_predictions import get_expiring_predictions
+        all_expiring = get_expiring_predictions(request, db)
+        expiring = [p for p in (all_expiring or []) if p.get("days_remaining", 99) <= 7][:8]
+    except Exception:
+        pass
+
+    _homepage_data_cache = {
+        "stats": stats,
+        "top_analysts": top5,
+        "trending_tickers": trending,
+        "recent_calls": recent,
+        "expiring_soon": expiring,
+    }
+    _homepage_data_cache_time = _time.time()
+    return _homepage_data_cache
 
 
 @router.get("/trending-tickers")

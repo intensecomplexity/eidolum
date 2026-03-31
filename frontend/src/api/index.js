@@ -39,6 +39,10 @@ export function getHomepageStats() {
   return api.get('/homepage-stats').then(r => r.data);
 }
 
+export function getHomepageData() {
+  return api.get('/homepage-data').then(r => r.data);
+}
+
 export function getTrendingTickers() {
   return api.get('/trending-tickers').then(r => r.data);
 }

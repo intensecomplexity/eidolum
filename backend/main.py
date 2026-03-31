@@ -1089,6 +1089,17 @@ def run_phase2_migrations():
     except Exception:
         db.rollback()
 
+    # ── 42. ticker_sectors: add company_name + industry columns ──
+    for col in [
+        "company_name VARCHAR(255)",
+        "industry VARCHAR(255)",
+    ]:
+        try:
+            db.execute(text(f"ALTER TABLE ticker_sectors ADD COLUMN {col}"))
+            db.commit()
+        except Exception:
+            db.rollback()
+
     print("[Phase2] All migrations complete")
     db.close()
 
@@ -1474,6 +1485,14 @@ async def lifespan(app):
                 db.close()
         except Exception as e:
             print(f"[Startup] Season init error: {e}")
+
+        # Backfill ticker_sectors company names for all tickers
+        try:
+            from jobs.sector_lookup import backfill_company_names
+            backfill_company_names()
+            print("[Startup] Company name backfill complete")
+        except Exception as e:
+            print(f"[Startup] Company name backfill error: {e}")
 
         # STEP 2: Start forward backfill (2020-01-01 → today)
         try:

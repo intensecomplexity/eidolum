@@ -355,10 +355,37 @@ function PredictionsTab({ showToast }) {
 function AuditTab() {
   const [data, setData] = useState(null);
   const [page, setPage] = useState(1);
+  const [error, setError] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    getAdminAuditLog({ page }).then(setData).catch(() => {});
+    setLoading(true);
+    setError(false);
+    getAdminAuditLog({ page })
+      .then(setData)
+      .catch(() => setError(true))
+      .finally(() => setLoading(false));
   }, [page]);
+
+  if (loading) return (
+    <div className="flex items-center justify-center py-16">
+      <div className="w-8 h-8 border-2 border-accent border-t-transparent rounded-full animate-spin" />
+    </div>
+  );
+
+  if (error) return (
+    <div className="text-center py-16">
+      <p className="text-text-secondary">Failed to load audit log.</p>
+      <button onClick={() => setPage(p => p)} className="text-accent text-sm mt-2">Retry</button>
+    </div>
+  );
+
+  if (!data?.entries?.length) return (
+    <div className="text-center py-16">
+      <p className="text-text-secondary">No audit log entries yet.</p>
+      <p className="text-muted text-sm mt-1">Admin actions (ban, delete, promote) will appear here.</p>
+    </div>
+  );
 
   return (
     <div>
@@ -375,7 +402,7 @@ function AuditTab() {
             </tr>
           </thead>
           <tbody>
-            {data?.entries?.map(a => (
+            {data.entries.map(a => (
               <tr key={a.id} className="border-b border-border/30">
                 <td className="px-3 py-2 text-xs font-mono text-muted whitespace-nowrap">{a.created_at?.slice(0, 16)}</td>
                 <td className="px-3 py-2 text-xs">{a.admin_email}</td>
@@ -388,7 +415,7 @@ function AuditTab() {
           </tbody>
         </table>
       </div>
-      {data && <Paginator page={page} totalPages={data.total_pages} setPage={setPage} total={data.total} />}
+      <Paginator page={page} totalPages={data.total_pages} setPage={setPage} total={data.total} />
     </div>
   );
 }
