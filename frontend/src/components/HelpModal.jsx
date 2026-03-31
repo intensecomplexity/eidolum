@@ -171,6 +171,11 @@ export default function HelpModal({ onClose }) {
                 </div>
               ))}
             </div>
+            <div className="text-center mt-4">
+              <button onClick={() => { onClose(); navigate('/how-it-works'); }} className="text-accent text-xs font-medium hover:underline">
+                Full scoring guide &rarr;
+              </button>
+            </div>
           </div>
         </div>
       </div>

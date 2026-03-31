@@ -271,3 +271,84 @@ def get_ticker_stats(
         "bullish_pending": bullish,
         "bearish_pending": bearish,
     }
+
+
+# ── GET /api/ticker/{ticker}/chart — price history + prediction markers ──────
+
+_chart_cache: dict[str, tuple] = {}
+_CHART_TTL = 3600  # 1 hour
+
+PERIOD_MAP = {"1w": "5d", "1m": "1mo", "3m": "3mo", "6m": "6mo", "1y": "1y", "all": "max"}
+
+
+@router.get("/ticker/{ticker}/chart")
+@limiter.limit("30/minute")
+def get_ticker_chart(
+    request: Request,
+    ticker: str,
+    period: str = Query("6m"),
+    db: Session = Depends(get_db),
+):
+    ticker = ticker.upper().strip()
+    yf_period = PERIOD_MAP.get(period, "6mo")
+    cache_key = f"{ticker}_{period}"
+
+    cached = _chart_cache.get(cache_key)
+    if cached and (time.time() - cached[1]) < _CHART_TTL:
+        return cached[0]
+
+    # Fetch price data from yfinance
+    prices = []
+    try:
+        import yfinance as yf
+        stock = yf.Ticker(ticker)
+        hist = stock.history(period=yf_period)
+        for date_idx, row in hist.iterrows():
+            prices.append({
+                "date": date_idx.strftime("%Y-%m-%d"),
+                "close": round(float(row["Close"]), 2),
+                "volume": int(row.get("Volume", 0)),
+            })
+    except Exception as e:
+        print(f"[Chart] yfinance error for {ticker}: {e}")
+
+    # Fetch prediction markers from DB
+    from models import Prediction, Forecaster
+    from sqlalchemy import text as _t
+
+    predictions = []
+    try:
+        # Get date range from price data
+        if prices:
+            start_date = prices[0]["date"]
+        else:
+            start_date = "2020-01-01"
+
+        rows = db.execute(_t("""
+            SELECT p.prediction_date, p.entry_price, p.target_price,
+                   p.direction, p.outcome, p.actual_return,
+                   f.name as forecaster_name
+            FROM predictions p
+            JOIN forecasters f ON f.id = p.forecaster_id
+            WHERE p.ticker = :t AND p.prediction_date >= :start
+            ORDER BY p.prediction_date ASC
+            LIMIT 100
+        """), {"t": ticker, "start": start_date}).fetchall()
+
+        for r in rows:
+            pred_date = r[0]
+            predictions.append({
+                "date": pred_date.strftime("%Y-%m-%d") if pred_date else None,
+                "price_at_prediction": float(r[1]) if r[1] else None,
+                "target": float(r[2]) if r[2] else None,
+                "direction": r[3],
+                "outcome": r[4],
+                "forecaster": r[6],
+                "return_pct": round(float(r[5]), 1) if r[5] is not None else None,
+            })
+    except Exception as e:
+        print(f"[Chart] prediction query error for {ticker}: {e}")
+
+    result = {"ticker": ticker, "period": period, "prices": prices, "predictions": predictions}
+    _chart_cache[cache_key] = (result, time.time())
+    return result

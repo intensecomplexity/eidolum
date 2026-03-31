@@ -51,14 +51,23 @@ import HeatmapPage from './pages/Heatmap';
 import EarningsPage from './pages/Earnings';
 import ComparePage from './pages/Compare';
 import Discover from './pages/Discover';
+import HowItWorks from './pages/HowItWorks';
+import OnboardingOverlay from './components/OnboardingOverlay';
 import { useAuth } from './context/AuthContext';
+import { useState } from 'react';
 
 export default function App() {
   const { isAuthenticated } = useAuth();
+  const [showOnboarding, setShowOnboarding] = useState(() => {
+    return !localStorage.getItem('eidolum_token') && !localStorage.getItem('eidolum_onboarding_complete');
+  });
 
   return (
     <div className="min-h-screen bg-bg pb-bottom-nav sm:pb-0">
       <Navbar />
+      {showOnboarding && !isAuthenticated && (
+        <OnboardingOverlay onComplete={() => setShowOnboarding(false)} />
+      )}
       <Routes>
         <Route path="/" element={isAuthenticated ? <Dashboard /> : <LandingPublic />} />
         <Route path="/home" element={<Landing />} />
@@ -111,6 +120,7 @@ export default function App() {
         <Route path="/analyst/:name" element={<AnalystProfilePage />} />
         <Route path="/heatmap" element={<HeatmapPage />} />
         <Route path="/discover" element={<Discover />} />
+        <Route path="/how-it-works" element={<HowItWorks />} />
         <Route path="/earnings" element={<EarningsPage />} />
       </Routes>
       <SaveToast />

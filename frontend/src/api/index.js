@@ -603,6 +603,10 @@ export function getTickerCurrentPrice(ticker) {
   return api.get(`/ticker/${ticker}/price`).then(r => r.data);
 }
 
+export function getTickerChart(ticker, period = '6m') {
+  return api.get(`/ticker/${ticker}/chart`, { params: { period } }).then(r => r.data);
+}
+
 export function getTickerPredictions(symbol, status = 'pending') {
   return api.get(`/tickers/${symbol}/predictions`, { params: { status } }).then(r => r.data);
 }

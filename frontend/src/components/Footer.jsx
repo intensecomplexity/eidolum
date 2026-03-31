@@ -18,6 +18,8 @@ export default function Footer() {
             <span className="opacity-30">·</span>
             <Link to="/leaderboard" className="hover:text-accent transition-colors">Leaderboard</Link>
             <span className="opacity-30">·</span>
+            <Link to="/how-it-works" className="hover:text-accent transition-colors">How It Works</Link>
+            <span className="opacity-30">·</span>
             {isAuthenticated ? (
               <>
                 <Link to="/submit" className="hover:text-accent transition-colors">Submit</Link>
