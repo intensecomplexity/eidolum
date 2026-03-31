@@ -604,8 +604,8 @@ export function getTickerConsensus(ticker) {
   return api.get(`/consensus/${ticker}`).then(r => r.data);
 }
 
-export function getAllConsensus() {
-  return api.get('/consensus').then(r => r.data);
+export function getAllConsensus(params = {}) {
+  return api.get('/consensus', { params }).then(r => r.data);
 }
 
 export function getExpiringPredictions() {
@@ -670,6 +670,52 @@ export function createAdminPrediction(data) {
 
 export function getSchedulerStatus() {
   return api.get('/admin/scheduler-status', { headers: adminHeaders() }).then(r => r.data);
+}
+
+// ——— JWT-based Admin Panel API ———
+
+export function getAdminDashboard() {
+  return api.get('/admin/dashboard', { headers: authHeaders() }).then(r => r.data);
+}
+
+export function getAdminUsers(params = {}) {
+  return api.get('/admin/users', { params, headers: authHeaders() }).then(r => r.data);
+}
+
+export function banUser(userId) {
+  return api.post(`/admin/users/${userId}/ban`, {}, { headers: authHeaders() }).then(r => r.data);
+}
+
+export function unbanUser(userId) {
+  return api.post(`/admin/users/${userId}/unban`, {}, { headers: authHeaders() }).then(r => r.data);
+}
+
+export function deleteUserAccount(userId) {
+  return api.delete(`/admin/users/${userId}`, { headers: authHeaders() }).then(r => r.data);
+}
+
+export function promoteAdmin(userId) {
+  return api.post(`/admin/users/${userId}/promote`, {}, { headers: authHeaders() }).then(r => r.data);
+}
+
+export function demoteAdmin(userId) {
+  return api.post(`/admin/users/${userId}/demote`, {}, { headers: authHeaders() }).then(r => r.data);
+}
+
+export function deleteForecasterAdmin(forecasterId) {
+  return api.delete(`/admin/forecasters/${forecasterId}`, { headers: authHeaders() }).then(r => r.data);
+}
+
+export function deletePredictionAdmin(predictionId) {
+  return api.delete(`/admin/predictions-v2/${predictionId}`, { headers: authHeaders() }).then(r => r.data);
+}
+
+export function getAdminAuditLog(params = {}) {
+  return api.get('/admin/audit-log', { params, headers: authHeaders() }).then(r => r.data);
+}
+
+export function getAdminForecasters(params = {}) {
+  return api.get('/admin/forecasters', { params, headers: authHeaders() }).then(r => r.data);
 }
 
 export default api;

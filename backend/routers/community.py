@@ -500,25 +500,36 @@ _CONSENSUS_TTL = 600  # 10 minutes
 
 @router.get("/consensus")
 @limiter.limit("30/minute")
-def get_all_consensus(request: Request, db: Session = Depends(get_db)):
+def get_all_consensus(
+    request: Request,
+    db: Session = Depends(get_db),
+    sector: str = Query(None),
+    sort: str = Query(None),
+):
     global _consensus_cache, _consensus_cache_time
 
-    if _consensus_cache and (_consensus_time.time() - _consensus_cache_time) < _CONSENSUS_TTL:
+    # Use cache only for unfiltered default requests
+    if not sector and not sort and _consensus_cache and (_consensus_time.time() - _consensus_cache_time) < _CONSENSUS_TTL:
         return _consensus_cache
 
-    # Single query across ALL predictions (scraped + community)
-    rows = db.execute(_consensus_text("""
-        SELECT ticker,
+    where = "WHERE direction IN ('bullish', 'bearish')"
+    params = {}
+    if sector:
+        where += " AND sector = :sector"
+        params["sector"] = sector
+
+    rows = db.execute(_consensus_text(f"""
+        SELECT ticker, sector,
                COUNT(*) as total,
                SUM(CASE WHEN direction = 'bullish' THEN 1 ELSE 0 END) as bullish,
                SUM(CASE WHEN direction = 'bearish' THEN 1 ELSE 0 END) as bearish
         FROM predictions
-        WHERE direction IN ('bullish', 'bearish')
-        GROUP BY ticker
+        {where}
+        GROUP BY ticker, sector
         HAVING COUNT(*) >= 5
         ORDER BY COUNT(*) DESC
-        LIMIT 60
-    """)).fetchall()
+        LIMIT 100
+    """), params).fetchall()
 
     # Batch-fetch top forecaster per ticker
     tickers = [r[0] for r in rows]
@@ -541,11 +552,12 @@ def get_all_consensus(request: Request, db: Session = Depends(get_db)):
 
     results = []
     for r in rows:
-        ticker, total, bullish, bearish = r[0], r[1], r[2], r[3]
+        ticker, ticker_sector, total, bullish, bearish = r[0], r[1], r[2], r[3], r[4]
         bull_pct = round(bullish / total * 100, 1) if total > 0 else 0.0
         top = top_by_ticker.get(ticker)
         results.append({
             "ticker": ticker,
+            "sector": ticker_sector or "Other",
             "total_predictions": total,
             "bullish_count": bullish,
             "bearish_count": bearish,
@@ -556,8 +568,17 @@ def get_all_consensus(request: Request, db: Session = Depends(get_db)):
             "top_caller_accuracy": top["accuracy"] if top else None,
         })
 
-    _consensus_cache = results
-    _consensus_cache_time = _consensus_time.time()
+    # Sort
+    if sort == "bullish":
+        results.sort(key=lambda x: x["bullish_percentage"], reverse=True)
+    elif sort == "bearish":
+        results.sort(key=lambda x: x["bearish_percentage"], reverse=True)
+    elif sort == "divided":
+        results.sort(key=lambda x: abs(x["bullish_percentage"] - 50))
+
+    if not sector and not sort:
+        _consensus_cache = results
+        _consensus_cache_time = _consensus_time.time()
     return results
 
 
