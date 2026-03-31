@@ -486,6 +486,10 @@ export function getTickerPrice(symbol) {
   return api.get(`/tickers/${symbol}/price`).then(r => r.data);
 }
 
+export function getTickerCurrentPrice(ticker) {
+  return api.get(`/ticker/${ticker}/price`).then(r => r.data);
+}
+
 export function getTickerPredictions(symbol, status = 'pending') {
   return api.get(`/tickers/${symbol}/predictions`, { params: { status } }).then(r => r.data);
 }

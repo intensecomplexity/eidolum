@@ -1,7 +1,7 @@
 import os
 import time
 import httpx
-from datetime import datetime
+from datetime import datetime, timezone
 from collections import defaultdict
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy.orm import Session
@@ -120,6 +120,28 @@ def get_ticker_price(request: Request, symbol: str):
         }
 
     return {k: v for k, v in data.items() if not k.startswith("_")}
+
+
+# ── GET /api/ticker/{ticker}/price ───────────────────────────────────────────
+
+
+@router.get("/ticker/{ticker}/price")
+@limiter.limit("60/minute")
+def get_ticker_price_simple(request: Request, ticker: str):
+    """Return current price in simplified format for the submission form."""
+    ticker = ticker.upper().strip()
+    if ticker not in TICKER_INFO:
+        raise HTTPException(status_code=404, detail=f"Unknown ticker: {ticker}")
+
+    data = _fetch_price_data(ticker)
+    price = data.get("current_price") if data else None
+    ts = datetime.fromtimestamp(data["_ts"], tz=timezone.utc).isoformat() if data and data.get("_ts") else None
+
+    return {
+        "ticker": ticker,
+        "price": price,
+        "updated_at": ts,
+    }
 
 
 # ── GET /api/tickers/{symbol}/predictions ─────────────────────────────────────

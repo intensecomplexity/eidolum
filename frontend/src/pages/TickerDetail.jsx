@@ -12,23 +12,31 @@ export default function TickerDetail() {
   const params = useParams();
   const ticker = (params.ticker || params.symbol || '').toUpperCase();
   const [data, setData] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!!ticker);
   const [error, setError] = useState(false);
 
-  useEffect(() => {
+  function fetchData() {
     if (!ticker) return;
     setLoading(true);
     setError(false);
+    setData(null);
     const timeout = setTimeout(() => {
       setLoading(false);
       setError(true);
-    }, 5000);
+    }, 8000);
     getTickerDetail(ticker)
-      .then(setData)
-      .catch(() => setError(true))
-      .finally(() => { clearTimeout(timeout); setLoading(false); });
-    return () => clearTimeout(timeout);
-  }, [ticker]);
+      .then(d => { clearTimeout(timeout); setData(d); setLoading(false); })
+      .catch(() => { clearTimeout(timeout); setError(true); setLoading(false); });
+  }
+
+  useEffect(() => { fetchData(); }, [ticker]);
+
+  if (!ticker) return (
+    <div className="max-w-5xl mx-auto px-4 py-20 text-center">
+      <p className="text-text-secondary text-lg">No ticker specified.</p>
+      <Link to="/consensus" className="text-accent mt-4 inline-block">Browse all tickers</Link>
+    </div>
+  );
 
   if (loading) return (
     <div className="flex items-center justify-center min-h-[60vh]">
@@ -36,22 +44,20 @@ export default function TickerDetail() {
     </div>
   );
 
-  if (error && !data) return (
+  if (error || !data) return (
     <div className="max-w-5xl mx-auto px-4 py-20 text-center">
-      <p className="text-text-secondary text-lg">Could not load data for {ticker}.</p>
-      <p className="text-muted text-sm mt-1">The request timed out or the ticker was not found.</p>
-      <Link to="/consensus" className="text-accent mt-4 inline-block">Browse all tickers</Link>
+      <p className="text-text-secondary text-lg">{error ? `Could not load data for ${ticker}.` : `No data found for ${ticker}.`}</p>
+      {error && <p className="text-muted text-sm mt-1">The request timed out or the server returned an error.</p>}
+      <button onClick={fetchData} className="text-accent mt-4 inline-block hover:underline cursor-pointer">Try again</button>
+      <span className="text-muted mx-2">or</span>
+      <Link to="/consensus" className="text-accent inline-block hover:underline">Browse all tickers</Link>
     </div>
   );
 
-  if (!data) return (
-    <div className="max-w-5xl mx-auto px-4 py-20 text-center">
-      <p className="text-text-secondary text-lg">No data found for {ticker}.</p>
-      <Link to="/consensus" className="text-accent mt-4 inline-block">Browse all tickers</Link>
-    </div>
-  );
-
-  const { consensus, stats, pending_predictions: pending, recent_evaluated: scored } = data;
+  const consensus = data.consensus || {};
+  const stats = data.stats || {};
+  const pending = data.pending_predictions || [];
+  const scored = data.recent_evaluated || [];
   const bullPct = consensus?.bullish_pct || 0;
   const bearPct = consensus?.bearish_pct || 0;
 
@@ -88,7 +94,7 @@ export default function TickerDetail() {
             {/* Consensus bar */}
             {data.total_predictions > 0 && (
               <div className="sm:w-64">
-                <ConsensusBar bullish={consensus.bullish_count} bearish={consensus.bearish_count} />
+                <ConsensusBar bullish={consensus.bullish_count || 0} bearish={consensus.bearish_count || 0} />
                 <div className="flex justify-between text-[10px] mt-1">
                   <span className="text-positive font-mono">{bullPct}% bullish</span>
                   <span className="text-negative font-mono">{bearPct}% bearish</span>
@@ -98,7 +104,7 @@ export default function TickerDetail() {
           </div>
 
           {/* Quick stats */}
-          {stats && (
+          {stats && stats.evaluated > 0 && (
             <div className="flex gap-4 sm:gap-6 mt-4 pt-4 border-t border-border/30 text-xs flex-wrap">
               <div>
                 <span className="text-muted">Historical accuracy: </span>
