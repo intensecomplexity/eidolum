@@ -5,7 +5,8 @@ Generate human-readable prediction context from raw analyst rating data.
 BULLISH_RATINGS = {"buy", "outperform", "overweight", "strong buy", "strong_buy", "positive", "top pick"}
 BEARISH_RATINGS = {"sell", "underperform", "underweight", "strong sell", "strong_sell", "negative", "reduce"}
 NEUTRAL_RATINGS = {"hold", "neutral", "market perform", "market_perform", "equal weight", "equal_weight",
-                   "sector perform", "sector_perform", "in line", "in_line", "peer perform", "peer_perform"}
+                   "sector perform", "sector_perform", "in line", "in_line", "peer perform", "peer_perform",
+                   "market weight", "market_weight"}
 
 
 def _sentiment(rating: str) -> str:

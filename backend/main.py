@@ -1280,7 +1280,10 @@ async def lifespan(app):
         except Exception:
             pass
 
-        # Reclassify hold/neutral predictions that were forced into bull/bear
+        # Reclassify hold/neutral predictions that were forced into bull/bear.
+        # The context_formatter writes "Firm: Neutral — ..." for hold/neutral ratings,
+        # and includes rating words like "Hold", "Equal-Weight", "Market Perform" etc.
+        # Also match predictions where context explicitly mentions neutral-type ratings.
         try:
             from sqlalchemy import text as _rcl_t
             _rcl_db = BgSessionLocal()
@@ -1289,18 +1292,52 @@ async def lifespan(app):
                 SET direction = 'neutral'
                 WHERE direction IN ('bullish', 'bearish')
                   AND (
-                    LOWER(exact_quote) ~ '(^|\\s)(hold|neutral|equal[\\s-]?weight|market[\\s-]?perform|sector[\\s-]?perform|in[\\s-]?line|peer[\\s-]?perform|market[\\s-]?weight)(\\s|$|,|\\.|;)'
-                    OR LOWER(context) ~ '(^|\\s)(hold|neutral|equal[\\s-]?weight|market[\\s-]?perform|sector[\\s-]?perform|in[\\s-]?line|peer[\\s-]?perform|market[\\s-]?weight)(\\s|$|,|\\.|;)'
+                    -- Match "Firm: Neutral — ..." pattern from context_formatter
+                    context LIKE '%: Neutral —%'
+                    OR exact_quote LIKE '%: Neutral —%'
+                    -- Match specific neutral rating words in context/quote
+                    OR context ILIKE '%Maintains Hold%'
+                    OR context ILIKE '%Maintains Neutral%'
+                    OR context ILIKE '%Maintains Equal%Weight%'
+                    OR context ILIKE '%Maintains Market Perform%'
+                    OR context ILIKE '%Maintains Sector Perform%'
+                    OR context ILIKE '%Maintains In-Line%'
+                    OR context ILIKE '%Maintains Peer Perform%'
+                    OR context ILIKE '%Maintains Market Weight%'
+                    OR context ILIKE '%Reaffirms Hold%'
+                    OR context ILIKE '%Reaffirms Neutral%'
+                    OR context ILIKE '%Reaffirms Equal%Weight%'
+                    OR context ILIKE '%Reaffirms Market Perform%'
+                    OR context ILIKE '%Hold rating on%'
+                    OR context ILIKE '%Neutral rating on%'
+                    OR context ILIKE '%Equal%Weight rating on%'
+                    OR context ILIKE '%Market Perform rating on%'
+                    OR context ILIKE '%Sector Perform rating on%'
+                    OR context ILIKE '%In-Line rating on%'
+                    OR context ILIKE '%coverage with Hold%'
+                    OR context ILIKE '%coverage with Neutral%'
+                    OR context ILIKE '%coverage with Equal%Weight%'
+                    OR context ILIKE '%coverage with Market Perform%'
+                    OR exact_quote ILIKE '%Maintains Hold%'
+                    OR exact_quote ILIKE '%Maintains Neutral%'
+                    OR exact_quote ILIKE '%Maintains Equal%Weight%'
+                    OR exact_quote ILIKE '%Hold rating on%'
+                    OR exact_quote ILIKE '%Neutral rating on%'
+                    OR exact_quote ILIKE '%Equal%Weight rating on%'
+                    OR exact_quote ILIKE '%Market Perform rating on%'
                   )
-                  AND LOWER(COALESCE(exact_quote, '') || ' ' || COALESCE(context, ''))
-                      !~ '(upgrade|downgrade|raise|lower|cut|boost)'
+                  -- Exclude explicit upgrades/downgrades (those are directional even if target rating is neutral)
+                  AND context NOT ILIKE '%Upgraded to%'
+                  AND context NOT ILIKE '%Downgraded to%'
             """))
             _rcl_db.commit()
             if result.rowcount > 0:
                 print(f"[Startup] Reclassified {result.rowcount} predictions to neutral")
+            else:
+                print("[Startup] No predictions to reclassify (all already correct)")
             _rcl_db.close()
-        except Exception:
-            pass
+        except Exception as e:
+            print(f"[Startup] Reclassification error: {e}")
 
         # Run migrations (add columns that models.py defines but create_all might miss)
         try:

@@ -305,16 +305,18 @@ def _get_direction(action_lower: str, rating_lower: str, pt_current, pt_prior) -
     if "downgrade" in action_lower:
         return "bearish"
 
-    # Maintains/reiterates — only valid if PT changed
+    # Maintains/reiterates
     if "maintains" in action_lower or "reiterates" in action_lower:
+        # Neutral ratings are always meaningful (confirms no expected movement)
+        if any(w in rating_lower for w in _NEUTRAL_RATINGS):
+            return "neutral"
+        # For bull/bear maintains, only include if PT actually changed
         if not pt_current or str(pt_current) == str(pt_prior):
             return None  # No change = skip
         if any(w in rating_lower for w in ["buy", "outperform", "overweight", "strong buy"]):
             return "bullish"
         if any(w in rating_lower for w in ["sell", "underperform", "underweight", "reduce"]):
             return "bearish"
-        if any(w in rating_lower for w in _NEUTRAL_RATINGS):
-            return "neutral"
         return None
 
     # Fallback: derive from rating name
