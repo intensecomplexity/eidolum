@@ -5,8 +5,7 @@ import { useAuth } from '../context/AuthContext';
 import {
   getAdminDashboard, getAdminUsers, getAdminForecasters, getAdminAuditLog,
   banUser, unbanUser, deleteUserAccount, promoteAdmin, demoteAdmin,
-  deleteForecasterAdmin, deletePredictionAdmin, getAdminPredictions,
-  getSchedulerStatus,
+  deleteForecasterAdmin, deletePredictionAdmin, listPredictionsAdmin,
 } from '../api';
 
 const TABS = ['Overview', 'Users', 'Forecasters', 'Predictions', 'Audit Log'];
@@ -292,10 +291,8 @@ function PredictionsTab({ showToast }) {
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
 
-  const adminHeaders = () => ({ Authorization: `Bearer ${sessionStorage.getItem('admin_token') || localStorage.getItem('eidolum_token') || ''}` });
-
   const load = useCallback(() => {
-    getAdminPredictions({ page, per_page: 50, search }).then(setData).catch(() => {});
+    listPredictionsAdmin({ page, per_page: 50, search }).then(setData).catch(() => {});
   }, [search, page]);
 
   useEffect(() => { load(); }, [load]);

@@ -219,7 +219,46 @@ def delete_forecaster(request: Request, forecaster_id: int, admin_id: int = Depe
     return {"status": "deleted", "predictions_removed": pred_count}
 
 
-# ── DELETE /api/admin/predictions/{id} (JWT-based) ──────────────────────────
+# ── GET /api/admin/predictions-v2 (JWT-based listing) ────────────────────────
+
+
+@router.get("/admin/predictions-v2")
+@limiter.limit("30/minute")
+def list_predictions_v2(request: Request, admin_id: int = Depends(require_admin_user), db: Session = Depends(get_db),
+                        search: str = Query(""), page: int = Query(1, ge=1), per_page: int = Query(50, ge=1, le=100)):
+    q = db.query(Prediction)
+    if search.strip():
+        pattern = f"%{search.strip().upper()}%"
+        q = q.filter(Prediction.ticker.like(pattern))
+    total = q.count()
+    predictions = q.order_by(Prediction.prediction_date.desc()).offset((page - 1) * per_page).limit(per_page).all()
+
+    # Batch-fetch forecaster names
+    fids = list(set(p.forecaster_id for p in predictions if p.forecaster_id))
+    fname_map = {}
+    if fids:
+        for f in db.query(Forecaster).filter(Forecaster.id.in_(fids)).all():
+            fname_map[f.id] = f.name
+
+    return {
+        "predictions": [{
+            "id": p.id,
+            "ticker": p.ticker,
+            "direction": p.direction,
+            "prediction_date": p.prediction_date.isoformat() if p.prediction_date else None,
+            "outcome": p.outcome,
+            "actual_return": float(p.actual_return) if p.actual_return is not None else None,
+            "forecaster_name": fname_map.get(p.forecaster_id, "Unknown"),
+            "exact_quote": (p.exact_quote or p.context or "")[:120],
+            "source_url": p.source_url,
+        } for p in predictions],
+        "total": total,
+        "page": page,
+        "total_pages": max(1, (total + per_page - 1) // per_page),
+    }
+
+
+# ── DELETE /api/admin/predictions-v2/{id} (JWT-based) ────────────────────────
 
 
 @router.delete("/admin/predictions-v2/{prediction_id}")

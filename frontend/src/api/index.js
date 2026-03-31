@@ -736,6 +736,10 @@ export function deleteForecasterAdmin(forecasterId) {
   return api.delete(`/admin/forecasters/${forecasterId}`, { headers: authHeaders() }).then(r => r.data);
 }
 
+export function listPredictionsAdmin(params = {}) {
+  return api.get('/admin/predictions-v2', { params, headers: authHeaders() }).then(r => r.data);
+}
+
 export function deletePredictionAdmin(predictionId) {
   return api.delete(`/admin/predictions-v2/${predictionId}`, { headers: authHeaders() }).then(r => r.data);
 }
