@@ -1,17 +1,18 @@
 import { Link } from 'react-router-dom';
-import { ExternalLink } from 'lucide-react';
+import { ExternalLink, Archive } from 'lucide-react';
 import PredictionBadge from './PredictionBadge';
 import ConflictBadge from './ConflictBadge';
 import BookmarkButton from './BookmarkButton';
 import PlatformBadge from './PlatformBadge';
 import { annotateContext, ExplainerLine } from '../utils/predictionExplainer';
 
+const HORIZON_LABELS = { short: '30d', medium: '90d', long: '1y', custom: 'Custom' };
+
 const API_BASE = 'https://eidolum-production.up.railway.app';
 
-function ProofBlock({ p }) {
+function ProofLinks({ p }) {
   const source = p.source_url || '';
   const archive = p.archive_url;
-  const archiveImg = archive && archive.startsWith('/archive/') ? `${API_BASE}${archive}` : null;
 
   const waybackLink = archive && archive.startsWith('https://web.archive.org')
     ? archive
@@ -19,48 +20,44 @@ function ProofBlock({ p }) {
       ? `https://web.archive.org/web/${source}`
       : null;
 
-  if (!source) return null;
+  const archiveImg = archive && archive.startsWith('/archive/') ? `${API_BASE}${archive}` : null;
 
-  // YouTube: thumbnail + watch link
+  if (!source && !archiveImg) return null;
+
+  // YouTube: simple link
   if (source.includes('youtube.com') || source.includes('youtu.be')) {
     const ts = p.video_timestamp_sec;
     const timeStr = ts ? `${Math.floor(ts / 60)}:${String(ts % 60).padStart(2, '0')}` : null;
     return (
-      <div className="mt-2">
-        {archiveImg && (
-          <img src={archiveImg} alt="Video proof"
-            className="w-full max-w-[400px] rounded-lg mb-2 border border-border block" />
-        )}
+      <div className="flex items-center gap-3">
         <a href={source} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()}
-          className="inline-flex items-center gap-1 text-xs text-accent hover:underline">
-          <ExternalLink className="w-3 h-3" />
-          {timeStr ? `Watch at ${timeStr}` : 'Watch on YouTube'}
+          className="inline-flex items-center gap-1 text-xs text-text-secondary hover:text-accent transition-colors">
+          <ExternalLink className="w-3 h-3" /> {timeStr ? `Watch at ${timeStr}` : 'Source'}
         </a>
       </div>
     );
   }
 
-  // Twitter / Reddit / Article: screenshot + clean text links
   return (
-    <div className="mt-2">
-      {archiveImg && (
-        <a href={archiveImg} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()}>
-          <img src={archiveImg} alt="Screenshot proof"
-            className="w-full max-w-[500px] rounded-lg mb-2 border border-border cursor-pointer block" />
-        </a>
-      )}
-      <div className="flex items-center gap-3">
+    <div className="flex items-center gap-3">
+      {source && (
         <a href={source} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()}
-          className="inline-flex items-center gap-1 text-xs text-text-secondary hover:text-accent">
+          className="inline-flex items-center gap-1 text-xs text-text-secondary hover:text-accent transition-colors">
           <ExternalLink className="w-3 h-3" /> Source
         </a>
-        {waybackLink && (
-          <a href={waybackLink} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()}
-            className="inline-flex items-center gap-1 text-xs text-text-secondary hover:text-accent">
-            <ExternalLink className="w-3 h-3" /> Proof
-          </a>
-        )}
-      </div>
+      )}
+      {waybackLink && (
+        <a href={waybackLink} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()}
+          className="inline-flex items-center gap-1 text-xs text-text-secondary hover:text-accent transition-colors">
+          <Archive className="w-3 h-3" /> Proof
+        </a>
+      )}
+      {archiveImg && (
+        <a href={archiveImg} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()}
+          className="inline-flex items-center gap-1 text-xs text-text-secondary hover:text-accent transition-colors">
+          <Archive className="w-3 h-3" /> Screenshot
+        </a>
+      )}
     </div>
   );
 }
@@ -73,13 +70,15 @@ function formatDate(iso) {
 export default function PredictionCard({ prediction: p, showForecaster = false, forecaster = null }) {
   const predId = p.id || p.prediction_id;
   const evalDate = p.evaluation_date || p.resolution_date;
+  const windowDays = p.window_days || p.evaluation_window_days;
 
   return (
-    <div className={`bg-surface border rounded-xl p-4 overflow-hidden break-words ${
+    <div className={`bg-surface border rounded-xl p-4 overflow-hidden ${
       p.outcome === 'pending' ? 'border-warning/30' : 'border-border'
-    }`}>
-      {/* Line 1: Ticker | Badges | Outcome */}
-      <div className="flex items-center justify-between gap-2 mb-2">
+    }`} style={{ wordBreak: 'break-word' }}>
+
+      {/* Line 1: Ticker | BULL/BEAR badge | result | bookmark */}
+      <div className="flex items-center justify-between mb-2">
         <div className="flex items-center gap-2 flex-wrap min-w-0">
           <Link to={`/asset/${p.ticker}`} className="font-mono text-accent text-base font-bold active:underline shrink-0">
             {p.ticker}
@@ -90,7 +89,7 @@ export default function PredictionCard({ prediction: p, showForecaster = false, 
               CRYPTO
             </span>
           )}
-          <PredictionBadge direction={p.direction} windowDays={p.window_days || p.evaluation_window_days} />
+          <PredictionBadge direction={p.direction} windowDays={windowDays} />
           {p.has_conflict && <ConflictBadge note={p.conflict_note} size="small" />}
         </div>
         <div className="flex items-center gap-1 shrink-0">
@@ -99,15 +98,15 @@ export default function PredictionCard({ prediction: p, showForecaster = false, 
         </div>
       </div>
 
-      {/* Forecaster info (if showing) */}
+      {/* Forecaster (if shown) */}
       {showForecaster && p.forecaster && (
         <Link
           to={`/forecaster/${p.forecaster.id}`}
           className="flex items-center gap-1.5 text-sm text-text-secondary active:text-accent mb-2"
         >
           <PlatformBadge platform={p.forecaster?.platform || p.source_type} size={14} />
-          {p.forecaster.name}
-          <span className="text-muted text-xs ml-1">
+          <span className="truncate">{p.forecaster.name}</span>
+          <span className="text-muted text-xs ml-1 shrink-0">
             {p.forecaster.accuracy_rate?.toFixed(1)}%
           </span>
         </Link>
@@ -115,41 +114,35 @@ export default function PredictionCard({ prediction: p, showForecaster = false, 
 
       {/* Raw analyst quote */}
       {(p.exact_quote || p.context) && (
-        <p className="text-xs text-text-primary leading-relaxed mb-1.5 break-words">
+        <p className="text-xs text-text-secondary italic leading-relaxed mb-1.5 break-words">
           {annotateContext(p.exact_quote || p.context, p.ticker)}
         </p>
       )}
 
-      {/* In simple terms (gold explainer) */}
+      {/* Simple explainer (gold) */}
       <ExplainerLine prediction={p} className="mb-2" />
 
-      {/* Entry → Target | Return */}
-      <div className="flex items-center gap-2 text-xs font-mono mb-1.5 flex-wrap">
+      {/* Price + return data */}
+      <div className="grid grid-cols-2 gap-x-3 gap-y-0.5 text-xs font-mono mb-2">
         {p.entry_price != null && (
           <span className="text-text-secondary">Entry ${p.entry_price.toFixed(2)}</span>
         )}
-        {p.entry_price != null && p.target_price != null && (
-          <span className="text-muted">&rarr;</span>
-        )}
         {p.target_price != null && (
-          <span className="text-text-secondary">Target ${p.target_price.toFixed(0)}</span>
+          <span className="text-text-secondary text-right">Target ${p.target_price.toFixed(0)}</span>
         )}
         {p.actual_return !== null && p.actual_return !== undefined && (
-          <>
-            <span className="text-muted">|</span>
-            <span className={`font-semibold ${p.actual_return >= 0 ? 'text-positive' : 'text-negative'}`}>
-              {p.actual_return >= 0 ? '+' : ''}{p.actual_return.toFixed(1)}%
-            </span>
-          </>
+          <span className={`font-semibold ${p.actual_return >= 0 ? 'text-positive' : 'text-negative'}`}>
+            Return: {p.actual_return >= 0 ? '+' : ''}{p.actual_return.toFixed(1)}%
+          </span>
         )}
       </div>
 
       {/* Dates */}
-      <div className="flex items-center gap-3 text-[10px] text-muted font-mono mb-2">
+      <div className="flex items-center gap-3 text-[10px] font-mono text-muted mb-2">
         {p.prediction_date && <span>{formatDate(p.prediction_date)}</span>}
         {evalDate && (
           <span>
-            {p.outcome === 'pending' ? `Eval ${formatDate(evalDate)}` : `Scored ${formatDate(evalDate)}`}
+            {p.outcome === 'pending' ? `Eval: ${formatDate(evalDate)}` : `Scored: ${formatDate(evalDate)}`}
           </span>
         )}
       </div>
@@ -161,8 +154,8 @@ export default function PredictionCard({ prediction: p, showForecaster = false, 
         </p>
       )}
 
-      {/* Source / Proof links */}
-      <ProofBlock p={p} />
+      {/* Source + Proof links */}
+      <ProofLinks p={p} />
 
       {/* Conflict detail */}
       {p.has_conflict && p.conflict_note && (
@@ -173,11 +166,9 @@ export default function PredictionCard({ prediction: p, showForecaster = false, 
       )}
 
       {/* Disclaimer */}
-      <div className="mt-2 pt-2 border-t border-border/20">
-        <p className="text-muted/50 text-[9px] leading-relaxed">
-          Quote sourced from public statement. Not investment advice.
-        </p>
-      </div>
+      <p className="text-muted text-[10px] italic mt-2 pt-1.5 border-t border-border/20 leading-relaxed">
+        Quote sourced from public statement. Not investment advice.
+      </p>
     </div>
   );
 }

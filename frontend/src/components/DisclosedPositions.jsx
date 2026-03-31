@@ -34,25 +34,8 @@ export default function DisclosedPositions({ forecasterId, platform }) {
   const rateInfo = RATE_COLORS[rateLevel];
   const hasContent = positions.length > 0 || isCongress;
 
-  // No positions and not congress — show a single collapsed line
-  if (!hasContent) {
-    return (
-      <button
-        onClick={() => setExpanded(!expanded)}
-        className="w-full card mb-6 sm:mb-8 py-3 flex items-center justify-between text-left"
-      >
-        <div className="flex items-center gap-2 text-sm">
-          <Briefcase className="w-3.5 h-3.5 text-muted" />
-          <span className="text-text-secondary">Disclosed Positions</span>
-          <span className="text-muted">&mdash;</span>
-          <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-mono font-semibold ${rateInfo.bg} ${rateInfo.color}`}>
-            <CheckCircle className="w-3 h-3" /> {stats.conflict_rate?.toFixed(0) || 0}% conflict
-          </span>
-        </div>
-        <ChevronDown className={`w-4 h-4 text-muted transition-transform ${expanded ? 'rotate-180' : ''}`} />
-      </button>
-    );
-  }
+  // No positions and not congress — hide entirely
+  if (!hasContent) return null;
 
   // Has positions or is congress — show full card
   return (
