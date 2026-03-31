@@ -85,7 +85,10 @@ export default function TickerDetail() {
             {data.company_name && (
               <div className="text-text-primary text-base sm:text-lg font-medium mt-1">{data.company_name}</div>
             )}
-            {data.industry && (
+            {data.description && (
+              <div className="text-text-secondary text-sm mt-1 leading-relaxed max-w-xl">{data.description}</div>
+            )}
+            {!data.description && data.industry && (
               <div className="text-muted text-sm mt-0.5">{data.industry}</div>
             )}
             {data.sector && (

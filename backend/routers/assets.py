@@ -80,14 +80,16 @@ def _build_ticker_detail(ticker: str, db) -> dict:
     sector = None
     company_name = None
     industry = None
+    description = None
     try:
         ts_row = db.execute(sql_text(
-            "SELECT sector, company_name, industry FROM ticker_sectors WHERE ticker = :t"
+            "SELECT sector, company_name, industry, description FROM ticker_sectors WHERE ticker = :t"
         ), {"t": ticker}).first()
         if ts_row:
             sector = ts_row[0]
             company_name = ts_row[1]
             industry = ts_row[2]
+            description = ts_row[3]
     except Exception:
         db.rollback()
 
@@ -309,6 +311,7 @@ def _build_ticker_detail(ticker: str, db) -> dict:
     result = {
         "ticker": ticker,
         "company_name": company_name,
+        "description": description,
         "industry": industry,
         "sector": sector,
         "total_predictions": total_all,

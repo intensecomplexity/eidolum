@@ -123,19 +123,20 @@ def _normalize_sector(raw: str) -> str:
     return raw or "Other"
 
 
-def _cache_to_db(ticker: str, sector: str, db=None, company_name: str = "", industry: str = ""):
-    """Cache sector, company name, and industry to DB table."""
+def _cache_to_db(ticker: str, sector: str, db=None, company_name: str = "", industry: str = "", description: str = ""):
+    """Cache sector, company name, industry, and description to DB table."""
     if not db:
         return
     try:
-        if company_name:
+        if company_name or description:
             db.execute(sql_text("""
-                INSERT INTO ticker_sectors (ticker, sector, company_name, industry)
-                VALUES (:t, :s, :cn, :ind)
+                INSERT INTO ticker_sectors (ticker, sector, company_name, industry, description)
+                VALUES (:t, :s, :cn, :ind, :desc)
                 ON CONFLICT (ticker) DO UPDATE SET sector = :s,
                     company_name = COALESCE(NULLIF(:cn, ''), ticker_sectors.company_name),
-                    industry = COALESCE(NULLIF(:ind, ''), ticker_sectors.industry)
-            """), {"t": ticker, "s": sector, "cn": company_name, "ind": industry})
+                    industry = COALESCE(NULLIF(:ind, ''), ticker_sectors.industry),
+                    description = COALESCE(NULLIF(:desc, ''), ticker_sectors.description)
+            """), {"t": ticker, "s": sector, "cn": company_name, "ind": industry, "desc": description})
         else:
             db.execute(sql_text("""
                 INSERT INTO ticker_sectors (ticker, sector) VALUES (:t, :s)
@@ -255,3 +256,74 @@ def backfill_company_names():
             time.sleep(1)
 
     print(f"[CompanyBackfill] Processed {len(tickers)} tickers, updated {updated} company names")
+
+
+def _first_sentence(text: str, max_len: int = 150) -> str:
+    """Extract the first sentence, capped at max_len characters."""
+    if not text:
+        return ""
+    # Split on period followed by space or end of string
+    for end in (".", ".\n"):
+        idx = text.find(end)
+        if idx > 0 and idx < 200:
+            sentence = text[:idx + 1].strip()
+            return sentence[:max_len]
+    return text[:max_len].strip()
+
+
+def backfill_descriptions():
+    """Populate ticker_sectors.description for all unique tickers using yfinance.
+    Only looks up tickers that don't have a description yet. Runs once at startup."""
+    from database import BgSessionLocal as SessionLocal
+
+    db = SessionLocal()
+    try:
+        rows = db.execute(sql_text("""
+            SELECT DISTINCT p.ticker
+            FROM predictions p
+            LEFT JOIN ticker_sectors ts ON ts.ticker = p.ticker
+            WHERE ts.description IS NULL OR ts.description = ''
+            LIMIT 500
+        """)).fetchall()
+    finally:
+        db.close()
+
+    if not rows:
+        print("[DescBackfill] All tickers already have descriptions")
+        return
+
+    tickers = [r[0] for r in rows]
+    updated = 0
+    print(f"[DescBackfill] {len(tickers)} tickers need descriptions")
+
+    for i, ticker in enumerate(tickers):
+        try:
+            import yfinance as yf
+            stock = yf.Ticker(ticker)
+            info = stock.info or {}
+            company_name = info.get("shortName") or info.get("longName") or ""
+            summary = info.get("longBusinessSummary") or ""
+            description = _first_sentence(summary)
+            sector_raw = info.get("sector") or ""
+            industry_raw = info.get("industry") or ""
+            sector = _normalize_sector(sector_raw) if sector_raw else KNOWN_SECTORS.get(ticker, "Other")
+
+            if description or company_name:
+                db = SessionLocal()
+                try:
+                    _cache_to_db(ticker, sector, db,
+                                 company_name=company_name,
+                                 industry=industry_raw,
+                                 description=description)
+                    updated += 1
+                finally:
+                    db.close()
+        except Exception as e:
+            if i < 3:
+                print(f"[DescBackfill] Error for {ticker}: {e}")
+
+        # Rate limit: 10 tickers per second
+        if (i + 1) % 10 == 0:
+            time.sleep(1)
+
+    print(f"[DescBackfill] Done: {updated}/{len(tickers)} descriptions added")

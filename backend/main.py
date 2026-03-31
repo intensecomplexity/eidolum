@@ -1089,10 +1089,11 @@ def run_phase2_migrations():
     except Exception:
         db.rollback()
 
-    # ── 42. ticker_sectors: add company_name + industry columns ──
+    # ── 42. ticker_sectors: add company_name + industry + description columns ──
     for col in [
         "company_name VARCHAR(255)",
         "industry VARCHAR(255)",
+        "description VARCHAR(300)",
     ]:
         try:
             db.execute(text(f"ALTER TABLE ticker_sectors ADD COLUMN {col}"))
@@ -1493,6 +1494,13 @@ async def lifespan(app):
             print("[Startup] Company name backfill complete")
         except Exception as e:
             print(f"[Startup] Company name backfill error: {e}")
+
+        # Backfill ticker descriptions (yfinance, first sentence of summary)
+        try:
+            from jobs.sector_lookup import backfill_descriptions
+            backfill_descriptions()
+        except Exception as e:
+            print(f"[Startup] Description backfill error: {e}")
 
         # STEP 2: Start forward backfill (2020-01-01 → today)
         try:
