@@ -73,12 +73,13 @@ class AdminAuthMiddleware(BaseHTTPMiddleware):
                         _db = SessionLocal()
                         try:
                             u = _db.query(User).filter(User.id == uid).first()
-                            if u and u.is_admin:
+                            if u and getattr(u, 'is_admin', 0):
                                 return await call_next(request)
+                            print(f"[AdminAuth] JWT user {uid} is_admin={getattr(u, 'is_admin', None) if u else 'NOT FOUND'}")
                         finally:
                             _db.close()
-                except Exception:
-                    pass
+                except Exception as e:
+                    print(f"[AdminAuth] JWT check error: {e}")
 
             from starlette.responses import JSONResponse
             return JSONResponse({"detail": "Not found"}, status_code=404)
