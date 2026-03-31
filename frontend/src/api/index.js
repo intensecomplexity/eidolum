@@ -48,7 +48,63 @@ export function getTrendingTickers() {
 }
 
 export function getTickerDetail(ticker) {
-  return api.get(`/ticker/${ticker}/detail`).then(r => r.data);
+  // Try the detail endpoint first; fall back to the consensus endpoint which always works
+  return api.get(`/ticker/${ticker}/detail`).then(r => {
+    // If detail returned 0 predictions, try consensus as fallback
+    if (r.data && r.data.total_predictions === 0) {
+      return api.get(`/asset/${ticker}/consensus`).then(c => _mergeConsensus(ticker, c.data));
+    }
+    return r.data;
+  }).catch(() => {
+    // Detail endpoint failed entirely — use consensus
+    return api.get(`/asset/${ticker}/consensus`).then(c => _mergeConsensus(ticker, c.data)).catch(() => null);
+  });
+}
+
+function _mergeConsensus(ticker, c) {
+  if (!c) return null;
+  const total = c.total_predictions || 0;
+  const bull = c.bullish_count || 0;
+  const bear = c.bearish_count || 0;
+  const neutral = c.neutral_count || 0;
+  // Build evaluated predictions from recent_predictions
+  const recent = (c.recent_predictions || []).map(p => ({
+    ...p,
+    id: p.prediction_id || p.id,
+    ticker,
+    forecaster: p.forecaster || { name: 'Unknown', id: 0, accuracy_rate: 0 },
+  }));
+  const evaluated = recent.filter(p => p.outcome !== 'pending');
+  const correct = evaluated.filter(p => p.outcome === 'correct' || p.outcome === 'hit').length;
+  const pending = recent.filter(p => p.outcome === 'pending');
+  return {
+    ticker,
+    company_name: c.company_name || null,
+    sector: c.sector || null,
+    industry: null,
+    total_predictions: total,
+    current_consensus: {
+      total, bullish_count: bull, bearish_count: bear, neutral_count: neutral,
+      bullish_pct: total > 0 ? Math.round(bull / total * 100 * 10) / 10 : 0,
+      bearish_pct: total > 0 ? Math.round(bear / total * 100 * 10) / 10 : 0,
+      neutral_pct: total > 0 ? Math.round(neutral / total * 100 * 10) / 10 : 0,
+      bulls: [], bears: [],
+    },
+    historical: {
+      total_evaluated: evaluated.length, correct,
+      accuracy: evaluated.length > 0 ? Math.round(correct / evaluated.length * 1000) / 10 : 0,
+      bullish_total: 0, bullish_accuracy: 0, bearish_total: 0, bearish_accuracy: 0,
+      avg_target: null,
+    },
+    stats: {
+      evaluated: evaluated.length, correct,
+      historical_accuracy: evaluated.length > 0 ? Math.round(correct / evaluated.length * 1000) / 10 : 0,
+      avg_target_price: null,
+      top_forecaster: c.top_accurate_forecasters?.[0] || null,
+    },
+    pending_predictions: pending,
+    recent_evaluated: evaluated,
+  };
 }
 
 export function getControversial() {
