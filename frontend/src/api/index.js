@@ -578,6 +578,24 @@ export function getFollowingFeed(before) {
   return api.get('/feed/following', { params, headers: authHeaders() }).then(r => r.data);
 }
 
+// ——— Activity Hub ———
+
+export function getActivityRecentCalls() {
+  return api.get('/activity/recent-predictions').then(r => r.data);
+}
+
+export function getActivityScoredCalls() {
+  return api.get('/activity/recently-scored').then(r => r.data);
+}
+
+export function getActivityExpiring() {
+  return api.get('/activity/expiring').then(r => r.data);
+}
+
+export function getActivityFriendsCalls() {
+  return api.get('/activity/friends', { headers: authHeaders() }).then(r => r.data);
+}
+
 // ——— Ticker Detail ———
 
 export function getTickerPrice(symbol) {
@@ -701,6 +719,8 @@ export function getAllConsensus(params = {}) {
 export function getExpiringPredictions() {
   return api.get('/predictions/expiring').then(r => r.data);
 }
+
+// (Activity Hub endpoints defined above in "Activity Hub" section)
 
 export function getUserPerks() {
   return api.get('/xp/me', { headers: authHeaders() }).then(r => r.data);

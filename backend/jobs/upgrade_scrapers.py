@@ -27,27 +27,43 @@ FMP_KEY = os.getenv("FMP_KEY", "")
 UPGRADE_TICKERS = FALLBACK_TICKERS[:150]
 
 
+NEUTRAL_GRADES = {"hold", "neutral", "equal-weight", "equal weight", "market perform",
+                  "sector perform", "in-line", "in line", "peer perform", "market weight"}
+
+
+def _is_neutral_grade(grade_lower):
+    return any(n in grade_lower for n in NEUTRAL_GRADES)
+
+
 def _action_to_direction(action, to_grade="", pt_changed=True):
-    """Convert action/grade to bullish/bearish. Maintains only valid if PT changed."""
+    """Convert action/grade to bullish/bearish/neutral."""
     action_lower = (action or "").lower()
     grade_lower = (to_grade or "").lower()
 
     if action_lower in ("upgrade", "init"):
+        if _is_neutral_grade(grade_lower):
+            return "neutral"
         if grade_lower in ("sell", "underweight", "underperform", "reduce"):
             return "bearish"
         return "bullish"
     if action_lower in ("downgrade",):
+        if _is_neutral_grade(grade_lower):
+            return "neutral"
         if grade_lower in ("buy", "overweight", "outperform"):
             return "bullish"
         return "bearish"
     if action_lower in ("reiterate", "maintain", "reiterated", "maintained"):
+        if _is_neutral_grade(grade_lower):
+            return "neutral"
         if not pt_changed:
             return None  # Maintains with no PT change = noise
         if grade_lower in ("buy", "overweight", "outperform", "strong buy"):
             return "bullish"
         if grade_lower in ("sell", "underweight", "underperform", "reduce", "strong sell"):
             return "bearish"
-        return None
+        return "neutral"  # Unknown grade on maintain = neutral
+    if _is_neutral_grade(grade_lower):
+        return "neutral"
     return None
 
 
@@ -462,3 +478,152 @@ def _fmp_daily_inner(db: Session):
 
     db.commit()
     print(f"[FMP-Daily] Done: {added} added")
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# SOURCE 5: FMP Grades per ticker (/stable/grades?symbol=X)
+# Returns full history of all analyst grade changes for a given ticker.
+# ═══════════════════════════════════════════════════════════════════════════
+
+def scrape_fmp_grades(db: Session):
+    """Scheduled scraper: fetch grades for top 200 tickers."""
+    if not SCRAPER_LOCK.acquire(blocking=False):
+        print("[FMP-Grades] Another scraper running, skipping")
+        return
+    try:
+        _fmp_grades_inner(db, max_tickers=200, days_back=7)
+    finally:
+        SCRAPER_LOCK.release()
+
+
+def backfill_fmp_grades(db: Session):
+    """One-time backfill: fetch full history for all tickers."""
+    if not SCRAPER_LOCK.acquire(blocking=False):
+        print("[FMP-Grades-Backfill] Another scraper running, skipping")
+        return
+    try:
+        _fmp_grades_inner(db, max_tickers=5000, days_back=365 * 8)  # 8 years back
+    finally:
+        SCRAPER_LOCK.release()
+
+
+def _fmp_grades_inner(db: Session, max_tickers=200, days_back=7):
+    if not FMP_KEY:
+        print("[FMP-Grades] No FMP_KEY, skipping")
+        return
+
+    from jobs.context_formatter import format_context
+
+    # Get tickers to process (most predicted first)
+    ticker_rows = db.execute(text("""
+        SELECT ticker, COUNT(*) as c FROM predictions
+        GROUP BY ticker ORDER BY c DESC LIMIT :lim
+    """), {"lim": max_tickers}).fetchall()
+    tickers = [r[0] for r in ticker_rows]
+
+    if not tickers:
+        print("[FMP-Grades] No tickers in DB")
+        return
+
+    cutoff = datetime.utcnow() - timedelta(days=days_back)
+    added = 0
+    skipped = 0
+
+    print(f"[FMP-Grades] Processing {len(tickers)} tickers (cutoff: {cutoff.date()})")
+
+    for i, ticker in enumerate(tickers):
+        try:
+            r = httpx.get(
+                "https://financialmodelingprep.com/stable/grades",
+                params={"symbol": ticker, "apikey": FMP_KEY},
+                timeout=15,
+            )
+            if r.status_code != 200:
+                continue
+            items = r.json()
+            if not isinstance(items, list):
+                continue
+
+            for item in items:
+                grade_date_str = (item.get("date") or "")[:10]
+                if not grade_date_str:
+                    continue
+
+                try:
+                    grade_date = datetime.strptime(grade_date_str, "%Y-%m-%d")
+                except Exception:
+                    continue
+
+                if grade_date < cutoff:
+                    continue
+
+                company = item.get("gradingCompany", "")
+                action = (item.get("action") or "").lower()
+                new_grade = item.get("newGrade", "")
+                prev_grade = item.get("previousGrade", "")
+
+                if not company or not action:
+                    continue
+
+                # Skip pure maintains where grade didn't change
+                if action in ("maintain", "reiterate") and new_grade == prev_grade:
+                    continue
+
+                canonical = resolve_forecaster_alias(company)
+                if _is_self_analysis(canonical, ticker):
+                    continue
+
+                direction = _action_to_direction(action, new_grade)
+                if not direction:
+                    skipped += 1
+                    continue
+
+                source_id = f"fmp_g_{ticker}_{canonical}_{grade_date_str}"
+                if db.execute(text("SELECT 1 FROM predictions WHERE source_platform_id = :sid LIMIT 1"), {"sid": source_id}).first():
+                    continue
+
+                forecaster = find_forecaster(canonical, db)
+                if not forecaster:
+                    skipped += 1
+                    continue
+
+                context = format_context(canonical, action, new_grade, ticker)
+
+                is_valid, _ = validate_prediction(
+                    ticker=ticker, direction=direction,
+                    source_url=f"https://financialmodelingprep.com/stable/grades?symbol={ticker}",
+                    archive_url=f"https://financialmodelingprep.com/stable/grades?symbol={ticker}",
+                    context=context, forecaster_id=forecaster.id,
+                )
+                if not is_valid:
+                    skipped += 1
+                    continue
+
+                call_type = "upgrade" if "upgrade" in action else "downgrade" if "downgrade" in action else "new_coverage" if "init" in action else "rating"
+
+                db.add(Prediction(
+                    forecaster_id=forecaster.id, ticker=ticker, direction=direction,
+                    prediction_date=grade_date, evaluation_date=grade_date + timedelta(days=90),
+                    window_days=90,
+                    source_url=f"https://financialmodelingprep.com/stable/grades?symbol={ticker}",
+                    archive_url=f"https://financialmodelingprep.com/stable/grades?symbol={ticker}",
+                    source_type="article", source_platform_id=source_id,
+                    context=context[:500], exact_quote=context,
+                    outcome="pending", verified_by="fmp_grades",
+                    call_type=call_type,
+                ))
+                added += 1
+
+        except Exception as e:
+            print(f"[FMP-Grades] Error for {ticker}: {e}")
+
+        # Rate limiting + batch commit
+        time.sleep(0.3)
+        if (i + 1) % 10 == 0:
+            db.commit()
+            if added > 0:
+                print(f"[FMP-Grades] {i + 1}/{len(tickers)} tickers, {added} added")
+            time.sleep(2)
+
+    db.commit()
+    print(f"[FMP-Grades] Done: {added} added, {skipped} skipped from {len(tickers)} tickers")

@@ -33,7 +33,7 @@ import MyCalls from './pages/MyCalls';
 import CommunityLeaderboard from './pages/CommunityLeaderboard';
 import Badges from './pages/Badges';
 import Consensus from './pages/Consensus';
-import Expiring from './pages/Expiring';
+import { Navigate } from 'react-router-dom';
 import Duels from './pages/Duels';
 import Seasons from './pages/Seasons';
 import Friends from './pages/Friends';
@@ -93,7 +93,7 @@ export default function App() {
         <Route path="/community" element={<CommunityLeaderboard />} />
         <Route path="/badges" element={<Badges />} />
         <Route path="/consensus" element={<Consensus />} />
-        <Route path="/expiring" element={<Expiring />} />
+        <Route path="/expiring" element={<Navigate to="/activity" replace />} />
         <Route path="/duels" element={<Duels />} />
         <Route path="/compete" element={<Seasons />} />
         <Route path="/seasons" element={<Seasons />} />

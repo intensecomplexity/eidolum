@@ -1,5 +1,5 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Home, BarChart3, Compass, Crosshair, User, Search } from 'lucide-react';
+import { Home, BarChart3, Zap, Crosshair, User, Search } from 'lucide-react';
 import { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 
@@ -42,10 +42,10 @@ export default function BottomNav() {
             <Home className="w-5 h-5" /><span className="text-[10px] font-medium whitespace-nowrap">Home</span>
           </Link>
           <Link to="/leaderboard" className={`flex flex-col items-center justify-center gap-0.5 w-full h-full active:bg-surface-2 transition-colors ${isActive('/leaderboard') ? 'text-accent' : 'text-muted'}`}>
-            <BarChart3 className="w-5 h-5" /><span className="text-[10px] font-medium whitespace-nowrap">Ranks</span>
+            <BarChart3 className="w-5 h-5" /><span className="text-[10px] font-medium whitespace-nowrap">Leaders</span>
           </Link>
-          <Link to="/discover" className={`flex flex-col items-center justify-center gap-0.5 w-full h-full active:bg-surface-2 transition-colors ${isActive('/discover') ? 'text-accent' : 'text-muted'}`}>
-            <Compass className="w-5 h-5" /><span className="text-[10px] font-medium whitespace-nowrap">Discover</span>
+          <Link to="/activity" className={`flex flex-col items-center justify-center gap-0.5 w-full h-full active:bg-surface-2 transition-colors ${isActive('/activity') ? 'text-accent' : 'text-muted'}`}>
+            <Zap className="w-5 h-5" /><span className="text-[10px] font-medium whitespace-nowrap">Activity</span>
           </Link>
           {isAuthenticated ? (
             <Link to="/submit" className={`flex flex-col items-center justify-center gap-0.5 w-full h-full active:bg-surface-2 transition-colors ${isActive('/submit') ? 'text-accent' : 'text-muted'}`}>

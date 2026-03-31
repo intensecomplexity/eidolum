@@ -1664,6 +1664,8 @@ app.include_router(seasons_router.router, prefix="/api")
 app.include_router(notifications_router.router, prefix="/api")
 app.include_router(ticker_detail.router, prefix="/api")
 app.include_router(activity_feed.router, prefix="/api")
+from routers import activity_hub
+app.include_router(activity_hub.router, prefix="/api")
 app.include_router(share.router, prefix="/api")
 app.include_router(daily_challenge_router.router, prefix="/api")
 app.include_router(reactions.router, prefix="/api")
