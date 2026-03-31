@@ -1,13 +1,15 @@
 """
-Benzinga historical backfill: forward + reverse.
+Benzinga historical backfill: forward only.
 
 Phase 1 (forward): 2024-03-29 -> today, day by day
-Phase 2 (reverse): 2024-03-28 -> backwards indefinitely until 30 consecutive empty days
-Phase 3 (ongoing): 2-hour incremental scraper runs in parallel (separate job)
+Phase 2 (ongoing): 2-hour incremental scraper runs in parallel (separate job)
+
+REVERSE BACKFILL PERMANENTLY DISABLED (2026-03-31):
+  Reverse backfill filled the postgres volume to 96% by pulling years of
+  historical data we don't need. Only forward backfill (last ~2 years) runs.
 
 Progress stored in Config table:
   - backfill_last_date: last completed forward date
-  - backfill_reverse_last_date: last completed reverse date
   - backfill_forward_done: "true" when forward reached today
 
 Connection-safe: opens/closes DB per day, never holds connections during API calls.
@@ -35,21 +37,18 @@ SKIP_ACTIONS = {
 }
 
 FORWARD_START = date(2024, 3, 29)
-REVERSE_START = date(2024, 3, 28)
-MAX_EMPTY_DAYS_REVERSE = 30  # stop reverse after 30 consecutive empty days
 
 # ── Global state ─────────────────────────────────────────────────────────────
 _backfill_running = False
 _backfill_stop = False
 _backfill_status = {
     "running": False,
-    "phase": None,         # "forward" | "reverse" | None
+    "phase": None,         # "forward" | None
     "current_date": None,
     "days_completed": 0,
     "predictions_inserted": 0,
     "last_error": None,
     "forward_done": False,
-    "reverse_last_date": None,
 }
 
 
@@ -79,7 +78,7 @@ def _set_config(db, key: str, value: str):
 
 # ── Main entry point ────────────────────────────────────────────────────────
 def run_backfill():
-    """Run forward backfill to today, then reverse backfill indefinitely."""
+    """Run forward backfill to today. Reverse backfill is permanently disabled."""
     global _backfill_running, _backfill_stop, _backfill_status
 
     if _backfill_running:
@@ -93,17 +92,14 @@ def run_backfill():
     _backfill_stop = False
 
     try:
-        # Phase 1: Forward
-        forward_done = _run_forward()
-
-        # Phase 2: Reverse (only if forward completed)
-        if forward_done and not _backfill_stop:
-            _run_reverse()
+        _run_forward()
+        # REVERSE BACKFILL PERMANENTLY DISABLED (2026-03-31)
+        # Was filling postgres volume to 96% by pulling years of unneeded data.
     finally:
         _backfill_running = False
         _backfill_status["running"] = False
         _backfill_status["phase"] = None
-        print("[Backfill] All phases complete")
+        print("[Backfill] Forward backfill complete")
 
 
 def _run_forward() -> bool:
@@ -162,6 +158,15 @@ def _run_forward() -> bool:
             print(f"[Forward] Stopped at {current}")
             return False
 
+        # Storage guard: stop if DB approaching volume limit
+        try:
+            from circuit_breaker import db_storage_ok
+            if not db_storage_ok("forward_backfill"):
+                print(f"[Forward] Paused at {current}: storage limit approaching")
+                return False
+        except Exception:
+            pass
+
         inserted = _process_one_day(current, "backfill_last_date", "Forward")
         total_inserted += inserted
         days_done += 1
@@ -175,8 +180,8 @@ def _run_forward() -> bool:
 
         if batch_days >= 30:
             _refresh_stats_if_needed()
-            print(f"[Forward] Batch done. {days_done}/{total_days} days, {total_inserted} inserted. Pausing 10s.")
-            time.sleep(10)
+            print(f"[Forward] Batch done. {days_done}/{total_days} days, {total_inserted} inserted. Pausing 15s.")
+            time.sleep(15)
             batch_days = 0
 
     # Mark forward complete
@@ -192,69 +197,9 @@ def _run_forward() -> bool:
     return True
 
 
-def _run_reverse():
-    """Phase 2: Reverse backfill from REVERSE_START backwards until data runs out."""
-    from database import BgSessionLocal
-
-    db = BgSessionLocal()
-    try:
-        resume = _get_config(db, "backfill_reverse_last_date")
-        if resume:
-            try:
-                start = datetime.strptime(resume, "%Y-%m-%d").date() - timedelta(days=1)
-            except Exception:
-                start = REVERSE_START
-        else:
-            start = REVERSE_START
-    finally:
-        db.close()
-
-    _backfill_status.update({
-        "phase": "reverse", "current_date": str(start),
-        "days_completed": 0, "predictions_inserted": 0, "last_error": None,
-    })
-
-    print(f"[Reverse] Starting from {start}, going backwards")
-    total_inserted = 0
-    days_done = 0
-    batch_days = 0
-    consecutive_empty = 0
-    current = start
-
-    while True:
-        if _backfill_stop:
-            print(f"[Reverse] Stopped at {current}")
-            break
-
-        inserted = _process_one_day(current, "backfill_reverse_last_date", "Reverse")
-        total_inserted += inserted
-        days_done += 1
-        batch_days += 1
-        _backfill_status["days_completed"] = days_done
-        _backfill_status["predictions_inserted"] = total_inserted
-        _backfill_status["current_date"] = str(current)
-        _backfill_status["reverse_last_date"] = str(current)
-
-        if inserted == 0:
-            consecutive_empty += 1
-        else:
-            consecutive_empty = 0
-
-        if consecutive_empty >= MAX_EMPTY_DAYS_REVERSE:
-            print(f"[Reverse] {MAX_EMPTY_DAYS_REVERSE} consecutive empty days at {current}. No more data. Stopping.")
-            break
-
-        current -= timedelta(days=1)
-        time.sleep(0.5)
-
-        if batch_days >= 30:
-            _refresh_stats_if_needed()
-            print(f"[Reverse] Batch done. {days_done} days back, {total_inserted} inserted, at {current}. Pausing 10s.")
-            time.sleep(10)
-            batch_days = 0
-
-    _refresh_stats_if_needed()
-    print(f"[Reverse] Complete: {days_done} days, {total_inserted} predictions, reached {current}")
+# _run_reverse() — PERMANENTLY DISABLED (2026-03-31)
+# Reverse backfill filled the postgres volume to 96% capacity.
+# Only forward backfill is needed (last ~2 years of data).
 
 
 # ── Process a single day ─────────────────────────────────────────────────────
@@ -289,7 +234,8 @@ def _refresh_stats_if_needed():
 
 # ── Auto-resume on startup ──────────────────────────────────────────────────
 def auto_resume_backfill():
-    """Called on startup. Resumes whichever phase is needed."""
+    """Called on startup. Resumes forward backfill if not caught up.
+    Reverse backfill is permanently disabled (2026-03-31)."""
     import threading
     if not MASSIVE_KEY:
         return
@@ -299,27 +245,19 @@ def auto_resume_backfill():
     try:
         forward_done = _get_config(db, "backfill_forward_done") == "true"
         fwd_last = _get_config(db, "backfill_last_date")
-        rev_last = _get_config(db, "backfill_reverse_last_date")
 
-        if forward_done:
-            # Check if forward needs refreshing (new days since last run)
-            if fwd_last:
-                last_fwd = datetime.strptime(fwd_last, "%Y-%m-%d").date()
-                if last_fwd < date.today() - timedelta(days=1):
-                    # Need to catch up forward first, then continue reverse
-                    _set_config(db, "backfill_forward_done", "false")
-                    print(f"[Backfill] Forward needs catch-up from {last_fwd} to today")
-                elif rev_last:
-                    print(f"[Backfill] Resuming reverse from {rev_last}")
-                else:
-                    print(f"[Backfill] Starting reverse from {REVERSE_START}")
-            else:
-                print(f"[Backfill] Starting reverse from {REVERSE_START}")
+        if forward_done and fwd_last:
+            last_fwd = datetime.strptime(fwd_last, "%Y-%m-%d").date()
+            if last_fwd >= date.today() - timedelta(days=1):
+                print(f"[Backfill] Forward already caught up to {fwd_last}. Nothing to do.")
+                return
+            # Need to catch up new days
+            _set_config(db, "backfill_forward_done", "false")
+            print(f"[Backfill] Forward needs catch-up from {last_fwd} to today")
+        elif fwd_last:
+            print(f"[Backfill] Resuming forward from {fwd_last}")
         else:
-            if fwd_last:
-                print(f"[Backfill] Resuming forward from {fwd_last}")
-            else:
-                print(f"[Backfill] Starting fresh forward from {FORWARD_START}")
+            print(f"[Backfill] Starting fresh forward from {FORWARD_START}")
     finally:
         db.close()
 

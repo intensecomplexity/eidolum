@@ -1318,7 +1318,7 @@ async def lifespan(app):
     from circuit_breaker import (
         db_is_healthy, mark_job_running, mark_job_done,
         acquire_job_lock, release_job_lock, watchdog_check,
-        memory_is_available,
+        memory_is_available, db_storage_ok,
     )
 
     def _guarded_job(job_name, job_fn, *, check_memory=False):
@@ -1326,6 +1326,7 @@ async def lifespan(app):
         - PROTECTION 2: Global job lock (only one job at a time)
         - PROTECTION 3: Circuit breaker (skip if DB unreachable)
         - PROTECTION 7: Memory guard (optional, for yfinance-type jobs)
+        - STORAGE GUARD: Skip if DB > 4GB (volume is 5GB max)
         - Context manager for DB sessions (connections always returned)
         """
         def wrapper():
@@ -1334,6 +1335,10 @@ async def lifespan(app):
 
             # PROTECTION 3: Circuit breaker
             if not db_is_healthy(job_name):
+                return
+
+            # STORAGE GUARD: Skip if DB approaching volume limit
+            if not db_storage_ok(job_name):
                 return
 
             # PROTECTION 7: Memory guard

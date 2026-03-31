@@ -124,6 +124,51 @@ def memory_is_available() -> bool:
     return True
 
 
+# ── STORAGE GUARD: Skip data ingestion if DB approaching volume limit ─────────
+DB_SIZE_LIMIT_BYTES = 4 * 1024 * 1024 * 1024  # 4 GB (volume is 5 GB max on Hobby)
+_last_storage_check: float = 0
+_last_storage_ok: bool = True
+STORAGE_CHECK_INTERVAL = 300  # Re-check every 5 minutes, not every job
+
+
+def db_storage_ok(job_name: str = "unknown") -> bool:
+    """Check if the database size is under the safety limit.
+    Caches the result for 5 minutes to avoid hammering pg_database_size."""
+    global _last_storage_check, _last_storage_ok
+
+    now = time.time()
+    if now - _last_storage_check < STORAGE_CHECK_INTERVAL:
+        if not _last_storage_ok:
+            print(f"[StorageGuard] {job_name}: SKIPPED — storage limit approaching (cached)")
+        return _last_storage_ok
+
+    try:
+        from database import bg_engine
+        from sqlalchemy import text as _t
+
+        with bg_engine.connect() as conn:
+            row = conn.execute(_t("SELECT pg_database_size(current_database())")).scalar()
+            size_bytes = int(row)
+            size_gb = size_bytes / (1024 ** 3)
+
+        _last_storage_check = now
+
+        if size_bytes > DB_SIZE_LIMIT_BYTES:
+            _last_storage_ok = False
+            print(f"[StorageGuard] {job_name}: SKIPPED — DB is {size_gb:.2f}GB (limit {DB_SIZE_LIMIT_BYTES / (1024**3):.0f}GB). Pausing data ingestion.")
+            return False
+
+        _last_storage_ok = True
+        return True
+
+    except Exception as e:
+        # If we can't check, allow the job to proceed (don't block on check failure)
+        print(f"[StorageGuard] {job_name}: check failed ({e}), allowing job")
+        _last_storage_check = now
+        _last_storage_ok = True
+        return True
+
+
 # ── Circuit breaker DB health check ───────────────────────────────────────────
 def db_is_healthy(job_name: str = "unknown") -> bool:
     """Check if the database is responsive enough for a background job to proceed.
