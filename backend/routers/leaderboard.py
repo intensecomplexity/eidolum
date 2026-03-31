@@ -332,7 +332,7 @@ CALL_TYPE_MAP = {
 
 
 def _build_filtered_leaderboard(db: Session, sector=None, call_type=None, sort="accuracy",
-                                 limit=100, min_predictions=10, direction=None) -> list:
+                                 limit=100, min_predictions=10, direction=None, timeframe=None) -> list:
     """SQL-based filtered leaderboard. Returns ranked list."""
     where_clauses = ["p.outcome IN ('correct','incorrect')"]
     params = {}
@@ -352,6 +352,12 @@ def _build_filtered_leaderboard(db: Session, sector=None, call_type=None, sort="
     if direction and direction != "All":
         where_clauses.append("p.direction = :direction")
         params["direction"] = direction
+    if timeframe == "short":
+        where_clauses.append("p.window_days < 30")
+    elif timeframe == "medium":
+        where_clauses.append("p.window_days >= 30 AND p.window_days <= 180")
+    elif timeframe == "long":
+        where_clauses.append("p.window_days > 180")
 
     where_sql = " AND ".join(where_clauses)
     params["min_preds"] = min_predictions
@@ -431,6 +437,7 @@ def get_leaderboard(
     sort: str = Query(None),
     limit: int = Query(100, ge=1, le=100),
     min_predictions: int = Query(None),
+    timeframe: str = Query(None),
 ):
     global _leaderboard_cache, _cache_time
 
@@ -439,17 +446,18 @@ def get_leaderboard(
         return _week_leaderboard(db)
 
     # Any filter/sort beyond default -> use SQL-based filtered leaderboard
-    has_filter = sector or call_type or direction or (sort and sort != "accuracy")
+    has_filter = sector or call_type or direction or timeframe or (sort and sort != "accuracy")
     if has_filter:
-        cache_key = f"{sector}|{call_type}|{sort}|{limit}|{min_predictions}|{direction}"
+        cache_key = f"{sector}|{call_type}|{sort}|{limit}|{min_predictions}|{direction}|{timeframe}"
         cached = _filtered_cache.get(cache_key)
         if cached and (_time.time() - cached[1]) < FILTERED_CACHE_TTL:
             return cached[0]
 
-        min_preds = min_predictions or (5 if sector or call_type else 10)
+        min_preds = min_predictions or (5 if sector or call_type or timeframe else 10)
         results = _build_filtered_leaderboard(
             db, sector=sector, call_type=call_type, sort=sort or "accuracy",
             limit=limit, min_predictions=min_preds, direction=direction,
+            timeframe=timeframe,
         )
         _filtered_cache[cache_key] = (results, _time.time())
         return results

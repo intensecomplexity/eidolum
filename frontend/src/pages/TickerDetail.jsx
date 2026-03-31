@@ -137,6 +137,36 @@ export default function TickerDetail() {
               <Clock className="w-4 h-4 text-warning" /> Active Predictions ({pending.length})
             </h2>
 
+            {/* Timeframe breakdown */}
+            {(() => {
+              const short = pending.filter(p => (p.window_days || p.evaluation_window_days || 90) < 30);
+              const medium = pending.filter(p => { const w = p.window_days || p.evaluation_window_days || 90; return w >= 30 && w <= 180; });
+              const long = pending.filter(p => (p.window_days || p.evaluation_window_days || 90) > 180);
+              const groups = [
+                { label: 'Short term', sub: 'under 30d', preds: short },
+                { label: 'Medium term', sub: '30-180d', preds: medium },
+                { label: 'Long term', sub: 'over 180d', preds: long },
+              ].filter(g => g.preds.length > 0);
+              if (groups.length > 1) {
+                return (
+                  <div className="flex flex-wrap gap-3 mb-4">
+                    {groups.map(g => {
+                      const bullPct = g.preds.length > 0 ? Math.round(g.preds.filter(p => p.direction === 'bullish').length / g.preds.length * 100) : 0;
+                      return (
+                        <div key={g.label} className="bg-surface-2 border border-border rounded-lg px-3 py-2 text-xs">
+                          <span className="font-medium text-text-primary">{g.label}</span>
+                          <span className="text-muted"> ({g.sub})</span>
+                          <span className="text-text-secondary">: {g.preds.length} — </span>
+                          <span className={bullPct >= 50 ? 'text-positive' : 'text-negative'}>{bullPct}% Bull</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+              }
+              return null;
+            })()}
+
             {/* Bullish first */}
             {['bullish', 'bearish'].map(dir => {
               const group = pending.filter(p => p.direction === dir);
@@ -206,7 +236,7 @@ function PredictionItem({ p, showOutcome = false }) {
           )}
         </div>
         <div className="flex items-center gap-2">
-          <PredictionBadge direction={p.direction} />
+          <PredictionBadge direction={p.direction} windowDays={p.window_days || p.evaluation_window_days} />
           {showOutcome && (
             p.outcome === 'correct'
               ? <span className="inline-flex items-center gap-0.5 text-[10px] font-mono font-semibold text-positive"><Check className="w-3 h-3" /></span>

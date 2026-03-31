@@ -340,7 +340,7 @@ function SavedCard({ prediction: p, userId, onUpdate }) {
           <Link to={`/asset/${p.ticker}`} className="font-mono text-accent text-lg font-bold hover:underline">
             {p.ticker}
           </Link>
-          <PredictionBadge direction={p.direction} />
+          <PredictionBadge direction={p.direction} windowDays={p.window_days || p.evaluation_window_days} />
           {savedDate && <span className="text-muted text-xs">Saved {savedDate}</span>}
         </div>
 

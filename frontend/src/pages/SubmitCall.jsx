@@ -78,7 +78,7 @@ export default function SubmitCall() {
   const [tickerName, setTickerName] = useState('');
   const [direction, setDirection] = useState('');
   const [priceTarget, setPriceTarget] = useState('');
-  const [windowDays, setWindowDays] = useState(30);
+  const [windowDays, setWindowDays] = useState(90);
   const [reasoning, setReasoning] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -417,6 +417,28 @@ export default function SubmitCall() {
             <label className="block text-xs text-muted uppercase tracking-wider mb-3">Evaluation Timeframe</label>
             <TimeframeSlider value={windowDays} onChange={setWindowDays} />
           </div>
+
+          {/* Prediction summary */}
+          {ticker && direction && hasTarget && !targetWarning && (
+            <div className="bg-accent/5 border border-accent/20 rounded-lg px-4 py-3 text-sm">
+              <p className="text-text-secondary">
+                You predict <span className="font-mono font-bold text-accent">{ticker}</span> will{' '}
+                {direction === 'bullish' ? 'reach' : 'fall to'}{' '}
+                <span className="font-mono font-bold text-text-primary">${parsedTarget.toFixed(2)}</span>
+                {impliedReturn !== null && (
+                  <span className={`font-mono font-bold ${parseFloat(impliedReturn) >= 0 ? 'text-positive' : 'text-negative'}`}>
+                    {' '}({parseFloat(impliedReturn) >= 0 ? '+' : ''}{impliedReturn}%)
+                  </span>
+                )}
+                {' '}within <span className="font-bold text-text-primary">
+                  {windowDays === 1 ? '1 day' : windowDays === 7 ? '1 week' : windowDays === 14 ? '2 weeks' : windowDays === 30 ? '1 month' : windowDays === 90 ? '3 months' : windowDays === 180 ? '6 months' : windowDays === 365 ? '1 year' : `${windowDays} days`}
+                </span>.
+              </p>
+              <p className="text-muted text-xs mt-1">
+                Evaluated on: {new Date(Date.now() + windowDays * 86400000).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+              </p>
+            </div>
+          )}
 
           <div className="card">
             <label className="block text-xs text-muted uppercase tracking-wider mb-2">

@@ -17,31 +17,14 @@ _TICKER_TTL = 300  # 5 minutes
 @router.get("/ticker/{ticker}/detail")
 @limiter.limit("60/minute")
 def get_ticker_detail(request: Request, ticker: str, db: Session = Depends(get_db)):
-    """Full ticker detail page data: consensus, pending predictions, recent scored, stats."""
+    """Full ticker detail page data: current consensus, historical track record, predictions."""
     ticker = ticker.upper().strip()
 
     cached = _ticker_cache.get(ticker)
     if cached and (_time.time() - cached[1]) < _TICKER_TTL:
         return cached[0]
 
-    # ── Consensus + counts ────────────────────────────────────────────────
-    counts = db.execute(sql_text("""
-        SELECT
-            COUNT(*) as total,
-            SUM(CASE WHEN direction='bullish' THEN 1 ELSE 0 END) as bullish,
-            SUM(CASE WHEN direction='bearish' THEN 1 ELSE 0 END) as bearish,
-            SUM(CASE WHEN outcome IN ('correct','incorrect') THEN 1 ELSE 0 END) as evaluated,
-            SUM(CASE WHEN outcome='correct' THEN 1 ELSE 0 END) as correct,
-            AVG(CASE WHEN target_price IS NOT NULL THEN target_price END) as avg_target
-        FROM predictions WHERE ticker = :t
-    """), {"t": ticker}).first()
-
-    total = counts[0] or 0
-    bullish = counts[1] or 0
-    bearish = counts[2] or 0
-    evaluated = counts[3] or 0
-    correct_count = counts[4] or 0
-    avg_target = round(float(counts[5]), 2) if counts[5] else None
+    from datetime import datetime
 
     # ── Sector + company name ─────────────────────────────────────────────
     sector = None
@@ -61,34 +44,36 @@ def get_ticker_detail(request: Request, ticker: str, db: Session = Depends(get_d
         sector = db.execute(sql_text(
             "SELECT sector FROM predictions WHERE ticker = :t AND sector IS NOT NULL AND sector != 'Other' LIMIT 1"
         ), {"t": ticker}).scalar()
-    # Fallback company name from hardcoded lookup
     if not company_name:
         from ticker_lookup import TICKER_INFO
         company_name = TICKER_INFO.get(ticker)
 
-    # ── Pending predictions (sorted by eval date, soonest first) ──────────
+    # ── Pending predictions with forecaster details ───────────────────────
     pending_rows = db.execute(sql_text("""
         SELECT p.id, p.direction, p.target_price, p.entry_price,
                p.prediction_date, p.evaluation_date, p.window_days,
                p.context, p.exact_quote, p.source_url,
-               f.id, f.name, f.handle, f.accuracy_score
+               f.id, f.name, f.handle, f.accuracy_score, f.firm
         FROM predictions p
         JOIN forecasters f ON f.id = p.forecaster_id
         WHERE p.ticker = :t AND p.outcome = 'pending'
         ORDER BY p.evaluation_date ASC NULLS LAST
-        LIMIT 30
+        LIMIT 50
     """), {"t": ticker}).fetchall()
 
     pending = []
+    bulls = []
+    bears = []
     for r in pending_rows:
         eval_date = r[5]
         pred_date = r[4]
         days_rem = None
         if eval_date:
-            from datetime import datetime
             days_rem = max(0, (eval_date - datetime.utcnow()).days)
-        pending.append({
-            "id": r[0], "direction": r[1], "target_price": float(r[2]) if r[2] else None,
+        acc = round(float(r[13]), 1) if r[13] else 0
+        target = float(r[2]) if r[2] else None
+        pred = {
+            "id": r[0], "direction": r[1], "target_price": target,
             "entry_price": float(r[3]) if r[3] else None,
             "prediction_date": pred_date.isoformat() if pred_date else None,
             "evaluation_date": eval_date.isoformat() if eval_date else None,
@@ -96,15 +81,81 @@ def get_ticker_detail(request: Request, ticker: str, db: Session = Depends(get_d
             "source_url": r[9], "days_remaining": days_rem, "ticker": ticker,
             "outcome": "pending",
             "forecaster": {"id": r[10], "name": r[11], "handle": r[12],
-                           "accuracy_rate": float(r[13]) if r[13] else 0},
-        })
+                           "accuracy_rate": acc, "firm": r[14] or None},
+        }
+        pending.append(pred)
+
+        entry = {"forecaster_id": r[10], "name": r[11], "firm": r[14] or None,
+                 "accuracy": acc, "target": target}
+        if r[1] == "bullish":
+            bulls.append(entry)
+        else:
+            bears.append(entry)
+
+    # Sort by accuracy descending within each group
+    bulls.sort(key=lambda x: x["accuracy"], reverse=True)
+    bears.sort(key=lambda x: x["accuracy"], reverse=True)
+
+    pending_total = len(pending)
+    pending_bullish = len(bulls)
+    pending_bearish = len(bears)
+
+    current_consensus = {
+        "total": pending_total,
+        "bullish_count": pending_bullish,
+        "bearish_count": pending_bearish,
+        "bullish_pct": round(pending_bullish / pending_total * 100, 1) if pending_total > 0 else 0,
+        "bearish_pct": round(pending_bearish / pending_total * 100, 1) if pending_total > 0 else 0,
+        "bulls": bulls,
+        "bears": bears,
+    }
+
+    # ── Historical (evaluated predictions) ────────────────────────────────
+    hist_row = db.execute(sql_text("""
+        SELECT
+            COUNT(*) as total,
+            SUM(CASE WHEN outcome='correct' THEN 1 ELSE 0 END) as correct,
+            SUM(CASE WHEN direction='bullish' THEN 1 ELSE 0 END) as bull_total,
+            SUM(CASE WHEN direction='bullish' AND outcome='correct' THEN 1 ELSE 0 END) as bull_correct,
+            SUM(CASE WHEN direction='bearish' THEN 1 ELSE 0 END) as bear_total,
+            SUM(CASE WHEN direction='bearish' AND outcome='correct' THEN 1 ELSE 0 END) as bear_correct,
+            AVG(CASE WHEN target_price IS NOT NULL THEN target_price END) as avg_target
+        FROM predictions
+        WHERE ticker = :t AND outcome IN ('correct', 'incorrect')
+    """), {"t": ticker}).first()
+
+    hist_total = hist_row[0] or 0
+    hist_correct = hist_row[1] or 0
+    hist_bull_total = hist_row[2] or 0
+    hist_bull_correct = hist_row[3] or 0
+    hist_bear_total = hist_row[4] or 0
+    hist_bear_correct = hist_row[5] or 0
+    hist_avg_target = round(float(hist_row[6]), 2) if hist_row[6] else None
+
+    historical = {
+        "total_evaluated": hist_total,
+        "correct": hist_correct,
+        "accuracy": round(hist_correct / hist_total * 100, 1) if hist_total > 0 else 0,
+        "bullish_total": hist_bull_total,
+        "bullish_correct": hist_bull_correct,
+        "bullish_accuracy": round(hist_bull_correct / hist_bull_total * 100, 1) if hist_bull_total > 0 else 0,
+        "bearish_total": hist_bear_total,
+        "bearish_correct": hist_bear_correct,
+        "bearish_accuracy": round(hist_bear_correct / hist_bear_total * 100, 1) if hist_bear_total > 0 else 0,
+        "avg_target": hist_avg_target,
+    }
+
+    # ── Total count across all predictions ────────────────────────────────
+    total_all = db.execute(sql_text(
+        "SELECT COUNT(*) FROM predictions WHERE ticker = :t"
+    ), {"t": ticker}).scalar() or 0
 
     # ── Recent evaluated (last 15) ────────────────────────────────────────
     scored_rows = db.execute(sql_text("""
         SELECT p.id, p.direction, p.target_price, p.entry_price,
                p.prediction_date, p.evaluation_date, p.outcome, p.actual_return,
                p.context, p.exact_quote,
-               f.id, f.name, f.handle, f.accuracy_score
+               f.id, f.name, f.handle, f.accuracy_score, f.firm
         FROM predictions p
         JOIN forecasters f ON f.id = p.forecaster_id
         WHERE p.ticker = :t AND p.outcome IN ('correct','incorrect')
@@ -122,7 +173,8 @@ def get_ticker_detail(request: Request, ticker: str, db: Session = Depends(get_d
             "outcome": r[6], "actual_return": float(r[7]) if r[7] is not None else None,
             "context": r[8], "exact_quote": r[9], "ticker": ticker,
             "forecaster": {"id": r[10], "name": r[11], "handle": r[12],
-                           "accuracy_rate": float(r[13]) if r[13] else 0},
+                           "accuracy_rate": float(r[13]) if r[13] else 0,
+                           "firm": r[14] or None},
         })
 
     # ── Top forecaster on this ticker ─────────────────────────────────────
@@ -150,16 +202,13 @@ def get_ticker_detail(request: Request, ticker: str, db: Session = Depends(get_d
         "company_name": company_name,
         "industry": industry,
         "sector": sector,
-        "total_predictions": total,
-        "consensus": {
-            "bullish_count": bullish, "bearish_count": bearish,
-            "bullish_pct": round(bullish / total * 100, 1) if total > 0 else 0,
-            "bearish_pct": round(bearish / total * 100, 1) if total > 0 else 0,
-        },
+        "total_predictions": total_all,
+        "current_consensus": current_consensus,
+        "historical": historical,
         "stats": {
-            "evaluated": evaluated, "correct": correct_count,
-            "historical_accuracy": round(correct_count / evaluated * 100, 1) if evaluated > 0 else 0,
-            "avg_target_price": avg_target,
+            "evaluated": hist_total, "correct": hist_correct,
+            "historical_accuracy": historical["accuracy"],
+            "avg_target_price": hist_avg_target,
             "top_forecaster": top_fc,
         },
         "pending_predictions": pending,

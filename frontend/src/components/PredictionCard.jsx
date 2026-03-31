@@ -113,7 +113,7 @@ export default function PredictionCard({ prediction: p, showForecaster = false, 
               CRYPTO
             </span>
           )}
-          <PredictionBadge direction={p.direction} />
+          <PredictionBadge direction={p.direction} windowDays={p.window_days || p.evaluation_window_days} />
           {p.has_conflict && <ConflictBadge note={p.conflict_note} size="small" />}
           <span className="text-muted text-[10px] font-mono border border-border rounded px-1 py-0.5">
             {horizonLabel}

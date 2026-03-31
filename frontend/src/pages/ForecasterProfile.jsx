@@ -465,7 +465,7 @@ function PredictionRow({ p, forecaster: fc }) {
           )}
         </td>
         <td className="px-6 py-3">
-          <PredictionBadge direction={p.direction} />
+          <PredictionBadge direction={p.direction} windowDays={p.window_days || p.evaluation_window_days} />
           {p.has_conflict && <ConflictBadge note={p.conflict_note} size="small" />}
         </td>
         <td className="px-6 py-3 text-right font-mono text-sm text-text-secondary">{p.entry_price ? `$${p.entry_price.toFixed(2)}` : '-'}</td>

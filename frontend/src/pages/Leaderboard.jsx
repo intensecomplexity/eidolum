@@ -83,6 +83,7 @@ export default function Leaderboard() {
   const [metric, setMetric] = useState(() => localStorage.getItem('eidolum_metric') || 'avg_return');
   const [metricOpen, setMetricOpen] = useState(false);
   const metricRef = useRef(null);
+  const [timeframe, setTimeframe] = useState('all');
 
   function handleTabClick(key) {
     setActiveTab(key);
@@ -107,6 +108,7 @@ export default function Leaderboard() {
     if (activeTab === 'sector' && sector !== 'All') params.sector = sector;
     if (activeTab === 'calltype' && callType !== 'All') params.call_type = callType;
     if (direction !== 'All') params.direction = direction;
+    if (timeframe !== 'all') params.timeframe = timeframe;
     return params;
   }
 
@@ -140,7 +142,7 @@ export default function Leaderboard() {
         setEmptyMessage('Could not load leaderboard. Retrying...');
       })
       .finally(() => setLoading(false));
-  }, [activeTab, sector, direction, callType, metric]);
+  }, [activeTab, sector, direction, callType, metric, timeframe]);
 
   // Auto-retry every 30 seconds when leaderboard is empty
   useEffect(() => {
@@ -159,7 +161,7 @@ export default function Leaderboard() {
         .catch(() => {});
     }, 30000);
     return () => clearInterval(timer);
-  }, [emptyMessage, loading, activeTab, sector, direction, callType, metric]);
+  }, [emptyMessage, loading, activeTab, sector, direction, callType, metric, timeframe]);
 
   useEffect(() => {
     if (activeTab === 'sector') {
@@ -246,6 +248,27 @@ export default function Leaderboard() {
                     ))}
                   </select>
                   <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-muted pointer-events-none" />
+                </div>
+              )}
+
+              {/* Timeframe filter — available on all tabs except week */}
+              {activeTab !== 'week' && (
+                <div className="flex gap-1 shrink-0">
+                  {[
+                    { key: 'all', label: 'All' },
+                    { key: 'short', label: '<30d' },
+                    { key: 'medium', label: '30-180d' },
+                    { key: 'long', label: '>180d' },
+                  ].map(tf => (
+                    <button key={tf.key} onClick={() => setTimeframe(tf.key)}
+                      className={`px-2 py-1 rounded text-[11px] font-mono font-semibold transition-colors ${
+                        timeframe === tf.key
+                          ? 'bg-accent/15 text-accent border border-accent/30'
+                          : 'bg-surface-2 text-muted border border-border'
+                      }`}>
+                      {tf.label}
+                    </button>
+                  ))}
                 </div>
               )}
 
