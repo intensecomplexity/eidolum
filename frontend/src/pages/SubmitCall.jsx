@@ -5,7 +5,7 @@ import { useAuth } from '../context/AuthContext';
 import TimeframeSlider from '../components/TimeframeSlider';
 import TickerSearch from '../components/TickerSearch';
 import Footer from '../components/Footer';
-import { submitUserPrediction, getDeletionStatus, searchTickers, getWeeklyChallenge, getUserPerks } from '../api';
+import { submitUserPrediction, getDeletionStatus, searchTickers, getWeeklyChallenge, getUserPerks, getTickerPrice } from '../api';
 
 // ── Confetti burst ───────────────────────────────────────────────────────────
 
@@ -86,6 +86,9 @@ export default function SubmitCall() {
   const [delStatus, setDelStatus] = useState(null);
   const [weeklyChallenge, setWeeklyChallenge] = useState(null);
   const [perksInfo, setPerksInfo] = useState(null);
+  const [currentPrice, setCurrentPrice] = useState(null);
+  const [priceLoading, setPriceLoading] = useState(false);
+  const [companyName, setCompanyName] = useState('');
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -94,6 +97,46 @@ export default function SubmitCall() {
       getUserPerks().then(setPerksInfo).catch(() => {});
     }
   }, [isAuthenticated]);
+
+  // Fetch current price when ticker changes
+  useEffect(() => {
+    if (!ticker) {
+      setCurrentPrice(null);
+      setCompanyName('');
+      return;
+    }
+    setPriceLoading(true);
+    getTickerPrice(ticker)
+      .then(data => {
+        setCurrentPrice(data.current_price);
+        setCompanyName(data.name || '');
+      })
+      .catch(() => {
+        setCurrentPrice(null);
+        setCompanyName('');
+      })
+      .finally(() => setPriceLoading(false));
+  }, [ticker]);
+
+  // Direction + target price validation
+  const parsedTarget = parseFloat(priceTarget.replace(/[$,]/g, ''));
+  const hasTarget = priceTarget.trim() && !isNaN(parsedTarget) && parsedTarget > 0;
+  const hasPrice = currentPrice != null && currentPrice > 0;
+
+  let targetWarning = '';
+  if (hasTarget && hasPrice && direction) {
+    if (direction === 'bullish' && parsedTarget < currentPrice) {
+      targetWarning = `Bullish means you think the price will go UP. Your target ($${parsedTarget.toFixed(2)}) is below the current price ($${currentPrice.toFixed(2)}).`;
+    } else if (direction === 'bearish' && parsedTarget > currentPrice) {
+      targetWarning = `Bearish means you think the price will go DOWN. Your target ($${parsedTarget.toFixed(2)}) is above the current price ($${currentPrice.toFixed(2)}).`;
+    } else if (parsedTarget === currentPrice) {
+      targetWarning = `Your target is the same as the current price. Pick a different target.`;
+    }
+  }
+
+  const impliedReturn = (hasTarget && hasPrice)
+    ? (((parsedTarget - currentPrice) / currentPrice) * 100).toFixed(1)
+    : null;
 
   // Fire confetti when success appears
   useEffect(() => {
@@ -116,6 +159,7 @@ export default function SubmitCall() {
     if (!ticker) return 'Select a ticker from the search results';
     if (!direction) return 'Select a direction (Bullish or Bearish)';
     if (!priceTarget.trim()) return 'Price target is required';
+    if (targetWarning) return targetWarning;
     if (windowDays < 1 || windowDays > 365) return 'Evaluation window must be 1-365 days';
     return null;
   }
@@ -316,6 +360,21 @@ export default function SubmitCall() {
               onChange={(t, name) => { setTicker(t); setTickerName(name || ''); }}
               placeholder="TSLA, Tesla, Bitcoin..."
             />
+            {ticker && (
+              <div className="mt-2 text-sm">
+                {priceLoading ? (
+                  <span className="text-muted">Loading price...</span>
+                ) : currentPrice != null ? (
+                  <span className="text-text-secondary">
+                    <span className="font-mono font-bold text-accent">{ticker}</span>
+                    {companyName && <span> — {companyName}</span>}
+                    <span> — Current price: <span className="font-mono font-bold text-text-primary">${currentPrice.toFixed(2)}</span></span>
+                  </span>
+                ) : (
+                  <span className="text-muted">Price unavailable</span>
+                )}
+              </div>
+            )}
           </div>
 
           <div className="card">
@@ -335,8 +394,23 @@ export default function SubmitCall() {
           <div className="card">
             <label className="block text-xs text-muted uppercase tracking-wider mb-2">Price Target</label>
             <input type="text" value={priceTarget} onChange={e => setPriceTarget(e.target.value)} placeholder="$150.00"
-              className="w-full px-4 py-3 bg-surface-2 border border-border rounded-lg text-text-primary placeholder:text-muted focus:outline-none focus:border-accent/50 font-mono text-lg" />
-            <p className="text-xs text-muted mt-1.5">The price you expect the stock to reach</p>
+              className={`w-full px-4 py-3 bg-surface-2 border rounded-lg text-text-primary placeholder:text-muted focus:outline-none font-mono text-lg ${targetWarning ? 'border-negative/50 focus:border-negative/70' : 'border-border focus:border-accent/50'}`} />
+            {targetWarning ? (
+              <div className="flex items-start gap-1.5 mt-2 text-xs text-negative">
+                <AlertCircle className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
+                <span>{targetWarning}</span>
+              </div>
+            ) : impliedReturn !== null ? (
+              <p className="text-xs mt-1.5">
+                <span className="text-muted">Target: </span>
+                <span className="font-mono font-medium text-text-secondary">${parsedTarget.toFixed(2)}</span>
+                <span className={`font-mono font-bold ml-1 ${parseFloat(impliedReturn) >= 0 ? 'text-positive' : 'text-negative'}`}>
+                  ({parseFloat(impliedReturn) >= 0 ? '+' : ''}{impliedReturn}% from ${currentPrice.toFixed(2)})
+                </span>
+              </p>
+            ) : (
+              <p className="text-xs text-muted mt-1.5">The price you expect the stock to reach</p>
+            )}
           </div>
 
           <div className="card">
@@ -354,7 +428,7 @@ export default function SubmitCall() {
           </div>
 
           <div className="sticky bottom-16 sm:bottom-0 z-10 bg-bg pt-3 -mx-4 sm:mx-0 px-4 sm:px-0 pb-3 sm:pb-0">
-            <button type="submit" disabled={loading} className="btn-primary w-full disabled:opacity-50">
+            <button type="submit" disabled={loading || !!targetWarning} className="btn-primary w-full disabled:opacity-50">
               {loading ? <div className="w-5 h-5 border-2 border-bg border-t-transparent rounded-full animate-spin" /> : 'Lock In My Call'}
             </button>
             {perksInfo?.current_perks && perksInfo.current_perks.max_predictions_per_day !== -1 && (
