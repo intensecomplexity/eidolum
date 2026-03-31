@@ -337,13 +337,15 @@ export default function ForecasterProfile() {
           </div>
         )}
 
-        {/* Predictions — cards on mobile with evidence */}
-        <div className="sm:hidden space-y-3 mb-6">
+        {/* Predictions — cards on mobile with evidence inside */}
+        <div className="sm:hidden space-y-3 mb-6 mx-0">
           <h2 className="text-base font-semibold mb-2">Prediction History</h2>
           {displayedPredictions.map((p) => (
-            <div key={p.id}>
-              <PredictionCard prediction={p} forecaster={data} />
-              <div className="px-4 -mt-3 pb-3">
+            <div key={p.id} className="bg-surface border border-border rounded-xl overflow-hidden" style={{ wordBreak: 'break-word' }}>
+              <div className="p-4">
+                <PredictionCard prediction={p} forecaster={data} />
+              </div>
+              <div className="px-4 pb-3 border-t border-border/20">
                 <EvidenceCard prediction={p} forecaster={data} compact />
               </div>
             </div>
