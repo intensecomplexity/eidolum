@@ -39,22 +39,22 @@ export default function BottomNav() {
            style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
         <div className="flex items-center justify-around h-[60px]">
           <Link to="/" className={`flex flex-col items-center justify-center gap-0.5 w-full h-full active:bg-surface-2 transition-colors ${isActive('/') && !isActive('/login') && !isActive('/register') ? 'text-accent' : 'text-muted'}`}>
-            <Home className="w-5 h-5" /><span className="text-[10px] font-medium">Home</span>
+            <Home className="w-5 h-5" /><span className="text-[10px] font-medium whitespace-nowrap">Home</span>
           </Link>
           <Link to="/leaderboard" className={`flex flex-col items-center justify-center gap-0.5 w-full h-full active:bg-surface-2 transition-colors ${isActive('/leaderboard') ? 'text-accent' : 'text-muted'}`}>
-            <BarChart3 className="w-5 h-5" /><span className="text-[10px] font-medium">Leaders</span>
+            <BarChart3 className="w-5 h-5" /><span className="text-[10px] font-medium whitespace-nowrap">Ranks</span>
           </Link>
           {isAuthenticated ? (
             <Link to="/submit" className={`flex flex-col items-center justify-center gap-0.5 w-full h-full active:bg-surface-2 transition-colors ${isActive('/submit') ? 'text-accent' : 'text-muted'}`}>
-              <Crosshair className="w-5 h-5" /><span className="text-[10px] font-medium">Submit</span>
+              <Crosshair className="w-5 h-5" /><span className="text-[10px] font-medium whitespace-nowrap">Submit</span>
             </Link>
           ) : (
             <button onClick={() => setShowSearch(true)} className="flex flex-col items-center justify-center gap-0.5 w-full h-full text-muted active:bg-surface-2 transition-colors">
-              <Search className="w-5 h-5" /><span className="text-[10px] font-medium">Search</span>
+              <Search className="w-5 h-5" /><span className="text-[10px] font-medium whitespace-nowrap">Search</span>
             </button>
           )}
           <Link to={isAuthenticated ? '/profile' : '/login'} className={`flex flex-col items-center justify-center gap-0.5 w-full h-full active:bg-surface-2 transition-colors ${isActive('/profile') || isActive('/login') ? 'text-accent' : 'text-muted'}`}>
-            <User className="w-5 h-5" /><span className="text-[10px] font-medium">{isAuthenticated ? 'Profile' : 'Log In'}</span>
+            <User className="w-5 h-5" /><span className="text-[10px] font-medium whitespace-nowrap">{isAuthenticated ? 'Profile' : 'Log In'}</span>
           </Link>
         </div>
       </nav>

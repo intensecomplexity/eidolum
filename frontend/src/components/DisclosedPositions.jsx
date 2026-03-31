@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Briefcase, CheckCircle } from 'lucide-react';
+import { Briefcase, CheckCircle, ChevronDown } from 'lucide-react';
 import { getForecasterPositions } from '../api';
 
 const RATE_COLORS = {
@@ -19,6 +19,7 @@ function getRateLevel(rate) {
 
 export default function DisclosedPositions({ forecasterId, platform }) {
   const [data, setData] = useState(null);
+  const [expanded, setExpanded] = useState(false);
 
   useEffect(() => {
     getForecasterPositions(forecasterId).then(setData).catch(() => {});
@@ -31,14 +32,34 @@ export default function DisclosedPositions({ forecasterId, platform }) {
   const stats = data.conflict_stats || {};
   const rateLevel = getRateLevel(stats.conflict_rate || 0);
   const rateInfo = RATE_COLORS[rateLevel];
+  const hasContent = positions.length > 0 || isCongress;
 
+  // No positions and not congress — show a single collapsed line
+  if (!hasContent) {
+    return (
+      <button
+        onClick={() => setExpanded(!expanded)}
+        className="w-full card mb-6 sm:mb-8 py-3 flex items-center justify-between text-left"
+      >
+        <div className="flex items-center gap-2 text-sm">
+          <Briefcase className="w-3.5 h-3.5 text-muted" />
+          <span className="text-text-secondary">Disclosed Positions</span>
+          <span className="text-muted">&mdash;</span>
+          <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-mono font-semibold ${rateInfo.bg} ${rateInfo.color}`}>
+            <CheckCircle className="w-3 h-3" /> {stats.conflict_rate?.toFixed(0) || 0}% conflict
+          </span>
+        </div>
+        <ChevronDown className={`w-4 h-4 text-muted transition-transform ${expanded ? 'rotate-180' : ''}`} />
+      </button>
+    );
+  }
+
+  // Has positions or is congress — show full card
   return (
     <div className="card mb-6 sm:mb-8">
-      {/* Congress special banner */}
       {isCongress && (
         <div className="bg-warning/[0.06] border border-warning/20 rounded-lg p-3 mb-4">
           <div className="flex items-center gap-2 mb-1">
-            <span className="text-base">🏛️</span>
             <span className="text-warning text-sm font-bold">Congressional Trader</span>
           </div>
           <p className="text-text-secondary text-xs leading-relaxed">
@@ -59,42 +80,33 @@ export default function DisclosedPositions({ forecasterId, platform }) {
         </span>
       </div>
 
-      {positions.length === 0 && !isCongress ? (
-        <div className="flex items-center gap-2 text-positive text-sm">
-          <CheckCircle className="w-4 h-4" />
-          No disclosed positions on record
-        </div>
-      ) : (
-        <>
-          {positions.length > 0 && (
-            <div className="space-y-2 mb-3">
-              {positions.map((p, i) => (
-                <div key={i} className="flex items-center justify-between text-sm py-1.5 border-b border-border/30 last:border-0">
-                  <div className="flex items-center gap-2">
-                    <Link to={`/asset/${p.ticker}`} className="font-mono text-accent font-semibold hover:underline">
-                      {p.ticker}
-                    </Link>
-                    <span className={`text-xs font-mono ${
-                      p.position_type === 'long' ? 'text-positive' :
-                      p.position_type === 'short' ? 'text-negative' : 'text-muted'
-                    }`}>
-                      {p.position_type.toUpperCase()}
-                    </span>
-                  </div>
-                  <span className="text-muted text-xs">
-                    {p.disclosed_at ? `disclosed ${new Date(p.disclosed_at).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}` : 'ongoing'}
-                  </span>
-                </div>
-              ))}
+      {positions.length > 0 && (
+        <div className="space-y-2 mb-3">
+          {positions.map((p, i) => (
+            <div key={i} className="flex items-center justify-between text-sm py-1.5 border-b border-border/30 last:border-0">
+              <div className="flex items-center gap-2">
+                <Link to={`/asset/${p.ticker}`} className="font-mono text-accent font-semibold hover:underline">
+                  {p.ticker}
+                </Link>
+                <span className={`text-xs font-mono ${
+                  p.position_type === 'long' ? 'text-positive' :
+                  p.position_type === 'short' ? 'text-negative' : 'text-muted'
+                }`}>
+                  {p.position_type.toUpperCase()}
+                </span>
+              </div>
+              <span className="text-muted text-xs">
+                {p.disclosed_at ? `disclosed ${new Date(p.disclosed_at).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}` : 'ongoing'}
+              </span>
             </div>
-          )}
+          ))}
+        </div>
+      )}
 
-          {stats.conflict_predictions > 0 && (
-            <p className="text-muted text-xs">
-              ⚠️ {stats.conflict_predictions} of {stats.total_predictions} predictions involve stocks where a position was disclosed
-            </p>
-          )}
-        </>
+      {stats.conflict_predictions > 0 && (
+        <p className="text-muted text-xs">
+          {stats.conflict_predictions} of {stats.total_predictions} predictions involve stocks where a position was disclosed
+        </p>
       )}
     </div>
   );

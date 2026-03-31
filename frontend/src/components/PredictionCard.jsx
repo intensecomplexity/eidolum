@@ -1,11 +1,10 @@
 import { Link } from 'react-router-dom';
+import { ExternalLink } from 'lucide-react';
 import PredictionBadge from './PredictionBadge';
 import ConflictBadge from './ConflictBadge';
 import BookmarkButton from './BookmarkButton';
 import PlatformBadge from './PlatformBadge';
 import { annotateContext, ExplainerLine } from '../utils/predictionExplainer';
-
-const HORIZON_LABELS = { short: '30d', medium: '90d', long: '1y', custom: 'Custom' };
 
 const API_BASE = 'https://eidolum-production.up.railway.app';
 
@@ -14,7 +13,6 @@ function ProofBlock({ p }) {
   const archive = p.archive_url;
   const archiveImg = archive && archive.startsWith('/archive/') ? `${API_BASE}${archive}` : null;
 
-  // Wayback Machine archive link (stored or computed from source_url for articles)
   const waybackLink = archive && archive.startsWith('https://web.archive.org')
     ? archive
     : (source && !source.includes('youtube.com') && !source.includes('x.com') && !source.includes('twitter.com') && !source.includes('reddit.com'))
@@ -23,69 +21,48 @@ function ProofBlock({ p }) {
 
   if (!source) return null;
 
-  // YouTube: thumbnail + watch button
+  // YouTube: thumbnail + watch link
   if (source.includes('youtube.com') || source.includes('youtu.be')) {
     const ts = p.video_timestamp_sec;
     const timeStr = ts ? `${Math.floor(ts / 60)}:${String(ts % 60).padStart(2, '0')}` : null;
     return (
-      <div style={{ marginTop: '8px', marginBottom: '4px' }}>
+      <div className="mt-2">
         {archiveImg && (
           <img src={archiveImg} alt="Video proof"
-            style={{ width: '100%', maxWidth: '400px', borderRadius: '8px', marginBottom: '8px',
-              border: '1px solid rgba(255,255,255,0.1)', display: 'block' }} />
+            className="w-full max-w-[400px] rounded-lg mb-2 border border-border block" />
         )}
         <a href={source} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()}
-          style={{ display: 'inline-flex', alignItems: 'center', gap: '6px',
-            padding: '6px 14px', borderRadius: '6px', background: '#FF0000', color: '#fff',
-            fontSize: '0.85rem', fontWeight: 600, textDecoration: 'none' }}>
-          {timeStr ? `▶ Watch at ${timeStr}` : '▶ Watch on YouTube'}
+          className="inline-flex items-center gap-1 text-xs text-accent hover:underline">
+          <ExternalLink className="w-3 h-3" />
+          {timeStr ? `Watch at ${timeStr}` : 'Watch on YouTube'}
         </a>
       </div>
     );
   }
 
-  // Twitter / Reddit: screenshot proof + source button
-  const isTwitter = source.includes('x.com') || source.includes('twitter.com');
-  const isReddit = source.includes('reddit.com');
-  const isArticle = !isTwitter && !isReddit;
-  const label = isTwitter ? '𝕏 View on X' : isReddit ? '🔴 View on Reddit' : '🔗 Source Article';
-  const bg = isTwitter ? '#000' : isReddit ? '#FF4500' : '#333';
-
+  // Twitter / Reddit / Article: screenshot + clean text links
   return (
-    <div style={{ marginTop: '8px', marginBottom: '4px' }}>
+    <div className="mt-2">
       {archiveImg && (
         <a href={archiveImg} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()}>
           <img src={archiveImg} alt="Screenshot proof"
-            style={{ width: '100%', maxWidth: '500px', borderRadius: '8px', marginBottom: '8px',
-              border: '1px solid rgba(255,255,255,0.1)', cursor: 'pointer', display: 'block' }} />
+            className="w-full max-w-[500px] rounded-lg mb-2 border border-border cursor-pointer block" />
         </a>
       )}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+      <div className="flex items-center gap-3">
         <a href={source} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()}
-          style={{ display: 'inline-flex', alignItems: 'center', gap: '6px',
-            padding: '6px 14px', borderRadius: '6px', background: bg, color: '#fff',
-            fontSize: '0.85rem', fontWeight: 500, textDecoration: 'none' }}>
-          {label}
+          className="inline-flex items-center gap-1 text-xs text-text-secondary hover:text-accent">
+          <ExternalLink className="w-3 h-3" /> Source
         </a>
         {waybackLink && (
           <a href={waybackLink} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()}
-            style={{ display: 'inline-flex', alignItems: 'center', gap: '6px',
-              padding: '6px 14px', borderRadius: '6px', background: 'rgba(52, 211, 153, 0.1)',
-              color: '#34d399', border: '1px solid rgba(52, 211, 153, 0.2)',
-              fontSize: '0.8rem', fontWeight: 500, textDecoration: 'none' }}>
-            📁 Archived Proof
+            className="inline-flex items-center gap-1 text-xs text-text-secondary hover:text-accent">
+            <ExternalLink className="w-3 h-3" /> Proof
           </a>
         )}
       </div>
     </div>
   );
-}
-
-function formatTimestamp(sec) {
-  if (!sec) return '';
-  const m = Math.floor(sec / 60);
-  const s = sec % 60;
-  return `${m}:${String(s).padStart(2, '0')}`;
 }
 
 function formatDate(iso) {
@@ -96,35 +73,33 @@ function formatDate(iso) {
 export default function PredictionCard({ prediction: p, showForecaster = false, forecaster = null }) {
   const predId = p.id || p.prediction_id;
   const evalDate = p.evaluation_date || p.resolution_date;
-  const horizonLabel = HORIZON_LABELS[p.time_horizon] || `${p.window_days}d`;
 
   return (
-    <div className={`bg-surface border rounded-xl p-4 ${
+    <div className={`bg-surface border rounded-xl p-4 overflow-hidden break-words ${
       p.outcome === 'pending' ? 'border-warning/30' : 'border-border'
     }`}>
-      <div className="flex items-center justify-between mb-2">
-        <div className="flex items-center gap-2">
-          <Link to={`/asset/${p.ticker}`} className="font-mono text-accent text-base font-bold active:underline">
+      {/* Line 1: Ticker | Badges | Outcome */}
+      <div className="flex items-center justify-between gap-2 mb-2">
+        <div className="flex items-center gap-2 flex-wrap min-w-0">
+          <Link to={`/asset/${p.ticker}`} className="font-mono text-accent text-base font-bold active:underline shrink-0">
             {p.ticker}
           </Link>
           {p.sector === 'Crypto' && (
-            <span className="text-[9px] font-bold tracking-wide px-1.5 py-0.5 rounded-full"
+            <span className="text-[9px] font-bold tracking-wide px-1.5 py-0.5 rounded-full shrink-0"
               style={{ backgroundColor: 'rgba(247, 147, 26, 0.15)', color: '#f7931a' }}>
               CRYPTO
             </span>
           )}
           <PredictionBadge direction={p.direction} windowDays={p.window_days || p.evaluation_window_days} />
           {p.has_conflict && <ConflictBadge note={p.conflict_note} size="small" />}
-          <span className="text-muted text-[10px] font-mono border border-border rounded px-1 py-0.5">
-            {horizonLabel}
-          </span>
         </div>
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-1 shrink-0">
           {predId && <BookmarkButton predictionId={predId} />}
           <PredictionBadge outcome={p.outcome} />
         </div>
       </div>
 
+      {/* Forecaster info (if showing) */}
       {showForecaster && p.forecaster && (
         <Link
           to={`/forecaster/${p.forecaster.id}`}
@@ -138,67 +113,70 @@ export default function PredictionCard({ prediction: p, showForecaster = false, 
         </Link>
       )}
 
-      {/* Price + return data */}
-      <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-xs font-mono mb-1">
-        <span className="text-muted">{formatDate(p.prediction_date)}</span>
-        <span className="text-right">
-          {p.actual_return !== null && p.actual_return !== undefined ? (
-            <span className={`font-semibold ${p.actual_return >= 0 ? 'text-positive' : 'text-negative'}`}>
-              {p.actual_return >= 0 ? '+' : ''}{p.actual_return.toFixed(1)}%
-            </span>
-          ) : (
-            <span className="text-muted">Pending</span>
-          )}
-        </span>
-        {p.entry_price != null && (
-          <span className="text-text-secondary whitespace-nowrap">Entry ${p.entry_price.toFixed(2)}</span>
-        )}
-        {p.target_price != null && (
-          <span className="text-text-secondary text-right whitespace-nowrap">Target ${p.target_price.toFixed(0)}</span>
-        )}
-      </div>
-
-      {/* Context with glossary tooltips */}
+      {/* Raw analyst quote */}
       {(p.exact_quote || p.context) && (
-        <p className="text-xs text-text-secondary italic mt-1.5 leading-relaxed">
+        <p className="text-xs text-text-primary leading-relaxed mb-1.5 break-words">
           {annotateContext(p.exact_quote || p.context, p.ticker)}
         </p>
       )}
 
-      {/* Simple explainer */}
-      <ExplainerLine prediction={p} className="mt-1" />
+      {/* In simple terms (gold explainer) */}
+      <ExplainerLine prediction={p} className="mb-2" />
+
+      {/* Entry → Target | Return */}
+      <div className="flex items-center gap-2 text-xs font-mono mb-1.5 flex-wrap">
+        {p.entry_price != null && (
+          <span className="text-text-secondary">Entry ${p.entry_price.toFixed(2)}</span>
+        )}
+        {p.entry_price != null && p.target_price != null && (
+          <span className="text-muted">&rarr;</span>
+        )}
+        {p.target_price != null && (
+          <span className="text-text-secondary">Target ${p.target_price.toFixed(0)}</span>
+        )}
+        {p.actual_return !== null && p.actual_return !== undefined && (
+          <>
+            <span className="text-muted">|</span>
+            <span className={`font-semibold ${p.actual_return >= 0 ? 'text-positive' : 'text-negative'}`}>
+              {p.actual_return >= 0 ? '+' : ''}{p.actual_return.toFixed(1)}%
+            </span>
+          </>
+        )}
+      </div>
+
+      {/* Dates */}
+      <div className="flex items-center gap-3 text-[10px] text-muted font-mono mb-2">
+        {p.prediction_date && <span>{formatDate(p.prediction_date)}</span>}
+        {evalDate && (
+          <span>
+            {p.outcome === 'pending' ? `Eval ${formatDate(evalDate)}` : `Scored ${formatDate(evalDate)}`}
+          </span>
+        )}
+      </div>
 
       {/* Evaluation summary */}
       {p.evaluation_summary && (
-        <p className={`text-xs italic mt-1.5 leading-relaxed ${p.outcome === 'correct' ? 'text-positive/80' : 'text-negative/80'}`}>
+        <p className={`text-xs italic leading-relaxed mb-2 ${p.outcome === 'correct' ? 'text-positive/80' : 'text-negative/80'}`}>
           {p.evaluation_summary}
         </p>
       )}
 
-      {/* Platform-specific proof */}
+      {/* Source / Proof links */}
       <ProofBlock p={p} />
 
       {/* Conflict detail */}
       {p.has_conflict && p.conflict_note && (
         <div className="flex items-start gap-1.5 mt-2 pt-2 border-t border-border/30">
-          <span className="text-warning text-xs">⚠️</span>
-          <span className="text-warning/80 text-[11px]">{p.conflict_note}</span>
+          <span className="text-warning text-xs shrink-0">!</span>
+          <span className="text-warning/80 text-[11px] break-words">{p.conflict_note}</span>
         </div>
       )}
 
-      {/* Disclaimer + evaluation date — stacked with clear spacing */}
-      <div className="mt-3 pt-2 border-t border-border/20 space-y-1.5">
-        <p className="text-muted text-[10px] italic leading-relaxed">
-          Quote sourced from public statement. Eidolum does not provide investment advice.
+      {/* Disclaimer */}
+      <div className="mt-2 pt-2 border-t border-border/20">
+        <p className="text-muted/50 text-[9px] leading-relaxed">
+          Quote sourced from public statement. Not investment advice.
         </p>
-        {evalDate && (
-          <p className="text-muted text-[10px] italic leading-relaxed">
-            {p.outcome === 'pending'
-              ? `⏱ Evaluates on ${formatDate(evalDate)}`
-              : `Evaluated at ${formatDate(evalDate)}`
-            }
-          </p>
-        )}
       </div>
     </div>
   );
