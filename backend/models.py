@@ -348,6 +348,21 @@ class WatchlistItem(Base):
     __table_args__ = (UniqueConstraint("user_id", "ticker", name="uq_watchlist"),)
 
 
+class NotificationQueue(Base):
+    __tablename__ = "notification_queue"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    ticker = Column(String(10), nullable=False)
+    prediction_id = Column(Integer, nullable=True)
+    forecaster_name = Column(String(100), nullable=True)
+    direction = Column(String(20), nullable=True)
+    target_price = Column(Numeric(10, 2), nullable=True)
+    context = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    sent_at = Column(DateTime, nullable=True)
+
+
 class PredictionComment(Base):
     __tablename__ = "prediction_comments"
 

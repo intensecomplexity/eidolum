@@ -15,6 +15,10 @@ export function getForecaster(id, params = {}) {
   return api.get(`/forecaster/${id}`, { params }).then(r => r.data);
 }
 
+export function getForecasterSimulator(id) {
+  return api.get(`/forecaster/${id}/simulator`).then(r => r.data);
+}
+
 export function getSectors() {
   return api.get('/sectors').then(r => r.data);
 }

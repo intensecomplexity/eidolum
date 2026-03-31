@@ -248,3 +248,130 @@ def _get_preds(fid, page, limit, filter_type, sector, db):
             "timestamp_url": get_youtube_timestamp_url(p[17], p[18]),
         })
     return results
+
+
+# ── GET /api/forecaster/{forecaster_id}/simulator ────────────────────────────
+
+_sim_cache: dict[int, tuple] = {}
+_SIM_TTL = 3600  # 1 hour
+
+
+@router.get("/forecaster/{forecaster_id}/simulator")
+@limiter.limit("30/minute")
+def get_portfolio_simulator(
+    request: Request,
+    forecaster_id: int,
+    db: Session = Depends(get_db),
+):
+    cached = _sim_cache.get(forecaster_id)
+    if cached and (_time.time() - cached[1]) < _SIM_TTL:
+        return cached[0]
+
+    f = db.query(Forecaster).filter(Forecaster.id == forecaster_id).first()
+    if not f:
+        raise HTTPException(status_code=404, detail="Forecaster not found")
+
+    # Get all scored predictions ordered by date
+    rows = db.execute(sql_text("""
+        SELECT ticker, direction, prediction_date, evaluation_date,
+               entry_price, target_price, actual_return, outcome
+        FROM predictions
+        WHERE forecaster_id = :fid
+          AND outcome IN ('correct', 'incorrect', 'hit', 'near', 'miss')
+          AND actual_return IS NOT NULL
+          AND prediction_date IS NOT NULL
+        ORDER BY prediction_date ASC
+    """), {"fid": forecaster_id}).fetchall()
+
+    if len(rows) < 5:
+        result = {"forecaster_id": forecaster_id, "forecaster_name": f.name,
+                  "insufficient_data": True, "total_predictions": len(rows)}
+        _sim_cache[forecaster_id] = (result, _time.time())
+        return result
+
+    # Simulate portfolio
+    starting = 10000
+    per_trade = 1000
+    portfolio = starting
+    timeline = []
+    trades = []
+    best_call = None
+    worst_call = None
+    first_date = None
+    last_date = None
+
+    for r in rows:
+        ticker, direction, pred_date, eval_date, entry, target, ret, outcome = r
+        if ret is None:
+            continue
+
+        ret_pct = float(ret)
+        pnl = per_trade * (ret_pct / 100)
+        portfolio += pnl
+
+        date_str = pred_date.strftime("%Y-%m-%d") if pred_date else None
+        eval_str = eval_date.strftime("%Y-%m-%d") if eval_date else None
+        if not first_date and date_str:
+            first_date = date_str
+        if date_str:
+            last_date = date_str
+
+        trade = {
+            "date": date_str,
+            "eval_date": eval_str,
+            "ticker": ticker,
+            "direction": direction,
+            "entry": float(entry) if entry else None,
+            "target": float(target) if target else None,
+            "return_pct": round(ret_pct, 1),
+            "pnl": round(pnl, 2),
+            "portfolio_value": round(portfolio, 2),
+            "outcome": outcome,
+        }
+        trades.append(trade)
+        timeline.append({
+            "date": date_str,
+            "value": round(portfolio, 2),
+            "prediction": f"{ticker} {'+' if ret_pct >= 0 else ''}{ret_pct:.1f}%",
+        })
+
+        if best_call is None or ret_pct > best_call["return_pct"]:
+            best_call = {"ticker": ticker, "return_pct": round(ret_pct, 1), "date": date_str}
+        if worst_call is None or ret_pct < worst_call["return_pct"]:
+            worst_call = {"ticker": ticker, "return_pct": round(ret_pct, 1), "date": date_str}
+
+    total_return = round((portfolio - starting) / starting * 100, 1)
+
+    # Build time period string
+    period_str = None
+    if first_date and last_date:
+        from datetime import datetime as _dt
+        try:
+            fd = _dt.strptime(first_date, "%Y-%m-%d")
+            ld = _dt.strptime(last_date, "%Y-%m-%d")
+            period_str = f"{fd.strftime('%b %Y')} — {ld.strftime('%b %Y')}"
+        except Exception:
+            pass
+
+    # Alpha vs S&P (use forecaster's stored alpha if available)
+    alpha = round(float(f.alpha or 0), 1) if f.alpha else 0
+
+    result = {
+        "forecaster_id": forecaster_id,
+        "forecaster_name": f.name,
+        "insufficient_data": False,
+        "starting_capital": starting,
+        "per_trade": per_trade,
+        "current_value": round(portfolio, 2),
+        "total_return_pct": total_return,
+        "total_predictions": len(trades),
+        "time_period": period_str,
+        "alpha": alpha,
+        "best_call": best_call,
+        "worst_call": worst_call,
+        "portfolio_over_time": timeline,
+        "trades": trades,
+    }
+
+    _sim_cache[forecaster_id] = (result, _time.time())
+    return result
