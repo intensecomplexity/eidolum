@@ -176,24 +176,45 @@ export default function ForecasterProfile() {
             {/* Stats — pie chart + 2x2 grid on mobile, row on desktop */}
             <div className="flex items-center gap-4 sm:gap-6 shrink-0">
               {/* Pie chart */}
-              {(data.prediction_counts?.correct > 0 || data.prediction_counts?.incorrect > 0) && (
-                <div className="hidden sm:block">
+              {(data.prediction_counts?.evaluated > 0 || data.prediction_counts?.correct > 0) && (
+                <div className="hidden sm:flex flex-col items-center gap-2">
                   <MiniPieChart
+                    hits={data.prediction_counts?.hits || 0}
+                    nears={data.prediction_counts?.nears || 0}
+                    misses={data.prediction_counts?.misses || 0}
                     correct={data.prediction_counts?.correct || data.correct_predictions || 0}
                     incorrect={data.prediction_counts?.incorrect || 0}
                     pending={data.prediction_counts?.pending || 0}
                     size={100}
                     showCenter
                   />
+                  {/* Legend */}
+                  <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-[10px]">
+                    {(data.prediction_counts?.hits || data.prediction_counts?.correct || 0) > 0 && (
+                      <div className="flex items-center gap-1"><span className="w-2 h-2 rounded-full" style={{ backgroundColor: '#34d399' }} /><span className="text-text-secondary">{data.prediction_counts?.hits || data.prediction_counts?.correct} Hits</span></div>
+                    )}
+                    {(data.prediction_counts?.nears || 0) > 0 && (
+                      <div className="flex items-center gap-1"><span className="w-2 h-2 rounded-full" style={{ backgroundColor: '#fbbf24' }} /><span className="text-text-secondary">{data.prediction_counts.nears} Nears</span></div>
+                    )}
+                    {(data.prediction_counts?.misses || data.prediction_counts?.incorrect || 0) > 0 && (
+                      <div className="flex items-center gap-1"><span className="w-2 h-2 rounded-full" style={{ backgroundColor: '#f87171' }} /><span className="text-text-secondary">{data.prediction_counts?.misses || data.prediction_counts?.incorrect} Misses</span></div>
+                    )}
+                    {(data.prediction_counts?.pending || 0) > 0 && (
+                      <div className="flex items-center gap-1"><span className="w-2 h-2 rounded-full" style={{ backgroundColor: '#4b5563' }} /><span className="text-text-secondary">{data.prediction_counts.pending} Pending</span></div>
+                    )}
+                  </div>
                 </div>
               )}
               <div className="grid grid-cols-2 sm:flex gap-3 sm:gap-5 shrink-0">
                 <div className="text-center bg-surface-2 sm:bg-transparent rounded-lg p-3 sm:p-0">
                   <div className="flex items-center justify-center gap-2">
                     {/* Tiny pie on mobile only */}
-                    {(data.prediction_counts?.correct > 0 || data.prediction_counts?.incorrect > 0) && (
+                    {(data.prediction_counts?.evaluated > 0 || data.prediction_counts?.correct > 0) && (
                       <div className="sm:hidden">
                         <MiniPieChart
+                          hits={data.prediction_counts?.hits || 0}
+                          nears={data.prediction_counts?.nears || 0}
+                          misses={data.prediction_counts?.misses || 0}
                           correct={data.prediction_counts?.correct || data.correct_predictions || 0}
                           incorrect={data.prediction_counts?.incorrect || 0}
                           pending={data.prediction_counts?.pending || 0}

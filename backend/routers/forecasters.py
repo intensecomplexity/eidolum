@@ -113,7 +113,7 @@ def get_forecaster(
         "total_all_predictions": total_all,
         "sector_strengths": [],
         "accuracy_over_time": _build_accuracy_trend(forecaster_id, db),
-        "prediction_counts": {"all": 0, "evaluated": 0, "pending": 0, "correct": 0, "incorrect": 0},
+        "prediction_counts": {"all": 0, "evaluated": 0, "pending": 0, "hits": 0, "nears": 0, "misses": 0, "correct": 0, "incorrect": 0},
         "predictions": _get_preds(forecaster_id, page, limit, filter, sector, db),
         "disclosed_positions": [],
         "conflict_stats": {"total": 0, "conflicts": 0, "rate": 0},
@@ -157,10 +157,13 @@ def get_forecaster_sectors(request: Request, forecaster_id: int, db: Session = D
         "sector_strengths": sectors,
         "prediction_counts": {
             "all": sum(counts.values()),
-            "evaluated": counts.get("correct", 0) + counts.get("incorrect", 0),
+            "evaluated": counts.get("hit", 0) + counts.get("near", 0) + counts.get("miss", 0) + counts.get("correct", 0) + counts.get("incorrect", 0),
             "pending": counts.get("pending", 0),
-            "correct": counts.get("correct", 0),
-            "incorrect": counts.get("incorrect", 0),
+            "hits": counts.get("hit", 0) + counts.get("correct", 0),
+            "nears": counts.get("near", 0),
+            "misses": counts.get("miss", 0) + counts.get("incorrect", 0),
+            "correct": counts.get("hit", 0) + counts.get("correct", 0),
+            "incorrect": counts.get("miss", 0) + counts.get("incorrect", 0),
         },
     }
 
