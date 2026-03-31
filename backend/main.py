@@ -1130,6 +1130,9 @@ def archive_missing_proofs(db):
 
 _scheduler = None  # module-level reference for diagnostic endpoints
 
+# PROTECTION 1: Kill switch — set DISABLE_BACKGROUND_JOBS=true to skip ALL scheduled jobs
+_JOBS_DISABLED = os.getenv("DISABLE_BACKGROUND_JOBS", "").lower() in ("true", "1", "yes")
+
 
 # ┌──────────────────────────────────────────────────────────────────────────────┐
 # │ CRITICAL: Do NOT add synchronous DB operations to lifespan().              │
@@ -1137,16 +1140,29 @@ _scheduler = None  # module-level reference for diagnostic endpoints
 # │ Adding blocking DB calls here WILL crash the site on deploy.               │
 # │ The app must bind its port and start serving within seconds.               │
 # │ See incident 2026-03-29: startup hung → Railway couldn't deploy new code.  │
+# │ See incident 2026-03-31: connection exhaustion from concurrent bg jobs.    │
 # └──────────────────────────────────────────────────────────────────────────────┘
 @asynccontextmanager
 async def lifespan(app):
     global _scheduler
     import threading
 
+    # PROTECTION 8: Railway credit warning
+    print("[STARTUP] ========================================")
+    print("[STARTUP] Railway trial plan — monitor credits!")
+    print("[STARTUP] Site goes offline when credits hit $0.")
+    print("[STARTUP] Check: Railway dashboard → Usage tab")
+    print("[STARTUP] ========================================")
+
+    if _JOBS_DISABLED:
+        print("[STARTUP] *** BACKGROUND JOBS DISABLED (DISABLE_BACKGROUND_JOBS=true) ***")
+        print("[STARTUP] App will serve requests but no scrapers/evaluators will run.")
+
     def _startup_all():
-        """ALL DB-touching startup work runs here — completely off the critical path."""
+        """ALL DB-touching startup work runs here — completely off the critical path.
+        PROTECTION 5: Waits 30 seconds before touching the DB so the app can serve requests."""
         import time as _t2
-        _t2.sleep(3)  # Let the app bind its port first
+        _t2.sleep(30)  # PROTECTION 5: 30 second delay — app must be fully ready first
 
         # Phase 1: Schema init + migrations
         try:
@@ -1169,18 +1185,22 @@ async def lifespan(app):
         # Seed magazine forecasters
         try:
             db = BgSessionLocal()
-            from jobs.seed_magazines import seed_magazine_forecasters
-            seed_magazine_forecasters(db)
-            db.close()
+            try:
+                from jobs.seed_magazines import seed_magazine_forecasters
+                seed_magazine_forecasters(db)
+            finally:
+                db.close()
         except Exception as e:
             print(f"[Startup] Magazine seed error: {e}")
 
         # Merge duplicate forecasters
         try:
             db = BgSessionLocal()
-            from jobs.news_scraper import merge_duplicate_forecasters
-            merge_duplicate_forecasters(db)
-            db.close()
+            try:
+                from jobs.news_scraper import merge_duplicate_forecasters
+                merge_duplicate_forecasters(db)
+            finally:
+                db.close()
         except Exception as e:
             print(f"[Startup] Forecaster merge error: {e}")
 
@@ -1188,36 +1208,40 @@ async def lifespan(app):
         try:
             from sqlalchemy import text as _t
             db = BgSessionLocal()
-            for col_sql in [
-                "ALTER TABLE forecasters ADD COLUMN accuracy_score FLOAT",
-                "ALTER TABLE forecasters ADD COLUMN total_predictions INTEGER DEFAULT 0",
-                "ALTER TABLE forecasters ADD COLUMN correct_predictions INTEGER DEFAULT 0",
-                "ALTER TABLE forecasters ADD COLUMN streak INTEGER DEFAULT 0",
-                "ALTER TABLE forecasters ADD COLUMN avg_return FLOAT",
-                "ALTER TABLE predictions ADD COLUMN evaluated_at TIMESTAMP",
-                "ALTER TABLE ticker_sectors ADD COLUMN company_name VARCHAR(200)",
-                "ALTER TABLE ticker_sectors ADD COLUMN industry VARCHAR(100)",
-                "ALTER TABLE forecasters ADD COLUMN firm VARCHAR(200)",
-                "ALTER TABLE users ADD COLUMN twitter_url VARCHAR(255)",
-                "ALTER TABLE users ADD COLUMN linkedin_url VARCHAR(255)",
-                "ALTER TABLE users ADD COLUMN youtube_url VARCHAR(255)",
-                "ALTER TABLE users ADD COLUMN website_url VARCHAR(255)",
-                "ALTER TABLE predictions ADD COLUMN call_type VARCHAR(50)",
-            ]:
-                try:
-                    db.execute(_t(col_sql))
-                    db.commit()
-                except Exception:
-                    db.rollback()
-            db.close()
+            try:
+                for col_sql in [
+                    "ALTER TABLE forecasters ADD COLUMN accuracy_score FLOAT",
+                    "ALTER TABLE forecasters ADD COLUMN total_predictions INTEGER DEFAULT 0",
+                    "ALTER TABLE forecasters ADD COLUMN correct_predictions INTEGER DEFAULT 0",
+                    "ALTER TABLE forecasters ADD COLUMN streak INTEGER DEFAULT 0",
+                    "ALTER TABLE forecasters ADD COLUMN avg_return FLOAT",
+                    "ALTER TABLE predictions ADD COLUMN evaluated_at TIMESTAMP",
+                    "ALTER TABLE ticker_sectors ADD COLUMN company_name VARCHAR(200)",
+                    "ALTER TABLE ticker_sectors ADD COLUMN industry VARCHAR(100)",
+                    "ALTER TABLE forecasters ADD COLUMN firm VARCHAR(200)",
+                    "ALTER TABLE users ADD COLUMN twitter_url VARCHAR(255)",
+                    "ALTER TABLE users ADD COLUMN linkedin_url VARCHAR(255)",
+                    "ALTER TABLE users ADD COLUMN youtube_url VARCHAR(255)",
+                    "ALTER TABLE users ADD COLUMN website_url VARCHAR(255)",
+                    "ALTER TABLE predictions ADD COLUMN call_type VARCHAR(50)",
+                ]:
+                    try:
+                        db.execute(_t(col_sql))
+                        db.commit()
+                    except Exception:
+                        db.rollback()
+            finally:
+                db.close()
         except Exception as e:
             print(f"[Startup] Stats column error: {e}")
 
         # Archive columns
         try:
             db = BgSessionLocal()
-            migrate_add_archive_columns(db)
-            db.close()
+            try:
+                migrate_add_archive_columns(db)
+            finally:
+                db.close()
         except Exception as e:
             print(f"[Startup] Archive column error: {e}")
 
@@ -1225,8 +1249,10 @@ async def lifespan(app):
         try:
             from seasons import ensure_current_season as _ecs
             db = BgSessionLocal()
-            _ecs(db)
-            db.close()
+            try:
+                _ecs(db)
+            finally:
+                db.close()
         except Exception as e:
             print(f"[Startup] Season init error: {e}")
 
@@ -1234,67 +1260,107 @@ async def lifespan(app):
         try:
             from jobs.daily_challenge import ensure_daily_challenge_exists
             db = BgSessionLocal()
-            ensure_daily_challenge_exists(db)
-            db.close()
+            try:
+                ensure_daily_challenge_exists(db)
+            finally:
+                db.close()
         except Exception as e:
             print(f"[Startup] Daily challenge error: {e}")
 
         # Backfill call_type for existing predictions
         try:
+            from sqlalchemy import text as _t
             db = BgSessionLocal()
-            updated = db.execute(_t("""
-                UPDATE predictions SET call_type = CASE
-                    WHEN context ILIKE '%upgrade%' THEN 'upgrade'
-                    WHEN context ILIKE '%downgrade%' THEN 'downgrade'
-                    WHEN context ILIKE '%initiat%coverage%' THEN 'new_coverage'
-                    WHEN target_price IS NOT NULL THEN 'price_target'
-                    ELSE 'rating'
-                END
-                WHERE call_type IS NULL AND outcome != 'pending_review'
-            """)).rowcount
-            db.commit()
-            if updated:
-                print(f"[Startup] Backfilled call_type for {updated} predictions")
-            db.close()
+            try:
+                updated = db.execute(_t("""
+                    UPDATE predictions SET call_type = CASE
+                        WHEN context ILIKE '%upgrade%' THEN 'upgrade'
+                        WHEN context ILIKE '%downgrade%' THEN 'downgrade'
+                        WHEN context ILIKE '%initiat%coverage%' THEN 'new_coverage'
+                        WHEN target_price IS NOT NULL THEN 'price_target'
+                        ELSE 'rating'
+                    END
+                    WHERE call_type IS NULL AND outcome != 'pending_review'
+                """)).rowcount
+                db.commit()
+                if updated:
+                    print(f"[Startup] Backfilled call_type for {updated} predictions")
+            finally:
+                db.close()
         except Exception as e:
             print(f"[Startup] call_type backfill error: {e}")
 
         # Auto-resume Benzinga backfill if not caught up
-        try:
-            from jobs.benzinga_backfill import auto_resume_backfill
-            auto_resume_backfill()
-        except Exception as e:
-            print(f"[Startup] Backfill auto-resume error: {e}")
+        if not _JOBS_DISABLED:
+            try:
+                from jobs.benzinga_backfill import auto_resume_backfill
+                auto_resume_backfill()
+            except Exception as e:
+                print(f"[Startup] Backfill auto-resume error: {e}")
 
         print("[Startup] All background DB init complete")
 
     threading.Thread(target=_startup_all, daemon=True).start()
-    print("[Startup] App starting immediately — all DB init deferred to background thread")
+    print("[Startup] App starting immediately — all DB init deferred to background thread (30s delay)")
 
     # Security warning (no DB needed)
     if not os.getenv("ADMIN_SECRET"):
         print("[WARNING] ADMIN_SECRET not set — admin routes are unprotected!")
+
+    # ── PROTECTION 1: Skip ALL scheduler registration if jobs are disabled ────
+    if _JOBS_DISABLED:
+        print("[STARTUP] Scheduler NOT started (DISABLE_BACKGROUND_JOBS=true)")
+        yield
+        return
+
     # Start background job scheduler
     from admin_panel import scheduler_last_run
-    from circuit_breaker import db_is_healthy, mark_job_running, mark_job_done
+    from circuit_breaker import (
+        db_is_healthy, mark_job_running, mark_job_done,
+        acquire_job_lock, release_job_lock, watchdog_check,
+        memory_is_available,
+    )
 
-    def _guarded_job(job_name, job_fn):
-        """Wrap a background job with circuit breaker + tracking."""
+    def _guarded_job(job_name, job_fn, *, check_memory=False):
+        """Wrap a background job with:
+        - PROTECTION 2: Global job lock (only one job at a time)
+        - PROTECTION 3: Circuit breaker (skip if DB unreachable)
+        - PROTECTION 7: Memory guard (optional, for yfinance-type jobs)
+        - Context manager for DB sessions (connections always returned)
+        """
         def wrapper():
             from datetime import datetime as _dt
             scheduler_last_run[job_name] = _dt.utcnow()
+
+            # PROTECTION 3: Circuit breaker
             if not db_is_healthy(job_name):
                 return
+
+            # PROTECTION 7: Memory guard
+            if check_memory and not memory_is_available():
+                print(f"[{job_name}] Skipped: low memory")
+                return
+
+            # PROTECTION 2: Global lock — only ONE job at a time
+            if not acquire_job_lock(job_name):
+                return  # Another job is running, skip this cycle
+
             mark_job_running(job_name)
-            db = BgSessionLocal()
             try:
-                job_fn(db)
-            except Exception as e:
-                print(f"[{job_name}] Error: {e}")
+                db = BgSessionLocal()
+                try:
+                    job_fn(db)
+                except Exception as e:
+                    print(f"[{job_name}] Error: {e}")
+                finally:
+                    db.close()
             finally:
-                db.close()
                 mark_job_done(job_name)
+                release_job_lock(job_name)
         return wrapper
+
+    # ── Define all guarded jobs ───────────────────────────────────────────────
+    # All first runs are deferred to 30+ seconds after startup so DB init completes first
 
     run_fast_scraper = _guarded_job("fast_scraper", lambda db: __import__('jobs.news_scraper', fromlist=['scrape_fast_predictions']).scrape_fast_predictions(db))
     run_hourly_scraper = _guarded_job("full_scraper", lambda db: run_scraper(db))
@@ -1310,76 +1376,29 @@ async def lifespan(app):
     run_fmp_upgrades = _guarded_job("fmp_upgrades", lambda db: __import__('jobs.upgrade_scrapers', fromlist=['scrape_fmp_upgrades']).scrape_fmp_upgrades(db))
     run_fmp_price_targets = _guarded_job("fmp_price_targets", lambda db: __import__('jobs.upgrade_scrapers', fromlist=['scrape_fmp_price_targets']).scrape_fmp_price_targets(db))
     run_fmp_daily_grades = _guarded_job("fmp_daily_grades", lambda db: __import__('jobs.upgrade_scrapers', fromlist=['scrape_fmp_daily_grades']).scrape_fmp_daily_grades(db))
-    run_yfinance = _guarded_job("yfinance", lambda db: __import__('jobs.rss_scrapers', fromlist=['scrape_yfinance_recommendations']).scrape_yfinance_recommendations(db))
+    # PROTECTION 7: yfinance gets memory guard
+    run_yfinance = _guarded_job("yfinance", lambda db: __import__('jobs.rss_scrapers', fromlist=['scrape_yfinance_recommendations']).scrape_yfinance_recommendations(db), check_memory=True)
     run_benzinga_api = _guarded_job("benzinga_api", lambda db: __import__('jobs.benzinga_scraper', fromlist=['scrape_benzinga_ratings']).scrape_benzinga_ratings(db))
     run_newsapi = _guarded_job("newsapi", lambda db: __import__('jobs.news_scraper', fromlist=['scrape_newsapi']).scrape_newsapi(db))
-
-    print("[STARTUP] Scheduler starting...")
-    scheduler = AsyncIOScheduler()
-    _scheduler = scheduler
-    # Core scrapers
-    scheduler.add_job(run_hourly_scraper, "interval", hours=1, id="scraper")
-    scheduler.add_job(run_fast_scraper, "interval", minutes=15, id="fast_scraper")
-    scheduler.add_job(run_benzinga_api, "interval", hours=2, id="benzinga_api", next_run_time=datetime.utcnow() + timedelta(minutes=15))
-    scheduler.add_job(run_newsapi, "interval", hours=4, id="newsapi", next_run_time=datetime.utcnow() + timedelta(minutes=10))
-    # DISABLED: benzinga_web produces garbage data (bad firm names, duplicates of API data)
-    # scheduler.add_job(run_benzinga_web, "interval", hours=2, id="benzinga_web", next_run_time=datetime.utcnow() + timedelta(minutes=25))
-
-    # Massive API — Benzinga ratings
     run_massive_benzinga = _guarded_job("massive_benzinga", lambda db: __import__('jobs.massive_benzinga', fromlist=['scrape_massive_ratings']).scrape_massive_ratings(db))
-    scheduler.add_job(run_massive_benzinga, "interval", hours=2, id="massive_benzinga", next_run_time=datetime.utcnow() + timedelta(minutes=20))
 
-    # FMP structured data
-    scheduler.add_job(run_fmp_upgrades, "interval", hours=2, id="fmp_upgrades", next_run_time=datetime.utcnow() + timedelta(minutes=30))
-    scheduler.add_job(run_fmp_price_targets, "interval", hours=2, id="fmp_price_targets", next_run_time=datetime.utcnow() + timedelta(minutes=60))
-    scheduler.add_job(run_fmp_daily_grades, "interval", hours=3, id="fmp_daily_grades", next_run_time=datetime.utcnow() + timedelta(minutes=90))
-    # yfinance
-    scheduler.add_job(run_yfinance, "interval", hours=3, id="yfinance", next_run_time=datetime.utcnow() + timedelta(minutes=120))
-    # Evaluator + leaderboard
-    scheduler.add_job(run_15min_evaluator, "interval", minutes=15, id="evaluator")
-    scheduler.add_job(run_15min_user_evaluator, "interval", minutes=15, id="user_evaluator", next_run_time=datetime.utcnow() + timedelta(seconds=30))
-    scheduler.add_job(run_15min_duel_evaluator, "interval", minutes=15, id="duel_evaluator")
-    scheduler.add_job(run_hourly_season_check, "interval", hours=1, id="season_check")
+    # Newsletter — previously leaked a SessionLocal() outside _guarded_job. Fixed.
+    run_newsletter_job = _guarded_job("newsletter", lambda db: run_newsletter(db))
 
-    # Daily challenge jobs (EST times)
+    # Analyst notifications — now guarded
+    def _analyst_notifications(db):
+        from jobs.analyst_notifications import run_analyst_notifications as _ran
+        _ran()
+    run_analyst_notifications_job = _guarded_job("analyst_notifications", _analyst_notifications)
+
     run_create_daily_challenge = _guarded_job("daily_challenge_create", lambda db: __import__('jobs.daily_challenge', fromlist=['create_daily_challenge']).create_daily_challenge(db))
     run_score_daily_challenge = _guarded_job("daily_challenge_score", lambda db: __import__('jobs.daily_challenge', fromlist=['score_daily_challenge']).score_daily_challenge(db))
-
-    # Weekday: create at 14:30 UTC (9:30 AM EST)
-    scheduler.add_job(run_create_daily_challenge, "cron", hour=14, minute=30, id="daily_challenge_create_weekday", day_of_week="mon-fri")
-    # Weekend: create crypto challenge at 00:05 UTC
-    scheduler.add_job(run_create_daily_challenge, "cron", hour=0, minute=5, id="daily_challenge_create_weekend", day_of_week="sat,sun")
-    # Weekday stock scoring: 21:30 UTC (4:30 PM EST)
-    scheduler.add_job(run_score_daily_challenge, "cron", hour=21, minute=30, id="daily_challenge_score_weekday", day_of_week="mon-fri")
-    # Crypto scoring (weekdays + weekends): 23:55 UTC
-    scheduler.add_job(run_score_daily_challenge, "cron", hour=23, minute=55, id="daily_challenge_score_crypto")
-
-    # Price alerts
     run_price_alerts = _guarded_job("price_alerts", lambda db: __import__('jobs.price_alerts', fromlist=['check_price_alerts']).check_price_alerts(db))
-    scheduler.add_job(run_price_alerts, "interval", minutes=30, id="price_alerts")
-
-    # Leaderboard refresh
     run_hourly_leaderboard = _guarded_job("leaderboard", lambda db: run_leaderboard_refresh(db))
-    scheduler.add_job(run_hourly_leaderboard, "interval", hours=1, id="leaderboard")
-    scheduler.add_job(lambda: run_newsletter(SessionLocal()), "cron", hour=8, minute=0, id="newsletter")
-
-    # Weekly digest
     run_weekly_digest = _guarded_job("weekly_digest", lambda db: __import__('jobs.weekly_digest', fromlist=['send_weekly_digest']).send_weekly_digest(db))
-    scheduler.add_job(run_weekly_digest, "cron", day_of_week="sun", hour=10, minute=0, id="weekly_digest")
-
-    # Earnings calendar
     run_earnings_update = _guarded_job("earnings", lambda db: __import__('jobs.earnings', fromlist=['update_earnings_calendar']).update_earnings_calendar(db))
-    scheduler.add_job(run_earnings_update, "cron", hour=0, minute=15, id="earnings_update")
-
-    # Analyst subscription notifications
-    from jobs.analyst_notifications import run_analyst_notifications
-    scheduler.add_job(run_analyst_notifications, "interval", hours=1, id="analyst_notifications", next_run_time=datetime.utcnow() + timedelta(minutes=45))
-
-    # Weekly challenge
     run_weekly_challenge = _guarded_job("weekly_challenge", lambda db: __import__('weekly_challenges', fromlist=['create_weekly_challenge']).create_weekly_challenge(db))
-    scheduler.add_job(run_weekly_challenge, "cron", day_of_week="mon", hour=0, minute=1, id="weekly_challenge")
 
-    # Auto-evaluate expired predictions (circuit breaker built-in via _guarded_job)
     def _auto_evaluate(db):
         from jobs.historical_evaluator import evaluate_batch, refresh_all_forecaster_stats
         result = evaluate_batch(max_tickers=500)
@@ -1389,20 +1408,86 @@ async def lifespan(app):
         if scored > 0:
             refresh_all_forecaster_stats()
     run_auto_evaluate = _guarded_job("auto_evaluate", _auto_evaluate)
-    scheduler.add_job(run_auto_evaluate, "interval", hours=1, id="auto_evaluate", next_run_time=datetime.utcnow() + timedelta(minutes=10))
 
-    # Auto-refresh forecaster stats
     def _refresh_stats(db):
         from jobs.historical_evaluator import refresh_all_forecaster_stats
         refresh_all_forecaster_stats()
     run_refresh_stats = _guarded_job("refresh_stats", _refresh_stats)
-    scheduler.add_job(run_refresh_stats, "interval", hours=2, id="refresh_stats", next_run_time=datetime.utcnow() + timedelta(minutes=8))
 
-    # ── Safeguard #4: Auto-pause jobs when site is slow ──────────────────────
+    # ── Register all jobs with the scheduler ──────────────────────────────────
+    # PROTECTION 5: No job runs before 60 seconds after startup (30s DB delay + 30s buffer)
+    _first_run = datetime.utcnow() + timedelta(seconds=60)
+
+    print("[STARTUP] Scheduler starting...")
+    scheduler = AsyncIOScheduler()
+    _scheduler = scheduler
+
+    # Core scrapers
+    scheduler.add_job(run_hourly_scraper, "interval", hours=1, id="scraper", next_run_time=_first_run)
+    scheduler.add_job(run_fast_scraper, "interval", minutes=15, id="fast_scraper", next_run_time=_first_run + timedelta(minutes=2))
+    scheduler.add_job(run_benzinga_api, "interval", hours=2, id="benzinga_api", next_run_time=_first_run + timedelta(minutes=15))
+    scheduler.add_job(run_newsapi, "interval", hours=4, id="newsapi", next_run_time=_first_run + timedelta(minutes=10))
+
+    # Massive API — Benzinga ratings
+    scheduler.add_job(run_massive_benzinga, "interval", hours=2, id="massive_benzinga", next_run_time=_first_run + timedelta(minutes=20))
+
+    # FMP structured data
+    scheduler.add_job(run_fmp_upgrades, "interval", hours=2, id="fmp_upgrades", next_run_time=_first_run + timedelta(minutes=30))
+    scheduler.add_job(run_fmp_price_targets, "interval", hours=2, id="fmp_price_targets", next_run_time=_first_run + timedelta(minutes=60))
+    scheduler.add_job(run_fmp_daily_grades, "interval", hours=3, id="fmp_daily_grades", next_run_time=_first_run + timedelta(minutes=90))
+
+    # yfinance (memory-guarded)
+    scheduler.add_job(run_yfinance, "interval", hours=3, id="yfinance", next_run_time=_first_run + timedelta(minutes=120))
+
+    # Evaluator + leaderboard
+    scheduler.add_job(run_15min_evaluator, "interval", minutes=15, id="evaluator", next_run_time=_first_run + timedelta(minutes=3))
+    scheduler.add_job(run_15min_user_evaluator, "interval", minutes=15, id="user_evaluator", next_run_time=_first_run + timedelta(minutes=4))
+    scheduler.add_job(run_15min_duel_evaluator, "interval", minutes=15, id="duel_evaluator", next_run_time=_first_run + timedelta(minutes=5))
+    scheduler.add_job(run_hourly_season_check, "interval", hours=1, id="season_check", next_run_time=_first_run + timedelta(minutes=45))
+
+    # Daily challenge jobs (EST times)
+    scheduler.add_job(run_create_daily_challenge, "cron", hour=14, minute=30, id="daily_challenge_create_weekday", day_of_week="mon-fri")
+    scheduler.add_job(run_create_daily_challenge, "cron", hour=0, minute=5, id="daily_challenge_create_weekend", day_of_week="sat,sun")
+    scheduler.add_job(run_score_daily_challenge, "cron", hour=21, minute=30, id="daily_challenge_score_weekday", day_of_week="mon-fri")
+    scheduler.add_job(run_score_daily_challenge, "cron", hour=23, minute=55, id="daily_challenge_score_crypto")
+
+    # Price alerts
+    scheduler.add_job(run_price_alerts, "interval", minutes=30, id="price_alerts", next_run_time=_first_run + timedelta(minutes=6))
+
+    # Leaderboard refresh
+    scheduler.add_job(run_hourly_leaderboard, "interval", hours=1, id="leaderboard", next_run_time=_first_run + timedelta(minutes=7))
+
+    # Newsletter (now properly guarded — was previously leaking SessionLocal)
+    scheduler.add_job(run_newsletter_job, "cron", hour=8, minute=0, id="newsletter")
+
+    # Weekly digest
+    scheduler.add_job(run_weekly_digest, "cron", day_of_week="sun", hour=10, minute=0, id="weekly_digest")
+
+    # Earnings calendar
+    scheduler.add_job(run_earnings_update, "cron", hour=0, minute=15, id="earnings_update")
+
+    # Analyst subscription notifications (now properly guarded)
+    scheduler.add_job(run_analyst_notifications_job, "interval", hours=1, id="analyst_notifications", next_run_time=_first_run + timedelta(minutes=45))
+
+    # Weekly challenge
+    scheduler.add_job(run_weekly_challenge, "cron", day_of_week="mon", hour=0, minute=1, id="weekly_challenge")
+
+    # Auto-evaluate expired predictions
+    scheduler.add_job(run_auto_evaluate, "interval", hours=1, id="auto_evaluate", next_run_time=_first_run + timedelta(minutes=10))
+
+    # Auto-refresh forecaster stats
+    scheduler.add_job(run_refresh_stats, "interval", hours=2, id="refresh_stats", next_run_time=_first_run + timedelta(minutes=8))
+
+    # ── PROTECTION 4 (site health) + PROTECTION 6 (stuck job watchdog) ────────
     def _site_health_watchdog():
         from circuit_breaker import check_site_health_and_pause
         check_site_health_and_pause()
+
+    def _stuck_job_watchdog():
+        watchdog_check()
+
     scheduler.add_job(_site_health_watchdog, "interval", minutes=5, id="site_health_watchdog")
+    scheduler.add_job(_stuck_job_watchdog, "interval", minutes=5, id="stuck_job_watchdog")
 
     scheduler.start()
     job_ids = [j.id for j in scheduler.get_jobs()]
@@ -1410,7 +1495,9 @@ async def lifespan(app):
     for j in scheduler.get_jobs():
         print(f"[STARTUP]   {j.id}: next_run={j.next_run_time}")
     print(f"[STARTUP] FINNHUB_KEY set: {bool(os.getenv('FINNHUB_KEY', '').strip())}")
-    print(f"[STARTUP] User evaluator will run in ~30s")
+    print(f"[STARTUP] Global job lock: ENABLED (only 1 bg job at a time)")
+    print(f"[STARTUP] Connection pools: user=3+5(8max), bg=1+1(2max), total=10max")
+    print(f"[STARTUP] First job will run in ~60s")
     yield
     scheduler.shutdown()
 

@@ -15,10 +15,11 @@ if DATABASE_URL.startswith("sqlite"):
     bg_engine = engine  # Same engine for SQLite
 else:
     # User-facing pool: fast timeout, strict limits
+    # Total max = pool_size + max_overflow = 3 + 5 = 8 connections
     engine = create_engine(
         DATABASE_URL,
         connect_args=connect_args,
-        pool_size=5,
+        pool_size=3,
         max_overflow=5,
         pool_timeout=5,
         pool_recycle=300,
@@ -31,12 +32,14 @@ else:
         cursor.execute("SET statement_timeout = '5000'")  # 5 seconds for user queries
         cursor.close()
 
-    # Background job pool: longer timeout, smaller pool
+    # Background job pool: longer timeout, tiny pool (only 1 job runs at a time)
+    # Total max = pool_size + max_overflow = 1 + 1 = 2 connections
+    # Combined with user pool: max 8 + 2 = 10 connections (well within Railway limit)
     bg_engine = create_engine(
         DATABASE_URL,
         connect_args=connect_args,
-        pool_size=2,
-        max_overflow=2,
+        pool_size=1,
+        max_overflow=1,
         pool_timeout=30,
         pool_recycle=300,
         pool_pre_ping=True,
