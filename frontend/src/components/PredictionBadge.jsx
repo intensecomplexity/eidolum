@@ -29,6 +29,9 @@ export default function PredictionBadge({ direction, outcome, windowDays }) {
   if (outcome === 'incorrect') {
     return <span className="text-negative font-mono text-sm font-semibold">&#10007;</span>;
   }
+  if (outcome === 'no_data') {
+    return <span className="text-muted font-mono text-[10px]">N/A</span>;
+  }
   return <span className="badge-pending">PENDING</span>;
 }
 

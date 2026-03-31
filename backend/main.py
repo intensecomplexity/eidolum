@@ -1399,9 +1399,16 @@ async def lifespan(app):
     scheduler = AsyncIOScheduler()
     _scheduler = scheduler
 
+    # JOB 5: daily sweep for stuck predictions (no_data cleanup)
+    def _sweep_stuck(db):
+        from jobs.evaluator import sweep_stuck_predictions
+        sweep_stuck_predictions(db)
+    run_sweep = _guarded_job("sweep_stuck", _sweep_stuck)
+
     scheduler.add_job(run_massive_benzinga, "interval", hours=2, id="massive_benzinga", next_run_time=_first_run)
     scheduler.add_job(run_auto_evaluate, "interval", hours=1, id="auto_evaluate", next_run_time=_first_run + timedelta(minutes=5))
     scheduler.add_job(run_refresh_stats, "interval", hours=2, id="refresh_stats", next_run_time=_first_run + timedelta(minutes=10))
+    scheduler.add_job(run_sweep, "interval", hours=24, id="sweep_stuck", next_run_time=_first_run + timedelta(minutes=15))
     scheduler.add_job(_watchdog, "interval", minutes=5, id="watchdog")
 
     scheduler.start()
