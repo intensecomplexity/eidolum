@@ -1,12 +1,20 @@
 import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { TrendingUp, TrendingDown, Clock, Trophy, ArrowLeft, Check, X } from 'lucide-react';
+import { TrendingUp, TrendingDown, Trophy, ArrowLeft, Check, X, BarChart3, Users } from 'lucide-react';
 import PredictionBadge from '../components/PredictionBadge';
 import ConsensusBar from '../components/ConsensusBar';
 import Footer from '../components/Footer';
 import { ExplainerLine } from '../utils/predictionExplainer';
 import { annotateContext } from '../utils/predictionExplainer';
 import { getTickerDetail } from '../api';
+
+// ── Accuracy badge color helper ────────────────────────────────────────────
+
+function accuracyColor(acc) {
+  if (acc >= 60) return 'text-positive bg-positive/10 border-positive/30';
+  if (acc >= 40) return 'text-warning bg-warning/10 border-warning/30';
+  return 'text-negative bg-negative/10 border-negative/30';
+}
 
 export default function TickerDetail() {
   const params = useParams();
@@ -54,12 +62,11 @@ export default function TickerDetail() {
     </div>
   );
 
-  const consensus = data.consensus || {};
+  const cc = data.current_consensus || {};
+  const hist = data.historical || {};
   const stats = data.stats || {};
   const pending = data.pending_predictions || [];
   const scored = data.recent_evaluated || [];
-  const bullPct = consensus?.bullish_pct || 0;
-  const bearPct = consensus?.bearish_pct || 0;
 
   return (
     <div>
@@ -70,9 +77,9 @@ export default function TickerDetail() {
           <ArrowLeft className="w-4 h-4" /> Back to Consensus
         </Link>
 
-        {/* ── 1. HEADER ──────────────────────────────────────────────── */}
+        {/* ── HEADER ────────────────────────────────────────────────────── */}
         <div className="card mb-6">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <div>
               <div className="flex items-center gap-3 mb-1">
                 <span className="font-mono text-3xl sm:text-4xl font-bold tracking-wider text-text-primary">{ticker}</span>
@@ -88,127 +95,231 @@ export default function TickerDetail() {
               {data.industry && (
                 <div className="text-muted text-xs">{data.industry}</div>
               )}
-              <div className="text-muted text-sm mt-1">{data.total_predictions} predictions tracked</div>
             </div>
-
-            {/* Consensus bar */}
-            {data.total_predictions > 0 && (
-              <div className="sm:w-64">
-                <ConsensusBar bullish={consensus.bullish_count || 0} bearish={consensus.bearish_count || 0} />
-                <div className="flex justify-between text-[10px] mt-1">
-                  <span className="text-positive font-mono">{bullPct}% bullish</span>
-                  <span className="text-negative font-mono">{bearPct}% bearish</span>
-                </div>
-              </div>
-            )}
           </div>
+        </div>
 
-          {/* Quick stats */}
-          {stats && stats.evaluated > 0 && (
-            <div className="flex gap-4 sm:gap-6 mt-4 pt-4 border-t border-border/30 text-xs flex-wrap">
-              <div>
-                <span className="text-muted">Historical accuracy: </span>
-                <span className={`font-mono font-semibold ${stats.historical_accuracy >= 50 ? 'text-positive' : 'text-negative'}`}>{stats.historical_accuracy}%</span>
-                <span className="text-muted"> ({stats.correct}/{stats.evaluated} correct)</span>
+        {/* ── STATS BAR ─────────────────────────────────────────────────── */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
+          <div className="card py-3 text-center">
+            <div className="text-lg font-mono font-bold text-text-primary">{data.total_predictions}</div>
+            <div className="text-[10px] text-muted uppercase tracking-wider">Total Tracked</div>
+          </div>
+          <div className="card py-3 text-center">
+            <div className="text-lg font-mono font-bold text-warning">{cc.total || 0}</div>
+            <div className="text-[10px] text-muted uppercase tracking-wider">Active</div>
+          </div>
+          <div className="card py-3 text-center">
+            <div className="text-lg font-mono font-bold text-text-secondary">{hist.total_evaluated || 0}</div>
+            <div className="text-[10px] text-muted uppercase tracking-wider">Evaluated</div>
+          </div>
+          <div className="card py-3 text-center">
+            <div className={`text-lg font-mono font-bold ${(hist.accuracy || 0) >= 50 ? 'text-positive' : 'text-negative'}`}>
+              {hist.total_evaluated > 0 ? `${hist.accuracy}%` : '\u2014'}
+            </div>
+            <div className="text-[10px] text-muted uppercase tracking-wider">Hist. Accuracy</div>
+          </div>
+        </div>
+
+        {stats.top_forecaster && (
+          <div className="card py-2.5 px-4 mb-6 flex items-center gap-2 text-xs">
+            <Trophy className="w-3.5 h-3.5 text-accent flex-shrink-0" />
+            <span className="text-muted">Top analyst on {ticker}:</span>
+            <Link to={`/forecaster/${stats.top_forecaster.id}`} className="text-accent font-medium hover:underline">
+              {stats.top_forecaster.name}
+            </Link>
+            <span className="font-mono text-positive">({stats.top_forecaster.accuracy}%)</span>
+            <span className="text-muted">&middot; {stats.top_forecaster.predictions} calls</span>
+          </div>
+        )}
+
+        {/* ── SECTION 1: CURRENT ANALYST OUTLOOK ────────────────────────── */}
+        <div className="mb-8">
+          <h2 className="text-sm font-semibold text-muted uppercase tracking-wider mb-3 flex items-center gap-1.5">
+            <Users className="w-4 h-4 text-accent" /> Current Analyst Outlook
+            {cc.total > 0 && <span className="text-muted font-normal">({cc.total} active prediction{cc.total !== 1 ? 's' : ''})</span>}
+          </h2>
+
+          {cc.total > 0 ? (
+            <>
+              {/* Consensus bar for pending only */}
+              <div className="card mb-4">
+                <ConsensusBar bullish={cc.bullish_count || 0} bearish={cc.bearish_count || 0} />
+                <div className="flex justify-between text-[10px] mt-1">
+                  <span className="text-positive font-mono">{cc.bullish_pct}% bullish ({cc.bullish_count})</span>
+                  <span className="text-negative font-mono">{cc.bearish_pct}% bearish ({cc.bearish_count})</span>
+                </div>
               </div>
-              {stats.avg_target_price && (
-                <div>
-                  <span className="text-muted">Avg target: </span>
-                  <span className="font-mono text-text-secondary">${stats.avg_target_price.toFixed(0)}</span>
-                </div>
-              )}
-              {stats.top_forecaster && (
-                <div>
-                  <span className="text-muted">Top analyst: </span>
-                  <Link to={`/forecaster/${stats.top_forecaster.id}`} className="text-accent hover:underline">
-                    {stats.top_forecaster.name}
-                  </Link>
-                  <span className="font-mono text-positive ml-1">({stats.top_forecaster.accuracy}%)</span>
-                </div>
-              )}
+
+              {/* Bull/Bear analyst lists */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                {/* Bulls */}
+                {cc.bulls && cc.bulls.length > 0 && (
+                  <div className="card">
+                    <div className="flex items-center gap-2 mb-3">
+                      <TrendingUp className="w-4 h-4 text-positive" />
+                      <span className="text-xs font-bold uppercase text-positive">
+                        Bullish ({cc.bulls.length} analyst{cc.bulls.length !== 1 ? 's' : ''})
+                      </span>
+                    </div>
+                    <div className="space-y-2.5">
+                      {cc.bulls.map((a, i) => (
+                        <div key={i} className="flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <Link to={`/forecaster/${a.forecaster_id}`} className="text-sm font-medium hover:text-accent transition-colors truncate">
+                              {a.name}
+                            </Link>
+                            {a.firm && <span className="text-[10px] text-muted hidden sm:inline">at {a.firm}</span>}
+                            {a.accuracy > 0 && (
+                              <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded border ${accuracyColor(a.accuracy)}`}>
+                                {a.accuracy.toFixed(1)}%
+                              </span>
+                            )}
+                          </div>
+                          {a.target != null && (
+                            <span className="text-xs font-mono text-text-secondary flex-shrink-0">${a.target.toFixed(0)}</span>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Bears */}
+                {cc.bears && cc.bears.length > 0 && (
+                  <div className="card">
+                    <div className="flex items-center gap-2 mb-3">
+                      <TrendingDown className="w-4 h-4 text-negative" />
+                      <span className="text-xs font-bold uppercase text-negative">
+                        Bearish ({cc.bears.length} analyst{cc.bears.length !== 1 ? 's' : ''})
+                      </span>
+                    </div>
+                    <div className="space-y-2.5">
+                      {cc.bears.map((a, i) => (
+                        <div key={i} className="flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <Link to={`/forecaster/${a.forecaster_id}`} className="text-sm font-medium hover:text-accent transition-colors truncate">
+                              {a.name}
+                            </Link>
+                            {a.firm && <span className="text-[10px] text-muted hidden sm:inline">at {a.firm}</span>}
+                            {a.accuracy > 0 && (
+                              <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded border ${accuracyColor(a.accuracy)}`}>
+                                {a.accuracy.toFixed(1)}%
+                              </span>
+                            )}
+                          </div>
+                          {a.target != null && (
+                            <span className="text-xs font-mono text-text-secondary flex-shrink-0">${a.target.toFixed(0)}</span>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Detailed pending prediction cards */}
+              {['bullish', 'bearish'].map(dir => {
+                const group = pending.filter(p => p.direction === dir);
+                if (group.length === 0) return null;
+                return (
+                  <div key={dir} className="mb-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      {dir === 'bullish'
+                        ? <TrendingUp className="w-3.5 h-3.5 text-positive" />
+                        : <TrendingDown className="w-3.5 h-3.5 text-negative" />}
+                      <span className={`text-xs font-bold uppercase ${dir === 'bullish' ? 'text-positive' : 'text-negative'}`}>
+                        {dir} predictions ({group.length})
+                      </span>
+                    </div>
+                    <div className="space-y-2">
+                      {group.map(p => (
+                        <PredictionItem key={p.id} p={p} />
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
+            </>
+          ) : (
+            <div className="card text-center py-8">
+              <p className="text-text-secondary">No active predictions for {ticker} right now.</p>
             </div>
           )}
         </div>
 
-        {/* ── 2. PENDING PREDICTIONS ─────────────────────────────────── */}
-        {pending.length > 0 && (
+        {/* ── SECTION 2: HISTORICAL TRACK RECORD ────────────────────────── */}
+        {hist.total_evaluated > 0 && (
           <div className="mb-8">
             <h2 className="text-sm font-semibold text-muted uppercase tracking-wider mb-3 flex items-center gap-1.5">
-              <Clock className="w-4 h-4 text-warning" /> Active Predictions ({pending.length})
+              <BarChart3 className="w-4 h-4 text-accent" /> Historical Track Record
             </h2>
 
-            {/* Timeframe breakdown */}
-            {(() => {
-              const short = pending.filter(p => (p.window_days || p.evaluation_window_days || 90) < 30);
-              const medium = pending.filter(p => { const w = p.window_days || p.evaluation_window_days || 90; return w >= 30 && w <= 180; });
-              const long = pending.filter(p => (p.window_days || p.evaluation_window_days || 90) > 180);
-              const groups = [
-                { label: 'Short term', sub: 'under 30d', preds: short },
-                { label: 'Medium term', sub: '30-180d', preds: medium },
-                { label: 'Long term', sub: 'over 180d', preds: long },
-              ].filter(g => g.preds.length > 0);
-              if (groups.length > 1) {
-                return (
-                  <div className="flex flex-wrap gap-3 mb-4">
-                    {groups.map(g => {
-                      const bullPct = g.preds.length > 0 ? Math.round(g.preds.filter(p => p.direction === 'bullish').length / g.preds.length * 100) : 0;
-                      return (
-                        <div key={g.label} className="bg-surface-2 border border-border rounded-lg px-3 py-2 text-xs">
-                          <span className="font-medium text-text-primary">{g.label}</span>
-                          <span className="text-muted"> ({g.sub})</span>
-                          <span className="text-text-secondary">: {g.preds.length} — </span>
-                          <span className={bullPct >= 50 ? 'text-positive' : 'text-negative'}>{bullPct}% Bull</span>
-                        </div>
-                      );
-                    })}
-                  </div>
-                );
-              }
-              return null;
-            })()}
+            <div className="card mb-4">
+              <div className="text-text-secondary text-sm mb-3">
+                How accurate have analysts been on <span className="font-mono font-bold text-accent">{ticker}</span>?
+              </div>
 
-            {/* Bullish first */}
-            {['bullish', 'bearish'].map(dir => {
-              const group = pending.filter(p => p.direction === dir);
-              if (group.length === 0) return null;
-              return (
-                <div key={dir} className="mb-4">
-                  <div className="flex items-center gap-2 mb-2">
-                    {dir === 'bullish'
-                      ? <TrendingUp className="w-3.5 h-3.5 text-positive" />
-                      : <TrendingDown className="w-3.5 h-3.5 text-negative" />}
-                    <span className={`text-xs font-bold uppercase ${dir === 'bullish' ? 'text-positive' : 'text-negative'}`}>
-                      {dir} ({group.length})
-                    </span>
-                  </div>
-                  <div className="space-y-2">
-                    {group.map(p => (
-                      <PredictionItem key={p.id} p={p} />
-                    ))}
-                  </div>
+              {/* Overall accuracy */}
+              <div className="flex items-center gap-3 mb-4">
+                <div className={`text-2xl font-mono font-bold ${hist.accuracy >= 50 ? 'text-positive' : 'text-negative'}`}>
+                  {hist.accuracy}%
                 </div>
-              );
-            })}
-          </div>
-        )}
+                <div className="text-xs text-muted">
+                  historical accuracy ({hist.correct}/{hist.total_evaluated} correct)
+                </div>
+              </div>
 
-        {pending.length === 0 && (
-          <div className="card text-center py-8 mb-8">
-            <p className="text-text-secondary">No active predictions for {ticker} right now.</p>
-          </div>
-        )}
+              {hist.avg_target && (
+                <div className="text-xs text-muted mb-4">
+                  Average target price: <span className="font-mono text-text-secondary">${hist.avg_target.toFixed(0)}</span>
+                </div>
+              )}
 
-        {/* ── 3. RECENTLY EVALUATED ──────────────────────────────────── */}
-        {scored.length > 0 && (
-          <div className="mb-8">
-            <h2 className="text-sm font-semibold text-muted uppercase tracking-wider mb-3 flex items-center gap-1.5">
-              <Trophy className="w-4 h-4 text-accent" /> Recently Evaluated
-            </h2>
-            <div className="space-y-2">
-              {scored.map(p => (
-                <PredictionItem key={p.id} p={p} showOutcome />
-              ))}
+              {/* Bull vs Bear accuracy comparison */}
+              <div className="grid grid-cols-2 gap-3 pt-3 border-t border-border/30">
+                {hist.bullish_total > 0 && (
+                  <div className="flex items-center gap-2">
+                    <TrendingUp className="w-3.5 h-3.5 text-positive flex-shrink-0" />
+                    <div className="text-xs">
+                      <span className="text-positive font-semibold">{hist.bullish_total} bullish</span>
+                      <span className="text-muted">: </span>
+                      <span className={`font-mono font-bold ${hist.bullish_accuracy >= 50 ? 'text-positive' : 'text-negative'}`}>
+                        {hist.bullish_accuracy}%
+                      </span>
+                      <span className="text-muted"> correct</span>
+                    </div>
+                  </div>
+                )}
+                {hist.bearish_total > 0 && (
+                  <div className="flex items-center gap-2">
+                    <TrendingDown className="w-3.5 h-3.5 text-negative flex-shrink-0" />
+                    <div className="text-xs">
+                      <span className="text-negative font-semibold">{hist.bearish_total} bearish</span>
+                      <span className="text-muted">: </span>
+                      <span className={`font-mono font-bold ${hist.bearish_accuracy >= 50 ? 'text-positive' : 'text-negative'}`}>
+                        {hist.bearish_accuracy}%
+                      </span>
+                      <span className="text-muted"> correct</span>
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
+
+            {/* Recently evaluated predictions */}
+            {scored.length > 0 && (
+              <>
+                <h3 className="text-xs font-semibold text-muted uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                  <Trophy className="w-3.5 h-3.5 text-accent" /> Recently Evaluated
+                </h3>
+                <div className="space-y-2">
+                  {scored.map(p => (
+                    <PredictionItem key={p.id} p={p} showOutcome />
+                  ))}
+                </div>
+              </>
+            )}
           </div>
         )}
       </div>
@@ -231,8 +342,13 @@ function PredictionItem({ p, showOutcome = false }) {
               {fc.name}
             </Link>
           )}
+          {fc?.firm && (
+            <span className="text-[10px] text-muted">at {fc.firm}</span>
+          )}
           {fc?.accuracy_rate > 0 && (
-            <span className="text-[10px] font-mono text-muted">({fc.accuracy_rate.toFixed(0)}% acc)</span>
+            <span className={`text-[10px] font-mono px-1 py-0.5 rounded border ${accuracyColor(fc.accuracy_rate)}`}>
+              {fc.accuracy_rate.toFixed(0)}%
+            </span>
           )}
         </div>
         <div className="flex items-center gap-2">
