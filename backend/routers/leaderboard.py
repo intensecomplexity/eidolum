@@ -371,10 +371,8 @@ def _build_filtered_leaderboard(db: Session, sector=None, call_type=None, sort="
     elif sort == "avg_return":
         order_sql = "avg_return DESC NULLS LAST, accuracy DESC"
     elif sort == "recent":
-        # Only predictions MADE within 6 months AND SCORED within 30 days
-        # This filters out old backfill predictions scored today
+        # Predictions SCORED within the last 30 days (regardless of when they were made)
         where_clauses.append("COALESCE(p.evaluated_at, p.evaluation_date) >= NOW() - INTERVAL '30 days'")
-        where_clauses.append("p.prediction_date >= NOW() - INTERVAL '6 months'")
         where_sql = " AND ".join(where_clauses)
         order_sql = "accuracy DESC, total DESC"
         params["min_preds"] = max(min_predictions // 2, 1)  # lower threshold for recent
@@ -463,6 +461,13 @@ def get_leaderboard(
             limit=limit, min_predictions=min_preds, direction=direction,
             timeframe=timeframe,
         )
+        # Fallback: if "recent" returns empty, show top evaluated forecasters instead
+        if not results and sort == "recent":
+            results = _build_filtered_leaderboard(
+                db, sector=sector, call_type=call_type, sort="accuracy",
+                limit=limit, min_predictions=min_preds, direction=direction,
+                timeframe=timeframe,
+            )
         _filtered_cache[cache_key] = (results, _time.time())
         return results
 

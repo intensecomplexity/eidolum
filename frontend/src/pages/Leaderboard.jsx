@@ -242,9 +242,7 @@ export default function Leaderboard() {
               </div>
             ) : emptyMessage && activeTab !== 'week' ? (
               <div className="card text-center py-12">
-                <div className="w-8 h-8 border-2 border-accent border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-                <p className="text-text-secondary text-base mb-2">{emptyMessage}</p>
-                <p className="text-muted text-xs">Auto-refreshing every 30 seconds...</p>
+                <p className="text-text-secondary text-base">{emptyMessage}</p>
               </div>
             ) : activeTab === 'week' ? (
               <WeekView weekData={weekData} data={data} />
