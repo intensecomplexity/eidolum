@@ -1101,6 +1101,42 @@ def run_phase2_migrations():
         except Exception:
             db.rollback()
 
+    # ── 43. notification_queue table + user notification columns ──
+    try:
+        db.execute(text("""
+            CREATE TABLE IF NOT EXISTS notification_queue (
+                id SERIAL PRIMARY KEY,
+                user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+                ticker VARCHAR(10) NOT NULL,
+                prediction_id INTEGER,
+                forecaster_name VARCHAR(100),
+                direction VARCHAR(20),
+                target_price NUMERIC(10,2),
+                context TEXT,
+                created_at TIMESTAMP DEFAULT NOW(),
+                sent_at TIMESTAMP
+            )
+        """))
+        db.commit()
+    except Exception:
+        db.rollback()
+
+    for col in [
+        "email_notifications INTEGER DEFAULT 1",
+        "notification_frequency VARCHAR(20) DEFAULT 'daily'",
+    ]:
+        try:
+            db.execute(text(f"ALTER TABLE users ADD COLUMN {col}"))
+            db.commit()
+        except Exception:
+            db.rollback()
+
+    try:
+        db.execute(text("ALTER TABLE watchlist ADD COLUMN notify INTEGER DEFAULT 1"))
+        db.commit()
+    except Exception:
+        db.rollback()
+
     print("[Phase2] All migrations complete")
     db.close()
 
@@ -1598,6 +1634,7 @@ async def lifespan(app):
     scheduler.add_job(run_auto_evaluate, "interval", hours=1, id="auto_evaluate", next_run_time=_first_run + timedelta(minutes=5))
     scheduler.add_job(run_refresh_stats, "interval", hours=2, id="refresh_stats", next_run_time=_first_run + timedelta(minutes=10))
     scheduler.add_job(run_sweep, "interval", hours=24, id="sweep_stuck", next_run_time=_first_run + timedelta(minutes=15))
+    scheduler.add_job(run_analyst_notif, "interval", hours=1, id="analyst_notifications", next_run_time=_first_run + timedelta(minutes=25))
     scheduler.add_job(_watchdog, "interval", minutes=5, id="watchdog")
 
     # Site-wide weekly digest — Monday 8AM EST (13:00 UTC)

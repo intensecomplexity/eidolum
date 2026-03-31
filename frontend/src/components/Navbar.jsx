@@ -1,8 +1,9 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Menu, X, Crosshair, HelpCircle, LogOut, Settings, Swords, Users, User, Search, BarChart3, Trophy, Star, BookmarkCheck, CircleUser, Wrench } from 'lucide-react';
+import { Menu, X, Crosshair, HelpCircle, LogOut, Settings, Swords, Users, User, Search, BarChart3, Trophy, Star, BookmarkCheck, CircleUser, Wrench, Sun, Moon } from 'lucide-react';
 import EidolumLogo from './EidolumLogo';
 import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
+import useTheme from '../hooks/useTheme';
 import UniversalSearch from './UniversalSearch';
 import DuelModal from './DuelModal';
 import NotificationBell from './NotificationBell';
@@ -12,6 +13,7 @@ export default function Navbar() {
   const location = useLocation();
   const navigate = useNavigate();
   const { isAuthenticated, user, logout } = useAuth();
+  const { theme, toggleTheme } = useTheme();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [userDropdown, setUserDropdown] = useState(false);
   const [duelTarget, setDuelTarget] = useState(null);
@@ -125,6 +127,11 @@ export default function Navbar() {
               </div>
 
               {/* Help button */}
+              {/* Theme toggle */}
+              <button onClick={toggleTheme} className="hidden sm:flex items-center justify-center w-9 h-9 rounded-lg text-text-secondary hover:text-accent transition-colors" title={theme === 'dark' ? 'Light mode' : 'Dark mode'}>
+                {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+              </button>
+
               <button onClick={() => setShowHelp(true)} className="hidden sm:flex items-center justify-center w-9 h-9 rounded-lg text-text-secondary hover:text-accent transition-colors" title="How it works">
                 <HelpCircle className="w-4.5 h-4.5" />
               </button>

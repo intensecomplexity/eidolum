@@ -1,25 +1,67 @@
 import { useState, useEffect } from 'react';
 import { UserPlus, UserCheck } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
+import { subscribeAnalyst, unsubscribeAnalyst, getAnalystSubscriptionStatus } from '../api';
 import FollowModal from './FollowModal';
 
 export default function FollowButton({ forecaster, compact = false }) {
+  const { isAuthenticated } = useAuth();
   const [isFollowing, setIsFollowing] = useState(false);
+  const [loading, setLoading] = useState(false);
   const [showModal, setShowModal] = useState(false);
 
+  // Check subscription status for logged-in users
   useEffect(() => {
-    const followed = JSON.parse(localStorage.getItem('qa_followed') || '[]');
-    setIsFollowing(followed.includes(forecaster.id));
-  }, [forecaster.id]);
+    if (isAuthenticated && forecaster?.name) {
+      getAnalystSubscriptionStatus(forecaster.name)
+        .then(d => setIsFollowing(d?.subscribed || false))
+        .catch(() => {
+          // Fallback to localStorage
+          const followed = JSON.parse(localStorage.getItem('qa_followed') || '[]');
+          setIsFollowing(followed.includes(forecaster.id));
+        });
+    } else {
+      const followed = JSON.parse(localStorage.getItem('qa_followed') || '[]');
+      setIsFollowing(followed.includes(forecaster.id));
+    }
+  }, [forecaster?.id, forecaster?.name, isAuthenticated]);
 
-  function handleClick(e) {
+  async function handleClick(e) {
     e.preventDefault();
     e.stopPropagation();
-    if (isFollowing) {
-      // Unfollow
+
+    if (isAuthenticated) {
+      // Direct API call for logged-in users
+      setLoading(true);
+      try {
+        if (isFollowing) {
+          await unsubscribeAnalyst(forecaster.name);
+          setIsFollowing(false);
+        } else {
+          await subscribeAnalyst(forecaster.name);
+          setIsFollowing(true);
+        }
+      } catch {
+        // Fallback to localStorage toggle
+        const followed = JSON.parse(localStorage.getItem('qa_followed') || '[]');
+        if (isFollowing) {
+          localStorage.setItem('qa_followed', JSON.stringify(followed.filter(id => id !== forecaster.id)));
+          setIsFollowing(false);
+        } else {
+          followed.push(forecaster.id);
+          localStorage.setItem('qa_followed', JSON.stringify(followed));
+          setIsFollowing(true);
+        }
+      } finally {
+        setLoading(false);
+      }
+    } else if (isFollowing) {
+      // Non-auth unfollow
       const followed = JSON.parse(localStorage.getItem('qa_followed') || '[]');
       localStorage.setItem('qa_followed', JSON.stringify(followed.filter(id => id !== forecaster.id)));
       setIsFollowing(false);
     } else {
+      // Non-auth: show email modal
       setShowModal(true);
     }
   }
@@ -28,11 +70,12 @@ export default function FollowButton({ forecaster, compact = false }) {
     <>
       <button
         onClick={handleClick}
+        disabled={loading}
         className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors min-h-[36px] ${
           isFollowing
-            ? 'bg-positive/10 text-positive border border-positive/20'
+            ? 'bg-accent/10 text-accent border border-accent/20'
             : 'bg-surface-2 text-text-secondary border border-border active:border-accent/50 active:text-accent'
-        } ${compact ? 'px-2 py-1 text-xs min-h-[28px]' : ''}`}
+        } ${compact ? 'px-2 py-1 text-xs min-h-[28px]' : ''} ${loading ? 'opacity-50' : ''}`}
       >
         {isFollowing ? (
           <>

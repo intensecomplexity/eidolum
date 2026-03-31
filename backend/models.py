@@ -255,6 +255,8 @@ class User(Base):
     referred_by = Column(Integer, ForeignKey("users.id"), nullable=True)
     is_admin = Column(Integer, default=0)  # 0=false, 1=true
     is_banned = Column(Integer, default=0)  # 0=false, 1=true
+    email_notifications = Column(Integer, default=1)  # 0=false, 1=true
+    notification_frequency = Column(String(20), default="daily")  # "instant", "daily", "weekly"
 
     predictions = relationship("UserPrediction", back_populates="user", cascade="all, delete-orphan")
     achievements = relationship("Achievement", back_populates="user", cascade="all, delete-orphan")

@@ -4,6 +4,7 @@ import { TrendingUp, TrendingDown, Trophy, ArrowLeft, Check, X, BarChart3, Users
 import PredictionBadge from '../components/PredictionBadge';
 import ConsensusBar from '../components/ConsensusBar';
 import StockChart from '../components/StockChart';
+import StockPrice from '../components/StockPrice';
 import CompanyLogo from '../components/CompanyLogo';
 import Footer from '../components/Footer';
 import TickerDiscussionSection from '../components/TickerDiscussionSection';
@@ -86,6 +87,7 @@ export default function TickerDetail() {
             <div className="flex items-center gap-3 mb-1">
               <CompanyLogo domain={data.logo_domain} ticker={ticker} sector={data.sector} size={36} />
               <span className="font-mono text-3xl sm:text-4xl font-bold tracking-wider text-text-primary">{ticker}</span>
+              <StockPrice ticker={ticker} size="large" autoRefresh />
             </div>
             {data.company_name && (
               <div className="text-text-primary text-base sm:text-lg font-medium mt-1">{data.company_name}</div>
