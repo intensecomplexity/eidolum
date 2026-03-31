@@ -288,8 +288,13 @@ def _get_sector_safe(ticker: str, db) -> str:
         return "Other"
 
 
+_NEUTRAL_RATINGS = ["hold", "neutral", "market perform", "market_perform", "equal weight",
+                     "equal_weight", "sector perform", "sector_perform", "in line", "in_line",
+                     "peer perform", "peer_perform", "sector weight", "sector_weight"]
+
+
 def _get_direction(action_lower: str, rating_lower: str, pt_current, pt_prior) -> str | None:
-    """Determine bullish/bearish from action + rating + price target change."""
+    """Determine bullish/bearish/neutral from action + rating + price target change."""
 
     # Explicit upgrade/initiate = bullish
     if any(w in action_lower for w in ["upgrade", "initiates"]):
@@ -307,6 +312,8 @@ def _get_direction(action_lower: str, rating_lower: str, pt_current, pt_prior) -
             return "bullish"
         if any(w in rating_lower for w in ["sell", "underperform", "underweight", "reduce"]):
             return "bearish"
+        if any(w in rating_lower for w in _NEUTRAL_RATINGS):
+            return "neutral"
         return None
 
     # Fallback: derive from rating name
@@ -314,5 +321,7 @@ def _get_direction(action_lower: str, rating_lower: str, pt_current, pt_prior) -
         return "bullish"
     if any(w in rating_lower for w in ["sell", "underperform", "underweight", "strong sell", "negative", "reduce"]):
         return "bearish"
+    if any(w in rating_lower for w in _NEUTRAL_RATINGS):
+        return "neutral"
 
     return None

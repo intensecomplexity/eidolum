@@ -144,11 +144,7 @@ export default function Consensus() {
                   </div>
                   <span className="text-muted text-xs font-mono">{c.total_predictions} calls</span>
                 </div>
-                <ConsensusBar bullish={c.bullish_count} bearish={c.bearish_count} />
-                <div className="flex justify-between text-[10px] mt-1 font-mono">
-                  <span className="text-positive">{c.bullish_percentage}% bull</span>
-                  <span className="text-negative">{c.bearish_percentage}% bear</span>
-                </div>
+                <ConsensusBar bullish={c.bullish_count} bearish={c.bearish_count} neutral={c.neutral_count || 0} />
                 {c.top_caller && (
                   <div className="mt-2 text-[10px] text-muted truncate">
                     Top: <span className="text-accent">{c.top_caller}</span>

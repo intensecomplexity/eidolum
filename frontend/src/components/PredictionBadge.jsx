@@ -14,9 +14,11 @@ export default function PredictionBadge({ direction, outcome, windowDays }) {
   const windowLabel = formatWindow(windowDays);
 
   if (direction) {
+    const cls = direction === 'bullish' ? 'badge-bull' : direction === 'neutral' ? 'badge-hold' : 'badge-bear';
+    const label = direction === 'bullish' ? 'BULL' : direction === 'neutral' ? 'HOLD' : 'BEAR';
     return (
-      <span className={direction === 'bullish' ? 'badge-bull' : 'badge-bear'}>
-        {direction === 'bullish' ? 'BULL' : 'BEAR'}
+      <span className={cls}>
+        {label}
         {windowLabel && <span className="opacity-70 ml-0.5 text-[10px]">{windowLabel}</span>}
       </span>
     );

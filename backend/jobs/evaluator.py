@@ -102,6 +102,9 @@ def run_evaluator(db: Session):
                 p.outcome = "correct" if price <= p.target_price else "incorrect"
             else:
                 p.outcome = "correct" if actual_return < 0 else "incorrect"
+        elif p.direction == "neutral":
+            # Hold/neutral = correct if stock moved less than 5% either way
+            p.outcome = "correct" if abs(actual_return) <= 5.0 else "incorrect"
 
         p.actual_return = actual_return
         p.evaluation_date = now

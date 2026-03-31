@@ -512,7 +512,7 @@ def get_all_consensus(
     if not sector and not sort and _consensus_cache and (_consensus_time.time() - _consensus_cache_time) < _CONSENSUS_TTL:
         return _consensus_cache
 
-    where = "WHERE direction IN ('bullish', 'bearish')"
+    where = "WHERE direction IN ('bullish', 'bearish', 'neutral')"
     params = {}
     if sector:
         where += " AND sector = :sector"
@@ -522,7 +522,8 @@ def get_all_consensus(
         SELECT ticker, sector,
                COUNT(*) as total,
                SUM(CASE WHEN direction = 'bullish' THEN 1 ELSE 0 END) as bullish,
-               SUM(CASE WHEN direction = 'bearish' THEN 1 ELSE 0 END) as bearish
+               SUM(CASE WHEN direction = 'bearish' THEN 1 ELSE 0 END) as bearish,
+               SUM(CASE WHEN direction = 'neutral' THEN 1 ELSE 0 END) as neutral
         FROM predictions
         {where}
         GROUP BY ticker, sector
@@ -552,8 +553,9 @@ def get_all_consensus(
 
     results = []
     for r in rows:
-        ticker, ticker_sector, total, bullish, bearish = r[0], r[1], r[2], r[3], r[4]
+        ticker, ticker_sector, total, bullish, bearish, neutral_count = r[0], r[1], r[2], r[3], r[4], r[5]
         bull_pct = round(bullish / total * 100, 1) if total > 0 else 0.0
+        neutral_pct = round(neutral_count / total * 100, 1) if total > 0 else 0.0
         top = top_by_ticker.get(ticker)
         results.append({
             "ticker": ticker,
@@ -561,7 +563,9 @@ def get_all_consensus(
             "total_predictions": total,
             "bullish_count": bullish,
             "bearish_count": bearish,
+            "neutral_count": neutral_count,
             "bullish_percentage": bull_pct,
+            "neutral_percentage": neutral_pct,
             "bearish_percentage": round(100 - bull_pct, 1),
             "top_caller": top["name"] if top else None,
             "top_caller_id": top["id"] if top else None,

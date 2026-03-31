@@ -168,6 +168,12 @@ export function simpleExplainer(prediction) {
     if (isMaintain) return `In simple terms: Still negative on ${ticker}, expects it to go down`;
     return `In simple terms: Negative on ${ticker}, expects it to go down`;
   }
+  if (direction === 'neutral') {
+    if (target && entry && entry > 0) {
+      return `In simple terms: Neutral on ${ticker}. Expects the stock to stay around current levels. Target $${target.toFixed(0)} (currently $${entry.toFixed(0)})`;
+    }
+    return `In simple terms: Neutral on ${ticker}. Neither bullish nor bearish.`;
+  }
 
   return null;
 }

@@ -236,9 +236,9 @@ def submit_prediction(
     if check_duplicate_prediction(user_id, ticker, req.direction, db):
         raise HTTPException(status_code=409, detail=f"You already have a {req.direction} prediction on {ticker} from today. Wait 24 hours or pick a different ticker.")
 
-    if req.direction not in ("bullish", "bearish"):
-        raise HTTPException(status_code=400, detail="Direction must be 'bullish' or 'bearish'")
-    if not req.price_target or not req.price_target.strip():
+    if req.direction not in ("bullish", "bearish", "neutral"):
+        raise HTTPException(status_code=400, detail="Direction must be 'bullish', 'bearish', or 'neutral'")
+    if req.direction != "neutral" and (not req.price_target or not req.price_target.strip()):
         raise HTTPException(status_code=400, detail="Price target is required")
     if req.evaluation_window_days < 1 or req.evaluation_window_days > 365:
         raise HTTPException(status_code=400, detail="Evaluation window must be 1-365 days")

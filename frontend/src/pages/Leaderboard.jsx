@@ -11,7 +11,7 @@ import FollowButton from '../components/FollowButton';
 import { getLeaderboard } from '../api';
 
 const SECTORS = ['All', 'Technology', 'Healthcare', 'Financial Services', 'Consumer Cyclical', 'Consumer Defensive', 'Energy', 'Industrials', 'Communication Services', 'Crypto'];
-const DIRECTIONS = ['All', 'bullish', 'bearish'];
+const DIRECTIONS = ['All', 'bullish', 'bearish', 'neutral'];
 
 const SHORT_SECTOR = {
   'Financial Services': 'Finance', 'Communication Services': 'Comms',

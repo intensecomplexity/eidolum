@@ -158,8 +158,8 @@ export default function SubmitCall() {
 
   function validate() {
     if (!ticker) return 'Select a ticker from the search results';
-    if (!direction) return 'Select a direction (Bullish or Bearish)';
-    if (!priceTarget.trim()) return 'Price target is required';
+    if (!direction) return 'Select a direction';
+    if (direction !== 'neutral' && !priceTarget.trim()) return 'Price target is required';
     if (targetWarning) return targetWarning;
     if (windowDays < 1 || windowDays > 365) return 'Evaluation window must be 1-365 days';
     return null;
@@ -255,6 +255,8 @@ export default function SubmitCall() {
                   <span className="flex items-center gap-1.5 text-positive font-medium">
                     <TrendingUp className="w-4 h-4" /> Bullish
                   </span>
+                ) : success.direction === 'neutral' ? (
+                  <span className="flex items-center gap-1.5 text-warning font-medium">Hold</span>
                 ) : (
                   <span className="flex items-center gap-1.5 text-negative font-medium">
                     <TrendingDown className="w-4 h-4" /> Bearish
@@ -382,14 +384,18 @@ export default function SubmitCall() {
 
           <div className="card">
             <label className="block text-xs text-muted uppercase tracking-wider mb-3">Direction</label>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-3 gap-3">
               <button type="button" onClick={() => setDirection('bullish')}
                 className={`flex items-center justify-center gap-2 py-4 rounded-lg border text-sm font-medium transition-colors ${direction === 'bullish' ? 'bg-positive/10 border-positive/40 text-positive' : 'bg-surface-2 border-border text-text-secondary hover:border-positive/20'}`}>
-                <TrendingUp className="w-5 h-5" /> Bullish
+                <TrendingUp className="w-5 h-5" /> Bull
               </button>
               <button type="button" onClick={() => setDirection('bearish')}
                 className={`flex items-center justify-center gap-2 py-4 rounded-lg border text-sm font-medium transition-colors ${direction === 'bearish' ? 'bg-negative/10 border-negative/40 text-negative' : 'bg-surface-2 border-border text-text-secondary hover:border-negative/20'}`}>
-                <TrendingDown className="w-5 h-5" /> Bearish
+                <TrendingDown className="w-5 h-5" /> Bear
+              </button>
+              <button type="button" onClick={() => setDirection('neutral')}
+                className={`flex items-center justify-center gap-2 py-4 rounded-lg border text-sm font-medium transition-colors ${direction === 'neutral' ? 'bg-warning/10 border-warning/40 text-warning' : 'bg-surface-2 border-border text-text-secondary hover:border-warning/20'}`}>
+                Hold
               </button>
             </div>
           </div>
