@@ -1227,12 +1227,19 @@ async def lifespan(app):
         db_storage_ok,
     )
 
+    # Opt-out kill switch: set DISABLE_BACKGROUND_JOBS=true to stop all jobs
+    _disable = os.getenv("DISABLE_BACKGROUND_JOBS", "").lower() in ("true", "1", "yes")
+
     print("[STARTUP] ════════════════════════════════════════")
-    print("[STARTUP] Eidolum API — fresh DB rebuild")
-    print("[STARTUP] Tables will be created 10s after boot")
-    print("[STARTUP] Backfill: 2020-01-01 → today")
-    print("[STARTUP] Active jobs: backfill, evaluator, scraper, stats")
+    print("[STARTUP] Eidolum API starting")
+    print(f"[STARTUP] Background jobs: {'DISABLED' if _disable else 'ENABLED (default)'}")
+    print(f"[STARTUP] MASSIVE_API_KEY set: {bool(os.getenv('MASSIVE_API_KEY', '').strip())}")
     print("[STARTUP] ════════════════════════════════════════")
+
+    if _disable:
+        print("[STARTUP] Jobs disabled via DISABLE_BACKGROUND_JOBS. Only serving API requests.")
+        yield
+        return
 
     # ── Background thread: create tables + seed + start backfill ──────────────
     def _startup_init():
@@ -1482,10 +1489,12 @@ async def lifespan(app):
     scheduler.add_job(_watchdog, "interval", minutes=5, id="watchdog")
 
     scheduler.start()
-    print(f"[STARTUP] {len(scheduler.get_jobs())} jobs registered: {[j.id for j in scheduler.get_jobs()]}")
-    print(f"[STARTUP] First scheduled job at ~{_first_run.strftime('%H:%M:%S')} UTC")
-    print(f"[STARTUP] Connection pools: user=3+5(8), bg=2+3(5), total=13 max")
-    print(f"[STARTUP] Storage guard: pause ingestion at 40GB (volume=50GB)")
+    for j in scheduler.get_jobs():
+        print(f"[STARTUP] Job: {j.id} → next_run={j.next_run_time}")
+    print(f"[STARTUP] {len(scheduler.get_jobs())} jobs registered")
+    print(f"[STARTUP] Backfill daemon thread started in _startup_init (runs after 10s)")
+    print(f"[STARTUP] Storage guard: 40GB limit")
+    print(f"[STARTUP] Global job lock: only 1 job at a time")
     yield
     scheduler.shutdown()
 

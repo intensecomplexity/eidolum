@@ -231,6 +231,7 @@ def auto_resume_backfill():
     Reverse backfill is permanently disabled (2026-03-31)."""
     import threading
     if not MASSIVE_KEY:
+        print("[Backfill] MASSIVE_API_KEY not set — backfill cannot run")
         return
 
     from database import BgSessionLocal
