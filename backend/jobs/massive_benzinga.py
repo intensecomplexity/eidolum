@@ -293,36 +293,35 @@ _NEUTRAL_RATINGS = ["hold", "neutral", "market perform", "market_perform", "equa
 
 
 def _get_direction(action_lower: str, rating_lower: str, pt_current, pt_prior) -> str | None:
-    """Determine bullish/bearish/neutral from action + rating + price target change."""
+    """Determine bullish/bearish/neutral from action + rating + price target change.
 
-    # Explicit upgrade/initiate = bullish
-    if any(w in action_lower for w in ["upgrade", "initiates"]):
-        return "bullish"
+    CRITICAL: The destination rating (rating_current) determines the direction,
+    NOT the action verb. "Downgrades to Hold" = neutral (not bearish).
+    "Upgrades to Hold" = neutral (not bullish).
+    """
+    _BULL = ["buy", "outperform", "overweight", "strong buy", "positive", "accumulate", "add", "top pick"]
+    _BEAR = ["sell", "underperform", "underweight", "strong sell", "negative", "reduce", "avoid"]
 
-    # Explicit downgrade = bearish
-    if "downgrade" in action_lower:
-        return "bearish"
-
-    # Maintains/reiterates
-    if "maintains" in action_lower or "reiterates" in action_lower:
-        # Neutral ratings are always meaningful (confirms no expected movement)
-        if any(w in rating_lower for w in _NEUTRAL_RATINGS):
-            return "neutral"
-        # For bull/bear maintains, only include if PT actually changed
-        if not pt_current or str(pt_current) == str(pt_prior):
-            return None  # No change = skip
-        if any(w in rating_lower for w in ["buy", "outperform", "overweight", "strong buy"]):
-            return "bullish"
-        if any(w in rating_lower for w in ["sell", "underperform", "underweight", "reduce"]):
-            return "bearish"
-        return None
-
-    # Fallback: derive from rating name
-    if any(w in rating_lower for w in ["buy", "outperform", "overweight", "strong buy", "positive"]):
-        return "bullish"
-    if any(w in rating_lower for w in ["sell", "underperform", "underweight", "strong sell", "negative", "reduce"]):
-        return "bearish"
+    # STEP 1: The destination rating always wins.
+    # "Downgrades to Hold" → neutral. "Upgrades to Buy" → bullish.
     if any(w in rating_lower for w in _NEUTRAL_RATINGS):
         return "neutral"
+    if any(w in rating_lower for w in _BULL):
+        # For maintains/reiterates with no PT change, skip (no new information)
+        if ("maintains" in action_lower or "reiterates" in action_lower):
+            if not pt_current or str(pt_current) == str(pt_prior):
+                return None
+        return "bullish"
+    if any(w in rating_lower for w in _BEAR):
+        if ("maintains" in action_lower or "reiterates" in action_lower):
+            if not pt_current or str(pt_current) == str(pt_prior):
+                return None
+        return "bearish"
+
+    # STEP 2: Rating not recognized. Use action as hint.
+    if any(w in action_lower for w in ["upgrade", "initiates"]):
+        return "bullish"
+    if "downgrade" in action_lower:
+        return "bearish"
 
     return None

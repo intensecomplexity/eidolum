@@ -1346,22 +1346,18 @@ async def lifespan(app):
         except Exception as _me:
             print(f"[Startup] Outcome migration error: {_me}")
 
-        # ── Reclassify hold/neutral predictions from context text ──────────
+        # ── Reclassify hold/neutral predictions ────────────────────────
+        # The context_formatter._sentiment() correctly returns "Neutral" for
+        # hold/neutral ratings, writing "Firm: Neutral — ..." in context.
+        # But _get_direction() used to return "bullish"/"bearish" based on the
+        # action verb (upgrade/downgrade) BEFORE checking the rating. This means
+        # many predictions have direction=bullish/bearish but context="Neutral —".
         try:
             with engine.connect() as _nc:
-                neutral_patterns = [
-                    "Neutral —", "Neutral—",
-                    "Maintains Hold", "Maintains Neutral", "Maintains Market Perform",
-                    "Maintains Equal Weight", "Maintains Equal-Weight",
-                    "Maintains Sector Perform", "Maintains In-Line", "Maintains In Line",
-                    "Reaffirms Hold", "Reaffirms Neutral",
-                    "Hold rating", "Neutral rating", "Market Perform rating",
-                    "Equal Weight rating", "Equal-Weight rating",
-                    "Sector Perform rating", "In-Line rating",
-                ]
-                conditions = " OR ".join(f"context LIKE '%{p}%'" for p in neutral_patterns)
                 reclassified = _nc.execute(sql_text(
-                    f"UPDATE predictions SET direction = 'neutral' WHERE direction != 'neutral' AND ({conditions})"
+                    """UPDATE predictions SET direction = 'neutral'
+                    WHERE direction != 'neutral'
+                    AND (context LIKE '%: Neutral%' OR exact_quote LIKE '%: Neutral%')"""
                 )).rowcount
                 _nc.commit()
                 if reclassified:

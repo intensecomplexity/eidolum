@@ -1,13 +1,13 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { Eye, X, TrendingUp, TrendingDown, Plus } from 'lucide-react';
+import { Eye, X, TrendingUp, TrendingDown, Plus, Bell, BellOff } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import ConsensusBar from '../components/ConsensusBar';
 import TickerSearch from '../components/TickerSearch';
 import TickerLink from '../components/TickerLink';
 import TypeBadge from '../components/TypeBadge';
 import Footer from '../components/Footer';
-import { getWatchlist, getWatchlistFeed, removeFromWatchlist, addToWatchlist } from '../api';
+import { getWatchlist, getWatchlistFeed, removeFromWatchlist, addToWatchlist, toggleWatchlistNotify } from '../api';
 
 export default function WatchlistPage() {
   const navigate = useNavigate();
@@ -34,8 +34,14 @@ export default function WatchlistPage() {
   async function handleAdd(ticker) {
     await addToWatchlist(ticker).catch(() => {});
     setShowAdd(false);
-    // Refresh
     getWatchlist().then(setItems).catch(() => {});
+  }
+
+  async function handleToggleNotify(ticker) {
+    try {
+      const result = await toggleWatchlistNotify(ticker);
+      setItems(prev => prev.map(i => i.ticker === ticker ? { ...i, notify: result.notify } : i));
+    } catch {}
   }
 
   if (!isAuthenticated) {
@@ -87,10 +93,17 @@ export default function WatchlistPage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-8">
             {items.map(item => (
               <div key={item.ticker} className="card relative group">
-                <button onClick={() => handleRemove(item.ticker)}
-                  className="absolute top-3 right-3 text-muted hover:text-negative opacity-0 group-hover:opacity-100 transition-opacity">
-                  <X className="w-4 h-4" />
-                </button>
+                <div className="absolute top-3 right-3 flex items-center gap-1.5">
+                  <button onClick={() => handleToggleNotify(item.ticker)}
+                    className={`transition-colors ${item.notify ? 'text-accent' : 'text-muted hover:text-accent'}`}
+                    title={item.notify ? 'Notifications on' : 'Notifications off'}>
+                    {item.notify ? <Bell className="w-4 h-4" /> : <BellOff className="w-4 h-4" />}
+                  </button>
+                  <button onClick={() => handleRemove(item.ticker)}
+                    className="text-muted hover:text-negative opacity-0 group-hover:opacity-100 transition-opacity">
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
                 <div className="flex items-center gap-2 mb-2">
                   <TickerLink ticker={item.ticker} className="text-lg" />
                   <span className="text-text-secondary text-sm truncate">{item.name}</span>

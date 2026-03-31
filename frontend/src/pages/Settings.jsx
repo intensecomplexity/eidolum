@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Settings as SettingsIcon, Bell, BellOff, Mail, User, Shield, AlertTriangle, Globe, ExternalLink, Play } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import Footer from '../components/Footer';
-import { setPriceAlerts, setEmailPreferences, getNotificationPrefs, setNotificationPrefs, updateSocialLinks } from '../api';
+import { setPriceAlerts, setEmailPreferences, getNotificationPrefs, setNotificationPrefs, updateSocialLinks, getEmailNotificationSettings, setEmailNotificationSettings } from '../api';
 
 export default function Settings() {
   const navigate = useNavigate();
@@ -15,12 +15,18 @@ export default function Settings() {
   const [social, setSocial] = useState({ twitter_url: '', linkedin_url: '', youtube_url: '', website_url: '' });
   const [socialSaving, setSocialSaving] = useState(false);
   const [socialMsg, setSocialMsg] = useState('');
+  const [emailNotif, setEmailNotif] = useState(true);
+  const [notifFreq, setNotifFreq] = useState('daily');
 
   useEffect(() => {
     if (user) {
       setPriceAlertsState(user.price_alerts_enabled !== false);
       setWeeklyDigestState(user.weekly_digest_enabled !== false);
       getNotificationPrefs().then(setNotifPrefsState).catch(() => {});
+      getEmailNotificationSettings().then(d => {
+        setEmailNotif(d.email_notifications !== false);
+        setNotifFreq(d.notification_frequency || 'daily');
+      }).catch(() => {});
       setSocial({
         twitter_url: user.twitter_url || '',
         linkedin_url: user.linkedin_url || '',
@@ -86,6 +92,50 @@ export default function Settings() {
             onToggle={togglePriceAlerts}
             loading={saving === 'price'}
           />
+        </div>
+
+        {/* Watchlist Email Notifications */}
+        <div className="card mb-4">
+          <h2 className="text-xs text-muted uppercase tracking-wider mb-4 flex items-center gap-1.5"><Mail className="w-3.5 h-3.5" /> Watchlist Email Notifications</h2>
+
+          <ToggleRow
+            icon={emailNotif ? <Bell className="w-5 h-5 text-accent" /> : <BellOff className="w-5 h-5 text-muted" />}
+            title="Email me about new analyst calls"
+            desc="Get notified when analysts make new predictions on stocks in your watchlist."
+            enabled={emailNotif}
+            onToggle={async () => {
+              const next = !emailNotif;
+              setEmailNotif(next);
+              await setEmailNotificationSettings(next, notifFreq).catch(() => {});
+            }}
+            loading={false}
+          />
+
+          {emailNotif && (
+            <div className="mt-4 pl-8">
+              <div className="text-xs text-muted mb-2">Frequency</div>
+              <div className="flex gap-2">
+                {['instant', 'daily', 'weekly'].map(freq => (
+                  <button key={freq} onClick={async () => {
+                    setNotifFreq(freq);
+                    await setEmailNotificationSettings(emailNotif, freq).catch(() => {});
+                  }}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                      notifFreq === freq
+                        ? 'bg-accent/15 text-accent border border-accent/30'
+                        : 'bg-surface-2 text-text-secondary border border-border'
+                    }`}>
+                    {freq === 'instant' ? 'Instant' : freq === 'daily' ? 'Daily Digest' : 'Weekly Digest'}
+                  </button>
+                ))}
+              </div>
+              <p className="text-[11px] text-muted mt-2">
+                {notifFreq === 'instant' ? 'You\'ll get an email for each new analyst call.' :
+                 notifFreq === 'daily' ? 'One email each weekday at 8 AM EST with all new calls.' :
+                 'One email each Monday with the week\'s calls.'}
+              </p>
+            </div>
+          )}
         </div>
 
         {/* Account */}

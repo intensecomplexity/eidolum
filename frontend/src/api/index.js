@@ -556,6 +556,18 @@ export function removeFromWatchlist(ticker) {
   return api.delete(`/watchlist/${ticker}`, { headers: authHeaders() }).then(r => r.data);
 }
 
+export function toggleWatchlistNotify(ticker) {
+  return api.patch(`/watchlist/${ticker}/notify`, {}, { headers: authHeaders() }).then(r => r.data);
+}
+
+export function getEmailNotificationSettings() {
+  return api.get('/settings/email-notifications', { headers: authHeaders() }).then(r => r.data);
+}
+
+export function setEmailNotificationSettings(enabled, frequency) {
+  return api.put('/settings/email-notifications', { enabled, frequency }, { headers: authHeaders() }).then(r => r.data);
+}
+
 // ——— I Told You So ———
 
 export function getToldYouSo(predictionId) {

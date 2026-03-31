@@ -38,36 +38,28 @@ _SKIP_ACTIONS = {"removes", "suspends", "terminates", "firm_dissolved"}
 
 
 def _classify_direction(action: str, new_grade: str, prev_grade: str) -> str | None:
-    """Classify into bullish/bearish/neutral."""
+    """Classify into bullish/bearish/neutral.
+    The destination grade always determines direction.
+    'Downgrades to Hold' = neutral, not bearish."""
     action_l = (action or "").lower().strip()
     grade_l = (new_grade or "").lower().strip()
 
-    # Skip non-prediction actions
     if any(s in action_l for s in _SKIP_ACTIONS):
         return None
 
-    # Explicit actions override grade
-    if action_l in ("upgrade",):
-        return "bullish"
-    if action_l in ("downgrade",):
-        return "bearish"
-
-    # Grade-based classification
+    # Destination grade always wins
+    if grade_l in _NEUTRAL_GRADES:
+        return "neutral"
     if grade_l in _BULLISH_GRADES:
         return "bullish"
     if grade_l in _BEARISH_GRADES:
         return "bearish"
-    if grade_l in _NEUTRAL_GRADES:
-        return "neutral"
 
-    # Maintain/reiterate — need grade to decide
-    if action_l in ("maintain", "reiterated", "init"):
-        if grade_l in _BULLISH_GRADES:
-            return "bullish"
-        if grade_l in _BEARISH_GRADES:
-            return "bearish"
-        if grade_l in _NEUTRAL_GRADES:
-            return "neutral"
+    # Grade not recognized — use action as hint
+    if action_l in ("upgrade", "init"):
+        return "bullish"
+    if action_l in ("downgrade",):
+        return "bearish"
 
     return None
 
