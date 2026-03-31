@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { TrendingUp, ChevronDown, Search, AlertTriangle, CheckCircle } from 'lucide-react';
 import ConsensusBar from '../components/ConsensusBar';
+import CompanyLogo from '../components/CompanyLogo';
 import TickerLink from '../components/TickerLink';
 import Footer from '../components/Footer';
 import { getAllConsensus } from '../api';
@@ -136,6 +137,7 @@ export default function Consensus() {
                 <div className="flex items-center justify-between mb-2">
                   <div className="min-w-0">
                     <div className="flex items-center gap-2">
+                      <CompanyLogo domain={c.logo_domain} ticker={c.ticker} sector={c.sector} size={24} />
                       <span className="font-mono text-accent font-bold text-lg">{c.ticker}</span>
                       {c.company_name && (
                         <span className="text-text-secondary text-sm truncate">{c.company_name}</span>

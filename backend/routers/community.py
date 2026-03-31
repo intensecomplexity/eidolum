@@ -665,15 +665,21 @@ def get_all_consensus(
         except Exception:
             pass  # SQLite doesn't support DISTINCT ON
 
-    # Get company names for all tickers
+    # Get company names + logo domains for all tickers
     from ticker_lookup import TICKER_INFO
+    from ticker_domains import get_domain
     name_by_ticker = {}
+    domain_by_ticker = {}
     if tickers:
         try:
-            name_rows = db.execute(_consensus_text(
-                "SELECT ticker, company_name FROM ticker_sectors WHERE ticker = ANY(:tickers) AND company_name IS NOT NULL"
+            info_rows = db.execute(_consensus_text(
+                "SELECT ticker, company_name, logo_domain FROM ticker_sectors WHERE ticker = ANY(:tickers)"
             ), {"tickers": tickers}).fetchall()
-            name_by_ticker = {r[0]: r[1] for r in name_rows}
+            for r in info_rows:
+                if r[1]:
+                    name_by_ticker[r[0]] = r[1]
+                if r[2]:
+                    domain_by_ticker[r[0]] = r[2]
         except Exception:
             pass
 
@@ -684,9 +690,11 @@ def get_all_consensus(
         neutral_pct = round(neutral_count / total * 100, 1) if total > 0 else 0.0
         top = top_by_ticker.get(ticker)
         company_name = name_by_ticker.get(ticker) or TICKER_INFO.get(ticker)
+        logo_domain = domain_by_ticker.get(ticker) or get_domain(ticker)
         results.append({
             "ticker": ticker,
             "company_name": company_name,
+            "logo_domain": logo_domain,
             "sector": ticker_sector or "Other",
             "total_predictions": total,
             "bullish_count": bullish,

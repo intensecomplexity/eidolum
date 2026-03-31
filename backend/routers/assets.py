@@ -308,9 +308,13 @@ def _build_ticker_detail(ticker: str, db) -> dict:
     except Exception:
         pass
 
+    from ticker_domains import get_domain as _gd
+    logo_domain = _gd(ticker)
+
     result = {
         "ticker": ticker,
         "company_name": company_name,
+        "logo_domain": logo_domain,
         "description": description,
         "industry": industry,
         "sector": sector,
