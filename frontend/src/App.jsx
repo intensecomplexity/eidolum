@@ -49,6 +49,7 @@ import AnalystProfilePage from './pages/AnalystProfile';
 import HeatmapPage from './pages/Heatmap';
 import EarningsPage from './pages/Earnings';
 import ComparePage from './pages/Compare';
+import Discover from './pages/Discover';
 import { useAuth } from './context/AuthContext';
 
 export default function App() {
@@ -107,6 +108,7 @@ export default function App() {
         <Route path="/analysts" element={<AnalystsPage />} />
         <Route path="/analyst/:name" element={<AnalystProfilePage />} />
         <Route path="/heatmap" element={<HeatmapPage />} />
+        <Route path="/discover" element={<Discover />} />
         <Route path="/earnings" element={<EarningsPage />} />
       </Routes>
       <SaveToast />

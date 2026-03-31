@@ -1,5 +1,5 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Home, BarChart3, Search, Crosshair, User } from 'lucide-react';
+import { Home, BarChart3, Compass, Crosshair, User, Search } from 'lucide-react';
 import { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 
@@ -43,6 +43,9 @@ export default function BottomNav() {
           </Link>
           <Link to="/leaderboard" className={`flex flex-col items-center justify-center gap-0.5 w-full h-full active:bg-surface-2 transition-colors ${isActive('/leaderboard') ? 'text-accent' : 'text-muted'}`}>
             <BarChart3 className="w-5 h-5" /><span className="text-[10px] font-medium whitespace-nowrap">Ranks</span>
+          </Link>
+          <Link to="/discover" className={`flex flex-col items-center justify-center gap-0.5 w-full h-full active:bg-surface-2 transition-colors ${isActive('/discover') ? 'text-accent' : 'text-muted'}`}>
+            <Compass className="w-5 h-5" /><span className="text-[10px] font-medium whitespace-nowrap">Discover</span>
           </Link>
           {isAuthenticated ? (
             <Link to="/submit" className={`flex flex-col items-center justify-center gap-0.5 w-full h-full active:bg-surface-2 transition-colors ${isActive('/submit') ? 'text-accent' : 'text-muted'}`}>
