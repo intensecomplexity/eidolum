@@ -5,7 +5,7 @@ import EidolumLogo from '../components/EidolumLogo';
 import RankNumber from '../components/RankNumber';
 import Footer from '../components/Footer';
 import { useAuth } from '../context/AuthContext';
-import { getLeaderboard, getHomepageStats, getTrendingTickers, getPendingPredictions, subscribeNewsletter } from '../api';
+import { getHomepageData, subscribeNewsletter } from '../api';
 import formatRoundNumber from '../utils/formatNumber';
 
 // ── Animated counter ─────────────────────────────────────────────────────────
@@ -81,10 +81,12 @@ export default function LandingPublic() {
   const [recentCalls, setRecentCalls] = useState([]);
 
   useEffect(() => {
-    getLeaderboard().then(data => setTop5((data || []).slice(0, 5))).catch(() => {});
-    getHomepageStats().then(setStats).catch(() => {});
-    getTrendingTickers().then(data => setTrending((data || []).slice(0, 8))).catch(() => {});
-    getPendingPredictions().then(data => setRecentCalls((data || []).slice(0, 5))).catch(() => {});
+    getHomepageData().then(d => {
+      if (d.top_analysts) setTop5(d.top_analysts.slice(0, 5));
+      if (d.stats) setStats(d.stats);
+      if (d.trending_tickers) setTrending(d.trending_tickers.slice(0, 8));
+      if (d.recent_calls) setRecentCalls(d.recent_calls.slice(0, 5));
+    }).catch(() => {});
   }, []);
 
   return (

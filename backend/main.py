@@ -1347,21 +1347,65 @@ async def lifespan(app):
             print(f"[Startup] Outcome migration error: {_me}")
 
         # ── Reclassify hold/neutral predictions ────────────────────────
-        # The context_formatter._sentiment() correctly returns "Neutral" for
-        # hold/neutral ratings, writing "Firm: Neutral — ..." in context.
-        # But _get_direction() used to return "bullish"/"bearish" based on the
-        # action verb (upgrade/downgrade) BEFORE checking the rating. This means
-        # many predictions have direction=bullish/bearish but context="Neutral —".
+        # Phase 1: Context says "Neutral —" (sentiment function got it right)
+        # Phase 2: Context contains neutral rating names (Hold, Equal-Weight, etc.)
+        # Phase 3: Price target within 3% of entry = likely hold
         try:
             with engine.connect() as _nc:
-                reclassified = _nc.execute(sql_text(
+                total_reclass = 0
+
+                # Phase 1: "Firm: Neutral —" in context
+                r1 = _nc.execute(sql_text(
                     """UPDATE predictions SET direction = 'neutral'
                     WHERE direction != 'neutral'
                     AND (context LIKE '%: Neutral%' OR exact_quote LIKE '%: Neutral%')"""
                 )).rowcount
                 _nc.commit()
-                if reclassified:
-                    print(f"[Startup] Reclassified {reclassified} predictions to neutral")
+                total_reclass += r1
+
+                # Phase 2: Context contains neutral rating names
+                # Catches "Maintains Hold rating", "Equal-Weight rating", etc.
+                # even when sentiment label was wrong ("Bullish — Maintains Hold")
+                r2 = _nc.execute(sql_text(
+                    """UPDATE predictions SET direction = 'neutral'
+                    WHERE direction != 'neutral' AND (
+                        context LIKE '%Hold rating%'
+                        OR context LIKE '%Neutral rating%'
+                        OR context LIKE '%Market Perform rating%'
+                        OR context LIKE '%Equal Weight rating%'
+                        OR context LIKE '%Equal-Weight rating%'
+                        OR context LIKE '%Sector Perform rating%'
+                        OR context LIKE '%In-Line rating%'
+                        OR context LIKE '%In Line rating%'
+                        OR context LIKE '%Peer Perform rating%'
+                        OR context LIKE '%Market Weight rating%'
+                        OR context LIKE '%Sector Weight rating%'
+                        OR context LIKE '% to Hold%'
+                        OR context LIKE '% to Neutral%'
+                        OR context LIKE '% to Market Perform%'
+                        OR context LIKE '% to Equal Weight%'
+                        OR context LIKE '% to Equal-Weight%'
+                        OR context LIKE '% to Sector Perform%'
+                        OR context LIKE '% to In-Line%'
+                        OR context LIKE '% to Peer Perform%'
+                    )"""
+                )).rowcount
+                _nc.commit()
+                total_reclass += r2
+
+                # Phase 3: Price target within 3% of entry = effectively hold
+                r3 = _nc.execute(sql_text(
+                    """UPDATE predictions SET direction = 'neutral'
+                    WHERE direction != 'neutral'
+                    AND target_price IS NOT NULL AND entry_price IS NOT NULL AND entry_price > 0
+                    AND ABS(target_price - entry_price) / entry_price < 0.03
+                    AND (context LIKE '%Maintains%' OR context LIKE '%Reaffirms%')"""
+                )).rowcount
+                _nc.commit()
+                total_reclass += r3
+
+                if total_reclass:
+                    print(f"[Startup] Reclassified {total_reclass} to neutral (sentiment:{r1} + rating:{r2} + target:{r3})")
         except Exception as _ne:
             print(f"[Startup] Neutral reclassification error: {_ne}")
 
