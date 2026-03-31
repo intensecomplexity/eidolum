@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { TrendingUp, TrendingDown, Trophy, ArrowLeft, Check, X, BarChart3, Users } from 'lucide-react';
+import { TrendingUp, TrendingDown, Trophy, ArrowLeft, Check, X, BarChart3, Users, MessageSquare } from 'lucide-react';
 import PredictionBadge from '../components/PredictionBadge';
 import ConsensusBar from '../components/ConsensusBar';
 import Footer from '../components/Footer';
+import TickerDiscussionSection from '../components/TickerDiscussionSection';
 import { ExplainerLine } from '../utils/predictionExplainer';
 import { annotateContext } from '../utils/predictionExplainer';
 import { getTickerDetail } from '../api';
@@ -322,6 +323,15 @@ export default function TickerDetail() {
             )}
           </div>
         )}
+        {/* ── DISCUSSION ──────────────────────────────────────────── */}
+        <div className="mb-8">
+          <h2 className="text-sm font-semibold text-muted uppercase tracking-wider mb-3 flex items-center gap-1.5">
+            <MessageSquare className="w-4 h-4 text-accent" /> Discussion
+          </h2>
+          <div className="card">
+            <TickerDiscussionSection ticker={ticker} />
+          </div>
+        </div>
       </div>
       <Footer />
     </div>
