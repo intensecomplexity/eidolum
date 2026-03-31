@@ -1352,10 +1352,9 @@ async def lifespan(app):
         except Exception as e:
             print(f"[Startup] Admin promote error: {e}")
 
-        # Reclassify hold/neutral predictions that were forced into bull/bear.
-        # The context_formatter writes "Firm: Neutral — ..." for hold/neutral ratings,
-        # and includes rating words like "Hold", "Equal-Weight", "Market Perform" etc.
-        # Also match predictions where context explicitly mentions neutral-type ratings.
+        # Reclassify predictions to neutral where the target rating is hold/neutral.
+        # This includes: "Downgraded to Hold" (was bearish), "Upgraded to Neutral" (was bullish),
+        # "Maintains Hold", "Maintains Equal-Weight", etc.
         try:
             from sqlalchemy import text as _rcl_t
             _rcl_db = BgSessionLocal()
@@ -1364,10 +1363,23 @@ async def lifespan(app):
                 SET direction = 'neutral'
                 WHERE direction IN ('bullish', 'bearish')
                   AND (
-                    -- Match "Firm: Neutral — ..." pattern from context_formatter
+                    -- "Firm: Neutral — ..." pattern from context_formatter
                     context LIKE '%: Neutral —%'
                     OR exact_quote LIKE '%: Neutral —%'
-                    -- Match specific neutral rating words in context/quote
+                    -- Downgrades/upgrades TO a neutral rating
+                    OR context ILIKE '%Downgraded to Hold%'
+                    OR context ILIKE '%Downgraded to Neutral%'
+                    OR context ILIKE '%Downgraded to Equal%Weight%'
+                    OR context ILIKE '%Downgraded to Market Perform%'
+                    OR context ILIKE '%Downgraded to Sector Perform%'
+                    OR context ILIKE '%Downgraded to In-Line%'
+                    OR context ILIKE '%Downgraded to Peer Perform%'
+                    OR context ILIKE '%Upgraded to Hold%'
+                    OR context ILIKE '%Upgraded to Neutral%'
+                    OR context ILIKE '%Upgraded to Equal%Weight%'
+                    OR context ILIKE '%Upgraded to Market Perform%'
+                    OR context ILIKE '%Upgraded to Sector Perform%'
+                    -- Maintains/reiterates neutral ratings
                     OR context ILIKE '%Maintains Hold%'
                     OR context ILIKE '%Maintains Neutral%'
                     OR context ILIKE '%Maintains Equal%Weight%'
@@ -1379,7 +1391,7 @@ async def lifespan(app):
                     OR context ILIKE '%Reaffirms Hold%'
                     OR context ILIKE '%Reaffirms Neutral%'
                     OR context ILIKE '%Reaffirms Equal%Weight%'
-                    OR context ILIKE '%Reaffirms Market Perform%'
+                    -- Standalone neutral ratings
                     OR context ILIKE '%Hold rating on%'
                     OR context ILIKE '%Neutral rating on%'
                     OR context ILIKE '%Equal%Weight rating on%'
@@ -1390,17 +1402,7 @@ async def lifespan(app):
                     OR context ILIKE '%coverage with Neutral%'
                     OR context ILIKE '%coverage with Equal%Weight%'
                     OR context ILIKE '%coverage with Market Perform%'
-                    OR exact_quote ILIKE '%Maintains Hold%'
-                    OR exact_quote ILIKE '%Maintains Neutral%'
-                    OR exact_quote ILIKE '%Maintains Equal%Weight%'
-                    OR exact_quote ILIKE '%Hold rating on%'
-                    OR exact_quote ILIKE '%Neutral rating on%'
-                    OR exact_quote ILIKE '%Equal%Weight rating on%'
-                    OR exact_quote ILIKE '%Market Perform rating on%'
                   )
-                  -- Exclude explicit upgrades/downgrades (those are directional even if target rating is neutral)
-                  AND context NOT ILIKE '%Upgraded to%'
-                  AND context NOT ILIKE '%Downgraded to%'
             """))
             _rcl_db.commit()
             if result.rowcount > 0:
@@ -1530,6 +1532,12 @@ async def lifespan(app):
     scheduler = AsyncIOScheduler()
     _scheduler = scheduler
 
+    # JOB 4: FMP ratings scraper (every 4 hours, offset from Benzinga)
+    def _fmp_scrape(db):
+        from jobs.fmp_scraper import scrape_fmp_ratings
+        scrape_fmp_ratings(db)
+    run_fmp = _guarded_job("fmp_ratings", _fmp_scrape)
+
     # JOB 5: daily sweep for stuck predictions (no_data cleanup)
     def _sweep_stuck(db):
         from jobs.evaluator import sweep_stuck_predictions
@@ -1537,6 +1545,7 @@ async def lifespan(app):
     run_sweep = _guarded_job("sweep_stuck", _sweep_stuck)
 
     scheduler.add_job(run_massive_benzinga, "interval", hours=2, id="massive_benzinga", next_run_time=_first_run)
+    scheduler.add_job(run_fmp, "interval", hours=4, id="fmp_ratings", next_run_time=_first_run + timedelta(minutes=3))
     scheduler.add_job(run_auto_evaluate, "interval", hours=1, id="auto_evaluate", next_run_time=_first_run + timedelta(minutes=5))
     scheduler.add_job(run_refresh_stats, "interval", hours=2, id="refresh_stats", next_run_time=_first_run + timedelta(minutes=10))
     scheduler.add_job(run_sweep, "interval", hours=24, id="sweep_stuck", next_run_time=_first_run + timedelta(minutes=15))

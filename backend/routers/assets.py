@@ -112,7 +112,8 @@ def _build_ticker_detail(ticker: str, db) -> dict:
                 SUM(CASE WHEN outcome='correct' AND direction='bearish' THEN 1 ELSE 0 END) as bear_correct,
                 AVG(CASE WHEN target_price IS NOT NULL THEN target_price END) as avg_target,
                 SUM(CASE WHEN direction='bullish' THEN 1 ELSE 0 END) as all_bullish,
-                SUM(CASE WHEN direction='bearish' THEN 1 ELSE 0 END) as all_bearish
+                SUM(CASE WHEN direction='bearish' THEN 1 ELSE 0 END) as all_bearish,
+                SUM(CASE WHEN direction='neutral' THEN 1 ELSE 0 END) as all_neutral
             FROM predictions WHERE ticker = :t
         """), {"t": ticker}).first()
     except Exception as e:
@@ -130,6 +131,7 @@ def _build_ticker_detail(ticker: str, db) -> dict:
     hist_avg_target = round(float(counts_row[8]), 2) if counts_row and counts_row[8] else None
     all_bullish = (counts_row[9] or 0) if counts_row else 0
     all_bearish = (counts_row[10] or 0) if counts_row else 0
+    all_neutral = (counts_row[11] or 0) if counts_row else 0
 
     historical = {
         "total_evaluated": hist_total,
@@ -194,16 +196,20 @@ def _build_ticker_detail(ticker: str, db) -> dict:
     bears.sort(key=lambda x: x["accuracy"], reverse=True)
 
     pending_total = len(pending)
+    pending_neutrals = len([p for p in pending if p.get("direction") == "neutral"])
     # Use ALL predictions for consensus when pending count is too low
     consensus_bull = len(bulls) if pending_total >= 3 else all_bullish
     consensus_bear = len(bears) if pending_total >= 3 else all_bearish
+    consensus_neutral = pending_neutrals if pending_total >= 3 else all_neutral
     consensus_total = (pending_total if pending_total >= 3 else total_all) or 1
     current_consensus = {
         "total": consensus_total,
         "bullish_count": consensus_bull,
         "bearish_count": consensus_bear,
+        "neutral_count": consensus_neutral,
         "bullish_pct": round(consensus_bull / consensus_total * 100, 1) if consensus_total > 0 else 0,
         "bearish_pct": round(consensus_bear / consensus_total * 100, 1) if consensus_total > 0 else 0,
+        "neutral_pct": round(consensus_neutral / consensus_total * 100, 1) if consensus_total > 0 else 0,
         "bulls": bulls,
         "bears": bears,
     }

@@ -145,7 +145,7 @@ export default function TickerDetail() {
             <>
               {/* Consensus bar for pending only */}
               <div className="card mb-4">
-                <ConsensusBar bullish={cc.bullish_count || 0} bearish={cc.bearish_count || 0} />
+                <ConsensusBar bullish={cc.bullish_count || 0} bearish={cc.bearish_count || 0} neutral={cc.neutral_count || 0} />
                 <div className="flex justify-between text-[10px] mt-1">
                   <span className="text-positive font-mono">{cc.bullish_pct}% bullish ({cc.bullish_count})</span>
                   <span className="text-negative font-mono">{cc.bearish_pct}% bearish ({cc.bearish_count})</span>

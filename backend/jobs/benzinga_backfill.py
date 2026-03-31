@@ -423,24 +423,42 @@ def _get_sector_safe(ticker, db):
         return "Other"
 
 
+NEUTRAL_RATINGS = {"hold", "neutral", "equal weight", "equal-weight", "market perform",
+                   "sector perform", "in-line", "in line", "peer perform", "market weight"}
+
+
+def _is_neutral_rating(rating_lower):
+    return any(n in rating_lower for n in NEUTRAL_RATINGS)
+
+
 def _get_direction(action_lower, rating_lower, pt_current, pt_prior):
+    # Upgrades/initiates → check if target rating is neutral
     if any(w in action_lower for w in ["upgrade", "initiates"]):
+        if _is_neutral_rating(rating_lower):
+            return "neutral"  # "Upgraded to Hold" = neutral, not bullish
         return "bullish"
+    # Downgrades → check if target rating is neutral
     if "downgrade" in action_lower:
+        if _is_neutral_rating(rating_lower):
+            return "neutral"  # "Downgraded to Hold" = neutral, not bearish
         return "bearish"
+    # Maintains/reiterates
     if "maintains" in action_lower or "reiterates" in action_lower:
-        if not pt_current or str(pt_current) == str(pt_prior):
-            return None
+        if _is_neutral_rating(rating_lower):
+            return "neutral"
         if any(w in rating_lower for w in ["buy", "outperform", "overweight", "strong buy"]):
             return "bullish"
         if any(w in rating_lower for w in ["sell", "underperform", "underweight", "reduce"]):
             return "bearish"
-        return None
+        return "neutral"  # Unknown rating on maintains = neutral
+    # Standalone ratings
     if any(w in rating_lower for w in ["buy", "outperform", "overweight", "strong buy", "positive"]):
         return "bullish"
     if any(w in rating_lower for w in ["sell", "underperform", "underweight", "strong sell", "negative", "reduce"]):
         return "bearish"
-    return None
+    if _is_neutral_rating(rating_lower):
+        return "neutral"
+    return None  # Only skip if truly unrecognized
 
 
 def _get_call_type(action_lower: str, rating_lower: str, pt_current) -> str:
