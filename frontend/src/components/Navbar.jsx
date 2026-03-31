@@ -169,6 +169,9 @@ export default function Navbar() {
                         <DropdownItem to="/watchlist" icon="☆" label="Watchlist" onClick={() => setUserDropdown(false)} />
                         <DropdownItem to="/profile" icon="◉" label="Profile" onClick={() => setUserDropdown(false)} />
                         <DropdownItem to="/settings" icon="⚙" label="Settings" onClick={() => setUserDropdown(false)} />
+                        {user?.is_admin && (
+                          <DropdownItem to="/admin/dashboard" icon="🔧" label="Admin" onClick={() => setUserDropdown(false)} />
+                        )}
                       </div>
 
                       <div className="border-t border-border py-1">

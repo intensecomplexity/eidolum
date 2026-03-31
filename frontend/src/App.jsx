@@ -21,6 +21,7 @@ import InversePortfolio from './pages/InversePortfolio';
 import RecentPredictions from './pages/RecentPredictions';
 import ForecastersList from './pages/ForecastersList';
 import AdminPanel from './pages/AdminPanel';
+import AdminDashboard from './pages/AdminDashboard';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import ForgotPassword from './pages/ForgotPassword';
@@ -76,6 +77,7 @@ export default function App() {
         <Route path="/predictions" element={<RecentPredictions />} />
         <Route path="/forecasters" element={<ForecastersList />} />
         <Route path="/admin" element={<AdminPanel />} />
+        <Route path="/admin/dashboard" element={<AdminDashboard />} />
         {/* Phase 2 */}
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
