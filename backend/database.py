@@ -14,13 +14,15 @@ if DATABASE_URL.startswith("sqlite"):
     engine = create_engine(DATABASE_URL, connect_args=connect_args)
     bg_engine = engine  # Same engine for SQLite
 else:
-    # User-facing pool: fast timeout, strict limits
-    # Total max = pool_size + max_overflow = 3 + 5 = 8 connections
+    # MINIMAL connection pool — survive Postgres recovery/restarts
+    # pool_size=1: ONE persistent connection
+    # max_overflow=2: up to 2 temporary connections on burst
+    # Total max = 3 connections for user-facing queries
     engine = create_engine(
         DATABASE_URL,
         connect_args=connect_args,
-        pool_size=3,
-        max_overflow=5,
+        pool_size=1,
+        max_overflow=2,
         pool_timeout=5,
         pool_recycle=300,
         pool_pre_ping=True,
@@ -32,9 +34,9 @@ else:
         cursor.execute("SET statement_timeout = '5000'")  # 5 seconds for user queries
         cursor.close()
 
-    # Background job pool: longer timeout, tiny pool (only 1 job runs at a time)
-    # Total max = pool_size + max_overflow = 1 + 1 = 2 connections
-    # Combined with user pool: max 8 + 2 = 10 connections (well within Railway limit)
+    # Background job pool — shares same minimal config
+    # Total max = 1 + 1 = 2 connections for background work
+    # Grand total across both pools: max 5 connections
     bg_engine = create_engine(
         DATABASE_URL,
         connect_args=connect_args,
