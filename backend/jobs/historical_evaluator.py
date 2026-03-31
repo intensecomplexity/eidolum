@@ -348,10 +348,6 @@ def _fetch_history(ticker: str, start, end) -> dict:
     _quote_cache[ticker] = result
     return result
 
-    except Exception as exc:
-        print(f"[HistEval] Finnhub quote error for {ticker}: {exc}")
-        return {}
-
 
 def _closest_price(prices: dict, target_date) -> float | None:
     if not prices:
