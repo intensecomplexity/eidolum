@@ -54,7 +54,11 @@ def admin_dashboard(request: Request, admin_id: int = Depends(require_admin_user
     total_forecasters = db.query(func.count(Forecaster.id)).scalar() or 0
     total_users = db.query(func.count(User.id)).scalar() or 0
     pending = db.query(func.count(Prediction.id)).filter(Prediction.outcome == "pending").scalar() or 0
-    evaluated = db.query(func.count(Prediction.id)).filter(Prediction.outcome.in_(["correct", "incorrect"])).scalar() or 0
+    evaluated = db.query(func.count(Prediction.id)).filter(Prediction.outcome.notin_(["pending", "no_data"])).scalar() or 0
+
+    # Outcome breakdown
+    outcome_rows = db.execute(sql_text("SELECT outcome, COUNT(*) FROM predictions GROUP BY outcome ORDER BY COUNT(*) DESC")).fetchall()
+    outcome_breakdown = {r[0]: r[1] for r in outcome_rows}
 
     # DB size (Postgres only)
     db_size = None
@@ -82,6 +86,7 @@ def admin_dashboard(request: Request, admin_id: int = Depends(require_admin_user
         "total_users": total_users,
         "pending_predictions": pending,
         "evaluated_predictions": evaluated,
+        "outcome_breakdown": outcome_breakdown,
         "db_size": db_size,
         "recent_actions": actions,
         "admins": admin_list,

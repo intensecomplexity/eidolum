@@ -97,6 +97,26 @@ function OverviewTab({ dashboard }) {
         <StatCard label="User Predictions" value={d.total_user_predictions?.toLocaleString()} />
       </div>
 
+      {/* Outcome breakdown */}
+      {d.outcome_breakdown && (
+        <div className="card mb-6">
+          <h3 className="text-sm font-semibold text-muted uppercase tracking-wider mb-3">Outcome Breakdown</h3>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            {Object.entries(d.outcome_breakdown).sort((a, b) => b[1] - a[1]).map(([outcome, count]) => (
+              <div key={outcome} className="flex items-center justify-between text-xs py-1 px-2 bg-surface-2 rounded">
+                <span className={`font-mono font-semibold ${
+                  outcome === 'hit' || outcome === 'correct' ? 'text-positive' :
+                  outcome === 'near' ? 'text-warning' :
+                  outcome === 'miss' || outcome === 'incorrect' ? 'text-negative' :
+                  outcome === 'pending' ? 'text-muted' : 'text-text-secondary'
+                }`}>{outcome}</span>
+                <span className="font-mono text-text-secondary">{count.toLocaleString()}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Admins list */}
       {d.admins?.length > 0 && (
         <div className="card mb-6">

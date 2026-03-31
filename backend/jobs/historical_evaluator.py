@@ -413,38 +413,47 @@ def _update_stats(fids: set):
         db.close()
 
 
+_SCORED_OUTCOMES = "('hit','near','miss','correct','incorrect')"
+_HIT_OUTCOMES = "('hit','correct')"
+
+
 def refresh_all_forecaster_stats():
-    """Recalculate stats for ALL forecasters from scratch, including alpha."""
+    """Recalculate stats for ALL forecasters from scratch, including alpha.
+    Uses three-tier scoring: accuracy = (hits*1 + nears*0.5) / total * 100"""
     from database import BgSessionLocal as SessionLocal
     db = SessionLocal()
     updated = 0
     try:
         fids = [r[0] for r in db.execute(sql_text(
-            "SELECT DISTINCT forecaster_id FROM predictions WHERE outcome IN ('correct','incorrect')"
+            f"SELECT DISTINCT forecaster_id FROM predictions WHERE outcome IN {_SCORED_OUTCOMES}"
         )).fetchall()]
         print(f"[StatsRefresh] Refreshing {len(fids)} forecasters")
         for fid in fids:
-            total = db.execute(sql_text(
-                "SELECT COUNT(*) FROM predictions WHERE forecaster_id = :f AND outcome IN ('correct','incorrect')"
-            ), {"f": fid}).scalar() or 0
-            correct = db.execute(sql_text(
-                "SELECT COUNT(*) FROM predictions WHERE forecaster_id = :f AND outcome = 'correct'"
-            ), {"f": fid}).scalar() or 0
-            agg = db.execute(sql_text(
-                "SELECT AVG(alpha), AVG(actual_return) FROM predictions WHERE forecaster_id = :f AND outcome IN ('correct','incorrect') AND actual_return IS NOT NULL"
-            ), {"f": fid}).first()
-            avg_alpha = agg[0] if agg else None
-            avg_ret = agg[1] if agg else None
+            row = db.execute(sql_text(f"""
+                SELECT COUNT(*),
+                       SUM(CASE WHEN outcome IN {_HIT_OUTCOMES} THEN 1 ELSE 0 END),
+                       SUM(CASE WHEN outcome = 'near' THEN 1 ELSE 0 END),
+                       AVG(alpha),
+                       AVG(actual_return)
+                FROM predictions
+                WHERE forecaster_id = :f AND outcome IN {_SCORED_OUTCOMES}
+                  AND actual_return IS NOT NULL
+            """), {"f": fid}).first()
+            total = row[0] or 0
+            hits = row[1] or 0
+            nears = row[2] or 0
+            avg_alpha = row[3]
+            avg_ret = row[4]
             if total > 0:
-                acc = round(correct / total * 100, 1)
+                acc = round((hits + nears * 0.5) / total * 100, 1)
                 alp = round(float(avg_alpha), 2) if avg_alpha is not None else 0
                 ar = round(float(avg_ret), 2) if avg_ret is not None else 0
                 db.execute(sql_text(
                     "UPDATE forecasters SET total_predictions=:t, correct_predictions=:c, accuracy_score=:a, alpha=:alp, avg_return=:ar WHERE id=:f"
-                ), {"t": total, "c": correct, "a": acc, "alp": alp, "ar": ar, "f": fid})
+                ), {"t": total, "c": hits, "a": acc, "alp": alp, "ar": ar, "f": fid})
                 updated += 1
         db.commit()
-        print(f"[StatsRefresh] Updated {updated} forecasters (with alpha)")
+        print(f"[StatsRefresh] Updated {updated} forecasters")
         return {"updated": updated, "total_forecasters_with_scored": len(fids)}
     except Exception as e:
         db.rollback()
