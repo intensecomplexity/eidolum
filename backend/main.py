@@ -1236,6 +1236,25 @@ async def lifespan(app):
     print(f"[STARTUP] MASSIVE_API_KEY set: {bool(os.getenv('MASSIVE_API_KEY', '').strip())}")
     print("[STARTUP] ════════════════════════════════════════")
 
+    # ── Admin promote — runs ALWAYS, even with jobs disabled ────────────────
+    try:
+        from sqlalchemy import text as _admin_t
+        with engine.connect() as _ac:
+            try:
+                _ac.execute(_admin_t("ALTER TABLE users ADD COLUMN IF NOT EXISTS is_admin INTEGER DEFAULT 0"))
+                _ac.commit()
+            except Exception:
+                _ac.rollback()
+            _ac.execute(_admin_t("UPDATE users SET is_admin = 1 WHERE email = 'nimrodryder@gmail.com'"))
+            _ac.commit()
+            _row = _ac.execute(_admin_t("SELECT id, is_admin FROM users WHERE email = 'nimrodryder@gmail.com'")).first()
+            if _row:
+                print(f"[STARTUP] Admin promoted: user_id={_row[0]}, is_admin={_row[1]}")
+            else:
+                print("[STARTUP] Admin user not found yet (first deploy?)")
+    except Exception as _ae:
+        print(f"[STARTUP] Admin promote failed: {_ae}")
+
     if _disable:
         print("[STARTUP] Jobs disabled via DISABLE_BACKGROUND_JOBS. Only serving API requests.")
         yield
