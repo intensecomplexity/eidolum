@@ -10,6 +10,8 @@ const TYPE_CONFIG = {
   badge_earned:      { icon: Trophy,      color: 'text-warning',  nav: '/badges',   category: 'Badges' },
   duel_result:       { icon: Swords,      color: 'text-blue',     nav: '/duels',    category: 'Duels' },
   duel_challenge:    { icon: Swords,      color: 'text-warning',  nav: '/duels',    category: 'Duels' },
+  friend_request:    { icon: UserPlus,    color: 'text-warning',  nav: '/friends?tab=requests', category: 'Social' },
+  friend_accepted:   { icon: UserPlus,    color: 'text-positive', nav: '/friends',  category: 'Social' },
   new_follower:      { icon: UserPlus,    color: 'text-accent',   nav: '/friends',  category: 'Social' },
   streak_milestone:  { icon: Flame,       color: 'text-orange-400', nav: '/profile', category: 'Predictions' },
   season_ended:      { icon: Calendar,    color: 'text-accent',   nav: '/seasons',  category: 'Predictions' },
