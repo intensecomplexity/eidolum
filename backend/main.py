@@ -1556,6 +1556,12 @@ async def lifespan(app):
         refresh_all_forecaster_stats()
     run_refresh_stats = _guarded_job("refresh_stats", _refresh_stats)
 
+    # JOB 6: analyst subscription notifications (hourly)
+    def _analyst_notif(db):
+        from jobs.analyst_notifications import run_analyst_notifications
+        run_analyst_notifications()
+    run_analyst_notif = _guarded_job("analyst_notifications", _analyst_notif)
+
     # Watchdog: auto-kill stuck jobs + pause if site slow
     def _watchdog():
         watchdog_check()
@@ -1593,6 +1599,18 @@ async def lifespan(app):
     scheduler.add_job(run_refresh_stats, "interval", hours=2, id="refresh_stats", next_run_time=_first_run + timedelta(minutes=10))
     scheduler.add_job(run_sweep, "interval", hours=24, id="sweep_stuck", next_run_time=_first_run + timedelta(minutes=15))
     scheduler.add_job(_watchdog, "interval", minutes=5, id="watchdog")
+
+    # Site-wide weekly digest — Monday 8AM EST (13:00 UTC)
+    def _site_weekly_digest():
+        from jobs.weekly_digest import send_site_weekly_digest
+        db = BgSessionLocal()
+        try:
+            send_site_weekly_digest(db)
+        except Exception as e:
+            print(f"[SiteDigest] Error: {e}")
+        finally:
+            db.close()
+    scheduler.add_job(_site_weekly_digest, "cron", day_of_week="mon", hour=13, minute=0, id="site_weekly_digest")
 
     scheduler.start()
     for j in scheduler.get_jobs():
