@@ -1236,24 +1236,32 @@ async def lifespan(app):
     print(f"[STARTUP] MASSIVE_API_KEY set: {bool(os.getenv('MASSIVE_API_KEY', '').strip())}")
     print("[STARTUP] ════════════════════════════════════════")
 
-    # ── Admin promote — runs ALWAYS, even with jobs disabled ────────────────
+    # ── Admin promote — runs ALWAYS, unconditionally ────────────────────────
+    print("[STARTUP] Running admin promotion...")
     try:
-        from sqlalchemy import text as _admin_t
         with engine.connect() as _ac:
+            # Step 1: ensure column exists
             try:
-                _ac.execute(_admin_t("ALTER TABLE users ADD COLUMN IF NOT EXISTS is_admin INTEGER DEFAULT 0"))
+                _ac.execute(sql_text("ALTER TABLE users ADD COLUMN IF NOT EXISTS is_admin INTEGER DEFAULT 0"))
                 _ac.commit()
-            except Exception:
+                print("[STARTUP] is_admin column ensured")
+            except Exception as _col_err:
+                print(f"[STARTUP] Column alter (may already exist): {_col_err}")
                 _ac.rollback()
-            _ac.execute(_admin_t("UPDATE users SET is_admin = 1 WHERE email = 'nimrodryder@gmail.com'"))
+
+            # Step 2: force set admin
+            _ac.execute(sql_text("UPDATE users SET is_admin = 1 WHERE email = 'nimrodryder@gmail.com'"))
             _ac.commit()
-            _row = _ac.execute(_admin_t("SELECT id, is_admin FROM users WHERE email = 'nimrodryder@gmail.com'")).first()
+            print("[STARTUP] UPDATE executed")
+
+            # Step 3: verify
+            _row = _ac.execute(sql_text("SELECT id, email, is_admin FROM users WHERE email = 'nimrodryder@gmail.com'")).first()
             if _row:
-                print(f"[STARTUP] Admin promoted: user_id={_row[0]}, is_admin={_row[1]}")
+                print(f"[STARTUP] VERIFIED: user_id={_row[0]}, email={_row[1]}, is_admin={_row[2]}")
             else:
-                print("[STARTUP] Admin user not found yet (first deploy?)")
+                print("[STARTUP] WARNING: nimrodryder@gmail.com not found in users table")
     except Exception as _ae:
-        print(f"[STARTUP] Admin promote failed: {_ae}")
+        print(f"[STARTUP] Admin promote FAILED: {type(_ae).__name__}: {_ae}")
 
     if _disable:
         print("[STARTUP] Jobs disabled via DISABLE_BACKGROUND_JOBS. Only serving API requests.")
