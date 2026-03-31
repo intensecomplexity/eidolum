@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams, Link } from 'react-router-dom';
-import { User, TrendingUp, TrendingDown, Flame, Target, Crosshair, UserPlus } from 'lucide-react';
+import { User, TrendingUp, TrendingDown, Flame, Target, Crosshair } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import Footer from '../components/Footer';
 import TypeBadge from '../components/TypeBadge';
+import FriendButton from '../components/FriendButton';
 import StreakCalendar from '../components/StreakCalendar';
 import AccuracyChart from '../components/AccuracyChart';
 import AccuracyBreakdown from '../components/AccuracyBreakdown';
@@ -82,6 +83,10 @@ export default function Profile() {
         await followUser(targetId);
         setFriendshipStatus('pending_sent');
         showToast('Friend request sent');
+      } else if (action === 'cancel') {
+        await unfollowUser(targetId);
+        setFriendshipStatus('none');
+        showToast('Request cancelled');
       } else if (action === 'accept') {
         const { acceptFriendRequest } = await import('../api');
         await acceptFriendRequest(targetId);

@@ -1,35 +1,69 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Flame, Crosshair, Clock, Users, Swords, Award } from 'lucide-react';
+import { Flame, Crosshair, TrendingUp, TrendingDown, ArrowRight, Clock, Trophy } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import DailyChallengeCard from '../components/DailyChallengeCard';
 import WeeklyChallengeCard from '../components/WeeklyChallengeCard';
 import RivalCard from '../components/RivalCard';
-import LiveActivityFeed from '../components/LiveActivityFeed';
-import SectorBlock from '../components/SectorBlock';
 import Countdown from '../components/Countdown';
 import LivePnL from '../components/LivePnL';
 import TickerLink from '../components/TickerLink';
+import RankNumber from '../components/RankNumber';
 import Footer from '../components/Footer';
-import { getUserProfile, getUserPredictions, getGlobalStats, getSectorHeatmap, getNudges, getLivePrices } from '../api';
+import {
+  getUserProfile, getUserPredictions, getLivePrices,
+  getLeaderboard, getHomepageStats, getTrendingTickers,
+  getPendingPredictions, getExpiringPredictions, getWatchlistFeed,
+} from '../api';
+import formatRoundNumber from '../utils/formatNumber';
+
+// ── Time ago helper ─────────────────────────────────────────────────────────
+function timeAgo(dateStr) {
+  if (!dateStr) return '';
+  const diff = Date.now() - new Date(dateStr).getTime();
+  const hours = Math.floor(diff / 3600000);
+  if (hours < 1) return 'just now';
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  return `${days}d ago`;
+}
 
 export default function Dashboard() {
   const { user } = useAuth();
   const uid = user?.id || user?.user_id;
+
+  // Personal data
   const [profile, setProfile] = useState(null);
   const [pending, setPending] = useState([]);
   const [livePrices, setLivePrices] = useState({});
-  const [stats, setStats] = useState(null);
-  const [sectors, setSectors] = useState([]);
-  const [nudges, setNudges] = useState([]);
+
+  // Public content (same as logged-out homepage)
+  const [top5, setTop5] = useState([]);
+  const [homeStats, setHomeStats] = useState(null);
+  const [trending, setTrending] = useState([]);
+  const [recentCalls, setRecentCalls] = useState([]);
+
+  // Personalized extras
+  const [expiring, setExpiring] = useState([]);
+  const [watchlistFeed, setWatchlistFeed] = useState([]);
 
   useEffect(() => {
-    if (!uid) return;
-    getUserProfile(uid).then(setProfile).catch(() => {});
-    getUserPredictions(uid, 'pending').then(p => setPending(p || [])).catch(() => {});
-    getGlobalStats().then(setStats).catch(() => {});
-    getSectorHeatmap().then(s => setSectors((s || []).slice(0, 4))).catch(() => {});
-    getNudges().then(setNudges).catch(() => {});
+    // Personal
+    if (uid) {
+      getUserProfile(uid).then(setProfile).catch(() => {});
+      getUserPredictions(uid, 'pending').then(p => setPending(p || [])).catch(() => {});
+      getWatchlistFeed().then(d => setWatchlistFeed((d || []).slice(0, 10))).catch(() => {});
+    }
+    // Public content
+    getLeaderboard().then(d => setTop5((d || []).slice(0, 5))).catch(() => {});
+    getHomepageStats().then(setHomeStats).catch(() => {});
+    getTrendingTickers().then(d => setTrending((d || []).slice(0, 8))).catch(() => {});
+    getPendingPredictions().then(d => setRecentCalls((d || []).slice(0, 5))).catch(() => {});
+    getExpiringPredictions().then(d => {
+      // Filter to within 7 days
+      const soon = (d || []).filter(p => p.days_remaining != null && p.days_remaining <= 7);
+      setExpiring(soon.slice(0, 8));
+    }).catch(() => {});
   }, [uid]);
 
   // Fetch live prices for pending predictions + poll every 2 minutes
@@ -46,7 +80,7 @@ export default function Dashboard() {
   const streak = profile?.streak_current || 0;
   const predStreak = user?.prediction_streak_daily || 0;
 
-  // Calculate P&L for each prediction and compute overall
+  // Calculate P&L for each prediction
   const pendingWithPnl = pending.map(p => {
     const entry = p.price_at_call ? parseFloat(p.price_at_call) : null;
     const current = livePrices[p.ticker] || (p.current_price ? parseFloat(p.current_price) : null);
@@ -58,7 +92,6 @@ export default function Dashboard() {
     return { ...p, _current: current, _pnl: pnl };
   });
 
-  // Sort by PnL (best first), fallback to expiration
   const pendingSorted = [...pendingWithPnl].sort((a, b) => {
     if (a._pnl != null && b._pnl != null) return b._pnl - a._pnl;
     if (a._pnl != null) return -1;
@@ -68,105 +101,64 @@ export default function Dashboard() {
     return da - db2;
   });
 
-  // Overall P&L
   const pnlValues = pendingWithPnl.filter(p => p._pnl != null).map(p => p._pnl);
   const overallPnl = pnlValues.length > 0 ? pnlValues.reduce((a, b) => a + b, 0) / pnlValues.length : null;
-
-  // Action items
-  const expiringUrgent = pending.filter(p => {
-    if (!p.expires_at) return false;
-    const hrs = (new Date(p.expires_at).getTime() - Date.now()) / 3600000;
-    return hrs > 0 && hrs <= 24;
-  });
-
-  const badgeNudges = nudges.filter(n => n.type === 'badge' && n.pct >= 60);
 
   return (
     <div>
       <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6">
 
-        {/* ── SECTION 1: STATUS BAR ──────────────────────────────────── */}
+        {/* ── PERSONAL STATS BAR ────────────────────────────────────────── */}
         {profile && (
-          <div className="flex items-center gap-3 sm:gap-5 overflow-x-auto pills-scroll py-3 mb-4 border-b border-border">
-            <StatusItem label="Accuracy" value={`${acc}%`} color={acc >= 50 ? 'text-accent' : 'text-negative'} />
-            <Divider />
-            <div className="flex flex-col items-center gap-0.5 shrink-0">
-              <div className="flex items-center gap-1">
-                <span className="font-mono text-xs text-accent font-bold">Lv.{profile.xp_level || 1}</span>
-                <span className="text-[9px] text-muted">{profile.level_name || 'Newcomer'}</span>
+          <div className="flex items-center justify-between gap-3 py-3 mb-5 border-b border-border">
+            <div className="flex items-center gap-3 sm:gap-5 overflow-x-auto pills-scroll">
+              <StatusItem label="Accuracy" value={`${acc}%`} color={acc >= 50 ? 'text-accent' : acc > 0 ? 'text-negative' : 'text-muted'} />
+              <Divider />
+              <div className="flex flex-col items-center gap-0.5 shrink-0">
+                <div className="flex items-center gap-1">
+                  <span className="font-mono text-xs text-accent font-bold">Lv.{profile.xp_level || 1}</span>
+                  <span className="text-[9px] text-muted">{profile.level_name || 'Newcomer'}</span>
+                </div>
+                <div className="w-16 h-1 bg-surface-2 rounded-full overflow-hidden">
+                  <div className="h-full bg-accent rounded-full transition-all" style={{ width: `${profile.xp_progress_pct || 0}%` }} />
+                </div>
               </div>
-              <div className="w-16 h-1 bg-surface-2 rounded-full overflow-hidden">
-                <div className="h-full bg-accent rounded-full transition-all" style={{ width: `${profile.xp_progress_pct || 0}%` }} />
-              </div>
-              <span className="text-[9px] text-muted font-mono">{(profile.xp_total || 0).toLocaleString()} / {(profile.xp_to_next_level || 50).toLocaleString()} XP</span>
+              <Divider />
+              {streak >= 1 && (<><StatusItem label="Streak" value={<><Flame className="w-3 h-3 text-orange-400 inline" /> {streak}</>} /><Divider /></>)}
+              <StatusItem label="Pred. Streak" value={`${predStreak}d`} />
             </div>
-            <Divider />
-            {streak >= 1 && (<><StatusItem label="Streak" value={<><Flame className="w-3 h-3 text-orange-400 inline" /> {streak}</>} /><Divider /></>)}
-            <StatusItem label="Pred. Streak" value={`${predStreak}d`} />
-          </div>
-        )}
-
-        {/* ── SECTION 2: CHALLENGES + RIVAL ────────────────────────────── */}
-        <DailyChallengeCard />
-        <WeeklyChallengeCard />
-        <RivalCard />
-
-        {/* ── SECTION 3: ACTION ITEMS ────────────────────────────────── */}
-        {(expiringUrgent.length > 0 || badgeNudges.length > 0) ? (
-          <div className="card mb-4">
-            <h2 className="headline-serif text-base mb-3">Needs Your Attention</h2>
-            <div className="space-y-2">
-              {expiringUrgent.length > 0 && (
-                <Link to="/expiring" className="flex items-center gap-2 text-sm text-warning hover:text-warning/80">
-                  <Clock className="w-4 h-4" />
-                  <span>{expiringUrgent.length} prediction{expiringUrgent.length > 1 ? 's' : ''} expire{expiringUrgent.length === 1 ? 's' : ''} within 24 hours</span>
-                  <span className="text-xs text-muted ml-auto">{expiringUrgent.map(p => p.ticker).join(', ')}</span>
-                </Link>
-              )}
-              {badgeNudges.map((n, i) => (
-                <Link to="/badges" key={i} className="flex items-center gap-2 text-sm text-text-secondary hover:text-accent">
-                  <span>{n.icon}</span>
-                  <span>{n.message}</span>
-                  <span className="text-xs text-muted ml-auto font-mono">{n.progress}/{n.target}</span>
-                </Link>
-              ))}
-            </div>
-          </div>
-        ) : profile && profile.total_predictions > 0 ? null : (
-          <div className="card mb-4 text-center py-6">
-            <p className="text-sm text-text-secondary mb-2">All clear. Ready to make a call?</p>
-            <Link to="/submit" className="text-accent text-xs font-medium flex items-center gap-1 justify-center">
-              <Crosshair className="w-3.5 h-3.5" /> Submit a prediction
+            <Link to="/submit" className="btn-primary shrink-0 flex items-center gap-1.5 px-4 py-2 text-sm">
+              <Crosshair className="w-3.5 h-3.5" /> Submit a Call
             </Link>
           </div>
         )}
 
-        {/* ── SECTION 4: OPEN CALLS ──────────────────────────────────── */}
-        <div className="mb-4">
-          <div className="flex items-center justify-between mb-2">
-            <div className="flex items-center gap-3">
-              <h2 className="headline-serif text-base">Open Calls</h2>
-              {overallPnl !== null && (
-                <span className={`font-mono text-xs font-bold ${overallPnl >= 0 ? 'text-positive' : 'text-negative'}`}>
-                  {overallPnl >= 0 ? '+' : ''}{overallPnl.toFixed(1)}% avg
-                </span>
-              )}
+        {/* ── CHALLENGES (compact) ──────────────────────────────────────── */}
+        <DailyChallengeCard />
+        <WeeklyChallengeCard />
+        <RivalCard />
+
+        {/* ── SECTION 1: YOUR OPEN CALLS (only if predictions exist) ───── */}
+        {pendingSorted.length > 0 && (
+          <div className="mb-6">
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-3">
+                <h2 className="headline-serif text-base">Your Open Calls</h2>
+                {overallPnl !== null && (
+                  <span className={`font-mono text-xs font-bold ${overallPnl >= 0 ? 'text-positive' : 'text-negative'}`}>
+                    {overallPnl >= 0 ? '+' : ''}{overallPnl.toFixed(1)}% avg
+                  </span>
+                )}
+              </div>
+              {pending.length > 5 && <Link to="/my-calls" className="text-[10px] text-accent font-medium">See all {pending.length}</Link>}
             </div>
-            {pending.length > 5 && <Link to="/my-calls" className="text-[10px] text-accent font-medium">See all {pending.length}</Link>}
-          </div>
-          {pendingSorted.length === 0 ? (
-            <div className="card text-center py-6">
-              <p className="text-sm text-text-secondary mb-2">No open calls.</p>
-              <Link to="/submit" className="text-accent text-xs font-medium">Make your first prediction &rarr;</Link>
-            </div>
-          ) : (
             <div className="card p-0 overflow-hidden">
               {pendingSorted.slice(0, 5).map((p, i) => (
                 <div key={p.id} className={`flex items-center justify-between px-4 py-2.5 ${i > 0 ? 'border-t border-border/50' : ''}`}>
                   <div className="flex items-center gap-2.5">
                     <TickerLink ticker={p.ticker} className="text-sm" />
                     <span className={`text-[10px] ${p.direction === 'bullish' ? 'text-positive' : 'text-negative'}`}>
-                      {p.direction === 'bullish' ? '▲' : '▼'}
+                      {p.direction === 'bullish' ? '\u25B2' : '\u25BC'}
                     </span>
                     <span className="font-mono text-xs text-muted">{p.price_target}</span>
                   </div>
@@ -179,34 +171,196 @@ export default function Dashboard() {
                 </div>
               ))}
             </div>
-          )}
-        </div>
-
-        {/* ── SECTION 5: ACTIVITY + COMMUNITY PULSE ──────────────────── */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
-          <div className="card">
-            <LiveActivityFeed limit={8} poll={30000} />
           </div>
-          {sectors.length > 0 && (
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <h2 className="headline-serif text-base">Community Pulse</h2>
-                <Link to="/heatmap" className="text-[10px] text-accent font-medium">Full heatmap</Link>
+        )}
+
+        {/* ── SECTION 2: TRENDING NOW ──────────────────────────────────── */}
+        {trending.length > 0 && (
+          <div className="mb-6">
+            <h2 className="font-semibold text-base mb-3">Trending Now</h2>
+            <div className="flex gap-3 overflow-x-auto pills-scroll pb-2">
+              {trending.map(t => {
+                const bullPct = t.bull_pct || 50;
+                return (
+                  <Link key={t.ticker} to={`/asset/${t.ticker}`}
+                    className="shrink-0 w-36 sm:w-40 card py-3 px-4 hover:border-accent/30 transition-colors">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="font-mono font-bold text-accent text-sm">{t.ticker}</span>
+                      <span className="text-muted text-[10px] font-mono">{t.total} calls</span>
+                    </div>
+                    <div className="flex h-1.5 rounded-full overflow-hidden bg-surface-2">
+                      <div className="bg-positive rounded-l-full" style={{ width: `${bullPct}%` }} />
+                      <div className="bg-negative rounded-r-full" style={{ width: `${100 - bullPct}%` }} />
+                    </div>
+                    <div className="flex justify-between text-[10px] mt-1">
+                      <span className="text-positive font-mono">{bullPct}% bull</span>
+                      <span className="text-negative font-mono">{100 - bullPct}% bear</span>
+                    </div>
+                  </Link>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* ── SECTION 3: TOP ANALYSTS RIGHT NOW ───────────────────────── */}
+        {top5.length > 0 && (
+          <div className="mb-6">
+            <h2 className="font-semibold text-base mb-3">Top Analysts Right Now</h2>
+            <div className="card overflow-hidden p-0 border-accent/10">
+              <table className="w-full">
+                <thead>
+                  <tr className="text-left text-muted text-[10px] uppercase tracking-wider border-b border-border">
+                    <th className="px-4 py-2.5 w-10">#</th>
+                    <th className="px-4 py-2.5">Name</th>
+                    <th className="px-4 py-2.5 text-right">Accuracy</th>
+                    <th className="px-4 py-2.5 text-right hidden sm:table-cell">Avg Return</th>
+                    <th className="px-4 py-2.5 text-right hidden sm:table-cell">Scored</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {top5.map(f => (
+                    <tr key={f.id} className="border-b border-border/50 last:border-b-0 hover:bg-surface-2/30 transition-colors">
+                      <td className="px-4 py-2.5"><RankNumber rank={f.rank} /></td>
+                      <td className="px-4 py-2.5">
+                        <Link to={`/forecaster/${f.id}`} className="text-sm font-medium hover:text-accent transition-colors">{f.name}</Link>
+                      </td>
+                      <td className="px-4 py-2.5 text-right">
+                        <span className={`font-mono text-sm font-semibold ${(f.accuracy_rate || 0) >= 60 ? 'text-positive' : 'text-negative'}`}>
+                          {(f.accuracy_rate || 0).toFixed(1)}%
+                        </span>
+                      </td>
+                      <td className="px-4 py-2.5 text-right hidden sm:table-cell">
+                        <span className={`font-mono text-sm ${(f.avg_return || 0) >= 0 ? 'text-positive' : 'text-negative'}`}>
+                          {(f.avg_return || 0) >= 0 ? '+' : ''}{(f.avg_return || 0).toFixed(1)}%
+                        </span>
+                      </td>
+                      <td className="px-4 py-2.5 text-right hidden sm:table-cell">
+                        <span className="font-mono text-text-secondary text-sm">{f.scored_count || f.evaluated_predictions || 0}</span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <div className="text-center mt-3">
+              <Link to="/leaderboard" className="text-accent text-xs font-medium inline-flex items-center gap-1">
+                See full rankings <ArrowRight className="w-3 h-3" />
+              </Link>
+            </div>
+          </div>
+        )}
+
+        {/* ── SECTION 4: RECENT ANALYST CALLS ─────────────────────────── */}
+        {recentCalls.length > 0 && (
+          <div className="mb-6">
+            <h2 className="font-semibold text-base mb-3">Recent Analyst Calls</h2>
+            <div className="space-y-2">
+              {recentCalls.map(p => (
+                <Link key={p.id} to={`/asset/${p.ticker}`}
+                  className="flex items-center gap-3 card py-3 hover:border-accent/20 transition-colors">
+                  <span className={`shrink-0 ${p.direction === 'bullish' ? 'text-positive' : 'text-negative'}`}>
+                    {p.direction === 'bullish' ? <TrendingUp className="w-4 h-4" /> : <TrendingDown className="w-4 h-4" />}
+                  </span>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-medium text-text-primary">{p.forecaster?.name}</div>
+                    <div className="text-xs">
+                      <span className={p.direction === 'bullish' ? 'text-positive' : 'text-negative'}>
+                        {p.direction === 'bullish' ? 'Bullish' : 'Bearish'}
+                      </span>
+                      <span className="text-muted"> on </span>
+                      <span className="font-mono text-accent font-semibold">{p.ticker}</span>
+                      {p.target_price && <span className="text-muted">, target ${p.target_price.toFixed(0)}</span>}
+                    </div>
+                  </div>
+                  <span className="text-muted text-xs font-mono shrink-0">{timeAgo(p.prediction_date)}</span>
+                </Link>
+              ))}
+            </div>
+            <div className="text-center mt-3">
+              <Link to="/expiring" className="text-accent text-xs font-medium inline-flex items-center gap-1">
+                See all predictions <ArrowRight className="w-3 h-3" />
+              </Link>
+            </div>
+          </div>
+        )}
+
+        {/* ── SECTION 5: YOUR WATCHLIST (only if items) ──────────────── */}
+        {watchlistFeed.length > 0 && (
+          <div className="mb-6">
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="font-semibold text-base">Your Watchlist</h2>
+              <Link to="/watchlist" className="text-[10px] text-accent font-medium">Manage</Link>
+            </div>
+            <div className="space-y-2">
+              {watchlistFeed.slice(0, 5).map(p => (
+                <div key={p.id} className="card py-2.5 flex items-center justify-between">
+                  <div className="flex items-center gap-2.5">
+                    <TickerLink ticker={p.ticker} className="text-sm" />
+                    <span className={`text-[10px] ${p.direction === 'bullish' ? 'text-positive' : 'text-negative'}`}>
+                      {p.direction === 'bullish' ? '\u25B2' : '\u25BC'}
+                    </span>
+                    <span className="text-xs text-text-secondary">{p.username}</span>
+                    <span className="font-mono text-xs text-muted">{p.price_target}</span>
+                  </div>
+                  <span className="text-muted text-[10px] font-mono">{timeAgo(p.created_at)}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* ── SECTION 6: PREDICTIONS EXPIRING SOON ────────────────────── */}
+        {expiring.length > 0 && (
+          <div className="mb-6">
+            <h2 className="font-semibold text-base mb-1">Expiring Soon</h2>
+            <p className="text-xs text-muted mb-3">These calls are about to be scored — check back for results.</p>
+            <div className="space-y-2">
+              {expiring.map(p => (
+                <Link key={p.id} to={`/asset/${p.ticker}`}
+                  className="flex items-center justify-between card py-2.5 hover:border-accent/20 transition-colors">
+                  <div className="flex items-center gap-2.5">
+                    <span className={`text-[10px] ${p.direction === 'bullish' ? 'text-positive' : 'text-negative'}`}>
+                      {p.direction === 'bullish' ? '\u25B2' : '\u25BC'}
+                    </span>
+                    <TickerLink ticker={p.ticker} className="text-sm" />
+                    <span className="text-xs text-text-secondary">{p.username}</span>
+                    <span className="font-mono text-xs text-muted">{p.price_target}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {p.pnl_percentage != null && (
+                      <span className={`font-mono text-xs font-bold ${p.direction_winning ? 'text-positive' : 'text-negative'}`}>
+                        {p.pnl_percentage >= 0 ? '+' : ''}{p.pnl_percentage.toFixed(1)}%
+                      </span>
+                    )}
+                    <span className={`font-mono text-[10px] ${p.days_remaining <= 1 ? 'text-warning font-bold' : 'text-muted'}`}>
+                      <Clock className="w-3 h-3 inline mr-0.5" />{p.days_remaining}d
+                    </span>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* ── SECTION 7: THE NUMBERS ──────────────────────────────────── */}
+        {homeStats && (
+          <div className="border-t border-border pt-8 pb-6 mb-4">
+            <div className="grid grid-cols-3 gap-6 text-center">
+              <div>
+                <div className="font-mono text-xl sm:text-2xl font-bold text-accent">{formatRoundNumber(homeStats.total_predictions)}</div>
+                <div className="text-[10px] text-muted mt-1">Predictions Tracked</div>
               </div>
-              <div className="grid grid-cols-2 gap-2">
-                {sectors.map(s => (
-                  <SectorBlock key={s.sector} sector={s} compact onClick={() => {}} />
-                ))}
+              <div>
+                <div className="font-mono text-xl sm:text-2xl font-bold text-text-primary">{formatRoundNumber(homeStats.forecasters_tracked)}</div>
+                <div className="text-[10px] text-muted mt-1">Analysts Monitored</div>
+              </div>
+              <div>
+                <div className="font-mono text-xl sm:text-2xl font-bold text-positive">2+</div>
+                <div className="text-[10px] text-muted mt-1">Years of Data</div>
               </div>
             </div>
-          )}
-        </div>
-
-        {/* ── SECTION 6: FOOTER STATS ────────────────────────────────── */}
-        {stats && (
-          <p className="text-center text-[11px] text-muted/50 mb-4">
-            Eidolum is tracking <span className="font-mono">{stats.total_predictions?.toLocaleString()}</span> predictions from <span className="font-mono">{stats.total_forecasters?.toLocaleString()}</span> analysts and <span className="font-mono">{stats.total_users?.toLocaleString()}</span> players. Updated hourly.
-          </p>
+          </div>
         )}
       </div>
       <Footer />
