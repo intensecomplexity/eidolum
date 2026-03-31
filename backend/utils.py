@@ -103,7 +103,8 @@ def compute_streak(forecaster_id: int, db: Session) -> dict:
 
 
 def recalculate_forecaster_stats(forecaster_id: int, db: Session):
-    """Recalculate and persist a forecaster's cached stats from their predictions."""
+    """Recalculate and persist a forecaster's cached stats from their predictions.
+    Uses three-tier scoring: accuracy = (hits*1 + nears*0.5) / total * 100"""
     forecaster = db.query(Forecaster).filter(Forecaster.id == forecaster_id).first()
     if not forecaster:
         return
@@ -112,36 +113,42 @@ def recalculate_forecaster_stats(forecaster_id: int, db: Session):
         db.query(Prediction)
         .filter(
             Prediction.forecaster_id == forecaster_id,
-            Prediction.outcome.in_(["correct", "incorrect"]),
+            Prediction.outcome.in_(["hit", "near", "miss", "correct", "incorrect"]),
         )
         .order_by(Prediction.prediction_date.desc())
         .all()
     )
 
     total = len(evaluated)
-    correct = sum(1 for p in evaluated if p.outcome == "correct")
+    hits = sum(1 for p in evaluated if p.outcome in ("hit", "correct"))
+    nears = sum(1 for p in evaluated if p.outcome == "near")
+    misses = sum(1 for p in evaluated if p.outcome in ("miss", "incorrect"))
 
-    # Streak: count consecutive same-outcome from most recent
+    # Three-tier accuracy: hits=1.0, nears=0.5, misses=0
+    accuracy = round((hits + nears * 0.5) / total * 100, 1) if total > 0 else None
+
+    # Streak: count consecutive same-outcome from most recent (hit/near = positive, miss = negative)
     streak_count = 0
-    streak_type = None
+    streak_positive = None
     for p in evaluated:
-        if streak_type is None:
-            streak_type = p.outcome
-        if p.outcome == streak_type:
+        is_positive = p.outcome in ("hit", "correct", "near")
+        if streak_positive is None:
+            streak_positive = is_positive
+        if is_positive == streak_positive:
             streak_count += 1
         else:
             break
 
     try:
         forecaster.total_predictions = total
-        forecaster.correct_predictions = correct
-        forecaster.accuracy_score = round((correct / total) * 100, 1) if total > 0 else None
-        forecaster.streak = streak_count if streak_type == "correct" else -streak_count
+        forecaster.correct_predictions = hits  # backward compat: "correct" = hits
+        forecaster.accuracy_score = accuracy
+        forecaster.streak = streak_count if streak_positive else -streak_count
         db.commit()
-        print(f"[Stats] {forecaster.name}: {correct}/{total}, streak {forecaster.streak}")
+        print(f"[Stats] {forecaster.name}: {hits}H/{nears}N/{misses}M = {accuracy}%, streak {forecaster.streak}")
     except Exception as e:
         db.rollback()
-        print(f"[Stats] Could not persist stats for {forecaster.name} (columns may not exist yet): {e}")
+        print(f"[Stats] Could not persist stats for {forecaster.name}: {e}")
 
 
 def compute_rank_movement(forecaster: Forecaster, current_rank: int) -> dict:

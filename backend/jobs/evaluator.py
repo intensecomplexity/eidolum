@@ -58,26 +58,68 @@ def get_current_price(ticker: str) -> float | None:
     return None
 
 
+# ── Three-tier scoring: HIT / NEAR / MISS ────────────────────────────────────
+
+# Tolerance (%) for HIT — target reached within this margin
+_TOLERANCE = {1: 2, 7: 3, 14: 4, 30: 5, 90: 5, 180: 7, 365: 10}
+# Minimum movement (%) for NEAR — right direction, meaningful move
+_MIN_MOVEMENT = {1: 0.5, 7: 1, 14: 1.5, 30: 2, 90: 2, 180: 3, 365: 4}
+
+
+def _get_threshold(window_days: int, table: dict) -> float:
+    """Interpolate threshold from table based on window_days."""
+    if not window_days or window_days <= 0:
+        window_days = 30
+    keys = sorted(table.keys())
+    # Find the two closest keys
+    for i, k in enumerate(keys):
+        if window_days <= k:
+            return table[k]
+    return table[keys[-1]]
+
+
 def _evaluate_prediction(p: Prediction, price: float, now: datetime):
-    """Score a single prediction. Returns True if scored."""
+    """Score a prediction using three-tier system: hit / near / miss."""
     if not p.entry_price or p.entry_price <= 0:
         return False
 
     actual_return = round(((price - p.entry_price) / p.entry_price) * 100, 2)
+    window = p.window_days or 30
+    tolerance = _get_threshold(window, _TOLERANCE)
+    min_movement = _get_threshold(window, _MIN_MOVEMENT)
 
     if p.direction == "bullish":
-        if p.target_price:
-            p.outcome = "correct" if price >= p.target_price else "incorrect"
+        if p.target_price and p.target_price > 0:
+            target_dist_pct = abs(price - p.target_price) / p.target_price * 100
+            if price >= p.target_price or target_dist_pct <= tolerance:
+                p.outcome = "hit"
+            elif actual_return >= min_movement:
+                p.outcome = "near"
+            else:
+                p.outcome = "miss"
         else:
-            p.outcome = "correct" if actual_return > 0 else "incorrect"
+            p.outcome = "hit" if actual_return > 0 else "miss"
+
     elif p.direction == "bearish":
-        if p.target_price:
-            p.outcome = "correct" if price <= p.target_price else "incorrect"
+        if p.target_price and p.target_price > 0:
+            target_dist_pct = abs(price - p.target_price) / p.target_price * 100
+            if price <= p.target_price or target_dist_pct <= tolerance:
+                p.outcome = "hit"
+            elif actual_return <= -min_movement:
+                p.outcome = "near"
+            else:
+                p.outcome = "miss"
         else:
-            p.outcome = "correct" if actual_return < 0 else "incorrect"
+            p.outcome = "hit" if actual_return < 0 else "miss"
+
     elif p.direction == "neutral":
         abs_ret = abs(actual_return)
-        p.outcome = "correct" if abs_ret <= 5.0 else "near" if abs_ret <= 10.0 else "incorrect"
+        if abs_ret <= 5.0:
+            p.outcome = "hit"
+        elif abs_ret <= 10.0:
+            p.outcome = "near"
+        else:
+            p.outcome = "miss"
     else:
         return False
 

@@ -334,7 +334,7 @@ CALL_TYPE_MAP = {
 def _build_filtered_leaderboard(db: Session, sector=None, call_type=None, sort="accuracy",
                                  limit=100, min_predictions=10, direction=None, timeframe=None) -> list:
     """SQL-based filtered leaderboard. Returns ranked list."""
-    where_clauses = ["p.outcome IN ('correct','incorrect')"]
+    where_clauses = ["p.outcome IN ('hit','near','miss','correct','incorrect')"]
     params = {}
 
     if sector:
@@ -385,8 +385,9 @@ def _build_filtered_leaderboard(db: Session, sector=None, call_type=None, sort="
         SELECT f.id, f.name, f.handle, f.platform, f.channel_url,
                f.profile_image_url, f.streak, f.firm,
                COUNT(*) as total,
-               SUM(CASE WHEN p.outcome = 'correct' THEN 1 ELSE 0 END) as correct,
-               ROUND(SUM(CASE WHEN p.outcome='correct' THEN 1 ELSE 0 END)::numeric
+               SUM(CASE WHEN p.outcome IN ('hit','correct') THEN 1 ELSE 0 END) as hits,
+               ROUND((SUM(CASE WHEN p.outcome IN ('hit','correct') THEN 1.0 ELSE 0 END)
+                     + SUM(CASE WHEN p.outcome = 'near' THEN 0.5 ELSE 0 END))
                      / NULLIF(COUNT(*), 0) * 100, 1) as accuracy,
                COALESCE(AVG(p.alpha), 0) as avg_alpha,
                COALESCE(AVG(p.actual_return), 0) as avg_return

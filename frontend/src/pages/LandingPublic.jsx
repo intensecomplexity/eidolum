@@ -201,8 +201,8 @@ export default function LandingPublic() {
           <div className="card border-accent/20 py-5">
             <div className="text-[10px] text-accent font-mono font-bold tracking-widest mb-2">REAL EXAMPLE</div>
             <p className="text-sm text-text-primary leading-relaxed">
-              Goldman Sachs said <span className="font-mono text-accent font-semibold">AAPL</span> would hit $250.
-              It reached $237. Score: <span className="text-positive font-semibold">Correct (+14.7%)</span>
+              Goldman Sachs said <span className="font-mono text-accent font-semibold">AAPL</span> would hit $195.
+              It reached $198. Score: <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] font-mono font-bold" style={{ backgroundColor: '#34d399', color: '#000' }}>HIT</span> <span className="text-positive font-semibold">(+16.2%)</span>
             </p>
             <p className="text-xs text-muted mt-2 italic">Before Eidolum: trust reputation. After Eidolum: trust data.</p>
           </div>

@@ -127,22 +127,24 @@ def _build_ticker_detail(ticker: str, db) -> dict:
     hist_bull_total = (counts_row[4] or 0) if counts_row else 0
     hist_bull_hits = (counts_row[5] or 0) if counts_row else 0
     hist_bear_total = (counts_row[6] or 0) if counts_row else 0
-    hist_bear_correct = (counts_row[7] or 0) if counts_row else 0
+    hist_bear_hits = (counts_row[7] or 0) if counts_row else 0
     hist_avg_target = round(float(counts_row[8]), 2) if counts_row and counts_row[8] else None
-    all_bullish = (counts_row[9] or 0) if counts_row else 0
-    all_bearish = (counts_row[10] or 0) if counts_row else 0
-    all_neutral = (counts_row[11] or 0) if counts_row else 0
+    hist_nears = (counts_row[9] or 0) if counts_row else 0
+    hist_bull_nears = (counts_row[10] or 0) if counts_row else 0
+    hist_bear_nears = (counts_row[11] or 0) if counts_row else 0
+
+    def _tt(h, n, t):
+        return round((h + n * 0.5) / t * 100, 1) if t > 0 else 0
 
     historical = {
         "total_evaluated": hist_total,
-        "correct": hist_correct,
-        "accuracy": round(hist_correct / hist_total * 100, 1) if hist_total > 0 else 0,
+        "hits": hist_hits,
+        "nears": hist_nears,
+        "accuracy": _tt(hist_hits, hist_nears, hist_total),
         "bullish_total": hist_bull_total,
-        "bullish_correct": hist_bull_correct,
-        "bullish_accuracy": round(hist_bull_correct / hist_bull_total * 100, 1) if hist_bull_total > 0 else 0,
+        "bullish_accuracy": _tt(hist_bull_hits, hist_bull_nears, hist_bull_total),
         "bearish_total": hist_bear_total,
-        "bearish_correct": hist_bear_correct,
-        "bearish_accuracy": round(hist_bear_correct / hist_bear_total * 100, 1) if hist_bear_total > 0 else 0,
+        "bearish_accuracy": _tt(hist_bear_hits, hist_bear_nears, hist_bear_total),
         "avg_target": hist_avg_target,
     }
 
@@ -224,7 +226,7 @@ def _build_ticker_detail(ticker: str, db) -> dict:
                    f.id, f.name, f.handle, f.accuracy_score, f.firm
             FROM predictions p
             JOIN forecasters f ON f.id = p.forecaster_id
-            WHERE p.ticker = :t AND p.outcome IN ('correct','incorrect')
+            WHERE p.ticker = :t AND p.outcome IN ('hit','near','miss','correct','incorrect')
             ORDER BY p.evaluation_date DESC NULLS LAST
             LIMIT 15
         """), {"t": ticker}).fetchall()
@@ -253,7 +255,7 @@ def _build_ticker_detail(ticker: str, db) -> dict:
                    SUM(CASE WHEN p.outcome='correct' THEN 1 ELSE 0 END) as c,
                    COUNT(*) as t
             FROM predictions p JOIN forecasters f ON f.id = p.forecaster_id
-            WHERE p.ticker = :t AND p.outcome IN ('correct','incorrect')
+            WHERE p.ticker = :t AND p.outcome IN ('hit','near','miss','correct','incorrect')
             GROUP BY f.id, f.name HAVING COUNT(*) >= 2
             ORDER BY SUM(CASE WHEN p.outcome='correct' THEN 1 ELSE 0 END) * 1.0 / COUNT(*) DESC
             LIMIT 1

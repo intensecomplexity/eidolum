@@ -23,14 +23,29 @@ export default function PredictionBadge({ direction, outcome, windowDays }) {
       </span>
     );
   }
-  if (outcome === 'correct') {
-    return <span className="text-positive font-mono text-sm font-semibold">&#10003;</span>;
+  if (outcome === 'hit' || outcome === 'correct') {
+    return (
+      <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-mono font-bold"
+        style={{ backgroundColor: '#34d399', color: '#000' }}>
+        HIT
+      </span>
+    );
   }
   if (outcome === 'near') {
-    return <span className="text-warning font-mono text-sm font-semibold">~</span>;
+    return (
+      <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-mono font-bold"
+        style={{ backgroundColor: '#fbbf24', color: '#000' }}>
+        NEAR
+      </span>
+    );
   }
-  if (outcome === 'incorrect') {
-    return <span className="text-negative font-mono text-sm font-semibold">&#10007;</span>;
+  if (outcome === 'miss' || outcome === 'incorrect') {
+    return (
+      <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-mono font-bold"
+        style={{ backgroundColor: '#f87171', color: '#fff' }}>
+        MISS
+      </span>
+    );
   }
   if (outcome === 'no_data') {
     return <span className="text-muted font-mono text-[10px]">N/A</span>;

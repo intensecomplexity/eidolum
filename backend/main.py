@@ -1290,6 +1290,21 @@ async def lifespan(app):
     except Exception as _ae:
         print(f"[STARTUP] Admin promote FAILED: {type(_ae).__name__}: {_ae}")
 
+    # ── Migrate outcome values: correct→hit, incorrect→miss ──────────────
+    try:
+        with engine.connect() as _mc:
+            migrated = _mc.execute(sql_text(
+                "UPDATE predictions SET outcome = 'hit' WHERE outcome = 'correct'"
+            )).rowcount
+            migrated2 = _mc.execute(sql_text(
+                "UPDATE predictions SET outcome = 'miss' WHERE outcome = 'incorrect'"
+            )).rowcount
+            _mc.commit()
+            if migrated or migrated2:
+                print(f"[STARTUP] Migrated outcomes: {migrated} correct→hit, {migrated2} incorrect→miss")
+    except Exception as _me:
+        print(f"[STARTUP] Outcome migration error: {_me}")
+
     if _disable:
         print("[STARTUP] Jobs disabled via DISABLE_BACKGROUND_JOBS. Only serving API requests.")
         yield
@@ -2138,7 +2153,7 @@ def re_evaluate_all():
     db = BgSessionLocal()
     try:
         total_scored = db.execute(_t(
-            "SELECT COUNT(*) FROM predictions WHERE outcome IN ('correct','incorrect')"
+            "SELECT COUNT(*) FROM predictions WHERE outcome IN ('hit','near','miss','correct','incorrect')"
         )).scalar() or 0
     finally:
         db.close()
@@ -2162,7 +2177,7 @@ def re_evaluate_all():
                     # Reset only a batch of 500 predictions to pending
                     reset_ids = db.execute(_t("""
                         SELECT id FROM predictions
-                        WHERE outcome IN ('correct','incorrect')
+                        WHERE outcome IN ('hit','near','miss','correct','incorrect')
                         ORDER BY id
                         LIMIT :batch_size
                     """), {"batch_size": BATCH_SIZE}).fetchall()
