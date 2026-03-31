@@ -14,17 +14,59 @@ _ticker_cache: dict[str, tuple] = {}
 _TICKER_TTL = 300  # 5 minutes
 
 
+def _empty_ticker_result(ticker: str, company_name: str = None) -> dict:
+    """Return a valid but empty result for tickers with no predictions."""
+    return {
+        "ticker": ticker,
+        "company_name": company_name,
+        "industry": None,
+        "sector": None,
+        "total_predictions": 0,
+        "current_consensus": {
+            "total": 0, "bullish_count": 0, "bearish_count": 0,
+            "bullish_pct": 0, "bearish_pct": 0, "bulls": [], "bears": [],
+        },
+        "historical": {
+            "total_evaluated": 0, "correct": 0, "accuracy": 0,
+            "bullish_total": 0, "bullish_correct": 0, "bullish_accuracy": 0,
+            "bearish_total": 0, "bearish_correct": 0, "bearish_accuracy": 0,
+            "avg_target": None,
+        },
+        "stats": {"evaluated": 0, "correct": 0, "historical_accuracy": 0,
+                  "avg_target_price": None, "top_forecaster": None},
+        "pending_predictions": [],
+        "recent_evaluated": [],
+    }
+
+
 @router.get("/ticker/{ticker}/detail")
 @limiter.limit("60/minute")
 def get_ticker_detail(request: Request, ticker: str, db: Session = Depends(get_db)):
     """Full ticker detail page data: current consensus, historical track record, predictions."""
     ticker = ticker.upper().strip()
+    if not ticker or len(ticker) > 10:
+        return _empty_ticker_result(ticker)
 
     cached = _ticker_cache.get(ticker)
     if cached and (_time.time() - cached[1]) < _TICKER_TTL:
         return cached[0]
 
     from datetime import datetime
+
+    # Quick check: does this ticker have ANY predictions?
+    try:
+        exists = db.execute(sql_text(
+            "SELECT 1 FROM predictions WHERE ticker = :t LIMIT 1"
+        ), {"t": ticker}).first()
+    except Exception:
+        exists = None
+
+    if not exists:
+        # No predictions — return immediately without heavy queries
+        from ticker_lookup import TICKER_INFO
+        result = _empty_ticker_result(ticker, TICKER_INFO.get(ticker))
+        _ticker_cache[ticker] = (result, _time.time())
+        return result
 
     # ── Sector + company name ─────────────────────────────────────────────
     sector = None
@@ -41,9 +83,12 @@ def get_ticker_detail(request: Request, ticker: str, db: Session = Depends(get_d
     except Exception:
         pass
     if not sector:
-        sector = db.execute(sql_text(
-            "SELECT sector FROM predictions WHERE ticker = :t AND sector IS NOT NULL AND sector != 'Other' LIMIT 1"
-        ), {"t": ticker}).scalar()
+        try:
+            sector = db.execute(sql_text(
+                "SELECT sector FROM predictions WHERE ticker = :t AND sector IS NOT NULL AND sector != 'Other' LIMIT 1"
+            ), {"t": ticker}).scalar()
+        except Exception:
+            pass
     if not company_name:
         from ticker_lookup import TICKER_INFO
         company_name = TICKER_INFO.get(ticker)

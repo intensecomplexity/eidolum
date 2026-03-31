@@ -1247,6 +1247,27 @@ async def lifespan(app):
             print(f"[Startup] Table creation error: {e}")
             return  # Can't continue without tables
 
+        # Critical indexes for ticker detail page performance
+        try:
+            from sqlalchemy import text as _idx_t
+            _idx_db = BgSessionLocal()
+            for idx in [
+                "CREATE INDEX IF NOT EXISTS idx_pred_ticker ON predictions(ticker)",
+                "CREATE INDEX IF NOT EXISTS idx_pred_ticker_outcome ON predictions(ticker, outcome)",
+                "CREATE INDEX IF NOT EXISTS idx_pred_outcome ON predictions(outcome)",
+                "CREATE INDEX IF NOT EXISTS idx_pred_forecaster_id ON predictions(forecaster_id)",
+                "CREATE INDEX IF NOT EXISTS idx_pred_evaluation_date ON predictions(evaluation_date)",
+            ]:
+                try:
+                    _idx_db.execute(_idx_t(idx))
+                    _idx_db.commit()
+                except Exception:
+                    _idx_db.rollback()
+            _idx_db.close()
+            print("[Startup] Critical indexes created")
+        except Exception as e:
+            print(f"[Startup] Index creation error: {e}")
+
         # Auto-promote super admin
         try:
             _admin_db = BgSessionLocal()
