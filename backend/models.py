@@ -191,6 +191,20 @@ class DisclosedPosition(Base):
     notes = Column(Text, nullable=True)
 
 
+class AuditLog(Base):
+    __tablename__ = "audit_log"
+
+    id = Column(Integer, primary_key=True, index=True)
+    admin_user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    admin_email = Column(String(255), nullable=False)
+    action = Column(String(100), nullable=False)  # e.g. "delete_prediction", "ban_user", "promote_admin"
+    target_type = Column(String(50), nullable=True)  # "prediction", "forecaster", "user"
+    target_id = Column(Integer, nullable=True)
+    details = Column(Text, nullable=True)
+    ip_address = Column(String(45), nullable=True)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+
 class PasswordResetToken(Base):
     __tablename__ = "password_reset_tokens"
 
@@ -239,6 +253,8 @@ class User(Base):
     website_url = Column(String(255), nullable=True)
     subscription_tier = Column(String(20), default="free")  # "free" | "pro" | "institutional"
     referred_by = Column(Integer, ForeignKey("users.id"), nullable=True)
+    is_admin = Column(Integer, default=0)  # 0=false, 1=true
+    is_banned = Column(Integer, default=0)  # 0=false, 1=true
 
     predictions = relationship("UserPrediction", back_populates="user", cascade="all, delete-orphan")
     achievements = relationship("Achievement", back_populates="user", cascade="all, delete-orphan")

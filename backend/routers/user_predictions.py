@@ -243,6 +243,13 @@ def submit_prediction(
     if req.evaluation_window_days < 1 or req.evaluation_window_days > 365:
         raise HTTPException(status_code=400, detail="Evaluation window must be 1-365 days")
 
+    # Profanity check on reasoning
+    if req.reasoning and req.reasoning.strip():
+        from profanity_filter import is_profane, record_violation
+        if is_profane(req.reasoning):
+            record_violation(user_id, req.reasoning, "prediction_reasoning")
+            raise HTTPException(status_code=400, detail="Your prediction contains inappropriate language. Please edit it.")
+
     template = req.template or "custom"
     if template not in PREDICTION_TEMPLATES:
         template = "custom"

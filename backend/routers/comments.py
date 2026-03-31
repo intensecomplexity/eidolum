@@ -80,6 +80,11 @@ def create_comment(
     if len(text) > MAX_COMMENT_LEN:
         raise HTTPException(status_code=400, detail=f"Comment must be under {MAX_COMMENT_LEN} characters")
 
+    from profanity_filter import is_profane, record_violation
+    if is_profane(text):
+        record_violation(user_id, text, "comment")
+        raise HTTPException(status_code=400, detail="Your comment contains inappropriate language.")
+
     # Check level-based commenting perk
     from perks import get_user_perks
     _user_obj = db.query(User).filter(User.id == user_id).first()

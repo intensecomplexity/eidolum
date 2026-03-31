@@ -57,7 +57,6 @@ class TitleRequest(BaseModel):
 
 
 _TITLE_RE = re.compile(r"^[a-zA-Z0-9 ]+$")
-_BAD_WORDS = {"fuck", "shit", "ass", "bitch", "dick", "cunt", "nigger", "faggot"}
 
 
 @router.post("/profile/title")
@@ -77,8 +76,10 @@ def set_custom_title(request: Request, req: TitleRequest, current_user_id: int =
         raise HTTPException(status_code=400, detail="Title must be 30 characters or less")
     if not _TITLE_RE.match(title):
         raise HTTPException(status_code=400, detail="Title can only contain letters, numbers, and spaces")
-    if any(w in title.lower().split() for w in _BAD_WORDS):
-        raise HTTPException(status_code=400, detail="Title contains inappropriate language")
+    from profanity_filter import is_profane, record_violation
+    if is_profane(title):
+        record_violation(current_user_id, title, "custom_title")
+        raise HTTPException(status_code=400, detail="Title contains inappropriate language. Please choose something else.")
 
     user.custom_title = title
     db.commit()

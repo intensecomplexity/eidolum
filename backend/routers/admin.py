@@ -311,3 +311,38 @@ def security_report(request: Request, admin: bool = Depends(require_admin), db: 
     report["new_accounts_count"] = len(new_accounts)
 
     return report
+
+
+# ── Profanity list management ────────────────────────────────────────────────
+
+
+@router.get("/admin/profanity-list")
+@limiter.limit("10/minute")
+def get_profanity_list(request: Request, admin: bool = Depends(require_admin)):
+    """View current profanity filter word list stats and custom words."""
+    from profanity_filter import get_word_list, get_flagged_users, get_audit_log
+    data = get_word_list()
+    data["flagged_users"] = get_flagged_users()
+    data["recent_violations"] = get_audit_log(30)
+    return data
+
+
+@router.post("/admin/profanity-list")
+@limiter.limit("10/minute")
+def add_profanity_word(request: Request, body: dict, admin: bool = Depends(require_admin)):
+    """Add a word to the profanity filter."""
+    word = (body.get("word") or "").strip()
+    if not word or len(word) < 2:
+        raise HTTPException(status_code=400, detail="Word must be at least 2 characters")
+    from profanity_filter import add_custom_word
+    add_custom_word(word)
+    return {"status": "added", "word": word}
+
+
+@router.delete("/admin/profanity-list/{word}")
+@limiter.limit("10/minute")
+def remove_profanity_word(request: Request, word: str, admin: bool = Depends(require_admin)):
+    """Remove a word from the profanity filter."""
+    from profanity_filter import remove_word
+    remove_word(word)
+    return {"status": "removed", "word": word}

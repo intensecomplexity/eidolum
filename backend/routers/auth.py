@@ -69,6 +69,7 @@ def _user_dict(user: User) -> dict:
         "linkedin_url": getattr(user, 'linkedin_url', None),
         "youtube_url": getattr(user, 'youtube_url', None),
         "website_url": getattr(user, 'website_url', None),
+        "is_admin": bool(getattr(user, 'is_admin', 0)),
     }
 
 
@@ -254,6 +255,13 @@ def register(request: Request, req: RegisterRequest, db: Session = Depends(get_d
             detail="Username must be 3-30 characters (letters, numbers, underscores only)",
         )
 
+    # Profanity check on username and display name
+    from profanity_filter import is_profane
+    if is_profane(req.username):
+        raise HTTPException(status_code=400, detail="This username is not allowed. Please choose a different one.")
+    if req.display_name and is_profane(req.display_name):
+        raise HTTPException(status_code=400, detail="This display name is not allowed. Please choose a different one.")
+
     # Validate email
     if not _EMAIL_RE.match(req.email):
         raise HTTPException(status_code=400, detail="Invalid email format")
@@ -326,6 +334,9 @@ def login(request: Request, req: LoginRequest, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.email == req.email).first()
     if not user:
         raise HTTPException(status_code=401, detail="Invalid email or password")
+
+    if getattr(user, 'is_banned', 0):
+        raise HTTPException(status_code=403, detail="Your account has been suspended. Contact support.")
 
     # Google-only user trying password login
     auth_provider = getattr(user, 'auth_provider', 'email') or 'email'
