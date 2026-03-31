@@ -1277,36 +1277,8 @@ async def lifespan(app):
     print(f"[STARTUP] FMP_KEY set: {bool(_fmp)}{' (first 5: ' + _fmp[:5] + '...)' if _fmp else ''}")
     print("[STARTUP] ════════════════════════════════════════")
 
-    # ── Admin promote — runs ALWAYS, unconditionally ────────────────────────
-    from sqlalchemy import text as sql_text
-    print("[STARTUP] Running admin promotion...")
-    try:
-        with engine.connect() as _ac:
-            # Step 1: ensure column exists
-            try:
-                _ac.execute(sql_text("ALTER TABLE users ADD COLUMN IF NOT EXISTS is_admin INTEGER DEFAULT 0"))
-                _ac.commit()
-                print("[STARTUP] is_admin column ensured")
-            except Exception as _col_err:
-                print(f"[STARTUP] Column alter (may already exist): {_col_err}")
-                _ac.rollback()
-
-            # Step 2: force set admin
-            _ac.execute(sql_text("UPDATE users SET is_admin = 1 WHERE email = 'nimrodryder@gmail.com'"))
-            _ac.commit()
-            print("[STARTUP] UPDATE executed")
-
-            # Step 3: verify
-            _row = _ac.execute(sql_text("SELECT id, email, is_admin FROM users WHERE email = 'nimrodryder@gmail.com'")).first()
-            if _row:
-                print(f"[STARTUP] VERIFIED: user_id={_row[0]}, email={_row[1]}, is_admin={_row[2]}")
-            else:
-                print("[STARTUP] WARNING: nimrodryder@gmail.com not found in users table")
-    except Exception as _ae:
-        print(f"[STARTUP] Admin promote FAILED: {type(_ae).__name__}: {_ae}")
-
-    # NOTE: Outcome migration and neutral reclassification moved to _startup_init()
-    # background thread to avoid blocking healthcheck on Railway.
+    # NOTE: Admin promote, outcome migration, and neutral reclassification
+    # all moved to _startup_init() background thread to avoid blocking healthcheck.
 
     if _disable:
         print("[STARTUP] Jobs disabled via DISABLE_BACKGROUND_JOBS. Only serving API requests.")
