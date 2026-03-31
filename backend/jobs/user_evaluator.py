@@ -154,7 +154,7 @@ def evaluate_user_predictions(db: Session) -> list[dict]:
                 outcome = "correct" if price < entry else "incorrect"
             elif p.direction == "neutral":
                 pct_change = abs((price - float(entry)) / float(entry) * 100)
-                outcome = "correct" if pct_change <= 5.0 else "incorrect"
+                outcome = "correct" if pct_change <= 5.0 else "near" if pct_change <= 10.0 else "incorrect"
             else:
                 continue
 

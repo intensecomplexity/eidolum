@@ -26,6 +26,9 @@ export default function PredictionBadge({ direction, outcome, windowDays }) {
   if (outcome === 'correct') {
     return <span className="text-positive font-mono text-sm font-semibold">&#10003;</span>;
   }
+  if (outcome === 'near') {
+    return <span className="text-warning font-mono text-sm font-semibold">~</span>;
+  }
   if (outcome === 'incorrect') {
     return <span className="text-negative font-mono text-sm font-semibold">&#10007;</span>;
   }

@@ -76,7 +76,8 @@ def _evaluate_prediction(p: Prediction, price: float, now: datetime):
         else:
             p.outcome = "correct" if actual_return < 0 else "incorrect"
     elif p.direction == "neutral":
-        p.outcome = "correct" if abs(actual_return) <= 5.0 else "incorrect"
+        abs_ret = abs(actual_return)
+        p.outcome = "correct" if abs_ret <= 5.0 else "near" if abs_ret <= 10.0 else "incorrect"
     else:
         return False
 
