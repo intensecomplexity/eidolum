@@ -1,9 +1,10 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, UserPlus, UserCheck, Swords } from 'lucide-react';
-import { universalSearch, followUser } from '../api';
+import { Search, Swords } from 'lucide-react';
+import { universalSearch, followUser, unfollowUser } from '../api';
 import { useAuth } from '../context/AuthContext';
 import TypeBadge from './TypeBadge';
+import FriendButton from './FriendButton';
 
 /**
  * Universal search — searches tickers + users, shows dropdown with two sections.
@@ -83,19 +84,15 @@ export default function UniversalSearch({
     navigate(`/profile/${userId}`);
   }
 
-  const handleAddFriend = useCallback(async (userId, displayName) => {
+  const handleFriendAction = useCallback(async (userId, action) => {
     try {
-      await followUser(userId);
-      // Update results in-place
-      setResults(prev => {
-        if (!prev) return prev;
-        return {
-          ...prev,
-          users: prev.users.map(u =>
-            u.user_id === userId ? { ...u, is_friend: true } : u
-          ),
-        };
-      });
+      if (action === 'send') {
+        await followUser(userId);
+        setResults(prev => prev ? { ...prev, users: prev.users.map(u => u.user_id === userId ? { ...u, is_friend: 'pending_sent' } : u) } : prev);
+      } else if (action === 'cancel' || action === 'unfriend') {
+        await unfollowUser(userId);
+        setResults(prev => prev ? { ...prev, users: prev.users.map(u => u.user_id === userId ? { ...u, is_friend: false } : u) } : prev);
+      }
     } catch {}
   }, []);
 
@@ -183,19 +180,13 @@ export default function UniversalSearch({
                   {/* Actions */}
                   {isAuthenticated && (
                     <div className="flex items-center gap-1 flex-shrink-0">
-                      {u.is_friend ? (
-                        <span className="text-[10px] text-positive font-medium flex items-center gap-0.5">
-                          <UserCheck className="w-3 h-3" /> Friends
-                        </span>
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={(e) => { e.stopPropagation(); handleAddFriend(u.user_id, u.display_name); }}
-                          className="text-[10px] text-accent font-medium flex items-center gap-0.5 hover:text-accent/80"
-                        >
-                          <UserPlus className="w-3 h-3" /> Add
-                        </button>
-                      )}
+                      <div onClick={e => e.stopPropagation()}>
+                        <FriendButton
+                          compact
+                          status={u.is_friend === true || u.is_friend === 'accepted' ? 'accepted' : u.is_friend === 'pending_sent' ? 'pending_sent' : 'none'}
+                          onAction={(action) => handleFriendAction(u.user_id, action)}
+                        />
+                      </div>
                       <button
                         type="button"
                         onClick={(e) => { e.stopPropagation(); handleDuel(u); }}

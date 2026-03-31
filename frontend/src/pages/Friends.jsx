@@ -354,20 +354,14 @@ export default function Friends() {
                       <div className="text-xs text-muted font-mono">@{u.username}{u.accuracy != null && <> &middot; {u.accuracy}%</>}</div>
                     </div>
                     <div className="flex-shrink-0">
-                      {u._status === 'friends' ? (
-                        <span className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium text-positive bg-positive/10 border border-positive/20">
-                          <UserCheck className="w-3 h-3" /> Friends
-                        </span>
-                      ) : u._status === 'sent' ? (
-                        <span className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium text-muted bg-surface-2 border border-border">
-                          <Clock className="w-3 h-3" /> Request Sent
-                        </span>
-                      ) : (
-                        <button onClick={() => handleAddFriend(u.user_id)}
-                          className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium text-accent bg-accent/10 border border-accent/20 hover:bg-accent/15 transition-colors">
-                          <UserPlus className="w-3 h-3" /> Add Friend
-                        </button>
-                      )}
+                      <FriendButton
+                        status={u._status === 'friends' ? 'accepted' : u._status === 'sent' ? 'pending_sent' : 'none'}
+                        onAction={(action) => {
+                          if (action === 'send') handleAddFriend(u.user_id);
+                          else if (action === 'cancel') handleCancelRequest(u.user_id);
+                          else if (action === 'unfriend') handleRemoveFriend(u.user_id);
+                        }}
+                      />
                     </div>
                   </div>
                 ))}
