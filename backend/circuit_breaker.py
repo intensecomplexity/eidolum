@@ -125,7 +125,7 @@ def memory_is_available() -> bool:
 
 
 # ── STORAGE GUARD: Skip data ingestion if DB approaching volume limit ─────────
-DB_SIZE_LIMIT_BYTES = 4 * 1024 * 1024 * 1024  # 4 GB (volume is 5 GB max on Hobby)
+DB_SIZE_LIMIT_BYTES = 40 * 1024 * 1024 * 1024  # 40 GB (volume is 50 GB, leaves 10 GB for WAL/temp)
 _last_storage_check: float = 0
 _last_storage_ok: bool = True
 STORAGE_CHECK_INTERVAL = 300  # Re-check every 5 minutes, not every job

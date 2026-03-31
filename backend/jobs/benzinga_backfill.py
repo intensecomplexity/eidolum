@@ -1,16 +1,9 @@
 """
 Benzinga historical backfill: forward only.
 
-Phase 1 (forward): 2024-03-29 -> today, day by day
-Phase 2 (ongoing): 2-hour incremental scraper runs in parallel (separate job)
-
-REVERSE BACKFILL PERMANENTLY DISABLED (2026-03-31):
-  Reverse backfill filled the postgres volume to 96% by pulling years of
-  historical data we don't need. Only forward backfill (last ~2 years) runs.
-
-Progress stored in Config table:
-  - backfill_last_date: last completed forward date
-  - backfill_forward_done: "true" when forward reached today
+Forward backfill: 2020-01-01 -> today, day by day, chronologically.
+Progress stored in Config table so it survives restarts.
+Processes 30 days per batch, sleeps 10 seconds between batches.
 
 Connection-safe: opens/closes DB per day, never holds connections during API calls.
 """
@@ -36,7 +29,7 @@ SKIP_ACTIONS = {
     "terminates coverage on", "removes coverage", "suspends coverage",
 }
 
-FORWARD_START = date(2024, 3, 29)
+FORWARD_START = date(2020, 1, 1)
 
 # ── Global state ─────────────────────────────────────────────────────────────
 _backfill_running = False
@@ -180,8 +173,8 @@ def _run_forward() -> bool:
 
         if batch_days >= 30:
             _refresh_stats_if_needed()
-            print(f"[Forward] Batch done. {days_done}/{total_days} days, {total_inserted} inserted. Pausing 15s.")
-            time.sleep(15)
+            print(f"[Forward] Batch done. {days_done}/{total_days} days, {total_inserted} inserted. Pausing 10s.")
+            time.sleep(10)
             batch_days = 0
 
     # Mark forward complete
