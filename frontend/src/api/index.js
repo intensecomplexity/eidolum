@@ -294,6 +294,32 @@ export function getCommentCount(predictionId, source) {
   return api.get(`/comments/count/${predictionId}/${source}`).then(r => r.data);
 }
 
+// ——— Credibility ———
+
+export function getUserCredibility(userId) {
+  return api.get(`/users/${userId}/credibility`).then(r => r.data);
+}
+
+// ——— Ticker Discussions ———
+
+export function getTickerDiscussions(ticker, sort = 'newest', limit = 20, offset = 0) {
+  return api.get(`/ticker/${ticker}/discussions`, { params: { sort, limit, offset }, headers: authHeaders() }).then(r => r.data);
+}
+
+export function postTickerDiscussion(ticker, text, parentId = null) {
+  const body = { text };
+  if (parentId) body.parent_id = parentId;
+  return api.post(`/ticker/${ticker}/discussions`, body, { headers: authHeaders() }).then(r => r.data);
+}
+
+export function likeTickerDiscussion(ticker, postId) {
+  return api.post(`/ticker/${ticker}/discussions/${postId}/like`, {}, { headers: authHeaders() }).then(r => r.data);
+}
+
+export function deleteTickerDiscussion(ticker, postId) {
+  return api.delete(`/ticker/${ticker}/discussions/${postId}`, { headers: authHeaders() }).then(r => r.data);
+}
+
 // ——— Reactions ———
 
 export function getReactions(predictionId, source) {

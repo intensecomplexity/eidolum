@@ -376,6 +376,31 @@ class PredictionReaction(Base):
     )
 
 
+class TickerDiscussion(Base):
+    __tablename__ = "ticker_discussions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    ticker = Column(String(10), nullable=False, index=True)
+    text = Column(Text, nullable=False)
+    parent_id = Column(Integer, ForeignKey("ticker_discussions.id", ondelete="CASCADE"), nullable=True)
+    likes_count = Column(Integer, default=0)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+
+class TickerDiscussionLike(Base):
+    __tablename__ = "ticker_discussion_likes"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    discussion_id = Column(Integer, ForeignKey("ticker_discussions.id", ondelete="CASCADE"), nullable=False)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+    __table_args__ = (
+        UniqueConstraint("user_id", "discussion_id", name="uq_discussion_like"),
+    )
+
+
 class ActivityEvent(Base):
     __tablename__ = "activity_feed_v2"
 

@@ -81,6 +81,78 @@ def _get_friendship_status(profile_user_id: int, credentials, db) -> str:
     return "none"
 
 
+from sqlalchemy import text as _text
+_credibility_cache: dict = {}
+_CRED_TTL = 600  # 10 minutes
+
+
+@router.get("/users/{user_id}/credibility")
+@limiter.limit("120/minute")
+def get_user_credibility(request: Request, user_id: int, db: Session = Depends(get_db)):
+    import time as _ct
+    cached = _credibility_cache.get(user_id)
+    if cached and (_ct.time() - cached[1]) < _CRED_TTL:
+        return cached[0]
+
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    scored = db.execute(_text(
+        "SELECT COUNT(*), SUM(CASE WHEN outcome='correct' THEN 1 ELSE 0 END) "
+        "FROM user_predictions WHERE user_id = :uid AND outcome IN ('correct','incorrect')"
+    ), {"uid": user_id}).first()
+    total_scored = scored[0] or 0
+    correct = scored[1] or 0
+    accuracy = round(correct / total_scored * 100, 1) if total_scored > 0 else 0
+
+    # Top sector
+    top_sector = None
+    try:
+        sec_row = db.execute(_text(
+            "SELECT sector, COUNT(*) as c FROM user_predictions "
+            "WHERE user_id = :uid AND sector IS NOT NULL AND sector != '' "
+            "GROUP BY sector ORDER BY c DESC LIMIT 1"
+        ), {"uid": user_id}).first()
+        if sec_row:
+            top_sector = sec_row[0]
+    except Exception:
+        pass
+
+    # Duel record
+    duel_wins = 0
+    duel_losses = 0
+    try:
+        duel_row = db.execute(_text(
+            "SELECT "
+            "SUM(CASE WHEN winner_id = :uid THEN 1 ELSE 0 END), "
+            "SUM(CASE WHEN winner_id IS NOT NULL AND winner_id != :uid THEN 1 ELSE 0 END) "
+            "FROM duels WHERE status='completed' AND (challenger_id = :uid OR opponent_id = :uid)"
+        ), {"uid": user_id}).first()
+        if duel_row:
+            duel_wins = duel_row[0] or 0
+            duel_losses = duel_row[1] or 0
+    except Exception:
+        pass
+
+    result = {
+        "user_id": user_id,
+        "username": user.username,
+        "display_name": user.display_name,
+        "accuracy": accuracy,
+        "scored_predictions": total_scored,
+        "correct_predictions": correct,
+        "xp_level": getattr(user, 'xp_level', 1) or 1,
+        "streak": getattr(user, 'streak', 0) or 0,
+        "duel_wins": duel_wins,
+        "duel_losses": duel_losses,
+        "top_sector": top_sector,
+        "member_since": user.created_at.strftime("%b %Y") if user.created_at else None,
+    }
+    _credibility_cache[user_id] = (result, _ct.time())
+    return result
+
+
 @router.get("/users/{user_id}/profile")
 @limiter.limit("60/minute")
 def get_user_profile(request: Request, user_id: int, credentials: Optional[HTTPAuthorizationCredentials] = Depends(_optional_bearer), db: Session = Depends(get_db)):

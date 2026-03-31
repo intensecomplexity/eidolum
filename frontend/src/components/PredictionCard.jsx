@@ -5,6 +5,8 @@ import ConflictBadge from './ConflictBadge';
 import BookmarkButton from './BookmarkButton';
 import PlatformBadge from './PlatformBadge';
 import { annotateContext, ExplainerLine, ratingChangeLabel } from '../utils/predictionExplainer';
+import CommentSection from './CommentSection';
+import CredibilityBadge from './CredibilityBadge';
 
 const HORIZON_LABELS = { short: '30d', medium: '90d', long: '1y', custom: 'Custom' };
 
@@ -100,16 +102,20 @@ export default function PredictionCard({ prediction: p, showForecaster = false, 
 
       {/* Forecaster (if shown) */}
       {showForecaster && p.forecaster && (
-        <Link
-          to={`/forecaster/${p.forecaster.id}`}
-          className="flex items-center gap-1.5 text-sm text-text-secondary active:text-accent mb-2"
-        >
-          <PlatformBadge platform={p.forecaster?.platform || p.source_type} size={14} />
-          <span className="truncate">{p.forecaster.name}</span>
-          <span className="text-muted text-xs ml-1 shrink-0">
-            {p.forecaster.accuracy_rate?.toFixed(1)}%
-          </span>
-        </Link>
+        <div className="flex items-center gap-1.5 text-sm mb-2 flex-wrap">
+          <Link to={`/forecaster/${p.forecaster.id}`} className="flex items-center gap-1.5 text-text-secondary active:text-accent">
+            <PlatformBadge platform={p.forecaster?.platform || p.source_type} size={14} />
+            <span className="truncate">{p.forecaster.name}</span>
+          </Link>
+          <CredibilityBadge
+            userId={p.forecaster.id}
+            username={p.forecaster.name}
+            accuracy={p.forecaster.accuracy_rate}
+            scored={p.forecaster.total_predictions || 0}
+            isInstitutional={['institutional', 'congress'].includes(p.forecaster.platform)}
+            linkToProfile={false}
+          />
+        </div>
       )}
 
       {/* Raw analyst quote */}
@@ -169,6 +175,11 @@ export default function PredictionCard({ prediction: p, showForecaster = false, 
           <span className="text-warning text-xs shrink-0">!</span>
           <span className="text-warning/80 text-[11px] break-words">{p.conflict_note}</span>
         </div>
+      )}
+
+      {/* Comments */}
+      {predId && (
+        <CommentSection predictionId={predId} source={p.forecaster ? 'analyst' : 'user'} />
       )}
 
       {/* Disclaimer */}
