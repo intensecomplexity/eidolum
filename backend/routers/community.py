@@ -665,14 +665,28 @@ def get_all_consensus(
         except Exception:
             pass  # SQLite doesn't support DISTINCT ON
 
+    # Get company names for all tickers
+    from ticker_lookup import TICKER_INFO
+    name_by_ticker = {}
+    if tickers:
+        try:
+            name_rows = db.execute(_consensus_text(
+                "SELECT ticker, company_name FROM ticker_sectors WHERE ticker = ANY(:tickers) AND company_name IS NOT NULL"
+            ), {"tickers": tickers}).fetchall()
+            name_by_ticker = {r[0]: r[1] for r in name_rows}
+        except Exception:
+            pass
+
     results = []
     for r in rows:
         ticker, ticker_sector, total, bullish, bearish, neutral_count = r[0], r[1], r[2], r[3], r[4], r[5]
         bull_pct = round(bullish / total * 100, 1) if total > 0 else 0.0
         neutral_pct = round(neutral_count / total * 100, 1) if total > 0 else 0.0
         top = top_by_ticker.get(ticker)
+        company_name = name_by_ticker.get(ticker) or TICKER_INFO.get(ticker)
         results.append({
             "ticker": ticker,
+            "company_name": company_name,
             "sector": ticker_sector or "Other",
             "total_predictions": total,
             "bullish_count": bullish,

@@ -113,7 +113,10 @@ def _build_ticker_detail(ticker: str, db) -> dict:
                 AVG(CASE WHEN target_price IS NOT NULL THEN target_price END) as avg_target,
                 SUM(CASE WHEN outcome = 'near' THEN 1 ELSE 0 END) as near_count,
                 SUM(CASE WHEN outcome = 'near' AND direction='bullish' THEN 1 ELSE 0 END) as bull_near,
-                SUM(CASE WHEN outcome = 'near' AND direction='bearish' THEN 1 ELSE 0 END) as bear_near
+                SUM(CASE WHEN outcome = 'near' AND direction='bearish' THEN 1 ELSE 0 END) as bear_near,
+                SUM(CASE WHEN direction='bullish' THEN 1 ELSE 0 END) as all_bullish,
+                SUM(CASE WHEN direction='bearish' THEN 1 ELSE 0 END) as all_bearish,
+                SUM(CASE WHEN direction='neutral' THEN 1 ELSE 0 END) as all_neutral
             FROM predictions WHERE ticker = :t
         """), {"t": ticker}).first()
     except Exception as e:
@@ -132,6 +135,9 @@ def _build_ticker_detail(ticker: str, db) -> dict:
     hist_nears = (counts_row[9] or 0) if counts_row else 0
     hist_bull_nears = (counts_row[10] or 0) if counts_row else 0
     hist_bear_nears = (counts_row[11] or 0) if counts_row else 0
+    all_bullish = (counts_row[12] or 0) if counts_row else 0
+    all_bearish = (counts_row[13] or 0) if counts_row else 0
+    all_neutral = (counts_row[14] or 0) if counts_row else 0
 
     def _tt(h, n, t):
         return round((h + n * 0.5) / t * 100, 1) if t > 0 else 0

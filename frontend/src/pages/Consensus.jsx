@@ -136,6 +136,9 @@ export default function Consensus() {
                 <div className="flex items-center justify-between mb-2">
                   <div className="flex items-center gap-2">
                     <span className="font-mono text-accent font-bold text-lg">{c.ticker}</span>
+                    {c.company_name && (
+                      <span className="text-text-secondary text-xs truncate max-w-[120px]">{c.company_name}</span>
+                    )}
                     {c.sector && c.sector !== 'Other' && (
                       <span className="text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded-full bg-accent/10 text-accent border border-accent/20">
                         {c.sector}
