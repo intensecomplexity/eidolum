@@ -290,7 +290,8 @@ def _get_sector_safe(ticker: str, db) -> str:
 
 _NEUTRAL_RATINGS = ["hold", "neutral", "market perform", "market_perform", "equal weight",
                      "equal_weight", "sector perform", "sector_perform", "in line", "in_line",
-                     "peer perform", "peer_perform", "sector weight", "sector_weight"]
+                     "peer perform", "peer_perform", "sector weight", "sector_weight",
+                     "market weight", "market_weight"]
 
 
 def _get_direction(action_lower: str, rating_lower: str, pt_current, pt_prior) -> str | None:

@@ -1280,6 +1280,28 @@ async def lifespan(app):
         except Exception:
             pass
 
+        # Reclassify hold/neutral predictions that were forced into bull/bear
+        try:
+            from sqlalchemy import text as _rcl_t
+            _rcl_db = BgSessionLocal()
+            result = _rcl_db.execute(_rcl_t("""
+                UPDATE predictions
+                SET direction = 'neutral'
+                WHERE direction IN ('bullish', 'bearish')
+                  AND (
+                    LOWER(exact_quote) ~ '(^|\\s)(hold|neutral|equal[\\s-]?weight|market[\\s-]?perform|sector[\\s-]?perform|in[\\s-]?line|peer[\\s-]?perform|market[\\s-]?weight)(\\s|$|,|\\.|;)'
+                    OR LOWER(context) ~ '(^|\\s)(hold|neutral|equal[\\s-]?weight|market[\\s-]?perform|sector[\\s-]?perform|in[\\s-]?line|peer[\\s-]?perform|market[\\s-]?weight)(\\s|$|,|\\.|;)'
+                  )
+                  AND LOWER(COALESCE(exact_quote, '') || ' ' || COALESCE(context, ''))
+                      !~ '(upgrade|downgrade|raise|lower|cut|boost)'
+            """))
+            _rcl_db.commit()
+            if result.rowcount > 0:
+                print(f"[Startup] Reclassified {result.rowcount} predictions to neutral")
+            _rcl_db.close()
+        except Exception:
+            pass
+
         # Run migrations (add columns that models.py defines but create_all might miss)
         try:
             migrate_platform_types()
