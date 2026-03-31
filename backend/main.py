@@ -28,6 +28,7 @@ from jobs.user_evaluator import evaluate_user_predictions, evaluate_duels, check
 from jobs.leaderboard_refresh import run_leaderboard_refresh
 from jobs.newsletter import run_newsletter
 from admin_panel import router as admin_panel_router
+from routers.admin_panel import router as admin_v2_router
 
 
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):
@@ -1034,6 +1035,33 @@ def run_phase2_migrations():
     except Exception:
         db.rollback()
 
+    # ── 40. users.is_admin + is_banned columns ────────────────────
+    for col in ["is_admin INTEGER DEFAULT 0", "is_banned INTEGER DEFAULT 0"]:
+        try:
+            db.execute(text(f"ALTER TABLE users ADD COLUMN {col}"))
+            db.commit()
+        except Exception:
+            db.rollback()
+
+    # ── 41. audit_log table ───────────────────────────────────────
+    try:
+        db.execute(text("""
+            CREATE TABLE IF NOT EXISTS audit_log (
+                id SERIAL PRIMARY KEY,
+                admin_user_id INTEGER REFERENCES users(id),
+                admin_email VARCHAR(255) NOT NULL,
+                action VARCHAR(100) NOT NULL,
+                target_type VARCHAR(50),
+                target_id INTEGER,
+                details TEXT,
+                ip_address VARCHAR(45),
+                created_at TIMESTAMP DEFAULT NOW()
+            )
+        """))
+        db.commit()
+    except Exception:
+        db.rollback()
+
     print("[Phase2] All migrations complete")
     db.close()
 
@@ -1218,6 +1246,18 @@ async def lifespan(app):
         except Exception as e:
             print(f"[Startup] Table creation error: {e}")
             return  # Can't continue without tables
+
+        # Auto-promote super admin
+        try:
+            _admin_db = BgSessionLocal()
+            _sa = _admin_db.query(User).filter(User.email == "nimrodryder@gmail.com").first()
+            if _sa and not _sa.is_admin:
+                _sa.is_admin = 1
+                _admin_db.commit()
+                print("[Startup] Promoted nimrodryder@gmail.com to admin")
+            _admin_db.close()
+        except Exception:
+            pass
 
         # Run migrations (add columns that models.py defines but create_all might miss)
         try:
@@ -1441,6 +1481,7 @@ app.include_router(weekly_challenge_router.router, prefix="/api")
 from routers import xp_router
 app.include_router(xp_router.router, prefix="/api")
 app.include_router(admin_panel_router)  # /admin HTML + /api/admin/* endpoints
+app.include_router(admin_v2_router, prefix="/api")  # JWT-based admin panel
 
 
 @app.get("/health")
@@ -1588,7 +1629,7 @@ def alpha_debug():
         }
     except Exception as e:
         import traceback
-        return {"error": str(e), "traceback": traceback.format_exc()}
+        return {"error": str(e)}
     finally:
         db.close()
 
@@ -1632,7 +1673,7 @@ def db_diagnostics():
         }
     except Exception as e:
         import traceback
-        return {"error": str(e), "traceback": traceback.format_exc()}
+        return {"error": str(e)}
     finally:
         db.close()
 
@@ -1650,7 +1691,7 @@ def run_massive_benzinga_now():
         after = db.query(Prediction).filter(Prediction.verified_by == "massive_benzinga").count()
         return {"status": "ok", "before": before, "after": after, "new_predictions": after - before}
     except Exception as e:
-        return {"status": "error", "error": str(e), "traceback": _tb.format_exc()}
+        return {"status": "error", "error": str(e)}
     finally:
         db.close()
 
@@ -1867,7 +1908,7 @@ def evaluate_debug():
         }
     except Exception as e:
         import traceback
-        return {"error": str(e), "traceback": traceback.format_exc()}
+        return {"error": str(e)}
     finally:
         db.close()
 
@@ -2316,40 +2357,10 @@ def run_user_evaluator_now():
         results = evaluate_user_predictions(db)
         return {"status": "ok", "evaluated": len(results or []), "results": results or []}
     except Exception as e:
-        return {"status": "error", "error": str(e), "traceback": _tb.format_exc()}
+        return {"status": "error", "error": str(e)}
     finally:
         db.close()
 
 
-@app.get("/api/debug")
-def debug():
-    """Temporary debug endpoint — remove after deployment is stable."""
-    from database import DATABASE_URL as RESOLVED_URL
-    raw_url = os.getenv("DATABASE_URL", "not-set")
-    info = {
-        "database_url_set": bool(os.getenv("DATABASE_URL")),
-        "database_url_prefix": raw_url[:25] + "..." if raw_url != "not-set" else "not-set",
-        "engine_url_prefix": str(engine.url)[:30] + "...",
-        "engine_dialect": engine.dialect.name,
-        "seed_data": os.getenv("SEED_DATA", "not-set"),
-        "port": os.getenv("PORT", "not-set"),
-    }
-    try:
-        from sqlalchemy import func
-        db = BgSessionLocal()
-        count = db.query(Forecaster).count()
-        pred_count = db.query(Prediction).count()
-        info["db_connected"] = True
-        info["forecaster_count"] = count
-        info["prediction_count"] = pred_count
-        # Platform breakdown
-        platform_counts = db.query(
-            Forecaster.platform, func.count(Forecaster.id)
-        ).group_by(Forecaster.platform).all()
-        info["platform_breakdown"] = {p: c for p, c in platform_counts}
-        db.close()
-    except Exception as e:
-        info["db_connected"] = False
-        info["db_error"] = str(e)
-    return info
+# /api/debug endpoint REMOVED (2026-03-31) — exposed database info without auth
 
