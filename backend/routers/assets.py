@@ -63,11 +63,7 @@ def get_ticker_detail(request: Request, ticker: str, db: Session = Depends(get_d
 def _build_ticker_detail(ticker: str, db) -> dict:
     from datetime import datetime
 
-    # Set statement timeout (5s) for PostgreSQL
-    try:
-        db.execute(sql_text("SET LOCAL statement_timeout = '5000'"))
-    except Exception:
-        pass  # SQLite doesn't support this
+    # No manual statement_timeout — rely on the 8s RequestTimeoutMiddleware
 
     # Quick check: does this ticker have ANY predictions?
     exists = db.execute(sql_text(
@@ -105,7 +101,7 @@ def _build_ticker_detail(ticker: str, db) -> dict:
         from ticker_lookup import TICKER_INFO
         company_name = TICKER_INFO.get(ticker)
 
-    # ── Combined counts query (one round-trip instead of two) ────────────
+    # ── Combined counts query (one round-trip instead of multiple) ──────
     try:
         counts_row = db.execute(sql_text("""
             SELECT
@@ -117,10 +113,13 @@ def _build_ticker_detail(ticker: str, db) -> dict:
                 SUM(CASE WHEN outcome='correct' AND direction='bullish' THEN 1 ELSE 0 END) as bull_correct,
                 SUM(CASE WHEN outcome IN ('correct','incorrect') AND direction='bearish' THEN 1 ELSE 0 END) as bear_eval,
                 SUM(CASE WHEN outcome='correct' AND direction='bearish' THEN 1 ELSE 0 END) as bear_correct,
-                AVG(CASE WHEN outcome IN ('correct','incorrect') AND target_price IS NOT NULL THEN target_price END) as avg_target
+                AVG(CASE WHEN target_price IS NOT NULL THEN target_price END) as avg_target,
+                SUM(CASE WHEN direction='bullish' THEN 1 ELSE 0 END) as all_bullish,
+                SUM(CASE WHEN direction='bearish' THEN 1 ELSE 0 END) as all_bearish
             FROM predictions WHERE ticker = :t
         """), {"t": ticker}).first()
-    except Exception:
+    except Exception as e:
+        print(f"[TickerDetail] Counts query failed for {ticker}: {e}")
         counts_row = None
 
     total_all = (counts_row[0] or 0) if counts_row else 0
@@ -131,6 +130,8 @@ def _build_ticker_detail(ticker: str, db) -> dict:
     hist_bear_total = (counts_row[6] or 0) if counts_row else 0
     hist_bear_correct = (counts_row[7] or 0) if counts_row else 0
     hist_avg_target = round(float(counts_row[8]), 2) if counts_row and counts_row[8] else None
+    all_bullish = (counts_row[9] or 0) if counts_row else 0
+    all_bearish = (counts_row[10] or 0) if counts_row else 0
 
     historical = {
         "total_evaluated": hist_total,
@@ -194,12 +195,16 @@ def _build_ticker_detail(ticker: str, db) -> dict:
     bears.sort(key=lambda x: x["accuracy"], reverse=True)
 
     pending_total = len(pending)
+    # Use ALL predictions for consensus when pending count is too low
+    consensus_bull = len(bulls) if pending_total >= 3 else all_bullish
+    consensus_bear = len(bears) if pending_total >= 3 else all_bearish
+    consensus_total = (pending_total if pending_total >= 3 else total_all) or 1
     current_consensus = {
-        "total": pending_total,
-        "bullish_count": len(bulls),
-        "bearish_count": len(bears),
-        "bullish_pct": round(len(bulls) / pending_total * 100, 1) if pending_total > 0 else 0,
-        "bearish_pct": round(len(bears) / pending_total * 100, 1) if pending_total > 0 else 0,
+        "total": consensus_total,
+        "bullish_count": consensus_bull,
+        "bearish_count": consensus_bear,
+        "bullish_pct": round(consensus_bull / consensus_total * 100, 1) if consensus_total > 0 else 0,
+        "bearish_pct": round(consensus_bear / consensus_total * 100, 1) if consensus_total > 0 else 0,
         "bulls": bulls,
         "bears": bears,
     }
