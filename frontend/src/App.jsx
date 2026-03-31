@@ -23,6 +23,8 @@ import ForecastersList from './pages/ForecastersList';
 import AdminPanel from './pages/AdminPanel';
 import Login from './pages/Login';
 import Register from './pages/Register';
+import ForgotPassword from './pages/ForgotPassword';
+import ResetPassword from './pages/ResetPassword';
 import GoogleCallback from './pages/GoogleCallback';
 import Profile from './pages/Profile';
 import SubmitCall from './pages/SubmitCall';
@@ -77,6 +79,8 @@ export default function App() {
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
         <Route path="/join" element={<Register />} />
+        <Route path="/forgot-password" element={<ForgotPassword />} />
+        <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/auth/google/callback" element={<GoogleCallback />} />
         <Route path="/auth/callback" element={<GoogleCallback />} />
         <Route path="/profile" element={<Profile />} />

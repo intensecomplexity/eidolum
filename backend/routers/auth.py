@@ -1,6 +1,7 @@
 import os
 import re
 import secrets
+from datetime import datetime, timedelta, timezone
 from urllib.parse import urlencode, quote
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import RedirectResponse
@@ -10,15 +11,15 @@ from sqlalchemy.orm import Session
 import httpx
 
 from database import get_db
-from models import User
+from models import User, PasswordResetToken
 from auth import hash_password, verify_password, create_token, get_current_user_dep
 from rate_limit import limiter
 
 # Google OAuth config
 GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID", "").strip()
 GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET", "").strip()
-GOOGLE_REDIRECT_URI = os.getenv("GOOGLE_REDIRECT_URI", "https://www.eidolum.com/auth/google/callback").strip()
-FRONTEND_URL = os.getenv("FRONTEND_URL", "https://www.eidolum.com").strip()
+FRONTEND_URL = os.getenv("FRONTEND_URL", "https://www.eidolum.com").strip().rstrip("/")
+GOOGLE_REDIRECT_URI = os.getenv("GOOGLE_REDIRECT_URI", f"{FRONTEND_URL}/auth/google/callback").strip()
 
 router = APIRouter()
 
@@ -315,6 +316,128 @@ def login(request: Request, req: LoginRequest, db: Session = Depends(get_db)):
         "display_name": user.display_name,
         "token": create_token(user.id, user.username),
     }
+
+
+# ── POST /api/auth/forgot-password ──────────────────────────────────────────
+
+
+class ForgotPasswordRequest(BaseModel):
+    email: str
+
+
+@router.post("/auth/forgot-password")
+@limiter.limit("3/minute")
+def forgot_password(request: Request, req: ForgotPasswordRequest, db: Session = Depends(get_db)):
+    """Send a password reset email. Always returns 200 to avoid email enumeration."""
+    email = req.email.strip().lower()
+    if not _EMAIL_RE.match(email):
+        return {"message": "If that email exists, a reset link has been sent."}
+
+    user = db.query(User).filter(User.email == email).first()
+    if not user:
+        return {"message": "If that email exists, a reset link has been sent."}
+
+    # Rate limit: max 3 tokens per email per hour
+    one_hour_ago = datetime.now(timezone.utc) - timedelta(hours=1)
+    recent_count = db.query(PasswordResetToken).filter(
+        PasswordResetToken.user_id == user.id,
+        PasswordResetToken.created_at >= one_hour_ago,
+    ).count()
+    if recent_count >= 3:
+        return {"message": "If that email exists, a reset link has been sent."}
+
+    # Generate secure token
+    token = secrets.token_urlsafe(48)
+    reset_token = PasswordResetToken(
+        user_id=user.id,
+        token=token,
+        expires_at=datetime.now(timezone.utc) + timedelta(hours=1),
+    )
+    db.add(reset_token)
+    db.commit()
+
+    # Send email via Resend
+    reset_url = f"{FRONTEND_URL}/reset-password?token={token}"
+    try:
+        import resend
+        resend.api_key = os.getenv("RESEND_API_KEY", "")
+        from_email = os.getenv("FROM_EMAIL", "noreply@eidolum.com")
+        if resend.api_key:
+            resend.Emails.send({
+                "from": f"Eidolum <{from_email}>",
+                "to": [email],
+                "subject": "Reset your Eidolum password",
+                "html": f"""
+                <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 480px; margin: 0 auto; padding: 40px 20px; color: #e0e0e0; background: #0a0a0a;">
+                  <div style="text-align: center; margin-bottom: 32px;">
+                    <h1 style="color: #d4af37; font-size: 24px; margin: 0;">Eidolum</h1>
+                  </div>
+                  <h2 style="color: #ffffff; font-size: 20px; margin-bottom: 16px;">Reset your password</h2>
+                  <p style="color: #a0a0a0; font-size: 14px; line-height: 1.6;">
+                    We received a request to reset the password for your account (<strong>{email}</strong>).
+                    Click the button below to choose a new password.
+                  </p>
+                  <div style="text-align: center; margin: 32px 0;">
+                    <a href="{reset_url}" style="display: inline-block; background: #d4af37; color: #0a0a0a; padding: 12px 32px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 14px;">
+                      Reset Password
+                    </a>
+                  </div>
+                  <p style="color: #666; font-size: 12px; line-height: 1.5;">
+                    This link expires in 1 hour. If you didn't request this, you can safely ignore this email.
+                  </p>
+                  <hr style="border: none; border-top: 1px solid #222; margin: 32px 0;" />
+                  <p style="color: #444; font-size: 11px; text-align: center;">Eidolum — Track every prediction.</p>
+                </div>
+                """,
+            })
+            print(f"[Auth] Password reset email sent to {email}")
+        else:
+            print(f"[Auth] RESEND_API_KEY not set. Reset URL: {reset_url}")
+    except Exception as e:
+        print(f"[Auth] Failed to send reset email: {e}")
+
+    return {"message": "If that email exists, a reset link has been sent."}
+
+
+# ── POST /api/auth/reset-password ───────────────────────────────────────────
+
+
+class ResetPasswordRequest(BaseModel):
+    token: str
+    password: str
+
+
+@router.post("/auth/reset-password")
+@limiter.limit("10/minute")
+def reset_password(request: Request, req: ResetPasswordRequest, db: Session = Depends(get_db)):
+    """Verify token and update password."""
+    if len(req.password) < 8:
+        raise HTTPException(status_code=400, detail="Password must be at least 8 characters")
+
+    reset_token = db.query(PasswordResetToken).filter(
+        PasswordResetToken.token == req.token,
+        PasswordResetToken.used_at.is_(None),
+    ).first()
+
+    if not reset_token:
+        raise HTTPException(status_code=400, detail="Invalid or expired reset link")
+
+    if reset_token.expires_at.replace(tzinfo=timezone.utc) < datetime.now(timezone.utc):
+        raise HTTPException(status_code=400, detail="Reset link has expired. Please request a new one.")
+
+    user = db.query(User).filter(User.id == reset_token.user_id).first()
+    if not user:
+        raise HTTPException(status_code=400, detail="Account not found")
+
+    user.password_hash = hash_password(req.password)
+    if hasattr(user, 'auth_provider') and user.auth_provider == 'google':
+        # User now has a real password, keep google as provider but they can use both
+        pass
+    reset_token.used_at = datetime.now(timezone.utc)
+    db.commit()
+
+    print(f"[Auth] Password reset for user_id={user.id} username={user.username}")
+    return {"message": "Password updated. Please log in with your new password."}
 
 
 # ── GET /api/auth/me ─────────────────────────────────────────────────────────

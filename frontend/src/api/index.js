@@ -206,6 +206,14 @@ export function completeOnboarding() {
   return api.post('/auth/onboarding-complete', {}, { headers: authHeaders() }).then(r => r.data);
 }
 
+export function forgotPassword(email) {
+  return api.post('/auth/forgot-password', { email }).then(r => r.data);
+}
+
+export function resetPassword(token, password) {
+  return api.post('/auth/reset-password', { token, password }).then(r => r.data);
+}
+
 export function getNotifications(unreadOnly = false, limit = 50) {
   return api.get('/notifications', { params: { unread_only: unreadOnly, limit }, headers: authHeaders() }).then(r => r.data);
 }

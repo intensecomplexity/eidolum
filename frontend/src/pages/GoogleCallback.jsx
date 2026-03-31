@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-
-const API_BASE = 'https://eidolum-production.up.railway.app';
+import { API_BASE } from '../api';
 
 export default function GoogleCallback() {
   const [searchParams] = useSearchParams();

@@ -12,6 +12,7 @@ export default function Login() {
   const [showPw, setShowPw] = useState(false);
   const [loading, setLoading] = useState(false);
   const googleError = searchParams.get('error');
+  const resetSuccess = searchParams.get('reset') === 'success';
   const [error, setError] = useState(googleError ? 'Google sign-in failed. Please try again.' : '');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -38,6 +39,10 @@ export default function Login() {
           <h1 className="headline-serif text-3xl sm:text-4xl mb-2">Welcome back</h1>
           <p className="text-text-secondary text-sm">Log in to track your predictions</p>
         </div>
+
+        {resetSuccess && (
+          <div className="bg-positive/10 border border-positive/20 rounded-lg px-4 py-3 mb-4 text-sm text-positive">Password updated. Please log in with your new password.</div>
+        )}
 
         {error && (
           <div className="bg-negative/10 border border-negative/20 rounded-lg px-4 py-3 mb-4 text-sm text-negative">{error}</div>
@@ -66,6 +71,9 @@ export default function Login() {
                 {showPw ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
               </button>
             </div>
+          </div>
+          <div className="flex justify-end">
+            <Link to="/forgot-password" className="text-xs text-accent hover:underline">Forgot your password?</Link>
           </div>
           <button type="submit" disabled={loading} className="btn-primary w-full disabled:opacity-50">
             {loading ? <div className="w-5 h-5 border-2 border-bg border-t-transparent rounded-full animate-spin" /> : 'Log In'}
