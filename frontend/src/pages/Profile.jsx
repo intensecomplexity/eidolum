@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams, Link } from 'react-router-dom';
-import { User, TrendingUp, TrendingDown, Flame, Target, Crosshair } from 'lucide-react';
+import { User, TrendingUp, TrendingDown, Flame, Target, Crosshair, ExternalLink, Play } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import Footer from '../components/Footer';
 import TypeBadge from '../components/TypeBadge';
@@ -147,7 +147,7 @@ export default function Profile() {
                   <div className="flex items-center gap-2 mt-1">
                     {profile.twitter_url && (
                       <a href={profile.twitter_url} target="_blank" rel="noopener noreferrer" className="text-muted hover:text-accent transition-colors" title="Twitter / X">
-                        <span className="text-xs font-bold">𝕏</span>
+                        <ExternalLink className="w-3.5 h-3.5" />
                       </a>
                     )}
                     {profile.linkedin_url && (
@@ -157,7 +157,7 @@ export default function Profile() {
                     )}
                     {profile.youtube_url && (
                       <a href={profile.youtube_url} target="_blank" rel="noopener noreferrer" className="text-muted hover:text-accent transition-colors" title="YouTube">
-                        <span className="text-xs">▶</span>
+                        <Play className="w-3.5 h-3.5" />
                       </a>
                     )}
                     {profile.website_url && (

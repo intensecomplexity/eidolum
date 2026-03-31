@@ -458,8 +458,8 @@ function ProofBlock({ p }) {
   const ts = p.video_timestamp_sec;
   const timeStr = ts ? `${Math.floor(ts / 60)}:${String(ts % 60).padStart(2, '0')}` : null;
 
-  const label = isYT ? (timeStr ? `▶ Watch at ${timeStr}` : '▶ Watch on YouTube')
-    : isTwitter ? '𝕏 View on X' : isReddit ? 'View on Reddit' : 'View Source';
+  const label = isYT ? (timeStr ? `Watch at ${timeStr}` : 'Watch on YouTube')
+    : isTwitter ? 'View on X' : isReddit ? 'View on Reddit' : 'View Source';
   const bg = isYT ? '#FF0000' : isTwitter ? '#000' : isReddit ? '#FF4500' : '#333';
 
   return (

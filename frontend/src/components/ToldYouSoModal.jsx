@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import useLockBodyScroll from '../hooks/useLockBodyScroll';
-import { X, Copy, Check, TrendingUp, TrendingDown, Download } from 'lucide-react';
+import { X, Copy, Check, TrendingUp, TrendingDown, Download, ExternalLink } from 'lucide-react';
 import EidolumLogo from './EidolumLogo';
 import { getToldYouSo } from '../api';
 
@@ -141,7 +141,7 @@ export default function ToldYouSoModal({ predictionId, onClose }) {
             <div className="space-y-2">
               <button onClick={handleTweet}
                 className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-[#1d9bf0] text-white rounded-lg text-sm font-medium hover:bg-[#1a8cd8] transition-colors min-h-[44px]">
-                <span className="font-bold">𝕏</span> Share on X
+                <ExternalLink className="w-4 h-4" /> Share on X
               </button>
               <div className="grid grid-cols-2 gap-2">
                 <button onClick={handleLinkedIn}

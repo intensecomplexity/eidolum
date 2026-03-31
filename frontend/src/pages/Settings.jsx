@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Settings as SettingsIcon, Bell, BellOff, Mail, User, Shield, AlertTriangle, Globe, ExternalLink } from 'lucide-react';
+import { Settings as SettingsIcon, Bell, BellOff, Mail, User, Shield, AlertTriangle, Globe, ExternalLink, Play } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import Footer from '../components/Footer';
 import { setPriceAlerts, setEmailPreferences, getNotificationPrefs, setNotificationPrefs, updateSocialLinks } from '../api';
@@ -157,11 +157,11 @@ export default function Settings() {
           <h2 className="text-xs text-muted uppercase tracking-wider mb-4 flex items-center gap-1.5"><Globe className="w-3.5 h-3.5" /> Social Links</h2>
           <div className="space-y-3">
             <SocialInput label="Twitter / X" placeholder="https://x.com/yourusername" value={social.twitter_url}
-              onChange={v => setSocial(s => ({ ...s, twitter_url: v }))} icon={<span className="text-sm font-bold">𝕏</span>} />
+              onChange={v => setSocial(s => ({ ...s, twitter_url: v }))} icon={<ExternalLink className="w-4 h-4" />} />
             <SocialInput label="LinkedIn" placeholder="https://linkedin.com/in/yourusername" value={social.linkedin_url}
               onChange={v => setSocial(s => ({ ...s, linkedin_url: v }))} icon={<span className="text-sm font-bold text-blue-400">in</span>} />
             <SocialInput label="YouTube" placeholder="https://youtube.com/@yourchannel" value={social.youtube_url}
-              onChange={v => setSocial(s => ({ ...s, youtube_url: v }))} icon={<span className="text-sm">▶</span>} />
+              onChange={v => setSocial(s => ({ ...s, youtube_url: v }))} icon={<Play className="w-4 h-4" />} />
             <SocialInput label="Website" placeholder="https://yoursite.com" value={social.website_url}
               onChange={v => setSocial(s => ({ ...s, website_url: v }))} icon={<Globe className="w-4 h-4" />} />
           </div>

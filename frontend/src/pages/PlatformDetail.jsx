@@ -107,7 +107,7 @@ export default function PlatformDetail() {
               </div>
               <div className="text-center bg-surface-2 sm:bg-transparent rounded-lg p-3 sm:p-0">
                 <div className="font-mono text-xl sm:text-3xl font-bold text-accent">
-                  {data.best_streak > 0 ? `\ud83d\udd25 ${data.best_streak}` : '\u2014'}
+                  {data.best_streak > 0 ? data.best_streak : '\u2014'}
                 </div>
                 <div className="text-muted text-[11px] sm:text-xs">Best Streak</div>
               </div>

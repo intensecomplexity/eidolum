@@ -81,7 +81,7 @@ export default function ShareModal({ predictionId, userId, badgeShare, onClose }
               </button>
               <button onClick={handleTweet}
                 className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 bg-surface-2 border border-border rounded-lg text-xs font-medium text-text-secondary hover:text-text-primary transition-colors min-h-[40px]">
-                <span className="font-bold text-sm">𝕏</span>
+                <ExternalLink className="w-4 h-4" /> X
               </button>
               <button onClick={() => { if (data?.share_url) window.open(`https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(data.share_url)}`, '_blank'); }}
                 className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 bg-surface-2 border border-border rounded-lg text-xs font-medium text-text-secondary hover:text-text-primary transition-colors min-h-[40px]">

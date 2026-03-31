@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Zap } from 'lucide-react';
+import { Zap, AlertTriangle, Flame } from 'lucide-react';
 import Footer from '../components/Footer';
 import { getContrarianSignals } from '../api';
 
@@ -108,7 +108,7 @@ function SignalCard({ signal: s }) {
         {/* Alert */}
         <div className="bg-warning/5 border border-warning/20 rounded-lg p-3 mb-4">
           <div className="flex items-center gap-1.5 mb-1">
-            <span className="text-sm">&#x1F6A8;</span>
+            <AlertTriangle className="w-3.5 h-3.5 text-warning" />
             <span className="text-warning text-xs font-bold uppercase">Contrarian Alert</span>
           </div>
           <p className="text-text-secondary text-xs italic leading-relaxed">

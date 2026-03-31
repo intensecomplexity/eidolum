@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Zap, Flame, TrendingUp, TrendingDown } from 'lucide-react';
+import { Zap, Flame, TrendingUp, TrendingDown, AlertCircle } from 'lucide-react';
 import TypeBadge from '../components/TypeBadge';
 import TickerLink from '../components/TickerLink';
 import ReactionBar from '../components/ReactionBar';
@@ -121,8 +121,8 @@ export default function Controversial() {
                     <span className={p.direction === 'bullish' ? 'badge-bull' : 'badge-bear'}>{p.direction}</span>
                   </div>
                   <div className="flex items-center gap-3 text-xs">
-                    <span className="text-warning font-mono">🔥 {p.bold_call_count}</span>
-                    <span className="text-negative font-mono">😱 {p.no_way_count}</span>
+                    <span className="text-warning font-mono inline-flex items-center gap-0.5"><Flame className="w-3 h-3" /> {p.bold_call_count}</span>
+                    <span className="text-negative font-mono inline-flex items-center gap-0.5"><AlertCircle className="w-3 h-3" /> {p.no_way_count}</span>
                     {p.days_left !== null && <span className="text-muted">{p.days_left}d</span>}
                   </div>
                 </div>

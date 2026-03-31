@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import { Link } from 'react-router-dom';
-import { Bookmark, ArrowRight, Clock, Pencil, ExternalLink, X, ChevronDown, Trophy, Search } from 'lucide-react';
+import { Bookmark, ArrowRight, Clock, Pencil, ExternalLink, X, ChevronDown, Trophy, Search, CircleDot, BarChart3, Bell, CheckCircle, XCircle, AlertTriangle } from 'lucide-react';
 import Footer from '../components/Footer';
 import PredictionBadge from '../components/PredictionBadge';
 import PlatformBadge from '../components/PlatformBadge';
@@ -60,7 +60,7 @@ export default function SavedPredictions() {
       newAlerts.push({
         id: 'resolving_soon',
         type: 'warning',
-        icon: '\u26a0\ufe0f',
+        icon: 'warning',
         message: `${resolvingSoon.length} of your saved prediction${resolvingSoon.length > 1 ? 's' : ''} resolve${resolvingSoon.length === 1 ? 's' : ''} in the next 7 days.`,
       });
     }
@@ -78,7 +78,7 @@ export default function SavedPredictions() {
           newAlerts.push({
             id: alertId,
             type: isCorrect ? 'positive' : 'negative',
-            icon: isCorrect ? '\ud83d\udfe2' : '\ud83d\udd34',
+            icon: isCorrect ? 'correct' : 'incorrect',
             message: `${p.forecaster.name}'s ${p.ticker} call resolved ${p.outcome.toUpperCase()}${p.actual_return !== null ? ` \u2014 ${p.actual_return >= 0 ? '+' : ''}${p.actual_return.toFixed(1)}%` : ''}!`,
           });
         }
@@ -157,7 +157,7 @@ export default function SavedPredictions() {
                   'bg-warning/5 border-warning/20'
                 }`}
               >
-                <span className="text-base shrink-0">{alert.icon}</span>
+                <span className="shrink-0">{alert.icon === 'correct' ? <CheckCircle className="w-4 h-4 text-positive" /> : alert.icon === 'warning' ? <AlertTriangle className="w-4 h-4 text-warning" /> : <XCircle className="w-4 h-4 text-negative" />}</span>
                 <p className="text-sm text-text-primary flex-1">{alert.message}</p>
                 <button
                   onClick={() => dismissAlert(alert.id)}
@@ -238,12 +238,12 @@ function EmptyState() {
       {/* Onboarding cards */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 max-w-2xl mx-auto mb-8">
         {[
-          { icon: '\ud83d\udd16', title: 'Save predictions you want to track', desc: 'Tap the bookmark icon on any prediction to save it here and watch it live.' },
-          { icon: '\ud83d\udcca', title: 'Watch them move in real time', desc: 'See if the prediction is tracking toward its target \u2014 before it resolves.' },
-          { icon: '\ud83d\udd14', title: 'Get notified when they resolve', desc: 'Enter your email to get an alert when any saved prediction gets its final verdict.' },
+          { Icon: Bookmark, title: 'Save predictions you want to track', desc: 'Tap the bookmark icon on any prediction to save it here and watch it live.' },
+          { Icon: BarChart3, title: 'Watch them move in real time', desc: 'See if the prediction is tracking toward its target \u2014 before it resolves.' },
+          { Icon: Bell, title: 'Get notified when they resolve', desc: 'Enter your email to get an alert when any saved prediction gets its final verdict.' },
         ].map((step, i) => (
           <div key={i} className="card text-left">
-            <span className="text-2xl mb-2 block">{step.icon}</span>
+            <step.Icon className="w-6 h-6 text-accent mb-2" />
             <h3 className="text-sm font-semibold mb-1">{step.title}</h3>
             <p className="text-text-secondary text-xs leading-relaxed">{step.desc}</p>
           </div>
@@ -465,7 +465,7 @@ function TrackingSection({ p, currentReturn, returnSign, isTracking, targetProgr
           <div className="flex justify-between items-center">
             <span className="text-muted text-xs">Current movement</span>
             <span className={`font-mono text-sm font-bold ${isTracking ? 'text-positive' : 'text-negative'}`}>
-              {returnSign}{currentReturn.toFixed(1)}% {isTracking ? '\ud83d\udfe2' : '\ud83d\udd34'}
+              {returnSign}{currentReturn.toFixed(1)}%
             </span>
           </div>
         )}
@@ -502,8 +502,8 @@ function TrackingSection({ p, currentReturn, returnSign, isTracking, targetProgr
                 isUrgent ? 'text-warning' :
                 'text-text-secondary'
               }`}>
-                {isCritical ? '\ud83d\udd34 Resolves tomorrow' :
-                 isUrgent ? `\u26a0\ufe0f Resolves in ${p.days_remaining} day${p.days_remaining !== 1 ? 's' : ''}` :
+                {isCritical ? 'Resolves tomorrow' :
+                 isUrgent ? `Resolves in ${p.days_remaining} day${p.days_remaining !== 1 ? 's' : ''}` :
                  `${p.days_remaining} day${p.days_remaining !== 1 ? 's' : ''} left`}
               </span>
             </div>
