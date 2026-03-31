@@ -14,6 +14,7 @@ import NotificationBanner from '../components/NotificationBanner';
 import FollowButton from '../components/FollowButton';
 import Footer from '../components/Footer';
 import MiniPieChart from '../components/MiniPieChart';
+import PortfolioSimulator from '../components/PortfolioSimulator';
 import { getForecaster, getForecasterSectors, getPlatformDetail, getReportCards } from '../api';
 import { annotateContext, ExplainerLine, ratingChangeLabel } from '../utils/predictionExplainer';
 
@@ -324,6 +325,9 @@ export default function ForecasterProfile() {
             </div>
           </div>
         </div>
+
+        {/* Portfolio Simulator */}
+        <PortfolioSimulator forecasterId={parseInt(id)} forecasterName={data.name} />
 
         {/* Disclosed Positions */}
         <DisclosedPositions forecasterId={parseInt(id)} platform={data.platform} />
