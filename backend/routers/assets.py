@@ -337,6 +337,26 @@ def get_asset_consensus(
     days: int = Query(90, description="Look-back window in days"),
 ):
     ticker = ticker.upper()
+
+    # Get company info
+    _sector = None
+    _company = None
+    try:
+        _ts = db.execute(sql_text(
+            "SELECT sector, company_name FROM ticker_sectors WHERE ticker = :t"
+        ), {"t": ticker}).first()
+        if _ts:
+            _sector = _ts[0]
+            _company = _ts[1]
+    except Exception:
+        try:
+            db.rollback()
+        except Exception:
+            pass
+    if not _company:
+        from ticker_lookup import TICKER_INFO
+        _company = TICKER_INFO.get(ticker)
+
     predictions = (
         db.query(Prediction)
         .filter(Prediction.ticker == ticker)
@@ -348,6 +368,8 @@ def get_asset_consensus(
     if not predictions:
         return {
             "ticker": ticker,
+            "company_name": _company,
+            "sector": _sector,
             "total_predictions": 0,
             "bullish_count": 0,
             "bearish_count": 0,
@@ -431,6 +453,8 @@ def get_asset_consensus(
 
     return {
         "ticker": ticker,
+        "company_name": _company,
+        "sector": _sector,
         "total_predictions": total,
         "bullish_count": len(bull),
         "bearish_count": len(bear),
