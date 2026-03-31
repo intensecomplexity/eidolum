@@ -301,6 +301,8 @@ def _build_summary(ticker, direction, outcome, entry, eval_price, target, ret):
 
 
 FINNHUB_KEY = os.getenv("FINNHUB_KEY", "").strip()
+if not FINNHUB_KEY:
+    print("[HistEval] WARNING: FINNHUB_KEY not set — evaluator cannot fetch prices, no predictions will be scored")
 _quote_cache: dict[str, dict] = {}
 
 
@@ -313,27 +315,38 @@ def _fetch_history(ticker: str, start, end) -> dict:
     if ticker in _quote_cache:
         return _quote_cache[ticker]
 
-    if not FINNHUB_KEY:
+    price = None
+
+    # Try Finnhub first
+    if FINNHUB_KEY:
+        try:
+            r = httpx.get(
+                "https://finnhub.io/api/v1/quote",
+                params={"symbol": ticker, "token": FINNHUB_KEY},
+                timeout=8,
+            )
+            data = r.json()
+            current = float(data.get("c", 0) or 0)
+            prev_close = float(data.get("pc", 0) or 0)
+            price = current if current > 0 else prev_close if prev_close > 0 else None
+        except Exception:
+            pass
+
+    # Fallback to yfinance
+    if not price:
+        try:
+            from jobs.price_checker import get_current_price as yf_price
+            price = yf_price(ticker)
+        except Exception:
+            pass
+
+    if not price or price <= 0:
         return {}
 
-    try:
-        r = httpx.get(
-            "https://finnhub.io/api/v1/quote",
-            params={"symbol": ticker, "token": FINNHUB_KEY},
-            timeout=8,
-        )
-        data = r.json()
-        current = float(data.get("c", 0) or 0)
-        prev_close = float(data.get("pc", 0) or 0)
-        price = current if current > 0 else prev_close
-
-        if price <= 0:
-            return {}
-
-        today = datetime.utcnow().strftime("%Y-%m-%d")
-        result = {today: price, "_current": price}
-        _quote_cache[ticker] = result
-        return result
+    today = datetime.utcnow().strftime("%Y-%m-%d")
+    result = {today: price, "_current": price}
+    _quote_cache[ticker] = result
+    return result
 
     except Exception as exc:
         print(f"[HistEval] Finnhub quote error for {ticker}: {exc}")

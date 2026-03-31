@@ -449,10 +449,9 @@ def get_expiring_predictions(request: Request, db: Session = Depends(get_db)):
             UserPrediction.outcome == "pending",
             UserPrediction.expires_at.isnot(None),
             UserPrediction.expires_at <= cutoff,
-            UserPrediction.expires_at > now,
         )
         .order_by(UserPrediction.expires_at.asc())
-        .limit(50)
+        .limit(100)
         .all()
     )
 
@@ -463,6 +462,7 @@ def get_expiring_predictions(request: Request, db: Session = Depends(get_db)):
         d["user_type"] = utype or "player"
         remaining = (pred.expires_at - now).days if pred.expires_at else None
         d["days_remaining"] = max(remaining, 0) if remaining is not None else None
+        d["is_overdue"] = pred.expires_at < now if pred.expires_at else False
 
         # Add live PnL data
         entry = float(pred.price_at_call) if pred.price_at_call else None

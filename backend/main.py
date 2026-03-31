@@ -1316,6 +1316,7 @@ async def lifespan(app):
     # ── Background thread: create tables + seed + start backfill ──────────────
     def _startup_init():
         import time as _t2
+        from sqlalchemy import text as sql_text
         _t2.sleep(10)  # Let app bind port first
 
         # STEP 1: Create all tables
@@ -1885,6 +1886,7 @@ def run_massive_benzinga_now():
 @app.get("/api/admin/scraper-health")
 def scraper_health():
     """Health check for all background jobs."""
+    from sqlalchemy import text as sql_text
     from admin_panel import scheduler_last_run
     from jobs.benzinga_backfill import get_backfill_status
     from jobs.historical_evaluator import get_eval_status
@@ -1895,7 +1897,7 @@ def scraper_health():
             "SELECT COUNT(*) FROM predictions WHERE outcome = 'pending' AND evaluation_date IS NOT NULL AND evaluation_date < NOW()"
         )).scalar() or 0
         total_scored = db.execute(sql_text(
-            "SELECT COUNT(*) FROM predictions WHERE outcome IN ('correct','incorrect')"
+            "SELECT COUNT(*) FROM predictions WHERE outcome IN ('hit','near','miss','correct','incorrect')"
         )).scalar() or 0
     finally:
         db.close()
