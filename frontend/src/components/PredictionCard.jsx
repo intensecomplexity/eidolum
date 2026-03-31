@@ -7,6 +7,7 @@ import PlatformBadge from './PlatformBadge';
 import CredibilityBadge from './CredibilityBadge';
 import { annotateContext, ExplainerLine, ratingChangeLabel } from '../utils/predictionExplainer';
 import CommentSection from './CommentSection';
+import ScoringBreakdown from './ScoringBreakdown';
 
 const API_BASE = 'https://eidolum-production.up.railway.app';
 
@@ -190,6 +191,9 @@ export default function PredictionCard({ prediction: p, showForecaster = false, 
           {p.evaluation_summary}
         </p>
       )}
+
+      {/* Scoring breakdown (expandable) */}
+      <ScoringBreakdown prediction={p} />
 
       {/* Line 6: Source + date */}
       <ProofLinks p={p} />
