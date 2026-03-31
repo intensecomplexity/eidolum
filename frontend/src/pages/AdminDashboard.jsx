@@ -13,27 +13,30 @@ const TABS = ['Overview', 'Users', 'Forecasters', 'Predictions', 'Audit Log'];
 
 export default function AdminDashboard() {
   const navigate = useNavigate();
-  const { user, isAuthenticated } = useAuth();
+  const { user, isAuthenticated, loading: authLoading } = useAuth();
   const [tab, setTab] = useState('Overview');
   const [dashboard, setDashboard] = useState(null);
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState(null);
 
-  // Redirect non-admins
+  // Redirect non-admins — but WAIT for auth to load first
   useEffect(() => {
-    if (!isAuthenticated) { navigate('/'); return; }
-    if (user && !user.is_admin) { navigate('/'); return; }
-  }, [isAuthenticated, user]);
+    if (authLoading) return; // Still loading, don't redirect yet
+    if (!isAuthenticated || (user && !user.is_admin)) { navigate('/'); }
+  }, [authLoading, isAuthenticated, user]);
 
   useEffect(() => {
     if (!user?.is_admin) return;
     setLoading(true);
-    getAdminDashboard().then(setDashboard).catch(() => navigate('/')).finally(() => setLoading(false));
+    getAdminDashboard().then(setDashboard).catch(() => {}).finally(() => setLoading(false));
   }, [user]);
 
   function showToast(msg) { setToast(msg); setTimeout(() => setToast(null), 3000); }
 
-  if (!user?.is_admin) return null;
+  // Show spinner while auth is loading
+  if (authLoading || !user?.is_admin) {
+    return <div className="flex items-center justify-center min-h-[60vh]"><div className="w-8 h-8 border-2 border-accent border-t-transparent rounded-full animate-spin" /></div>;
+  }
   if (loading) return <div className="flex items-center justify-center min-h-[60vh]"><div className="w-8 h-8 border-2 border-accent border-t-transparent rounded-full animate-spin" /></div>;
 
   return (
