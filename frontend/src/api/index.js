@@ -580,20 +580,20 @@ export function getFollowingFeed(before) {
 
 // ——— Activity Hub ———
 
-export function getActivityRecentCalls() {
-  return api.get('/activity/recent-predictions').then(r => r.data);
+export function getActivityRecentCalls(limit = 50, offset = 0) {
+  return api.get('/activity/recent-predictions', { params: { limit, offset } }).then(r => r.data);
 }
 
-export function getActivityScoredCalls() {
-  return api.get('/activity/recently-scored').then(r => r.data);
+export function getActivityScoredCalls(limit = 50, offset = 0) {
+  return api.get('/activity/recently-scored', { params: { limit, offset } }).then(r => r.data);
 }
 
-export function getActivityExpiring() {
-  return api.get('/activity/expiring').then(r => r.data);
+export function getActivityExpiring(limit = 50, offset = 0) {
+  return api.get('/activity/expiring', { params: { limit, offset } }).then(r => r.data);
 }
 
-export function getActivityFriendsCalls() {
-  return api.get('/activity/friends', { headers: authHeaders() }).then(r => r.data);
+export function getActivityFriendsCalls(limit = 50, offset = 0) {
+  return api.get('/activity/friends', { params: { limit, offset }, headers: authHeaders() }).then(r => r.data);
 }
 
 // ——— Ticker Detail ———
