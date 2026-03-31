@@ -3,6 +3,7 @@ import { useParams, Link } from 'react-router-dom';
 import { TrendingUp, TrendingDown, Trophy, ArrowLeft, Check, X, BarChart3, Users, MessageSquare } from 'lucide-react';
 import PredictionBadge from '../components/PredictionBadge';
 import ConsensusBar from '../components/ConsensusBar';
+import StockChart from '../components/StockChart';
 import Footer from '../components/Footer';
 import TickerDiscussionSection from '../components/TickerDiscussionSection';
 import { ExplainerLine } from '../utils/predictionExplainer';
@@ -121,6 +122,9 @@ export default function TickerDetail() {
           </div>
         </div>
 
+        {/* ── PRICE CHART WITH PREDICTION MARKERS ──────────────────── */}
+        <StockChart ticker={ticker} />
+
         {stats.top_forecaster && (
           <div className="card py-2.5 px-4 mb-6 flex items-center gap-2 text-xs">
             <Trophy className="w-3.5 h-3.5 text-accent flex-shrink-0" />
@@ -132,6 +136,9 @@ export default function TickerDetail() {
             <span className="text-muted">&middot; {stats.top_forecaster.predictions} calls</span>
           </div>
         )}
+
+        {/* ── PRICE CHART ──────────────────────────────────────────────── */}
+        <StockChart ticker={ticker} />
 
         {/* ── SECTION 1: CURRENT ANALYST OUTLOOK ────────────────────────── */}
         <div className="mb-8">
