@@ -1320,6 +1320,37 @@ async def lifespan(app):
     except Exception as _me:
         print(f"[STARTUP] Outcome migration error: {_me}")
 
+    # ── Reclassify hold/neutral predictions from context text ────────────
+    # The scraper used to classify holds as bullish. The context text still
+    # contains the original rating ("Maintains Hold", "Equal-Weight", etc.)
+    try:
+        with engine.connect() as _nc:
+            # Context format: "Firm: Neutral — Maintains Hold rating on TICKER"
+            # or rating name appears directly in the context/exact_quote
+            neutral_patterns = [
+                "Neutral —", "Neutral—",
+                "Maintains Hold", "Maintains Neutral", "Maintains Market Perform",
+                "Maintains Equal Weight", "Maintains Equal-Weight",
+                "Maintains Sector Perform", "Maintains In-Line", "Maintains In Line",
+                "Maintains Peer Perform", "Maintains Market Weight", "Maintains Sector Weight",
+                "Reaffirms Hold", "Reaffirms Neutral", "Reaffirms Market Perform",
+                "Reaffirms Equal Weight", "Reaffirms Equal-Weight",
+                "Started coverage with Hold", "Started coverage with Neutral",
+                "Hold rating", "Neutral rating", "Market Perform rating",
+                "Equal Weight rating", "Equal-Weight rating",
+                "Sector Perform rating", "In-Line rating", "In Line rating",
+                "Peer Perform rating", "Market Weight rating", "Sector Weight rating",
+            ]
+            conditions = " OR ".join(f"context LIKE '%{p}%'" for p in neutral_patterns)
+            reclassified = _nc.execute(sql_text(
+                f"UPDATE predictions SET direction = 'neutral' WHERE direction != 'neutral' AND ({conditions})"
+            )).rowcount
+            _nc.commit()
+            if reclassified:
+                print(f"[STARTUP] Reclassified {reclassified} predictions to neutral")
+    except Exception as _ne:
+        print(f"[STARTUP] Neutral reclassification error: {_ne}")
+
     if _disable:
         print("[STARTUP] Jobs disabled via DISABLE_BACKGROUND_JOBS. Only serving API requests.")
         yield

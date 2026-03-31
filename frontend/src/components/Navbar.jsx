@@ -1,5 +1,5 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Menu, X, Crosshair, HelpCircle, LogOut, Settings, Award, Swords, Users, Eye, User, Target, Search } from 'lucide-react';
+import { Menu, X, Crosshair, HelpCircle, LogOut, Settings, Swords, Users, User, Search, BarChart3, Trophy, Star, BookmarkCheck, CircleUser, Wrench } from 'lucide-react';
 import EidolumLogo from './EidolumLogo';
 import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
@@ -168,23 +168,23 @@ export default function Navbar() {
 
                       {/* Menu items */}
                       <div className="py-1">
-                        <DropdownItem to="/my-calls" icon="◇" label="My Calls" onClick={() => setUserDropdown(false)} />
-                        <DropdownItem to="/compete" icon="🏆" label="Compete" onClick={() => setUserDropdown(false)} />
-                        <DropdownItem to="/duels" icon="⚔" label="Duels" onClick={() => setUserDropdown(false)} />
-                        <DropdownItem to="/friends" icon="👥" label="Friends" onClick={() => setUserDropdown(false)} />
-                        <DropdownItem to="/badges" icon="✦" label="Badges" onClick={() => setUserDropdown(false)} />
-                        <DropdownItem to="/watchlist" icon="☆" label="Watchlist" onClick={() => setUserDropdown(false)} />
-                        <DropdownItem to="/profile" icon="◉" label="Profile" onClick={() => setUserDropdown(false)} />
-                        <DropdownItem to="/settings" icon="⚙" label="Settings" onClick={() => setUserDropdown(false)} />
+                        <DropdownItem to="/my-calls" icon={BarChart3} label="My Calls" onClick={() => setUserDropdown(false)} />
+                        <DropdownItem to="/compete" icon={Trophy} label="Compete" onClick={() => setUserDropdown(false)} />
+                        <DropdownItem to="/duels" icon={Swords} label="Duels" onClick={() => setUserDropdown(false)} />
+                        <DropdownItem to="/friends" icon={Users} label="Friends" onClick={() => setUserDropdown(false)} />
+                        <DropdownItem to="/badges" icon={Star} label="Badges" onClick={() => setUserDropdown(false)} />
+                        <DropdownItem to="/watchlist" icon={BookmarkCheck} label="Watchlist" onClick={() => setUserDropdown(false)} />
+                        <DropdownItem to="/profile" icon={CircleUser} label="Profile" onClick={() => setUserDropdown(false)} />
+                        <DropdownItem to="/settings" icon={Settings} label="Settings" onClick={() => setUserDropdown(false)} />
                         {user?.is_admin && (
-                          <DropdownItem to="/admin/dashboard" icon="🔧" label="Admin" onClick={() => setUserDropdown(false)} />
+                          <DropdownItem to="/admin/dashboard" icon={Wrench} label="Admin" onClick={() => setUserDropdown(false)} />
                         )}
                       </div>
 
                       <div className="border-t border-border py-1">
                         <button onClick={() => { setUserDropdown(false); logout(); navigate('/'); }}
                           className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-negative hover:bg-surface-2 transition-colors text-left min-h-[40px]">
-                          <span className="w-5 text-center text-xs">↪</span> Log out
+                          <LogOut className="w-4 h-4" /> Log out
                         </button>
                       </div>
                     </div>
@@ -208,19 +208,19 @@ export default function Navbar() {
                         <div className="text-[10px] text-muted font-mono">@{user?.username}</div>
                       </Link>
                       <div className="py-1">
-                        <DropdownItem to="/my-calls" icon="◇" label="My Calls" onClick={() => setUserDropdown(false)} />
-                        <DropdownItem to="/compete" icon="🏆" label="Compete" onClick={() => setUserDropdown(false)} />
-                        <DropdownItem to="/duels" icon="⚔" label="Duels" onClick={() => setUserDropdown(false)} />
-                        <DropdownItem to="/friends" icon="👥" label="Friends" onClick={() => setUserDropdown(false)} />
-                        <DropdownItem to="/badges" icon="✦" label="Badges" onClick={() => setUserDropdown(false)} />
-                        <DropdownItem to="/watchlist" icon="☆" label="Watchlist" onClick={() => setUserDropdown(false)} />
-                        <DropdownItem to="/profile" icon="◉" label="Profile" onClick={() => setUserDropdown(false)} />
-                        <DropdownItem to="/settings" icon="⚙" label="Settings" onClick={() => setUserDropdown(false)} />
+                        <DropdownItem to="/my-calls" icon={BarChart3} label="My Calls" onClick={() => setUserDropdown(false)} />
+                        <DropdownItem to="/compete" icon={Trophy} label="Compete" onClick={() => setUserDropdown(false)} />
+                        <DropdownItem to="/duels" icon={Swords} label="Duels" onClick={() => setUserDropdown(false)} />
+                        <DropdownItem to="/friends" icon={Users} label="Friends" onClick={() => setUserDropdown(false)} />
+                        <DropdownItem to="/badges" icon={Star} label="Badges" onClick={() => setUserDropdown(false)} />
+                        <DropdownItem to="/watchlist" icon={BookmarkCheck} label="Watchlist" onClick={() => setUserDropdown(false)} />
+                        <DropdownItem to="/profile" icon={CircleUser} label="Profile" onClick={() => setUserDropdown(false)} />
+                        <DropdownItem to="/settings" icon={Settings} label="Settings" onClick={() => setUserDropdown(false)} />
                       </div>
                       <div className="border-t border-border py-1">
                         <button onClick={() => { setUserDropdown(false); logout(); navigate('/'); }}
                           className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-negative hover:bg-surface-2 transition-colors text-left min-h-[40px]">
-                          <span className="w-5 text-center text-xs">↪</span> Log out
+                          <LogOut className="w-4 h-4" /> Log out
                         </button>
                       </div>
                     </div>
@@ -272,14 +272,14 @@ export default function Navbar() {
   );
 }
 
-function DropdownItem({ to, icon, label, onClick }) {
+function DropdownItem({ to, icon: Icon, label, onClick }) {
   return (
     <Link
       to={to}
       onClick={onClick}
-      className="flex items-center gap-3 px-4 py-2.5 text-sm text-text-secondary hover:bg-surface-2 hover:text-text-primary transition-colors min-h-[44px] cursor-pointer"
+      className="flex items-center gap-3 px-4 py-2.5 text-sm text-text-secondary hover:bg-surface-2 hover:text-accent transition-colors min-h-[44px] cursor-pointer"
     >
-      <span className="w-5 text-center text-xs">{icon}</span> {label}
+      <Icon className="w-4 h-4" /> {label}
     </Link>
   );
 }

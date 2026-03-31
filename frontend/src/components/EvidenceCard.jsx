@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Play, ExternalLink, X as XIcon, Search, Archive } from 'lucide-react';
+import { Play, ExternalLink, X as XIcon, Search, Archive, MessageSquare, Newspaper, Link2 } from 'lucide-react';
 import getSourceUrl from '../utils/getSourceUrl';
 import { annotateContext, ExplainerLine } from '../utils/predictionExplainer';
 
@@ -22,11 +22,11 @@ function getSourceBadge(sourceType, verifiedBy, hasTimestamp) {
 }
 
 function SourceIcon({ type }) {
-  if (type === 'youtube') return <span className="text-sm">&#x25B6;</span>;
-  if (type === 'twitter') return <span className="text-sm">&#x1D54F;</span>;
-  if (type === 'reddit') return <span className="text-sm">&#x1F4DD;</span>;
-  if (type === 'article') return <span className="text-sm">&#x1F4F0;</span>;
-  return <span className="text-sm">&#x1F517;</span>;
+  if (type === 'youtube') return <Play className="w-3 h-3" />;
+  if (type === 'twitter') return <ExternalLink className="w-3 h-3" />;
+  if (type === 'reddit') return <MessageSquare className="w-3 h-3" />;
+  if (type === 'article') return <Newspaper className="w-3 h-3" />;
+  return <Link2 className="w-3 h-3" />;
 }
 
 /** Check if a source_platform_id is a real YouTube video ID (11 alphanumeric chars, no underscores/spaces) */
