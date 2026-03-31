@@ -643,7 +643,7 @@ def get_all_consensus(
         GROUP BY ticker, sector
         HAVING COUNT(*) >= 5
         ORDER BY COUNT(*) DESC
-        LIMIT 100
+        LIMIT 200
     """), params).fetchall()
 
     # Batch-fetch top forecaster per ticker
