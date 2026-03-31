@@ -1264,6 +1264,7 @@ async def lifespan(app):
     print("[STARTUP] ════════════════════════════════════════")
 
     # ── Admin promote — runs ALWAYS, unconditionally ────────────────────────
+    from sqlalchemy import text as sql_text
     print("[STARTUP] Running admin promotion...")
     try:
         with engine.connect() as _ac:
