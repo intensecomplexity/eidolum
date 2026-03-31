@@ -44,18 +44,44 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
 
 
 class AdminAuthMiddleware(BaseHTTPMiddleware):
-    """Block all /api/admin/* requests without valid ADMIN_SECRET header."""
+    """Block all /api/admin/* requests without valid auth.
+    Accepts either ADMIN_SECRET (legacy) or JWT token from an is_admin=1 user."""
 
     async def dispatch(self, request: Request, call_next):
         if request.url.path.startswith("/api/admin/"):
             admin_secret = os.getenv("ADMIN_SECRET", "")
-            token = request.headers.get("Authorization", "").replace("Bearer ", "")
+            bearer = request.headers.get("Authorization", "").replace("Bearer ", "").strip()
             query_secret = request.query_params.get("secret", "")
             header_secret = request.headers.get("X-Admin-Secret", "")
-            provided = token or header_secret or query_secret
-            if not admin_secret or provided != admin_secret:
-                from starlette.responses import JSONResponse
-                return JSONResponse({"detail": "Forbidden"}, status_code=403)
+
+            # Try legacy ADMIN_SECRET first
+            provided_secret = header_secret or query_secret
+            if admin_secret and provided_secret == admin_secret:
+                return await call_next(request)
+            if admin_secret and bearer == admin_secret:
+                return await call_next(request)
+
+            # Try JWT-based admin auth
+            if bearer:
+                try:
+                    from auth import get_current_user as _decode
+                    payload = _decode(bearer)
+                    uid = payload.get("user_id")
+                    if uid:
+                        from database import SessionLocal
+                        from models import User
+                        _db = SessionLocal()
+                        try:
+                            u = _db.query(User).filter(User.id == uid).first()
+                            if u and u.is_admin:
+                                return await call_next(request)
+                        finally:
+                            _db.close()
+                except Exception:
+                    pass
+
+            from starlette.responses import JSONResponse
+            return JSONResponse({"detail": "Not found"}, status_code=404)
         return await call_next(request)
 
 
