@@ -21,9 +21,12 @@ _pause_lock = threading.Lock()
 _running_jobs: dict[str, datetime] = {}
 _running_lock = threading.Lock()
 
-PAUSE_DURATION_MINUTES = 15
-DB_HEALTH_TIMEOUT_SECONDS = 2.0
-DB_HEALTH_SLOW_THRESHOLD_SECONDS = 1.0
+PAUSE_DURATION_MINUTES = 5
+DB_HEALTH_TIMEOUT_SECONDS = 3.0
+DB_HEALTH_SLOW_THRESHOLD_SECONDS = 3.0
+
+# Track consecutive self-check failures (only pause after 3 in a row)
+_selfcheck_failures = 0
 
 # ── PROTECTION 2: Global job lock ─────────────────────────────────────────────
 # Only ONE background job can run at any time. If a second job tries to start
@@ -257,21 +260,29 @@ def get_status() -> dict:
 def check_site_health_and_pause():
     """Check if user-facing endpoints are slow; if so, pause background jobs.
 
-    This is meant to run on a schedule (every 5 minutes).
+    Only pauses after 3 consecutive failures to avoid false positives from
+    transient network issues (common on Railway/container platforms).
     """
+    global _selfcheck_failures
     import httpx
 
     try:
         start = time.time()
-        # Use internal request to avoid going through external load balancer
         port = int(os.environ.get("PORT", 8000))
-        r = httpx.get(f"http://127.0.0.1:{port}/api/homepage-stats", timeout=5)
+        r = httpx.get(f"http://127.0.0.1:{port}/api/health", timeout=5)
         elapsed = time.time() - start
 
-        if elapsed > 3.0:
-            pause_all_jobs(f"homepage-stats took {elapsed:.1f}s")
-        elif r.status_code != 200:
-            pause_all_jobs(f"homepage-stats returned {r.status_code}")
+        if elapsed > 4.0 or r.status_code != 200:
+            _selfcheck_failures += 1
+            print(f"[HealthCheck] Slow/failed ({elapsed:.1f}s, status={r.status_code}), failures={_selfcheck_failures}/3")
+            if _selfcheck_failures >= 3:
+                pause_all_jobs(f"3 consecutive health check failures")
+                _selfcheck_failures = 0
+        else:
+            _selfcheck_failures = 0  # Reset on success
     except Exception as e:
-        # If we can't even reach ourselves, definitely pause
-        pause_all_jobs(f"self-check failed: {e}")
+        _selfcheck_failures += 1
+        print(f"[HealthCheck] Self-check error: {e}, failures={_selfcheck_failures}/3")
+        if _selfcheck_failures >= 3:
+            pause_all_jobs(f"3 consecutive self-check errors")
+            _selfcheck_failures = 0
