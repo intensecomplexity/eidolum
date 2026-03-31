@@ -1637,6 +1637,18 @@ async def lifespan(app):
     scheduler.add_job(run_analyst_notif, "interval", hours=1, id="analyst_notifications", next_run_time=_first_run + timedelta(minutes=25))
     scheduler.add_job(_watchdog, "interval", minutes=5, id="watchdog")
 
+    # JOB: Queue watchlist notifications (runs after scrapers, every 4 hours)
+    def _queue_watchlist():
+        from jobs.watchlist_notifier import queue_watchlist_notifications
+        queue_watchlist_notifications()
+    scheduler.add_job(_queue_watchlist, "interval", hours=4, id="watchlist_queue", next_run_time=_first_run + timedelta(minutes=35))
+
+    # JOB: Send watchlist daily digest (8 AM EST = 13:00 UTC, weekdays)
+    def _watchlist_digest():
+        from jobs.watchlist_notifier import send_daily_digest
+        send_daily_digest()
+    scheduler.add_job(_watchlist_digest, "cron", day_of_week="mon-fri", hour=13, minute=0, id="watchlist_digest")
+
     # Site-wide weekly digest — Monday 8AM EST (13:00 UTC)
     def _site_weekly_digest():
         from jobs.weekly_digest import send_site_weekly_digest

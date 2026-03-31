@@ -88,6 +88,26 @@ def remove_from_watchlist(
     return {"status": "removed", "ticker": ticker}
 
 
+# ── PATCH /api/watchlist/{ticker}/notify ─────────────────────────────────────
+
+
+@router.patch("/watchlist/{ticker}/notify")
+@limiter.limit("30/minute")
+def toggle_watchlist_notify(
+    request: Request,
+    ticker: str,
+    user_id: int = Depends(require_user),
+    db: Session = Depends(get_db),
+):
+    ticker = ticker.upper().strip()
+    item = db.query(WatchlistItem).filter(WatchlistItem.user_id == user_id, WatchlistItem.ticker == ticker).first()
+    if not item:
+        raise HTTPException(status_code=404, detail="Ticker not on watchlist")
+    item.notify = 0 if item.notify else 1
+    db.commit()
+    return {"ticker": ticker, "notify": bool(item.notify)}
+
+
 # ── GET /api/watchlist ────────────────────────────────────────────────────────
 
 

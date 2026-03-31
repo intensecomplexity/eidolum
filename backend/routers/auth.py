@@ -624,6 +624,39 @@ def get_notification_prefs(request: Request, current_user: dict = Depends(get_cu
     return DEFAULT_PREFERENCES
 
 
+# ── PUT /api/settings/email-notifications ────────────────────────────────────
+
+
+class EmailNotificationSettings(BaseModel):
+    enabled: bool
+    frequency: str = "daily"  # "instant", "daily", "weekly"
+
+
+@router.put("/settings/email-notifications")
+@limiter.limit("10/minute")
+def set_email_notification_settings(request: Request, req: EmailNotificationSettings, current_user: dict = Depends(get_current_user_dep), db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.id == current_user["user_id"]).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    user.email_notifications = 1 if req.enabled else 0
+    if req.frequency in ("instant", "daily", "weekly"):
+        user.notification_frequency = req.frequency
+    db.commit()
+    return {"email_notifications": req.enabled, "notification_frequency": user.notification_frequency or "daily"}
+
+
+@router.get("/settings/email-notifications")
+@limiter.limit("30/minute")
+def get_email_notification_settings(request: Request, current_user: dict = Depends(get_current_user_dep), db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.id == current_user["user_id"]).first()
+    if not user:
+        return {"email_notifications": True, "notification_frequency": "daily"}
+    return {
+        "email_notifications": bool(user.email_notifications) if user.email_notifications is not None else True,
+        "notification_frequency": user.notification_frequency or "daily",
+    }
+
+
 # ── GET /api/nudges ───────────────────────────────────────────────────────────
 
 
