@@ -482,6 +482,8 @@ def get_ticker_consensus(request: Request, ticker: str, db: Session = Depends(ge
         "bullish_percentage": round(bullish / total * 100, 1) if total > 0 else 0.0,
         "bearish_percentage": round(bearish / total * 100, 1) if total > 0 else 0.0,
         "top_caller": top_caller_name,
+        "top_caller_id": top_caller,
+        "top_caller_source": "player" if top_caller else None,
         "top_caller_accuracy": top_accuracy if top_caller else None,
     }
 
@@ -524,7 +526,7 @@ def get_all_consensus(request: Request, db: Session = Depends(get_db)):
     if tickers:
         try:
             top_rows = db.execute(_consensus_text("""
-                SELECT DISTINCT ON (p.ticker) p.ticker, f.name,
+                SELECT DISTINCT ON (p.ticker) p.ticker, f.id, f.name,
                        ROUND(CAST(f.accuracy_score AS numeric), 1) as acc
                 FROM predictions p
                 JOIN forecasters f ON f.id = p.forecaster_id
@@ -533,7 +535,7 @@ def get_all_consensus(request: Request, db: Session = Depends(get_db)):
                 ORDER BY p.ticker, f.accuracy_score DESC
             """), {"tickers": tickers}).fetchall()
             for r in top_rows:
-                top_by_ticker[r[0]] = {"name": r[1], "accuracy": float(r[2]) if r[2] else None}
+                top_by_ticker[r[0]] = {"id": r[1], "name": r[2], "accuracy": float(r[3]) if r[3] else None}
         except Exception:
             pass  # SQLite doesn't support DISTINCT ON
 
@@ -550,6 +552,7 @@ def get_all_consensus(request: Request, db: Session = Depends(get_db)):
             "bullish_percentage": bull_pct,
             "bearish_percentage": round(100 - bull_pct, 1),
             "top_caller": top["name"] if top else None,
+            "top_caller_id": top["id"] if top else None,
             "top_caller_accuracy": top["accuracy"] if top else None,
         })
 

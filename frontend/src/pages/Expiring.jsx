@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
+import { Link } from 'react-router-dom';
 import { Clock } from 'lucide-react';
 import Footer from '../components/Footer';
 import TypeBadge from '../components/TypeBadge';
@@ -82,7 +83,7 @@ export default function Expiring() {
                   </div>
                   {/* Meta row: user + target */}
                   <div className="flex items-center gap-1 text-xs text-muted mb-2">
-                    <span className="text-text-secondary whitespace-nowrap">@{p.username}</span>
+                    <Link to={`/profile/${p.user_id}`} className="text-accent hover:underline whitespace-nowrap">@{p.username}</Link>
                     <TypeBadge type={p.user_type} size={12} />
                     <span className="whitespace-nowrap">&middot; Target: <span className="font-mono">{p.price_target}</span></span>
                   </div>

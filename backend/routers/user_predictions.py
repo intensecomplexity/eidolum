@@ -55,6 +55,7 @@ class SubmitPredictionRequest(BaseModel):
     evaluation_window_days: int
     reasoning: Optional[str] = None
     template: Optional[str] = "custom"
+    company: Optional[str] = None  # honeypot field — bots fill this
 
 
 def _prediction_to_dict(p: UserPrediction) -> dict:
@@ -165,16 +166,47 @@ def search_tickers_endpoint(request: Request, q: str = Query("")):
 
 
 @router.post("/user-predictions/submit")
-@limiter.limit("10/minute")
+@limiter.limit("20/hour")
 def submit_prediction(
     request: Request,
     req: SubmitPredictionRequest,
     user_id: int = Depends(require_user),
     db: Session = Depends(get_db),
 ):
+    from spam_protection import (
+        is_honeypot_filled, check_prediction_cooldown,
+        check_repetitive_predictions, check_duplicate_prediction,
+        record_prediction,
+    )
+
+    # Honeypot — silently fake success
+    if is_honeypot_filled(req.company):
+        return {"id": 0, "ticker": req.ticker, "direction": req.direction,
+                "price_target": req.price_target, "outcome": "pending"}
+
+    # Cooldown (5 seconds between submissions)
+    cooldown = check_prediction_cooldown(user_id)
+    if cooldown:
+        raise HTTPException(status_code=429, detail=f"Too fast. Wait {cooldown}s before submitting again.")
+
+    # New account throttle (under 24h old → max 3/day)
+    user_obj = db.query(User).filter(User.id == user_id).first()
+    if user_obj and user_obj.created_at:
+        age_hours = (datetime.datetime.utcnow() - user_obj.created_at).total_seconds() / 3600
+        if age_hours < 24:
+            today_start = datetime.datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+            new_user_count = db.query(func.count(UserPrediction.id)).filter(
+                UserPrediction.user_id == user_id,
+                UserPrediction.created_at >= today_start,
+                _not_deleted(),
+            ).scalar() or 0
+            if new_user_count >= 3:
+                raise HTTPException(status_code=403, detail="New accounts can submit up to 3 predictions per day. Try again tomorrow!")
+
     # Enforce level-based daily prediction limit
     from perks import get_user_perks
-    user_obj = db.query(User).filter(User.id == user_id).first()
+    if not user_obj:
+        user_obj = db.query(User).filter(User.id == user_id).first()
     user_level = getattr(user_obj, 'xp_level', 1) or 1
     perks = get_user_perks(user_level)
     max_daily = perks["max_predictions_per_day"]
@@ -195,6 +227,14 @@ def submit_prediction(
     ticker = resolved if resolved else raw.upper()
     if ticker not in ALLOWED_TICKERS:
         raise HTTPException(status_code=400, detail=f"Unsupported ticker: {raw}")
+
+    # Repetitive prediction check (5 identical in a row)
+    if check_repetitive_predictions(user_id, ticker, req.direction):
+        raise HTTPException(status_code=429, detail="You've submitted too many identical predictions. Try a different ticker or direction.")
+
+    # Duplicate check (same ticker + direction within 24h)
+    if check_duplicate_prediction(user_id, ticker, req.direction, db):
+        raise HTTPException(status_code=409, detail=f"You already have a {req.direction} prediction on {ticker} from today. Wait 24 hours or pick a different ticker.")
 
     if req.direction not in ("bullish", "bearish"):
         raise HTTPException(status_code=400, detail="Direction must be 'bullish' or 'bearish'")
@@ -276,6 +316,7 @@ def submit_prediction(
     db.commit()
     db.refresh(prediction)
 
+    record_prediction(user_id, ticker, req.direction)
     return _prediction_to_dict(prediction)
 
 
@@ -470,10 +511,11 @@ def get_live_prices(request: Request, tickers: str = Query(""), db: Session = De
 @limiter.limit("5/minute")
 def admin_evaluate_predictions(request: Request, db: Session = Depends(get_db)):
     """Manually trigger user prediction evaluation. Returns detailed results."""
+    from middleware.auth import require_admin as _ra
     import os as _os
     secret = request.headers.get("X-Admin-Secret", "") or request.query_params.get("secret", "")
-    admin_secret = _os.getenv("ADMIN_SECRET", "eidolum-admin-2026")
-    if secret and secret != admin_secret:
+    admin_secret = _os.getenv("ADMIN_SECRET", "")
+    if not admin_secret or secret != admin_secret:
         raise HTTPException(status_code=403, detail="Unauthorized")
 
     from jobs.user_evaluator import evaluate_user_predictions

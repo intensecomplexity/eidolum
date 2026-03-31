@@ -28,7 +28,11 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
 # ── Config ────────────────────────────────────────────────────────────────────
 
-JWT_SECRET = os.getenv("JWT_SECRET", "dev-fallback-change-me-in-production-d4e8f9a1b2c3")
+JWT_SECRET = os.getenv("JWT_SECRET", "")
+if not JWT_SECRET:
+    print("[SECURITY WARNING] JWT_SECRET not set — using random key (tokens will not survive restarts)")
+    import secrets
+    JWT_SECRET = secrets.token_hex(32)
 JWT_ALGORITHM = "HS256"
 JWT_EXPIRY_DAYS = 7
 

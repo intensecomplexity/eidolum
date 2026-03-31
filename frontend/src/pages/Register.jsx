@@ -17,6 +17,7 @@ export default function Register() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [displayName, setDisplayName] = useState('');
+  const [hp, setHp] = useState('');
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -32,7 +33,7 @@ export default function Register() {
 
     setLoading(true);
     try {
-      await register(username.trim(), email.trim(), password, ref);
+      await register(username.trim(), email.trim(), password, ref, hp ? { website: hp } : {});
       navigate('/');
     } catch (err) {
       setError(err.response?.data?.detail || 'Registration failed');
@@ -90,6 +91,10 @@ export default function Register() {
                 {showPw ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
               </button>
             </div>
+          </div>
+          {/* Honeypot — hidden from real users */}
+          <div aria-hidden="true" style={{ position: 'absolute', left: '-9999px', height: 0, overflow: 'hidden' }}>
+            <input type="text" name="website" tabIndex={-1} autoComplete="off" value={hp} onChange={e => setHp(e.target.value)} />
           </div>
           <button type="submit" disabled={loading} className="btn-primary w-full disabled:opacity-50">
             {loading ? <div className="w-5 h-5 border-2 border-bg border-t-transparent rounded-full animate-spin" /> : 'Create Account'}

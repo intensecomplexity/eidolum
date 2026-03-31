@@ -33,6 +33,7 @@ class RegisterRequest(BaseModel):
     password: str
     display_name: Optional[str] = None
     ref: Optional[str] = None  # referral username
+    website: Optional[str] = None  # honeypot field — bots fill this
 
 
 class LoginRequest(BaseModel):
@@ -233,6 +234,19 @@ def google_callback(request: Request, code: str = Query(...), db: Session = Depe
 @router.post("/auth/register")
 @limiter.limit("5/minute")
 def register(request: Request, req: RegisterRequest, db: Session = Depends(get_db)):
+    from spam_protection import (
+        is_honeypot_filled, is_disposable_email,
+        check_ip_registration_limit, record_ip_registration,
+        record_blocked_registration,
+    )
+    from slowapi.util import get_remote_address
+    client_ip = get_remote_address(request)
+
+    # Honeypot check — silently reject bots
+    if is_honeypot_filled(req.website):
+        record_blocked_registration(client_ip, "honeypot", req.email)
+        return {"user_id": 0, "username": req.username, "token": "ok"}
+
     # Validate username: 3-30 chars, alphanumeric + underscores
     if not _USERNAME_RE.match(req.username):
         raise HTTPException(
@@ -244,9 +258,19 @@ def register(request: Request, req: RegisterRequest, db: Session = Depends(get_d
     if not _EMAIL_RE.match(req.email):
         raise HTTPException(status_code=400, detail="Invalid email format")
 
+    # Block disposable emails
+    if is_disposable_email(req.email):
+        record_blocked_registration(client_ip, "disposable_email", req.email)
+        raise HTTPException(status_code=400, detail="Please use a permanent email address")
+
     # Validate password length
     if len(req.password) < 8:
         raise HTTPException(status_code=400, detail="Password must be at least 8 characters")
+
+    # IP registration limit (3 per day)
+    if not check_ip_registration_limit(client_ip):
+        record_blocked_registration(client_ip, "ip_limit", req.email)
+        raise HTTPException(status_code=429, detail="Too many accounts created. Try again later.")
 
     # Check uniqueness
     if db.query(User).filter(User.username == req.username).first():
@@ -271,6 +295,7 @@ def register(request: Request, req: RegisterRequest, db: Session = Depends(get_d
     db.add(user)
     db.commit()
     db.refresh(user)
+    record_ip_registration(client_ip)
 
     from activity import log_activity
     log_activity(user_id=user.id, event_type="user_joined", description=f"{user.username} joined Eidolum", data={"user_id": user.id}, db=db)
@@ -296,7 +321,7 @@ def register(request: Request, req: RegisterRequest, db: Session = Depends(get_d
 
 
 @router.post("/auth/login")
-@limiter.limit("10/minute")
+@limiter.limit("5/15minutes")
 def login(request: Request, req: LoginRequest, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.email == req.email).first()
     if not user:

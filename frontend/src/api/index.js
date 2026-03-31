@@ -180,8 +180,8 @@ function authHeaders() {
   return { Authorization: `Bearer ${token}` };
 }
 
-export function registerUser(username, email, password, display_name, ref) {
-  const body = { username, email, password, display_name };
+export function registerUser(username, email, password, display_name, ref, extra = {}) {
+  const body = { username, email, password, display_name, ...extra };
   if (ref) body.ref = ref;
   return api.post('/auth/register', body).then(r => r.data);
 }

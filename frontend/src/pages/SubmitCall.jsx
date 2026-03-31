@@ -80,6 +80,7 @@ export default function SubmitCall() {
   const [priceTarget, setPriceTarget] = useState('');
   const [windowDays, setWindowDays] = useState(90);
   const [reasoning, setReasoning] = useState('');
+  const [hp, setHp] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(null);
@@ -181,14 +182,16 @@ export default function SubmitCall() {
 
     setLoading(true);
     try {
-      const result = await submitUserPrediction({
+      const payload = {
         ticker: resolvedTicker.trim(),
         direction,
         price_target: priceTarget.trim(),
         evaluation_window_days: windowDays,
         reasoning: reasoning.trim() || undefined,
         template: 'custom',
-      });
+      };
+      if (hp) payload.company = hp;
+      const result = await submitUserPrediction(payload);
       // Attach the display name we had before reset
       result._tickerName = tickerName;
       result._windowDays = windowDays;
@@ -447,6 +450,11 @@ export default function SubmitCall() {
             <textarea value={reasoning} onChange={e => setReasoning(e.target.value)}
               placeholder="Why do you think this will happen?" rows={3}
               className="w-full px-4 py-3 bg-surface-2 border border-border rounded-lg text-text-primary placeholder:text-muted focus:outline-none focus:border-accent/50 resize-none" />
+          </div>
+
+          {/* Honeypot */}
+          <div aria-hidden="true" style={{ position: 'absolute', left: '-9999px', height: 0, overflow: 'hidden' }}>
+            <input type="text" name="company" tabIndex={-1} autoComplete="off" value={hp} onChange={e => setHp(e.target.value)} />
           </div>
 
           <div className="sticky bottom-16 sm:bottom-0 z-10 bg-bg pt-3 -mx-4 sm:mx-0 px-4 sm:px-0 pb-3 sm:pb-0">

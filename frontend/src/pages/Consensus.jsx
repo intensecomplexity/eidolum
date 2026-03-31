@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { TrendingUp } from 'lucide-react';
 import ConsensusBar from '../components/ConsensusBar';
 import TickerSearch from '../components/TickerSearch';
@@ -67,7 +68,17 @@ export default function Consensus() {
               <ConsensusBar bullish={c.bullish_count} bearish={c.bearish_count} />
               {c.top_caller && (
                 <div className="mt-3 text-xs text-muted">
-                  Top caller: <span className="text-accent">@{c.top_caller}</span>
+                  Top caller:{' '}
+                  {c.top_caller_id ? (
+                    <Link
+                      to={c.top_caller_source === 'player' ? `/profile/${c.top_caller_id}` : `/forecaster/${c.top_caller_id}`}
+                      className="text-accent hover:underline"
+                    >
+                      {c.top_caller}
+                    </Link>
+                  ) : (
+                    <span className="text-accent">{c.top_caller}</span>
+                  )}
                   <span className="font-mono ml-1">({c.top_caller_accuracy}%)</span>
                 </div>
               )}
