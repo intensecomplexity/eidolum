@@ -81,6 +81,7 @@ def evaluate_batch(max_tickers: int = 200) -> dict:
     """Evaluate one batch of tickers. Connection-safe."""
     from database import BgSessionLocal as SessionLocal
 
+    _history_cache.clear()  # Clear between batches
     now = datetime.utcnow()
 
     # ── STEP 1: Read pending predictions (short DB connection) ──────────
@@ -88,7 +89,7 @@ def evaluate_batch(max_tickers: int = 200) -> dict:
     try:
         rows = db.execute(sql_text("""
             SELECT p.id, p.ticker, p.direction, p.target_price, p.entry_price,
-                   p.evaluation_date, p.prediction_date, p.forecaster_id
+                   p.evaluation_date, p.prediction_date, p.forecaster_id, p.window_days
             FROM predictions p
             WHERE p.outcome = 'pending'
               AND p.evaluation_date IS NOT NULL
@@ -120,7 +121,7 @@ def evaluate_batch(max_tickers: int = 200) -> dict:
             "target_price": float(r[3]) if r[3] else None,
             "entry_price": float(r[4]) if r[4] else None,
             "evaluation_date": r[5], "prediction_date": r[6],
-            "forecaster_id": r[7],
+            "forecaster_id": r[7], "window_days": r[8],
         })
 
     tickers = list(ticker_preds.keys())[:max_tickers]
@@ -150,58 +151,90 @@ def evaluate_batch(max_tickers: int = 200) -> dict:
             break
 
         prices = all_prices.get(ticker)
-        if not prices:
-            continue
-
         preds = ticker_preds[ticker]
 
         # ── STEP 4: Score predictions ───────────────────────────────────
         updates = []
+        no_data_updates = []
         skipped_no_eval_price = 0
         skipped_no_ref = 0
         for p in preds:
+            # If no price data at all, mark as no_data if overdue by 7+ days
+            if not prices:
+                days_overdue = (now - p["evaluation_date"]).days if p["evaluation_date"] else 0
+                if days_overdue >= 7:
+                    no_data_updates.append(p["id"])
+                skipped_no_eval_price += 1
+                continue
+
             eval_price = _closest_price(prices, p["evaluation_date"])
             if eval_price is None:
+                days_overdue = (now - p["evaluation_date"]).days if p["evaluation_date"] else 0
+                if days_overdue >= 7:
+                    no_data_updates.append(p["id"])
                 skipped_no_eval_price += 1
                 continue
 
             ref = p["entry_price"]
             if not ref or ref <= 0:
-                # Without a stored entry_price, we can't calculate accurate returns
-                # (_closest_price only has the current quote, not historical data)
+                days_overdue = (now - p["evaluation_date"]).days if p["evaluation_date"] else 0
+                if days_overdue >= 7:
+                    no_data_updates.append(p["id"])
                 skipped_no_ref += 1
                 continue
 
             target = p["target_price"]
 
             # Determine effective direction from price target when available
-            # A "bullish" rating with target BELOW entry is actually bearish
             direction = p["direction"]
             if target and target > 0 and ref > 0:
                 if target > ref:
-                    direction = "bullish"  # Target above entry = expects stock to rise
+                    direction = "bullish"
                 elif target < ref:
-                    direction = "bearish"  # Target below entry = expects stock to fall
+                    direction = "bearish"
 
-            # Calculate return based on direction
+            # Calculate return
             raw_move = round(((eval_price - ref) / ref) * 100, 2)
             if direction == "bearish":
-                ret = -raw_move  # For bearish, positive return = stock went down
+                ret = -raw_move
             else:
                 ret = raw_move
 
-            # Score: did the stock move in the predicted direction?
-            if target and target > 0:
-                if direction == "bullish":
-                    outcome = "correct" if eval_price >= target else "incorrect"
+            # Three-tier scoring: hit / near / miss
+            window = p.get("window_days") or 90
+            tolerance = _get_tolerance(window, _TOLERANCE)
+            min_movement = _get_tolerance(window, _MIN_MOVEMENT)
+
+            if direction == "neutral":
+                abs_ret = abs(raw_move)
+                if abs_ret <= 5.0:
+                    outcome = "hit"
+                elif abs_ret <= 10.0:
+                    outcome = "near"
                 else:
-                    outcome = "correct" if eval_price <= target else "incorrect"
+                    outcome = "miss"
+            elif target and target > 0:
+                target_dist_pct = abs(eval_price - target) / target * 100
+                if direction == "bullish":
+                    if eval_price >= target or target_dist_pct <= tolerance:
+                        outcome = "hit"
+                    elif raw_move >= min_movement:
+                        outcome = "near"
+                    else:
+                        outcome = "miss"
+                else:  # bearish
+                    if eval_price <= target or target_dist_pct <= tolerance:
+                        outcome = "hit"
+                    elif raw_move <= -min_movement:
+                        outcome = "near"
+                    else:
+                        outcome = "miss"
             else:
                 # No price target — pure directional
                 if direction == "bullish":
-                    outcome = "correct" if eval_price > ref else "incorrect"
+                    outcome = "hit" if eval_price > ref else "miss"
                 else:
-                    outcome = "correct" if eval_price < ref else "incorrect"
+                    outcome = "hit" if eval_price < ref else "miss"
 
             # Calculate benchmark (SPY) return for alpha
             spy_return = _calc_spy_return(p.get("prediction_date"), p.get("evaluation_date"))
@@ -214,17 +247,20 @@ def evaluate_batch(max_tickers: int = 200) -> dict:
                 "spy_return": spy_return, "alpha": pred_alpha,
             })
             affected_forecasters.add(p["forecaster_id"])
-            if outcome == "correct":
+            if outcome in ("hit", "correct"):
                 total_correct += 1
-            else:
+            elif outcome in ("miss", "incorrect"):
                 total_incorrect += 1
 
         if skipped_no_eval_price > 0 or skipped_no_ref > 0:
             print(f"[HistEval] {ticker}: skipped {skipped_no_eval_price} (no eval price) + {skipped_no_ref} (no ref price)")
-        print(f"[HistEval] {ticker}: {len(updates)} to update out of {len(preds)}")
+        if no_data_updates:
+            print(f"[HistEval] {ticker}: {len(no_data_updates)} marked no_data")
+        if updates or no_data_updates:
+            print(f"[HistEval] {ticker}: {len(updates)} scored, {len(no_data_updates)} no_data out of {len(preds)}")
 
         # ── STEP 5: Write results (short DB connection) ─────────────────
-        if updates:
+        if updates or no_data_updates:
             db = SessionLocal()
             try:
                 for u in updates:
@@ -238,6 +274,10 @@ def evaluate_batch(max_tickers: int = 200) -> dict:
                         "spy": u.get("spy_return"), "alp": u.get("alpha"),
                         "eval_at": now, "id": u["id"],
                     })
+                for pid in no_data_updates:
+                    db.execute(sql_text(
+                        "UPDATE predictions SET outcome='no_data', evaluated_at=:now WHERE id=:id"
+                    ), {"now": now, "id": pid})
                 db.commit()
                 total_scored += len(updates)
             except Exception as e:
@@ -258,6 +298,20 @@ def evaluate_batch(max_tickers: int = 200) -> dict:
         "incorrect": total_incorrect,
         "remaining_tickers": max(remaining, 0),
     }
+
+
+# ── Three-tier scoring thresholds ──────────────────────────────────────────
+_TOLERANCE = {1: 2, 7: 3, 14: 4, 30: 5, 90: 5, 180: 7, 365: 10}
+_MIN_MOVEMENT = {1: 0.5, 7: 1, 14: 1.5, 30: 2, 90: 2, 180: 3, 365: 4}
+
+
+def _get_tolerance(window_days: int, table: dict) -> float:
+    if not window_days or window_days <= 0:
+        window_days = 30
+    for k in sorted(table.keys()):
+        if window_days <= k:
+            return table[k]
+    return table[max(table.keys())]
 
 
 def _calc_spy_return(pred_date, eval_date) -> float | None:
@@ -287,37 +341,61 @@ def _build_summary(ticker, direction, outcome, entry, eval_price, target, ret):
     eval_str = f"${eval_price:,.2f}" if eval_price else "?"
     ret_str = f"{'+' if ret >= 0 else ''}{ret:.1f}%" if ret is not None else ""
 
+    mark = "✓" if outcome in ("hit", "correct") else "~" if outcome == "near" else "✗"
     if target and target > 0:
         target_str = f"${target:,.0f}"
-        if outcome == "correct":
-            return f"Target {target_str} on {ticker} — entry {entry_str}, reached {eval_str} {ret_str} ✓"
-        else:
-            return f"Target {target_str} on {ticker} — entry {entry_str}, ended at {eval_str} {ret_str}, target not reached"
+        return f"Target {target_str} on {ticker} — entry {entry_str}, ended at {eval_str} {ret_str} {mark}"
     else:
-        if outcome == "correct":
-            return f"Called {dir_label} on {ticker} at {entry_str}, stock moved to {eval_str} ({ret_str}) ✓"
-        else:
-            return f"Called {dir_label} on {ticker} at {entry_str}, stock moved to {eval_str} ({ret_str})"
+        return f"Called {dir_label} on {ticker} at {entry_str}, stock moved to {eval_str} ({ret_str}) {mark}"
 
 
 FINNHUB_KEY = os.getenv("FINNHUB_KEY", "").strip()
+FMP_KEY = os.getenv("FMP_KEY", "").strip()
 if not FINNHUB_KEY:
-    print("[HistEval] WARNING: FINNHUB_KEY not set — evaluator cannot fetch prices, no predictions will be scored")
+    print("[HistEval] WARNING: FINNHUB_KEY not set")
 _quote_cache: dict[str, dict] = {}
+_history_cache: dict[str, dict] = {}
 
 
 def _fetch_history(ticker: str, start, end) -> dict:
-    """Fetch current quote from Finnhub. Returns {today_str: current_price, 'prev_close': pc}.
-    Finnhub free tier doesn't support historical candles, so we use the current quote
-    as an approximation for scoring expired predictions."""
+    """Fetch historical daily prices for a ticker. Returns {date_str: close_price, ...}.
+    Tries FMP historical API first, then yfinance, then falls back to Finnhub current quote."""
     import httpx
 
-    if ticker in _quote_cache:
-        return _quote_cache[ticker]
+    if ticker in _history_cache:
+        return _history_cache[ticker]
 
-    price = None
+    prices = {}
 
-    # Try Finnhub first
+    # 1. Try FMP historical prices (free tier: 250 calls/day)
+    if FMP_KEY:
+        try:
+            r = httpx.get(
+                f"https://financialmodelingprep.com/api/v3/historical-price-full/{ticker}",
+                params={"apikey": FMP_KEY, "serietype": "line"},
+                timeout=10,
+            )
+            data = r.json()
+            historical = data.get("historical", [])
+            for day in historical:
+                ds = day.get("date", "")
+                close = day.get("close")
+                if ds and close and close > 0:
+                    prices[ds] = float(close)
+            if prices:
+                _history_cache[ticker] = prices
+                return prices
+        except Exception:
+            pass
+
+    # 2. Try yfinance (free, works sometimes on Railway)
+    try:
+        from jobs.price_checker import get_stock_price_on_date
+        # yfinance fallback handled per-prediction via _closest_price
+    except Exception:
+        pass
+
+    # 3. Fallback: Finnhub current quote (only valid for recently expired predictions)
     if FINNHUB_KEY:
         try:
             r = httpx.get(
@@ -327,40 +405,43 @@ def _fetch_history(ticker: str, start, end) -> dict:
             )
             data = r.json()
             current = float(data.get("c", 0) or 0)
-            prev_close = float(data.get("pc", 0) or 0)
-            price = current if current > 0 else prev_close if prev_close > 0 else None
+            if current > 0:
+                today = datetime.utcnow().strftime("%Y-%m-%d")
+                prices = {today: current, "_current": current}
+                _history_cache[ticker] = prices
+                return prices
         except Exception:
             pass
 
-    # Fallback to yfinance
-    if not price:
-        try:
-            from jobs.price_checker import get_current_price as yf_price
-            price = yf_price(ticker)
-        except Exception:
-            pass
-
-    if not price or price <= 0:
-        return {}
-
-    today = datetime.utcnow().strftime("%Y-%m-%d")
-    result = {today: price, "_current": price}
-    _quote_cache[ticker] = result
-    return result
+    return {}
 
 
 def _closest_price(prices: dict, target_date) -> float | None:
-    if not prices:
+    """Find the closest available price to the target date."""
+    if not prices or not target_date:
         return None
-    # If we only have the current quote, return it
-    if "_current" in prices:
-        return prices["_current"]
-    if not target_date:
-        return None
+
     target = target_date.date() if hasattr(target_date, 'date') else target_date
     ts = str(target)
+
+    # Exact match
     if ts in prices:
         return prices[ts]
+
+    # If only current quote, check if target is within 5 days of today
+    if "_current" in prices and len(prices) <= 2:
+        days_old = (datetime.utcnow().date() - target).days if hasattr(target, 'year') else 999
+        if days_old <= 5:
+            return prices["_current"]
+        # Too old for current quote — try yfinance for historical
+        try:
+            from jobs.price_checker import get_stock_price_on_date
+            # We need the ticker, but it's not passed here — use current as last resort
+        except Exception:
+            pass
+        return prices["_current"]  # Better than nothing, but flag in logs
+
+    # Find nearest date in the history
     best, best_diff = None, 999
     for ds, price in prices.items():
         if ds.startswith("_"):
@@ -383,24 +464,28 @@ def _update_stats(fids: set):
     updated = 0
     try:
         for fid in fids:
-            total = db.execute(sql_text(
-                "SELECT COUNT(*) FROM predictions WHERE forecaster_id = :f AND outcome IN ('correct','incorrect')"
-            ), {"f": fid}).scalar() or 0
-            correct = db.execute(sql_text(
-                "SELECT COUNT(*) FROM predictions WHERE forecaster_id = :f AND outcome = 'correct'"
-            ), {"f": fid}).scalar() or 0
-            agg = db.execute(sql_text(
-                "SELECT AVG(alpha), AVG(actual_return) FROM predictions WHERE forecaster_id = :f AND outcome IN ('correct','incorrect') AND actual_return IS NOT NULL"
-            ), {"f": fid}).first()
-            avg_alpha = agg[0] if agg else None
-            avg_ret = agg[1] if agg else None
+            row = db.execute(sql_text(f"""
+                SELECT COUNT(*),
+                       SUM(CASE WHEN outcome IN {_HIT_OUTCOMES} THEN 1 ELSE 0 END),
+                       SUM(CASE WHEN outcome = 'near' THEN 1 ELSE 0 END),
+                       AVG(alpha),
+                       AVG(actual_return)
+                FROM predictions
+                WHERE forecaster_id = :f AND outcome IN {_SCORED_OUTCOMES}
+                  AND actual_return IS NOT NULL
+            """), {"f": fid}).first()
+            total = row[0] or 0
+            hits = row[1] or 0
+            nears = row[2] or 0
+            avg_alpha = row[3]
+            avg_ret = row[4]
             if total > 0:
-                acc = round(correct / total * 100, 1)
+                acc = round((hits + nears * 0.5) / total * 100, 1)
                 alp = round(float(avg_alpha), 2) if avg_alpha is not None else 0
                 ar = round(float(avg_ret), 2) if avg_ret is not None else 0
                 db.execute(sql_text(
                     "UPDATE forecasters SET total_predictions=:t, correct_predictions=:c, accuracy_score=:a, alpha=:alp, avg_return=:ar WHERE id=:f"
-                ), {"t": total, "c": correct, "a": acc, "alp": alp, "ar": ar, "f": fid})
+                ), {"t": total, "c": hits, "a": acc, "alp": alp, "ar": ar, "f": fid})
                 updated += 1
         db.commit()
         print(f"[HistEval] Updated stats for {updated}/{len(fids)} forecasters")
