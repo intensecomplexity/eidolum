@@ -1268,17 +1268,28 @@ async def lifespan(app):
         except Exception as e:
             print(f"[Startup] Index creation error: {e}")
 
-        # Auto-promote super admin
+        # Ensure is_admin column exists + auto-promote super admin
         try:
             _admin_db = BgSessionLocal()
-            _sa = _admin_db.query(User).filter(User.email == "nimrodryder@gmail.com").first()
-            if _sa and not _sa.is_admin:
-                _sa.is_admin = 1
+            # Add column if missing (create_all doesn't alter existing tables)
+            try:
+                _admin_db.execute(sql_text("ALTER TABLE users ADD COLUMN IF NOT EXISTS is_admin INTEGER DEFAULT 0"))
                 _admin_db.commit()
-                print("[Startup] Promoted nimrodryder@gmail.com to admin")
+            except Exception:
+                _admin_db.rollback()
+            # Force-set admin on every startup
+            _admin_db.execute(sql_text(
+                "UPDATE users SET is_admin = 1 WHERE email = 'nimrodryder@gmail.com' AND (is_admin IS NULL OR is_admin = 0)"
+            ))
+            _admin_db.commit()
+            row = _admin_db.execute(sql_text(
+                "SELECT id, is_admin FROM users WHERE email = 'nimrodryder@gmail.com'"
+            )).first()
+            if row:
+                print(f"[Startup] Admin: user_id={row[0]}, is_admin={row[1]}")
             _admin_db.close()
-        except Exception:
-            pass
+        except Exception as e:
+            print(f"[Startup] Admin promote error: {e}")
 
         # Reclassify hold/neutral predictions that were forced into bull/bear.
         # The context_formatter writes "Firm: Neutral — ..." for hold/neutral ratings,

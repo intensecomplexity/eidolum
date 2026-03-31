@@ -129,6 +129,13 @@ export default function Navbar() {
                 <HelpCircle className="w-4.5 h-4.5" />
               </button>
 
+              {/* Admin gear icon */}
+              {user?.is_admin && (
+                <Link to="/admin/dashboard" className="hidden sm:flex items-center justify-center w-9 h-9 rounded-lg text-text-secondary hover:text-accent transition-colors" title="Admin Panel">
+                  <Settings className="w-4.5 h-4.5" />
+                </Link>
+              )}
+
               {/* Notification bell */}
               <NotificationBell />
 

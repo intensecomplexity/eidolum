@@ -82,24 +82,21 @@ def _build_ticker_detail(ticker: str, db) -> dict:
     industry = None
     try:
         ts_row = db.execute(sql_text(
-            "SELECT sector, company_name, industry FROM ticker_sectors WHERE ticker = :t"
+            "SELECT sector FROM ticker_sectors WHERE ticker = :t"
         ), {"t": ticker}).first()
         if ts_row:
             sector = ts_row[0]
-            company_name = ts_row[1]
-            industry = ts_row[2]
     except Exception:
-        pass
+        db.rollback()
     if not sector:
         try:
             sector = db.execute(sql_text(
                 "SELECT sector FROM predictions WHERE ticker = :t AND sector IS NOT NULL AND sector != 'Other' LIMIT 1"
             ), {"t": ticker}).scalar()
         except Exception:
-            pass
-    if not company_name:
-        from ticker_lookup import TICKER_INFO
-        company_name = TICKER_INFO.get(ticker)
+            db.rollback()
+    from ticker_lookup import TICKER_INFO
+    company_name = TICKER_INFO.get(ticker)
 
     # ── Combined counts query (one round-trip instead of multiple) ──────
     try:
@@ -120,6 +117,7 @@ def _build_ticker_detail(ticker: str, db) -> dict:
         """), {"t": ticker}).first()
     except Exception as e:
         print(f"[TickerDetail] Counts query failed for {ticker}: {e}")
+        db.rollback()
         counts_row = None
 
     total_all = (counts_row[0] or 0) if counts_row else 0
@@ -190,6 +188,7 @@ def _build_ticker_detail(ticker: str, db) -> dict:
                 bears.append(entry)
     except Exception as e:
         print(f"[TickerDetail] Pending query failed for {ticker}: {e}")
+        db.rollback()
 
     bulls.sort(key=lambda x: x["accuracy"], reverse=True)
     bears.sort(key=lambda x: x["accuracy"], reverse=True)
@@ -238,6 +237,7 @@ def _build_ticker_detail(ticker: str, db) -> dict:
             })
     except Exception as e:
         print(f"[TickerDetail] Scored query failed for {ticker}: {e}")
+        db.rollback()
 
     # ── Top forecaster on this ticker (simplified, no ::numeric cast) ────
     top_fc = None
