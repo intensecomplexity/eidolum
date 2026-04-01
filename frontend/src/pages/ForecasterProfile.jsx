@@ -347,6 +347,34 @@ export default function ForecasterProfile() {
           </div>
         </div>
 
+        {/* Direction breakdown — bull/bear/neutral split */}
+        {data.prediction_counts && (data.prediction_counts.bullish > 0 || data.prediction_counts.bearish > 0 || data.prediction_counts.neutral > 0) && (() => {
+          const bull = data.prediction_counts.bullish || 0;
+          const bear = data.prediction_counts.bearish || 0;
+          const neut = data.prediction_counts.neutral || 0;
+          const total = bull + bear + neut;
+          if (total === 0) return null;
+          const bullPct = Math.round(bull / total * 100);
+          const neutPct = Math.round(neut / total * 100);
+          const bearPct = 100 - bullPct - neutPct;
+          return (
+            <div className="card mb-6 sm:mb-8">
+              <h2 className="text-base sm:text-lg font-semibold mb-3">Direction Breakdown</h2>
+              <div className="flex items-center justify-between text-xs font-mono mb-1.5">
+                <span className="text-positive">{bullPct}% Bullish ({bull})</span>
+                {neut > 0 && <span className="text-warning">{neutPct}% Hold ({neut})</span>}
+                <span className="text-negative">{bearPct}% Bearish ({bear})</span>
+              </div>
+              <div className="h-3 rounded-full overflow-hidden flex bg-surface-2">
+                {bullPct > 0 && <div className="bg-positive" style={{ width: `${bullPct}%` }} />}
+                {neutPct > 0 && <div className="bg-warning" style={{ width: `${neutPct}%` }} />}
+                {bearPct > 0 && <div className="bg-negative" style={{ width: `${bearPct}%` }} />}
+              </div>
+              <p className="text-[10px] text-muted mt-1.5">{total} total predictions across all directions</p>
+            </div>
+          );
+        })()}
+
         {/* Portfolio Simulator */}
         <PortfolioSimulator forecasterId={parseInt(id)} forecasterName={data.name} />
 

@@ -153,6 +153,20 @@ def get_forecaster_sectors(request: Request, forecaster_id: int, db: Session = D
     except Exception:
         counts = {}
 
+    # Direction breakdown
+    dir_counts = {"bullish": 0, "bearish": 0, "neutral": 0}
+    try:
+        dir_rows = db.execute(sql_text("""
+            SELECT direction, COUNT(*) FROM predictions
+            WHERE forecaster_id = :fid AND direction IS NOT NULL
+            GROUP BY direction
+        """), {"fid": forecaster_id}).fetchall()
+        for r in dir_rows:
+            if r[0] in dir_counts:
+                dir_counts[r[0]] = r[1]
+    except Exception:
+        pass
+
     return {
         "sector_strengths": sectors,
         "prediction_counts": {
@@ -164,6 +178,9 @@ def get_forecaster_sectors(request: Request, forecaster_id: int, db: Session = D
             "misses": counts.get("miss", 0) + counts.get("incorrect", 0),
             "correct": counts.get("hit", 0) + counts.get("correct", 0),
             "incorrect": counts.get("miss", 0) + counts.get("incorrect", 0),
+            "bullish": dir_counts["bullish"],
+            "bearish": dir_counts["bearish"],
+            "neutral": dir_counts["neutral"],
         },
     }
 
