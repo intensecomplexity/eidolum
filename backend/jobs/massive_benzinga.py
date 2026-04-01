@@ -193,10 +193,14 @@ def _process_rating(rating: dict, db: Session) -> bool:
     if db.execute(text("SELECT 1 FROM predictions WHERE source_platform_id = :sid LIMIT 1"), {"sid": source_id}).first():
         return False
 
-    # Source URL
-    source_url = url_news or url_calendar or f"https://www.benzinga.com/quote/{ticker}/analyst-ratings"
-    if db.execute(text("SELECT 1 FROM predictions WHERE source_url = :u LIMIT 1"), {"u": source_url}).first():
-        return False
+    # Source URL — prefer real article URLs, reject generic quote pages
+    source_url = ""
+    for candidate in [url_news, url_calendar]:
+        if candidate and "/quote/" not in candidate:
+            source_url = candidate
+            break
+    if not source_url:
+        source_url = f"https://www.benzinga.com/stock/{ticker}/ratings"
 
     # Find or create forecaster
     forecaster = find_forecaster(canonical, db)

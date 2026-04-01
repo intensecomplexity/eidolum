@@ -170,9 +170,23 @@ export function simpleExplainer(prediction) {
   }
   if (direction === 'neutral') {
     if (target && entry && entry > 0) {
-      return `In simple terms: Neutral on ${ticker}. Expects the stock to stay around current levels. Target $${target.toFixed(0)} (currently $${entry.toFixed(0)})`;
+      const pctChange = ((target - entry) / entry * 100).toFixed(1);
+      const sign = target >= entry ? '+' : '';
+      return `In simple terms: Neutral on ${ticker}. Target $${target.toFixed(0)} (${sign}${pctChange}% from $${entry.toFixed(0)}). Expects limited movement.`;
     }
-    return `In simple terms: Neutral on ${ticker}. Neither bullish nor bearish.`;
+    if (isInitiate) {
+      return `In simple terms: Started covering ${ticker} with a neutral outlook${ratingCap ? ` (${ratingCap})` : ''}. No strong conviction either way.`;
+    }
+    if (isMaintain) {
+      return `In simple terms: Maintains neutral stance on ${ticker}${ratingCap ? ` (${ratingCap})` : ''}. Still sees no clear direction.`;
+    }
+    if (isDowngrade) {
+      return `In simple terms: Downgraded ${ticker} to neutral${ratingCap ? ` (${ratingCap})` : ''}. Less optimistic than before.`;
+    }
+    if (isUpgrade) {
+      return `In simple terms: Upgraded ${ticker} to neutral${ratingCap ? ` (${ratingCap})` : ''}. Slightly more positive than before.`;
+    }
+    return `In simple terms: Neutral on ${ticker}${ratingCap ? ` — rated ${ratingCap}` : ''}. Expects the stock to trade sideways.`;
   }
 
   return null;

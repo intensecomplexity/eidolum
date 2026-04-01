@@ -474,7 +474,8 @@ def _insert_rating(rating: dict, db) -> bool:
             pass
 
     window_days = 365 if target_price else 90
-    source_url = url_news or f"https://www.benzinga.com/quote/{ticker}/analyst-ratings"
+    # Prefer real article URLs, reject generic quote pages
+    source_url = url_news if url_news and "/quote/" not in url_news else f"https://www.benzinga.com/stock/{ticker}/ratings"
     from jobs.context_formatter import format_context
     context = format_context(canonical, action, rating_current, ticker, target_price)
 

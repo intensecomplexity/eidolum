@@ -1559,6 +1559,22 @@ async def lifespan(app):
         except Exception as e:
             print(f"[Startup] Season init error: {e}")
 
+        # One-time: fix generic benzinga.com/quote/ URLs to benzinga.com/stock/TICKER/ratings
+        try:
+            _fix_db = BgSessionLocal()
+            fixed = _fix_db.execute(sql_text("""
+                UPDATE predictions
+                SET source_url = 'https://www.benzinga.com/stock/' || ticker || '/ratings',
+                    archive_url = 'https://www.benzinga.com/stock/' || ticker || '/ratings'
+                WHERE source_url LIKE '%benzinga.com/quote/%'
+            """)).rowcount
+            _fix_db.commit()
+            _fix_db.close()
+            if fixed > 0:
+                print(f"[Startup] Fixed {fixed} generic Benzinga quote URLs")
+        except Exception as e:
+            print(f"[Startup] URL fix error: {e}")
+
         # Backfill ticker_sectors company names for all tickers
         try:
             from jobs.sector_lookup import backfill_company_names
