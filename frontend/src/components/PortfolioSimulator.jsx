@@ -48,27 +48,19 @@ export default function PortfolioSimulator({ forecasterId, forecasterName }) {
 
   return (
     <div className="card mb-6 sm:mb-8">
-      {/* Headline */}
+      {/* Headline — single compact block */}
       <div className="mb-4">
         <p className="text-xs text-muted uppercase tracking-wider font-semibold mb-2">
           <DollarSign className="w-3.5 h-3.5 inline -mt-0.5" /> Portfolio Simulator
         </p>
-        <p className="text-text-secondary text-sm mb-3">
-          If you followed <span className="text-accent font-medium">{forecasterName}</span>'s last {total_predictions} calls with ${starting_capital.toLocaleString()}...
+        <p className="text-sm text-text-secondary whitespace-nowrap overflow-hidden text-ellipsis">
+          If you followed <span className="text-accent font-medium">{forecasterName}</span>'s last {total_predictions} calls with ${starting_capital.toLocaleString()}
+          {' '}<span className="font-mono text-xl sm:text-2xl font-bold text-accent">${current_value.toLocaleString()}</span>
+          {' '}<span className={`font-mono text-sm font-bold ${isPositive ? 'text-positive' : 'text-negative'}`}>{isPositive ? '+' : ''}{total_return_pct}%</span>
         </p>
-        <div className="flex items-baseline gap-3 flex-wrap">
-          <span className="font-mono text-3xl sm:text-4xl font-bold text-accent">
-            ${current_value.toLocaleString()}
-          </span>
-          <span className={`font-mono text-lg font-bold ${isPositive ? 'text-positive' : 'text-negative'}`}>
-            {isPositive ? '+' : ''}{total_return_pct}%
-          </span>
-        </div>
         {alpha !== 0 && (
           <p className="text-xs text-muted mt-1">
-            Alpha vs S&P 500: <span className={`font-mono font-semibold ${alpha >= 0 ? 'text-positive' : 'text-negative'}`}>
-              {alpha >= 0 ? '+' : ''}{alpha}%
-            </span>
+            Alpha vs S&P 500: <span className={`font-mono font-semibold ${alpha >= 0 ? 'text-positive' : 'text-negative'}`}>{alpha >= 0 ? '+' : ''}{alpha}%</span>
           </p>
         )}
         {time_period && <p className="text-[10px] text-muted mt-0.5">{time_period}</p>}
