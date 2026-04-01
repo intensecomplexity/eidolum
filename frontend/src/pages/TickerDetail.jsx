@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { TrendingUp, TrendingDown, Trophy, ArrowLeft, Check, X, BarChart3, Users, MessageSquare } from 'lucide-react';
+import { TrendingUp, TrendingDown, Trophy, ArrowLeft, Check, X, BarChart3, Users, MessageSquare, ChevronDown, Clock, Target, Calendar, Minus } from 'lucide-react';
 import PredictionBadge from '../components/PredictionBadge';
 import ConsensusBar from '../components/ConsensusBar';
 import StockChart from '../components/StockChart';
@@ -142,9 +142,6 @@ export default function TickerDetail() {
             <span className="text-muted">&middot; {stats.top_forecaster.predictions} calls</span>
           </div>
         )}
-
-        {/* ── PRICE CHART ──────────────────────────────────────────────── */}
-        <StockChart ticker={ticker} />
 
         {/* ── SECTION 1: CURRENT ANALYST OUTLOOK ────────────────────────── */}
         <div className="mb-8">

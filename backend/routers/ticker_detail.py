@@ -276,9 +276,22 @@ def get_ticker_stats(
 # ── GET /api/ticker/{ticker}/chart — price history + prediction markers ──────
 
 _chart_cache: dict[str, tuple] = {}
-_CHART_TTL = 3600  # 1 hour
+_CHART_TTL_MARKET = 300   # 5 minutes during market hours
+_CHART_TTL_CLOSED = 3600  # 1 hour outside market hours
 
-PERIOD_MAP = {"1w": "5d", "1m": "1mo", "3m": "3mo", "6m": "6mo", "1y": "1y", "all": "max"}
+PERIOD_DAYS = {"1w": 7, "1m": 30, "3m": 90, "6m": 180, "1y": 365, "all": 3650}
+
+FMP_KEY = os.getenv("FMP_KEY", "")
+
+
+def _is_market_hours():
+    """Check if US stock market is currently open (rough check)."""
+    from datetime import timezone
+    now_utc = datetime.now(timezone.utc)
+    # ET = UTC-4 (EDT) or UTC-5 (EST). Use UTC-4 as approximation.
+    et_hour = (now_utc.hour - 4) % 24
+    weekday = now_utc.weekday()
+    return weekday < 5 and 9 <= et_hour < 16
 
 
 @router.get("/ticker/{ticker}/chart")
@@ -286,31 +299,63 @@ PERIOD_MAP = {"1w": "5d", "1m": "1mo", "3m": "3mo", "6m": "6mo", "1y": "1y", "al
 def get_ticker_chart(
     request: Request,
     ticker: str,
-    period: str = Query("6m"),
+    period: str = Query("3m"),
     db: Session = Depends(get_db),
 ):
     ticker = ticker.upper().strip()
-    yf_period = PERIOD_MAP.get(period, "6mo")
     cache_key = f"{ticker}_{period}"
+    ttl = _CHART_TTL_MARKET if _is_market_hours() else _CHART_TTL_CLOSED
 
     cached = _chart_cache.get(cache_key)
-    if cached and (time.time() - cached[1]) < _CHART_TTL:
+    if cached and (time.time() - cached[1]) < ttl:
         return cached[0]
 
-    # Fetch price data from yfinance
+    days = PERIOD_DAYS.get(period, 90)
     prices = []
-    try:
-        import yfinance as yf
-        stock = yf.Ticker(ticker)
-        hist = stock.history(period=yf_period)
-        for date_idx, row in hist.iterrows():
-            prices.append({
-                "date": date_idx.strftime("%Y-%m-%d"),
-                "close": round(float(row["Close"]), 2),
-                "volume": int(row.get("Volume", 0)),
-            })
-    except Exception as e:
-        print(f"[Chart] yfinance error for {ticker}: {e}")
+
+    # Try FMP first (reliable on Railway)
+    if FMP_KEY:
+        try:
+            r = httpx.get(
+                f"https://financialmodelingprep.com/stable/historical-price-full/{ticker}",
+                params={"apikey": FMP_KEY},
+                timeout=15,
+            )
+            if r.status_code == 200:
+                data = r.json()
+                historical = data.get("historical") or data if isinstance(data, list) else []
+                if isinstance(data, dict):
+                    historical = data.get("historical", [])
+                from datetime import timedelta as _td
+                cutoff = (datetime.utcnow() - _td(days=days)).strftime("%Y-%m-%d")
+                for item in historical:
+                    d = item.get("date", "")
+                    if d < cutoff:
+                        continue
+                    prices.append({
+                        "date": d,
+                        "close": round(float(item.get("close", 0)), 2),
+                        "volume": int(item.get("volume", 0)),
+                    })
+                prices.sort(key=lambda x: x["date"])
+        except Exception as e:
+            print(f"[Chart] FMP error for {ticker}: {e}")
+
+    # Fallback to yfinance if FMP returned nothing
+    if not prices:
+        try:
+            import yfinance as yf
+            yf_period_map = {"1w": "5d", "1m": "1mo", "3m": "3mo", "6m": "6mo", "1y": "1y", "all": "max"}
+            stock = yf.Ticker(ticker)
+            hist = stock.history(period=yf_period_map.get(period, "3mo"))
+            for date_idx, row in hist.iterrows():
+                prices.append({
+                    "date": date_idx.strftime("%Y-%m-%d"),
+                    "close": round(float(row["Close"]), 2),
+                    "volume": int(row.get("Volume", 0)),
+                })
+        except Exception as e:
+            print(f"[Chart] yfinance fallback error for {ticker}: {e}")
 
     # Fetch prediction markers from DB
     from models import Prediction, Forecaster

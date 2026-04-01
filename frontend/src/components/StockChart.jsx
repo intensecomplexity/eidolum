@@ -29,7 +29,7 @@ function PriceTooltip({ active, payload }) {
 }
 
 export default function StockChart({ ticker }) {
-  const [period, setPeriod] = useState('6m');
+  const [period, setPeriod] = useState('3m');
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -52,7 +52,15 @@ export default function StockChart({ ticker }) {
     );
   }
 
-  if (!data?.prices?.length) return null;
+  if (!data?.prices?.length) {
+    return (
+      <div className="card mb-6">
+        <div className="flex items-center justify-center h-[80px] text-muted text-sm">
+          Price data unavailable for this ticker
+        </div>
+      </div>
+    );
+  }
 
   const prices = data.prices;
   const predictions = data.predictions || [];
