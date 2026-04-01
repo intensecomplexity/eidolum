@@ -301,41 +301,50 @@ def _extract_domain(url: str) -> str:
         return ""
 
 
+def _get_tickers_needing_data(limit: int) -> list:
+    """Get tickers missing description or logo, prioritized by prediction count."""
+    from database import BgSessionLocal as SessionLocal
+    db = SessionLocal()
+    try:
+        rows = db.execute(sql_text("""
+            SELECT p.ticker, COUNT(*) as cnt
+            FROM predictions p
+            LEFT JOIN ticker_sectors ts ON ts.ticker = p.ticker
+            WHERE ts.description IS NULL OR ts.description = '' OR LENGTH(ts.description) < 20
+                  OR ts.logo_domain IS NULL OR ts.logo_domain = ''
+            GROUP BY p.ticker
+            ORDER BY cnt DESC
+            LIMIT :lim
+        """), {"lim": limit}).fetchall()
+        return [r[0] for r in rows]
+    except Exception as e:
+        print(f"[DescBackfill] Query error: {e}")
+        return []
+    finally:
+        db.close()
+
+
 def backfill_descriptions():
-    """Populate ticker_sectors description + logo_url using FMP /stable/profile.
-    Prioritizes tickers with most predictions. Max 50 per run (FMP 300/day limit).
-    Skips tickers that already have both description and logo_url."""
+    """Populate ticker_sectors using FMP /stable/profile endpoint.
+    Fetches: company name, description (2 sentences), logo URL, logo domain, sector, industry.
+    Max 50 tickers per run. 0.5s delay between calls. Handles errors gracefully."""
     import httpx
     from database import BgSessionLocal as SessionLocal
 
     fmp_key = os.getenv("FMP_KEY", "").strip()
     if not fmp_key:
-        print("[DescBackfill] FMP_KEY not set, skipping")
+        print("[DescBackfill] FMP_KEY not set, trying yfinance fallback")
+        backfill_descriptions_yfinance()
         return
 
-    db = SessionLocal()
-    try:
-        # Prioritize tickers with most predictions that are missing description or logo
-        rows = db.execute(sql_text("""
-            SELECT p.ticker, COUNT(*) as cnt
-            FROM predictions p
-            LEFT JOIN ticker_sectors ts ON ts.ticker = p.ticker
-            WHERE (ts.description IS NULL OR ts.description = ''
-                   OR ts.logo_url IS NULL OR ts.logo_url = '')
-            GROUP BY p.ticker
-            ORDER BY cnt DESC
-            LIMIT 50
-        """)).fetchall()
-    finally:
-        db.close()
-
-    if not rows:
+    tickers = _get_tickers_needing_data(50)
+    if not tickers:
         print("[DescBackfill] All tickers already have descriptions + logos")
         return
 
-    tickers = [r[0] for r in rows]
     updated = 0
-    print(f"[DescBackfill] {len(tickers)} tickers need descriptions/logos (using FMP)")
+    errors = 0
+    print(f"[DescBackfill-FMP] Starting: {len(tickers)} tickers")
 
     for i, ticker in enumerate(tickers):
         try:
@@ -344,17 +353,32 @@ def backfill_descriptions():
                 params={"symbol": ticker, "apikey": fmp_key},
                 timeout=10,
             )
+
             if r.status_code != 200:
+                if i < 5:
+                    print(f"[DescBackfill-FMP] {ticker}: HTTP {r.status_code}")
+                errors += 1
+                time.sleep(0.5)
                 continue
-            data = r.json()
-            if isinstance(data, list) and data:
-                data = data[0]
-            if not isinstance(data, dict):
+
+            # Parse JSON safely
+            try:
+                data = r.json()
+            except Exception:
+                if i < 5:
+                    print(f"[DescBackfill-FMP] {ticker}: invalid JSON response")
+                errors += 1
+                time.sleep(0.5)
+                continue
+
+            if isinstance(data, list):
+                data = data[0] if data else {}
+            if not isinstance(data, dict) or not data:
+                time.sleep(0.5)
                 continue
 
             company_name = data.get("companyName") or ""
             description_raw = data.get("description") or ""
-            # Use first 2 sentences for a meaningful description (not just company name)
             description = _first_two_sentences(description_raw)
             logo_url = data.get("image") or ""
             website = data.get("website") or ""
@@ -373,13 +397,68 @@ def backfill_descriptions():
                                  logo_url=logo_url,
                                  logo_domain=logo_domain)
                     updated += 1
+                    if updated <= 3 or updated % 10 == 0:
+                        print(f"[DescBackfill-FMP] {ticker}: OK (name={company_name[:30]}, desc={len(description)}ch, domain={logo_domain})")
+                finally:
+                    db.close()
+
+        except Exception as e:
+            errors += 1
+            if i < 5:
+                print(f"[DescBackfill-FMP] {ticker}: {type(e).__name__}: {e}")
+
+        time.sleep(0.5)
+
+    print(f"[DescBackfill-FMP] Done: {updated} updated, {errors} errors, {len(tickers)} total")
+
+
+# ── FALLBACK: yfinance version (slower, no API key needed) ──────────────────
+# Switch to this if FMP is unavailable by calling backfill_descriptions_yfinance()
+# from main.py instead of backfill_descriptions().
+
+def backfill_descriptions_yfinance():
+    """Fallback: populate ticker_sectors using yfinance (free, no key).
+    Slower (2s delay) and max 20 tickers per run to avoid 429 rate limits."""
+    from database import BgSessionLocal as SessionLocal
+
+    tickers = _get_tickers_needing_data(20)
+    if not tickers:
+        print("[DescBackfill-YF] All tickers already have descriptions")
+        return
+
+    updated = 0
+    print(f"[DescBackfill-YF] Starting: {len(tickers)} tickers (yfinance fallback)")
+
+    for i, ticker in enumerate(tickers):
+        try:
+            import yfinance as yf
+            stock = yf.Ticker(ticker)
+            info = stock.info or {}
+
+            company_name = info.get("shortName") or info.get("longName") or ""
+            summary = info.get("longBusinessSummary") or ""
+            description = _first_two_sentences(summary)
+            sector_raw = info.get("sector") or ""
+            industry_raw = info.get("industry") or ""
+            website = info.get("website") or ""
+            logo_domain = _extract_domain(website)
+            sector = _normalize_sector(sector_raw) if sector_raw else KNOWN_SECTORS.get(ticker, "Other")
+
+            if description or company_name:
+                db = SessionLocal()
+                try:
+                    _cache_to_db(ticker, sector, db,
+                                 company_name=company_name,
+                                 industry=industry_raw,
+                                 description=description,
+                                 logo_domain=logo_domain)
+                    updated += 1
                 finally:
                     db.close()
         except Exception as e:
             if i < 3:
-                print(f"[DescBackfill] Error for {ticker}: {e}")
+                print(f"[DescBackfill-YF] {ticker}: {e}")
 
-        # Rate limit: ~5 per second to stay within 300/day
-        time.sleep(0.5)
+        time.sleep(2)  # Slower to avoid Yahoo 429s
 
-    print(f"[DescBackfill] Done: {updated}/{len(tickers)} descriptions/logos added via FMP")
+    print(f"[DescBackfill-YF] Done: {updated}/{len(tickers)} via yfinance")

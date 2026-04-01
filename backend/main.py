@@ -1602,7 +1602,7 @@ async def lifespan(app):
         except Exception as e:
             print(f"[Startup] Company name backfill error: {e}")
 
-        # Backfill ticker descriptions (yfinance, first sentence of summary)
+        # Backfill ticker descriptions + logos via FMP (falls back to yfinance if no key)
         try:
             from jobs.sector_lookup import backfill_descriptions
             backfill_descriptions()
