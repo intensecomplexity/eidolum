@@ -17,7 +17,7 @@ from jobs.prediction_validator import (
     resolve_forecaster_alias,
     prediction_exists_cross_scraper,
 )
-from jobs.news_scraper import find_forecaster, SCRAPER_LOCK
+from jobs.news_scraper import find_forecaster
 from jobs.upgrade_scrapers import _is_self_analysis
 from jobs.massive_benzinga import _get_sector_safe
 
@@ -162,21 +162,18 @@ _last_fmp_date = None
 
 
 def scrape_fmp_ratings(db: Session):
-    """Fetch recent FMP ratings and insert new predictions."""
-    if not SCRAPER_LOCK.acquire(blocking=False):
-        print("[FMP] Another scraper running, skipping")
-        return
-    try:
-        _fmp_incremental(db)
-    finally:
-        SCRAPER_LOCK.release()
+    """Fetch recent FMP ratings and insert new predictions.
+    Does NOT use SCRAPER_LOCK — FMP writes to its own source_platform_id
+    prefix (fmp_) so there's no conflict with Benzinga scrapers."""
+    _fmp_incremental(db)
 
 
 def _fmp_incremental(db: Session):
     global _last_fmp_date
     if not FMP_KEY:
-        print("[FMP] FMP_KEY not set, skipping FMP scraper")
+        print(f"[FMP] FMP_KEY not set (env value: '{os.getenv('FMP_KEY', '')[:3]}...'), skipping")
         return
+    print(f"[FMP] FMP_KEY present: {FMP_KEY[:5]}...")
 
     if not _last_fmp_date:
         _last_fmp_date = (datetime.utcnow() - timedelta(days=3)).strftime("%Y-%m-%d")
@@ -226,13 +223,7 @@ def _fmp_incremental(db: Session):
 
 def backfill_fmp_ratings(db: Session, start_date: str = None):
     """Pull FMP historical data month by month from 2018-01-01."""
-    if not SCRAPER_LOCK.acquire(blocking=False):
-        print("[FMP-Backfill] Another scraper running, skipping")
-        return {"status": "locked"}
-    try:
-        return _fmp_backfill_inner(db, start_date)
-    finally:
-        SCRAPER_LOCK.release()
+    return _fmp_backfill_inner(db, start_date)
 
 
 def _fmp_backfill_inner(db: Session, start_date: str = None) -> dict:
