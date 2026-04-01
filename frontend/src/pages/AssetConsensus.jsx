@@ -55,14 +55,27 @@ export default function AssetConsensus() {
             <Link to="/leaderboard" className="inline-flex items-center gap-1 text-muted text-sm active:text-text-primary transition-colors mb-1 sm:mb-2 min-h-[44px]">
               <ArrowLeft className="w-4 h-4" /> Back
             </Link>
-            <div className="flex items-center gap-3 flex-wrap">
-              <h1 className="font-bold" style={{ fontSize: 'clamp(24px, 5vw, 36px)' }}>
-                <span className="font-mono text-accent">{ticker.toUpperCase()}</span>
-                <span className="text-text-secondary text-base sm:text-lg ml-2 sm:ml-3">Consensus</span>
-              </h1>
-              <WatchButton ticker={ticker.toUpperCase()} />
+            <div className="flex items-center gap-3 sm:gap-4 flex-wrap">
+              {data?.logo_url ? (
+                <img src={data.logo_url} alt={ticker} className="w-10 h-10 sm:w-12 sm:h-12 rounded-lg bg-surface-2 object-contain" onError={(e) => { e.target.style.display='none'; e.target.nextElementSibling && (e.target.nextElementSibling.style.display='flex'); }} />
+              ) : null}
+              {!data?.logo_url && (
+                <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-lg bg-surface-2 flex items-center justify-center text-accent font-bold text-lg">{ticker[0]?.toUpperCase()}</div>
+              )}
+              <div>
+                <div className="flex items-center gap-3">
+                  <h1 className="font-bold" style={{ fontSize: 'clamp(24px, 5vw, 36px)' }}>
+                    <span className="font-mono text-accent">{ticker.toUpperCase()}</span>
+                  </h1>
+                  <WatchButton ticker={ticker.toUpperCase()} />
+                </div>
+                {data?.company_name && <div className="text-text-secondary text-sm sm:text-base -mt-1">{data.company_name}</div>}
+                {data?.sector && <span className="inline-block px-2 py-0.5 text-xs font-mono rounded mt-1" style={{ background: '#D4A843', color: '#07090a' }}>{data.sector.toUpperCase()}</span>}
+              </div>
             </div>
-            {/* Real data shown via consensus stats below */}
+            {data?.description && data.description !== data?.company_name && (
+              <p className="text-text-secondary text-xs sm:text-sm mt-2 max-w-2xl leading-relaxed">{data.description.length > 200 ? data.description.slice(0, 200) + '...' : data.description}</p>
+            )}
           </div>
 
           <form onSubmit={handleSearch} className="relative w-full sm:w-auto">
