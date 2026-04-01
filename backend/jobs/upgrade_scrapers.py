@@ -580,8 +580,8 @@ def _fmp_grades_inner(db: Session, max_tickers=300, days_back=0):
 
                 is_valid, _ = validate_prediction(
                     ticker=ticker, direction=direction,
-                    source_url=f"https://financialmodelingprep.com/stable/grades?symbol={ticker}",
-                    archive_url=f"https://financialmodelingprep.com/stable/grades?symbol={ticker}",
+                    source_url=f"https://stockanalysis.com/stocks/{ticker.lower()}/forecast/",
+                    archive_url=f"https://www.benzinga.com/stock/{ticker.lower()}/ratings",
                     context=context, forecaster_id=forecaster.id,
                 )
                 if not is_valid:
@@ -594,8 +594,8 @@ def _fmp_grades_inner(db: Session, max_tickers=300, days_back=0):
                     forecaster_id=forecaster.id, ticker=ticker, direction=direction,
                     prediction_date=grade_date, evaluation_date=grade_date + timedelta(days=90),
                     window_days=90,
-                    source_url=f"https://financialmodelingprep.com/stable/grades?symbol={ticker}",
-                    archive_url=f"https://financialmodelingprep.com/stable/grades?symbol={ticker}",
+                    source_url=f"https://stockanalysis.com/stocks/{ticker.lower()}/forecast/",
+                    archive_url=f"https://www.benzinga.com/stock/{ticker.lower()}/ratings",
                     source_type="article", source_platform_id=source_id,
                     context=context[:500], exact_quote=context,
                     outcome="pending", verified_by="fmp_grades",

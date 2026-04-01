@@ -200,7 +200,7 @@ def _process_rating(rating: dict, db: Session) -> bool:
             source_url = candidate
             break
     if not source_url:
-        source_url = f"https://www.benzinga.com/stock/{ticker}/ratings"
+        source_url = f"https://www.benzinga.com/stock/{ticker.lower()}/ratings"
 
     # Find or create forecaster
     forecaster = find_forecaster(canonical, db)

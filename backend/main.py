@@ -1348,6 +1348,25 @@ async def lifespan(app):
         except Exception as _me:
             print(f"[Startup] Outcome migration error: {_me}")
 
+        # ── Fix broken source URLs ────────────────────────────────────
+        try:
+            with engine.connect() as _url_c:
+                # FMP: raw API endpoint → stockanalysis.com forecast page
+                r1 = _url_c.execute(sql_text(
+                    "UPDATE predictions SET source_url = 'https://stockanalysis.com/stocks/' || LOWER(ticker) || '/forecast/' "
+                    "WHERE source_url LIKE '%financialmodelingprep.com/stable/%'"
+                )).rowcount
+                # Benzinga: generic quote pages → ratings page
+                r2 = _url_c.execute(sql_text(
+                    "UPDATE predictions SET source_url = 'https://www.benzinga.com/stock/' || LOWER(ticker) || '/ratings' "
+                    "WHERE source_url LIKE '%benzinga.com/quote/%'"
+                )).rowcount
+                _url_c.commit()
+                if r1 or r2:
+                    print(f"[Startup] Fixed source URLs: {r1} FMP + {r2} Benzinga quote pages")
+        except Exception as _ue:
+            print(f"[Startup] Source URL fix error: {_ue}")
+
         # ── Reclassify hold/neutral predictions ────────────────────────
         # Phase 1: Context says "Neutral —" (sentiment function got it right)
         # Phase 2: Context contains neutral rating names (Hold, Equal-Weight, etc.)
