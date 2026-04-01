@@ -48,16 +48,18 @@ export default function PortfolioSimulator({ forecasterId, forecasterName }) {
 
   return (
     <div className="card mb-6 sm:mb-8">
-      {/* Headline — single compact block */}
+      {/* Headline */}
       <div className="mb-4">
         <p className="text-xs text-muted uppercase tracking-wider font-semibold mb-2">
           <DollarSign className="w-3.5 h-3.5 inline -mt-0.5" /> Portfolio Simulator
         </p>
-        <p className="text-sm text-text-secondary whitespace-nowrap overflow-hidden text-ellipsis">
-          If you followed <span className="text-accent font-medium">{forecasterName}</span>'s last {total_predictions} calls with ${starting_capital.toLocaleString()}
-          {' '}<span className="font-mono text-xl sm:text-2xl font-bold text-accent">${current_value.toLocaleString()}</span>
-          {' '}<span className={`font-mono text-sm font-bold ${isPositive ? 'text-positive' : 'text-negative'}`}>{isPositive ? '+' : ''}{total_return_pct}%</span>
-        </p>
+        <div className="flex items-baseline gap-2 flex-wrap">
+          <span className="text-sm text-text-secondary">
+            If you followed <span className="text-accent font-medium">{forecasterName}</span>'s last {total_predictions} calls with ${starting_capital.toLocaleString()}
+          </span>
+          <span className="font-mono text-2xl font-bold text-accent">${current_value.toLocaleString()}</span>
+          <span className={`font-mono text-sm font-bold ${isPositive ? 'text-positive' : 'text-negative'}`}>{isPositive ? '+' : ''}{total_return_pct}%</span>
+        </div>
         {alpha !== 0 && (
           <p className="text-xs text-muted mt-1">
             Alpha vs S&P 500: <span className={`font-mono font-semibold ${alpha >= 0 ? 'text-positive' : 'text-negative'}`}>{alpha >= 0 ? '+' : ''}{alpha}%</span>
