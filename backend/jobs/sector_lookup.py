@@ -123,21 +123,22 @@ def _normalize_sector(raw: str) -> str:
     return raw or "Other"
 
 
-def _cache_to_db(ticker: str, sector: str, db=None, company_name: str = "", industry: str = "", description: str = "", logo_url: str = ""):
-    """Cache sector, company name, industry, description, and logo_url to DB table."""
+def _cache_to_db(ticker: str, sector: str, db=None, company_name: str = "", industry: str = "", description: str = "", logo_url: str = "", logo_domain: str = ""):
+    """Cache sector, company name, industry, description, logo_url, and logo_domain to DB table."""
     if not db:
         return
     try:
-        if company_name or description or logo_url:
+        if company_name or description or logo_url or logo_domain:
             db.execute(sql_text("""
-                INSERT INTO ticker_sectors (ticker, sector, company_name, industry, description, logo_url)
-                VALUES (:t, :s, :cn, :ind, :desc, :logo)
+                INSERT INTO ticker_sectors (ticker, sector, company_name, industry, description, logo_url, logo_domain)
+                VALUES (:t, :s, :cn, :ind, :desc, :logo, :dom)
                 ON CONFLICT (ticker) DO UPDATE SET sector = :s,
                     company_name = COALESCE(NULLIF(:cn, ''), ticker_sectors.company_name),
                     industry = COALESCE(NULLIF(:ind, ''), ticker_sectors.industry),
                     description = COALESCE(NULLIF(:desc, ''), ticker_sectors.description),
-                    logo_url = COALESCE(NULLIF(:logo, ''), ticker_sectors.logo_url)
-            """), {"t": ticker, "s": sector, "cn": company_name, "ind": industry, "desc": description, "logo": logo_url})
+                    logo_url = COALESCE(NULLIF(:logo, ''), ticker_sectors.logo_url),
+                    logo_domain = COALESCE(NULLIF(:dom, ''), ticker_sectors.logo_domain)
+            """), {"t": ticker, "s": sector, "cn": company_name, "ind": industry, "desc": description, "logo": logo_url, "dom": logo_domain})
         else:
             db.execute(sql_text("""
                 INSERT INTO ticker_sectors (ticker, sector) VALUES (:t, :s)
@@ -263,13 +264,41 @@ def _first_sentence(text: str, max_len: int = 150) -> str:
     """Extract the first sentence, capped at max_len characters."""
     if not text:
         return ""
-    # Split on period followed by space or end of string
     for end in (".", ".\n"):
         idx = text.find(end)
         if idx > 0 and idx < 200:
             sentence = text[:idx + 1].strip()
             return sentence[:max_len]
     return text[:max_len].strip()
+
+
+def _first_two_sentences(text: str, max_len: int = 280) -> str:
+    """Extract the first two sentences for a meaningful description."""
+    if not text:
+        return ""
+    import re
+    sentences = re.split(r'(?<=\.)\s+', text.strip())
+    result = ""
+    for s in sentences[:2]:
+        if len(result) + len(s) + 1 > max_len:
+            break
+        result = (result + " " + s).strip()
+    return result or text[:max_len].strip()
+
+
+def _extract_domain(url: str) -> str:
+    """Extract domain from URL. 'https://www.apple.com/abc' -> 'apple.com'"""
+    if not url:
+        return ""
+    try:
+        from urllib.parse import urlparse
+        parsed = urlparse(url)
+        host = parsed.hostname or ""
+        if host.startswith("www."):
+            host = host[4:]
+        return host
+    except Exception:
+        return ""
 
 
 def backfill_descriptions():
@@ -325,20 +354,24 @@ def backfill_descriptions():
 
             company_name = data.get("companyName") or ""
             description_raw = data.get("description") or ""
-            description = _first_sentence(description_raw)
+            # Use first 2 sentences for a meaningful description (not just company name)
+            description = _first_two_sentences(description_raw)
             logo_url = data.get("image") or ""
+            website = data.get("website") or ""
+            logo_domain = _extract_domain(website)
             sector_raw = data.get("sector") or ""
             industry_raw = data.get("industry") or ""
             sector = _normalize_sector(sector_raw) if sector_raw else KNOWN_SECTORS.get(ticker, "Other")
 
-            if description or company_name or logo_url:
+            if description or company_name or logo_url or logo_domain:
                 db = SessionLocal()
                 try:
                     _cache_to_db(ticker, sector, db,
                                  company_name=company_name,
                                  industry=industry_raw,
                                  description=description,
-                                 logo_url=logo_url)
+                                 logo_url=logo_url,
+                                 logo_domain=logo_domain)
                     updated += 1
                 finally:
                     db.close()

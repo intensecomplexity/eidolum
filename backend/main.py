@@ -1095,6 +1095,7 @@ def run_phase2_migrations():
         "industry VARCHAR(255)",
         "description VARCHAR(300)",
         "logo_url VARCHAR(500)",
+        "logo_domain VARCHAR(100)",
     ]:
         try:
             db.execute(text(f"ALTER TABLE ticker_sectors ADD COLUMN {col}"))
