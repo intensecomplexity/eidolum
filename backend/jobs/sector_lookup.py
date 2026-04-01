@@ -302,7 +302,8 @@ def _extract_domain(url: str) -> str:
 
 
 def _get_tickers_needing_data(limit: int) -> list:
-    """Get tickers missing description or logo, prioritized by prediction count."""
+    """Get tickers missing description or logo, prioritized by prediction count.
+    Also re-fetches tickers where description equals company_name (bad data)."""
     from database import BgSessionLocal as SessionLocal
     db = SessionLocal()
     try:
@@ -310,8 +311,9 @@ def _get_tickers_needing_data(limit: int) -> list:
             SELECT p.ticker, COUNT(*) as cnt
             FROM predictions p
             LEFT JOIN ticker_sectors ts ON ts.ticker = p.ticker
-            WHERE ts.description IS NULL OR ts.description = '' OR LENGTH(ts.description) < 20
+            WHERE ts.description IS NULL OR ts.description = '' OR LENGTH(ts.description) < 50
                   OR ts.logo_domain IS NULL OR ts.logo_domain = ''
+                  OR ts.description = ts.company_name
             GROUP BY p.ticker
             ORDER BY cnt DESC
             LIMIT :lim

@@ -92,10 +92,10 @@ export default function TickerDetail() {
             {data.company_name && (
               <div className="text-text-primary text-base sm:text-lg font-medium mt-1">{data.company_name}</div>
             )}
-            {data.description && (
-              <div className="text-text-secondary text-sm mt-1 leading-relaxed max-w-xl">{data.description}</div>
+            {data.description && data.description !== data.company_name && data.description.length > 50 && (
+              <div className="text-muted text-sm mt-1 leading-relaxed max-w-xl line-clamp-2">{data.description}</div>
             )}
-            {!data.description && data.industry && (
+            {(!data.description || data.description === data.company_name || data.description.length <= 50) && data.industry && (
               <div className="text-muted text-sm mt-0.5">{data.industry}</div>
             )}
             {data.sector && (
