@@ -348,71 +348,191 @@ export default function TickerDetail() {
 }
 
 
-function PredictionItem({ p, showOutcome = false }) {
-  const fc = p.forecaster;
-  const quoteText = p.exact_quote || p.context || '';
+function OutcomeBadge({ outcome }) {
+  const cfg = {
+    hit: { label: 'HIT', cls: 'text-positive bg-positive/10 border-positive/30', Icon: Check },
+    correct: { label: 'HIT', cls: 'text-positive bg-positive/10 border-positive/30', Icon: Check },
+    near: { label: 'NEAR', cls: 'text-yellow-400 bg-yellow-400/10 border-yellow-400/30', Icon: Minus },
+    miss: { label: 'MISS', cls: 'text-negative bg-negative/10 border-negative/30', Icon: X },
+    incorrect: { label: 'MISS', cls: 'text-negative bg-negative/10 border-negative/30', Icon: X },
+  };
+  const c = cfg[outcome] || cfg.miss;
+  return (
+    <span className={`inline-flex items-center gap-0.5 text-[10px] font-mono font-bold px-1.5 py-0.5 rounded border ${c.cls}`}>
+      <c.Icon className="w-3 h-3" /> {c.label}
+    </span>
+  );
+}
+
+function TimelineBar({ predictionDate, evaluationDate }) {
+  if (!predictionDate || !evaluationDate) return null;
+  const start = new Date(predictionDate).getTime();
+  const end = new Date(evaluationDate).getTime();
+  const now = Date.now();
+  const total = end - start;
+  if (total <= 0) return null;
+  const elapsed = Math.min(now - start, total);
+  const pct = Math.max(0, Math.min(100, (elapsed / total) * 100));
+  const isComplete = now >= end;
 
   return (
-    <div className={`card py-3 ${showOutcome ? (p.outcome === 'correct' ? 'border-positive/20' : 'border-negative/20') : ''}`}>
+    <div className="mt-3">
+      <div className="flex justify-between text-[10px] text-muted mb-1">
+        <span>{predictionDate.slice(0, 10)}</span>
+        <span>{isComplete ? 'Evaluated' : `${Math.max(0, Math.ceil((end - now) / 86400000))}d left`}</span>
+        <span>{evaluationDate.slice(0, 10)}</span>
+      </div>
+      <div className="w-full h-1.5 bg-surface-2 rounded-full overflow-hidden">
+        <div
+          className={`h-full rounded-full transition-all duration-500 ${isComplete ? 'bg-accent' : 'bg-accent/60'}`}
+          style={{ width: `${pct}%` }}
+        />
+      </div>
+    </div>
+  );
+}
+
+function PredictionItem({ p, showOutcome = false }) {
+  const [expanded, setExpanded] = useState(false);
+  const fc = p.forecaster;
+  const quoteText = p.exact_quote || p.context || '';
+  const isScored = showOutcome && p.outcome && p.outcome !== 'pending';
+  const outcomeColor = isScored
+    ? (p.outcome === 'hit' || p.outcome === 'correct') ? 'border-l-emerald-500'
+      : p.outcome === 'near' ? 'border-l-yellow-400'
+      : 'border-l-red-500'
+    : 'border-l-transparent';
+
+  return (
+    <div
+      className={`card py-3 border-l-[3px] ${outcomeColor} cursor-pointer transition-colors hover:bg-surface-2/30`}
+      onClick={() => setExpanded(!expanded)}
+    >
+      {/* ── Header row ──────────────────────────────────────────── */}
       <div className="flex items-center justify-between mb-1.5">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 min-w-0">
           {fc && (
-            <Link to={`/forecaster/${fc.id}`} className="text-sm font-medium hover:text-accent transition-colors">
+            <Link to={`/forecaster/${fc.id}`} className="text-sm font-medium hover:text-accent transition-colors truncate"
+              onClick={e => e.stopPropagation()}>
               {fc.name}
             </Link>
           )}
-          {fc?.firm && (
-            <span className="text-[10px] text-muted">at {fc.firm}</span>
-          )}
+          {fc?.firm && <span className="text-[10px] text-muted hidden sm:inline">at {fc.firm}</span>}
           {fc?.accuracy_rate > 0 && (
             <span className={`text-[10px] font-mono px-1 py-0.5 rounded border ${accuracyColor(fc.accuracy_rate)}`}>
               {fc.accuracy_rate.toFixed(0)}%
             </span>
           )}
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-shrink-0">
           <PredictionBadge direction={p.direction} windowDays={p.window_days || p.evaluation_window_days} />
-          {showOutcome && (
-            p.outcome === 'correct'
-              ? <span className="inline-flex items-center gap-0.5 text-[10px] font-mono font-semibold text-positive"><Check className="w-3 h-3" /></span>
-              : <span className="inline-flex items-center gap-0.5 text-[10px] font-mono font-semibold text-negative"><X className="w-3 h-3" /></span>
+          {isScored && <OutcomeBadge outcome={p.outcome} />}
+          {isScored && p.actual_return != null && (
+            <span className={`text-xs font-mono font-bold ${p.actual_return >= 0 ? 'text-positive' : 'text-negative'}`}>
+              {p.actual_return >= 0 ? '+' : ''}{p.actual_return.toFixed(1)}%
+            </span>
           )}
+          <ChevronDown className={`w-3.5 h-3.5 text-muted transition-transform ${expanded ? 'rotate-180' : ''}`} />
         </div>
       </div>
 
-      {/* Prices */}
+      {/* ── Summary line (always visible) ────────────────────── */}
       <div className="flex gap-3 text-xs font-mono text-text-secondary mb-1">
         {p.entry_price != null && <span>Entry: ${p.entry_price.toFixed(2)}</span>}
         {p.target_price != null && <span>Target: ${p.target_price.toFixed(0)}</span>}
-        {showOutcome && p.actual_return != null && (
-          <span className={p.actual_return >= 0 ? 'text-positive' : 'text-negative'}>
-            {p.actual_return >= 0 ? '+' : ''}{p.actual_return.toFixed(1)}%
-          </span>
-        )}
       </div>
 
-      {/* Context with tooltips */}
-      {quoteText && (
-        <p className="text-xs text-text-secondary italic leading-relaxed">
-          {annotateContext(quoteText, p.ticker)}
-        </p>
-      )}
-
-      {/* Simple explainer */}
+      {/* ── Explainer (always visible) ───────────────────────── */}
       <ExplainerLine prediction={p} className="mt-0.5" />
 
-      {/* Footer */}
+      {/* ── Footer (always visible) ──────────────────────────── */}
       <div className="flex items-center justify-between mt-1.5 text-[10px] text-muted">
         <span>{p.prediction_date?.slice(0, 10)}</span>
-        {!showOutcome && p.days_remaining != null && (
+        {!isScored && p.days_remaining != null && (
           <span className={`font-mono ${p.days_remaining <= 7 ? 'text-warning font-semibold' : ''}`}>
             {p.days_remaining}d remaining
           </span>
         )}
-        {showOutcome && p.evaluation_date && (
+        {isScored && p.evaluation_date && (
           <span>Evaluated {p.evaluation_date.slice(0, 10)}</span>
         )}
       </div>
+
+      {/* ── EXPANDED DETAIL ──────────────────────────────────── */}
+      {expanded && (
+        <div className="mt-3 pt-3 border-t border-border/40 space-y-3" onClick={e => e.stopPropagation()}>
+
+          {/* Price detail grid */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+            {p.entry_price != null && (
+              <div className="bg-surface-2 rounded-lg p-2.5">
+                <div className="text-[10px] text-muted uppercase tracking-wider mb-0.5">Entry Price</div>
+                <div className="font-mono text-sm font-bold text-text-primary">${p.entry_price.toFixed(2)}</div>
+              </div>
+            )}
+            {p.target_price != null && (
+              <div className="bg-surface-2 rounded-lg p-2.5">
+                <div className="text-[10px] text-muted uppercase tracking-wider mb-0.5">Target Price</div>
+                <div className="font-mono text-sm font-bold" style={{ color: '#D4A843' }}>${p.target_price.toFixed(2)}</div>
+                {p.entry_price != null && p.entry_price > 0 && (
+                  <div className={`text-[10px] font-mono ${p.target_price >= p.entry_price ? 'text-positive' : 'text-negative'}`}>
+                    {p.target_price >= p.entry_price ? '+' : ''}{((p.target_price - p.entry_price) / p.entry_price * 100).toFixed(1)}%
+                  </div>
+                )}
+              </div>
+            )}
+            {isScored && p.actual_return != null && (
+              <div className="bg-surface-2 rounded-lg p-2.5">
+                <div className="text-[10px] text-muted uppercase tracking-wider mb-0.5">Actual Return</div>
+                <div className={`font-mono text-sm font-bold ${p.actual_return >= 0 ? 'text-positive' : 'text-negative'}`}>
+                  {p.actual_return >= 0 ? '+' : ''}{p.actual_return.toFixed(1)}%
+                </div>
+                {isScored && <OutcomeBadge outcome={p.outcome} />}
+              </div>
+            )}
+          </div>
+
+          {/* Timeline bar */}
+          <TimelineBar predictionDate={p.prediction_date} evaluationDate={p.evaluation_date} />
+
+          {/* Dates detail */}
+          <div className="flex flex-wrap gap-x-6 gap-y-1 text-xs">
+            {p.prediction_date && (
+              <div className="flex items-center gap-1.5 text-muted">
+                <Calendar className="w-3 h-3" /> Predicted: <span className="text-text-secondary font-mono">{p.prediction_date.slice(0, 10)}</span>
+              </div>
+            )}
+            {p.evaluation_date && (
+              <div className="flex items-center gap-1.5 text-muted">
+                <Clock className="w-3 h-3" /> {isScored ? 'Evaluated' : 'Evaluates'}: <span className="text-text-secondary font-mono">{p.evaluation_date.slice(0, 10)}</span>
+              </div>
+            )}
+            {(p.window_days || p.evaluation_window_days) && (
+              <div className="flex items-center gap-1.5 text-muted">
+                <Target className="w-3 h-3" /> Window: <span className="text-text-secondary font-mono">{p.window_days || p.evaluation_window_days} days</span>
+              </div>
+            )}
+          </div>
+
+          {/* Full quote */}
+          {quoteText && (
+            <div className="bg-surface-2 rounded-lg px-4 py-3 border-l-[3px] border-accent/40">
+              <p className="text-xs text-text-secondary italic leading-relaxed">
+                {annotateContext(quoteText, p.ticker)}
+              </p>
+            </div>
+          )}
+
+          {/* Source link */}
+          {p.source_url && (
+            <a href={p.source_url} target="_blank" rel="noopener noreferrer"
+              className="inline-flex items-center gap-1 text-xs text-accent hover:underline"
+              onClick={e => e.stopPropagation()}>
+              View source
+            </a>
+          )}
+        </div>
+      )}
     </div>
   );
 }
