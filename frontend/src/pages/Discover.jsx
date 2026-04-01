@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Search, TrendingUp, TrendingDown, Flame, AlertTriangle, Clock, BarChart3, Star } from 'lucide-react';
 import Footer from '../components/Footer';
+import CompanyLogo from '../components/CompanyLogo';
 import { searchTickers, getTrendingTickers, getSectors, getExpiringPredictions, getLeaderboard } from '../api';
 
 function formatBullBear(bull, bear) {
@@ -117,9 +118,10 @@ export default function Discover() {
                 return (
                   <Link key={t.ticker} to={`/asset/${t.ticker}`}
                     className="card py-3 flex items-center justify-between hover:bg-surface-2 transition-colors">
-                    <div>
+                    <div className="flex items-center gap-2">
+                      <CompanyLogo ticker={t.ticker} size={20} />
                       <span className="font-mono text-accent font-bold">{t.ticker}</span>
-                      <span className="text-text-secondary text-sm ml-2">{t.name}</span>
+                      <span className="text-text-secondary text-sm">{t.name}</span>
                     </div>
                     <div className="text-right">
                       <div className="text-xs font-mono text-text-secondary">{t.total} calls</div>
@@ -142,9 +144,10 @@ export default function Discover() {
               {divided.map(t => (
                 <Link key={t.ticker} to={`/asset/${t.ticker}`}
                   className="card py-3 flex items-center justify-between hover:bg-surface-2 transition-colors">
-                  <div>
+                  <div className="flex items-center gap-2">
+                    <CompanyLogo ticker={t.ticker} size={20} />
                     <span className="font-mono text-accent font-bold">{t.ticker}</span>
-                    <span className="text-text-secondary text-sm ml-2">{t.name}</span>
+                    <span className="text-text-secondary text-sm">{t.name}</span>
                   </div>
                   <div className="flex items-center gap-2 text-xs font-mono">
                     <span className="text-positive">{t.bull_pct}% Bull</span>

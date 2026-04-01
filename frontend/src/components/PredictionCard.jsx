@@ -8,6 +8,7 @@ import CredibilityBadge from './CredibilityBadge';
 import { annotateContext, ExplainerLine, ratingChangeLabel } from '../utils/predictionExplainer';
 import CommentSection from './CommentSection';
 import ScoringBreakdown from './ScoringBreakdown';
+import CompanyLogo from './CompanyLogo';
 
 const API_BASE = 'https://eidolum-production.up.railway.app';
 
@@ -96,6 +97,7 @@ export default function PredictionCard({ prediction: p, showForecaster = false, 
       {/* Line 2: Ticker + company name + direction + score badge */}
       <div className="flex items-center justify-between mb-2">
         <div className="flex items-center gap-2 flex-wrap min-w-0">
+          <CompanyLogo domain={p.logo_domain} logoUrl={p.logo_url} ticker={p.ticker} sector={p.sector} size={20} />
           <Link to={`/asset/${p.ticker}`} className="font-mono text-accent text-base font-bold hover:underline shrink-0">
             {p.ticker}
           </Link>

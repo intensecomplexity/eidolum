@@ -13,6 +13,7 @@ import BookmarkButton from '../components/BookmarkButton';
 import NotificationBanner from '../components/NotificationBanner';
 import FollowButton from '../components/FollowButton';
 import CompareButton from '../components/CompareButton';
+import CompanyLogo from '../components/CompanyLogo';
 import Footer from '../components/Footer';
 import MiniPieChart from '../components/MiniPieChart';
 import PortfolioSimulator from '../components/PortfolioSimulator';
@@ -568,7 +569,10 @@ function PredictionRow({ p, forecaster: fc }) {
           <span className="text-muted text-[10px] font-mono">{horizonLabel}</span>
         </td>
         <td className="px-6 py-3">
-          <Link to={`/asset/${p.ticker}`} className="ticker-mono text-accent hover:underline" onClick={e => e.stopPropagation()}>{p.ticker}</Link>
+          <div className="flex items-center gap-1.5">
+            <CompanyLogo ticker={p.ticker} sector={p.sector} size={18} />
+            <Link to={`/asset/${p.ticker}`} className="ticker-mono text-accent hover:underline" onClick={e => e.stopPropagation()}>{p.ticker}</Link>
+          </div>
           {p.sector === 'Crypto' && (
             <span className="ml-1 text-[9px] font-bold tracking-wide px-1 py-0.5 rounded-full" style={{ backgroundColor: 'rgba(247, 147, 26, 0.15)', color: '#f7931a' }}>CRYPTO</span>
           )}
