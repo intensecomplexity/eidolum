@@ -7,6 +7,7 @@ import PlatformBadge from '../components/PlatformBadge';
 import BookmarkButton from '../components/BookmarkButton';
 import { useSavedPredictions } from '../context/SavedPredictionsContext';
 import { getSavedPredictions, updateSavedNote } from '../api';
+import { formatTimeRemaining } from '../utils/timeRemaining';
 
 const FILTERS = [
   { key: 'all', label: 'All' },
@@ -291,12 +292,7 @@ function SavedCard({ prediction: p, userId, onUpdate }) {
   }
 
   // Resolution urgency — use precise time remaining
-  const _tr = (() => {
-    try {
-      const { formatTimeRemaining } = require('../utils/timeRemaining');
-      return formatTimeRemaining(p.expires_at || p.evaluation_date, p.days_remaining);
-    } catch { return { label: p.days_remaining != null ? `${p.days_remaining}d left` : '', isUrgent: p.days_remaining <= 7, isCritical: p.days_remaining <= 1, isEvaluating: false }; }
-  })();
+  const _tr = formatTimeRemaining(p.expires_at || p.evaluation_date, p.days_remaining);
   const isUrgent = isPending && _tr.isUrgent;
   const isCritical = isPending && _tr.isCritical;
 

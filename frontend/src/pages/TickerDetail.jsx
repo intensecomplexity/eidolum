@@ -10,6 +10,7 @@ import Footer from '../components/Footer';
 import TickerDiscussionSection from '../components/TickerDiscussionSection';
 import { ExplainerLine } from '../utils/predictionExplainer';
 import { annotateContext } from '../utils/predictionExplainer';
+import { formatTimeRemaining } from '../utils/timeRemaining';
 import { getTickerDetail } from '../api';
 
 // ── Accuracy badge color helper ────────────────────────────────────────────
@@ -449,7 +450,6 @@ function PredictionItem({ p, showOutcome = false }) {
       <div className="flex items-center justify-between mt-1.5 text-[10px] text-muted">
         <span>{p.prediction_date?.slice(0, 10)}</span>
         {!isScored && (p.days_remaining != null || p.evaluation_date) && (() => {
-          const { formatTimeRemaining } = require('../utils/timeRemaining');
           const tr = formatTimeRemaining(p.evaluation_date, p.days_remaining);
           if (tr.isEvaluating) return <span className="font-mono text-accent font-semibold">Evaluating</span>;
           if (!tr.label) return null;
