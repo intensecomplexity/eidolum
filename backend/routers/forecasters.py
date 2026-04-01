@@ -133,13 +133,14 @@ def get_forecaster_sectors(request: Request, forecaster_id: int, db: Session = D
     try:
         sector_rows = db.execute(sql_text("""
             SELECT sector, COUNT(*) as total,
-                   SUM(CASE WHEN outcome='correct' THEN 1 ELSE 0 END) as correct
+                   SUM(CASE WHEN outcome IN ('hit','correct') THEN 1 ELSE 0 END) as hits,
+                   SUM(CASE WHEN outcome = 'near' THEN 1 ELSE 0 END) as nears
             FROM predictions
-            WHERE forecaster_id = :fid AND outcome IN ('correct','incorrect')
+            WHERE forecaster_id = :fid AND outcome IN ('hit','near','miss','correct','incorrect')
               AND sector IS NOT NULL AND sector != ''
             GROUP BY sector ORDER BY total DESC
         """), {"fid": forecaster_id}).fetchall()
-        sectors = [{"sector": r[0], "accuracy": round(r[2] / r[1] * 100, 1) if r[1] > 0 else 0, "count": r[1]}
+        sectors = [{"sector": r[0], "accuracy": round((r[2] + r[3] * 0.5) / r[1] * 100, 1) if r[1] > 0 else 0, "count": r[1]}
                    for r in sector_rows if r[0] != "Other" or len(sector_rows) == 1]
     except Exception:
         sectors = []
