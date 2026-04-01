@@ -486,22 +486,16 @@ def _fmp_daily_inner(db: Session):
 # ═══════════════════════════════════════════════════════════════════════════
 
 def scrape_fmp_grades(db: Session):
-    """Scheduled scraper: fetch grades for top 200 tickers."""
-    _fmp_grades_inner(db, max_tickers=200, days_back=7)
+    """Scheduled scraper: fetch all grades for top 300 tickers. Runs once/day."""
+    _fmp_grades_inner(db, max_tickers=300, days_back=0)
 
 
 def backfill_fmp_grades(db: Session):
     """One-time backfill: fetch full history for all tickers."""
-    if not SCRAPER_LOCK.acquire(blocking=False):
-        print("[FMP-Grades-Backfill] Another scraper running, skipping")
-        return
-    try:
-        _fmp_grades_inner(db, max_tickers=5000, days_back=365 * 8)  # 8 years back
-    finally:
-        SCRAPER_LOCK.release()
+    _fmp_grades_inner(db, max_tickers=5000, days_back=0)  # Full history, no cutoff
 
 
-def _fmp_grades_inner(db: Session, max_tickers=200, days_back=7):
+def _fmp_grades_inner(db: Session, max_tickers=300, days_back=0):
     if not FMP_KEY:
         print("[FMP-Grades] No FMP_KEY, skipping")
         return
@@ -519,11 +513,12 @@ def _fmp_grades_inner(db: Session, max_tickers=200, days_back=7):
         print("[FMP-Grades] No tickers in DB")
         return
 
-    cutoff = datetime.utcnow() - timedelta(days=days_back)
+    # days_back=0 means no cutoff — fetch full history
+    cutoff = datetime.utcnow() - timedelta(days=days_back) if days_back > 0 else None
     added = 0
     skipped = 0
 
-    print(f"[FMP-Grades] Processing {len(tickers)} tickers (cutoff: {cutoff.date()})")
+    print(f"[FMP-Grades] Processing {len(tickers)} tickers (cutoff: {'none — full history' if not cutoff else cutoff.date()})")
 
     for i, ticker in enumerate(tickers):
         try:
@@ -548,7 +543,7 @@ def _fmp_grades_inner(db: Session, max_tickers=200, days_back=7):
                 except Exception:
                     continue
 
-                if grade_date < cutoff:
+                if cutoff and grade_date < cutoff:
                     continue
 
                 company = item.get("gradingCompany", "")

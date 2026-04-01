@@ -358,7 +358,7 @@ _quote_cache: dict[str, dict] = {}
 _history_cache: dict[str, dict] = {}
 _fmp_calls_today = 0
 _fmp_calls_date = ""
-_FMP_DAILY_LIMIT = 230  # Stay under the 250/day free tier
+_FMP_DAILY_LIMIT = 0  # FMP quota reserved for grades scraper (300/day) — evaluator uses Finnhub + yfinance
 
 
 def _fetch_history(ticker: str, start, end) -> dict:

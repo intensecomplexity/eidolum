@@ -70,11 +70,12 @@ def _set_config(db, key: str, value: str):
 
 
 # ── Main entry point ────────────────────────────────────────────────────────
-REVERSE_STOP = date(2011, 1, 1)  # Don't go further back than 2011
+REVERSE_STOP = date(2000, 1, 1)  # Safety floor — stop on empty API results before this
+EMPTY_DAYS_TO_STOP = 30  # Stop reverse backfill after 30 consecutive days with 0 results
 
 
 def run_backfill():
-    """Run forward backfill to today, then reverse backfill to 2011."""
+    """Run forward backfill to today, then reverse backfill until API data runs out."""
     global _backfill_running, _backfill_stop, _backfill_status
 
     if _backfill_running:
@@ -194,7 +195,8 @@ def _run_forward() -> bool:
 
 
 def _run_reverse() -> bool:
-    """Phase 2: Reverse backfill from 2019-12-31 backwards to 2011-01-01."""
+    """Phase 2: Reverse backfill from 2019-12-31 backwards. Stops when API
+    returns empty results for EMPTY_DAYS_TO_STOP consecutive days."""
     from database import BgSessionLocal
 
     db = BgSessionLocal()
@@ -223,19 +225,19 @@ def _run_reverse() -> bool:
             _set_config(db, "backfill_reverse_done", "true")
         finally:
             db.close()
-        print(f"[Reverse] Already reached {REVERSE_STOP}")
+        print(f"[Reverse] Already reached safety floor {REVERSE_STOP}")
         return True
 
-    total_days = (start - REVERSE_STOP).days + 1
     _backfill_status.update({
         "running": True, "phase": "reverse", "current_date": str(start),
         "days_completed": 0, "predictions_inserted": 0,
     })
 
-    print(f"[Reverse] {start} -> {REVERSE_STOP} ({total_days} days)")
+    print(f"[Reverse] Starting from {start} backwards (stops after {EMPTY_DAYS_TO_STOP} consecutive empty days)")
     total_inserted = 0
     days_done = 0
     batch_days = 0
+    consecutive_empty = 0
     current = start
 
     while current >= REVERSE_STOP:
@@ -260,12 +262,22 @@ def _run_reverse() -> bool:
         _backfill_status["predictions_inserted"] = total_inserted
         _backfill_status["current_date"] = str(current)
 
+        # Track consecutive empty days to detect end of API data
+        if inserted == 0:
+            consecutive_empty += 1
+        else:
+            consecutive_empty = 0
+
+        if consecutive_empty >= EMPTY_DAYS_TO_STOP:
+            print(f"[Reverse] {EMPTY_DAYS_TO_STOP} consecutive empty days at {current} — API has no more data. Marking complete.")
+            break
+
         current -= timedelta(days=1)
         time.sleep(0.5)
 
-        if batch_days >= 30:
+        if batch_days >= 90:
             _refresh_stats_if_needed()
-            print(f"[Reverse] Batch done. {days_done}/{total_days} days, {total_inserted} inserted. Pausing 10s.")
+            print(f"[Reverse] Batch done. {days_done} days, {total_inserted} inserted. At {current}. Pausing 10s.")
             time.sleep(10)
             batch_days = 0
 

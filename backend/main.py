@@ -1746,7 +1746,7 @@ async def lifespan(app):
     run_sweep = _guarded_job("sweep_stuck", _sweep_stuck)
 
     scheduler.add_job(run_massive_benzinga, "interval", hours=2, id="massive_benzinga", next_run_time=_first_run)
-    scheduler.add_job(_fmp_grades_standalone, "interval", hours=4, id="fmp_grades", next_run_time=_first_run + timedelta(minutes=20))
+    scheduler.add_job(_fmp_grades_standalone, "interval", hours=24, id="fmp_grades", next_run_time=_first_run + timedelta(minutes=20))
     scheduler.add_job(_auto_evaluate_standalone, "interval", minutes=30, id="auto_evaluate", next_run_time=_first_run + timedelta(minutes=5))
     scheduler.add_job(_refresh_stats_standalone, "interval", hours=2, id="refresh_stats", next_run_time=_first_run + timedelta(minutes=10))
     scheduler.add_job(run_sweep, "interval", hours=24, id="sweep_stuck", next_run_time=_first_run + timedelta(minutes=15))
@@ -2242,20 +2242,20 @@ def stop_backfill_endpoint():
 
 @app.post("/api/admin/backfill-fmp")
 def start_fmp_backfill():
-    """Start FMP historical backfill as a background task."""
+    """Start FMP grades backfill as a background task."""
     import threading
-    from jobs.fmp_scraper import backfill_fmp_ratings
+    from jobs.upgrade_scrapers import backfill_fmp_grades
     from database import BgSessionLocal
 
     def _run():
         db = BgSessionLocal()
         try:
-            backfill_fmp_ratings(db)
+            backfill_fmp_grades(db)
         finally:
             db.close()
 
     threading.Thread(target=_run, daemon=True).start()
-    return {"status": "started", "source": "fmp", "from": "2020-01-01"}
+    return {"status": "started", "source": "fmp_grades", "note": "full history"}
 
 
 @app.post("/api/admin/evaluate-historical")
