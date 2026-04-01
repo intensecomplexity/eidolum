@@ -77,8 +77,9 @@ def run_evaluation_background():
         _eval_status["running"] = False
 
 
-def evaluate_batch(max_tickers: int = 200) -> dict:
-    """Evaluate one batch of tickers. Connection-safe."""
+def evaluate_batch(max_tickers: int = 500) -> dict:
+    """Evaluate one batch of tickers. Connection-safe.
+    Groups predictions by ticker, fetches price history once per ticker from FMP."""
     from database import BgSessionLocal as SessionLocal
 
     _history_cache.clear()  # Clear between batches
@@ -128,19 +129,23 @@ def evaluate_batch(max_tickers: int = 200) -> dict:
     remaining = len(ticker_preds) - len(tickers)
 
     # ── STEP 3: Batch-fetch ALL prices (NO DB connection held) ──────────
-    print(f"[HistEval] Fetching prices for {len(tickers)} tickers...")
+    print(f"[HistEval] Fetching prices for {len(tickers)} tickers (FMP budget: {_FMP_DAILY_LIMIT - _fmp_calls_today} remaining)...")
     all_prices = {}
     for i, ticker in enumerate(tickers):
         if _eval_stop:
             break
+        if _fmp_calls_today >= _FMP_DAILY_LIMIT and not FINNHUB_KEY:
+            print(f"[HistEval] FMP daily limit reached at ticker {i}/{len(tickers)}")
+            break
         prices = _fetch_history(ticker, None, None)
         if prices:
             all_prices[ticker] = prices
-        # Rate limit: FMP ~4/sec, Finnhub ~60/min
-        if (i + 1) % 30 == 0:
-            time.sleep(1)
+        # Rate limit: ~4 req/sec for FMP
+        time.sleep(0.3)
+        if (i + 1) % 50 == 0:
+            print(f"[HistEval] Progress: {i + 1}/{len(tickers)} tickers fetched, {len(all_prices)} with data")
 
-    print(f"[HistEval] Got prices for {len(all_prices)}/{len(tickers)} tickers")
+    print(f"[HistEval] Got prices for {len(all_prices)}/{len(tickers)} tickers (FMP calls used today: {_fmp_calls_today})")
 
     total_scored = 0
     total_correct = 0
@@ -292,12 +297,18 @@ def evaluate_batch(max_tickers: int = 200) -> dict:
     if affected_forecasters:
         _update_stats(affected_forecasters)
 
+    backlog = remaining_count - total_scored
+    print(f"[HistEval] BATCH DONE: {total_scored} scored, {len(tickers)} tickers. "
+          f"Backlog: ~{max(backlog, 0):,} predictions remaining. "
+          f"FMP calls today: {_fmp_calls_today}/{_FMP_DAILY_LIMIT}")
+
     return {
         "tickers_processed": len(tickers),
         "predictions_scored": total_scored,
         "correct": total_correct,
         "incorrect": total_incorrect,
         "remaining_tickers": max(remaining, 0),
+        "backlog": max(backlog, 0),
     }
 
 
@@ -358,7 +369,7 @@ _quote_cache: dict[str, dict] = {}
 _history_cache: dict[str, dict] = {}
 _fmp_calls_today = 0
 _fmp_calls_date = ""
-_FMP_DAILY_LIMIT = 150  # Share FMP quota with grades scraper (~300/day total)
+_FMP_DAILY_LIMIT = 200  # Evaluator gets 200/day, grades scraper gets 100/day
 
 
 def _fetch_history(ticker: str, start, end) -> dict:
@@ -378,51 +389,40 @@ def _fetch_history(ticker: str, start, end) -> dict:
         _fmp_calls_today = 0
         _fmp_calls_date = today_str
 
-    # 1. Try FMP historical prices (Starter plan: /stable/ endpoint)
+    # 1. FMP historical prices — returns FULL price history in ONE call
+    # This is the primary source for evaluating the 200K backlog.
     if FMP_KEY and _fmp_calls_today < _FMP_DAILY_LIMIT:
         try:
             r = httpx.get(
                 "https://financialmodelingprep.com/stable/historical-price-full",
                 params={"symbol": ticker, "apikey": FMP_KEY, "serietype": "line"},
-                timeout=10,
+                timeout=15,
             )
             _fmp_calls_today += 1
-            data = r.json()
-            # Response can be list or dict with "historical" key
-            historical = data.get("historical", data) if isinstance(data, dict) else data
-            if isinstance(historical, list):
-                for day in historical:
-                    ds = (day.get("date") or "")[:10]
-                    close = day.get("close") or day.get("adjClose")
-                    if ds and close and float(close) > 0:
-                        prices[ds] = float(close)
-            if prices:
-                _history_cache[ticker] = prices
-                return prices
+            if r.status_code == 200:
+                try:
+                    data = r.json()
+                except Exception:
+                    data = {}
+                historical = data.get("historical", data) if isinstance(data, dict) else data
+                if isinstance(historical, list):
+                    for day in historical:
+                        ds = (day.get("date") or "")[:10]
+                        close = day.get("close") or day.get("adjClose")
+                        if ds and close and float(close) > 0:
+                            prices[ds] = float(close)
+                if prices:
+                    _history_cache[ticker] = prices
+                    return prices
+            else:
+                if _fmp_calls_today <= 5:
+                    print(f"[HistEval] FMP HTTP {r.status_code} for {ticker}")
         except Exception as e:
             _fmp_calls_today += 1
             if _fmp_calls_today <= 3:
-                print(f"[HistEval] FMP historical error for {ticker}: {e}")
+                print(f"[HistEval] FMP error for {ticker}: {e}")
 
-    # 2. Try yfinance with rate limiting (2s delay)
-    try:
-        import yfinance as yf
-        stock = yf.Ticker(ticker)
-        hist = stock.history(period="max")
-        if hist is not None and len(hist) > 0:
-            for date_idx, row in hist.iterrows():
-                ds = str(date_idx.date())
-                close = row.get("Close")
-                if close and float(close) > 0:
-                    prices[ds] = float(close)
-            if prices:
-                _history_cache[ticker] = prices
-                return prices
-        time.sleep(2)  # Rate limit yfinance
-    except Exception:
-        pass
-
-    # 3. Fallback: Finnhub current quote (only valid for recently expired predictions)
+    # 2. Finnhub current quote — last resort, only useful for very recent predictions
     if FINNHUB_KEY:
         try:
             r = httpx.get(

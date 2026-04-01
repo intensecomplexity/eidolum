@@ -1664,7 +1664,7 @@ async def lifespan(app):
                 catchup_start = _catchup_time.time()
                 max_catchup_time = 600  # 10 minutes max for startup catch-up
                 while (_catchup_time.time() - catchup_start) < max_catchup_time:
-                    result = evaluate_batch(max_tickers=200)
+                    result = evaluate_batch(max_tickers=500)
                     scored = result.get('predictions_scored', 0)
                     remaining = result.get('remaining_tickers', 0)
                     catchup_total += scored
@@ -1738,7 +1738,7 @@ async def lifespan(app):
             total_scored = 0
             batch_num = 0
             while (_eval_time.time() - start) < 480:  # 8 minute max per cycle
-                result = evaluate_batch(max_tickers=200)
+                result = evaluate_batch(max_tickers=500)
                 scored = result.get('predictions_scored', 0)
                 remaining = result.get('remaining_tickers', 0)
                 total_scored += scored
