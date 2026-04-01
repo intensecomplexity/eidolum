@@ -106,10 +106,19 @@ def evaluate_batch(max_tickers: int = 500) -> dict:
     finally:
         db.close()
 
-    print(f"[HistEval] Query returned {len(rows)} rows, {remaining_count} total remaining")
+    # Log outcome distribution for diagnostics
+    try:
+        db2 = SessionLocal()
+        dist = db2.execute(sql_text("SELECT outcome, COUNT(*) FROM predictions GROUP BY outcome ORDER BY COUNT(*) DESC")).fetchall()
+        db2.close()
+        print(f"[HistEval] Outcome distribution: {dict((r[0], r[1]) for r in dist)}")
+    except Exception:
+        pass
+
+    print(f"[HistEval] Pending overdue: {remaining_count}. Batch: {len(rows)} rows fetched.")
     if rows:
         r0 = rows[0]
-        print(f"[HistEval] First row: id={r0[0]} ticker={r0[1]} dir={r0[2]} tp={r0[3]} ep={r0[4]} eval_date={r0[5]} pred_date={r0[6]}")
+        print(f"[HistEval] First row: id={r0[0]} ticker={r0[1]} dir={r0[2]} eval_date={r0[5]}")
 
     if not rows:
         return {"tickers_processed": 0, "predictions_scored": 0, "remaining_tickers": 0, "correct": 0, "incorrect": 0}

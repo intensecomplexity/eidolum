@@ -15,12 +15,14 @@ FORECASTER_CACHE_TTL = 300
 
 
 def _build_accuracy_trend(forecaster_id: int, db: Session) -> list:
-    """Build prediction-by-prediction cumulative accuracy trend."""
+    """Build prediction-by-prediction cumulative accuracy trend.
+    Uses three-tier scoring: hit/correct=1.0, near=0.5, miss/incorrect=0."""
     try:
         rows = db.execute(sql_text("""
             SELECT outcome
             FROM predictions
-            WHERE forecaster_id = :fid AND outcome IN ('correct', 'incorrect')
+            WHERE forecaster_id = :fid AND outcome IN ('hit','near','miss','correct','incorrect')
+              AND actual_return IS NOT NULL
             ORDER BY COALESCE(evaluated_at, evaluation_date, prediction_date) ASC
         """), {"fid": forecaster_id}).fetchall()
     except Exception:
@@ -30,17 +32,20 @@ def _build_accuracy_trend(forecaster_id: int, db: Session) -> list:
         return []
 
     trend = []
-    correct = 0
+    hits = 0
+    nears = 0
     for i, r in enumerate(rows):
-        if r[0] == "correct":
-            correct += 1
+        if r[0] in ("hit", "correct"):
+            hits += 1
+        elif r[0] == "near":
+            nears += 1
         total = i + 1
-        # Sample every few points to keep payload small
+        acc = round((hits + nears * 0.5) / total * 100, 1)
         if total <= 10 or total % max(1, len(rows) // 50) == 0 or total == len(rows):
             trend.append({
                 "prediction_number": total,
-                "cumulative_accuracy": round(correct / total * 100, 1),
-                "correct": correct,
+                "cumulative_accuracy": acc,
+                "correct": hits,
                 "total": total,
             })
 

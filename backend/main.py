@@ -1337,16 +1337,14 @@ async def lifespan(app):
             print(f"[Startup] Table creation error: {e}")
             return  # Can't continue without tables
 
-        # ── Migrate outcome values: correct→hit, incorrect→miss ──────────
+        # ── Log outcome distribution (no migration — accept both old and new values) ──
         try:
             with engine.connect() as _mc:
-                migrated = _mc.execute(sql_text("UPDATE predictions SET outcome = 'hit' WHERE outcome = 'correct'")).rowcount
-                migrated2 = _mc.execute(sql_text("UPDATE predictions SET outcome = 'miss' WHERE outcome = 'incorrect'")).rowcount
-                _mc.commit()
-                if migrated or migrated2:
-                    print(f"[Startup] Migrated outcomes: {migrated} correct→hit, {migrated2} incorrect→miss")
+                dist_rows = _mc.execute(sql_text("SELECT outcome, COUNT(*) FROM predictions GROUP BY outcome ORDER BY COUNT(*) DESC")).fetchall()
+                dist = {r[0]: r[1] for r in dist_rows}
+                print(f"[Startup] Prediction outcomes: {dict(dist)}")
         except Exception as _me:
-            print(f"[Startup] Outcome migration error: {_me}")
+            print(f"[Startup] Outcome query error: {_me}")
 
         # ── Fix broken source URLs ────────────────────────────────────
         try:
