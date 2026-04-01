@@ -114,6 +114,7 @@ def recalculate_forecaster_stats(forecaster_id: int, db: Session):
         .filter(
             Prediction.forecaster_id == forecaster_id,
             Prediction.outcome.in_(["hit", "near", "miss", "correct", "incorrect"]),
+            Prediction.actual_return.isnot(None),
         )
         .order_by(Prediction.prediction_date.desc())
         .all()
@@ -125,7 +126,7 @@ def recalculate_forecaster_stats(forecaster_id: int, db: Session):
     misses = sum(1 for p in evaluated if p.outcome in ("miss", "incorrect"))
 
     # Three-tier accuracy: hits=1.0, nears=0.5, misses=0
-    accuracy = round((hits + nears * 0.5) / total * 100, 1) if total > 0 else None
+    accuracy = round((hits + nears * 0.5) / total * 100, 1) if total > 0 else 0
 
     # Streak: count consecutive same-outcome from most recent (hit/near = positive, miss = negative)
     streak_count = 0

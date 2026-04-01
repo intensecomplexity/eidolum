@@ -531,15 +531,29 @@ _HIT_OUTCOMES = "('hit','correct')"
 
 def refresh_all_forecaster_stats():
     """Recalculate stats for ALL forecasters from scratch, including alpha.
-    Uses three-tier scoring: accuracy = (hits*1 + nears*0.5) / total * 100"""
+    Uses three-tier scoring: accuracy = (hits*1 + nears*0.5) / total_scored * 100.
+    Zeros out forecasters with 0 scored predictions so they don't appear on leaderboard."""
     from database import BgSessionLocal as SessionLocal
     db = SessionLocal()
     updated = 0
+    zeroed = 0
     try:
+        # Step 1: Zero out ALL forecasters first (removes stale scores from unscored forecasters)
+        db.execute(sql_text(
+            "UPDATE forecasters SET total_predictions=0, correct_predictions=0, accuracy_score=0, alpha=0, avg_return=0 "
+            "WHERE total_predictions > 0 AND id NOT IN "
+            f"(SELECT DISTINCT forecaster_id FROM predictions WHERE outcome IN {_SCORED_OUTCOMES} AND actual_return IS NOT NULL)"
+        ))
+        zeroed = db.execute(sql_text(
+            "SELECT changes()"  # SQLite
+        )).scalar() if False else 0  # Postgres doesn't have changes()
+        db.commit()
+
+        # Step 2: Recalculate stats for forecasters WITH scored predictions
         fids = [r[0] for r in db.execute(sql_text(
-            f"SELECT DISTINCT forecaster_id FROM predictions WHERE outcome IN {_SCORED_OUTCOMES}"
+            f"SELECT DISTINCT forecaster_id FROM predictions WHERE outcome IN {_SCORED_OUTCOMES} AND actual_return IS NOT NULL"
         )).fetchall()]
-        print(f"[StatsRefresh] Refreshing {len(fids)} forecasters")
+        print(f"[StatsRefresh] Refreshing {len(fids)} forecasters with scored predictions")
         for fid in fids:
             row = db.execute(sql_text(f"""
                 SELECT COUNT(*),
@@ -565,7 +579,7 @@ def refresh_all_forecaster_stats():
                 ), {"t": total, "c": hits, "a": acc, "alp": alp, "ar": ar, "f": fid})
                 updated += 1
         db.commit()
-        print(f"[StatsRefresh] Updated {updated} forecasters")
+        print(f"[StatsRefresh] Updated {updated} forecasters, zeroed unscored")
         return {"updated": updated, "total_forecasters_with_scored": len(fids)}
     except Exception as e:
         db.rollback()
