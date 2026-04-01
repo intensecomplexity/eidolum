@@ -1346,6 +1346,30 @@ async def lifespan(app):
         except Exception as _me:
             print(f"[Startup] Outcome query error: {_me}")
 
+        # ── Test FMP historical prices endpoint ─────────────────────────
+        _fmp_key = os.getenv("FMP_KEY", "").strip()
+        if _fmp_key:
+            import httpx as _test_httpx
+            for _test_url in [
+                "https://financialmodelingprep.com/stable/historical-price-full",
+                f"https://financialmodelingprep.com/api/v3/historical-price-full/AAPL",
+            ]:
+                try:
+                    _params = {"apikey": _fmp_key, "serietype": "line"}
+                    if "stable" in _test_url:
+                        _params["symbol"] = "AAPL"
+                    _r = _test_httpx.get(_test_url, params=_params, timeout=10)
+                    _data = _r.json() if _r.status_code == 200 else {}
+                    _hist = _data.get("historical", _data) if isinstance(_data, dict) else _data
+                    _count = len(_hist) if isinstance(_hist, list) else 0
+                    print(f"[Startup] FMP test: {_test_url.split('com')[1][:50]} → HTTP {_r.status_code}, {_count} price points")
+                    if _count > 0:
+                        break  # Found a working endpoint
+                except Exception as _te:
+                    print(f"[Startup] FMP test error: {_te}")
+        else:
+            print("[Startup] FMP_KEY not set — evaluator will use Finnhub only")
+
         # ── Fix broken source URLs ────────────────────────────────────
         try:
             with engine.connect() as _url_c:

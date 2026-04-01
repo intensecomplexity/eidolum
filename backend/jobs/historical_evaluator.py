@@ -92,7 +92,7 @@ def evaluate_batch(max_tickers: int = 500) -> dict:
             SELECT p.id, p.ticker, p.direction, p.target_price, p.entry_price,
                    p.evaluation_date, p.prediction_date, p.forecaster_id, p.window_days
             FROM predictions p
-            WHERE p.outcome = 'pending'
+            WHERE (p.outcome = 'pending' OR p.outcome IS NULL OR p.outcome = '')
               AND p.evaluation_date IS NOT NULL
               AND p.evaluation_date < :now
             ORDER BY p.ticker
@@ -101,7 +101,8 @@ def evaluate_batch(max_tickers: int = 500) -> dict:
 
         remaining_count = db.execute(sql_text("""
             SELECT COUNT(*) FROM predictions
-            WHERE outcome = 'pending' AND evaluation_date IS NOT NULL AND evaluation_date < :now
+            WHERE (outcome = 'pending' OR outcome IS NULL OR outcome = '')
+              AND evaluation_date IS NOT NULL AND evaluation_date < :now
         """), {"now": now}).scalar() or 0
     finally:
         db.close()
@@ -398,38 +399,49 @@ def _fetch_history(ticker: str, start, end) -> dict:
         _fmp_calls_today = 0
         _fmp_calls_date = today_str
 
-    # 1. FMP historical prices — returns FULL price history in ONE call
-    # This is the primary source for evaluating the 200K backlog.
+    # 1. FMP historical prices — try multiple endpoint formats
+    # Starter plan may use /stable/ or /v3/ prefix
     if FMP_KEY and _fmp_calls_today < _FMP_DAILY_LIMIT:
-        try:
-            r = httpx.get(
-                "https://financialmodelingprep.com/stable/historical-price-full",
-                params={"symbol": ticker, "apikey": FMP_KEY, "serietype": "line"},
-                timeout=15,
-            )
-            _fmp_calls_today += 1
-            if r.status_code == 200:
-                try:
-                    data = r.json()
-                except Exception:
-                    data = {}
-                historical = data.get("historical", data) if isinstance(data, dict) else data
-                if isinstance(historical, list):
-                    for day in historical:
-                        ds = (day.get("date") or "")[:10]
-                        close = day.get("close") or day.get("adjClose")
-                        if ds and close and float(close) > 0:
-                            prices[ds] = float(close)
-                if prices:
-                    _history_cache[ticker] = prices
-                    return prices
-            else:
-                if _fmp_calls_today <= 5:
-                    print(f"[HistEval] FMP HTTP {r.status_code} for {ticker}")
-        except Exception as e:
-            _fmp_calls_today += 1
-            if _fmp_calls_today <= 3:
-                print(f"[HistEval] FMP error for {ticker}: {e}")
+        fmp_urls = [
+            # Stable API (new format)
+            ("https://financialmodelingprep.com/stable/historical-price-full",
+             {"symbol": ticker, "apikey": FMP_KEY, "serietype": "line"}),
+            # Legacy v3 API (widely documented)
+            (f"https://financialmodelingprep.com/api/v3/historical-price-full/{ticker}",
+             {"apikey": FMP_KEY, "serietype": "line"}),
+        ]
+        for url, params in fmp_urls:
+            try:
+                r = httpx.get(url, params=params, timeout=15)
+                _fmp_calls_today += 1
+                if r.status_code == 200:
+                    try:
+                        data = r.json()
+                    except Exception:
+                        continue
+                    historical = data.get("historical", data) if isinstance(data, dict) else data
+                    if isinstance(historical, list):
+                        for day in historical:
+                            ds = (day.get("date") or "")[:10]
+                            close = day.get("close") or day.get("adjClose")
+                            if ds and close and float(close) > 0:
+                                prices[ds] = float(close)
+                    if prices:
+                        if _fmp_calls_today <= 3:
+                            print(f"[HistEval] FMP OK for {ticker}: {len(prices)} price points from {url.split('/')[-1]}")
+                        _history_cache[ticker] = prices
+                        return prices
+                elif r.status_code == 404:
+                    continue  # Try next URL format
+                else:
+                    if _fmp_calls_today <= 5:
+                        print(f"[HistEval] FMP HTTP {r.status_code} for {ticker} ({url.split('com')[1][:40]})")
+                    break  # Non-404 error, don't try other URLs
+            except Exception as e:
+                _fmp_calls_today += 1
+                if _fmp_calls_today <= 3:
+                    print(f"[HistEval] FMP error for {ticker}: {e}")
+                break
 
     # 2. Finnhub current quote — last resort, only useful for very recent predictions
     if FINNHUB_KEY:
