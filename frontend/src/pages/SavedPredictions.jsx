@@ -290,9 +290,15 @@ function SavedCard({ prediction: p, userId, onUpdate }) {
     }
   }
 
-  // Resolution urgency
-  const isUrgent = isPending && p.days_remaining !== null && p.days_remaining <= 7;
-  const isCritical = isPending && p.days_remaining !== null && p.days_remaining <= 1;
+  // Resolution urgency — use precise time remaining
+  const _tr = (() => {
+    try {
+      const { formatTimeRemaining } = require('../utils/timeRemaining');
+      return formatTimeRemaining(p.expires_at || p.evaluation_date, p.days_remaining);
+    } catch { return { label: p.days_remaining != null ? `${p.days_remaining}d left` : '', isUrgent: p.days_remaining <= 7, isCritical: p.days_remaining <= 1, isEvaluating: false }; }
+  })();
+  const isUrgent = isPending && _tr.isUrgent;
+  const isCritical = isPending && _tr.isCritical;
 
   const borderColor = isPending ? 'border-l-warning' : isCorrect ? 'border-l-positive' : 'border-l-negative';
   const bgTint = isCorrect ? 'bg-positive/[0.02]' : isIncorrect ? 'bg-negative/[0.02]' : '';
@@ -498,13 +504,12 @@ function TrackingSection({ p, currentReturn, returnSign, isTracking, targetProgr
             <div className="flex justify-between items-center mb-1">
               <span className="text-muted text-xs">Resolution</span>
               <span className={`text-xs font-mono font-medium ${
+                _tr.isEvaluating ? 'text-accent' :
                 isCritical ? 'text-negative pulse-live' :
                 isUrgent ? 'text-warning' :
                 'text-text-secondary'
               }`}>
-                {isCritical ? 'Resolves tomorrow' :
-                 isUrgent ? `Resolves in ${p.days_remaining} day${p.days_remaining !== 1 ? 's' : ''}` :
-                 `${p.days_remaining} day${p.days_remaining !== 1 ? 's' : ''} left`}
+                {_tr.label || `${p.days_remaining}d left`}
               </span>
             </div>
             <div className="w-full h-1.5 bg-surface rounded-full overflow-hidden">
@@ -517,7 +522,7 @@ function TrackingSection({ p, currentReturn, returnSign, isTracking, targetProgr
             </div>
             <div className="flex justify-between text-[10px] text-muted mt-0.5">
               <span>{p.days_elapsed}d elapsed</span>
-              <span>{p.days_remaining}d left</span>
+              <span>{_tr.label || `${p.days_remaining}d left`}</span>
             </div>
           </div>
         )}

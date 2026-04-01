@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { Clock, Bell } from 'lucide-react';
 import BookmarkButton from './BookmarkButton';
 import PlatformBadge from './PlatformBadge';
+import { formatTimeRemaining } from '../utils/timeRemaining';
 import { getPendingPredictions } from '../api';
 
 export default function PendingPredictions() {
@@ -108,7 +109,7 @@ function PendingCard({ prediction: p }) {
           </span>
           <span className="flex items-center gap-1 text-text-secondary font-mono">
             <Clock className="w-3 h-3" />
-            {p.days_remaining}d left
+            {formatTimeRemaining(p.expires_at || p.evaluation_date, p.days_remaining).label || `${p.days_remaining}d left`}
           </span>
         </div>
         <div className="w-full h-2 bg-surface-2 rounded-full overflow-hidden">

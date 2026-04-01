@@ -448,11 +448,13 @@ function PredictionItem({ p, showOutcome = false }) {
       {/* ── Footer (always visible) ──────────────────────────── */}
       <div className="flex items-center justify-between mt-1.5 text-[10px] text-muted">
         <span>{p.prediction_date?.slice(0, 10)}</span>
-        {!isScored && p.days_remaining != null && (
-          <span className={`font-mono ${p.days_remaining <= 7 ? 'text-warning font-semibold' : ''}`}>
-            {p.days_remaining}d remaining
-          </span>
-        )}
+        {!isScored && (p.days_remaining != null || p.evaluation_date) && (() => {
+          const { formatTimeRemaining } = require('../utils/timeRemaining');
+          const tr = formatTimeRemaining(p.evaluation_date, p.days_remaining);
+          if (tr.isEvaluating) return <span className="font-mono text-accent font-semibold">Evaluating</span>;
+          if (!tr.label) return null;
+          return <span className={`font-mono ${tr.isUrgent ? 'text-warning font-semibold' : ''}`}>{tr.label}</span>;
+        })()}
         {isScored && p.evaluation_date && (
           <span>Evaluated {p.evaluation_date.slice(0, 10)}</span>
         )}

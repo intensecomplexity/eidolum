@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { Zap, Flame, TrendingUp, TrendingDown, AlertCircle } from 'lucide-react';
 import TypeBadge from '../components/TypeBadge';
 import TickerLink from '../components/TickerLink';
+import { formatTimeRemaining } from '../utils/timeRemaining';
 import ReactionBar from '../components/ReactionBar';
 import ConsensusBar from '../components/ConsensusBar';
 import Footer from '../components/Footer';
@@ -49,7 +50,7 @@ export default function Controversial() {
                     </div>
                     {p.days_left !== null && (
                       <span className={`font-mono text-xs ${p.days_left <= 3 ? 'text-negative font-bold' : p.days_left <= 7 ? 'text-warning' : 'text-muted'}`}>
-                        {p.days_left}d left
+                        {formatTimeRemaining(null, p.days_left).label || `${p.days_left}d left`}
                       </span>
                     )}
                   </div>
