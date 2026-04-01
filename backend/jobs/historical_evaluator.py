@@ -133,11 +133,12 @@ def evaluate_batch(max_tickers: int = 200) -> dict:
     for i, ticker in enumerate(tickers):
         if _eval_stop:
             break
-        prices = _fetch_history(ticker, None, None)  # Just gets current quote
+        prices = _fetch_history(ticker, None, None)
         if prices:
             all_prices[ticker] = prices
-        if (i + 1) % 50 == 0:
-            time.sleep(1)  # Respect Finnhub rate limit (~60/min)
+        # Rate limit: FMP ~4/sec, Finnhub ~60/min
+        if (i + 1) % 30 == 0:
+            time.sleep(1)
 
     print(f"[HistEval] Got prices for {len(all_prices)}/{len(tickers)} tickers")
 
@@ -355,6 +356,9 @@ if not FINNHUB_KEY:
     print("[HistEval] WARNING: FINNHUB_KEY not set")
 _quote_cache: dict[str, dict] = {}
 _history_cache: dict[str, dict] = {}
+_fmp_calls_today = 0
+_fmp_calls_date = ""
+_FMP_DAILY_LIMIT = 230  # Stay under the 250/day free tier
 
 
 def _fetch_history(ticker: str, start, end) -> dict:
@@ -366,15 +370,23 @@ def _fetch_history(ticker: str, start, end) -> dict:
         return _history_cache[ticker]
 
     prices = {}
+    global _fmp_calls_today, _fmp_calls_date
+
+    # Reset FMP counter daily
+    today_str = datetime.utcnow().strftime("%Y-%m-%d")
+    if _fmp_calls_date != today_str:
+        _fmp_calls_today = 0
+        _fmp_calls_date = today_str
 
     # 1. Try FMP historical prices (free tier: 250 calls/day)
-    if FMP_KEY:
+    if FMP_KEY and _fmp_calls_today < _FMP_DAILY_LIMIT:
         try:
             r = httpx.get(
                 f"https://financialmodelingprep.com/api/v3/historical-price-full/{ticker}",
                 params={"apikey": FMP_KEY, "serietype": "line"},
                 timeout=10,
             )
+            _fmp_calls_today += 1
             data = r.json()
             historical = data.get("historical", [])
             for day in historical:
@@ -386,7 +398,7 @@ def _fetch_history(ticker: str, start, end) -> dict:
                 _history_cache[ticker] = prices
                 return prices
         except Exception:
-            pass
+            _fmp_calls_today += 1  # Count failed calls too
 
     # 2. Try yfinance (free, works sometimes on Railway)
     try:
