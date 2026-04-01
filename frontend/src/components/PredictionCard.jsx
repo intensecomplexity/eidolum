@@ -28,34 +28,45 @@ function formatDate(iso) {
   return iso.slice(0, 10);
 }
 
+function getDomainLabel(url) {
+  if (!url) return null;
+  if (url.includes('benzinga.com')) return 'Benzinga';
+  if (url.includes('stockanalysis.com')) return 'Stock Analysis';
+  if (url.includes('youtube.com') || url.includes('youtu.be')) return 'YouTube';
+  if (url.includes('x.com') || url.includes('twitter.com')) return 'X';
+  if (url.includes('reddit.com')) return 'Reddit';
+  if (url.includes('financialmodelingprep.com')) return 'FMP';
+  if (url.includes('seekingalpha.com')) return 'Seeking Alpha';
+  if (url.includes('reuters.com')) return 'Reuters';
+  if (url.includes('cnbc.com')) return 'CNBC';
+  try { return new URL(url).hostname.replace('www.', ''); } catch { return 'Source'; }
+}
+
+function isRealArchive(url) {
+  return url && url.startsWith('https://web.archive.org');
+}
+
 function ProofLinks({ p }) {
   const source = p.source_url || '';
-  const archive = p.archive_url;
-  const waybackLink = archive && archive.startsWith('https://web.archive.org')
-    ? archive
-    : (source && !source.includes('youtube.com') && !source.includes('x.com') && !source.includes('twitter.com') && !source.includes('reddit.com'))
-      ? `https://web.archive.org/web/${source}`
-      : null;
-
   if (!source) return null;
 
+  const archive = isRealArchive(p.archive_url) ? p.archive_url : null;
   const isYT = source.includes('youtube.com') || source.includes('youtu.be');
   const ts = p.video_timestamp_sec;
   const timeStr = ts ? `${Math.floor(ts / 60)}:${String(ts % 60).padStart(2, '0')}` : null;
-  const sourceLabel = isYT ? (timeStr ? `Watch at ${timeStr}` : 'Source') : 'Source';
-  const verified = p.verified_by || 'benzinga';
+  const label = isYT && timeStr ? `YouTube at ${timeStr}` : getDomainLabel(source);
   const dateStr = formatDate(p.prediction_date);
 
   return (
     <div className="flex items-center gap-2 text-[10px] text-muted">
       <a href={source} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()}
         className="inline-flex items-center gap-1 hover:text-accent transition-colors">
-        <ExternalLink className="w-3 h-3" /> {sourceLabel}
+        <ExternalLink className="w-3 h-3" /> {label}
       </a>
-      {waybackLink && (
-        <a href={waybackLink} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()}
+      {archive && (
+        <a href={archive} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()}
           className="inline-flex items-center gap-1 hover:text-accent transition-colors">
-          <Archive className="w-3 h-3" /> Proof
+          <Archive className="w-3 h-3" /> Archived
         </a>
       )}
       {dateStr && <span className="ml-auto">{dateStr}</span>}
@@ -177,13 +188,10 @@ export default function PredictionCard({ prediction: p, showForecaster = false, 
         return rc ? <p className="text-[10px] text-muted italic mb-1">{rc}</p> : null;
       })()}
 
-      {/* Prediction summary — only show if exact_quote differs from context */}
-      {!compact && (p.exact_quote || p.context) && (
+      {/* Summary — only show if exact_quote is a real quote (differs from context) */}
+      {!compact && p.exact_quote && p.exact_quote !== p.context && (
         <p className="text-xs text-text-secondary italic leading-relaxed mb-2 break-words">
-          {annotateContext(
-            p.exact_quote && p.exact_quote !== p.context ? p.exact_quote : p.context,
-            p.ticker
-          )}
+          {annotateContext(p.exact_quote, p.ticker)}
         </p>
       )}
 

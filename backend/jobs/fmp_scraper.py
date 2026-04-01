@@ -125,7 +125,7 @@ def _process_fmp_rating(item: dict, db: Session) -> bool:
         return False
 
     # Source URL
-    source_url = news_url or f"https://financialmodelingprep.com/quote/{ticker}"
+    source_url = news_url or f"https://stockanalysis.com/stocks/{ticker.lower()}/forecast/"
 
     # Build context
     grade_text = f"{prev_grade} → {new_grade}" if prev_grade and new_grade else new_grade
@@ -137,7 +137,7 @@ def _process_fmp_rating(item: dict, db: Session) -> bool:
     # Validate
     is_valid, _ = validate_prediction(
         ticker=ticker, direction=direction, source_url=source_url,
-        archive_url=source_url, context=context, forecaster_id=forecaster.id,
+        archive_url=None, context=context, forecaster_id=forecaster.id,
     )
     if not is_valid:
         return False
@@ -146,7 +146,7 @@ def _process_fmp_rating(item: dict, db: Session) -> bool:
         forecaster_id=forecaster.id, ticker=ticker, direction=direction,
         prediction_date=pred_date,
         evaluation_date=pred_date + timedelta(days=window_days),
-        window_days=window_days, source_url=source_url, archive_url=source_url,
+        window_days=window_days, source_url=source_url, archive_url=None,
         source_type="article", source_platform_id=source_id,
         sector=_get_sector_safe(ticker, db),
         context=context[:500], exact_quote=context,

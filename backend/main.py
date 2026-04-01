@@ -1430,6 +1430,42 @@ async def lifespan(app):
         except Exception as _ne:
             print(f"[Startup] Neutral reclassification error: {_ne}")
 
+        # ── Fix bad source URLs ──────────────────────────────────────────
+        try:
+            _url_db = BgSessionLocal()
+            total_fixed = 0
+
+            # Benzinga: /quote/TICKER → /stock/TICKER/ratings
+            r1 = _url_db.execute(sql_text(
+                "UPDATE predictions SET source_url = REPLACE(source_url, '/quote/', '/stock/') || '/ratings' "
+                "WHERE source_url LIKE '%benzinga.com/quote/%' AND source_url NOT LIKE '%/ratings'"
+            )).rowcount
+            _url_db.commit()
+            total_fixed += r1
+
+            # FMP stable/grades URLs → stockanalysis.com
+            r2 = _url_db.execute(sql_text(
+                "UPDATE predictions SET source_url = 'https://stockanalysis.com/stocks/' || LOWER(ticker) || '/forecast/' "
+                "WHERE source_url LIKE '%financialmodelingprep.com/stable/%'"
+            )).rowcount
+            _url_db.commit()
+            total_fixed += r2
+
+            # Clear fake archive URLs (not real web.archive.org)
+            r3 = _url_db.execute(sql_text(
+                "UPDATE predictions SET archive_url = NULL "
+                "WHERE archive_url IS NOT NULL AND archive_url NOT LIKE 'https://web.archive.org%' "
+                "AND archive_url NOT LIKE '/archive/%'"
+            )).rowcount
+            _url_db.commit()
+            total_fixed += r3
+
+            if total_fixed:
+                print(f"[Startup] Fixed {total_fixed} URLs (benzinga:{r1} + fmp:{r2} + fake_archive:{r3})")
+            _url_db.close()
+        except Exception as _ue:
+            print(f"[Startup] URL migration error: {_ue}")
+
         # Critical indexes for ticker detail page performance
         try:
             from sqlalchemy import text as _idx_t
