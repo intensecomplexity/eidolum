@@ -327,8 +327,7 @@ def auto_resume_backfill():
         if forward_done and fwd_last:
             last_fwd = datetime.strptime(fwd_last, "%Y-%m-%d").date()
             if last_fwd >= date.today() - timedelta(days=1):
-                print(f"[Backfill] Forward already caught up to {fwd_last}. Nothing to do.")
-                return
+                print(f"[Backfill] Forward already caught up to {fwd_last}. Checking reverse backfill.")
             # Need to catch up new days
             _set_config(db, "backfill_forward_done", "false")
             print(f"[Backfill] Forward needs catch-up from {last_fwd} to today")
