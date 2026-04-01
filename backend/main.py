@@ -1847,11 +1847,32 @@ async def lifespan(app):
             db2.close()
     run_sweep = _guarded_job("sweep_stuck", _sweep_stuck)
 
+    # JOB 7: Retry no_data predictions using yfinance (free, no FMP budget used)
+    def _retry_no_data_standalone():
+        from datetime import datetime as _dt
+        from admin_panel import scheduler_last_run
+        scheduler_last_run["retry_no_data"] = _dt.utcnow()
+        if not db_is_healthy("retry_no_data"):
+            return
+        mark_job_running("retry_no_data")
+        try:
+            db = BgSessionLocal()
+            try:
+                from jobs.retry_no_data import retry_no_data_batch
+                retry_no_data_batch(db, max_tickers=50)
+            except Exception as e:
+                print(f"[retry_no_data] Error: {e}")
+            finally:
+                db.close()
+        finally:
+            mark_job_done("retry_no_data")
+
     scheduler.add_job(run_massive_benzinga, "interval", hours=2, id="massive_benzinga", next_run_time=_first_run)
     scheduler.add_job(_fmp_grades_standalone, "interval", hours=24, id="fmp_grades", next_run_time=_first_run + timedelta(minutes=20))
     scheduler.add_job(_auto_evaluate_standalone, "interval", minutes=30, id="auto_evaluate", next_run_time=_first_run + timedelta(minutes=5))
     scheduler.add_job(_refresh_stats_standalone, "interval", hours=2, id="refresh_stats", next_run_time=_first_run + timedelta(minutes=10))
     scheduler.add_job(run_sweep, "interval", hours=24, id="sweep_stuck", next_run_time=_first_run + timedelta(minutes=15))
+    scheduler.add_job(_retry_no_data_standalone, "interval", hours=1, id="retry_no_data", next_run_time=_first_run + timedelta(minutes=30))
     scheduler.add_job(run_analyst_notif, "interval", hours=1, id="analyst_notifications", next_run_time=_first_run + timedelta(minutes=25))
     scheduler.add_job(_watchdog, "interval", minutes=5, id="watchdog")
 
