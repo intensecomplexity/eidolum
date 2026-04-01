@@ -2107,14 +2107,14 @@ def alpha_debug():
                 COUNT(CASE WHEN evaluation_date IS NULL THEN 1 END) as eval_date_null,
                 COUNT(CASE WHEN prediction_date IS NULL THEN 1 END) as pred_date_null
             FROM predictions
-            WHERE outcome IN ('correct','incorrect')
+            WHERE outcome IN ('hit','near','miss','correct','incorrect')
         """)).first()
         # Sample 3 evaluated predictions with their raw column values
         samples = db.execute(_t("""
             SELECT id, ticker, outcome, actual_return, alpha, sp500_return,
                    prediction_date, evaluation_date
             FROM predictions
-            WHERE outcome IN ('correct','incorrect')
+            WHERE outcome IN ('hit','near','miss','correct','incorrect')
             ORDER BY id DESC LIMIT 5
         """)).fetchall()
         return {
@@ -2717,7 +2717,7 @@ def backfill_alpha():
         rows = dbs.execute(_t("""
             SELECT id, actual_return, prediction_date, evaluation_date
             FROM predictions
-            WHERE outcome IN ('correct','incorrect')
+            WHERE outcome IN ('hit','near','miss','correct','incorrect')
               AND alpha IS NULL
               AND actual_return IS NOT NULL
             LIMIT 10000

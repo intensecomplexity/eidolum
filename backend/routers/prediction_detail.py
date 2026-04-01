@@ -51,7 +51,7 @@ def get_prediction_detail(
             raise HTTPException(status_code=404, detail="Prediction not found")
 
         user = db.query(User).filter(User.id == pred.user_id).first()
-        scored_count = db.query(func.count(UserPrediction.id)).filter(UserPrediction.user_id == pred.user_id, UserPrediction.outcome.in_(["correct", "incorrect"]), UserPrediction.deleted_at.is_(None)).scalar() or 0
+        scored_count = db.query(func.count(UserPrediction.id)).filter(UserPrediction.user_id == pred.user_id, UserPrediction.outcome.in_(["hit","near","miss","correct","incorrect"]), UserPrediction.deleted_at.is_(None)).scalar() or 0
         correct_count = db.query(func.count(UserPrediction.id)).filter(UserPrediction.user_id == pred.user_id, UserPrediction.outcome == "correct", UserPrediction.deleted_at.is_(None)).scalar() or 0
         accuracy = round(correct_count / scored_count * 100, 1) if scored_count > 0 else 0
 

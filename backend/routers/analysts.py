@@ -45,7 +45,7 @@ def list_analysts(request: Request, q: str = Query(""), db: Session = Depends(ge
             # Compute from predictions table
             scored = db.query(func.count(Prediction.id)).filter(
                 Prediction.forecaster_id == f.id,
-                Prediction.outcome.in_(["correct", "incorrect"]),
+                Prediction.outcome.in_(["hit","near","miss","correct","incorrect"]),
             ).scalar() or 0
             correct = db.query(func.count(Prediction.id)).filter(
                 Prediction.forecaster_id == f.id,
@@ -82,7 +82,7 @@ def analyst_rankings(request: Request, db: Session = Depends(get_db)):
     for f in forecasters:
         scored = db.query(func.count(Prediction.id)).filter(
             Prediction.forecaster_id == f.id,
-            Prediction.outcome.in_(["correct", "incorrect"]),
+            Prediction.outcome.in_(["hit","near","miss","correct","incorrect"]),
         ).scalar() or 0
         if scored < 10:
             continue
@@ -217,7 +217,7 @@ def analyst_accuracy_history(request: Request, name: str, db: Session = Depends(
         db.query(Prediction)
         .filter(
             Prediction.forecaster_id == f.id,
-            Prediction.outcome.in_(["correct", "incorrect"]),
+            Prediction.outcome.in_(["hit","near","miss","correct","incorrect"]),
             Prediction.evaluation_date.isnot(None),
         )
         .order_by(Prediction.evaluation_date.asc())

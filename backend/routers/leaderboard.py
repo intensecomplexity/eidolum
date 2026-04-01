@@ -100,7 +100,7 @@ def _refresh_leaderboard(db: Session) -> list | dict:
                        SUM(CASE WHEN outcome='correct' THEN 1 ELSE 0 END) as correct
                 FROM predictions
                 WHERE forecaster_id = ANY(:fids)
-                  AND outcome IN ('correct','incorrect')
+                  AND outcome IN ('hit','near','miss','correct','incorrect')
                   AND sector IS NOT NULL AND sector != '' AND sector != 'Other'
                 GROUP BY forecaster_id, sector
                 ORDER BY forecaster_id, total DESC
@@ -138,7 +138,7 @@ def _check_stats_integrity(db: Session):
         sample = db.execute(sql_text("""
             SELECT f.id, f.name, f.total_predictions,
                    (SELECT COUNT(*) FROM predictions p
-                    WHERE p.forecaster_id = f.id AND p.outcome IN ('correct','incorrect')) as actual
+                    WHERE p.forecaster_id = f.id AND p.outcome IN ('hit','near','miss','correct','incorrect')) as actual
             FROM forecasters f
             WHERE f.total_predictions > 0
             ORDER BY RANDOM() LIMIT 5
@@ -186,7 +186,7 @@ def _week_leaderboard_impl(db: Session) -> dict:
                f.accuracy_score as alltime_acc, p.outcome
         FROM predictions p
         JOIN forecasters f ON f.id = p.forecaster_id
-        WHERE p.outcome IN ('correct','incorrect')
+        WHERE p.outcome IN ('hit','near','miss','correct','incorrect')
           AND COALESCE(p.evaluated_at, p.evaluation_date) >= NOW() - INTERVAL '7 days'
           AND COALESCE(p.evaluated_at, p.evaluation_date) <= NOW()
     """)).fetchall()
@@ -198,7 +198,7 @@ def _week_leaderboard_impl(db: Session) -> dict:
                NULL as alltime_acc, up.outcome
         FROM user_predictions up
         JOIN users u ON u.id = up.user_id
-        WHERE up.outcome IN ('correct','incorrect')
+        WHERE up.outcome IN ('hit','near','miss','correct','incorrect')
           AND up.evaluated_at >= NOW() - INTERVAL '7 days'
           AND up.evaluated_at <= NOW()
           AND up.deleted_at IS NULL
@@ -227,7 +227,7 @@ def _week_leaderboard_impl(db: Session) -> dict:
                 SELECT COUNT(*) FILTER (WHERE outcome = 'correct') as c,
                        COUNT(*) as t
                 FROM user_predictions
-                WHERE user_id = :uid AND outcome IN ('correct','incorrect') AND deleted_at IS NULL
+                WHERE user_id = :uid AND outcome IN ('hit','near','miss','correct','incorrect') AND deleted_at IS NULL
             """), {"uid": r[1]}).fetchone()
             alltime_acc = round(alltime[0] / alltime[1] * 100, 1) if alltime and alltime[1] > 0 else 0
             scored_map[key] = {
@@ -303,7 +303,7 @@ def _week_leaderboard_impl(db: Session) -> dict:
             SELECT COUNT(*) FILTER (WHERE outcome = 'correct') as c,
                    COUNT(*) as t
             FROM user_predictions
-            WHERE user_id = :uid AND outcome IN ('correct','incorrect') AND deleted_at IS NULL
+            WHERE user_id = :uid AND outcome IN ('hit','near','miss','correct','incorrect') AND deleted_at IS NULL
         """), {"uid": r[1]}).fetchone()
         alltime_acc = round(alltime[0] / alltime[1] * 100, 1) if alltime and alltime[1] > 0 else 0
         new_calls.append({
@@ -496,11 +496,11 @@ def get_sectors(request: Request, db: Session = Depends(get_db)):
     sector_rows = db.execute(sql_text("""
         SELECT sector, COUNT(*) as total,
                SUM(CASE WHEN outcome='correct' THEN 1 ELSE 0 END) as correct,
-               SUM(CASE WHEN outcome IN ('correct','incorrect') THEN 1 ELSE 0 END) as evaluated
+               SUM(CASE WHEN outcome IN ('hit','near','miss','correct','incorrect') THEN 1 ELSE 0 END) as evaluated
         FROM predictions
         WHERE sector IS NOT NULL AND sector != '' AND sector != 'Other'
         GROUP BY sector
-        HAVING SUM(CASE WHEN outcome IN ('correct','incorrect') THEN 1 ELSE 0 END) >= 5
+        HAVING SUM(CASE WHEN outcome IN ('hit','near','miss','correct','incorrect') THEN 1 ELSE 0 END) >= 5
         ORDER BY total DESC
     """)).fetchall()
 
@@ -523,13 +523,13 @@ def get_sectors(request: Request, db: Session = Depends(get_db)):
         forecaster_rows = db.execute(sql_text("""
             SELECT p.sector, f.id, f.name,
                    SUM(CASE WHEN p.outcome='correct' THEN 1 ELSE 0 END) as correct,
-                   SUM(CASE WHEN p.outcome IN ('correct','incorrect') THEN 1 ELSE 0 END) as evaluated
+                   SUM(CASE WHEN p.outcome IN ('hit','near','miss','correct','incorrect') THEN 1 ELSE 0 END) as evaluated
             FROM predictions p
             JOIN forecasters f ON f.id = p.forecaster_id
             WHERE p.sector = ANY(:sectors)
-              AND p.outcome IN ('correct','incorrect')
+              AND p.outcome IN ('hit','near','miss','correct','incorrect')
             GROUP BY p.sector, f.id, f.name
-            HAVING SUM(CASE WHEN p.outcome IN ('correct','incorrect') THEN 1 ELSE 0 END) >= 3
+            HAVING SUM(CASE WHEN p.outcome IN ('hit','near','miss','correct','incorrect') THEN 1 ELSE 0 END) >= 3
             ORDER BY p.sector, correct DESC, evaluated DESC
         """), {"sectors": sector_names}).fetchall()
 

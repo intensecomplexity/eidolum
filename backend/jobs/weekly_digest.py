@@ -24,7 +24,7 @@ def _week_stats(user_id: int, db: Session) -> dict:
     this_week = db.query(UserPrediction).filter(
         UserPrediction.user_id == user_id,
         UserPrediction.evaluated_at >= week_ago,
-        UserPrediction.outcome.in_(["correct", "incorrect"]),
+        UserPrediction.outcome.in_(["hit","near","miss","correct","incorrect"]),
         UserPrediction.deleted_at.is_(None),
     ).all()
     tw_correct = sum(1 for p in this_week if p.outcome == "correct")
@@ -36,7 +36,7 @@ def _week_stats(user_id: int, db: Session) -> dict:
         UserPrediction.user_id == user_id,
         UserPrediction.evaluated_at >= two_weeks_ago,
         UserPrediction.evaluated_at < week_ago,
-        UserPrediction.outcome.in_(["correct", "incorrect"]),
+        UserPrediction.outcome.in_(["hit","near","miss","correct","incorrect"]),
         UserPrediction.deleted_at.is_(None),
     ).all()
     lw_correct = sum(1 for p in last_week if p.outcome == "correct")

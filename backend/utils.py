@@ -77,7 +77,7 @@ def compute_streak(forecaster_id: int, db: Session) -> dict:
     recent = (
         db.query(Prediction)
         .filter(Prediction.forecaster_id == forecaster_id)
-        .filter(Prediction.outcome.notin_(["pending"]))
+        .filter(Prediction.outcome.in_(["hit","near","miss","correct","incorrect"]))
         .order_by(Prediction.prediction_date.desc())
         .limit(20)
         .all()

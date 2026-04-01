@@ -45,7 +45,7 @@ def get_share_data(request: Request, prediction_id: int, db: Session = Depends(g
         from sqlalchemy import func
         scored_count = db.query(func.count(UserPrediction.id)).filter(
             UserPrediction.user_id == user.id,
-            UserPrediction.outcome.in_(["correct", "incorrect"]),
+            UserPrediction.outcome.in_(["hit","near","miss","correct","incorrect"]),
             UserPrediction.deleted_at.is_(None),
         ).scalar() or 0
         correct_count = db.query(func.count(UserPrediction.id)).filter(
@@ -144,7 +144,7 @@ def get_profile_share_data(request: Request, user_id: int, db: Session = Depends
     from sqlalchemy import func
     scored_count = db.query(func.count(UserPrediction.id)).filter(
         UserPrediction.user_id == user_id,
-        UserPrediction.outcome.in_(["correct", "incorrect"]),
+        UserPrediction.outcome.in_(["hit","near","miss","correct","incorrect"]),
         UserPrediction.deleted_at.is_(None),
     ).scalar() or 0
     correct_count = db.query(func.count(UserPrediction.id)).filter(
@@ -190,7 +190,7 @@ def embed_widget(request: Request, username: str, db: Session = Depends(get_db))
 
     scored_count = db.query(func.count(UserPrediction.id)).filter(
         UserPrediction.user_id == user.id,
-        UserPrediction.outcome.in_(["correct", "incorrect"]),
+        UserPrediction.outcome.in_(["hit","near","miss","correct","incorrect"]),
         UserPrediction.deleted_at.is_(None),
     ).scalar() or 0
     correct_count = db.query(func.count(UserPrediction.id)).filter(
@@ -245,7 +245,7 @@ def told_you_so_data(request: Request, prediction_id: int, db: Session = Depends
     from sqlalchemy import func
     scored_count = db.query(func.count(UserPrediction.id)).filter(
         UserPrediction.user_id == pred.user_id,
-        UserPrediction.outcome.in_(["correct", "incorrect"]),
+        UserPrediction.outcome.in_(["hit","near","miss","correct","incorrect"]),
         UserPrediction.deleted_at.is_(None),
     ).scalar() or 0
     correct_count = db.query(func.count(UserPrediction.id)).filter(

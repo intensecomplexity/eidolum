@@ -237,7 +237,7 @@ def get_accuracy_chart(request: Request, forecaster_id: int, db: Session = Depen
         rows = db.execute(sql_text("""
             SELECT prediction_date, ticker, direction, outcome
             FROM predictions
-            WHERE forecaster_id = :fid AND outcome IN ('correct','incorrect')
+            WHERE forecaster_id = :fid AND outcome IN ('hit','near','miss','correct','incorrect')
             ORDER BY prediction_date ASC LIMIT 50
         """), {"fid": forecaster_id}).fetchall()
         cum_c = cum_t = 0

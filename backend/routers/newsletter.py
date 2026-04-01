@@ -52,7 +52,7 @@ def generate_newsletter(request: Request, admin: bool = Depends(require_admin), 
     # 1. Biggest resolved calls this week
     resolved = db.query(Prediction).filter(
         Prediction.evaluation_date >= week_ago,
-        Prediction.outcome.notin_(["pending"]),
+        Prediction.outcome.in_(["hit","near","miss","correct","incorrect"]),
         Prediction.actual_return.isnot(None)
     ).all()
     resolved.sort(key=lambda p: abs(p.actual_return or 0), reverse=True)
@@ -89,7 +89,7 @@ def generate_newsletter(request: Request, admin: bool = Depends(require_admin), 
         preds = db.query(Prediction).filter(
             Prediction.forecaster_id == f.id,
             Prediction.evaluation_date >= week_ago,
-            Prediction.outcome.notin_(["pending"])
+            Prediction.outcome.in_(["hit","near","miss","correct","incorrect"])
         ).all()
         for p in preds:
             platform_stats[plat]["total"] += 1

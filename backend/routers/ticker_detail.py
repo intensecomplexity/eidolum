@@ -170,7 +170,7 @@ def get_ticker_predictions(
         query = query.filter(UserPrediction.outcome == "pending")
         query = query.order_by(UserPrediction.expires_at.asc())
     elif status == "scored":
-        query = query.filter(UserPrediction.outcome.in_(["correct", "incorrect"]))
+        query = query.filter(UserPrediction.outcome.in_(["hit","near","miss","correct","incorrect"]))
         query = query.order_by(UserPrediction.evaluated_at.desc())
     else:
         query = query.order_by(UserPrediction.created_at.desc())
@@ -196,7 +196,7 @@ def get_ticker_top_callers(
         db.query(UserPrediction)
         .filter(
             UserPrediction.ticker == symbol,
-            UserPrediction.outcome.in_(["correct", "incorrect"]),
+            UserPrediction.outcome.in_(["hit","near","miss","correct","incorrect"]),
             UserPrediction.deleted_at.is_(None),
         )
         .all()

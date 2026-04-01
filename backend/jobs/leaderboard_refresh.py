@@ -17,7 +17,7 @@ def run_leaderboard_refresh(db: Session):
     for f in forecasters:
         preds = db.query(Prediction).filter(
             Prediction.forecaster_id == f.id,
-            Prediction.outcome.in_(["correct", "incorrect"]),
+            Prediction.outcome.in_(["hit","near","miss","correct","incorrect"]),
         ).all()
 
         if not preds:

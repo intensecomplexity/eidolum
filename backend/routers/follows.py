@@ -91,7 +91,7 @@ def trigger_alerts(request: Request, db: Session = Depends(get_db)):
     cutoff = datetime.datetime.utcnow() - datetime.timedelta(hours=24)
     resolved = db.query(Prediction).filter(
         Prediction.evaluation_date >= cutoff,
-        Prediction.outcome.notin_(["pending"])
+        Prediction.outcome.in_(["hit","near","miss","correct","incorrect"])
     ).all()
 
     queued = 0

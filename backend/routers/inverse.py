@@ -29,7 +29,7 @@ def get_inverse_portfolio(
         db.query(Prediction)
         .filter(
             Prediction.forecaster_id == forecaster_id,
-            Prediction.outcome.notin_(["pending"]),
+            Prediction.outcome.in_(["hit","near","miss","correct","incorrect"]),
             Prediction.actual_return.isnot(None),
         )
         .order_by(Prediction.prediction_date.asc())

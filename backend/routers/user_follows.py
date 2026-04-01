@@ -27,13 +27,13 @@ def _rank_name(scored: int) -> str:
 
 
 def _user_accuracy(user_id: int, db: Session) -> float:
-    scored = db.query(UserPrediction).filter(UserPrediction.user_id == user_id, UserPrediction.outcome.in_(["correct", "incorrect"])).all()
+    scored = db.query(UserPrediction).filter(UserPrediction.user_id == user_id, UserPrediction.outcome.in_(["hit","near","miss","correct","incorrect"])).all()
     if not scored: return 0.0
     return round(sum(1 for p in scored if p.outcome == "correct") / len(scored) * 100, 1)
 
 
 def _user_scored_count(user_id: int, db: Session) -> int:
-    return db.query(func.count(UserPrediction.id)).filter(UserPrediction.user_id == user_id, UserPrediction.outcome.in_(["correct", "incorrect"]), UserPrediction.deleted_at.is_(None)).scalar() or 0
+    return db.query(func.count(UserPrediction.id)).filter(UserPrediction.user_id == user_id, UserPrediction.outcome.in_(["hit","near","miss","correct","incorrect"]), UserPrediction.deleted_at.is_(None)).scalar() or 0
 
 
 def _accepted():

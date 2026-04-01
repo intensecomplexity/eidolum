@@ -13,7 +13,7 @@ def _build_leaderboard(db: Session) -> list[dict]:
     for user in users:
         scored = db.query(UserPrediction).filter(
             UserPrediction.user_id == user.id,
-            UserPrediction.outcome.in_(["correct", "incorrect"]),
+            UserPrediction.outcome.in_(["hit","near","miss","correct","incorrect"]),
             UserPrediction.deleted_at.is_(None),
         ).all()
         scored_count = len(scored)

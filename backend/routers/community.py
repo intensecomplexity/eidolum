@@ -100,7 +100,7 @@ def get_user_credibility(request: Request, user_id: int, db: Session = Depends(g
 
     scored = db.execute(_text(
         "SELECT COUNT(*), SUM(CASE WHEN outcome='correct' THEN 1 ELSE 0 END) "
-        "FROM user_predictions WHERE user_id = :uid AND outcome IN ('correct','incorrect')"
+        "FROM user_predictions WHERE user_id = :uid AND outcome IN ('hit','near','miss','correct','incorrect')"
     ), {"uid": user_id}).first()
     total_scored = scored[0] or 0
     correct = scored[1] or 0
@@ -265,7 +265,7 @@ def user_accuracy_history(request: Request, user_id: int, db: Session = Depends(
         db.query(UserPrediction)
         .filter(
             UserPrediction.user_id == user_id,
-            UserPrediction.outcome.in_(["correct", "incorrect"]),
+            UserPrediction.outcome.in_(["hit","near","miss","correct","incorrect"]),
             UserPrediction.deleted_at.is_(None),
             UserPrediction.evaluated_at.isnot(None),
         )
@@ -320,7 +320,7 @@ def user_accuracy_trend(request: Request, user_id: int, db: Session = Depends(ge
         db.query(UserPrediction)
         .filter(
             UserPrediction.user_id == user_id,
-            UserPrediction.outcome.in_(["correct", "incorrect"]),
+            UserPrediction.outcome.in_(["hit","near","miss","correct","incorrect"]),
             UserPrediction.deleted_at.is_(None),
         )
         .order_by(func.coalesce(UserPrediction.evaluated_at, UserPrediction.created_at).asc())
@@ -361,7 +361,7 @@ def user_accuracy_by_category(request: Request, user_id: int, db: Session = Depe
         db.query(UserPrediction)
         .filter(
             UserPrediction.user_id == user_id,
-            UserPrediction.outcome.in_(["correct", "incorrect"]),
+            UserPrediction.outcome.in_(["hit","near","miss","correct","incorrect"]),
             UserPrediction.deleted_at.is_(None),
         )
         .all()
@@ -426,7 +426,7 @@ def community_leaderboard(request: Request, user_type: str = Query(None), db: Se
             db.query(UserPrediction)
             .filter(
                 UserPrediction.user_id == user.id,
-                UserPrediction.outcome.in_(["correct", "incorrect"]),
+                UserPrediction.outcome.in_(["hit","near","miss","correct","incorrect"]),
                 UserPrediction.deleted_at.is_(None),
             )
             .all()
@@ -478,11 +478,11 @@ def get_my_rival(request: Request, current_user_id: int = Depends(_require_user)
     # Head-to-head: shared tickers
     my_preds = db.query(UserPrediction).filter(
         UserPrediction.user_id == current_user_id,
-        UserPrediction.outcome.in_(["correct", "incorrect"]),
+        UserPrediction.outcome.in_(["hit","near","miss","correct","incorrect"]),
     ).all()
     rival_preds = db.query(UserPrediction).filter(
         UserPrediction.user_id == rival["rival_user_id"],
-        UserPrediction.outcome.in_(["correct", "incorrect"]),
+        UserPrediction.outcome.in_(["hit","near","miss","correct","incorrect"]),
     ).all()
 
     my_tickers = {p.ticker for p in my_preds}
@@ -511,14 +511,14 @@ def get_global_stats(request: Request, db: Session = Depends(get_db)):
     # User predictions
     up_total = db.query(func.count(UserPrediction.id)).filter(UserPrediction.deleted_at.is_(None)).scalar() or 0
     up_active = db.query(func.count(UserPrediction.id)).filter(UserPrediction.outcome == "pending", UserPrediction.deleted_at.is_(None)).scalar() or 0
-    up_scored = db.query(func.count(UserPrediction.id)).filter(UserPrediction.outcome.in_(["correct", "incorrect"]), UserPrediction.deleted_at.is_(None)).scalar() or 0
+    up_scored = db.query(func.count(UserPrediction.id)).filter(UserPrediction.outcome.in_(["hit","near","miss","correct","incorrect"]), UserPrediction.deleted_at.is_(None)).scalar() or 0
     up_correct = db.query(func.count(UserPrediction.id)).filter(UserPrediction.outcome == "correct", UserPrediction.deleted_at.is_(None)).scalar() or 0
 
     # Also count scraped predictions from the original predictions table
     try:
         from models import Prediction, Forecaster
         scraped_total = db.query(func.count(Prediction.id)).scalar() or 0
-        scraped_scored = db.query(func.count(Prediction.id)).filter(Prediction.outcome.in_(["correct", "incorrect"])).scalar() or 0
+        scraped_scored = db.query(func.count(Prediction.id)).filter(Prediction.outcome.in_(["hit","near","miss","correct","incorrect"])).scalar() or 0
         scraped_correct = db.query(func.count(Prediction.id)).filter(Prediction.outcome == "correct").scalar() or 0
         total_forecasters = db.query(func.count(Forecaster.id)).filter(Forecaster.total_predictions > 0).scalar() or 0
     except Exception:
@@ -562,7 +562,7 @@ def get_ticker_consensus(request: Request, ticker: str, db: Session = Depends(ge
         db.query(UserPrediction)
         .filter(
             UserPrediction.ticker == ticker,
-            UserPrediction.outcome.in_(["correct", "incorrect"]),
+            UserPrediction.outcome.in_(["hit","near","miss","correct","incorrect"]),
         )
         .all()
     )

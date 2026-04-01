@@ -94,7 +94,7 @@ def sector_heatmap(request: Request, db: Session = Depends(get_db)):
             db.query(UserPrediction)
             .filter(
                 UserPrediction.ticker.in_(tickers),
-                UserPrediction.outcome.in_(["correct", "incorrect"]),
+                UserPrediction.outcome.in_(["hit","near","miss","correct","incorrect"]),
                 UserPrediction.deleted_at.is_(None),
             )
             .all()

@@ -126,7 +126,7 @@ def _get_cached_leaderboard(db: Session) -> list[dict]:
     for u in users:
         scored = (
             db.query(UserPrediction)
-            .filter(UserPrediction.user_id == u.id, UserPrediction.outcome.in_(["correct", "incorrect"]))
+            .filter(UserPrediction.user_id == u.id, UserPrediction.outcome.in_(["hit","near","miss","correct","incorrect"]))
             .all()
         )
         sc = len(scored)
