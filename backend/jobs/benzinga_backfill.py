@@ -479,12 +479,14 @@ def _insert_rating(rating: dict, db) -> bool:
     from jobs.context_formatter import format_context
     context = format_context(canonical, action, rating_current, ticker, target_price)
 
-    is_valid, _ = validate_prediction(
+    is_valid, result = validate_prediction(
         ticker=ticker, direction=direction, source_url=source_url,
         archive_url=source_url, context=context, forecaster_id=forecaster.id,
     )
     if not is_valid:
         return False
+    if isinstance(result, dict):
+        source_url = result.get("source_url", source_url)
 
     db.add(Prediction(
         forecaster_id=forecaster.id, ticker=ticker, direction=direction,

@@ -240,13 +240,15 @@ def _process_rating(rating: dict, db: Session) -> bool:
     if prediction_exists_cross_scraper(ticker, forecaster.id, direction, pred_date, db):
         return False
 
-    # Validate
-    is_valid, _ = validate_prediction(
+    # Validate (may fix source_url)
+    is_valid, result = validate_prediction(
         ticker=ticker, direction=direction, source_url=source_url,
         archive_url=source_url, context=context, forecaster_id=forecaster.id,
     )
     if not is_valid:
         return False
+    if isinstance(result, dict):
+        source_url = result.get("source_url", source_url)
 
     # Insert
     pred = Prediction(

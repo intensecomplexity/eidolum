@@ -567,21 +567,73 @@ def extract_forecaster_name(headline, source="", ticker=""):
     return None
 
 
-def validate_prediction(ticker, direction, source_url, archive_url, context, forecaster_id):
-    """Layer 2: Check all required fields."""
-    if not ticker or not re.match(r"^[A-Z0-9.]{1,8}$", ticker.strip().upper()):
-        return False, "Invalid ticker"
-    if not direction or direction not in ("bullish", "bearish"):
-        return False, "Invalid direction"
-    if not source_url or not source_url.startswith("http"):
-        return False, "Invalid source URL"
-    fake_urls = [
-        "yahoo.com/quote", "stockanalysis.com", "goldmansachs.com/market-data",
+def _sanitize_source_url(url: str, ticker: str) -> tuple[str | None, str | None]:
+    """Check URL quality and fix or reject bad patterns.
+    Returns (fixed_url, log_message) or (None, rejection_reason)."""
+    if not url or not url.startswith("http"):
+        return None, "Invalid source URL"
+
+    from urllib.parse import urlparse
+    parsed = urlparse(url)
+    path = parsed.path.rstrip("/")
+
+    # (1) Generic Benzinga quote page → replace with ratings page
+    if "benzinga.com/quote/" in url:
+        fixed = f"https://www.benzinga.com/stock/{ticker.lower()}/ratings"
+        print(f"[L2-URLFix] {ticker}: benzinga.com/quote/ → {fixed}")
+        return fixed, None
+
+    # (2) Raw FMP API endpoints → replace with ratings page
+    if "financialmodelingprep.com/stable/" in url or "financialmodelingprep.com/api/" in url:
+        fixed = f"https://www.benzinga.com/stock/{ticker.lower()}/ratings"
+        print(f"[L2-URLFix] {ticker}: FMP API URL → {fixed}")
+        return fixed, None
+
+    # (3) Domain root with no meaningful path (e.g. goldmansachs.com, yahoo.com)
+    if not path or path == "/" or len(path) < 3:
+        return None, f"Domain-only URL: {url}"
+
+    # (4) stockanalysis.com without a specific article path
+    if "stockanalysis.com" in url:
+        # Allow specific forecast pages, reject generic ticker pages
+        if "/forecast/" not in url and "/news/" not in url:
+            fixed = f"https://www.benzinga.com/stock/{ticker.lower()}/ratings"
+            print(f"[L2-URLFix] {ticker}: generic stockanalysis → {fixed}")
+            return fixed, None
+
+    # Other known fake URL patterns
+    fake_patterns = [
+        "yahoo.com/quote", "goldmansachs.com/market-data",
         "jpmorgan.com/market-data", "morganstanley.com/market-data",
     ]
-    for pattern in fake_urls:
-        if pattern in source_url:
-            return False, f"Fake URL: {pattern}"
+    for pattern in fake_patterns:
+        if pattern in url:
+            return None, f"Fake URL: {pattern}"
+
+    return url, None
+
+
+def validate_prediction(ticker, direction, source_url, archive_url, context, forecaster_id):
+    """Layer 2: Check all required fields + URL quality."""
+    if not ticker or not re.match(r"^[A-Z0-9.]{1,8}$", ticker.strip().upper()):
+        return False, "Invalid ticker"
+    if not direction or direction not in ("bullish", "bearish", "neutral"):
+        return False, "Invalid direction"
+
+    # URL quality check — fix or reject bad URLs
+    clean_ticker = ticker.strip().upper()
+    fixed_url, rejection = _sanitize_source_url(source_url, clean_ticker)
+    if rejection and not fixed_url:
+        return False, rejection
+    if fixed_url:
+        source_url = fixed_url
+        # Also fix archive_url if it matches the original bad pattern
+        fixed_archive, _ = _sanitize_source_url(archive_url, clean_ticker)
+        if fixed_archive:
+            archive_url = fixed_archive
+
+    if not source_url or not source_url.startswith("http"):
+        return False, "Invalid source URL"
     if not archive_url or not archive_url.startswith("http"):
         return False, "Missing archive URL"
     if not context or len(context) < 10:
@@ -594,7 +646,8 @@ def validate_prediction(ticker, direction, source_url, archive_url, context, for
             return False, f"Fake content: {pattern}"
     if not forecaster_id:
         return False, "Missing forecaster"
-    return True, "Valid"
+    # Return fixed URLs so callers can use the sanitized versions
+    return True, {"source_url": source_url, "archive_url": archive_url}
 
 
 def prediction_exists_cross_scraper(ticker: str, forecaster_id: int, direction: str, prediction_date, db) -> bool:
@@ -624,17 +677,30 @@ def cleanup_invalid_predictions(db):
 
     r = db.execute(sql_text("""
         DELETE FROM predictions WHERE
-            source_url IS NULL OR source_url = '' OR source_url NOT LIKE 'http%'
-            OR source_url LIKE '%yahoo.com/quote%'
-            OR source_url LIKE '%stockanalysis.com%'
+            source_url IS NULL OR source_url = '' OR source_url NOT LIKE 'http%%'
+            OR source_url LIKE '%%yahoo.com/quote%%'
+            OR source_url LIKE '%%goldmansachs.com/market-data%%'
+            OR source_url LIKE '%%jpmorgan.com/market-data%%'
     """))
     deleted += r.rowcount
 
+    # Fix remaining generic Benzinga/FMP URLs instead of deleting
+    r = db.execute(sql_text("""
+        UPDATE predictions
+        SET source_url = 'https://www.benzinga.com/stock/' || LOWER(ticker) || '/ratings',
+            archive_url = 'https://www.benzinga.com/stock/' || LOWER(ticker) || '/ratings'
+        WHERE source_url LIKE '%%benzinga.com/quote/%%'
+           OR source_url LIKE '%%financialmodelingprep.com/stable/%%'
+           OR source_url LIKE '%%financialmodelingprep.com/api/%%'
+    """))
+    if r.rowcount > 0:
+        print(f"[L3-Cleanup] Fixed {r.rowcount} generic URLs")
+
     r = db.execute(sql_text("""
         DELETE FROM predictions WHERE
-            context LIKE 'Analyst consensus:%'
-            OR context LIKE 'Price target for%'
-            OR exact_quote LIKE '<%'
+            context LIKE 'Analyst consensus:%%'
+            OR context LIKE 'Price target for%%'
+            OR exact_quote LIKE '<%%'
     """))
     deleted += r.rowcount
 
@@ -642,7 +708,7 @@ def cleanup_invalid_predictions(db):
         DELETE FROM predictions WHERE
             ticker IS NULL OR ticker = '' OR ticker = 'UNKNOWN'
             OR direction IS NULL OR direction = ''
-            OR direction NOT IN ('bullish', 'bearish')
+            OR direction NOT IN ('bullish', 'bearish', 'neutral')
     """))
     deleted += r.rowcount
 

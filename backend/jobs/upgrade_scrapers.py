@@ -578,15 +578,19 @@ def _fmp_grades_inner(db: Session, max_tickers=300, days_back=0):
 
                 context = format_context(canonical, action, new_grade, ticker)
 
-                is_valid, _ = validate_prediction(
+                src_url = f"https://stockanalysis.com/stocks/{ticker.lower()}/forecast/"
+                arc_url = f"https://www.benzinga.com/stock/{ticker.lower()}/ratings"
+                is_valid, result = validate_prediction(
                     ticker=ticker, direction=direction,
-                    source_url=f"https://stockanalysis.com/stocks/{ticker.lower()}/forecast/",
-                    archive_url=f"https://www.benzinga.com/stock/{ticker.lower()}/ratings",
+                    source_url=src_url, archive_url=arc_url,
                     context=context, forecaster_id=forecaster.id,
                 )
                 if not is_valid:
                     skipped += 1
                     continue
+                if isinstance(result, dict):
+                    src_url = result.get("source_url", src_url)
+                    arc_url = result.get("archive_url", arc_url)
 
                 call_type = "upgrade" if "upgrade" in action else "downgrade" if "downgrade" in action else "new_coverage" if "init" in action else "rating"
 
@@ -594,8 +598,7 @@ def _fmp_grades_inner(db: Session, max_tickers=300, days_back=0):
                     forecaster_id=forecaster.id, ticker=ticker, direction=direction,
                     prediction_date=grade_date, evaluation_date=grade_date + timedelta(days=90),
                     window_days=90,
-                    source_url=f"https://stockanalysis.com/stocks/{ticker.lower()}/forecast/",
-                    archive_url=f"https://www.benzinga.com/stock/{ticker.lower()}/ratings",
+                    source_url=src_url, archive_url=arc_url,
                     source_type="article", source_platform_id=source_id,
                     context=context[:500], exact_quote=context,
                     outcome="pending", verified_by="fmp_grades",
