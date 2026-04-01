@@ -94,6 +94,38 @@ def get_forecaster(
         sector_count = 0
         total_all = f.total_predictions or 0
 
+    # Prediction counts by outcome + direction (single query)
+    pred_counts = {"all": 0, "evaluated": 0, "pending": 0, "hits": 0, "nears": 0, "misses": 0, "correct": 0, "incorrect": 0, "bullish": 0, "bearish": 0, "neutral": 0}
+    try:
+        count_rows = db.execute(sql_text("""
+            SELECT outcome, direction, COUNT(*) FROM predictions
+            WHERE forecaster_id = :fid GROUP BY outcome, direction
+        """), {"fid": forecaster_id}).fetchall()
+        for r in count_rows:
+            outcome, direction, cnt = r[0], r[1], r[2]
+            pred_counts["all"] += cnt
+            if outcome in ("hit", "correct"):
+                pred_counts["hits"] += cnt
+                pred_counts["correct"] += cnt
+                pred_counts["evaluated"] += cnt
+            elif outcome == "near":
+                pred_counts["nears"] += cnt
+                pred_counts["evaluated"] += cnt
+            elif outcome in ("miss", "incorrect"):
+                pred_counts["misses"] += cnt
+                pred_counts["incorrect"] += cnt
+                pred_counts["evaluated"] += cnt
+            elif outcome == "pending":
+                pred_counts["pending"] += cnt
+            if direction == "bullish":
+                pred_counts["bullish"] += cnt
+            elif direction == "bearish":
+                pred_counts["bearish"] += cnt
+            elif direction == "neutral":
+                pred_counts["neutral"] += cnt
+    except Exception as e:
+        print(f"[Forecaster] Count query error for {forecaster_id}: {e}")
+
     result = {
         "id": f.id, "name": f.name, "handle": f.handle,
         "platform": f.platform or "youtube", "channel_url": f.channel_url,
@@ -104,7 +136,7 @@ def get_forecaster(
         "streak": {"type": "none", "count": 0},
         "accuracy_rate": float(f.accuracy_score or 0),
         "total_predictions": f.total_predictions or 0,
-        "evaluated_predictions": f.total_predictions or 0,
+        "evaluated_predictions": pred_counts["evaluated"],
         "correct_predictions": f.correct_predictions or 0,
         "alpha": float(f.alpha or 0),
         "avg_return": float(f.avg_return or 0),
@@ -113,7 +145,7 @@ def get_forecaster(
         "total_all_predictions": total_all,
         "sector_strengths": [],
         "accuracy_over_time": _build_accuracy_trend(forecaster_id, db),
-        "prediction_counts": {"all": 0, "evaluated": 0, "pending": 0, "hits": 0, "nears": 0, "misses": 0, "correct": 0, "incorrect": 0},
+        "prediction_counts": pred_counts,
         "predictions": _get_preds(forecaster_id, page, limit, filter, sector, db),
         "disclosed_positions": [],
         "conflict_stats": {"total": 0, "conflicts": 0, "rate": 0},
