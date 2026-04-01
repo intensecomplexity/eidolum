@@ -126,6 +126,12 @@ def get_forecaster(
     except Exception as e:
         print(f"[Forecaster] Count query error for {forecaster_id}: {e}")
 
+    # Calculate accuracy from actual prediction outcomes (not stale cached value)
+    if pred_counts["evaluated"] > 0:
+        live_accuracy = round((pred_counts["hits"] + pred_counts["nears"] * 0.5) / pred_counts["evaluated"] * 100, 1)
+    else:
+        live_accuracy = 0
+
     result = {
         "id": f.id, "name": f.name, "handle": f.handle,
         "platform": f.platform or "youtube", "channel_url": f.channel_url,
@@ -134,10 +140,10 @@ def get_forecaster(
         "firm": getattr(f, 'firm', None),
         "firm_url": get_firm_url(getattr(f, 'firm', None)),
         "streak": {"type": "none", "count": 0},
-        "accuracy_rate": float(f.accuracy_score or 0),
-        "total_predictions": f.total_predictions or 0,
+        "accuracy_rate": live_accuracy,
+        "total_predictions": pred_counts["evaluated"],
         "evaluated_predictions": pred_counts["evaluated"],
-        "correct_predictions": f.correct_predictions or 0,
+        "correct_predictions": pred_counts["hits"],
         "alpha": float(f.alpha or 0),
         "avg_return": float(f.avg_return or 0),
         "first_prediction_date": first_pred_date,
@@ -248,13 +254,13 @@ def _get_preds(fid, page, limit, filter_type, sector, db):
     where = ""
     params = {"fid": fid, "lim": limit, "off": offset}
     if filter_type == "evaluated":
-        where += " AND outcome IN ('correct','incorrect')"
+        where += " AND outcome IN ('hit','near','miss','correct','incorrect')"
     elif filter_type == "pending":
         where += " AND outcome = 'pending'"
-    elif filter_type == "correct":
-        where += " AND outcome = 'correct'"
-    elif filter_type == "incorrect":
-        where += " AND outcome = 'incorrect'"
+    elif filter_type == "correct" or filter_type == "hit":
+        where += " AND outcome IN ('hit','correct')"
+    elif filter_type == "incorrect" or filter_type == "miss":
+        where += " AND outcome IN ('miss','incorrect')"
     if sector:
         where += " AND sector = :sec"
         params["sec"] = sector
@@ -269,7 +275,7 @@ def _get_preds(fid, page, limit, filter_type, sector, db):
                    verified_by, has_conflict, conflict_note
             FROM predictions
             WHERE forecaster_id = :fid {where}
-            ORDER BY CASE WHEN outcome IN ('correct','incorrect') THEN 0 ELSE 1 END,
+            ORDER BY CASE WHEN outcome IN ('hit','near','miss','correct','incorrect') THEN 0 ELSE 1 END,
                      prediction_date DESC
             LIMIT :lim OFFSET :off
         """), params).fetchall()
