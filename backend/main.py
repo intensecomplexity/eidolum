@@ -1583,9 +1583,10 @@ async def lifespan(app):
             _fix_db = BgSessionLocal()
             fixed = _fix_db.execute(sql_text("""
                 UPDATE predictions
-                SET source_url = 'https://www.benzinga.com/stock/' || ticker || '/ratings',
-                    archive_url = 'https://www.benzinga.com/stock/' || ticker || '/ratings'
+                SET source_url = 'https://www.benzinga.com/stock/' || LOWER(ticker) || '/ratings',
+                    archive_url = 'https://www.benzinga.com/stock/' || LOWER(ticker) || '/ratings'
                 WHERE source_url LIKE '%benzinga.com/quote/%'
+                   OR source_url LIKE '%benzinga.com/stock/%/analyst-ratings'
             """)).rowcount
             _fix_db.commit()
             _fix_db.close()

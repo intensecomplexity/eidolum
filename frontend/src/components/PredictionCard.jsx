@@ -177,10 +177,13 @@ export default function PredictionCard({ prediction: p, showForecaster = false, 
         return rc ? <p className="text-[10px] text-muted italic mb-1">{rc}</p> : null;
       })()}
 
-      {/* Raw analyst quote (collapsed for compact mode) */}
+      {/* Prediction summary — only show if exact_quote differs from context */}
       {!compact && (p.exact_quote || p.context) && (
         <p className="text-xs text-text-secondary italic leading-relaxed mb-2 break-words">
-          {annotateContext(p.exact_quote || p.context, p.ticker)}
+          {annotateContext(
+            p.exact_quote && p.exact_quote !== p.context ? p.exact_quote : p.context,
+            p.ticker
+          )}
         </p>
       )}
 

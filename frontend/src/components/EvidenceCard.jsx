@@ -50,7 +50,7 @@ export default function EvidenceCard({ prediction: p, forecaster = null, expanda
 
   if (!p) return null;
 
-  const hasQuote = p.exact_quote && p.exact_quote.length > 0;
+  const hasQuote = p.exact_quote && p.exact_quote.length > 0 && p.exact_quote !== p.context;
   const hasSource = p.source_url && p.source_url.length > 0;
   const hasRealVideo = isRealYouTubeId(p.source_platform_id);
   const badge = getSourceBadge(p.source_type, p.verified_by, !!p.video_timestamp_sec);
