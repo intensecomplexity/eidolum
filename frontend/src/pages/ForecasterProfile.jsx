@@ -191,7 +191,7 @@ export default function ForecasterProfile() {
                     size={100}
                     showCenter
                   />
-                  {/* Legend */}
+                  {/* Outcome legend */}
                   <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-[10px]">
                     {(data.prediction_counts?.hits || data.prediction_counts?.correct || 0) > 0 && (
                       <div className="flex items-center gap-1"><span className="w-2 h-2 rounded-full" style={{ backgroundColor: '#34d399' }} /><span className="text-text-secondary">{data.prediction_counts?.hits || data.prediction_counts?.correct} Hits</span></div>
@@ -208,6 +208,29 @@ export default function ForecasterProfile() {
                   </div>
                 </div>
               )}
+              {/* Direction pie chart */}
+              {(data.prediction_counts?.bullish > 0 || data.prediction_counts?.bearish > 0 || data.prediction_counts?.neutral > 0) && (
+                  <div className="hidden sm:flex flex-col items-center gap-2">
+                    <MiniPieChart
+                      bullish={data.prediction_counts?.bullish || 0}
+                      bearish={data.prediction_counts?.bearish || 0}
+                      neutral={data.prediction_counts?.neutral || 0}
+                      size={72}
+                      showCenter
+                    />
+                    <div className="flex gap-3 text-[10px]">
+                      {data.prediction_counts?.bullish > 0 && (
+                        <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-positive" /><span className="text-text-secondary">{data.prediction_counts.bullish} Bull</span></span>
+                      )}
+                      {data.prediction_counts?.neutral > 0 && (
+                        <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-warning" /><span className="text-text-secondary">{data.prediction_counts.neutral} Hold</span></span>
+                      )}
+                      {data.prediction_counts?.bearish > 0 && (
+                        <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-negative" /><span className="text-text-secondary">{data.prediction_counts.bearish} Bear</span></span>
+                      )}
+                    </div>
+                  </div>
+                )}
               <div className="grid grid-cols-2 sm:flex gap-3 sm:gap-5 shrink-0">
                 <div className="text-center bg-surface-2 sm:bg-transparent rounded-lg p-3 sm:p-0">
                   <div className="flex items-center justify-center gap-2">
