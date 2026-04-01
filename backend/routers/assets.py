@@ -348,13 +348,17 @@ def get_asset_consensus(
     # Get company info
     _sector = None
     _company = None
+    _logo_url = None
+    _description = None
     try:
         _ts = db.execute(sql_text(
-            "SELECT sector, company_name FROM ticker_sectors WHERE ticker = :t"
+            "SELECT sector, company_name, logo_url, description FROM ticker_sectors WHERE ticker = :t"
         ), {"t": ticker}).first()
         if _ts:
             _sector = _ts[0]
             _company = _ts[1]
+            _logo_url = _ts[2]
+            _description = _ts[3]
     except Exception:
         try:
             db.rollback()
@@ -375,6 +379,8 @@ def get_asset_consensus(
         return {
             "ticker": ticker,
             "company_name": _company,
+            "logo_url": _logo_url,
+            "description": _description,
             "sector": _sector,
             "total_predictions": 0,
             "total_all_predictions": 0,
@@ -501,6 +507,8 @@ def get_asset_consensus(
     return {
         "ticker": ticker,
         "company_name": _company,
+        "logo_url": _logo_url,
+        "description": _description,
         "sector": _sector,
         "total_predictions": total,
         "total_all_predictions": len(all_predictions),

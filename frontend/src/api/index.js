@@ -97,6 +97,8 @@ function _mergeConsensus(ticker, c) {
   return {
     ticker,
     company_name: c.company_name || null,
+    logo_url: c.logo_url || null,
+    description: c.description || null,
     sector: c.sector || null,
     industry: null,
     total_predictions: totalAll,

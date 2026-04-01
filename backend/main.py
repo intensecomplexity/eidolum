@@ -1094,6 +1094,7 @@ def run_phase2_migrations():
         "company_name VARCHAR(255)",
         "industry VARCHAR(255)",
         "description VARCHAR(300)",
+        "logo_url VARCHAR(500)",
     ]:
         try:
             db.execute(text(f"ALTER TABLE ticker_sectors ADD COLUMN {col}"))
@@ -1572,7 +1573,40 @@ async def lifespan(app):
         except Exception as e:
             print(f"[Startup] Description backfill error: {e}")
 
-        # STEP 2: Start forward backfill (2020-01-01 → today)
+        # STEP 2: Catch-up evaluation — clear the backlog of overdue predictions
+        try:
+            from sqlalchemy import text as _eval_t
+            _eval_db = BgSessionLocal()
+            overdue_count = _eval_db.execute(_eval_t(
+                "SELECT COUNT(*) FROM predictions WHERE outcome = 'pending' AND evaluation_date IS NOT NULL AND evaluation_date < NOW()"
+            )).scalar() or 0
+            _eval_db.close()
+            print(f"[Startup] Overdue predictions: {overdue_count}")
+
+            if overdue_count > 100:
+                print(f"[Startup] Starting evaluation catch-up for {overdue_count} overdue predictions...")
+                import time as _catchup_time
+                from jobs.historical_evaluator import evaluate_batch, refresh_all_forecaster_stats
+                catchup_total = 0
+                catchup_start = _catchup_time.time()
+                max_catchup_time = 600  # 10 minutes max for startup catch-up
+                while (_catchup_time.time() - catchup_start) < max_catchup_time:
+                    result = evaluate_batch(max_tickers=200)
+                    scored = result.get('predictions_scored', 0)
+                    remaining = result.get('remaining_tickers', 0)
+                    catchup_total += scored
+                    if remaining == 0 or result.get('tickers_processed', 0) == 0:
+                        break
+                    print(f"[Startup/Eval] {catchup_total} scored so far, {remaining} remaining...")
+                    _catchup_time.sleep(2)
+                if catchup_total > 0:
+                    refresh_all_forecaster_stats()
+                elapsed = _catchup_time.time() - catchup_start
+                print(f"[Startup] Evaluation catch-up done: {catchup_total} scored in {elapsed:.0f}s")
+        except Exception as e:
+            print(f"[Startup] Evaluation catch-up error: {e}")
+
+        # STEP 3: Start forward backfill (2020-01-01 → today)
         try:
             from jobs.benzinga_backfill import auto_resume_backfill
             auto_resume_backfill()
@@ -1615,22 +1649,54 @@ async def lifespan(app):
     # JOB 1: massive_benzinga 2-hour scraper (new daily data)
     run_massive_benzinga = _guarded_job("massive_benzinga", lambda db: __import__('jobs.massive_benzinga', fromlist=['scrape_massive_ratings']).scrape_massive_ratings(db))
 
-    # JOB 2: evaluator (score expired predictions, 500 tickers per batch)
-    def _auto_evaluate(db):
-        from jobs.historical_evaluator import evaluate_batch, refresh_all_forecaster_stats
-        result = evaluate_batch(max_tickers=500)
-        scored = result.get('predictions_scored', 0)
-        remaining = result.get('remaining_tickers', 0)
-        print(f"[AutoEval] {scored} scored, {remaining} remaining")
-        if scored > 0:
-            refresh_all_forecaster_stats()
-    run_auto_evaluate = _guarded_job("auto_evaluate", _auto_evaluate)
+    # JOB 2: evaluator — runs INDEPENDENTLY (no global lock!)
+    # The evaluator only reads pending predictions and writes outcomes.
+    # Zero data conflict with scrapers — should never be blocked by the lock.
+    def _auto_evaluate_standalone():
+        import time as _eval_time
+        from datetime import datetime as _dt
+        scheduler_last_run["auto_evaluate"] = _dt.utcnow()
+        if not db_is_healthy("auto_evaluate"):
+            return
+        mark_job_running("auto_evaluate")
+        try:
+            from jobs.historical_evaluator import evaluate_batch, refresh_all_forecaster_stats
+            start = _eval_time.time()
+            total_scored = 0
+            batch_num = 0
+            while (_eval_time.time() - start) < 480:  # 8 minute max per cycle
+                result = evaluate_batch(max_tickers=200)
+                scored = result.get('predictions_scored', 0)
+                remaining = result.get('remaining_tickers', 0)
+                total_scored += scored
+                batch_num += 1
+                print(f"[AutoEval] Batch {batch_num}: {scored} scored, {remaining} remaining")
+                if remaining == 0 or result.get('tickers_processed', 0) == 0:
+                    break
+                _eval_time.sleep(2)
+            if total_scored > 0:
+                refresh_all_forecaster_stats()
+            print(f"[AutoEval] Done: {total_scored} scored in {batch_num} batches ({_eval_time.time()-start:.0f}s)")
+        except Exception as e:
+            print(f"[auto_evaluate] Error: {e}")
+        finally:
+            mark_job_done("auto_evaluate")
 
-    # JOB 3: stats refresh
-    def _refresh_stats(db):
-        from jobs.historical_evaluator import refresh_all_forecaster_stats
-        refresh_all_forecaster_stats()
-    run_refresh_stats = _guarded_job("refresh_stats", _refresh_stats)
+    # JOB 3: stats refresh — lightweight SQL only, no lock needed
+    def _refresh_stats_standalone():
+        from datetime import datetime as _dt
+        from admin_panel import scheduler_last_run
+        scheduler_last_run["refresh_stats"] = _dt.utcnow()
+        if not db_is_healthy("refresh_stats"):
+            return
+        mark_job_running("refresh_stats")
+        try:
+            from jobs.historical_evaluator import refresh_all_forecaster_stats
+            refresh_all_forecaster_stats()
+        except Exception as e:
+            print(f"[refresh_stats] Error: {e}")
+        finally:
+            mark_job_done("refresh_stats")
 
     # JOB 6: analyst subscription notifications (hourly)
     def _analyst_notif(db):
@@ -1650,17 +1716,28 @@ async def lifespan(app):
     scheduler = AsyncIOScheduler()
     _scheduler = scheduler
 
-    # JOB 4: FMP ratings scraper (every 4 hours, offset from Benzinga)
-    def _fmp_scrape(db):
-        from jobs.fmp_scraper import scrape_fmp_ratings
-        scrape_fmp_ratings(db)
-    run_fmp = _guarded_job("fmp_ratings", _fmp_scrape)
-
-    # JOB 5a: FMP per-ticker grades (/stable/grades — works, unlike the RSS endpoints)
-    def _fmp_grades(db):
-        from jobs.upgrade_scrapers import scrape_fmp_grades
-        scrape_fmp_grades(db)
-    run_fmp_grades = _guarded_job("fmp_grades", _fmp_grades)
+    # JOB 4: FMP per-ticker grades — runs independently (no global lock)
+    def _fmp_grades_standalone():
+        """FMP grades has zero data conflict with other jobs — no lock needed."""
+        from datetime import datetime as _dt
+        from admin_panel import scheduler_last_run
+        scheduler_last_run["fmp_grades"] = _dt.utcnow()
+        if not db_is_healthy("fmp_grades"):
+            return
+        if not db_storage_ok("fmp_grades"):
+            return
+        mark_job_running("fmp_grades")
+        try:
+            db = BgSessionLocal()
+            try:
+                from jobs.upgrade_scrapers import scrape_fmp_grades
+                scrape_fmp_grades(db)
+            except Exception as e:
+                print(f"[fmp_grades] Error: {e}")
+            finally:
+                db.close()
+        finally:
+            mark_job_done("fmp_grades")
 
     # JOB 6: daily sweep for stuck predictions (no_data cleanup)
     def _sweep_stuck(db):
@@ -1669,10 +1746,9 @@ async def lifespan(app):
     run_sweep = _guarded_job("sweep_stuck", _sweep_stuck)
 
     scheduler.add_job(run_massive_benzinga, "interval", hours=2, id="massive_benzinga", next_run_time=_first_run)
-    scheduler.add_job(run_fmp, "interval", hours=4, id="fmp_ratings", next_run_time=_first_run + timedelta(minutes=3))
-    scheduler.add_job(run_fmp_grades, "interval", hours=4, id="fmp_grades", next_run_time=_first_run + timedelta(minutes=20))
-    scheduler.add_job(run_auto_evaluate, "interval", hours=1, id="auto_evaluate", next_run_time=_first_run + timedelta(minutes=5))
-    scheduler.add_job(run_refresh_stats, "interval", hours=2, id="refresh_stats", next_run_time=_first_run + timedelta(minutes=10))
+    scheduler.add_job(_fmp_grades_standalone, "interval", hours=4, id="fmp_grades", next_run_time=_first_run + timedelta(minutes=20))
+    scheduler.add_job(_auto_evaluate_standalone, "interval", minutes=30, id="auto_evaluate", next_run_time=_first_run + timedelta(minutes=5))
+    scheduler.add_job(_refresh_stats_standalone, "interval", hours=2, id="refresh_stats", next_run_time=_first_run + timedelta(minutes=10))
     scheduler.add_job(run_sweep, "interval", hours=24, id="sweep_stuck", next_run_time=_first_run + timedelta(minutes=15))
     scheduler.add_job(run_analyst_notif, "interval", hours=1, id="analyst_notifications", next_run_time=_first_run + timedelta(minutes=25))
     scheduler.add_job(_watchdog, "interval", minutes=5, id="watchdog")

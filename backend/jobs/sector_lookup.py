@@ -123,20 +123,21 @@ def _normalize_sector(raw: str) -> str:
     return raw or "Other"
 
 
-def _cache_to_db(ticker: str, sector: str, db=None, company_name: str = "", industry: str = "", description: str = ""):
-    """Cache sector, company name, industry, and description to DB table."""
+def _cache_to_db(ticker: str, sector: str, db=None, company_name: str = "", industry: str = "", description: str = "", logo_url: str = ""):
+    """Cache sector, company name, industry, description, and logo_url to DB table."""
     if not db:
         return
     try:
-        if company_name or description:
+        if company_name or description or logo_url:
             db.execute(sql_text("""
-                INSERT INTO ticker_sectors (ticker, sector, company_name, industry, description)
-                VALUES (:t, :s, :cn, :ind, :desc)
+                INSERT INTO ticker_sectors (ticker, sector, company_name, industry, description, logo_url)
+                VALUES (:t, :s, :cn, :ind, :desc, :logo)
                 ON CONFLICT (ticker) DO UPDATE SET sector = :s,
                     company_name = COALESCE(NULLIF(:cn, ''), ticker_sectors.company_name),
                     industry = COALESCE(NULLIF(:ind, ''), ticker_sectors.industry),
-                    description = COALESCE(NULLIF(:desc, ''), ticker_sectors.description)
-            """), {"t": ticker, "s": sector, "cn": company_name, "ind": industry, "desc": description})
+                    description = COALESCE(NULLIF(:desc, ''), ticker_sectors.description),
+                    logo_url = COALESCE(NULLIF(:logo, ''), ticker_sectors.logo_url)
+            """), {"t": ticker, "s": sector, "cn": company_name, "ind": industry, "desc": description, "logo": logo_url})
         else:
             db.execute(sql_text("""
                 INSERT INTO ticker_sectors (ticker, sector) VALUES (:t, :s)
@@ -272,49 +273,72 @@ def _first_sentence(text: str, max_len: int = 150) -> str:
 
 
 def backfill_descriptions():
-    """Populate ticker_sectors.description for all unique tickers using yfinance.
-    Only looks up tickers that don't have a description yet. Runs once at startup."""
+    """Populate ticker_sectors description + logo_url using FMP /stable/profile.
+    Prioritizes tickers with most predictions. Max 50 per run (FMP 300/day limit).
+    Skips tickers that already have both description and logo_url."""
+    import httpx
     from database import BgSessionLocal as SessionLocal
+
+    fmp_key = os.getenv("FMP_KEY", "").strip()
+    if not fmp_key:
+        print("[DescBackfill] FMP_KEY not set, skipping")
+        return
 
     db = SessionLocal()
     try:
+        # Prioritize tickers with most predictions that are missing description or logo
         rows = db.execute(sql_text("""
-            SELECT DISTINCT p.ticker
+            SELECT p.ticker, COUNT(*) as cnt
             FROM predictions p
             LEFT JOIN ticker_sectors ts ON ts.ticker = p.ticker
-            WHERE ts.description IS NULL OR ts.description = ''
-            LIMIT 500
+            WHERE (ts.description IS NULL OR ts.description = ''
+                   OR ts.logo_url IS NULL OR ts.logo_url = '')
+            GROUP BY p.ticker
+            ORDER BY cnt DESC
+            LIMIT 50
         """)).fetchall()
     finally:
         db.close()
 
     if not rows:
-        print("[DescBackfill] All tickers already have descriptions")
+        print("[DescBackfill] All tickers already have descriptions + logos")
         return
 
     tickers = [r[0] for r in rows]
     updated = 0
-    print(f"[DescBackfill] {len(tickers)} tickers need descriptions")
+    print(f"[DescBackfill] {len(tickers)} tickers need descriptions/logos (using FMP)")
 
     for i, ticker in enumerate(tickers):
         try:
-            import yfinance as yf
-            stock = yf.Ticker(ticker)
-            info = stock.info or {}
-            company_name = info.get("shortName") or info.get("longName") or ""
-            summary = info.get("longBusinessSummary") or ""
-            description = _first_sentence(summary)
-            sector_raw = info.get("sector") or ""
-            industry_raw = info.get("industry") or ""
+            r = httpx.get(
+                "https://financialmodelingprep.com/stable/profile",
+                params={"symbol": ticker, "apikey": fmp_key},
+                timeout=10,
+            )
+            if r.status_code != 200:
+                continue
+            data = r.json()
+            if isinstance(data, list) and data:
+                data = data[0]
+            if not isinstance(data, dict):
+                continue
+
+            company_name = data.get("companyName") or ""
+            description_raw = data.get("description") or ""
+            description = _first_sentence(description_raw)
+            logo_url = data.get("image") or ""
+            sector_raw = data.get("sector") or ""
+            industry_raw = data.get("industry") or ""
             sector = _normalize_sector(sector_raw) if sector_raw else KNOWN_SECTORS.get(ticker, "Other")
 
-            if description or company_name:
+            if description or company_name or logo_url:
                 db = SessionLocal()
                 try:
                     _cache_to_db(ticker, sector, db,
                                  company_name=company_name,
                                  industry=industry_raw,
-                                 description=description)
+                                 description=description,
+                                 logo_url=logo_url)
                     updated += 1
                 finally:
                     db.close()
@@ -322,8 +346,7 @@ def backfill_descriptions():
             if i < 3:
                 print(f"[DescBackfill] Error for {ticker}: {e}")
 
-        # Rate limit: 10 tickers per second
-        if (i + 1) % 10 == 0:
-            time.sleep(1)
+        # Rate limit: ~5 per second to stay within 300/day
+        time.sleep(0.5)
 
-    print(f"[DescBackfill] Done: {updated}/{len(tickers)} descriptions added")
+    print(f"[DescBackfill] Done: {updated}/{len(tickers)} descriptions/logos added via FMP")
