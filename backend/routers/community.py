@@ -670,16 +670,19 @@ def get_all_consensus(
     from ticker_domains import get_domain
     name_by_ticker = {}
     domain_by_ticker = {}
+    logo_by_ticker = {}
     if tickers:
         try:
             info_rows = db.execute(_consensus_text(
-                "SELECT ticker, company_name, logo_domain FROM ticker_sectors WHERE ticker = ANY(:tickers)"
+                "SELECT ticker, company_name, logo_domain, logo_url FROM ticker_sectors WHERE ticker = ANY(:tickers)"
             ), {"tickers": tickers}).fetchall()
             for r in info_rows:
                 if r[1]:
                     name_by_ticker[r[0]] = r[1]
                 if r[2]:
                     domain_by_ticker[r[0]] = r[2]
+                if r[3]:
+                    logo_by_ticker[r[0]] = r[3]
         except Exception:
             pass
 
@@ -691,10 +694,12 @@ def get_all_consensus(
         top = top_by_ticker.get(ticker)
         company_name = name_by_ticker.get(ticker) or TICKER_INFO.get(ticker)
         logo_domain = domain_by_ticker.get(ticker) or get_domain(ticker)
+        logo_url = logo_by_ticker.get(ticker)
         results.append({
             "ticker": ticker,
             "company_name": company_name,
             "logo_domain": logo_domain,
+            "logo_url": logo_url,
             "sector": ticker_sector or "Other",
             "total_predictions": total,
             "bullish_count": bullish,
