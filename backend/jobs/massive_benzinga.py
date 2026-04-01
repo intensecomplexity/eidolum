@@ -245,7 +245,7 @@ def _process_rating(rating: dict, db: Session) -> bool:
         return False
 
     # Insert
-    db.add(Prediction(
+    pred = Prediction(
         forecaster_id=forecaster.id, ticker=ticker, direction=direction,
         prediction_date=pred_date,
         evaluation_date=pred_date + timedelta(days=window_days),
@@ -257,7 +257,17 @@ def _process_rating(rating: dict, db: Session) -> bool:
         context=context[:500], exact_quote=context,
         outcome="pending", verified_by="massive_benzinga",
         call_type=call_type,
-    ))
+    )
+    db.add(pred)
+    db.flush()  # Get the prediction ID
+
+    # Notify watchlist users (only for recent predictions, not backfill)
+    try:
+        from jobs.watchlist_alerts import notify_watchlist_users
+        notify_watchlist_users(ticker, pred.id, canonical, direction, target_price, pred_date, db)
+    except Exception:
+        pass
+
     return True
 
 

@@ -595,7 +595,7 @@ def _fmp_grades_inner(db: Session, max_tickers=200, days_back=7):
 
                 call_type = "upgrade" if "upgrade" in action else "downgrade" if "downgrade" in action else "new_coverage" if "init" in action else "rating"
 
-                db.add(Prediction(
+                pred = Prediction(
                     forecaster_id=forecaster.id, ticker=ticker, direction=direction,
                     prediction_date=grade_date, evaluation_date=grade_date + timedelta(days=90),
                     window_days=90,
@@ -605,7 +605,14 @@ def _fmp_grades_inner(db: Session, max_tickers=200, days_back=7):
                     context=context[:500], exact_quote=context,
                     outcome="pending", verified_by="fmp_grades",
                     call_type=call_type,
-                ))
+                )
+                db.add(pred)
+                db.flush()
+                try:
+                    from jobs.watchlist_alerts import notify_watchlist_users
+                    notify_watchlist_users(ticker, pred.id, canonical, direction, None, grade_date, db)
+                except Exception:
+                    pass
                 added += 1
 
         except Exception as e:

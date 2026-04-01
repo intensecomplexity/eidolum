@@ -14,6 +14,7 @@ const TYPE_CONFIG = {
   new_follower:      { icon: UserPlus,    color: 'text-accent',   nav: '/friends' },
   streak_milestone:  { icon: Flame,       color: 'text-orange-400', nav: '/profile' },
   season_ended:      { icon: Calendar,    color: 'text-accent',   nav: '/seasons' },
+  watchlist_alert:   { icon: Bell,        color: 'text-accent',   nav: null },  // nav set dynamically from data.ticker
 };
 
 export default function NotificationBell() {
@@ -81,7 +82,10 @@ export default function NotificationBell() {
     }
     setOpen(false);
     const cfg = TYPE_CONFIG[notif.type] || {};
-    navigate(cfg.nav || '/notifications');
+    const nav = notif.type === 'watchlist_alert' && notif.data?.ticker
+      ? `/asset/${notif.data.ticker}`
+      : cfg.nav || '/notifications';
+    navigate(nav);
   }
 
   async function handleMarkAllRead() {
