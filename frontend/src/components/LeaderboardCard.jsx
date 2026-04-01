@@ -4,6 +4,7 @@ import MiniPieChart from './MiniPieChart';
 import PlatformBadge from './PlatformBadge';
 import RankBadge from './RankBadge';
 import StreakBadge from './StreakBadge';
+import CompareButton from './CompareButton';
 
 function getMetricValue(f, metricKey) {
   if (metricKey === 'avg_return') {
@@ -42,7 +43,10 @@ export default function LeaderboardCard({ forecaster: f, metric = 'avg_return' }
             )}
           </div>
         </div>
-        <ChevronRight className="w-5 h-5 text-muted shrink-0 mt-1" />
+        <div className="flex items-center gap-1 shrink-0">
+          <CompareButton forecaster={f} size="icon" />
+          <ChevronRight className="w-5 h-5 text-muted" />
+        </div>
       </div>
 
       {/* Stats row */}

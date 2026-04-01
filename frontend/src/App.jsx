@@ -54,7 +54,9 @@ import CompareForecasters from './pages/CompareForecasters';
 import Discover from './pages/Discover';
 import HowItWorks from './pages/HowItWorks';
 import OnboardingOverlay from './components/OnboardingOverlay';
+import ComparisonTray from './components/ComparisonTray';
 import { useAuth } from './context/AuthContext';
+import { CompareProvider } from './context/CompareContext';
 import { useState } from 'react';
 
 export default function App() {
@@ -64,6 +66,7 @@ export default function App() {
   });
 
   return (
+    <CompareProvider>
     <div className="min-h-screen bg-bg pb-bottom-nav sm:pb-0">
       <Navbar />
       {showOnboarding && !isAuthenticated && (
@@ -126,7 +129,9 @@ export default function App() {
         <Route path="/earnings" element={<EarningsPage />} />
       </Routes>
       <SaveToast />
+      <ComparisonTray />
       <BottomNav />
     </div>
+    </CompareProvider>
   );
 }

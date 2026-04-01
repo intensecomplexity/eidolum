@@ -12,6 +12,7 @@ import EvidenceCard from '../components/EvidenceCard';
 import BookmarkButton from '../components/BookmarkButton';
 import NotificationBanner from '../components/NotificationBanner';
 import FollowButton from '../components/FollowButton';
+import CompareButton from '../components/CompareButton';
 import Footer from '../components/Footer';
 import MiniPieChart from '../components/MiniPieChart';
 import PortfolioSimulator from '../components/PortfolioSimulator';
@@ -120,6 +121,7 @@ export default function ForecasterProfile() {
                 <PlatformBadge platform={data.platform} size={20} showLabel />
                 <StreakBadge streak={data.streak} />
                 <FollowButton forecaster={data} />
+                <CompareButton forecaster={data} />
               </div>
               <div className="flex items-center gap-2 sm:gap-3 text-text-secondary text-sm flex-wrap">
                 <span className="font-mono text-xs sm:text-sm">{data.handle}</span>
