@@ -1876,6 +1876,12 @@ async def lifespan(app):
     scheduler.add_job(run_analyst_notif, "interval", hours=1, id="analyst_notifications", next_run_time=_first_run + timedelta(minutes=25))
     scheduler.add_job(_watchdog, "interval", minutes=5, id="watchdog")
 
+    # JOB: Enrich generic fallback URLs with real article URLs via Jina Search
+    def _enrich_urls():
+        from jobs.enrich_urls import enrich_source_urls
+        enrich_source_urls()
+    scheduler.add_job(_enrich_urls, "interval", hours=1, id="enrich_urls", next_run_time=_first_run + timedelta(minutes=40))
+
     # JOB: Queue watchlist notifications (runs after scrapers, every 4 hours)
     def _queue_watchlist():
         from jobs.watchlist_notifier import queue_watchlist_notifications
