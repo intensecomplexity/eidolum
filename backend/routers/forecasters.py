@@ -272,16 +272,18 @@ def _get_preds(fid, page, limit, filter_type, sector, db):
 
     try:
         rows = db.execute(sql_text(f"""
-            SELECT id, ticker, direction, target_price, entry_price,
-                   prediction_date, evaluation_date, window_days,
-                   outcome, actual_return, evaluation_summary,
-                   sector, context, exact_quote, source_url, archive_url,
-                   source_type, source_platform_id, video_timestamp_sec,
-                   verified_by, has_conflict, conflict_note
-            FROM predictions
-            WHERE forecaster_id = :fid {where}
-            ORDER BY CASE WHEN outcome IN ('hit','near','miss','correct','incorrect') THEN 0 ELSE 1 END,
-                     prediction_date DESC
+            SELECT p.id, p.ticker, p.direction, p.target_price, p.entry_price,
+                   p.prediction_date, p.evaluation_date, p.window_days,
+                   p.outcome, p.actual_return, p.evaluation_summary,
+                   p.sector, p.context, p.exact_quote, p.source_url, p.archive_url,
+                   p.source_type, p.source_platform_id, p.video_timestamp_sec,
+                   p.verified_by, p.has_conflict, p.conflict_note,
+                   ts.logo_domain, ts.logo_url, ts.company_name
+            FROM predictions p
+            LEFT JOIN ticker_sectors ts ON ts.ticker = p.ticker
+            WHERE p.forecaster_id = :fid {where}
+            ORDER BY CASE WHEN p.outcome IN ('hit','near','miss','correct','incorrect') THEN 0 ELSE 1 END,
+                     p.prediction_date DESC
             LIMIT :lim OFFSET :off
         """), params).fetchall()
     except Exception:
@@ -310,6 +312,7 @@ def _get_preds(fid, page, limit, filter_type, sector, db):
             "has_source": bool(p[14] and ('/status/' in (p[14] or '') or '/watch?v=' in (p[14] or ''))),
             "timestamp_display": format_timestamp(p[18]),
             "timestamp_url": get_youtube_timestamp_url(p[17], p[18]),
+            "logo_domain": p[22], "logo_url": p[23], "company_name": p[24],
         })
     return results
 

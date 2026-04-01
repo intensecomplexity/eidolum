@@ -593,7 +593,7 @@ function PredictionRow({ p, forecaster: fc }) {
         </td>
         <td className="px-6 py-3">
           <div className="flex items-center gap-1.5">
-            <CompanyLogo ticker={p.ticker} sector={p.sector} size={18} />
+            <CompanyLogo domain={p.logo_domain} logoUrl={p.logo_url} ticker={p.ticker} sector={p.sector} size={18} />
             <Link to={`/asset/${p.ticker}`} className="ticker-mono text-accent hover:underline" onClick={e => e.stopPropagation()}>{p.ticker}</Link>
           </div>
           {p.sector === 'Crypto' && (
