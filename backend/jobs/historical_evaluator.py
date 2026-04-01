@@ -358,7 +358,7 @@ _quote_cache: dict[str, dict] = {}
 _history_cache: dict[str, dict] = {}
 _fmp_calls_today = 0
 _fmp_calls_date = ""
-_FMP_DAILY_LIMIT = 0  # FMP quota reserved for grades scraper (300/day) — evaluator uses Finnhub + yfinance
+_FMP_DAILY_LIMIT = 150  # Share FMP quota with grades scraper (~300/day total)
 
 
 def _fetch_history(ticker: str, start, end) -> dict:
@@ -378,32 +378,47 @@ def _fetch_history(ticker: str, start, end) -> dict:
         _fmp_calls_today = 0
         _fmp_calls_date = today_str
 
-    # 1. Try FMP historical prices (free tier: 250 calls/day)
+    # 1. Try FMP historical prices (Starter plan: /stable/ endpoint)
     if FMP_KEY and _fmp_calls_today < _FMP_DAILY_LIMIT:
         try:
             r = httpx.get(
-                f"https://financialmodelingprep.com/api/v3/historical-price-full/{ticker}",
-                params={"apikey": FMP_KEY, "serietype": "line"},
+                "https://financialmodelingprep.com/stable/historical-price-full",
+                params={"symbol": ticker, "apikey": FMP_KEY, "serietype": "line"},
                 timeout=10,
             )
             _fmp_calls_today += 1
             data = r.json()
-            historical = data.get("historical", [])
-            for day in historical:
-                ds = day.get("date", "")
-                close = day.get("close")
-                if ds and close and close > 0:
+            # Response can be list or dict with "historical" key
+            historical = data.get("historical", data) if isinstance(data, dict) else data
+            if isinstance(historical, list):
+                for day in historical:
+                    ds = (day.get("date") or "")[:10]
+                    close = day.get("close") or day.get("adjClose")
+                    if ds and close and float(close) > 0:
+                        prices[ds] = float(close)
+            if prices:
+                _history_cache[ticker] = prices
+                return prices
+        except Exception as e:
+            _fmp_calls_today += 1
+            if _fmp_calls_today <= 3:
+                print(f"[HistEval] FMP historical error for {ticker}: {e}")
+
+    # 2. Try yfinance with rate limiting (2s delay)
+    try:
+        import yfinance as yf
+        stock = yf.Ticker(ticker)
+        hist = stock.history(period="max")
+        if hist is not None and len(hist) > 0:
+            for date_idx, row in hist.iterrows():
+                ds = str(date_idx.date())
+                close = row.get("Close")
+                if close and float(close) > 0:
                     prices[ds] = float(close)
             if prices:
                 _history_cache[ticker] = prices
                 return prices
-        except Exception:
-            _fmp_calls_today += 1  # Count failed calls too
-
-    # 2. Try yfinance (free, works sometimes on Railway)
-    try:
-        from jobs.price_checker import get_stock_price_on_date
-        # yfinance fallback handled per-prediction via _closest_price
+        time.sleep(2)  # Rate limit yfinance
     except Exception:
         pass
 

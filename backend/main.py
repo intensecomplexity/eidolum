@@ -1777,8 +1777,15 @@ async def lifespan(app):
 
     # JOB 6: daily sweep for stuck predictions (no_data cleanup)
     def _sweep_stuck(db):
-        from jobs.evaluator import sweep_stuck_predictions
+        from jobs.evaluator import sweep_stuck_predictions, retry_no_data_predictions
         sweep_stuck_predictions(db)
+        # Also retry no_data predictions
+        from database import BgSessionLocal
+        db2 = BgSessionLocal()
+        try:
+            retry_no_data_predictions(db2)
+        finally:
+            db2.close()
     run_sweep = _guarded_job("sweep_stuck", _sweep_stuck)
 
     scheduler.add_job(run_massive_benzinga, "interval", hours=2, id="massive_benzinga", next_run_time=_first_run)

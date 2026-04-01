@@ -269,6 +269,66 @@ def sweep_stuck_predictions(db: Session):
     print(f"[Sweep] Scored {scored}, marked {no_data_count} as no_data out of {len(stuck)} stuck")
 
     from utils import recalculate_forecaster_stats
-    affected_ids = set(p.forecaster_id for p in stuck if p.outcome in ("correct", "incorrect"))
+    affected_ids = set(p.forecaster_id for p in stuck if p.outcome in ("hit", "near", "miss", "correct", "incorrect"))
     for fid in affected_ids:
         recalculate_forecaster_stats(fid, db)
+
+
+def retry_no_data_predictions(db: Session):
+    """Daily retry: attempt to re-evaluate predictions marked as no_data.
+    Uses historical price lookup with rate limiting. Processes max 100 per run."""
+    import time as _time
+    print(f"[NoDataRetry] Retrying no_data predictions at {datetime.utcnow().isoformat()}")
+    _price_cache.clear()
+    _failed_tickers.clear()
+
+    now = datetime.utcnow()
+
+    no_data = db.query(Prediction).filter(
+        Prediction.outcome == "no_data",
+        Prediction.entry_price.isnot(None),
+        Prediction.entry_price > 0,
+        Prediction.ticker.isnot(None),
+    ).order_by(Prediction.prediction_date.desc()).limit(100).all()
+
+    if not no_data:
+        print("[NoDataRetry] No no_data predictions to retry")
+        return
+
+    scored = 0
+    still_no_data = 0
+
+    for p in no_data:
+        # Try to get historical price at evaluation date
+        price = None
+
+        # Try yfinance for historical price at eval date
+        try:
+            from jobs.price_checker import get_stock_price_on_date
+            eval_date = p.evaluation_date or (p.prediction_date + timedelta(days=p.window_days or 30))
+            date_str = eval_date.strftime("%Y-%m-%d") if eval_date else None
+            if date_str:
+                price = get_stock_price_on_date(p.ticker, date_str)
+        except Exception:
+            pass
+
+        if price is None:
+            # Try current price as fallback
+            price = get_current_price(p.ticker)
+
+        if price and _evaluate_prediction(p, price, now):
+            scored += 1
+        else:
+            still_no_data += 1
+
+        # Rate limit: 2 seconds between calls
+        _time.sleep(2)
+
+    if scored > 0:
+        db.commit()
+        from utils import recalculate_forecaster_stats
+        affected_ids = set(p.forecaster_id for p in no_data if p.outcome in ("hit", "near", "miss"))
+        for fid in affected_ids:
+            recalculate_forecaster_stats(fid, db)
+
+    print(f"[NoDataRetry] Scored {scored}, still no_data: {still_no_data}")
