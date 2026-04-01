@@ -70,8 +70,8 @@ def _set_config(db, key: str, value: str):
 
 
 # ── Main entry point ────────────────────────────────────────────────────────
-REVERSE_STOP = date(2000, 1, 1)  # Safety floor — stop on empty API results before this
-EMPTY_DAYS_TO_STOP = 30  # Stop reverse backfill after 30 consecutive days with 0 results
+# No hardcoded stop year. Reverse backfill runs until the API returns nothing.
+EMPTY_DAYS_TO_STOP = 30  # Stop after 30 consecutive days with 0 results = end of API data
 
 
 def run_backfill():
@@ -173,12 +173,12 @@ def _run_forward() -> bool:
         _backfill_status["current_date"] = str(current)
 
         current += timedelta(days=1)
-        time.sleep(0.5)
+        time.sleep(0.2)
 
-        if batch_days >= 30:
+        if batch_days >= 90:
             _refresh_stats_if_needed()
-            print(f"[Forward] Batch done. {days_done}/{total_days} days, {total_inserted} inserted. Pausing 10s.")
-            time.sleep(10)
+            print(f"[Forward] Batch done. {days_done}/{total_days} days, {total_inserted} inserted. Pausing 5s.")
+            time.sleep(5)
             batch_days = 0
 
     # Mark forward complete
@@ -219,28 +219,19 @@ def _run_reverse() -> bool:
     finally:
         db.close()
 
-    if start <= REVERSE_STOP:
-        db = BgSessionLocal()
-        try:
-            _set_config(db, "backfill_reverse_done", "true")
-        finally:
-            db.close()
-        print(f"[Reverse] Already reached safety floor {REVERSE_STOP}")
-        return True
-
     _backfill_status.update({
         "running": True, "phase": "reverse", "current_date": str(start),
         "days_completed": 0, "predictions_inserted": 0,
     })
 
-    print(f"[Reverse] Starting from {start} backwards (stops after {EMPTY_DAYS_TO_STOP} consecutive empty days)")
+    print(f"[Reverse] Starting from {start} backwards (stops after {EMPTY_DAYS_TO_STOP} consecutive empty days with 0 results)")
     total_inserted = 0
     days_done = 0
     batch_days = 0
     consecutive_empty = 0
     current = start
 
-    while current >= REVERSE_STOP:
+    while True:
         if _backfill_stop:
             print(f"[Reverse] Stopped at {current}")
             return False
@@ -273,12 +264,12 @@ def _run_reverse() -> bool:
             break
 
         current -= timedelta(days=1)
-        time.sleep(0.5)
+        time.sleep(0.2)
 
         if batch_days >= 90:
             _refresh_stats_if_needed()
-            print(f"[Reverse] Batch done. {days_done} days, {total_inserted} inserted. At {current}. Pausing 10s.")
-            time.sleep(10)
+            print(f"[Reverse] Batch done. {days_done} days, {total_inserted} inserted. At {current}. Pausing 5s.")
+            time.sleep(5)
             batch_days = 0
 
     db = BgSessionLocal()
@@ -324,7 +315,7 @@ def _refresh_stats_if_needed():
 
 # ── Auto-resume on startup ──────────────────────────────────────────────────
 def auto_resume_backfill():
-    """Called on startup. Resumes forward backfill, then reverse to 2011."""
+    """Called on startup. Resumes forward backfill, then reverse until API data runs out."""
     import threading
     if not MASSIVE_KEY:
         print("[Backfill] MASSIVE_API_KEY not set — backfill cannot run")
@@ -411,7 +402,7 @@ def _fetch_and_insert_day(day_str: str, db) -> tuple:
             except Exception:
                 continue
 
-        if not next_url or page >= 10:
+        if not next_url:
             break
 
     if inserted > 0:
