@@ -85,7 +85,7 @@ export default function TickerDetail() {
         <div className="card mb-6">
           <div>
             <div className="flex items-center gap-3 mb-1">
-              <CompanyLogo domain={data.logo_domain} ticker={ticker} sector={data.sector} size={36} />
+              <CompanyLogo domain={data.logo_domain} logoUrl={data.logo_url} ticker={ticker} sector={data.sector} size={36} />
               <span className="font-mono text-3xl sm:text-4xl font-bold tracking-wider text-text-primary">{ticker}</span>
               <StockPrice ticker={ticker} size="large" autoRefresh />
             </div>
