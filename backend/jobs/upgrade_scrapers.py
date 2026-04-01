@@ -487,13 +487,7 @@ def _fmp_daily_inner(db: Session):
 
 def scrape_fmp_grades(db: Session):
     """Scheduled scraper: fetch grades for top 200 tickers."""
-    if not SCRAPER_LOCK.acquire(blocking=False):
-        print("[FMP-Grades] Another scraper running, skipping")
-        return
-    try:
-        _fmp_grades_inner(db, max_tickers=200, days_back=7)
-    finally:
-        SCRAPER_LOCK.release()
+    _fmp_grades_inner(db, max_tickers=200, days_back=7)
 
 
 def backfill_fmp_grades(db: Session):

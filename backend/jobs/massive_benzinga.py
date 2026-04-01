@@ -17,7 +17,7 @@ from jobs.prediction_validator import (
     resolve_forecaster_alias,
     prediction_exists_cross_scraper,
 )
-from jobs.news_scraper import find_forecaster, SCRAPER_LOCK
+from jobs.news_scraper import find_forecaster
 from jobs.upgrade_scrapers import _is_self_analysis
 
 MASSIVE_KEY = os.getenv("MASSIVE_API_KEY", "").strip()
@@ -32,14 +32,10 @@ SKIP_ACTIONS = {
 
 
 def scrape_massive_ratings(db: Session):
-    """Fetch analyst ratings from Massive API and insert as predictions."""
-    if not SCRAPER_LOCK.acquire(blocking=False):
-        print("[MassiveBZ] Another scraper running, skipping")
-        return
-    try:
-        _massive_inner(db)
-    finally:
-        SCRAPER_LOCK.release()
+    """Fetch analyst ratings from Massive API and insert as predictions.
+    No SCRAPER_LOCK needed — _guarded_job provides per-job locking,
+    and source_platform_id dedup prevents duplicate inserts."""
+    _massive_inner(db)
 
 
 def _massive_inner(db: Session):
