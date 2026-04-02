@@ -80,7 +80,7 @@ export default function MiniPieChart({
   return (
     <svg width={size} height={size} viewBox="0 0 40 40" className={className} role="img" aria-label={titleText}>
       <title>{titleText}</title>
-      <circle cx={cx} cy={cy} r="18" fill="none" stroke="#D4A843" strokeWidth="0.5" opacity="0.4" />
+      <circle cx={cx} cy={cy} r="18" fill="none" stroke={isDirectionMode ? '#6B7280' : '#D4A843'} strokeWidth="0.5" opacity="0.4" />
       <circle cx={cx} cy={cy} r={r} fill="none" stroke="#1a1a1a" strokeWidth="5" />
       {segments.map((seg, i) => (
         <circle key={i} cx={cx} cy={cy} r={r} fill="none"

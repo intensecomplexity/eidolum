@@ -70,29 +70,33 @@ export default function LeaderboardCard({ forecaster: f, metric = 'avg_return' }
           <div className="flex gap-4 items-end">
             {/* Accuracy + pies */}
             <div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-end gap-3">
                 {/* Outcome pie */}
                 {(hasOutcome || useFallback) && (
-                  <span onClick={e => { e.preventDefault(); e.stopPropagation(); setExpanded(!expanded); }}
-                    className="cursor-pointer hover:opacity-80">
+                  <div className="flex flex-col items-center flex-shrink-0 cursor-pointer hover:opacity-80"
+                    onClick={e => { e.preventDefault(); e.stopPropagation(); setExpanded(!expanded); }}>
                     {hasOutcome
-                      ? <MiniPieChart hits={hits} nears={nears} misses={misses} pending={pending} size={32} />
-                      : <MiniPieChart correct={fallbackCorrect} incorrect={fallbackMiss} size={32} />
+                      ? <MiniPieChart hits={hits} nears={nears} misses={misses} pending={pending} size={36} />
+                      : <MiniPieChart correct={fallbackCorrect} incorrect={fallbackMiss} size={36} />
                     }
-                  </span>
+                    <span className="text-[9px] text-muted mt-0.5">Score</span>
+                  </div>
                 )}
                 {/* Direction pie */}
                 {hasDir && (
-                  <span onClick={e => { e.preventDefault(); e.stopPropagation(); setExpanded(!expanded); }}
-                    className="cursor-pointer hover:opacity-80">
-                    <MiniPieChart bullish={bullish} bearish={bearish} neutral={neutral} size={32} />
-                  </span>
+                  <div className="flex flex-col items-center flex-shrink-0 cursor-pointer hover:opacity-80"
+                    onClick={e => { e.preventDefault(); e.stopPropagation(); setExpanded(!expanded); }}>
+                    <MiniPieChart bullish={bullish} bearish={bearish} neutral={neutral} size={36} />
+                    <span className="text-[9px] text-accent/60 mt-0.5">Dir</span>
+                  </div>
                 )}
-                <div className={`font-mono text-[22px] font-bold leading-tight ${f.accuracy_rate >= 60 ? 'text-positive' : 'text-negative'}`}>
-                  {f.accuracy_rate.toFixed(1)}%
+                <div>
+                  <div className={`font-mono text-[22px] font-bold leading-tight ${f.accuracy_rate >= 60 ? 'text-positive' : 'text-negative'}`}>
+                    {f.accuracy_rate.toFixed(1)}%
+                  </div>
+                  <div className="text-muted text-[11px]">accuracy</div>
                 </div>
               </div>
-              <div className="text-muted text-[11px]">accuracy</div>
             </div>
 
             {/* Metric */}
