@@ -384,68 +384,17 @@ _FMP_DAILY_LIMIT = 60  # RetryNoData gets ~240/day (batched), evaluator gets ~60
 
 def _fetch_history(ticker: str, start, end) -> dict:
     """Fetch historical daily prices for a ticker. Returns {date_str: close_price, ...}.
-    Uses FMP /api/v3/ as primary source (yfinance is blocked on Railway)."""
+    Priority: Tiingo (free) → FMP (paid, fallback) → Finnhub (current only)."""
     import httpx
 
     if ticker in _history_cache:
         return _history_cache[ticker]
 
     prices = {}
-    global _fmp_calls_today, _fmp_calls_date
 
-    # Reset FMP counter daily
-    today_str = datetime.utcnow().strftime("%Y-%m-%d")
-    if _fmp_calls_date != today_str:
-        _fmp_calls_today = 0
-        _fmp_calls_date = today_str
-
-    # 1. FMP historical prices — try multiple endpoint formats
-    # Starter plan may use /stable/ or /v3/ prefix
-    if FMP_KEY and _fmp_calls_today < _FMP_DAILY_LIMIT:
-        fmp_urls = [
-            # Stable API (new format)
-            ("https://financialmodelingprep.com/stable/historical-price-full",
-             {"symbol": ticker, "apikey": FMP_KEY, "serietype": "line"}),
-            # Legacy v3 API (widely documented)
-            (f"https://financialmodelingprep.com/api/v3/historical-price-full/{ticker}",
-             {"apikey": FMP_KEY, "serietype": "line"}),
-        ]
-        for url, params in fmp_urls:
-            try:
-                r = httpx.get(url, params=params, timeout=15)
-                _fmp_calls_today += 1
-                if r.status_code == 200:
-                    try:
-                        data = r.json()
-                    except Exception:
-                        continue
-                    historical = data.get("historical", data) if isinstance(data, dict) else data
-                    if isinstance(historical, list):
-                        for day in historical:
-                            ds = (day.get("date") or "")[:10]
-                            close = day.get("close") or day.get("adjClose")
-                            if ds and close and float(close) > 0:
-                                prices[ds] = float(close)
-                    if prices:
-                        if _fmp_calls_today <= 3:
-                            print(f"[HistEval] FMP OK for {ticker}: {len(prices)} price points from {url.split('/')[-1]}")
-                        _history_cache[ticker] = prices
-                        return prices
-                elif r.status_code == 404:
-                    continue  # Try next URL format
-                else:
-                    if _fmp_calls_today <= 5:
-                        print(f"[HistEval] FMP HTTP {r.status_code} for {ticker} ({url.split('com')[1][:40]})")
-                    break  # Non-404 error, don't try other URLs
-            except Exception as e:
-                _fmp_calls_today += 1
-                if _fmp_calls_today <= 3:
-                    print(f"[HistEval] FMP error for {ticker}: {e}")
-                break
-
-    # 2. Tiingo historical prices (free tier: 1000 req/day)
+    # 1. Tiingo historical prices (free: 1000 req/day, optimized date range + columns)
     _tiingo_key = os.getenv("TIINGO_API_KEY", "").strip()
-    if _tiingo_key and not prices:
+    if _tiingo_key:
         try:
             r = httpx.get(
                 f"https://api.tiingo.com/tiingo/daily/{ticker}/prices",
@@ -472,6 +421,35 @@ def _fetch_history(ticker: str, start, end) -> dict:
                     return prices
         except Exception:
             pass
+
+    # 2. FMP fallback (paid — only if Tiingo failed and budget remains)
+    global _fmp_calls_today, _fmp_calls_date
+    today_str = datetime.utcnow().strftime("%Y-%m-%d")
+    if _fmp_calls_date != today_str:
+        _fmp_calls_today = 0
+        _fmp_calls_date = today_str
+    if FMP_KEY and _fmp_calls_today < _FMP_DAILY_LIMIT and not prices:
+        try:
+            r = httpx.get(
+                "https://financialmodelingprep.com/stable/historical-price-full",
+                params={"symbol": ticker, "apikey": FMP_KEY, "serietype": "line"},
+                timeout=15,
+            )
+            _fmp_calls_today += 1
+            if r.status_code == 200:
+                data = r.json()
+                historical = data.get("historical", data) if isinstance(data, dict) else data
+                if isinstance(historical, list):
+                    for day in historical:
+                        ds = (day.get("date") or "")[:10]
+                        close = day.get("close") or day.get("adjClose")
+                        if ds and close and float(close) > 0:
+                            prices[ds] = float(close)
+                if prices:
+                    _history_cache[ticker] = prices
+                    return prices
+        except Exception:
+            _fmp_calls_today += 1
 
     # 3. Finnhub current quote — last resort, only useful for very recent predictions
     if FINNHUB_KEY:
