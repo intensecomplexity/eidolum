@@ -105,6 +105,7 @@ export default function ForecasterProfile() {
     title: `${data.name} Accuracy — ${data.accuracy_rate?.toFixed(1)}% on ${data.total_predictions || 0} predictions | Eidolum`,
     description: `${data.name}${data.firm ? ` at ${data.firm}` : ''} has ${data.accuracy_rate?.toFixed(1)}% accuracy across ${data.total_predictions || 0} tracked predictions. Verified against real market data.`,
     url: `https://www.eidolum.com/forecaster/${id}`,
+    image: `https://eidolum-production.up.railway.app/api/og-image/forecaster/${id}`,
   });
 
   const displayedPredictions = data.predictions || [];

@@ -1,10 +1,10 @@
 import { useEffect } from 'react';
 
 /**
- * Set page title, meta description, and Open Graph tags.
- * @param {{ title?: string, description?: string, url?: string }} opts
+ * Set page title, meta description, Open Graph, and Twitter card tags.
+ * @param {{ title?: string, description?: string, url?: string, image?: string }} opts
  */
-export default function useSEO({ title, description, url } = {}) {
+export default function useSEO({ title, description, url, image } = {}) {
   useEffect(() => {
     if (title) {
       document.title = title;
@@ -19,10 +19,16 @@ export default function useSEO({ title, description, url } = {}) {
     if (url) {
       setMeta('og:url', url);
     }
+    if (image) {
+      setMeta('og:image', image);
+      setMeta('twitter:image', image);
+      setMeta('twitter:card', 'summary_large_image');
+    } else {
+      setMeta('twitter:card', 'summary');
+    }
     setMeta('og:type', 'website');
     setMeta('og:site_name', 'Eidolum');
-    setMeta('twitter:card', 'summary');
-  }, [title, description, url]);
+  }, [title, description, url, image]);
 }
 
 function setMeta(name, content) {

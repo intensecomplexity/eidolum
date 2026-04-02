@@ -1496,6 +1496,43 @@ async def lifespan(app):
         except Exception as e:
             print(f"[Startup] Index creation error: {e}")
 
+        # Populate forecaster slugs
+        try:
+            _slug_db = BgSessionLocal()
+            try:
+                _slug_db.execute(sql_text("ALTER TABLE forecasters ADD COLUMN IF NOT EXISTS slug VARCHAR(255) UNIQUE"))
+                _slug_db.commit()
+            except Exception:
+                _slug_db.rollback()
+            # Populate missing slugs
+            no_slug = _slug_db.execute(sql_text(
+                "SELECT id, name FROM forecasters WHERE slug IS NULL OR slug = ''"
+            )).fetchall()
+            if no_slug:
+                import re as _slug_re
+                seen = set()
+                # Get existing slugs
+                existing = _slug_db.execute(sql_text("SELECT slug FROM forecasters WHERE slug IS NOT NULL AND slug != ''")).fetchall()
+                for r in existing:
+                    seen.add(r[0])
+                populated = 0
+                for fid, fname in no_slug:
+                    base = _slug_re.sub(r'[^a-z0-9]+', '-', (fname or 'unknown').lower().strip()).strip('-') or 'unknown'
+                    slug = base
+                    suffix = 2
+                    while slug in seen:
+                        slug = f"{base}-{suffix}"
+                        suffix += 1
+                    seen.add(slug)
+                    _slug_db.execute(sql_text("UPDATE forecasters SET slug = :s WHERE id = :id"), {"s": slug, "id": fid})
+                    populated += 1
+                _slug_db.commit()
+                if populated > 0:
+                    print(f"[Startup] Populated slugs for {populated} forecasters")
+            _slug_db.close()
+        except Exception as e:
+            print(f"[Startup] Slug migration error: {e}")
+
         # Ensure is_admin column exists + auto-promote super admin
         try:
             _admin_db = BgSessionLocal()
