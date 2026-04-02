@@ -1,6 +1,8 @@
 import datetime
+import re
 import time as _time
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import text as sql_text
 from database import get_db
@@ -12,6 +14,14 @@ router = APIRouter()
 
 _forecaster_cache: dict[int, tuple] = {}
 FORECASTER_CACHE_TTL = 300
+
+
+def slugify(name: str) -> str:
+    """Convert forecaster name to URL slug: 'Dan Ives' → 'dan-ives'"""
+    s = name.lower().strip()
+    s = re.sub(r'[^a-z0-9]+', '-', s)
+    s = s.strip('-')
+    return s or 'unknown'
 
 
 def _build_accuracy_trend(forecaster_id: int, db: Session) -> list:
@@ -139,6 +149,7 @@ def get_forecaster(
 
     result = {
         "id": f.id, "name": f.name, "handle": f.handle,
+        "slug": getattr(f, 'slug', None) or slugify(f.name),
         "platform": f.platform or "youtube", "channel_url": f.channel_url,
         "subscriber_count": f.subscriber_count, "profile_image_url": f.profile_image_url,
         "bio": f.bio,
@@ -167,6 +178,25 @@ def get_forecaster(
     _forecaster_cache[forecaster_id] = (cache_data, _time.time())
 
     return result
+
+
+@router.get("/forecaster/by-slug/{slug}")
+@limiter.limit("30/minute")
+def get_forecaster_by_slug(
+    request: Request,
+    slug: str,
+    page: int = Query(1, ge=1),
+    limit: int = Query(20, ge=1, le=100),
+    filter: str = Query(None),
+    sector: str = Query(None),
+    db: Session = Depends(get_db),
+):
+    """Look up forecaster by URL slug (e.g. 'dan-ives')."""
+    f = db.query(Forecaster).filter(Forecaster.slug == slug).first()
+    if not f:
+        raise HTTPException(status_code=404, detail="Forecaster not found")
+    # Delegate to the main endpoint
+    return get_forecaster(request, f.id, page, limit, filter, sector, db)
 
 
 @router.get("/forecaster/{forecaster_id}/sectors")

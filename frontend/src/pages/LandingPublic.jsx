@@ -1,12 +1,12 @@
-import { useEffect, useState, useRef } from 'react';
-import { Link } from 'react-router-dom';
+import { useEffect, useState, useRef, useCallback } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import useSEO from '../hooks/useSEO';
-import { ArrowRight, ChevronDown, TrendingUp, TrendingDown, Satellite, Clock, BarChart3, Trophy, Briefcase, Target, Mail, Check } from 'lucide-react';
+import { ArrowRight, ChevronDown, TrendingUp, TrendingDown, Satellite, Clock, BarChart3, Trophy, Briefcase, Target, Mail, Check, Search } from 'lucide-react';
 import EidolumLogo from '../components/EidolumLogo';
 import RankNumber from '../components/RankNumber';
 import Footer from '../components/Footer';
 import { useAuth } from '../context/AuthContext';
-import { getHomepageData, subscribeNewsletter } from '../api';
+import { getHomepageData, subscribeNewsletter, searchTickers, searchForecasters } from '../api';
 import formatRoundNumber from '../utils/formatNumber';
 
 // ── Animated counter ─────────────────────────────────────────────────────────
@@ -75,6 +75,117 @@ function timeAgo(dateStr) {
   return `${days}d ago`;
 }
 
+// ── Hero search bar with instant results ────────────────────────────────────
+
+function HeroSearch() {
+  const navigate = useNavigate();
+  const [query, setQuery] = useState('');
+  const [analysts, setAnalysts] = useState([]);
+  const [tickers, setTickers] = useState([]);
+  const [open, setOpen] = useState(false);
+  const debounceRef = useRef(null);
+  const inputRef = useRef(null);
+  const wrapperRef = useRef(null);
+
+  // '/' keyboard shortcut
+  useEffect(() => {
+    function onKey(e) {
+      if (e.key === '/' && !['INPUT', 'TEXTAREA'].includes(document.activeElement?.tagName)) {
+        e.preventDefault();
+        inputRef.current?.focus();
+      }
+    }
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, []);
+
+  // Close on outside click
+  useEffect(() => {
+    function handle(e) { if (wrapperRef.current && !wrapperRef.current.contains(e.target)) setOpen(false); }
+    document.addEventListener('mousedown', handle);
+    return () => document.removeEventListener('mousedown', handle);
+  }, []);
+
+  function doSearch(text) {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    if (!text.trim()) { setAnalysts([]); setTickers([]); setOpen(false); return; }
+    debounceRef.current = setTimeout(() => {
+      Promise.all([
+        searchForecasters(text.trim()).catch(() => []),
+        searchTickers(text.trim()).catch(() => []),
+      ]).then(([fc, tk]) => {
+        setAnalysts((fc || []).slice(0, 5));
+        setTickers((tk || []).slice(0, 5));
+        setOpen((fc || []).length > 0 || (tk || []).length > 0);
+      });
+    }, 300);
+  }
+
+  function go(path) { setOpen(false); setQuery(''); navigate(path); }
+
+  return (
+    <div className="relative max-w-xl mx-auto" ref={wrapperRef}>
+      <div className="relative">
+        <Search className="absolute left-5 top-1/2 -translate-y-1/2 w-5 h-5 text-muted" />
+        <input
+          ref={inputRef}
+          type="text"
+          value={query}
+          onChange={e => { setQuery(e.target.value); doSearch(e.target.value); }}
+          onFocus={() => { if (analysts.length || tickers.length) setOpen(true); }}
+          placeholder="Search any analyst or ticker... (e.g., Dan Ives, AAPL)"
+          className="w-full pl-12 pr-12 py-4 bg-surface border border-border rounded-xl text-lg text-text-primary placeholder:text-muted/50 focus:outline-none focus:border-accent/50 transition-colors"
+        />
+        <kbd className="absolute right-4 top-1/2 -translate-y-1/2 hidden sm:inline text-xs text-muted/30 border border-border/30 rounded px-1.5 py-0.5 font-mono">/</kbd>
+      </div>
+
+      {/* Dropdown results */}
+      {open && (analysts.length > 0 || tickers.length > 0) && (
+        <div className="absolute z-50 w-full mt-2 bg-surface border border-border rounded-xl shadow-2xl overflow-hidden text-left">
+          {analysts.length > 0 && (
+            <div>
+              <div className="px-4 pt-3 pb-1 text-[10px] text-muted uppercase tracking-wider font-bold">Analysts</div>
+              {analysts.map(f => (
+                <button key={f.id} onClick={() => go(`/forecaster/${f.id}`)}
+                  className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-surface-2 transition-colors">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="text-sm font-medium text-text-primary truncate">{f.name}</span>
+                    {f.firm && <span className="text-[10px] text-muted hidden sm:inline">{f.firm}</span>}
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <span className={`font-mono text-xs font-semibold ${(f.accuracy_rate || 0) >= 60 ? 'text-positive' : 'text-negative'}`}>
+                      {(f.accuracy_rate || 0).toFixed(1)}%
+                    </span>
+                    <span className="text-[10px] text-muted font-mono">{f.total_predictions || 0} calls</span>
+                  </div>
+                </button>
+              ))}
+            </div>
+          )}
+          {tickers.length > 0 && (
+            <div className={analysts.length > 0 ? 'border-t border-border' : ''}>
+              <div className="px-4 pt-3 pb-1 text-[10px] text-muted uppercase tracking-wider font-bold">Tickers</div>
+              {tickers.map(t => (
+                <button key={t.ticker} onClick={() => go(`/asset/${t.ticker}`)}
+                  className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-surface-2 transition-colors">
+                  <span className="font-mono font-bold text-accent text-sm">{t.ticker}</span>
+                  <span className="text-sm text-text-secondary truncate">{t.name}</span>
+                </button>
+              ))}
+            </div>
+          )}
+          <div className="px-4 py-2 border-t border-border/50">
+            <Link to="/leaderboard" className="text-xs text-muted hover:text-accent transition-colors" onClick={() => setOpen(false)}>
+              or browse the full leaderboard &rarr;
+            </Link>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+
 export default function LandingPublic() {
   useSEO({
     title: 'Eidolum — Who Should You Actually Listen To? Analyst Prediction Tracker',
@@ -98,7 +209,7 @@ export default function LandingPublic() {
 
   return (
     <div>
-      {/* ── 1. HERO ────────────────────────────────────────────────────── */}
+      {/* ── 1. HERO WITH SEARCH ─────────────────────────────────────── */}
       <section className="relative overflow-hidden">
         <div className="absolute inset-0 grid-bg opacity-50" />
         <div className="absolute inset-0" style={{ background: 'radial-gradient(ellipse at 50% 0%, rgba(212,160,23,0.08) 0%, transparent 60%)' }} />
@@ -108,37 +219,17 @@ export default function LandingPublic() {
             Who should you <span className="font-serif italic text-accent">actually</span> listen to?
           </h1>
           <p className="text-text-secondary text-base sm:text-lg leading-relaxed max-w-xl mx-auto mb-8">
-            We track analyst and investor predictions against real market data. No opinions. Just accuracy scores.
+            Look up any analyst or stock to see their real track record. No opinions. Just accuracy scores verified against market data.
           </p>
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
-            <Link to="/register" className="btn-primary px-8 w-full sm:w-auto">Start Predicting</Link>
-            <Link to="/leaderboard" className="btn-secondary px-8 w-full sm:w-auto">See the Leaderboard</Link>
-          </div>
+
+          {/* Search bar */}
+          <HeroSearch />
 
           {/* Trust stat bar */}
           {stats && (
             <div className="mt-6 text-muted text-xs sm:text-sm font-mono">
               Tracking <span className="text-accent font-semibold">{formatRoundNumber(stats.total_predictions)}</span> predictions
               {' '}from <span className="text-accent font-semibold">{formatRoundNumber(stats.forecasters_tracked)}</span> analysts since 2024
-            </div>
-          )}
-
-          {/* Mini leaderboard preview */}
-          {top5.length >= 3 && (
-            <div className="mt-8 max-w-md mx-auto">
-              <div className="card p-0 overflow-hidden border-accent/10">
-                {top5.slice(0, 3).map((f, i) => (
-                  <div key={f.id} className="flex items-center gap-3 px-4 py-3 border-b border-border/50 last:border-b-0">
-                    <RankNumber rank={i + 1} />
-                    <div className="flex-1 min-w-0">
-                      <span className="text-sm font-medium">{f.name}</span>
-                    </div>
-                    <span className={`font-mono text-sm font-semibold ${(f.accuracy_rate || 0) >= 60 ? 'text-positive' : 'text-negative'}`}>
-                      {(f.accuracy_rate || 0).toFixed(1)}%
-                    </span>
-                  </div>
-                ))}
-              </div>
             </div>
           )}
         </div>

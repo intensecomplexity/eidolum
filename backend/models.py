@@ -17,6 +17,7 @@ class Forecaster(Base):
     profile_image_url = Column(String, nullable=True)
     bio = Column(Text, nullable=True)
     firm = Column(String, nullable=True)  # e.g. "Goldman Sachs", "UBS" — for institutional analysts
+    slug = Column(String, unique=True, nullable=True, index=True)
     rank_last_week = Column(Integer, nullable=True)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
 

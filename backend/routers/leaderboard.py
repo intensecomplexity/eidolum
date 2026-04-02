@@ -103,8 +103,11 @@ def _refresh_leaderboard(db: Session) -> list | dict:
     results = []
     for i, r in enumerate(rows):
         streak_val = r[7] or 0
+        import re as _re
+        _name = r[1] or ""
+        _slug = _re.sub(r'[^a-z0-9]+', '-', _name.lower().strip()).strip('-') or "unknown"
         results.append({
-            "id": r[0], "name": r[1], "handle": r[2],
+            "id": r[0], "name": _name, "handle": r[2], "slug": _slug,
             "platform": r[3] or "youtube", "channel_url": r[4],
             "subscriber_count": r[5], "profile_image_url": r[6],
             "streak": {"type": "winning" if streak_val > 0 else "losing" if streak_val < 0 else "none", "count": abs(streak_val)},
@@ -458,8 +461,11 @@ def _build_filtered_leaderboard(db: Session, sector=None, call_type=None, sort="
     results = []
     for i, r in enumerate(rows):
         streak_val = r[6] or 0
+        import re as _re
+        _name = r[1] or ""
+        _slug = _re.sub(r'[^a-z0-9]+', '-', _name.lower().strip()).strip('-') or "unknown"
         results.append({
-            "id": r[0], "name": r[1], "handle": r[2],
+            "id": r[0], "name": _name, "handle": r[2], "slug": _slug,
             "platform": r[3] or "youtube", "channel_url": r[4],
             "profile_image_url": r[5],
             "streak": {"type": "winning" if streak_val > 0 else "losing" if streak_val < 0 else "none", "count": abs(streak_val)},
