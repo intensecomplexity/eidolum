@@ -267,6 +267,7 @@ export default function Leaderboard() {
                           <th className="px-3 py-3 w-16">Rank</th>
                           <th className="px-3 py-3">Forecaster</th>
                           <th className="px-3 py-3 text-right">Accuracy</th>
+                          <th className="px-3 py-3 text-center hidden lg:table-cell w-14">Direction</th>
                           <th className="px-3 py-3 text-right">
                             <div className="relative inline-block" ref={metricRef}>
                               <button
@@ -294,8 +295,8 @@ export default function Leaderboard() {
                             </div>
                           </th>
                           <th className="px-3 py-3 text-right">Predictions</th>
-                          <th className="px-3 py-3 text-center hidden md:table-cell w-16">Streak</th>
-                          <th className="px-3 py-3 hidden xl:table-cell max-w-[200px]">Sectors</th>
+                          <th className="px-3 py-3 text-center hidden xl:table-cell w-16">Streak</th>
+                          <th className="px-3 py-3 hidden xl:table-cell max-w-[160px]">Sectors</th>
                           <th className="px-2 py-3 text-center hidden lg:table-cell w-14">Follow</th>
                         </tr>
                       </thead>
@@ -306,28 +307,17 @@ export default function Leaderboard() {
                             style={{ animation: `leaderboardFadeIn 0.3s ease-out ${idx * 0.02}s both` }}>
                             <td className="px-3 py-4"><RankBadge rank={f.rank} movement={f.rank_movement} /></td>
                             <td className="px-3 py-3">
-                              <div className="flex items-center gap-2">
-                                <Link to={`/forecaster/${f.id}`} className="hover:text-accent transition-colors min-w-0">
-                                  <div className="flex items-center gap-1.5">
-                                    <span className="font-medium text-[0.93rem] truncate">{f.name}</span>
-                                    <PlatformBadge platform={f.platform} />
-                                  </div>
-                                  {f.firm ? (
-                                    <div className="text-muted text-xs truncate">{f.firm}</div>
-                                  ) : (
-                                    <div className="text-muted text-xs font-mono truncate">{f.handle}</div>
-                                  )}
-                                </Link>
-                                {(f.bullish_count > 0 || f.bearish_count > 0 || f.neutral_count > 0) && (
-                                  <div className="hidden lg:block flex-shrink-0 cursor-pointer hover:opacity-80"
-                                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); setExpandedId(expandedId === f.id ? null : f.id); }}>
-                                    <MiniPieChart
-                                      bullish={f.bullish_count || 0} bearish={f.bearish_count || 0}
-                                      neutral={f.neutral_count || 0} size={24}
-                                    />
-                                  </div>
+                              <Link to={`/forecaster/${f.id}`} className="hover:text-accent transition-colors">
+                                <div className="flex items-center gap-1.5">
+                                  <span className="font-medium text-[0.93rem]">{f.name}</span>
+                                  <PlatformBadge platform={f.platform} />
+                                </div>
+                                {f.firm ? (
+                                  <div className="text-muted text-xs">{f.firm}</div>
+                                ) : (
+                                  <div className="text-muted text-xs font-mono">{f.handle}</div>
                                 )}
-                              </div>
+                              </Link>
                             </td>
                             <td className="px-3 py-3 text-right">
                               <div className="flex items-center justify-end gap-1.5">
@@ -348,26 +338,37 @@ export default function Leaderboard() {
                                 </span>
                               </div>
                             </td>
-                            <td className="px-3 py-4 text-right">
+                            <td className="px-3 py-3 text-center hidden lg:table-cell">
+                              {(f.bullish_count > 0 || f.bearish_count > 0 || f.neutral_count > 0) && (
+                                <div className="cursor-pointer hover:opacity-80 inline-block"
+                                  onClick={(e) => { e.preventDefault(); e.stopPropagation(); setExpandedId(expandedId === f.id ? null : f.id); }}>
+                                  <MiniPieChart
+                                    bullish={f.bullish_count || 0} bearish={f.bearish_count || 0}
+                                    neutral={f.neutral_count || 0} size={24}
+                                  />
+                                </div>
+                              )}
+                            </td>
+                            <td className="px-3 py-3 text-right">
                               {(() => {
                                 if (f.total_predictions === 0) return <span className="font-mono text-muted">—</span>;
                                 const mv = getMetricValue(f, metric);
                                 return <span className={`font-mono ${metric === 'hit_rate' ? 'text-text-secondary' : mv.positive ? 'text-positive' : 'text-negative'}`}>{mv.text}</span>;
                               })()}
                             </td>
-                            <td className="px-3 py-4 text-right">
+                            <td className="px-3 py-3 text-right">
                               <div className="font-mono text-text-secondary text-sm">{f.evaluated_predictions}</div>
                               <div className="text-muted text-[10px] font-mono">{f.total_predictions} total</div>
                             </td>
-                            <td className="px-3 py-4 text-center hidden md:table-cell"><StreakBadge streak={f.streak} /></td>
-                            <td className="px-3 py-4 hidden xl:table-cell max-w-[200px]">
+                            <td className="px-3 py-3 text-center hidden xl:table-cell"><StreakBadge streak={f.streak} /></td>
+                            <td className="px-3 py-3 hidden xl:table-cell max-w-[160px]">
                               <div className="flex gap-1.5 flex-wrap">
                                 {f.sector_strengths.slice(0, 2).map((s) => (
                                   <SectorBadge key={s.sector} sector={s.sector} accuracy={s.accuracy} count={s.count} />
                                 ))}
                               </div>
                             </td>
-                            <td className="px-2 py-4 text-center hidden lg:table-cell">
+                            <td className="px-2 py-3 text-center hidden lg:table-cell">
                               <FollowButton forecaster={f} compact />
                             </td>
                           </tr>
