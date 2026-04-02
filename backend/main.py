@@ -1901,11 +1901,28 @@ async def lifespan(app):
     scheduler.add_job(run_analyst_notif, "interval", hours=1, id="analyst_notifications", next_run_time=_first_run + timedelta(minutes=25))
     scheduler.add_job(_watchdog, "interval", minutes=5, id="watchdog")
 
-    # JOB: Enrich generic fallback URLs with real article URLs via Jina Search
+    # JOB: Backfill real article URLs from Benzinga API (2,000/run, hourly)
+    def _backfill_urls():
+        from datetime import datetime as _dt
+        from admin_panel import scheduler_last_run
+        scheduler_last_run["backfill_urls"] = _dt.utcnow()
+        if not db_is_healthy("backfill_urls"):
+            return
+        mark_job_running("backfill_urls")
+        try:
+            from jobs.backfill_urls import backfill_real_urls
+            backfill_real_urls(max_per_run=2000)
+        except Exception as e:
+            print(f"[backfill_urls] Error: {e}")
+        finally:
+            mark_job_done("backfill_urls")
+    scheduler.add_job(_backfill_urls, "interval", hours=1, id="backfill_urls", next_run_time=_first_run + timedelta(minutes=40))
+
+    # JOB: Enrich remaining generic URLs with Jina Search (fallback for non-Benzinga)
     def _enrich_urls():
         from jobs.enrich_urls import enrich_source_urls
         enrich_source_urls()
-    scheduler.add_job(_enrich_urls, "interval", hours=1, id="enrich_urls", next_run_time=_first_run + timedelta(minutes=40))
+    scheduler.add_job(_enrich_urls, "interval", hours=2, id="enrich_urls", next_run_time=_first_run + timedelta(minutes=50))
 
     # JOB: Queue watchlist notifications (runs after scrapers, every 4 hours)
     def _queue_watchlist():
