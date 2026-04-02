@@ -94,15 +94,18 @@ def _refresh_leaderboard(db: Session) -> list | dict:
         fids = [r["id"] for r in results]
         try:
             sector_rows = db.execute(sql_text("""
-                SELECT forecaster_id, sector,
+                SELECT p.forecaster_id, ts.sector,
                        COUNT(*) as total,
-                       SUM(CASE WHEN outcome='correct' THEN 1 ELSE 0 END) as correct
-                FROM predictions
-                WHERE forecaster_id = ANY(:fids)
-                  AND outcome IN ('hit','near','miss','correct','incorrect')
-                  AND sector IS NOT NULL AND sector != '' AND sector != 'Other'
-                GROUP BY forecaster_id, sector
-                ORDER BY forecaster_id, total DESC
+                       SUM(CASE WHEN p.outcome IN ('hit','correct') THEN 1.0
+                                WHEN p.outcome = 'near' THEN 0.5 ELSE 0 END) as score
+                FROM predictions p
+                JOIN ticker_sectors ts ON ts.ticker = p.ticker
+                WHERE p.forecaster_id = ANY(:fids)
+                  AND p.outcome IN ('hit','near','miss','correct','incorrect')
+                  AND ts.sector IS NOT NULL AND ts.sector != '' AND ts.sector != 'Other'
+                GROUP BY p.forecaster_id, ts.sector
+                HAVING COUNT(*) >= 3
+                ORDER BY p.forecaster_id, score DESC
             """), {"fids": fids}).fetchall()
 
             sector_by_fid = {}
@@ -113,7 +116,7 @@ def _refresh_leaderboard(db: Session) -> list | dict:
                 if len(sector_by_fid[fid]) < 3:
                     sector_by_fid[fid].append({
                         "sector": row[1],
-                        "accuracy": round(row[3] / row[2] * 100, 1) if row[2] > 0 else 0,
+                        "accuracy": round(float(row[3]) / row[2] * 100, 1) if row[2] > 0 else 0,
                         "count": row[2],
                     })
 
@@ -570,25 +573,28 @@ def get_leaderboard(
 def get_sectors(request: Request, db: Session = Depends(get_db)):
     """Return a summary of all sectors for the 'By Sector' tab."""
     sector_rows = db.execute(sql_text("""
-        SELECT sector, COUNT(*) as total,
-               SUM(CASE WHEN outcome='correct' THEN 1 ELSE 0 END) as correct,
-               SUM(CASE WHEN outcome IN ('hit','near','miss','correct','incorrect') THEN 1 ELSE 0 END) as evaluated
-        FROM predictions
-        WHERE sector IS NOT NULL AND sector != '' AND sector != 'Other'
-        GROUP BY sector
-        HAVING SUM(CASE WHEN outcome IN ('hit','near','miss','correct','incorrect') THEN 1 ELSE 0 END) >= 5
+        SELECT ts.sector, COUNT(*) as total,
+               SUM(CASE WHEN p.outcome IN ('hit','correct') THEN 1.0
+                        WHEN p.outcome = 'near' THEN 0.5 ELSE 0 END) as score,
+               SUM(CASE WHEN p.outcome IN ('hit','near','miss','correct','incorrect') THEN 1 ELSE 0 END) as evaluated
+        FROM predictions p
+        JOIN ticker_sectors ts ON ts.ticker = p.ticker
+        WHERE ts.sector IS NOT NULL AND ts.sector != '' AND ts.sector != 'Other'
+          AND p.outcome IN ('hit','near','miss','correct','incorrect')
+        GROUP BY ts.sector
+        HAVING SUM(CASE WHEN p.outcome IN ('hit','near','miss','correct','incorrect') THEN 1 ELSE 0 END) >= 5
         ORDER BY total DESC
     """)).fetchall()
 
     sectors = []
     sector_names = []
     for r in sector_rows:
-        accuracy = round(r[2] / r[3] * 100, 1) if r[3] > 0 else 0.0
+        accuracy = round(float(r[2]) / r[3] * 100, 1) if r[3] > 0 else 0.0
         sectors.append({
             "sector": r[0],
             "total_predictions": r[1],
             "evaluated": r[3],
-            "correct": r[2],
+            "correct": int(float(r[2])),
             "accuracy": accuracy,
             "top_forecasters": [],
         })
@@ -597,16 +603,18 @@ def get_sectors(request: Request, db: Session = Depends(get_db)):
     # Fetch top forecasters per sector in a single query
     if sector_names:
         forecaster_rows = db.execute(sql_text("""
-            SELECT p.sector, f.id, f.name,
-                   SUM(CASE WHEN p.outcome='correct' THEN 1 ELSE 0 END) as correct,
-                   SUM(CASE WHEN p.outcome IN ('hit','near','miss','correct','incorrect') THEN 1 ELSE 0 END) as evaluated
+            SELECT ts.sector, f.id, f.name,
+                   SUM(CASE WHEN p.outcome IN ('hit','correct') THEN 1.0
+                            WHEN p.outcome = 'near' THEN 0.5 ELSE 0 END) as score,
+                   COUNT(*) as evaluated
             FROM predictions p
             JOIN forecasters f ON f.id = p.forecaster_id
-            WHERE p.sector = ANY(:sectors)
+            JOIN ticker_sectors ts ON ts.ticker = p.ticker
+            WHERE ts.sector = ANY(:sectors)
               AND p.outcome IN ('hit','near','miss','correct','incorrect')
-            GROUP BY p.sector, f.id, f.name
-            HAVING SUM(CASE WHEN p.outcome IN ('hit','near','miss','correct','incorrect') THEN 1 ELSE 0 END) >= 3
-            ORDER BY p.sector, correct DESC, evaluated DESC
+            GROUP BY ts.sector, f.id, f.name
+            HAVING COUNT(*) >= 3
+            ORDER BY ts.sector, score DESC, evaluated DESC
         """), {"sectors": sector_names}).fetchall()
 
         # Group by sector and keep top 3
@@ -616,7 +624,7 @@ def get_sectors(request: Request, db: Session = Depends(get_db)):
             if s not in top_by_sector:
                 top_by_sector[s] = []
             if len(top_by_sector[s]) < 3:
-                acc = round(row[3] / row[4] * 100, 1) if row[4] > 0 else 0.0
+                acc = round(float(row[3]) / row[4] * 100, 1) if row[4] > 0 else 0.0
                 top_by_sector[s].append({
                     "id": row[1],
                     "name": row[2],
