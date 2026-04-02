@@ -840,6 +840,12 @@ export function getSchedulerStatus() {
   return api.get('/admin/scheduler-status', { headers: adminHeaders() }).then(r => r.data);
 }
 
+// ——— Smart Money ———
+
+export function getSmartMoney(params = {}) {
+  return api.get('/smart-money', { params }).then(r => r.data);
+}
+
 // ——— JWT-based Admin Panel API ———
 
 export function getAdminDashboard() {

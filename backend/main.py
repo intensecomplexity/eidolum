@@ -2143,6 +2143,8 @@ app.include_router(admin_panel_router)  # /admin HTML + /api/admin/* endpoints
 app.include_router(admin_v2_router, prefix="/api")  # JWT-based admin panel
 from routers.og_image import router as og_image_router
 app.include_router(og_image_router, prefix="/api")
+from routers.smart_money import router as smart_money_router
+app.include_router(smart_money_router, prefix="/api")
 from routers.tournaments import router as tournaments_router
 app.include_router(tournaments_router, prefix="/api")
 

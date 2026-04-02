@@ -52,6 +52,7 @@ import EarningsPage from './pages/Earnings';
 import ComparePage from './pages/Compare';
 import CompareForecasters from './pages/CompareForecasters';
 import Discover from './pages/Discover';
+import SmartMoney from './pages/SmartMoney';
 import Tournaments from './pages/Tournaments';
 import HowItWorks from './pages/HowItWorks';
 import OnboardingOverlay from './components/OnboardingOverlay';
@@ -127,6 +128,7 @@ export default function App() {
         <Route path="/analyst/:name" element={<AnalystProfilePage />} />
         <Route path="/heatmap" element={<HeatmapPage />} />
         <Route path="/discover" element={<Discover />} />
+        <Route path="/smart-money" element={<SmartMoney />} />
         <Route path="/how-it-works" element={<HowItWorks />} />
         <Route path="/earnings" element={<EarningsPage />} />
         <Route path="/compete/tournaments" element={<Tournaments />} />
