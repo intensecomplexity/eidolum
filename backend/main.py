@@ -1635,71 +1635,21 @@ async def lifespan(app):
         except Exception as e:
             print(f"[Startup] Season init error: {e}")
 
-        # Diagnostic: show actual generic URL patterns, then fix ALL non-article URLs
+        # ROLLBACK: revert broken benzinga.com/analyst/ratings/{id} URLs (404s)
+        # back to safe generic format. Jina enrichment handles finding real URLs.
         try:
             _fix_db = BgSessionLocal()
-
-            # Show the actual source_url values that are NOT real articles
-            diag = _fix_db.execute(sql_text("""
-                SELECT source_url, COUNT(*) as cnt
-                FROM predictions
-                WHERE source_url NOT LIKE '%%benzinga.com/analyst/%%'
-                  AND source_url NOT LIKE '%%benzinga.com/news/%%'
-                  AND source_url NOT LIKE '%%seekingalpha.com/%%'
-                  AND source_url NOT LIKE '%%cnbc.com/%%'
-                  AND source_url NOT LIKE '%%youtube.com/%%'
-                  AND source_url NOT LIKE '%%reuters.com/%%'
-                  AND source_url NOT LIKE '%%marketwatch.com/%%'
-                  AND source_url LIKE '%%benzinga%%'
-                GROUP BY source_url
-                ORDER BY cnt DESC
-                LIMIT 10
-            """)).fetchall()
-            print("[URL-DIAG] Top 10 generic Benzinga URL patterns:")
-            for d in diag:
-                print(f"  {d[1]:>6,}x  {d[0][:80]}")
-
-            # Count predictions with bz_ external_id that have NON-article URLs
-            fixable = _fix_db.execute(sql_text("""
-                SELECT COUNT(*) FROM predictions
-                WHERE external_id IS NOT NULL AND external_id LIKE 'bz_%%'
-                  AND source_url NOT LIKE '%%benzinga.com/analyst/ratings/%%'
-                  AND source_url NOT LIKE '%%benzinga.com/news/%%'
-            """)).scalar() or 0
-            print(f"[URL-DIAG] Fixable (have bz_ external_id + generic URL): {fixable:,}")
-
-            # FIX: ANY prediction with bz_ external_id that doesn't already have
-            # a real article URL → construct the real Benzinga ratings URL
-            if fixable > 0:
-                fixed = _fix_db.execute(sql_text("""
-                    UPDATE predictions
-                    SET source_url = 'https://www.benzinga.com/analyst/ratings/' || REPLACE(external_id, 'bz_', '')
-                    WHERE external_id IS NOT NULL
-                      AND external_id LIKE 'bz_%%'
-                      AND source_url NOT LIKE '%%benzinga.com/analyst/ratings/%%'
-                      AND source_url NOT LIKE '%%benzinga.com/news/%%'
-                      AND source_url NOT LIKE '%%seekingalpha.com/%%'
-                      AND source_url NOT LIKE '%%cnbc.com/%%'
-                """)).rowcount
-                _fix_db.commit()
-                print(f"[URL-FIX] Fixed {fixed:,} predictions with real Benzinga URLs from external_id")
-
-            # Count remaining
-            remaining = _fix_db.execute(sql_text("""
-                SELECT COUNT(*) FROM predictions
-                WHERE source_url NOT LIKE '%%benzinga.com/analyst/%%'
-                  AND source_url NOT LIKE '%%benzinga.com/news/%%'
-                  AND source_url NOT LIKE '%%seekingalpha.com/%%'
-                  AND source_url NOT LIKE '%%cnbc.com/%%'
-                  AND source_url NOT LIKE '%%youtube.com/%%'
-                  AND source_url NOT LIKE '%%reuters.com/%%'
-            """)).scalar() or 0
-            print(f"[URL-FIX] {remaining:,} predictions still have non-article URLs")
-
+            reverted = _fix_db.execute(sql_text("""
+                UPDATE predictions
+                SET source_url = 'https://www.benzinga.com/stock/' || LOWER(ticker) || '/ratings'
+                WHERE source_url LIKE '%%benzinga.com/analyst/ratings/%%'
+            """)).rowcount
+            _fix_db.commit()
+            if reverted > 0:
+                print(f"[Startup] Reverted {reverted:,} broken /analyst/ratings/ URLs to /stock/TICKER/ratings")
             _fix_db.close()
         except Exception as e:
-            print(f"[Startup] URL fix error: {e}")
-            import traceback; traceback.print_exc()
+            print(f"[Startup] URL rollback error: {e}")
 
         # Check no_data backlog size — if large, skip non-evaluation FMP usage
         _no_data_count = 0

@@ -144,35 +144,27 @@ def _search_jina(query: str) -> str | None:
 
 
 def bulk_fix_benzinga_urls():
-    """Instant fix: construct real Benzinga calendar URLs from external_id.
-    external_id stores 'bz_{benzinga_id}' — Benzinga has a direct URL format.
-    No API calls needed. Can fix thousands of URLs in seconds."""
+    """Revert any broken /analyst/ratings/ URLs to safe generic format.
+    Real article URLs are found by the Jina enrichment job."""
     from database import BgSessionLocal
     db = BgSessionLocal()
 
     try:
-        # Fix predictions that have external_id but generic source_url
         fixed = db.execute(sql_text("""
             UPDATE predictions
-            SET source_url = 'https://www.benzinga.com/analyst/ratings/' || REPLACE(external_id, 'bz_', '')
-            WHERE external_id IS NOT NULL
-              AND external_id LIKE 'bz_%'
-              AND (
-                  source_url LIKE '%/stock/%/ratings'
-                  OR source_url LIKE '%/stock/%/ratings/'
-                  OR source_url LIKE '%benzinga.com/stock/%'
-              )
+            SET source_url = 'https://www.benzinga.com/stock/' || LOWER(ticker) || '/ratings'
+            WHERE source_url LIKE '%benzinga.com/analyst/ratings/%'
         """)).rowcount
         db.commit()
-        print(f"[BulkURLFix] Fixed {fixed} Benzinga predictions with real calendar URLs from external_id")
+        if fixed > 0:
+            print(f"[BulkURLFix] Reverted {fixed} broken /analyst/ratings/ URLs")
 
-        # Count remaining generic URLs
         remaining = db.execute(sql_text("""
             SELECT COUNT(*) FROM predictions
             WHERE source_url LIKE '%/stock/%/ratings%'
                OR source_url LIKE '%/forecast/%'
         """)).scalar() or 0
-        print(f"[BulkURLFix] {remaining} predictions still have generic URLs")
+        print(f"[BulkURLFix] {remaining} predictions have generic fallback URLs (Jina enrichment will improve these)")
 
     except Exception as e:
         print(f"[BulkURLFix] Error: {e}")
