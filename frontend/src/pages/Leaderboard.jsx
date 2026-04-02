@@ -305,23 +305,34 @@ export default function Leaderboard() {
                           <tr className="border-b border-border/50 hover:bg-surface-2/50 transition-colors cursor-pointer"
                             style={{ animation: `leaderboardFadeIn 0.3s ease-out ${idx * 0.02}s both` }}>
                             <td className="px-3 py-4"><RankBadge rank={f.rank} movement={f.rank_movement} /></td>
-                            <td className="px-3 py-4">
-                              <Link to={`/forecaster/${f.id}`} className="hover:text-accent transition-colors">
-                                <div className="flex items-center gap-2">
-                                  <span style={{ fontWeight: 500, fontSize: '0.95rem' }}>{f.name}</span>
-                                  <PlatformBadge platform={f.platform} />
-                                </div>
-                                {f.firm ? (
-                                  <div className="text-muted text-xs">{f.firm}</div>
-                                ) : (
-                                  <div className="text-muted text-xs font-mono">{f.handle}</div>
+                            <td className="px-3 py-3">
+                              <div className="flex items-center gap-2">
+                                <Link to={`/forecaster/${f.id}`} className="hover:text-accent transition-colors min-w-0">
+                                  <div className="flex items-center gap-1.5">
+                                    <span className="font-medium text-[0.93rem] truncate">{f.name}</span>
+                                    <PlatformBadge platform={f.platform} />
+                                  </div>
+                                  {f.firm ? (
+                                    <div className="text-muted text-xs truncate">{f.firm}</div>
+                                  ) : (
+                                    <div className="text-muted text-xs font-mono truncate">{f.handle}</div>
+                                  )}
+                                </Link>
+                                {(f.bullish_count > 0 || f.bearish_count > 0 || f.neutral_count > 0) && (
+                                  <div className="hidden lg:block flex-shrink-0 cursor-pointer hover:opacity-80"
+                                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); setExpandedId(expandedId === f.id ? null : f.id); }}>
+                                    <MiniPieChart
+                                      bullish={f.bullish_count || 0} bearish={f.bearish_count || 0}
+                                      neutral={f.neutral_count || 0} size={24}
+                                    />
+                                  </div>
                                 )}
-                              </Link>
+                              </div>
                             </td>
-                            <td className="px-3 py-4 text-right">
+                            <td className="px-3 py-3 text-right">
                               <div className="flex items-center justify-end gap-1.5">
                                 {f.total_predictions > 0 && (
-                                  <div className="hidden lg:flex items-center gap-1 cursor-pointer hover:opacity-80 transition-opacity"
+                                  <div className="hidden lg:block flex-shrink-0 cursor-pointer hover:opacity-80"
                                     onClick={(e) => { e.preventDefault(); e.stopPropagation(); setExpandedId(expandedId === f.id ? null : f.id); }}>
                                     <MiniPieChart
                                       hits={f.hits || 0} nears={f.nears || 0} misses={f.misses || 0}
@@ -330,12 +341,6 @@ export default function Leaderboard() {
                                       incorrect={Math.max(0, (f.total_predictions || 0) - (f.correct_predictions || 0))}
                                       size={24}
                                     />
-                                    {(f.bullish_count > 0 || f.bearish_count > 0 || f.neutral_count > 0) && (
-                                      <MiniPieChart
-                                        bullish={f.bullish_count || 0} bearish={f.bearish_count || 0}
-                                        neutral={f.neutral_count || 0} size={24}
-                                      />
-                                    )}
                                   </div>
                                 )}
                                 <span className={`font-mono font-medium ${f.total_predictions === 0 ? 'text-muted' : f.accuracy_rate >= 60 ? 'text-positive' : 'text-negative'}`} style={{ letterSpacing: '-0.01em' }}>
