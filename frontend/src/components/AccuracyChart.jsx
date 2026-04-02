@@ -43,7 +43,7 @@ export default function AccuracyChart({ data = [], onMonthClick }) {
     return (
       <div>
         <ResponsiveContainer width="100%" height={220}>
-          <LineChart data={data} margin={{ top: 5, right: 5, bottom: 5, left: -15 }}>
+          <LineChart data={data} margin={{ top: 5, right: 5, bottom: 5, left: 0 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
             <XAxis dataKey="prediction_number" tick={{ fill: '#6b7280', fontSize: 10 }} axisLine={{ stroke: 'rgba(255,255,255,0.08)' }} tickLine={false} />
             <YAxis domain={[0, 100]} tick={{ fill: '#6b7280', fontSize: 10 }} axisLine={false} tickLine={false} tickFormatter={v => `${v}%`} />
@@ -80,7 +80,7 @@ export default function AccuracyChart({ data = [], onMonthClick }) {
   return (
     <div>
       <ResponsiveContainer width="100%" height={220}>
-        <LineChart data={data} onClick={handleClick} margin={{ top: 5, right: 5, bottom: 5, left: -15 }}>
+        <LineChart data={data} onClick={handleClick} margin={{ top: 5, right: 5, bottom: 5, left: 0 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
           <XAxis
             dataKey="month"

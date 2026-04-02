@@ -313,10 +313,10 @@ export default function ForecasterProfile() {
             {chartData.length > 0 ? (
               <>
                 <ResponsiveContainer width="100%" height={220}>
-                  <LineChart data={chartData} margin={{ top: 5, right: 5, bottom: 5, left: -15 }}>
+                  <LineChart data={chartData} margin={{ top: 5, right: 5, bottom: 5, left: 0 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
                     <XAxis dataKey="prediction_number" tick={{ fill: '#64748b', fontSize: 10 }} stroke="rgba(255,255,255,0.08)" tickLine={false} />
-                    <YAxis domain={[0, 100]} tick={{ fill: '#64748b', fontSize: 10 }} stroke="rgba(255,255,255,0.08)" tickLine={false} axisLine={false} tickFormatter={(v) => `${v}%`} width={35} />
+                    <YAxis domain={[0, 100]} tick={{ fill: '#64748b', fontSize: 10 }} stroke="rgba(255,255,255,0.08)" tickLine={false} axisLine={false} tickFormatter={(v) => `${v}%`} width={40} />
                     <Tooltip content={({ active, payload }) => {
                       if (!active || !payload?.length) return null;
                       const d = payload[0].payload;
