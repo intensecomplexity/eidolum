@@ -1,11 +1,13 @@
 """
 Retry no_data predictions using Tiingo historical prices.
-Tiingo free tier: 500 requests/hour, 500 unique symbols/day.
+Tiingo free tier: 1,000 requests/day, 2GB bandwidth/day.
+
+BANDWIDTH OPTIMIZATION: instead of fetching full history from 2011,
+calculates the exact date range needed per ticker (earliest prediction
+to latest evaluation + padding). Also requests only close+date columns.
+This cuts bandwidth ~90% vs full OHLC history.
 
 Runs every hour, processes 40 tickers per run.
-40 tickers/hour x 12 working hours = 480 tickers/day (under 500 limit).
-Each ticker covers ~87 predictions on average → ~3,500 scored per hour.
-217K backlog clears in ~5 days.
 """
 import os
 import time
@@ -19,27 +21,57 @@ TIINGO_KEY = os.getenv("TIINGO_API_KEY", "").strip()
 
 _price_cache: dict[str, dict] = {}
 
-# Daily symbol tracking (Tiingo limits 500 unique symbols/day)
+# Daily tracking
 _tiingo_symbols_today: set[str] = set()
 _tiingo_day: str = ""
-TIINGO_DAILY_SYMBOL_LIMIT = 480  # Leave 20 buffer for other uses
+TIINGO_DAILY_SYMBOL_LIMIT = 950  # Leave 50 buffer for other uses
 
 
 def _check_daily_limit(ticker: str) -> bool:
-    """Check if we can fetch this ticker today. Returns True if OK."""
     global _tiingo_symbols_today, _tiingo_day
     today = datetime.utcnow().strftime("%Y-%m-%d")
     if _tiingo_day != today:
         _tiingo_symbols_today = set()
         _tiingo_day = today
     if ticker in _tiingo_symbols_today:
-        return True  # Already fetched today, cached
+        return True
     return len(_tiingo_symbols_today) < TIINGO_DAILY_SYMBOL_LIMIT
 
 
-def _fetch_tiingo_history(ticker: str) -> dict:
-    """Fetch full price history from Tiingo. Returns {date_str: close, ...}.
-    Tiingo limit: 500 req/hour, 500 unique symbols/day."""
+def _date_range_for_ticker(preds: list) -> tuple[str, str]:
+    """Calculate the minimal date range needed for a ticker's predictions.
+    Returns (start_date, end_date) as YYYY-MM-DD strings."""
+    dates = []
+    for p in preds:
+        if p["prediction_date"]:
+            d = p["prediction_date"]
+            dates.append(d.date() if hasattr(d, 'date') else d)
+        if p["evaluation_date"]:
+            d = p["evaluation_date"]
+            dates.append(d.date() if hasattr(d, 'date') else d)
+
+    if not dates:
+        # Fallback: last 2 years
+        end = datetime.utcnow().date()
+        start = end - timedelta(days=730)
+        return str(start), str(end)
+
+    earliest = min(dates)
+    latest = max(dates)
+    # Add 30 days padding on each side for closest-price lookups
+    start = earliest - timedelta(days=30)
+    end = latest + timedelta(days=30)
+    # Cap end at today
+    today = datetime.utcnow().date()
+    if end > today:
+        end = today
+
+    return str(start), str(end)
+
+
+def _fetch_tiingo_history(ticker: str, start_date: str, end_date: str) -> dict:
+    """Fetch price history from Tiingo for a specific date range.
+    Only requests close+date columns to minimize bandwidth."""
     if ticker in _price_cache:
         return _price_cache[ticker]
 
@@ -53,7 +85,13 @@ def _fetch_tiingo_history(ticker: str) -> dict:
     try:
         r = httpx.get(
             f"https://api.tiingo.com/tiingo/daily/{ticker}/prices",
-            params={"startDate": "2011-01-01", "token": TIINGO_KEY},
+            params={
+                "startDate": start_date,
+                "endDate": end_date,
+                "resampleFreq": "daily",
+                "columns": "close,date",
+                "token": TIINGO_KEY,
+            },
             headers={"Content-Type": "application/json"},
             timeout=15,
         )
@@ -77,14 +115,13 @@ def _fetch_tiingo_history(ticker: str) -> dict:
         _tiingo_symbols_today.add(ticker)
         return prices
     except Exception as e:
-        if len(_price_cache) < 5:
+        if len(_tiingo_symbols_today) < 5:
             print(f"[RetryNoData] Tiingo error for {ticker}: {e}")
         _price_cache[ticker] = {}
         return {}
 
 
 def _closest_price(prices: dict, target_date) -> float | None:
-    """Find closest price to target date within 5 business days."""
     if not prices or not target_date:
         return None
     target = target_date.date() if hasattr(target_date, 'date') else target_date
@@ -100,16 +137,14 @@ def _closest_price(prices: dict, target_date) -> float | None:
 
 
 def retry_no_data_batch(db, max_tickers: int = 40):
-    """Re-evaluate no_data predictions using Tiingo historical prices.
-    40 tickers per run x 12 hours = 480/day (under 500 Tiingo symbol limit)."""
+    """Re-evaluate no_data predictions using Tiingo with minimal date ranges."""
     _price_cache.clear()
     now = datetime.utcnow()
 
     if not TIINGO_KEY:
-        print("[RetryNoData] TIINGO_API_KEY not set, cannot retry no_data predictions")
+        print("[RetryNoData] TIINGO_API_KEY not set, cannot retry")
         return {"scored": 0, "remaining": 0}
 
-    # Get no_data predictions grouped by ticker
     rows = db.execute(sql_text("""
         SELECT p.id, p.ticker, p.direction, p.target_price, p.entry_price,
                p.evaluation_date, p.prediction_date, p.forecaster_id, p.window_days
@@ -127,7 +162,6 @@ def retry_no_data_batch(db, max_tickers: int = 40):
         print("[RetryNoData] No no_data predictions to retry")
         return {"scored": 0, "remaining": 0}
 
-    # Group by ticker
     ticker_preds = defaultdict(list)
     for r in rows:
         ticker_preds[r[1]].append({
@@ -142,8 +176,7 @@ def retry_no_data_batch(db, max_tickers: int = 40):
     total_tickers = len(ticker_preds)
 
     print(f"[RetryNoData] {remaining_total:,} no_data across {total_tickers} tickers. "
-          f"Processing {len(tickers)} tickers via Tiingo. "
-          f"Daily symbols: {len(_tiingo_symbols_today)}/{TIINGO_DAILY_SYMBOL_LIMIT}")
+          f"Processing {len(tickers)} tickers. Daily symbols: {len(_tiingo_symbols_today)}/{TIINGO_DAILY_SYMBOL_LIMIT}")
 
     total_scored = 0
     total_still_no_data = 0
@@ -151,10 +184,16 @@ def retry_no_data_batch(db, max_tickers: int = 40):
     api_calls = 0
 
     for i, ticker in enumerate(tickers):
-        prices = _fetch_tiingo_history(ticker)
+        preds = ticker_preds[ticker]
+
+        # Calculate minimal date range for this ticker's predictions
+        start_date, end_date = _date_range_for_ticker(preds)
+        prices = _fetch_tiingo_history(ticker, start_date, end_date)
         api_calls += 1
 
-        preds = ticker_preds[ticker]
+        if prices and api_calls <= 3:
+            print(f"[RetryNoData] {ticker}: {len(prices)} prices ({start_date} to {end_date}), {len(preds)} predictions")
+
         updates = []
 
         for p in preds:
@@ -219,17 +258,14 @@ def retry_no_data_batch(db, max_tickers: int = 40):
                 })
             total_scored += len(updates)
 
-        # Commit + log every 25 tickers
-        if (i + 1) % 25 == 0:
+        if (i + 1) % 20 == 0:
             db.commit()
             print(f"[RetryNoData] {i + 1}/{len(tickers)} tickers, {total_scored} re-scored, {api_calls} Tiingo calls")
 
-        # Rate limit: ~3.6 req/sec to stay well within 500/hr
         time.sleep(0.3)
 
     db.commit()
 
-    # Update forecaster stats
     if affected_forecasters:
         from utils import recalculate_forecaster_stats
         for fid in affected_forecasters:
@@ -240,5 +276,5 @@ def retry_no_data_batch(db, max_tickers: int = 40):
 
     remaining = remaining_total - total_scored
     print(f"[RetryNoData] DONE: {total_scored} re-scored, {total_still_no_data} still no data, "
-          f"~{max(remaining, 0):,} remaining. {api_calls} Tiingo calls for {len(tickers)} tickers.")
+          f"~{max(remaining, 0):,} remaining. {api_calls} Tiingo calls.")
     return {"scored": total_scored, "still_no_data": total_still_no_data, "remaining": max(remaining, 0)}

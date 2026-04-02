@@ -443,7 +443,37 @@ def _fetch_history(ticker: str, start, end) -> dict:
                     print(f"[HistEval] FMP error for {ticker}: {e}")
                 break
 
-    # 2. Finnhub current quote — last resort, only useful for very recent predictions
+    # 2. Tiingo historical prices (free tier: 1000 req/day)
+    _tiingo_key = os.getenv("TIINGO_API_KEY", "").strip()
+    if _tiingo_key and not prices:
+        try:
+            r = httpx.get(
+                f"https://api.tiingo.com/tiingo/daily/{ticker}/prices",
+                params={
+                    "startDate": (datetime.utcnow() - timedelta(days=730)).strftime("%Y-%m-%d"),
+                    "endDate": datetime.utcnow().strftime("%Y-%m-%d"),
+                    "resampleFreq": "daily",
+                    "columns": "close,date",
+                    "token": _tiingo_key,
+                },
+                headers={"Content-Type": "application/json"},
+                timeout=15,
+            )
+            if r.status_code == 200:
+                data = r.json()
+                if isinstance(data, list):
+                    for day in data:
+                        ds = (day.get("date") or "")[:10]
+                        close = day.get("close") or day.get("adjClose")
+                        if ds and close and float(close) > 0:
+                            prices[ds] = float(close)
+                if prices:
+                    _history_cache[ticker] = prices
+                    return prices
+        except Exception:
+            pass
+
+    # 3. Finnhub current quote — last resort, only useful for very recent predictions
     if FINNHUB_KEY:
         try:
             r = httpx.get(
