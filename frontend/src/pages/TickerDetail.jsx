@@ -29,6 +29,13 @@ export default function TickerDetail() {
   const [loading, setLoading] = useState(!!ticker);
   const [error, setError] = useState(false);
 
+  // SEO hook MUST be before any early returns (React hooks rule)
+  useSEO({
+    title: data ? `${ticker}${data.company_name ? ` — ${data.company_name}` : ''} Analyst Predictions & Consensus | Eidolum` : `${ticker} | Eidolum`,
+    description: data ? `${data.total_predictions || 0} analyst predictions tracked for ${ticker}. See bull/bear consensus and top forecasters.` : undefined,
+    url: `https://www.eidolum.com/asset/${ticker}`,
+  });
+
   function fetchData() {
     if (!ticker) return;
     setLoading(true);
@@ -72,11 +79,6 @@ export default function TickerDetail() {
   const hist = data.historical || {};
   const stats = data.stats || {};
 
-  useSEO({
-    title: `${ticker}${data.company_name ? ` — ${data.company_name}` : ''} Analyst Predictions & Consensus | Eidolum`,
-    description: `${data.total_predictions || 0} analyst predictions tracked for ${ticker}${data.company_name ? ` (${data.company_name})` : ''}. ${hist.accuracy > 0 ? `Historical accuracy: ${hist.accuracy}%. ` : ''}See bull/bear consensus and top forecasters.`,
-    url: `https://www.eidolum.com/asset/${ticker}`,
-  });
   const pending = data.pending_predictions || [];
   const scored = data.recent_evaluated || [];
 
