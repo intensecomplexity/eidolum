@@ -20,6 +20,48 @@ INTEGRITY_CHECK_TTL = 600
 _last_forecaster_count: int = 0
 
 
+def _enrich_sector_strengths(results: list, db: Session):
+    """Batch-fetch sector strengths for a list of forecaster results. Modifies in-place."""
+    if not results:
+        return
+    fids = [r["id"] for r in results]
+    try:
+        fid_placeholders = ",".join(str(int(f)) for f in fids)
+        sector_rows = db.execute(sql_text(f"""
+            SELECT p.forecaster_id, ts.sector,
+                   COUNT(*) as total,
+                   SUM(CASE WHEN p.outcome IN ('hit','correct') THEN 1.0
+                            WHEN p.outcome = 'near' THEN 0.5 ELSE 0 END) as score
+            FROM predictions p
+            JOIN ticker_sectors ts ON ts.ticker = p.ticker
+            WHERE p.forecaster_id IN ({fid_placeholders})
+              AND p.outcome IN ('hit','near','miss','correct','incorrect')
+              AND ts.sector IS NOT NULL AND ts.sector != '' AND ts.sector != 'Other'
+            GROUP BY p.forecaster_id, ts.sector
+            HAVING COUNT(*) >= 3
+            ORDER BY p.forecaster_id, score DESC
+        """)).fetchall()
+
+        sector_by_fid = {}
+        for row in sector_rows:
+            fid = int(row[0])
+            if fid not in sector_by_fid:
+                sector_by_fid[fid] = []
+            if len(sector_by_fid[fid]) < 3:
+                sector_by_fid[fid].append({
+                    "sector": row[1],
+                    "accuracy": round(float(row[3]) / row[2] * 100, 1) if row[2] > 0 else 0,
+                    "count": row[2],
+                })
+
+        for r in results:
+            r["sector_strengths"] = sector_by_fid.get(int(r["id"]), [])
+    except Exception as e:
+        import traceback
+        print(f"[Leaderboard] Sector strengths error: {e}")
+        traceback.print_exc()
+
+
 def _refresh_leaderboard(db: Session) -> list | dict:
     """Compute the full leaderboard. Falls back to lower thresholds if empty."""
     global _last_forecaster_count
@@ -89,59 +131,12 @@ def _refresh_leaderboard(db: Session) -> list | dict:
         print(f"[Leaderboard] WARNING: forecaster count dropped from {_last_forecaster_count} to {new_count} — possible stats sync issue")
     _last_forecaster_count = new_count
 
-    # Batch-fetch sector strengths for all forecasters in one query
+    # Batch-fetch sector strengths
+    _enrich_sector_strengths(results, db)
+
+    # Batch-fetch outcome + direction counts for pie charts
     if results:
         fids = [r["id"] for r in results]
-        print(f"[Leaderboard] Fetching sector strengths for {len(fids)} forecasters: {fids[:3]}...")
-        try:
-            # Use IN with generated placeholders instead of ANY (more portable)
-            fid_placeholders = ",".join(str(int(f)) for f in fids)
-            sector_rows = db.execute(sql_text(f"""
-                SELECT p.forecaster_id, ts.sector,
-                       COUNT(*) as total,
-                       SUM(CASE WHEN p.outcome IN ('hit','correct') THEN 1.0
-                                WHEN p.outcome = 'near' THEN 0.5 ELSE 0 END) as score
-                FROM predictions p
-                JOIN ticker_sectors ts ON ts.ticker = p.ticker
-                WHERE p.forecaster_id IN ({fid_placeholders})
-                  AND p.outcome IN ('hit','near','miss','correct','incorrect')
-                  AND ts.sector IS NOT NULL AND ts.sector != '' AND ts.sector != 'Other'
-                GROUP BY p.forecaster_id, ts.sector
-                HAVING COUNT(*) >= 3
-                ORDER BY p.forecaster_id, score DESC
-            """)).fetchall()
-            print(f"[Leaderboard] Got {len(sector_rows)} sector rows")
-
-            sector_by_fid = {}
-            for row in sector_rows:
-                fid = int(row[0])  # Ensure int key
-                if fid not in sector_by_fid:
-                    sector_by_fid[fid] = []
-                if len(sector_by_fid[fid]) < 3:
-                    sector_by_fid[fid].append({
-                        "sector": row[1],
-                        "accuracy": round(float(row[3]) / row[2] * 100, 1) if row[2] > 0 else 0,
-                        "count": row[2],
-                    })
-
-            # Debug: print both sides of the lookup
-            sb_sorted = sorted(sector_by_fid.keys())
-            r_sorted = sorted(int(r["id"]) for r in results)
-            print(f"[Leaderboard] sector fids ({len(sb_sorted)}): {sb_sorted[:10]}")
-            print(f"[Leaderboard] result fids ({len(r_sorted)}): {r_sorted[:10]}")
-            overlap = set(sb_sorted) & set(r_sorted)
-            print(f"[Leaderboard] Overlap: {len(overlap)} IDs match")
-            if sector_rows:
-                print(f"[Leaderboard] First sector row raw: {sector_rows[0]}")
-
-            for r in results:
-                r["sector_strengths"] = sector_by_fid.get(int(r["id"]), [])
-        except Exception as e:
-            import traceback
-            print(f"[Leaderboard] Sector query error: {e}")
-            traceback.print_exc()
-
-        # Batch-fetch outcome + direction counts for pie charts
         try:
             count_rows = db.execute(sql_text("""
                 SELECT forecaster_id, outcome, direction, COUNT(*) as cnt
@@ -516,6 +511,9 @@ def _build_filtered_leaderboard(db: Session, sector=None, call_type=None, sort="
                           "bearish_count": c.get("bearish", 0), "neutral_count": c.get("neutral", 0)})
         except Exception:
             pass
+
+    # Batch-fetch sector strengths (same as default leaderboard)
+    _enrich_sector_strengths(results, db)
 
     return results
 
