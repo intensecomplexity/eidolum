@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { ChevronDown, Filter, Trophy, Flame, Clock } from 'lucide-react';
 import Footer from '../components/Footer';
@@ -67,6 +67,7 @@ export default function Leaderboard() {
   const [direction, setDirection] = useState('All');
   const [metric, setMetric] = useState(() => localStorage.getItem('eidolum_metric') || 'avg_return');
   const [metricOpen, setMetricOpen] = useState(false);
+  const [expandedId, setExpandedId] = useState(null);
   const metricRef = useRef(null);
   const [timeframe, setTimeframe] = useState('all');
 
@@ -301,7 +302,8 @@ export default function Leaderboard() {
                       </thead>
                       <tbody key={metric}>
                         {data.map((f, idx) => (
-                          <tr key={f.id} className="border-b border-border/50 hover:bg-surface-2/50 transition-colors cursor-pointer"
+                          <React.Fragment key={f.id}>
+                          <tr className="border-b border-border/50 hover:bg-surface-2/50 transition-colors cursor-pointer"
                             style={{ animation: `leaderboardFadeIn 0.3s ease-out ${idx * 0.02}s both` }}>
                             <td className="px-6 py-4"><RankBadge rank={f.rank} movement={f.rank_movement} /></td>
                             <td className="px-6 py-4">
@@ -323,16 +325,16 @@ export default function Leaderboard() {
                             <td className="px-6 py-4 text-right">
                               <div className="flex items-center justify-end gap-2">
                                 {f.total_predictions > 0 && (
-                                  <MiniPieChart
-                                    hits={f.hits || 0}
-                                    nears={f.nears || 0}
-                                    misses={f.misses || 0}
-                                    pending={f.pending_count || 0}
-                                    correct={f.correct_predictions || 0}
-                                    incorrect={Math.max(0, (f.total_predictions || 0) - (f.correct_predictions || 0))}
-                                    size={28}
-                                    className="hidden lg:block"
-                                  />
+                                  <div className="hidden lg:block cursor-pointer hover:opacity-80 transition-opacity"
+                                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); setExpandedId(expandedId === f.id ? null : f.id); }}>
+                                    <MiniPieChart
+                                      hits={f.hits || 0} nears={f.nears || 0} misses={f.misses || 0}
+                                      pending={f.pending_count || 0}
+                                      correct={f.correct_predictions || 0}
+                                      incorrect={Math.max(0, (f.total_predictions || 0) - (f.correct_predictions || 0))}
+                                      size={28}
+                                    />
+                                  </div>
                                 )}
                                 <span className={`font-mono font-medium ${f.total_predictions === 0 ? 'text-muted' : f.accuracy_rate >= 60 ? 'text-positive' : 'text-negative'}`} style={{ letterSpacing: '-0.01em' }}>
                                   {f.total_predictions === 0 ? '—' : `${f.accuracy_rate.toFixed(1)}%`}
@@ -341,12 +343,13 @@ export default function Leaderboard() {
                             </td>
                             <td className="px-6 py-4 text-center hidden lg:table-cell">
                               {(f.bullish_count > 0 || f.bearish_count > 0 || f.neutral_count > 0) && (
-                                <MiniPieChart
-                                  bullish={f.bullish_count || 0}
-                                  bearish={f.bearish_count || 0}
-                                  neutral={f.neutral_count || 0}
-                                  size={28}
-                                />
+                                <div className="cursor-pointer hover:opacity-80 transition-opacity inline-block"
+                                  onClick={(e) => { e.preventDefault(); e.stopPropagation(); setExpandedId(expandedId === f.id ? null : f.id); }}>
+                                  <MiniPieChart
+                                    bullish={f.bullish_count || 0} bearish={f.bearish_count || 0}
+                                    neutral={f.neutral_count || 0} size={28}
+                                  />
+                                </div>
                               )}
                             </td>
                             <td className="px-6 py-4 text-right">
@@ -372,6 +375,53 @@ export default function Leaderboard() {
                               <FollowButton forecaster={f} compact />
                             </td>
                           </tr>
+                          {expandedId === f.id && (() => {
+                            const hits = f.hits || f.correct_predictions || 0;
+                            const nears = f.nears || 0;
+                            const misses = f.misses || Math.max(0, (f.total_predictions || 0) - (f.correct_predictions || 0));
+                            const pending = f.pending_count || 0;
+                            const oTotal = hits + nears + misses;
+                            const bull = f.bullish_count || 0;
+                            const bear = f.bearish_count || 0;
+                            const neut = f.neutral_count || 0;
+                            const dTotal = bull + bear + neut;
+                            const pct = (n, t) => t > 0 ? Math.round(n / t * 100) : 0;
+                            return (
+                              <tr>
+                                <td colSpan={10} className="bg-surface-2/30 border-t border-accent/10 py-6 px-6">
+                                  <div className="grid grid-cols-2 gap-8 max-w-lg mx-auto">
+                                    <div>
+                                      <div className="text-[10px] text-muted uppercase tracking-wider mb-3">Scoring Breakdown</div>
+                                      <div className="flex items-start gap-4">
+                                        <MiniPieChart hits={hits} nears={nears} misses={misses} pending={pending}
+                                          correct={f.correct_predictions || 0} incorrect={misses} size={80} showCenter />
+                                        <div className="space-y-1.5 text-[11px]">
+                                          {hits > 0 && <div className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full" style={{backgroundColor:'#34d399'}} />{hits} Hits ({pct(hits, oTotal)}%)</div>}
+                                          {nears > 0 && <div className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full" style={{backgroundColor:'#fbbf24'}} />{nears} Nears ({pct(nears, oTotal)}%)</div>}
+                                          {misses > 0 && <div className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full" style={{backgroundColor:'#f87171'}} />{misses} Misses ({pct(misses, oTotal)}%)</div>}
+                                          {pending > 0 && <div className="flex items-center gap-1.5 text-muted"><span className="w-2.5 h-2.5 rounded-full" style={{backgroundColor:'#6b7280'}} />{pending} Pending</div>}
+                                        </div>
+                                      </div>
+                                    </div>
+                                    {dTotal > 0 && (
+                                      <div>
+                                        <div className="text-[10px] text-muted uppercase tracking-wider mb-3">Direction Breakdown</div>
+                                        <div className="flex items-start gap-4">
+                                          <MiniPieChart bullish={bull} bearish={bear} neutral={neut} size={80} showCenter />
+                                          <div className="space-y-1.5 text-[11px]">
+                                            {bull > 0 && <div className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full" style={{backgroundColor:'#22c55e'}} />{bull} Bullish ({pct(bull, dTotal)}%)</div>}
+                                            {neut > 0 && <div className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full" style={{backgroundColor:'#F59E0B'}} />{neut} Neutral ({pct(neut, dTotal)}%)</div>}
+                                            {bear > 0 && <div className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full" style={{backgroundColor:'#ef4444'}} />{bear} Bearish ({pct(bear, dTotal)}%)</div>}
+                                          </div>
+                                        </div>
+                                      </div>
+                                    )}
+                                  </div>
+                                </td>
+                              </tr>
+                            );
+                          })()}
+                          </React.Fragment>
                         ))}
                       </tbody>
                     </table>
