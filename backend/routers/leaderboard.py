@@ -123,6 +123,49 @@ def _refresh_leaderboard(db: Session) -> list | dict:
         except Exception as e:
             print(f"[Leaderboard] Sector query error: {e}")
 
+        # Batch-fetch outcome + direction counts for pie charts
+        try:
+            count_rows = db.execute(sql_text("""
+                SELECT forecaster_id, outcome, direction, COUNT(*) as cnt
+                FROM predictions
+                WHERE forecaster_id = ANY(:fids)
+                GROUP BY forecaster_id, outcome, direction
+            """), {"fids": fids}).fetchall()
+
+            counts_by_fid = {}
+            for row in count_rows:
+                fid = row[0]
+                if fid not in counts_by_fid:
+                    counts_by_fid[fid] = {"hits": 0, "nears": 0, "misses": 0, "pending": 0, "bullish": 0, "bearish": 0, "neutral": 0}
+                c = counts_by_fid[fid]
+                outcome, direction, cnt = row[1], row[2], row[3]
+                if outcome in ("hit", "correct"):
+                    c["hits"] += cnt
+                elif outcome == "near":
+                    c["nears"] += cnt
+                elif outcome in ("miss", "incorrect"):
+                    c["misses"] += cnt
+                elif outcome == "pending":
+                    c["pending"] += cnt
+                if direction == "bullish":
+                    c["bullish"] += cnt
+                elif direction == "bearish":
+                    c["bearish"] += cnt
+                elif direction == "neutral":
+                    c["neutral"] += cnt
+
+            for r in results:
+                c = counts_by_fid.get(r["id"], {})
+                r["hits"] = c.get("hits", 0)
+                r["nears"] = c.get("nears", 0)
+                r["misses"] = c.get("misses", 0)
+                r["pending_count"] = c.get("pending", 0)
+                r["bullish_count"] = c.get("bullish", 0)
+                r["bearish_count"] = c.get("bearish", 0)
+                r["neutral_count"] = c.get("neutral", 0)
+        except Exception as e:
+            print(f"[Leaderboard] Counts query error: {e}")
+
     return results
 
 
@@ -421,7 +464,41 @@ def _build_filtered_leaderboard(db: Session, sector=None, call_type=None, sort="
             "conflict_count": 0, "conflict_rate": 0,
             "verified_predictions": 0,
             "sector_strengths": [],
+            "hits": 0, "nears": 0, "misses": 0, "pending_count": 0,
+            "bullish_count": 0, "bearish_count": 0, "neutral_count": 0,
         })
+
+    # Batch-fetch outcome + direction counts
+    if results:
+        fids = [r["id"] for r in results]
+        try:
+            count_rows = db.execute(sql_text("""
+                SELECT forecaster_id, outcome, direction, COUNT(*) as cnt
+                FROM predictions
+                WHERE forecaster_id = ANY(:fids)
+                GROUP BY forecaster_id, outcome, direction
+            """), {"fids": fids}).fetchall()
+            counts_by_fid = {}
+            for row in count_rows:
+                fid = row[0]
+                if fid not in counts_by_fid:
+                    counts_by_fid[fid] = {"hits": 0, "nears": 0, "misses": 0, "pending": 0, "bullish": 0, "bearish": 0, "neutral": 0}
+                c = counts_by_fid[fid]
+                if row[1] in ("hit", "correct"): c["hits"] += row[3]
+                elif row[1] == "near": c["nears"] += row[3]
+                elif row[1] in ("miss", "incorrect"): c["misses"] += row[3]
+                elif row[1] == "pending": c["pending"] += row[3]
+                if row[2] == "bullish": c["bullish"] += row[3]
+                elif row[2] == "bearish": c["bearish"] += row[3]
+                elif row[2] == "neutral": c["neutral"] += row[3]
+            for r in results:
+                c = counts_by_fid.get(r["id"], {})
+                r.update({"hits": c.get("hits", 0), "nears": c.get("nears", 0), "misses": c.get("misses", 0),
+                          "pending_count": c.get("pending", 0), "bullish_count": c.get("bullish", 0),
+                          "bearish_count": c.get("bearish", 0), "neutral_count": c.get("neutral", 0)})
+        except Exception:
+            pass
+
     return results
 
 
