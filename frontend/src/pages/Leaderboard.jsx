@@ -322,12 +322,25 @@ export default function Leaderboard() {
                             <td className="px-6 py-4 text-right">
                               <div className="flex items-center justify-end gap-2">
                                 {f.total_predictions > 0 && (
-                                  <MiniPieChart
-                                    correct={f.correct_predictions || 0}
-                                    incorrect={(f.total_predictions || 0) - (f.correct_predictions || 0)}
-                                    size={28}
-                                    className="hidden lg:block"
-                                  />
+                                  <div className="hidden lg:flex items-center gap-1.5">
+                                    <MiniPieChart
+                                      hits={f.hits || 0}
+                                      nears={f.nears || 0}
+                                      misses={f.misses || 0}
+                                      pending={f.pending_count || 0}
+                                      correct={f.correct_predictions || 0}
+                                      incorrect={Math.max(0, (f.total_predictions || 0) - (f.correct_predictions || 0))}
+                                      size={28}
+                                    />
+                                    {(f.bullish_count > 0 || f.bearish_count > 0 || f.neutral_count > 0) && (
+                                      <MiniPieChart
+                                        bullish={f.bullish_count || 0}
+                                        bearish={f.bearish_count || 0}
+                                        neutral={f.neutral_count || 0}
+                                        size={28}
+                                      />
+                                    )}
+                                  </div>
                                 )}
                                 <span className={`font-mono font-medium ${f.total_predictions === 0 ? 'text-muted' : f.accuracy_rate >= 60 ? 'text-positive' : 'text-negative'}`} style={{ letterSpacing: '-0.01em' }}>
                                   {f.total_predictions === 0 ? '—' : `${f.accuracy_rate.toFixed(1)}%`}
