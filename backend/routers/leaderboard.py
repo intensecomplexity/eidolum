@@ -27,7 +27,7 @@ def _refresh_leaderboard(db: Session) -> list | dict:
     # No manual statement_timeout — rely on RequestTimeoutMiddleware (8s)
 
     # Try descending thresholds so the leaderboard is NEVER empty without explanation
-    for min_preds in [10, 5, 3, 1]:
+    for min_preds in [35, 20, 10, 5, 1]:
         rows = db.execute(sql_text("""
             SELECT
                 f.id, f.name, f.handle, f.platform, f.channel_url,
@@ -43,7 +43,7 @@ def _refresh_leaderboard(db: Session) -> list | dict:
         """), {"min_preds": min_preds}).fetchall()
 
         if rows:
-            if min_preds < 10:
+            if min_preds < 35:
                 print(f"[Leaderboard] WARNING: fell back to {min_preds}+ threshold ({len(rows)} results)")
             break
 
@@ -377,7 +377,7 @@ CALL_TYPE_MAP = {
 
 
 def _build_filtered_leaderboard(db: Session, sector=None, call_type=None, sort="accuracy",
-                                 limit=100, min_predictions=10, direction=None, timeframe=None) -> list:
+                                 limit=100, min_predictions=35, direction=None, timeframe=None) -> list:
     """SQL-based filtered leaderboard. Returns ranked list."""
     where_clauses = ["p.outcome IN ('hit','near','miss','correct','incorrect')"]
     params = {}
@@ -534,7 +534,7 @@ def get_leaderboard(
         if cached and (_time.time() - cached[1]) < FILTERED_CACHE_TTL:
             return cached[0]
 
-        min_preds = min_predictions or (5 if sector or call_type or timeframe else 10)
+        min_preds = min_predictions or (10 if sector or call_type or timeframe else 35)
         results = _build_filtered_leaderboard(
             db, sector=sector, call_type=call_type, sort=sort or "accuracy",
             limit=limit, min_predictions=min_preds, direction=direction,
