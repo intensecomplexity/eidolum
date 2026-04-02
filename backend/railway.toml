@@ -1,3 +1,5 @@
 [deploy]
 startCommand = "uvicorn main:app --host 0.0.0.0 --port $PORT"
 healthcheckPath = "/health"
+# Only redeploy when backend/ files change — frontend pushes should NOT restart Railway
+watchPatterns = ["backend/**"]
