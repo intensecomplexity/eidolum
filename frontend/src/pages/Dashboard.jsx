@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Flame, Crosshair, TrendingUp, TrendingDown, ArrowRight, Clock, Trophy } from 'lucide-react';
+import { Flame, Crosshair, TrendingUp, TrendingDown, ArrowRight, Clock, Trophy, Zap } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import DailyChallengeCard from '../components/DailyChallengeCard';
 import WeeklyChallengeCard from '../components/WeeklyChallengeCard';
@@ -9,6 +9,9 @@ import Countdown from '../components/Countdown';
 import LivePnL from '../components/LivePnL';
 import TickerLink from '../components/TickerLink';
 import RankNumber from '../components/RankNumber';
+import CompanyLogo from '../components/CompanyLogo';
+import ConsensusBar from '../components/ConsensusBar';
+import PredictionBadge from '../components/PredictionBadge';
 import Footer from '../components/Footer';
 import {
   getUserProfile, getUserPredictions, getLivePrices,
@@ -39,8 +42,8 @@ export default function Dashboard() {
   // Public content (same as logged-out homepage)
   const [top5, setTop5] = useState([]);
   const [homeStats, setHomeStats] = useState(null);
-  const [trending, setTrending] = useState([]);
-  const [recentCalls, setRecentCalls] = useState([]);
+  const [biggestCalls, setBiggestCalls] = useState([]);
+  const [mostDivided, setMostDivided] = useState([]);
 
   // Personalized extras
   const [expiring, setExpiring] = useState([]);
@@ -51,9 +54,8 @@ export default function Dashboard() {
     getHomepageData().then(d => {
       if (d.stats) setHomeStats(d.stats);
       if (d.top_analysts) setTop5(d.top_analysts);
-      if (d.trending_tickers) setTrending(d.trending_tickers);
-      if (d.recent_calls) setRecentCalls(d.recent_calls);
-      if (d.expiring_soon) setExpiring(d.expiring_soon);
+      if (d.biggest_calls) setBiggestCalls(d.biggest_calls);
+      if (d.most_divided) setMostDivided(d.most_divided);
     }).catch(() => {});
   }, []);
 
@@ -176,31 +178,35 @@ export default function Dashboard() {
           </div>
         )}
 
-        {/* ── SECTION 2: TRENDING NOW ──────────────────────────────────── */}
-        {trending.length > 0 && (
+        {/* ── SECTION 2: BIGGEST CALLS ─────────────────────────────────── */}
+        {biggestCalls.length > 0 && (
           <div className="mb-6">
-            <h2 className="font-semibold text-base mb-3">Trending Now</h2>
-            <div className="flex gap-3 overflow-x-auto pills-scroll pb-2">
-              {trending.map(t => {
-                const bullPct = t.bull_pct || 50;
-                return (
-                  <Link key={t.ticker} to={`/asset/${t.ticker}`}
-                    className="shrink-0 w-36 sm:w-40 card py-3 px-4 hover:border-accent/30 transition-colors">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="font-mono font-bold text-accent text-sm">{t.ticker}</span>
-                      <span className="text-muted text-[10px] font-mono">{t.total} calls</span>
+            <h2 className="font-semibold text-base mb-3 flex items-center gap-1.5">
+              <Zap className="w-4 h-4 text-accent" /> Biggest Calls
+            </h2>
+            <div className="space-y-2">
+              {biggestCalls.map(p => (
+                <Link key={p.id} to={`/asset/${p.ticker}`}
+                  className="flex items-center gap-3 card py-3 hover:border-accent/20 transition-colors">
+                  <CompanyLogo domain={p.logo_domain} logoUrl={p.logo_url} ticker={p.ticker} size={28} />
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono text-accent font-bold text-sm">{p.ticker}</span>
+                      <PredictionBadge outcome={p.outcome} />
+                      <span className={`font-mono text-sm font-bold ${p.actual_return >= 0 ? 'text-positive' : 'text-negative'}`}>
+                        {p.actual_return >= 0 ? '+' : ''}{p.actual_return}%
+                      </span>
                     </div>
-                    <div className="flex h-1.5 rounded-full overflow-hidden bg-surface-2">
-                      <div className="bg-positive rounded-l-full" style={{ width: `${bullPct}%` }} />
-                      <div className="bg-negative rounded-r-full" style={{ width: `${100 - bullPct}%` }} />
+                    <div className="text-xs text-text-secondary truncate">
+                      <Link to={`/forecaster/${p.forecaster_id}`} className="text-accent hover:underline" onClick={e => e.stopPropagation()}>
+                        {p.forecaster_name}
+                      </Link>
+                      <span className="text-muted"> {p.direction === 'bullish' ? 'Bull' : p.direction === 'neutral' ? 'Hold' : 'Bear'}</span>
+                      {p.target_price && <span className="text-muted">, target ${p.target_price.toFixed(0)}</span>}
                     </div>
-                    <div className="flex justify-between text-[10px] mt-1">
-                      <span className="text-positive font-mono">{bullPct}% bull</span>
-                      <span className="text-negative font-mono">{100 - bullPct}% bear</span>
-                    </div>
-                  </Link>
-                );
-              })}
+                  </div>
+                </Link>
+              ))}
             </div>
           </div>
         )}
@@ -253,35 +259,28 @@ export default function Dashboard() {
           </div>
         )}
 
-        {/* ── SECTION 4: RECENT ANALYST CALLS ─────────────────────────── */}
-        {recentCalls.length > 0 && (
+        {/* ── SECTION 4: MOST DIVIDED ──────────────────────────────────── */}
+        {mostDivided.length > 0 && (
           <div className="mb-6">
-            <h2 className="font-semibold text-base mb-3">Recent Analyst Calls</h2>
-            <div className="space-y-2">
-              {recentCalls.map(p => (
-                <Link key={p.id} to={`/asset/${p.ticker}`}
-                  className="flex items-center gap-3 card py-3 hover:border-accent/20 transition-colors">
-                  <span className={`shrink-0 ${p.direction === 'bullish' ? 'text-positive' : 'text-negative'}`}>
-                    {p.direction === 'bullish' ? <TrendingUp className="w-4 h-4" /> : <TrendingDown className="w-4 h-4" />}
-                  </span>
-                  <div className="flex-1 min-w-0">
-                    <div className="text-sm font-medium text-text-primary">{p.forecaster?.name}</div>
-                    <div className="text-xs">
-                      <span className={p.direction === 'bullish' ? 'text-positive' : 'text-negative'}>
-                        {p.direction === 'bullish' ? 'Bullish' : 'Bearish'}
-                      </span>
-                      <span className="text-muted"> on </span>
-                      <span className="font-mono text-accent font-semibold">{p.ticker}</span>
-                      {p.target_price && <span className="text-muted">, target ${p.target_price.toFixed(0)}</span>}
-                    </div>
+            <h2 className="font-semibold text-base mb-3">Most Divided</h2>
+            <p className="text-xs text-muted mb-3">Analysts can't agree on these stocks</p>
+            <div className="flex gap-3 overflow-x-auto pills-scroll pb-2">
+              {mostDivided.map(t => (
+                <Link key={t.ticker} to={`/asset/${t.ticker}`}
+                  className="shrink-0 w-44 sm:w-48 card py-3 px-4 hover:border-accent/30 transition-colors">
+                  <div className="flex items-center gap-2 mb-2">
+                    <CompanyLogo domain={t.logo_domain} logoUrl={t.logo_url} ticker={t.ticker} size={22} />
+                    <span className="font-mono font-bold text-accent text-sm">{t.ticker}</span>
+                    <span className="text-muted text-[10px] font-mono ml-auto">{t.total}</span>
                   </div>
-                  <span className="text-muted text-xs font-mono shrink-0">{timeAgo(p.prediction_date)}</span>
+                  {t.company_name && <div className="text-[10px] text-text-secondary truncate mb-1.5">{t.company_name}</div>}
+                  <ConsensusBar bullish={t.bullish} bearish={t.bearish} />
                 </Link>
               ))}
             </div>
             <div className="text-center mt-3">
-              <Link to="/expiring" className="text-accent text-xs font-medium inline-flex items-center gap-1">
-                See all predictions <ArrowRight className="w-3 h-3" />
+              <Link to="/consensus" className="text-accent text-xs font-medium inline-flex items-center gap-1">
+                See all consensus <ArrowRight className="w-3 h-3" />
               </Link>
             </div>
           </div>

@@ -726,35 +726,76 @@ def get_homepage_data(request: Request, db: Session = Depends(get_db)):
     except Exception:
         pass
 
-    # Trending tickers
-    trending = []
+    # Biggest Calls: recently scored predictions with highest absolute return
+    biggest_calls = []
     try:
-        trending = get_trending_tickers(request, db)[:8]
+        bc_rows = db.execute(sql_text("""
+            SELECT p.id, p.ticker, p.direction, p.target_price, p.entry_price,
+                   p.outcome, p.actual_return, p.prediction_date,
+                   f.id AS fid, f.name AS fname, f.accuracy_score,
+                   ts.logo_domain, ts.logo_url, ts.company_name
+            FROM predictions p
+            JOIN forecasters f ON f.id = p.forecaster_id
+            LEFT JOIN ticker_sectors ts ON ts.ticker = p.ticker
+            WHERE p.outcome IN ('hit','near','miss','correct','incorrect')
+              AND p.actual_return IS NOT NULL AND p.actual_return != 0
+            ORDER BY ABS(p.actual_return) DESC
+            LIMIT 5
+        """)).fetchall()
+        for r in bc_rows:
+            biggest_calls.append({
+                "id": r[0], "ticker": r[1], "direction": r[2],
+                "target_price": float(r[3]) if r[3] else None,
+                "entry_price": float(r[4]) if r[4] else None,
+                "outcome": r[5], "actual_return": round(float(r[6]), 1),
+                "prediction_date": r[7].isoformat() if r[7] else None,
+                "forecaster_id": r[8], "forecaster_name": r[9],
+                "accuracy": round(float(r[10]), 1) if r[10] else 0,
+                "logo_domain": r[11], "logo_url": r[12], "company_name": r[13],
+            })
     except Exception:
         pass
 
-    # Recent calls (pending predictions)
-    recent = []
+    # Most Divided: tickers with bull/bear split closest to 50/50
+    most_divided = []
     try:
-        recent = get_pending_predictions(request, db)[:5]
-    except Exception:
-        pass
-
-    # Expiring soon (within 7 days)
-    expiring = []
-    try:
-        from routers.user_predictions import get_expiring_predictions
-        all_expiring = get_expiring_predictions(request, db)
-        expiring = [p for p in (all_expiring or []) if p.get("days_remaining", 99) <= 7][:8]
+        md_rows = db.execute(sql_text("""
+            SELECT ticker,
+                   COUNT(*) as total,
+                   SUM(CASE WHEN direction = 'bullish' THEN 1 ELSE 0 END) as bullish,
+                   SUM(CASE WHEN direction = 'bearish' THEN 1 ELSE 0 END) as bearish
+            FROM predictions
+            WHERE direction IN ('bullish', 'bearish')
+            GROUP BY ticker
+            HAVING COUNT(*) >= 10
+            ORDER BY ABS(SUM(CASE WHEN direction='bullish' THEN 1 ELSE 0 END) * 1.0 / COUNT(*) - 0.5)
+            LIMIT 5
+        """)).fetchall()
+        for r in md_rows:
+            ticker = r[0]
+            total = r[1]
+            bull = r[2]
+            # Get logo info
+            try:
+                ts_row = db.execute(sql_text("SELECT logo_domain, logo_url, company_name FROM ticker_sectors WHERE ticker = :t"), {"t": ticker}).first()
+            except Exception:
+                ts_row = None
+            most_divided.append({
+                "ticker": ticker, "total": total,
+                "bullish": bull, "bearish": r[3],
+                "bull_pct": round(bull / total * 100, 1) if total > 0 else 50,
+                "logo_domain": ts_row[0] if ts_row else None,
+                "logo_url": ts_row[1] if ts_row else None,
+                "company_name": ts_row[2] if ts_row else None,
+            })
     except Exception:
         pass
 
     _homepage_data_cache = {
         "stats": stats,
         "top_analysts": top5,
-        "trending_tickers": trending,
-        "recent_calls": recent,
-        "expiring_soon": expiring,
+        "biggest_calls": biggest_calls,
+        "most_divided": most_divided,
     }
     _homepage_data_cache_time = _time.time()
     return _homepage_data_cache
