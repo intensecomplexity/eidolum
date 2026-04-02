@@ -1,45 +1,59 @@
 """
-Retry no_data predictions using yfinance (free, unlimited).
-Runs hourly, processes 50 tickers per run with 2s delays.
-At ~1,200 tickers/day, clears the 217K backlog in 2-3 days.
-Does NOT use FMP — saves that budget for the grades scraper.
+Retry no_data predictions using FMP /api/v3/historical-price-full.
+yfinance is completely blocked on Railway (returns empty for all tickers).
+
+Runs every 2 hours, processes 200 tickers per run.
+Each FMP call returns the FULL price history for one ticker,
+reused for all predictions on that ticker.
+
+At 200 tickers/run × 12 runs/day = 2,400 tickers/day.
 """
+import os
 import time
-from datetime import datetime
+from datetime import datetime, timedelta
 from collections import defaultdict
 from sqlalchemy import text as sql_text
 
-# Import scoring thresholds from the main evaluator
 from jobs.historical_evaluator import _get_tolerance, _TOLERANCE, _MIN_MOVEMENT, _build_summary
 
-_yf_cache: dict[str, dict] = {}
+FMP_KEY = os.getenv("FMP_KEY", "").strip()
+
+_price_cache: dict[str, dict] = {}
 
 
-def _fetch_yf_history(ticker: str) -> dict:
-    """Download full price history for a ticker using yfinance. Returns {date_str: close, ...}."""
-    if ticker in _yf_cache:
-        return _yf_cache[ticker]
+def _fetch_fmp_history(ticker: str) -> dict:
+    """Fetch full price history from FMP /api/v3/. Returns {date_str: close, ...}."""
+    if ticker in _price_cache:
+        return _price_cache[ticker]
 
+    if not FMP_KEY:
+        return {}
+
+    import httpx
     try:
-        import yfinance as yf
-        stock = yf.Ticker(ticker)
-        hist = stock.history(period="max")
-        if hist is None or len(hist) == 0:
-            _yf_cache[ticker] = {}
+        r = httpx.get(
+            f"https://financialmodelingprep.com/api/v3/historical-price-full/{ticker}",
+            params={"apikey": FMP_KEY, "serietype": "line"},
+            timeout=15,
+        )
+        if r.status_code != 200:
+            _price_cache[ticker] = {}
             return {}
 
+        data = r.json()
+        historical = data.get("historical", []) if isinstance(data, dict) else []
         prices = {}
-        for date_idx, row in hist.iterrows():
-            ds = str(date_idx.date())
-            close = row.get("Close")
-            if close and float(close) > 0:
+        for day in historical:
+            ds = (day.get("date") or "")[:10]
+            close = day.get("close")
+            if ds and close and float(close) > 0:
                 prices[ds] = float(close)
 
-        _yf_cache[ticker] = prices
+        _price_cache[ticker] = prices
         return prices
     except Exception as e:
-        print(f"[RetryNoData] yfinance error for {ticker}: {e}")
-        _yf_cache[ticker] = {}
+        print(f"[RetryNoData] FMP error for {ticker}: {e}")
+        _price_cache[ticker] = {}
         return {}
 
 
@@ -51,8 +65,6 @@ def _closest_price(prices: dict, target_date) -> float | None:
     ts = str(target)
     if ts in prices:
         return prices[ts]
-    # Search nearby dates (weekends/holidays)
-    from datetime import timedelta
     for offset in range(1, 6):
         for d in [target - timedelta(days=offset), target + timedelta(days=offset)]:
             ds = str(d)
@@ -61,10 +73,14 @@ def _closest_price(prices: dict, target_date) -> float | None:
     return None
 
 
-def retry_no_data_batch(db, max_tickers: int = 50):
-    """Re-evaluate no_data predictions using yfinance. Max 50 tickers per run."""
-    _yf_cache.clear()
+def retry_no_data_batch(db, max_tickers: int = 200):
+    """Re-evaluate no_data predictions using FMP historical prices."""
+    _price_cache.clear()
     now = datetime.utcnow()
+
+    if not FMP_KEY:
+        print("[RetryNoData] FMP_KEY not set, cannot retry")
+        return {"scored": 0, "remaining": 0}
 
     # Get no_data predictions grouped by ticker
     rows = db.execute(sql_text("""
@@ -73,7 +89,7 @@ def retry_no_data_batch(db, max_tickers: int = 50):
         FROM predictions p
         WHERE p.outcome = 'no_data'
         ORDER BY p.ticker
-        LIMIT 10000
+        LIMIT 50000
     """)).fetchall()
 
     remaining_total = db.execute(sql_text(
@@ -81,7 +97,7 @@ def retry_no_data_batch(db, max_tickers: int = 50):
     )).scalar() or 0
 
     if not rows:
-        print(f"[RetryNoData] No no_data predictions to retry")
+        print("[RetryNoData] No no_data predictions to retry")
         return {"scored": 0, "remaining": 0}
 
     # Group by ticker
@@ -98,15 +114,18 @@ def retry_no_data_batch(db, max_tickers: int = 50):
     tickers = list(ticker_preds.keys())[:max_tickers]
     total_tickers = len(ticker_preds)
 
-    print(f"[RetryNoData] {remaining_total} no_data predictions across {total_tickers} tickers. Processing {len(tickers)} tickers this run.")
+    print(f"[RetryNoData] {remaining_total:,} no_data predictions across {total_tickers} tickers. Processing {len(tickers)} tickers this run.")
 
     total_scored = 0
     total_still_no_data = 0
     affected_forecasters = set()
 
     for i, ticker in enumerate(tickers):
-        prices = _fetch_yf_history(ticker)
-        time.sleep(2)  # Rate limit yfinance
+        prices = _fetch_fmp_history(ticker)
+
+        # Brief pause every 10 tickers (FMP rate limit)
+        if (i + 1) % 10 == 0:
+            time.sleep(0.5)
 
         preds = ticker_preds[ticker]
         updates = []
@@ -178,7 +197,7 @@ def retry_no_data_batch(db, max_tickers: int = 50):
                 })
             total_scored += len(updates)
 
-        if (i + 1) % 10 == 0:
+        if (i + 1) % 20 == 0:
             db.commit()
             print(f"[RetryNoData] Progress: {i + 1}/{len(tickers)} tickers, {total_scored} re-scored")
 

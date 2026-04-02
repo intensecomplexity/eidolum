@@ -384,7 +384,7 @@ _FMP_DAILY_LIMIT = 200  # Evaluator gets 200/day, grades scraper gets 100/day
 
 def _fetch_history(ticker: str, start, end) -> dict:
     """Fetch historical daily prices for a ticker. Returns {date_str: close_price, ...}.
-    Tries FMP historical API first, then yfinance, then falls back to Finnhub current quote."""
+    Uses FMP /api/v3/ as primary source (yfinance is blocked on Railway)."""
     import httpx
 
     if ticker in _history_cache:
@@ -476,18 +476,12 @@ def _closest_price(prices: dict, target_date) -> float | None:
     if ts in prices:
         return prices[ts]
 
-    # If only current quote, check if target is within 5 days of today
+    # If only current quote (from Finnhub), only valid for recent predictions
     if "_current" in prices and len(prices) <= 2:
         days_old = (datetime.utcnow().date() - target).days if hasattr(target, 'year') else 999
         if days_old <= 5:
             return prices["_current"]
-        # Too old for current quote — try yfinance for historical
-        try:
-            from jobs.price_checker import get_stock_price_on_date
-            # We need the ticker, but it's not passed here — use current as last resort
-        except Exception:
-            pass
-        return prices["_current"]  # Better than nothing, but flag in logs
+        return None  # Too old for current quote — need historical data
 
     # Find nearest date in the history
     best, best_diff = None, 999
