@@ -1635,92 +1635,66 @@ async def lifespan(app):
         except Exception as e:
             print(f"[Startup] Season init error: {e}")
 
-        # Diagnostic + fix for generic source URLs
+        # Diagnostic: show actual generic URL patterns, then fix ALL non-article URLs
         try:
             _fix_db = BgSessionLocal()
 
-            # Diagnostic: what URL patterns exist?
-            url_patterns = _fix_db.execute(sql_text("""
-                SELECT
-                    CASE
-                        WHEN source_url LIKE '%%/stock/%%/ratings%%' THEN '/stock/*/ratings'
-                        WHEN source_url LIKE '%%/quote/%%' THEN '/quote/*'
-                        WHEN source_url LIKE '%%/forecast/%%' THEN '/forecast/*'
-                        WHEN source_url LIKE '%%/stable/grades%%' THEN '/stable/grades'
-                        WHEN source_url LIKE '%%benzinga.com/analyst/%%' THEN 'benzinga/analyst/*'
-                        WHEN source_url LIKE '%%benzinga.com/news/%%' THEN 'benzinga/news/*'
-                        ELSE 'other'
-                    END as pattern,
-                    COUNT(*) as cnt
+            # Show the actual source_url values that are NOT real articles
+            diag = _fix_db.execute(sql_text("""
+                SELECT source_url, COUNT(*) as cnt
                 FROM predictions
-                GROUP BY pattern
+                WHERE source_url NOT LIKE '%%benzinga.com/analyst/%%'
+                  AND source_url NOT LIKE '%%benzinga.com/news/%%'
+                  AND source_url NOT LIKE '%%seekingalpha.com/%%'
+                  AND source_url NOT LIKE '%%cnbc.com/%%'
+                  AND source_url NOT LIKE '%%youtube.com/%%'
+                  AND source_url NOT LIKE '%%reuters.com/%%'
+                  AND source_url NOT LIKE '%%marketwatch.com/%%'
+                  AND source_url LIKE '%%benzinga%%'
+                GROUP BY source_url
                 ORDER BY cnt DESC
+                LIMIT 10
             """)).fetchall()
-            print("[URL-DIAG] Source URL patterns:")
-            for p in url_patterns:
-                print(f"  {p[0]}: {p[1]:,}")
+            print("[URL-DIAG] Top 10 generic Benzinga URL patterns:")
+            for d in diag:
+                print(f"  {d[1]:>6,}x  {d[0][:80]}")
 
-            # Diagnostic: what does external_id look like?
-            eid_samples = _fix_db.execute(sql_text("""
-                SELECT external_id, source_platform_id, source_url, ticker
-                FROM predictions
-                WHERE external_id IS NOT NULL
-                LIMIT 5
-            """)).fetchall()
-            print("[URL-DIAG] External ID samples:")
-            for s in eid_samples:
-                print(f"  eid={s[0]}, spid={s[1]}, url={s[2][:60]}..., ticker={s[3]}")
+            # Count predictions with bz_ external_id that have NON-article URLs
+            fixable = _fix_db.execute(sql_text("""
+                SELECT COUNT(*) FROM predictions
+                WHERE external_id IS NOT NULL AND external_id LIKE 'bz_%%'
+                  AND source_url NOT LIKE '%%benzinga.com/analyst/ratings/%%'
+                  AND source_url NOT LIKE '%%benzinga.com/news/%%'
+            """)).scalar() or 0
+            print(f"[URL-DIAG] Fixable (have bz_ external_id + generic URL): {fixable:,}")
 
-            eid_count = _fix_db.execute(sql_text(
-                "SELECT COUNT(*) FROM predictions WHERE external_id IS NOT NULL AND external_id LIKE 'bz_%%'"
-            )).scalar() or 0
-            print(f"[URL-DIAG] Predictions with bz_ external_id: {eid_count:,}")
-
-            spid_count = _fix_db.execute(sql_text(
-                "SELECT COUNT(*) FROM predictions WHERE source_platform_id IS NOT NULL AND source_platform_id LIKE 'mbz_%%'"
-            )).scalar() or 0
-            print(f"[URL-DIAG] Predictions with mbz_ source_platform_id: {spid_count:,}")
-
-            # Fix 1: generic /stock/*/ratings URLs where we have bz_ external_id
-            if eid_count > 0:
-                fixed1 = _fix_db.execute(sql_text("""
+            # FIX: ANY prediction with bz_ external_id that doesn't already have
+            # a real article URL → construct the real Benzinga ratings URL
+            if fixable > 0:
+                fixed = _fix_db.execute(sql_text("""
                     UPDATE predictions
                     SET source_url = 'https://www.benzinga.com/analyst/ratings/' || REPLACE(external_id, 'bz_', '')
                     WHERE external_id IS NOT NULL
                       AND external_id LIKE 'bz_%%'
-                      AND source_url LIKE '%%/stock/%%/ratings%%'
+                      AND source_url NOT LIKE '%%benzinga.com/analyst/ratings/%%'
+                      AND source_url NOT LIKE '%%benzinga.com/news/%%'
+                      AND source_url NOT LIKE '%%seekingalpha.com/%%'
+                      AND source_url NOT LIKE '%%cnbc.com/%%'
                 """)).rowcount
                 _fix_db.commit()
-                print(f"[URL-FIX] Fixed {fixed1} URLs using bz_ external_id")
+                print(f"[URL-FIX] Fixed {fixed:,} predictions with real Benzinga URLs from external_id")
 
-            # Fix 2: generic /stock/*/ratings URLs where we have mbz_ source_platform_id with benzinga_id
-            fixed2 = _fix_db.execute(sql_text("""
-                UPDATE predictions
-                SET source_url = 'https://www.benzinga.com/analyst/ratings/' || REPLACE(REPLACE(source_platform_id, 'mbz_', ''), 'fmp_g_', '')
-                WHERE source_url LIKE '%%/stock/%%/ratings%%'
-                  AND source_platform_id IS NOT NULL
-                  AND (source_platform_id LIKE 'mbz_%%' AND LENGTH(source_platform_id) < 20)
-            """)).rowcount
-            _fix_db.commit()
-            print(f"[URL-FIX] Fixed {fixed2} URLs using mbz_ source_platform_id")
-
-            # Fix 3: remaining /quote/ URLs
-            fixed3 = _fix_db.execute(sql_text("""
-                UPDATE predictions
-                SET source_url = 'https://www.benzinga.com/stock/' || LOWER(ticker) || '/ratings'
-                WHERE source_url LIKE '%%benzinga.com/quote/%%'
-            """)).rowcount
-            _fix_db.commit()
-            print(f"[URL-FIX] Fixed {fixed3} /quote/ URLs")
-
-            # Count remaining generic
+            # Count remaining
             remaining = _fix_db.execute(sql_text("""
                 SELECT COUNT(*) FROM predictions
-                WHERE source_url LIKE '%%/stock/%%/ratings%%'
-                   OR source_url LIKE '%%/forecast/%%'
-                   OR source_url LIKE '%%/stable/grades%%'
+                WHERE source_url NOT LIKE '%%benzinga.com/analyst/%%'
+                  AND source_url NOT LIKE '%%benzinga.com/news/%%'
+                  AND source_url NOT LIKE '%%seekingalpha.com/%%'
+                  AND source_url NOT LIKE '%%cnbc.com/%%'
+                  AND source_url NOT LIKE '%%youtube.com/%%'
+                  AND source_url NOT LIKE '%%reuters.com/%%'
             """)).scalar() or 0
-            print(f"[URL-FIX] {remaining:,} predictions still have generic URLs")
+            print(f"[URL-FIX] {remaining:,} predictions still have non-article URLs")
 
             _fix_db.close()
         except Exception as e:

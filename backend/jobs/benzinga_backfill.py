@@ -420,7 +420,7 @@ def _insert_rating(rating: dict, db) -> bool:
     pt_current = rating.get("pt_current") or rating.get("price_target") or ""
     pt_prior = rating.get("pt_prior") or rating.get("previous_price_target") or ""
     date_str = (rating.get("date") or "")[:10]
-    url_news = rating.get("url_news") or rating.get("benzinga_news_url") or ""
+    url_news = rating.get("benzinga_news_url") or rating.get("url_news") or ""
     benzinga_id = str(rating.get("id") or rating.get("benzinga_id") or "")
 
     if not ticker or not firm or not date_str or len(date_str) < 8:

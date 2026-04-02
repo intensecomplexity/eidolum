@@ -157,8 +157,8 @@ def _process_rating(rating: dict, db: Session) -> bool:
     pt_current = rating.get("pt_current") or rating.get("price_target") or ""
     pt_prior = rating.get("pt_prior") or rating.get("previous_price_target") or ""
     date_str = (rating.get("date") or rating.get("last_updated") or "")[:10]
-    url_news = rating.get("url_news") or rating.get("benzinga_news_url") or ""
-    url_calendar = rating.get("url_calendar") or rating.get("benzinga_calendar_url") or ""
+    url_news = rating.get("benzinga_news_url") or rating.get("url_news") or ""
+    url_calendar = rating.get("benzinga_calendar_url") or rating.get("url_calendar") or ""
     benzinga_id = rating.get("id") or rating.get("benzinga_id") or ""
 
     # Must have ticker and firm
