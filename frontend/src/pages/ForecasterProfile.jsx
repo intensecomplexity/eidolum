@@ -18,11 +18,11 @@ import CompanyLogo from '../components/CompanyLogo';
 import Footer from '../components/Footer';
 import MiniPieChart from '../components/MiniPieChart';
 import PortfolioSimulator from '../components/PortfolioSimulator';
-import { getForecaster, getForecasterSectors, getPlatformDetail, getReportCards } from '../api';
+import { getForecaster, getForecasterBySlug, getForecasterSectors, getPlatformDetail, getReportCards } from '../api';
 import { annotateContext, ExplainerLine, ratingChangeLabel } from '../utils/predictionExplainer';
 
 export default function ForecasterProfile() {
-  const { id } = useParams();
+  const { id, slug } = useParams();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [platformInfo, setPlatformInfo] = useState(null);
@@ -34,7 +34,8 @@ export default function ForecasterProfile() {
 
   useEffect(() => {
     setLoading(true);
-    getForecaster(id)
+    const fetchFn = slug ? () => getForecasterBySlug(slug) : () => getForecaster(id);
+    fetchFn()
       .then((d) => {
         setData(d);
         // Fetch platform ranking

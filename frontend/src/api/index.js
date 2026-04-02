@@ -33,6 +33,10 @@ export function getForecaster(id, params = {}) {
   return api.get(`/forecaster/${id}`, { params }).then(r => r.data);
 }
 
+export function getForecasterBySlug(slug, params = {}) {
+  return api.get(`/forecaster/by-slug/${slug}`, { params }).then(r => r.data);
+}
+
 export function getForecasterSimulator(id) {
   return api.get(`/forecaster/${id}/simulator`).then(r => r.data);
 }

@@ -42,7 +42,7 @@ export default function LeaderboardCard({ forecaster: f, metric = 'avg_return' }
 
   return (
     <div className="bg-surface border border-border rounded-xl p-4 transition-colors">
-      <Link to={`/forecaster/${f.id}`} className="block active:bg-surface-2">
+      <Link to={f.slug ? `/analyst/${f.slug}` : `/forecaster/${f.id}`} className="block active:bg-surface-2">
         {/* Top row */}
         <div className="flex items-start justify-between mb-3">
           <div className="flex items-center gap-2.5">

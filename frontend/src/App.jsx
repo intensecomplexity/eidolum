@@ -80,6 +80,7 @@ export default function App() {
         <Route path="/platforms" element={<Platforms />} />
         <Route path="/platforms/:platformId" element={<PlatformDetail />} />
         <Route path="/forecaster/:id" element={<ForecasterProfile />} />
+        <Route path="/analyst/:slug" element={<ForecasterProfile />} />
         <Route path="/asset/:ticker" element={<TickerDetail />} />
         <Route path="/saved" element={<SavedPredictions />} />
         <Route path="/watchlist" element={<WatchlistPage />} />
