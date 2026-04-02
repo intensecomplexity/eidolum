@@ -92,21 +92,25 @@ def _refresh_leaderboard(db: Session) -> list | dict:
     # Batch-fetch sector strengths for all forecasters in one query
     if results:
         fids = [r["id"] for r in results]
+        print(f"[Leaderboard] Fetching sector strengths for {len(fids)} forecasters: {fids[:3]}...")
         try:
-            sector_rows = db.execute(sql_text("""
+            # Use IN with generated placeholders instead of ANY (more portable)
+            fid_placeholders = ",".join(str(int(f)) for f in fids)
+            sector_rows = db.execute(sql_text(f"""
                 SELECT p.forecaster_id, ts.sector,
                        COUNT(*) as total,
                        SUM(CASE WHEN p.outcome IN ('hit','correct') THEN 1.0
                                 WHEN p.outcome = 'near' THEN 0.5 ELSE 0 END) as score
                 FROM predictions p
                 JOIN ticker_sectors ts ON ts.ticker = p.ticker
-                WHERE p.forecaster_id = ANY(:fids)
+                WHERE p.forecaster_id IN ({fid_placeholders})
                   AND p.outcome IN ('hit','near','miss','correct','incorrect')
                   AND ts.sector IS NOT NULL AND ts.sector != '' AND ts.sector != 'Other'
                 GROUP BY p.forecaster_id, ts.sector
                 HAVING COUNT(*) >= 3
                 ORDER BY p.forecaster_id, score DESC
-            """), {"fids": fids}).fetchall()
+            """)).fetchall()
+            print(f"[Leaderboard] Got {len(sector_rows)} sector rows")
 
             sector_by_fid = {}
             for row in sector_rows:
@@ -123,7 +127,9 @@ def _refresh_leaderboard(db: Session) -> list | dict:
             for r in results:
                 r["sector_strengths"] = sector_by_fid.get(r["id"], [])
         except Exception as e:
+            import traceback
             print(f"[Leaderboard] Sector query error: {e}")
+            traceback.print_exc()
 
         # Batch-fetch outcome + direction counts for pie charts
         try:
