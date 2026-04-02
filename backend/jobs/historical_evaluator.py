@@ -392,23 +392,26 @@ def _fetch_history(ticker: str, start, end) -> dict:
 
     prices = {}
 
-    # 1. Tiingo historical prices (free: 1000 req/day, optimized date range + columns)
+    # 1. Tiingo — skip if rate limited (429 cached for 24 hours)
     _tiingo_key = os.getenv("TIINGO_API_KEY", "").strip()
-    if _tiingo_key:
+    if _tiingo_key and not getattr(_fetch_history, '_tiingo_blocked_until', None) or \
+       (getattr(_fetch_history, '_tiingo_blocked_until', None) and datetime.utcnow() > _fetch_history._tiingo_blocked_until):
         try:
             r = httpx.get(
                 f"https://api.tiingo.com/tiingo/daily/{ticker}/prices",
                 params={
                     "startDate": (datetime.utcnow() - timedelta(days=730)).strftime("%Y-%m-%d"),
                     "endDate": datetime.utcnow().strftime("%Y-%m-%d"),
-                    "resampleFreq": "daily",
                     "columns": "close,date",
                     "token": _tiingo_key,
                 },
                 headers={"Content-Type": "application/json"},
                 timeout=15,
             )
-            if r.status_code == 200:
+            if r.status_code == 429:
+                _fetch_history._tiingo_blocked_until = datetime.utcnow() + timedelta(hours=24)
+                print("[HistEval] Tiingo 429 — blocked for 24h, using FMP/Finnhub")
+            elif r.status_code == 200:
                 data = r.json()
                 if isinstance(data, list):
                     for day in data:

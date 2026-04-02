@@ -1317,18 +1317,6 @@ async def lifespan(app):
     print(f"[STARTUP] TIINGO_API_KEY set: {bool(_tiingo)}")
     print("[STARTUP] ════════════════════════════════════════")
 
-    # Tiingo diagnostic — confirm API works from Railway
-    if _tiingo:
-        try:
-            import httpx as _hx
-            _tr = _hx.get("https://api.tiingo.com/tiingo/daily/AAPL/prices",
-                          params={"startDate": "2024-01-01", "token": _tiingo},
-                          headers={"Content-Type": "application/json"}, timeout=10)
-            _td = _tr.json() if _tr.status_code == 200 else []
-            print(f"[TIINGO-DIAG] AAPL: HTTP {_tr.status_code}, {len(_td)} rows")
-        except Exception as _te:
-            print(f"[TIINGO-DIAG] Failed: {_te}")
-
     # NOTE: Admin promote, outcome migration, and neutral reclassification
     # all moved to _startup_init() background thread to avoid blocking healthcheck.
 
@@ -1884,7 +1872,7 @@ async def lifespan(app):
             db = BgSessionLocal()
             try:
                 from jobs.retry_no_data import retry_no_data_batch
-                retry_no_data_batch(db, max_tickers=80)
+                retry_no_data_batch(db, max_tickers=200)
             except Exception as e:
                 print(f"[retry_no_data] Error: {e}")
             finally:
