@@ -108,6 +108,18 @@ def _massive_inner(db: Session):
 
         if page == 1:
             print(f"[MassiveBZ] Page 1: {len(ratings)} ratings. Fields: {list(ratings[0].keys())}")
+            # Log URL field availability for first 5 ratings
+            url_stats = {"has_url_news": 0, "has_url_calendar": 0, "neither": 0}
+            for _r in ratings[:20]:
+                un = _r.get("url_news") or _r.get("benzinga_news_url") or ""
+                uc = _r.get("url_calendar") or _r.get("benzinga_calendar_url") or ""
+                if un and "://" in un:
+                    url_stats["has_url_news"] += 1
+                elif uc and "://" in uc:
+                    url_stats["has_url_calendar"] += 1
+                else:
+                    url_stats["neither"] += 1
+            print(f"[MassiveBZ] URL fields in first 20: {url_stats}")
 
         for rating in ratings:
             result = _process_rating(rating, db)
@@ -193,11 +205,11 @@ def _process_rating(rating: dict, db: Session) -> bool:
     if db.execute(text("SELECT 1 FROM predictions WHERE source_platform_id = :sid LIMIT 1"), {"sid": source_id}).first():
         return False
 
-    # Source URL — prefer real article URLs, reject generic quote pages
+    # Source URL — prefer real article URLs from the API
     source_url = ""
     for candidate in [url_news, url_calendar]:
-        if candidate and "/quote/" not in candidate:
-            source_url = candidate
+        if candidate and candidate.strip() and "://" in candidate and "/quote/" not in candidate:
+            source_url = candidate.strip()
             break
     if not source_url:
         source_url = f"https://www.benzinga.com/stock/{ticker.lower()}/ratings"

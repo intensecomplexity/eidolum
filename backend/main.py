@@ -1381,6 +1381,13 @@ async def lifespan(app):
         except Exception as _ue:
             print(f"[Startup] Source URL fix error: {_ue}")
 
+        # ── Bulk fix: generate real Benzinga URLs from external_id ────
+        try:
+            from jobs.enrich_urls import bulk_fix_benzinga_urls
+            bulk_fix_benzinga_urls()
+        except Exception as _bf:
+            print(f"[Startup] Bulk URL fix error: {_bf}")
+
         # ── Reclassify hold/neutral predictions ────────────────────────
         # Phase 1: Context says "Neutral —" (sentiment function got it right)
         # Phase 2: Context contains neutral rating names (Hold, Equal-Weight, etc.)

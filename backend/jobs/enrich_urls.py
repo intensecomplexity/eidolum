@@ -141,3 +141,41 @@ def _search_jina(query: str) -> str | None:
         return None
     except Exception:
         return None
+
+
+def bulk_fix_benzinga_urls():
+    """Instant fix: construct real Benzinga calendar URLs from external_id.
+    external_id stores 'bz_{benzinga_id}' — Benzinga has a direct URL format.
+    No API calls needed. Can fix thousands of URLs in seconds."""
+    from database import BgSessionLocal
+    db = BgSessionLocal()
+
+    try:
+        # Fix predictions that have external_id but generic source_url
+        fixed = db.execute(sql_text("""
+            UPDATE predictions
+            SET source_url = 'https://www.benzinga.com/analyst/ratings/' || REPLACE(external_id, 'bz_', '')
+            WHERE external_id IS NOT NULL
+              AND external_id LIKE 'bz_%'
+              AND (
+                  source_url LIKE '%/stock/%/ratings'
+                  OR source_url LIKE '%/stock/%/ratings/'
+                  OR source_url LIKE '%benzinga.com/stock/%'
+              )
+        """)).rowcount
+        db.commit()
+        print(f"[BulkURLFix] Fixed {fixed} Benzinga predictions with real calendar URLs from external_id")
+
+        # Count remaining generic URLs
+        remaining = db.execute(sql_text("""
+            SELECT COUNT(*) FROM predictions
+            WHERE source_url LIKE '%/stock/%/ratings%'
+               OR source_url LIKE '%/forecast/%'
+        """)).scalar() or 0
+        print(f"[BulkURLFix] {remaining} predictions still have generic URLs")
+
+    except Exception as e:
+        print(f"[BulkURLFix] Error: {e}")
+        db.rollback()
+    finally:
+        db.close()
