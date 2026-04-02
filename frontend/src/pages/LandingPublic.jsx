@@ -136,7 +136,7 @@ function HeroSearch() {
           placeholder="Search any analyst or ticker... (e.g., Dan Ives, AAPL)"
           className="w-full pl-12 pr-12 py-4 bg-surface border border-border rounded-xl text-lg text-text-primary placeholder:text-muted/50 focus:outline-none focus:border-accent/50 transition-colors"
         />
-        <kbd className="absolute right-4 top-1/2 -translate-y-1/2 hidden sm:inline text-xs text-muted/30 border border-border/30 rounded px-1.5 py-0.5 font-mono">/</kbd>
+        {/* '/' keyboard shortcut works but badge removed for cleaner UI */}
       </div>
 
       {/* Dropdown results */}
@@ -146,7 +146,7 @@ function HeroSearch() {
             <div>
               <div className="px-4 pt-3 pb-1 text-[10px] text-muted uppercase tracking-wider font-bold">Analysts</div>
               {analysts.map(f => (
-                <button key={f.id} onClick={() => go(`/forecaster/${f.id}`)}
+                <button key={f.id} onClick={() => go(f.slug ? `/analyst/${f.slug}` : `/forecaster/${f.id}`)}
                   className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-surface-2 transition-colors">
                   <div className="flex items-center gap-2 min-w-0">
                     <span className="text-sm font-medium text-text-primary truncate">{f.name}</span>

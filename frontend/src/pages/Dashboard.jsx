@@ -13,6 +13,7 @@ import CompanyLogo from '../components/CompanyLogo';
 import ConsensusBar from '../components/ConsensusBar';
 import PredictionBadge from '../components/PredictionBadge';
 import Footer from '../components/Footer';
+import HeroSearch from '../components/HeroSearch';
 import {
   getUserProfile, getUserPredictions, getLivePrices,
   getHomepageData, getWatchlistFeed,
@@ -112,6 +113,11 @@ export default function Dashboard() {
   return (
     <div>
       <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6">
+
+        {/* ── SEARCH BAR ─────────────────────────────────────────────────── */}
+        <div className="mb-5">
+          <HeroSearch compact />
+        </div>
 
         {/* ── PERSONAL STATS BAR ────────────────────────────────────────── */}
         {profile && (
