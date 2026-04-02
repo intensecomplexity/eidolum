@@ -1864,7 +1864,7 @@ async def lifespan(app):
             db = BgSessionLocal()
             try:
                 from jobs.retry_no_data import retry_no_data_batch
-                retry_no_data_batch(db, max_tickers=100)
+                retry_no_data_batch(db, max_tickers=200)
             except Exception as e:
                 print(f"[retry_no_data] Error: {e}")
             finally:
@@ -1877,7 +1877,7 @@ async def lifespan(app):
     scheduler.add_job(_auto_evaluate_standalone, "interval", minutes=30, id="auto_evaluate", next_run_time=_first_run + timedelta(minutes=5))
     scheduler.add_job(_refresh_stats_standalone, "interval", hours=2, id="refresh_stats", next_run_time=_first_run + timedelta(minutes=10))
     scheduler.add_job(run_sweep, "interval", hours=24, id="sweep_stuck", next_run_time=_first_run + timedelta(minutes=15))
-    scheduler.add_job(_retry_no_data_standalone, "interval", hours=2, id="retry_no_data", next_run_time=_first_run + timedelta(minutes=30))
+    scheduler.add_job(_retry_no_data_standalone, "interval", hours=1, id="retry_no_data", next_run_time=_first_run + timedelta(minutes=30))
     scheduler.add_job(run_analyst_notif, "interval", hours=1, id="analyst_notifications", next_run_time=_first_run + timedelta(minutes=25))
     scheduler.add_job(_watchdog, "interval", minutes=5, id="watchdog")
 
