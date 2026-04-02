@@ -1346,29 +1346,7 @@ async def lifespan(app):
         except Exception as _me:
             print(f"[Startup] Outcome query error: {_me}")
 
-        # ── Test FMP historical prices endpoint ─────────────────────────
-        _fmp_key = os.getenv("FMP_KEY", "").strip()
-        if _fmp_key:
-            import httpx as _test_httpx
-            for _test_url in [
-                "https://financialmodelingprep.com/stable/historical-price-full",
-                f"https://financialmodelingprep.com/api/v3/historical-price-full/AAPL",
-            ]:
-                try:
-                    _params = {"apikey": _fmp_key, "serietype": "line"}
-                    if "stable" in _test_url:
-                        _params["symbol"] = "AAPL"
-                    _r = _test_httpx.get(_test_url, params=_params, timeout=10)
-                    _data = _r.json() if _r.status_code == 200 else {}
-                    _hist = _data.get("historical", _data) if isinstance(_data, dict) else _data
-                    _count = len(_hist) if isinstance(_hist, list) else 0
-                    print(f"[Startup] FMP test: {_test_url.split('com')[1][:50]} → HTTP {_r.status_code}, {_count} price points")
-                    if _count > 0:
-                        break  # Found a working endpoint
-                except Exception as _te:
-                    print(f"[Startup] FMP test error: {_te}")
-        else:
-            print("[Startup] FMP_KEY not set — evaluator will use Finnhub only")
+        # (FMP startup diagnostic removed — was wasting API calls on every deploy)
 
         # ── Fix broken source URLs ────────────────────────────────────
         try:
@@ -1653,72 +1631,19 @@ async def lifespan(app):
         except Exception as e:
             print(f"[Startup] URL fix error: {e}")
 
-        # ── yfinance / FMP diagnostic ─────────────────────────────
+        # Check no_data backlog size — if large, skip non-evaluation FMP usage
+        _no_data_count = 0
         try:
-            print("[YF-DIAG] Starting yfinance diagnostic on AAPL...")
-            import yfinance as yf
-            import traceback as _tb
+            _nd_db = BgSessionLocal()
+            _no_data_count = _nd_db.execute(sql_text(
+                "SELECT COUNT(*) FROM predictions WHERE outcome = 'no_data'"
+            )).scalar() or 0
+            _nd_db.close()
+            print(f"[Startup] no_data predictions: {_no_data_count:,}")
+        except Exception:
+            pass
 
-            # Test 1: history(period='max')
-            try:
-                t = yf.Ticker('AAPL')
-                h = t.history(period='max')
-                print(f"[YF-DIAG] history(period='max'): {len(h)} rows, columns={list(h.columns) if len(h) > 0 else 'empty'}")
-                if len(h) > 0:
-                    print(f"[YF-DIAG]   date range: {h.index[0]} to {h.index[-1]}, last close={h['Close'].iloc[-1]:.2f}")
-            except Exception as _e1:
-                print(f"[YF-DIAG] history(period='max') FAILED: {type(_e1).__name__}: {_e1}")
-                _tb.print_exc()
-
-            # Test 2: yf.download
-            try:
-                d = yf.download('AAPL', period='1y', progress=False)
-                print(f"[YF-DIAG] download(period='1y'): {len(d)} rows")
-                if len(d) > 0:
-                    print(f"[YF-DIAG]   last close={d['Close'].iloc[-1]:.2f}")
-            except Exception as _e2:
-                print(f"[YF-DIAG] download(period='1y') FAILED: {type(_e2).__name__}: {_e2}")
-                _tb.print_exc()
-
-            # Test 3: history(period='1y')
-            try:
-                t2 = yf.Ticker('AAPL')
-                h2 = t2.history(period='1y')
-                print(f"[YF-DIAG] history(period='1y'): {len(h2)} rows")
-                if len(h2) > 0:
-                    print(f"[YF-DIAG]   last close={h2['Close'].iloc[-1]:.2f}")
-            except Exception as _e3:
-                print(f"[YF-DIAG] history(period='1y') FAILED: {type(_e3).__name__}: {_e3}")
-                _tb.print_exc()
-
-            # Test 4: FMP fallback
-            _fmp_key = os.getenv("FMP_KEY", "").strip()
-            if _fmp_key:
-                try:
-                    import httpx as _diag_httpx
-                    _fmp_r = _diag_httpx.get(
-                        "https://financialmodelingprep.com/stable/historical-price-full",
-                        params={"symbol": "AAPL", "apikey": _fmp_key, "serietype": "line"},
-                        timeout=10,
-                    )
-                    _fmp_data = _fmp_r.json()
-                    _hist = _fmp_data.get("historical", _fmp_data) if isinstance(_fmp_data, dict) else _fmp_data
-                    _count = len(_hist) if isinstance(_hist, list) else 0
-                    print(f"[YF-DIAG] FMP /stable/historical-price-full: status={_fmp_r.status_code}, {_count} rows")
-                    if isinstance(_hist, list) and _count > 0:
-                        print(f"[YF-DIAG]   first={_hist[-1] if _count > 0 else 'N/A'}, last={_hist[0]}")
-                    elif isinstance(_fmp_data, dict) and "Error" in str(_fmp_data):
-                        print(f"[YF-DIAG]   FMP error response: {str(_fmp_data)[:200]}")
-                except Exception as _e4:
-                    print(f"[YF-DIAG] FMP FAILED: {type(_e4).__name__}: {_e4}")
-            else:
-                print("[YF-DIAG] FMP_KEY not set, skipping FMP test")
-
-            print("[YF-DIAG] Diagnostic complete")
-        except Exception as _diag_err:
-            print(f"[YF-DIAG] Diagnostic error: {_diag_err}")
-
-        # Backfill ticker_sectors company names for all tickers
+        # Backfill company names (uses Finnhub, not FMP — always safe)
         try:
             from jobs.sector_lookup import backfill_company_names
             backfill_company_names()
@@ -1726,12 +1651,15 @@ async def lifespan(app):
         except Exception as e:
             print(f"[Startup] Company name backfill error: {e}")
 
-        # Backfill ticker descriptions + logos via FMP (falls back to yfinance if no key)
-        try:
-            from jobs.sector_lookup import backfill_descriptions
-            backfill_descriptions()
-        except Exception as e:
-            print(f"[Startup] Description backfill error: {e}")
+        # Description backfill — SKIP if no_data backlog exists (saves FMP budget)
+        if _no_data_count < 1000:
+            try:
+                from jobs.sector_lookup import backfill_descriptions
+                backfill_descriptions()
+            except Exception as e:
+                print(f"[Startup] Description backfill error: {e}")
+        else:
+            print(f"[Startup] Skipping description backfill — {_no_data_count:,} no_data predictions need FMP budget")
 
         # STEP 2: Catch-up evaluation — clear the backlog of overdue predictions
         try:

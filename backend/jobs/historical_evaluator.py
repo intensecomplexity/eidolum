@@ -379,7 +379,7 @@ _quote_cache: dict[str, dict] = {}
 _history_cache: dict[str, dict] = {}
 _fmp_calls_today = 0
 _fmp_calls_date = ""
-_FMP_DAILY_LIMIT = 200  # Evaluator gets 200/day, grades scraper gets 100/day
+_FMP_DAILY_LIMIT = 100  # Evaluator: 100, RetryNoData: ~20 (batched 5x=100 tickers), grades: 100
 
 
 def _fetch_history(ticker: str, start, end) -> dict:
