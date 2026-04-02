@@ -264,11 +264,11 @@ export default function Leaderboard() {
                     <table className="w-full">
                       <thead>
                         <tr className="text-left text-muted uppercase border-b border-border" style={{ fontSize: '0.72rem', letterSpacing: '0.06em', fontWeight: 500 }}>
-                          <th className="px-6 py-3 w-24">Rank</th>
-                          <th className="px-6 py-3">Forecaster</th>
-                          <th className="px-6 py-3 text-right">Accuracy</th>
-                          <th className="px-6 py-3 text-center hidden lg:table-cell">Direction</th>
-                          <th className="px-6 py-3 text-right">
+                          <th className="px-3 py-3 w-16">Rank</th>
+                          <th className="px-3 py-3">Forecaster</th>
+                          <th className="px-3 py-3 text-right">Accuracy</th>
+                          <th className="px-3 py-3 text-center hidden 2xl:table-cell">Direction</th>
+                          <th className="px-3 py-3 text-right">
                             <div className="relative inline-block" ref={metricRef}>
                               <button
                                 onClick={(e) => { e.stopPropagation(); setMetricOpen(!metricOpen); }}
@@ -294,10 +294,10 @@ export default function Leaderboard() {
                               )}
                             </div>
                           </th>
-                          <th className="px-6 py-3 text-right">Predictions</th>
-                          <th className="px-6 py-3 text-center hidden md:table-cell">Streak</th>
-                          <th className="px-6 py-3 hidden xl:table-cell">Sector Strengths</th>
-                          <th className="px-6 py-3 text-center hidden lg:table-cell">Follow</th>
+                          <th className="px-3 py-3 text-right">Predictions</th>
+                          <th className="px-3 py-3 text-center hidden md:table-cell w-16">Streak</th>
+                          <th className="px-3 py-3 hidden xl:table-cell max-w-[200px]">Sectors</th>
+                          <th className="px-2 py-3 text-center hidden lg:table-cell w-12"></th>
                         </tr>
                       </thead>
                       <tbody key={metric}>
@@ -305,15 +305,12 @@ export default function Leaderboard() {
                           <React.Fragment key={f.id}>
                           <tr className="border-b border-border/50 hover:bg-surface-2/50 transition-colors cursor-pointer"
                             style={{ animation: `leaderboardFadeIn 0.3s ease-out ${idx * 0.02}s both` }}>
-                            <td className="px-6 py-4"><RankBadge rank={f.rank} movement={f.rank_movement} /></td>
-                            <td className="px-6 py-4">
+                            <td className="px-3 py-4"><RankBadge rank={f.rank} movement={f.rank_movement} /></td>
+                            <td className="px-3 py-4">
                               <Link to={`/forecaster/${f.id}`} className="hover:text-accent transition-colors">
                                 <div className="flex items-center gap-2">
                                   <span style={{ fontWeight: 500, fontSize: '0.95rem' }}>{f.name}</span>
                                   <PlatformBadge platform={f.platform} />
-                                  {f.has_disclosed_positions && (
-                                    <span className="text-warning text-xs" title="Has disclosed positions">💼</span>
-                                  )}
                                 </div>
                                 {f.firm ? (
                                   <div className="text-muted text-xs">{f.firm}</div>
@@ -322,7 +319,7 @@ export default function Leaderboard() {
                                 )}
                               </Link>
                             </td>
-                            <td className="px-6 py-4 text-right">
+                            <td className="px-3 py-4 text-right">
                               <div className="flex items-center justify-end gap-2">
                                 {f.total_predictions > 0 && (
                                   <div className="hidden lg:block cursor-pointer hover:opacity-80 transition-opacity"
@@ -341,7 +338,7 @@ export default function Leaderboard() {
                                 </span>
                               </div>
                             </td>
-                            <td className="px-6 py-4 text-center hidden lg:table-cell">
+                            <td className="px-3 py-4 text-center hidden 2xl:table-cell">
                               {(f.bullish_count > 0 || f.bearish_count > 0 || f.neutral_count > 0) && (
                                 <div className="cursor-pointer hover:opacity-80 transition-opacity inline-block"
                                   onClick={(e) => { e.preventDefault(); e.stopPropagation(); setExpandedId(expandedId === f.id ? null : f.id); }}>
@@ -352,26 +349,26 @@ export default function Leaderboard() {
                                 </div>
                               )}
                             </td>
-                            <td className="px-6 py-4 text-right">
+                            <td className="px-3 py-4 text-right">
                               {(() => {
                                 if (f.total_predictions === 0) return <span className="font-mono text-muted">—</span>;
                                 const mv = getMetricValue(f, metric);
                                 return <span className={`font-mono ${metric === 'hit_rate' ? 'text-text-secondary' : mv.positive ? 'text-positive' : 'text-negative'}`}>{mv.text}</span>;
                               })()}
                             </td>
-                            <td className="px-6 py-4 text-right">
-                              <div className="font-mono text-text-secondary">{f.evaluated_predictions} scored</div>
+                            <td className="px-3 py-4 text-right">
+                              <div className="font-mono text-text-secondary text-sm">{f.evaluated_predictions}</div>
                               <div className="text-muted text-[10px] font-mono">{f.total_predictions} total</div>
                             </td>
-                            <td className="px-6 py-4 text-center hidden md:table-cell"><StreakBadge streak={f.streak} /></td>
-                            <td className="px-6 py-4 hidden xl:table-cell">
-                              <div className="flex gap-2 flex-wrap">
+                            <td className="px-3 py-4 text-center hidden md:table-cell"><StreakBadge streak={f.streak} /></td>
+                            <td className="px-3 py-4 hidden xl:table-cell max-w-[200px]">
+                              <div className="flex gap-1.5 flex-wrap">
                                 {f.sector_strengths.slice(0, 2).map((s) => (
                                   <SectorBadge key={s.sector} sector={s.sector} accuracy={s.accuracy} count={s.count} />
                                 ))}
                               </div>
                             </td>
-                            <td className="px-6 py-4 text-center hidden lg:table-cell">
+                            <td className="px-2 py-4 text-center hidden lg:table-cell">
                               <FollowButton forecaster={f} compact />
                             </td>
                           </tr>
