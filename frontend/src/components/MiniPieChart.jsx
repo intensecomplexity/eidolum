@@ -1,5 +1,5 @@
 /**
- * Pure SVG pie chart. Two modes:
+ * MiniPieChart — Pure SVG pie chart. Two modes:
  *
  * OUTCOME MODE (default): hit/near/miss/pending breakdown
  *  - hits, nears, misses, pending (or correct/incorrect for backward compat)
@@ -89,7 +89,7 @@ export default function MiniPieChart({
           strokeDashoffset={-((seg.offset / 100) * circumference)}
           transform={`rotate(-90 ${cx} ${cy})`} strokeLinecap="butt" />
       ))}
-      {showCenter && size >= 80 && (
+      {showCenter && size >= 56 && (
         <text x={cx} y={cy} textAnchor="middle" dominantBaseline="central"
           fill="#e0e0e0" fontSize="7" fontFamily="monospace" fontWeight="bold">
           {centerText}
