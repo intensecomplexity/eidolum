@@ -148,7 +148,9 @@ export default function Navbar() {
 
               {/* User dropdown (desktop) */}
               {isAuthenticated ? (
-                <div className="relative hidden sm:block" ref={dropdownRef}>
+                <div className="relative hidden sm:block" ref={dropdownRef}
+                  onMouseEnter={() => { clearTimeout(dropdownRef._hoverTimer); setUserDropdown(true); }}
+                  onMouseLeave={() => { dropdownRef._hoverTimer = setTimeout(() => setUserDropdown(false), 200); }}>
                   <button onClick={() => setUserDropdown(!userDropdown)}
                     className="flex items-center gap-1.5 px-2 py-1.5 rounded-lg hover:bg-surface-2 transition-colors min-h-[36px]">
                     <div className="w-7 h-7 rounded-full bg-accent/15 flex items-center justify-center text-[11px] font-mono font-bold text-accent">
@@ -159,7 +161,7 @@ export default function Navbar() {
 
                   {/* Dropdown */}
                   {userDropdown && (
-                    <div className="absolute right-0 top-full mt-2 w-64 bg-surface border border-border rounded-xl shadow-lg overflow-hidden z-[60] feed-item-enter">
+                    <div className="absolute right-0 top-full mt-2 w-64 bg-surface border border-border rounded-xl shadow-lg z-[60] feed-item-enter max-h-[calc(100vh-80px)] overflow-y-auto">
                       {/* Mini profile header — clickable */}
                       <Link to="/profile" onClick={() => setUserDropdown(false)} className="block px-4 py-3 border-b border-border bg-surface-2/50 hover:bg-surface-2 transition-colors">
                         <div className="flex items-center gap-2.5">
@@ -188,7 +190,7 @@ export default function Navbar() {
                         )}
                       </div>
 
-                      <div className="border-t border-border py-1">
+                      <div className="border-t border-border pt-1 pb-2">
                         <button onClick={() => { setUserDropdown(false); logout(); navigate('/'); }}
                           className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-negative hover:bg-surface-2 transition-colors text-left min-h-[40px]">
                           <LogOut className="w-4 h-4" /> Log out
