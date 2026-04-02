@@ -10,6 +10,7 @@ import CompanyLogo from '../components/CompanyLogo';
 import Footer from '../components/Footer';
 import TickerDiscussionSection from '../components/TickerDiscussionSection';
 import { ExplainerLine } from '../utils/predictionExplainer';
+import ScoringBreakdown from '../components/ScoringBreakdown';
 import { annotateContext } from '../utils/predictionExplainer';
 import { formatTimeRemaining } from '../utils/timeRemaining';
 import { getTickerDetail } from '../api';
@@ -533,6 +534,9 @@ function PredictionItem({ p, showOutcome = false }) {
               </p>
             </div>
           )}
+
+          {/* Scoring breakdown */}
+          {isScored && <ScoringBreakdown prediction={p} />}
 
           {/* Source link */}
           {p.source_url && (
