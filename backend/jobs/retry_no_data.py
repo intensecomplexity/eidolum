@@ -1,13 +1,14 @@
 """
-Retry no_data predictions using Tiingo historical prices.
-Tiingo free tier: 1,000 requests/day, 2GB bandwidth/day.
+Retry no_data predictions using Polygon (recent) + Tiingo (historical).
 
-BANDWIDTH OPTIMIZATION: instead of fetching full history from 2011,
-calculates the exact date range needed per ticker (earliest prediction
-to latest evaluation + padding). Also requests only close+date columns.
-This cuts bandwidth ~90% vs full OHLC history.
+Polygon Stocks Basic (free): 5 calls/min, no daily limit, 2 years of data.
+Tiingo (free): 1,000 calls/day, 30+ years of data.
 
-Runs every hour, processes 40 tickers per run.
+Strategy:
+- Predictions with eval_date after April 2024 → Polygon (faster, unlimited)
+- Predictions with eval_date before April 2024 → Tiingo (limited, deep history)
+- Process Polygon tickers first, then Tiingo tickers
+- Group by ticker, fetch once per ticker, score all predictions from cache
 """
 import os
 import time
@@ -17,68 +18,73 @@ from sqlalchemy import text as sql_text
 
 from jobs.historical_evaluator import _get_tolerance, _TOLERANCE, _MIN_MOVEMENT, _build_summary
 
+POLYGON_KEY = os.getenv("MASSIVE_API_KEY", "").strip()
 TIINGO_KEY = os.getenv("TIINGO_API_KEY", "").strip()
+
+# Polygon: 2 years of data cutoff
+POLYGON_CUTOFF = datetime(2024, 4, 1)
 
 _price_cache: dict[str, dict] = {}
 
-# Daily tracking
-_tiingo_symbols_today: set[str] = set()
-_tiingo_day: str = ""
-TIINGO_DAILY_SYMBOL_LIMIT = 950  # Leave 50 buffer for other uses
+# Tiingo daily tracking (1,000/day limit)
+_tiingo_calls_today = 0
+_tiingo_day = ""
+TIINGO_DAILY_LIMIT = 950
 
 
-def _check_daily_limit(ticker: str) -> bool:
-    global _tiingo_symbols_today, _tiingo_day
+def _reset_tiingo_counter():
+    global _tiingo_calls_today, _tiingo_day
     today = datetime.utcnow().strftime("%Y-%m-%d")
     if _tiingo_day != today:
-        _tiingo_symbols_today = set()
+        _tiingo_calls_today = 0
         _tiingo_day = today
-    if ticker in _tiingo_symbols_today:
-        return True
-    return len(_tiingo_symbols_today) < TIINGO_DAILY_SYMBOL_LIMIT
 
 
-def _date_range_for_ticker(preds: list) -> tuple[str, str]:
-    """Calculate the minimal date range needed for a ticker's predictions.
-    Returns (start_date, end_date) as YYYY-MM-DD strings."""
-    dates = []
-    for p in preds:
-        if p["prediction_date"]:
-            d = p["prediction_date"]
-            dates.append(d.date() if hasattr(d, 'date') else d)
-        if p["evaluation_date"]:
-            d = p["evaluation_date"]
-            dates.append(d.date() if hasattr(d, 'date') else d)
-
-    if not dates:
-        # Fallback: last 2 years
-        end = datetime.utcnow().date()
-        start = end - timedelta(days=730)
-        return str(start), str(end)
-
-    earliest = min(dates)
-    latest = max(dates)
-    # Add 30 days padding on each side for closest-price lookups
-    start = earliest - timedelta(days=30)
-    end = latest + timedelta(days=30)
-    # Cap end at today
-    today = datetime.utcnow().date()
-    if end > today:
-        end = today
-
-    return str(start), str(end)
-
-
-def _fetch_tiingo_history(ticker: str, start_date: str, end_date: str) -> dict:
-    """Fetch price history from Tiingo for a specific date range.
-    Only requests close+date columns to minimize bandwidth."""
+def _fetch_polygon(ticker: str, start_date: str, end_date: str) -> dict:
+    """Fetch daily prices from Polygon. Rate: 5/min (12s between calls)."""
     if ticker in _price_cache:
         return _price_cache[ticker]
+    if not POLYGON_KEY:
+        return {}
 
+    import httpx
+    try:
+        r = httpx.get(
+            f"https://api.polygon.io/v2/aggs/ticker/{ticker}/range/1/day/{start_date}/{end_date}",
+            params={"adjusted": "true", "sort": "asc", "apiKey": POLYGON_KEY},
+            timeout=15,
+        )
+        if r.status_code != 200:
+            _price_cache[ticker] = {}
+            return {}
+
+        data = r.json()
+        results = data.get("results") or []
+        prices = {}
+        for bar in results:
+            ts_ms = bar.get("t")
+            close = bar.get("c")
+            if ts_ms and close and float(close) > 0:
+                ds = datetime.utcfromtimestamp(ts_ms / 1000).strftime("%Y-%m-%d")
+                prices[ds] = float(close)
+
+        _price_cache[ticker] = prices
+        return prices
+    except Exception as e:
+        _price_cache[ticker] = {}
+        return {}
+
+
+def _fetch_tiingo(ticker: str, start_date: str, end_date: str) -> dict:
+    """Fetch daily prices from Tiingo. Limit: 950 unique tickers/day."""
+    global _tiingo_calls_today
+    if ticker in _price_cache:
+        return _price_cache[ticker]
     if not TIINGO_KEY:
         return {}
 
-    if not _check_daily_limit(ticker):
+    _reset_tiingo_counter()
+    if _tiingo_calls_today >= TIINGO_DAILY_LIMIT:
         return {}
 
     import httpx
@@ -86,15 +92,14 @@ def _fetch_tiingo_history(ticker: str, start_date: str, end_date: str) -> dict:
         r = httpx.get(
             f"https://api.tiingo.com/tiingo/daily/{ticker}/prices",
             params={
-                "startDate": start_date,
-                "endDate": end_date,
-                "resampleFreq": "daily",
-                "columns": "close,date",
-                "token": TIINGO_KEY,
+                "startDate": start_date, "endDate": end_date,
+                "columns": "close,date", "token": TIINGO_KEY,
             },
             headers={"Content-Type": "application/json"},
             timeout=15,
         )
+        _tiingo_calls_today += 1
+
         if r.status_code != 200:
             _price_cache[ticker] = {}
             return {}
@@ -112,11 +117,8 @@ def _fetch_tiingo_history(ticker: str, start_date: str, end_date: str) -> dict:
                 prices[ds] = float(close)
 
         _price_cache[ticker] = prices
-        _tiingo_symbols_today.add(ticker)
         return prices
-    except Exception as e:
-        if len(_tiingo_symbols_today) < 5:
-            print(f"[RetryNoData] Tiingo error for {ticker}: {e}")
+    except Exception:
         _price_cache[ticker] = {}
         return {}
 
@@ -130,20 +132,83 @@ def _closest_price(prices: dict, target_date) -> float | None:
         return prices[ts]
     for offset in range(1, 6):
         for d in [target - timedelta(days=offset), target + timedelta(days=offset)]:
-            ds = str(d)
-            if ds in prices:
-                return prices[ds]
+            if str(d) in prices:
+                return prices[str(d)]
     return None
 
 
-def retry_no_data_batch(db, max_tickers: int = 40):
-    """Re-evaluate no_data predictions using Tiingo with minimal date ranges."""
-    _price_cache.clear()
-    now = datetime.utcnow()
+def _date_range(preds: list) -> tuple[str, str]:
+    """Minimal date range for a ticker's predictions (30 day padding)."""
+    dates = []
+    for p in preds:
+        if p["prediction_date"]:
+            d = p["prediction_date"]
+            dates.append(d.date() if hasattr(d, 'date') else d)
+        if p["evaluation_date"]:
+            d = p["evaluation_date"]
+            dates.append(d.date() if hasattr(d, 'date') else d)
+    if not dates:
+        end = datetime.utcnow().date()
+        return str(end - timedelta(days=730)), str(end)
+    start = min(dates) - timedelta(days=30)
+    end = min(max(dates) + timedelta(days=30), datetime.utcnow().date())
+    return str(start), str(end)
 
-    if not TIINGO_KEY:
-        print("[RetryNoData] TIINGO_API_KEY not set, cannot retry")
-        return {"scored": 0, "remaining": 0}
+
+def _score_predictions(preds: list, prices: dict, now: datetime) -> list:
+    """Score predictions against price data. Returns list of update dicts."""
+    updates = []
+    for p in preds:
+        eval_price = _closest_price(prices, p["evaluation_date"])
+        if eval_price is None:
+            continue
+
+        ref = p["entry_price"]
+        if not ref or ref <= 0:
+            ref = _closest_price(prices, p["prediction_date"])
+            if not ref or ref <= 0:
+                continue
+
+        target = p["target_price"]
+        direction = p["direction"]
+        if target and target > 0 and ref > 0:
+            if target > ref:
+                direction = "bullish"
+            elif target < ref:
+                direction = "bearish"
+
+        raw_move = round(((eval_price - ref) / ref) * 100, 2)
+        ret = -raw_move if direction == "bearish" else raw_move
+
+        window = p.get("window_days") or 90
+        tolerance = _get_tolerance(window, _TOLERANCE)
+        min_movement = _get_tolerance(window, _MIN_MOVEMENT)
+
+        if direction == "neutral":
+            abs_ret = abs(raw_move)
+            outcome = "hit" if abs_ret <= 5.0 else "near" if abs_ret <= 10.0 else "miss"
+        elif target and target > 0:
+            target_dist_pct = abs(eval_price - target) / target * 100
+            if direction == "bullish":
+                outcome = "hit" if (eval_price >= target or target_dist_pct <= tolerance) else "near" if raw_move >= min_movement else "miss"
+            else:
+                outcome = "hit" if (eval_price <= target or target_dist_pct <= tolerance) else "near" if raw_move <= -min_movement else "miss"
+        else:
+            outcome = "hit" if (eval_price > ref if direction == "bullish" else eval_price < ref) else "miss"
+
+        summary = _build_summary(p["ticker"], direction, outcome, ref, eval_price, target, ret)
+        updates.append({
+            "id": p["id"], "outcome": outcome, "ret": ret, "ep": ref,
+            "direction": direction, "summary": summary, "fid": p["forecaster_id"],
+        })
+    return updates
+
+
+def retry_no_data_batch(db, max_tickers: int = 80):
+    """Re-evaluate no_data predictions. Polygon for recent, Tiingo for old."""
+    _price_cache.clear()
+    _reset_tiingo_counter()
+    now = datetime.utcnow()
 
     rows = db.execute(sql_text("""
         SELECT p.id, p.ticker, p.direction, p.target_price, p.entry_price,
@@ -162,6 +227,7 @@ def retry_no_data_batch(db, max_tickers: int = 40):
         print("[RetryNoData] No no_data predictions to retry")
         return {"scored": 0, "remaining": 0}
 
+    # Group by ticker
     ticker_preds = defaultdict(list)
     for r in rows:
         ticker_preds[r[1]].append({
@@ -172,79 +238,40 @@ def retry_no_data_batch(db, max_tickers: int = 40):
             "forecaster_id": r[7], "window_days": r[8],
         })
 
-    tickers = list(ticker_preds.keys())[:max_tickers]
-    total_tickers = len(ticker_preds)
+    # Split tickers into Polygon (recent) vs Tiingo (old)
+    polygon_tickers = []
+    tiingo_tickers = []
+    for ticker, preds in ticker_preds.items():
+        # If ANY prediction has eval_date within Polygon's range, use Polygon
+        latest_eval = max((p["evaluation_date"] for p in preds if p["evaluation_date"]), default=None)
+        if latest_eval and latest_eval >= POLYGON_CUTOFF:
+            polygon_tickers.append(ticker)
+        else:
+            tiingo_tickers.append(ticker)
 
-    print(f"[RetryNoData] {remaining_total:,} no_data across {total_tickers} tickers. "
-          f"Processing {len(tickers)} tickers. Daily symbols: {len(_tiingo_symbols_today)}/{TIINGO_DAILY_SYMBOL_LIMIT}")
+    # Limit totals
+    polygon_batch = polygon_tickers[:max_tickers]
+    tiingo_remaining = max(0, max_tickers - len(polygon_batch))
+    tiingo_batch = tiingo_tickers[:tiingo_remaining]
+
+    print(f"[RetryNoData] {remaining_total:,} no_data across {len(ticker_preds)} tickers. "
+          f"This run: {len(polygon_batch)} Polygon + {len(tiingo_batch)} Tiingo. "
+          f"Tiingo budget: {_tiingo_calls_today}/{TIINGO_DAILY_LIMIT}")
 
     total_scored = 0
     total_still_no_data = 0
+    polygon_scored = 0
+    tiingo_scored = 0
     affected_forecasters = set()
-    api_calls = 0
 
-    for i, ticker in enumerate(tickers):
+    # ── Phase 1: Polygon (recent, 5 calls/min = 12s between calls) ──
+    for i, ticker in enumerate(polygon_batch):
         preds = ticker_preds[ticker]
+        start_date, end_date = _date_range(preds)
+        prices = _fetch_polygon(ticker, start_date, end_date)
 
-        # Calculate minimal date range for this ticker's predictions
-        start_date, end_date = _date_range_for_ticker(preds)
-        prices = _fetch_tiingo_history(ticker, start_date, end_date)
-        api_calls += 1
-
-        if prices and api_calls <= 3:
-            print(f"[RetryNoData] {ticker}: {len(prices)} prices ({start_date} to {end_date}), {len(preds)} predictions")
-
-        updates = []
-
-        for p in preds:
-            eval_price = _closest_price(prices, p["evaluation_date"])
-            if eval_price is None:
-                total_still_no_data += 1
-                continue
-
-            ref = p["entry_price"]
-            if not ref or ref <= 0:
-                ref = _closest_price(prices, p["prediction_date"])
-                if not ref or ref <= 0:
-                    total_still_no_data += 1
-                    continue
-
-            target = p["target_price"]
-            direction = p["direction"]
-            if target and target > 0 and ref > 0:
-                if target > ref:
-                    direction = "bullish"
-                elif target < ref:
-                    direction = "bearish"
-
-            raw_move = round(((eval_price - ref) / ref) * 100, 2)
-            ret = -raw_move if direction == "bearish" else raw_move
-
-            window = p.get("window_days") or 90
-            tolerance = _get_tolerance(window, _TOLERANCE)
-            min_movement = _get_tolerance(window, _MIN_MOVEMENT)
-
-            if direction == "neutral":
-                abs_ret = abs(raw_move)
-                outcome = "hit" if abs_ret <= 5.0 else "near" if abs_ret <= 10.0 else "miss"
-            elif target and target > 0:
-                target_dist_pct = abs(eval_price - target) / target * 100
-                if direction == "bullish":
-                    outcome = "hit" if (eval_price >= target or target_dist_pct <= tolerance) else "near" if raw_move >= min_movement else "miss"
-                else:
-                    outcome = "hit" if (eval_price <= target or target_dist_pct <= tolerance) else "near" if raw_move <= -min_movement else "miss"
-            else:
-                if direction == "bullish":
-                    outcome = "hit" if eval_price > ref else "miss"
-                else:
-                    outcome = "hit" if eval_price < ref else "miss"
-
-            summary = _build_summary(p["ticker"], direction, outcome, ref, eval_price, target, ret)
-            updates.append({
-                "id": p["id"], "outcome": outcome, "ret": ret, "ep": ref,
-                "direction": direction, "summary": summary, "fid": p["forecaster_id"],
-            })
-            affected_forecasters.add(p["forecaster_id"])
+        updates = _score_predictions(preds, prices, now)
+        total_still_no_data += len(preds) - len(updates)
 
         if updates:
             for u in updates:
@@ -252,20 +279,54 @@ def retry_no_data_batch(db, max_tickers: int = 40):
                     UPDATE predictions SET outcome=:o, actual_return=:r, direction=:d,
                     entry_price=COALESCE(entry_price,:ep), evaluation_summary=:s,
                     evaluated_at=:now WHERE id=:id
-                """), {
-                    "o": u["outcome"], "r": u["ret"], "d": u["direction"],
-                    "ep": u["ep"], "s": u["summary"], "now": now, "id": u["id"],
-                })
+                """), {"o": u["outcome"], "r": u["ret"], "d": u["direction"],
+                       "ep": u["ep"], "s": u["summary"], "now": now, "id": u["id"]})
+            polygon_scored += len(updates)
             total_scored += len(updates)
+            for u in updates:
+                affected_forecasters.add(u["fid"])
 
-        if (i + 1) % 20 == 0:
+        if (i + 1) % 5 == 0:
             db.commit()
-            print(f"[RetryNoData] {i + 1}/{len(tickers)} tickers, {total_scored} re-scored, {api_calls} Tiingo calls")
 
-        time.sleep(0.3)
+        time.sleep(12)  # Polygon: 5 calls/min
 
     db.commit()
 
+    # ── Phase 2: Tiingo (old predictions, 950/day limit) ──
+    for i, ticker in enumerate(tiingo_batch):
+        if _tiingo_calls_today >= TIINGO_DAILY_LIMIT:
+            print(f"[RetryNoData] Tiingo daily limit reached at ticker {i}/{len(tiingo_batch)}")
+            break
+
+        preds = ticker_preds[ticker]
+        start_date, end_date = _date_range(preds)
+        prices = _fetch_tiingo(ticker, start_date, end_date)
+
+        updates = _score_predictions(preds, prices, now)
+        total_still_no_data += len(preds) - len(updates)
+
+        if updates:
+            for u in updates:
+                db.execute(sql_text("""
+                    UPDATE predictions SET outcome=:o, actual_return=:r, direction=:d,
+                    entry_price=COALESCE(entry_price,:ep), evaluation_summary=:s,
+                    evaluated_at=:now WHERE id=:id
+                """), {"o": u["outcome"], "r": u["ret"], "d": u["direction"],
+                       "ep": u["ep"], "s": u["summary"], "now": now, "id": u["id"]})
+            tiingo_scored += len(updates)
+            total_scored += len(updates)
+            for u in updates:
+                affected_forecasters.add(u["fid"])
+
+        if (i + 1) % 10 == 0:
+            db.commit()
+
+        time.sleep(0.5)  # Tiingo: generous limit
+
+    db.commit()
+
+    # Update forecaster stats
     if affected_forecasters:
         from utils import recalculate_forecaster_stats
         for fid in affected_forecasters:
@@ -275,6 +336,7 @@ def retry_no_data_batch(db, max_tickers: int = 40):
                 pass
 
     remaining = remaining_total - total_scored
-    print(f"[RetryNoData] DONE: {total_scored} re-scored, {total_still_no_data} still no data, "
-          f"~{max(remaining, 0):,} remaining. {api_calls} Tiingo calls.")
-    return {"scored": total_scored, "still_no_data": total_still_no_data, "remaining": max(remaining, 0)}
+    print(f"[RetryNoData] DONE: {total_scored} scored (Polygon:{polygon_scored} + Tiingo:{tiingo_scored}), "
+          f"{total_still_no_data} still no data, ~{max(remaining, 0):,} remaining. "
+          f"Tiingo today: {_tiingo_calls_today}/{TIINGO_DAILY_LIMIT}")
+    return {"scored": total_scored, "polygon": polygon_scored, "tiingo": tiingo_scored, "remaining": max(remaining, 0)}

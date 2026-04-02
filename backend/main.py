@@ -1878,7 +1878,7 @@ async def lifespan(app):
             db = BgSessionLocal()
             try:
                 from jobs.retry_no_data import retry_no_data_batch
-                retry_no_data_batch(db, max_tickers=40)
+                retry_no_data_batch(db, max_tickers=80)
             except Exception as e:
                 print(f"[retry_no_data] Error: {e}")
             finally:
