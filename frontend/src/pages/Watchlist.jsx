@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowRight, Eye, Clock, Users } from 'lucide-react';
+import timeLeft from '../utils/timeLeft';
 import Footer from '../components/Footer';
 import PredictionCard from '../components/PredictionCard';
 import { getForecaster, getAssetConsensus, getPendingPredictions, getActivityFeed } from '../api';
@@ -178,7 +179,7 @@ export default function Watchlist() {
                 </h2>
                 <div className="space-y-2">
                   {pendingData.map(p => {
-                    const daysLeft = p.days_remaining;
+                    const tl = timeLeft(p.evaluation_date || p.expires_at || p.days_remaining);
                     return (
                       <div key={p.id} className="card p-3 sm:p-4">
                         <div className="flex items-center justify-between mb-2">
@@ -192,7 +193,7 @@ export default function Watchlist() {
                               {p.direction === 'bullish' ? 'BULL' : 'BEAR'}
                             </span>
                           </div>
-                          <span className="text-warning text-xs font-mono">{daysLeft}d left</span>
+                          <span className={`text-xs font-mono ${tl.expired ? 'text-muted' : 'text-warning'}`}>{tl.text}</span>
                         </div>
                         <div className="w-full h-1.5 bg-surface-2 rounded-full overflow-hidden">
                           <div

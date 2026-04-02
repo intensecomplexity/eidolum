@@ -5,6 +5,7 @@ import { useAuth } from '../context/AuthContext';
 import TickerLink from '../components/TickerLink';
 import Footer from '../components/Footer';
 import { getActivityRecentCalls, getActivityScoredCalls, getActivityExpiring, getActivityFriendsCalls } from '../api';
+import timeLeft from '../utils/timeLeft';
 
 const TABS = [
   { key: 'all', label: 'All' },
@@ -107,8 +108,7 @@ function ScoredCard({ item }) {
 }
 
 function ExpiringCard({ item }) {
-  const days = item.days_remaining;
-  const urgencyClass = days != null && days < 30 ? 'text-negative' : days != null && days < 90 ? 'text-warning' : 'text-text-secondary';
+  const tl = timeLeft(item.evaluation_date || item.days_remaining);
 
   return (
     <div className={`card border-l-4 ${borderColor(item)} py-3 px-4`}>
@@ -120,8 +120,8 @@ function ExpiringCard({ item }) {
             {item.forecaster_name}
           </Link>
         </div>
-        <span className={`text-xs font-mono flex-shrink-0 font-semibold ${urgencyClass}`}>
-          {days != null ? `${days}d left` : '?'}
+        <span className={`text-xs font-mono flex-shrink-0 font-semibold ${tl.expired ? 'text-muted' : tl.urgent ? 'text-negative' : 'text-text-secondary'}`}>
+          {tl.text}
         </span>
       </div>
       <div className="flex items-center gap-2 mt-1.5">

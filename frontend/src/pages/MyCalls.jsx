@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { Crosshair, Clock, Check, X, Lock, Trash2 } from 'lucide-react';
+import timeLeft from '../utils/timeLeft';
 import { useAuth } from '../context/AuthContext';
 import Footer from '../components/Footer';
 import TickerLink from '../components/TickerLink';
@@ -244,8 +245,7 @@ function PredictionCard({ p, onDelete }) {
 
       <div className="flex items-center justify-between mt-3 text-xs text-muted">
         <span>{new Date(p.created_at).toLocaleDateString()}</span>
-        {remaining !== null && remaining > 0 && <span className="font-mono text-warning">{remaining}d left</span>}
-        {remaining === 0 && p.outcome === 'pending' && <span className="font-mono text-accent">Evaluating...</span>}
+        {(() => { const tl = timeLeft(p.expires_at || remaining); return tl.expired ? <span className="font-mono text-muted">Evaluating</span> : remaining > 0 ? <span className={`font-mono ${tl.urgent ? 'text-warning' : 'text-muted'}`}>{tl.text}</span> : null; })()}
       </div>
       <ReactionBar predictionId={p.id} source="user" isOwn={true} outcome={p.outcome} />
       <CommentSection predictionId={p.id} source="user" />
@@ -275,7 +275,7 @@ function PredictionRow({ p, onDelete }) {
       <td className="px-6 py-4 text-center">
         <span className="font-mono text-xs text-muted">
           {p.evaluation_window_days}d
-          {remaining !== null && remaining > 0 && <span className="text-warning ml-1">({remaining}d left)</span>}
+          {(() => { const tl = timeLeft(p.expires_at || remaining); return !tl.expired && remaining > 0 ? <span className={`ml-1 ${tl.urgent ? 'text-warning' : 'text-muted'}`}>({tl.text})</span> : null; })()}
         </span>
       </td>
       <td className="px-6 py-4 text-center"><OutcomeBadge outcome={p.outcome} /></td>

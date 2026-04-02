@@ -18,6 +18,7 @@ import {
   getHomepageData, getWatchlistFeed,
 } from '../api';
 import formatRoundNumber from '../utils/formatNumber';
+import timeLeft from '../utils/timeLeft';
 
 // ── Time ago helper ─────────────────────────────────────────────────────────
 function timeAgo(dateStr) {
@@ -334,9 +335,14 @@ export default function Dashboard() {
                         {p.pnl_percentage >= 0 ? '+' : ''}{p.pnl_percentage.toFixed(1)}%
                       </span>
                     )}
-                    <span className={`font-mono text-[10px] ${p.days_remaining <= 1 ? 'text-warning font-bold' : 'text-muted'}`}>
-                      <Clock className="w-3 h-3 inline mr-0.5" />{p.days_remaining}d
-                    </span>
+                    {(() => {
+                      const tl = timeLeft(p.expires_at || p.days_remaining);
+                      return (
+                        <span className={`font-mono text-[10px] ${tl.expired ? 'text-muted' : tl.urgent ? 'text-warning font-bold' : 'text-muted'}`}>
+                          <Clock className="w-3 h-3 inline mr-0.5" />{tl.text}
+                        </span>
+                      );
+                    })()}
                   </div>
                 </Link>
               ))}
