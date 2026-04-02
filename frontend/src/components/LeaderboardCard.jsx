@@ -19,54 +19,64 @@ function getMetricValue(f, metricKey) {
   return { text: `${f.correct_predictions}/${f.total_predictions}`, positive: true, label: 'hit rate' };
 }
 
-function PiePopover({ children, title, legend, onClose }) {
+function PieExpanded({ title, onClose, children }) {
   const ref = useRef(null);
   useEffect(() => {
     function handle(e) { if (ref.current && !ref.current.contains(e.target)) onClose(); }
     document.addEventListener('mousedown', handle);
-    return () => document.removeEventListener('mousedown', handle);
+    document.addEventListener('touchstart', handle);
+    return () => { document.removeEventListener('mousedown', handle); document.removeEventListener('touchstart', handle); };
   }, [onClose]);
 
   return (
-    <div ref={ref} className="absolute z-50 bg-surface border border-border rounded-xl shadow-lg p-4 feed-item-enter"
-      style={{ top: '100%', left: '50%', transform: 'translateX(-50%)', marginTop: 4, minWidth: 220 }}
-      onClick={e => e.preventDefault()}>
-      <div className="text-[10px] text-muted uppercase tracking-wider mb-2 font-semibold">{title}</div>
-      <div className="flex items-center gap-3">
+    <div className="fixed inset-0 z-[70] flex items-center justify-center bg-bg/50 backdrop-blur-sm"
+      onClick={e => { e.preventDefault(); e.stopPropagation(); onClose(); }}>
+      <div ref={ref} className="bg-surface border border-border rounded-xl shadow-lg p-5 max-w-xs w-full feed-item-enter"
+        onClick={e => { e.preventDefault(); e.stopPropagation(); }}>
+        <div className="text-xs text-muted uppercase tracking-wider mb-3 font-semibold">{title}</div>
         {children}
-        <div className="space-y-1">{legend}</div>
       </div>
     </div>
   );
 }
 
-function LegendRow({ color, label, count, pct }) {
-  return (
-    <div className="flex items-center gap-1.5 text-[10px]">
-      <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: color }} />
-      <span className="text-text-secondary">{count} {label} ({pct}%)</span>
-    </div>
-  );
-}
-
 export default function LeaderboardCard({ forecaster: f, metric = 'avg_return' }) {
-  const [showOutcome, setShowOutcome] = useState(false);
-  const [showDirection, setShowDirection] = useState(false);
+  const [expandedPie, setExpandedPie] = useState(null); // 'outcome' | 'direction' | null
 
-  const hasOutcome = (f.hits || 0) + (f.nears || 0) + (f.misses || 0) + (f.pending_count || 0) > 0;
-  const hasDirection = (f.bullish_count || 0) + (f.bearish_count || 0) + (f.neutral_count || 0) > 0;
+  // Outcome data — use hits/nears/misses if available, fall back to correct/incorrect
+  const hits = f.hits || 0;
+  const nears = f.nears || 0;
+  const misses = f.misses || 0;
+  const pendingCount = f.pending_count || 0;
+  const hasOutcomeData = hits + nears + misses + pendingCount > 0;
 
-  const outcomeTotal = (f.hits || 0) + (f.nears || 0) + (f.misses || 0) + (f.pending_count || 0);
-  const dirTotal = (f.bullish_count || 0) + (f.bearish_count || 0) + (f.neutral_count || 0);
+  // Fallback: use correct/incorrect from cached forecaster stats
+  const fallbackCorrect = f.correct_predictions || 0;
+  const fallbackIncorrect = Math.max(0, (f.evaluated_predictions || f.total_predictions || 0) - fallbackCorrect);
+  const useOutcomeFallback = !hasOutcomeData && (fallbackCorrect + fallbackIncorrect) > 0;
 
+  // Direction data
+  const bullish = f.bullish_count || 0;
+  const bearish = f.bearish_count || 0;
+  const neutral = f.neutral_count || 0;
+  const hasDirection = bullish + bearish + neutral > 0;
+
+  const outcomeTotal = hasOutcomeData ? hits + nears + misses + pendingCount : fallbackCorrect + fallbackIncorrect;
+  const dirTotal = bullish + bearish + neutral;
   const pct = (n, t) => t > 0 ? Math.round(n / t * 100) : 0;
+
+  function handlePieClick(which, e) {
+    e.preventDefault();
+    e.stopPropagation();
+    setExpandedPie(expandedPie === which ? null : which);
+  }
 
   return (
     <Link
       to={`/forecaster/${f.id}`}
       className="block bg-surface border border-border rounded-xl p-4 active:bg-surface-2 transition-colors"
     >
-      {/* Top row: rank + name + platform */}
+      {/* Top row */}
       <div className="flex items-start justify-between mb-3">
         <div className="flex items-center gap-2.5">
           <RankBadge rank={f.rank} movement={f.rank_movement} />
@@ -94,19 +104,12 @@ export default function LeaderboardCard({ forecaster: f, metric = 'avg_return' }
           {/* Accuracy + outcome pie */}
           <div>
             <div className="flex items-center gap-1.5">
-              {hasOutcome && (
-                <div className="relative" onClick={e => { e.preventDefault(); e.stopPropagation(); setShowOutcome(!showOutcome); setShowDirection(false); }}>
-                  <MiniPieChart hits={f.hits || 0} nears={f.nears || 0} misses={f.misses || 0} pending={f.pending_count || 0} size={28} />
-                  {showOutcome && (
-                    <PiePopover title="Outcome Breakdown" onClose={() => setShowOutcome(false)}>
-                      <MiniPieChart hits={f.hits || 0} nears={f.nears || 0} misses={f.misses || 0} pending={f.pending_count || 0} size={80} showCenter />
-                      <>
-                        {f.hits > 0 && <LegendRow color="#34d399" label="Hits" count={f.hits} pct={pct(f.hits, outcomeTotal)} />}
-                        {f.nears > 0 && <LegendRow color="#fbbf24" label="Nears" count={f.nears} pct={pct(f.nears, outcomeTotal)} />}
-                        {f.misses > 0 && <LegendRow color="#f87171" label="Misses" count={f.misses} pct={pct(f.misses, outcomeTotal)} />}
-                        {f.pending_count > 0 && <LegendRow color="#4b5563" label="Pending" count={f.pending_count} pct={pct(f.pending_count, outcomeTotal)} />}
-                      </>
-                    </PiePopover>
+              {(hasOutcomeData || useOutcomeFallback) && (
+                <div className="cursor-pointer" onClick={e => handlePieClick('outcome', e)}>
+                  {hasOutcomeData ? (
+                    <MiniPieChart hits={hits} nears={nears} misses={misses} pending={pendingCount} size={32} />
+                  ) : (
+                    <MiniPieChart correct={fallbackCorrect} incorrect={fallbackIncorrect} size={32} />
                   )}
                 </div>
               )}
@@ -120,24 +123,14 @@ export default function LeaderboardCard({ forecaster: f, metric = 'avg_return' }
           {/* Direction pie */}
           {hasDirection && (
             <div>
-              <div className="relative" onClick={e => { e.preventDefault(); e.stopPropagation(); setShowDirection(!showDirection); setShowOutcome(false); }}>
-                <MiniPieChart bullish={f.bullish_count || 0} bearish={f.bearish_count || 0} neutral={f.neutral_count || 0} size={28} />
-                {showDirection && (
-                  <PiePopover title="Direction Breakdown" onClose={() => setShowDirection(false)}>
-                    <MiniPieChart bullish={f.bullish_count || 0} bearish={f.bearish_count || 0} neutral={f.neutral_count || 0} size={80} showCenter />
-                    <>
-                      {f.bullish_count > 0 && <LegendRow color="#34d399" label="Bullish" count={f.bullish_count} pct={pct(f.bullish_count, dirTotal)} />}
-                      {f.neutral_count > 0 && <LegendRow color="#fbbf24" label="Hold" count={f.neutral_count} pct={pct(f.neutral_count, dirTotal)} />}
-                      {f.bearish_count > 0 && <LegendRow color="#f87171" label="Bearish" count={f.bearish_count} pct={pct(f.bearish_count, dirTotal)} />}
-                    </>
-                  </PiePopover>
-                )}
+              <div className="cursor-pointer" onClick={e => handlePieClick('direction', e)}>
+                <MiniPieChart bullish={bullish} bearish={bearish} neutral={neutral} size={32} />
               </div>
               <div className="text-muted text-[11px]">direction</div>
             </div>
           )}
 
-          {/* Secondary metric */}
+          {/* Metric */}
           <div>
             {(() => {
               const mv = getMetricValue(f, metric);
@@ -155,7 +148,7 @@ export default function LeaderboardCard({ forecaster: f, metric = 'avg_return' }
             <div className="font-mono text-[15px] font-semibold text-text-secondary leading-tight mt-1.5">
               {f.evaluated_predictions} scored
             </div>
-            <div className="text-muted text-[11px]">{f.total_predictions} total</div>
+            <div className="text-muted text-[11px]">{outcomeTotal} total</div>
           </div>
         </div>
         <StreakBadge streak={f.streak} />
@@ -177,6 +170,73 @@ export default function LeaderboardCard({ forecaster: f, metric = 'avg_return' }
             );
           })}
         </div>
+      )}
+
+      {/* Expanded pie modal (renders as fixed overlay, not clipped by card) */}
+      {expandedPie === 'outcome' && (
+        <PieExpanded title={`${f.name} — Outcome Breakdown`} onClose={() => setExpandedPie(null)}>
+          <div className="flex items-start gap-4">
+            {hasOutcomeData ? (
+              <MiniPieChart hits={hits} nears={nears} misses={misses} pending={pendingCount} size={100} showCenter />
+            ) : (
+              <MiniPieChart correct={fallbackCorrect} incorrect={fallbackIncorrect} size={100} showCenter />
+            )}
+            <div className="space-y-1.5 pt-2">
+              {(hasOutcomeData ? hits : fallbackCorrect) > 0 && (
+                <div className="flex items-center gap-2 text-xs">
+                  <span className="w-2.5 h-2.5 rounded-full bg-[#34d399]" />
+                  <span className="text-text-secondary">{hasOutcomeData ? hits : fallbackCorrect} Hits ({pct(hasOutcomeData ? hits : fallbackCorrect, outcomeTotal)}%)</span>
+                </div>
+              )}
+              {nears > 0 && (
+                <div className="flex items-center gap-2 text-xs">
+                  <span className="w-2.5 h-2.5 rounded-full bg-[#fbbf24]" />
+                  <span className="text-text-secondary">{nears} Nears ({pct(nears, outcomeTotal)}%)</span>
+                </div>
+              )}
+              {(hasOutcomeData ? misses : fallbackIncorrect) > 0 && (
+                <div className="flex items-center gap-2 text-xs">
+                  <span className="w-2.5 h-2.5 rounded-full bg-[#f87171]" />
+                  <span className="text-text-secondary">{hasOutcomeData ? misses : fallbackIncorrect} Misses ({pct(hasOutcomeData ? misses : fallbackIncorrect, outcomeTotal)}%)</span>
+                </div>
+              )}
+              {pendingCount > 0 && (
+                <div className="flex items-center gap-2 text-xs">
+                  <span className="w-2.5 h-2.5 rounded-full bg-[#4b5563]" />
+                  <span className="text-text-secondary">{pendingCount} Pending ({pct(pendingCount, outcomeTotal)}%)</span>
+                </div>
+              )}
+            </div>
+          </div>
+        </PieExpanded>
+      )}
+
+      {expandedPie === 'direction' && hasDirection && (
+        <PieExpanded title={`${f.name} — Direction Breakdown`} onClose={() => setExpandedPie(null)}>
+          <div className="flex items-start gap-4">
+            <MiniPieChart bullish={bullish} bearish={bearish} neutral={neutral} size={100} showCenter />
+            <div className="space-y-1.5 pt-2">
+              {bullish > 0 && (
+                <div className="flex items-center gap-2 text-xs">
+                  <span className="w-2.5 h-2.5 rounded-full bg-[#34d399]" />
+                  <span className="text-text-secondary">{bullish} Bullish ({pct(bullish, dirTotal)}%)</span>
+                </div>
+              )}
+              {neutral > 0 && (
+                <div className="flex items-center gap-2 text-xs">
+                  <span className="w-2.5 h-2.5 rounded-full bg-[#fbbf24]" />
+                  <span className="text-text-secondary">{neutral} Hold ({pct(neutral, dirTotal)}%)</span>
+                </div>
+              )}
+              {bearish > 0 && (
+                <div className="flex items-center gap-2 text-xs">
+                  <span className="w-2.5 h-2.5 rounded-full bg-[#f87171]" />
+                  <span className="text-text-secondary">{bearish} Bearish ({pct(bearish, dirTotal)}%)</span>
+                </div>
+              )}
+            </div>
+          </div>
+        </PieExpanded>
       )}
     </Link>
   );
