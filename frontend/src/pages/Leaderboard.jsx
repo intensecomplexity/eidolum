@@ -267,7 +267,6 @@ export default function Leaderboard() {
                           <th className="px-3 py-3 w-16">Rank</th>
                           <th className="px-3 py-3">Forecaster</th>
                           <th className="px-3 py-3 text-right">Accuracy</th>
-                          <th className="px-3 py-3 text-center hidden 2xl:table-cell">Direction</th>
                           <th className="px-3 py-3 text-right">
                             <div className="relative inline-block" ref={metricRef}>
                               <button
@@ -320,34 +319,29 @@ export default function Leaderboard() {
                               </Link>
                             </td>
                             <td className="px-3 py-4 text-right">
-                              <div className="flex items-center justify-end gap-2">
+                              <div className="flex items-center justify-end gap-1.5">
                                 {f.total_predictions > 0 && (
-                                  <div className="hidden lg:block cursor-pointer hover:opacity-80 transition-opacity"
+                                  <div className="hidden lg:flex items-center gap-1 cursor-pointer hover:opacity-80 transition-opacity"
                                     onClick={(e) => { e.preventDefault(); e.stopPropagation(); setExpandedId(expandedId === f.id ? null : f.id); }}>
                                     <MiniPieChart
                                       hits={f.hits || 0} nears={f.nears || 0} misses={f.misses || 0}
                                       pending={f.pending_count || 0}
                                       correct={f.correct_predictions || 0}
                                       incorrect={Math.max(0, (f.total_predictions || 0) - (f.correct_predictions || 0))}
-                                      size={28}
+                                      size={24}
                                     />
+                                    {(f.bullish_count > 0 || f.bearish_count > 0 || f.neutral_count > 0) && (
+                                      <MiniPieChart
+                                        bullish={f.bullish_count || 0} bearish={f.bearish_count || 0}
+                                        neutral={f.neutral_count || 0} size={24}
+                                      />
+                                    )}
                                   </div>
                                 )}
                                 <span className={`font-mono font-medium ${f.total_predictions === 0 ? 'text-muted' : f.accuracy_rate >= 60 ? 'text-positive' : 'text-negative'}`} style={{ letterSpacing: '-0.01em' }}>
                                   {f.total_predictions === 0 ? '—' : `${f.accuracy_rate.toFixed(1)}%`}
                                 </span>
                               </div>
-                            </td>
-                            <td className="px-3 py-4 text-center hidden 2xl:table-cell">
-                              {(f.bullish_count > 0 || f.bearish_count > 0 || f.neutral_count > 0) && (
-                                <div className="cursor-pointer hover:opacity-80 transition-opacity inline-block"
-                                  onClick={(e) => { e.preventDefault(); e.stopPropagation(); setExpandedId(expandedId === f.id ? null : f.id); }}>
-                                  <MiniPieChart
-                                    bullish={f.bullish_count || 0} bearish={f.bearish_count || 0}
-                                    neutral={f.neutral_count || 0} size={28}
-                                  />
-                                </div>
-                              )}
                             </td>
                             <td className="px-3 py-4 text-right">
                               {(() => {
