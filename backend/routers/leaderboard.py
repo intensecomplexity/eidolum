@@ -114,7 +114,7 @@ def _refresh_leaderboard(db: Session) -> list | dict:
 
             sector_by_fid = {}
             for row in sector_rows:
-                fid = row[0]
+                fid = int(row[0])  # Ensure int key
                 if fid not in sector_by_fid:
                     sector_by_fid[fid] = []
                 if len(sector_by_fid[fid]) < 3:
@@ -124,8 +124,17 @@ def _refresh_leaderboard(db: Session) -> list | dict:
                         "count": row[2],
                     })
 
+            # Debug: check for ID type mismatch
+            if sector_by_fid and results:
+                sb_keys = list(sector_by_fid.keys())[:3]
+                r_ids = [r["id"] for r in results[:3]]
+                print(f"[Leaderboard] sector_by_fid keys (type={type(sb_keys[0]).__name__}): {sb_keys}")
+                print(f"[Leaderboard] result ids (type={type(r_ids[0]).__name__}): {r_ids}")
+                matched = sum(1 for r in results if int(r["id"]) in sector_by_fid)
+                print(f"[Leaderboard] Matched {matched}/{len(results)} forecasters with sector data")
+
             for r in results:
-                r["sector_strengths"] = sector_by_fid.get(r["id"], [])
+                r["sector_strengths"] = sector_by_fid.get(int(r["id"]), [])
         except Exception as e:
             import traceback
             print(f"[Leaderboard] Sector query error: {e}")
