@@ -466,6 +466,10 @@ export function getUpcomingEarnings() {
   return api.get('/earnings/upcoming').then(r => r.data);
 }
 
+export function isEarningsEnabled() {
+  return api.get('/earnings/enabled').then(r => r.data);
+}
+
 export function getTickerEarnings(symbol) {
   return api.get(`/earnings/ticker/${symbol}`).then(r => r.data);
 }
