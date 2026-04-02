@@ -1,13 +1,22 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Home, BarChart3, Zap, Crosshair, User, Search } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { getDailyChallengeStatus } from '../api';
 
 export default function BottomNav() {
   const location = useLocation();
   const navigate = useNavigate();
   const { isAuthenticated } = useAuth();
   const [showSearch, setShowSearch] = useState(false);
+  const [challengeDot, setChallengeDot] = useState(false);
+
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    getDailyChallengeStatus()
+      .then(d => { if (d.enabled && !d.entered) setChallengeDot(true); else setChallengeDot(false); })
+      .catch(() => {});
+  }, [isAuthenticated, location.pathname]);
   const [search, setSearch] = useState('');
 
   function handleSearch(e) {
@@ -44,8 +53,10 @@ export default function BottomNav() {
           <Link to="/leaderboard" className={`flex flex-col items-center justify-center gap-0.5 w-full h-full active:bg-surface-2 transition-colors ${isActive('/leaderboard') ? 'text-accent' : 'text-muted'}`}>
             <BarChart3 className="w-5 h-5" /><span className="text-[10px] font-medium whitespace-nowrap">Leaders</span>
           </Link>
-          <Link to="/activity" className={`flex flex-col items-center justify-center gap-0.5 w-full h-full active:bg-surface-2 transition-colors ${isActive('/activity') ? 'text-accent' : 'text-muted'}`}>
-            <Zap className="w-5 h-5" /><span className="text-[10px] font-medium whitespace-nowrap">Activity</span>
+          <Link to="/activity" className={`relative flex flex-col items-center justify-center gap-0.5 w-full h-full active:bg-surface-2 transition-colors ${isActive('/activity') ? 'text-accent' : 'text-muted'}`}>
+            <Zap className="w-5 h-5" />
+            {challengeDot && <span className="absolute top-2 right-[calc(50%-2px)] w-2 h-2 rounded-full bg-accent" />}
+            <span className="text-[10px] font-medium whitespace-nowrap">Activity</span>
           </Link>
           {isAuthenticated ? (
             <Link to="/submit" className={`flex flex-col items-center justify-center gap-0.5 w-full h-full active:bg-surface-2 transition-colors ${isActive('/submit') ? 'text-accent' : 'text-muted'}`}>
