@@ -1635,22 +1635,97 @@ async def lifespan(app):
         except Exception as e:
             print(f"[Startup] Season init error: {e}")
 
-        # One-time: fix generic benzinga.com/quote/ URLs to benzinga.com/stock/TICKER/ratings
+        # Diagnostic + fix for generic source URLs
         try:
             _fix_db = BgSessionLocal()
-            fixed = _fix_db.execute(sql_text("""
+
+            # Diagnostic: what URL patterns exist?
+            url_patterns = _fix_db.execute(sql_text("""
+                SELECT
+                    CASE
+                        WHEN source_url LIKE '%%/stock/%%/ratings%%' THEN '/stock/*/ratings'
+                        WHEN source_url LIKE '%%/quote/%%' THEN '/quote/*'
+                        WHEN source_url LIKE '%%/forecast/%%' THEN '/forecast/*'
+                        WHEN source_url LIKE '%%/stable/grades%%' THEN '/stable/grades'
+                        WHEN source_url LIKE '%%benzinga.com/analyst/%%' THEN 'benzinga/analyst/*'
+                        WHEN source_url LIKE '%%benzinga.com/news/%%' THEN 'benzinga/news/*'
+                        ELSE 'other'
+                    END as pattern,
+                    COUNT(*) as cnt
+                FROM predictions
+                GROUP BY pattern
+                ORDER BY cnt DESC
+            """)).fetchall()
+            print("[URL-DIAG] Source URL patterns:")
+            for p in url_patterns:
+                print(f"  {p[0]}: {p[1]:,}")
+
+            # Diagnostic: what does external_id look like?
+            eid_samples = _fix_db.execute(sql_text("""
+                SELECT external_id, source_platform_id, source_url, ticker
+                FROM predictions
+                WHERE external_id IS NOT NULL
+                LIMIT 5
+            """)).fetchall()
+            print("[URL-DIAG] External ID samples:")
+            for s in eid_samples:
+                print(f"  eid={s[0]}, spid={s[1]}, url={s[2][:60]}..., ticker={s[3]}")
+
+            eid_count = _fix_db.execute(sql_text(
+                "SELECT COUNT(*) FROM predictions WHERE external_id IS NOT NULL AND external_id LIKE 'bz_%%'"
+            )).scalar() or 0
+            print(f"[URL-DIAG] Predictions with bz_ external_id: {eid_count:,}")
+
+            spid_count = _fix_db.execute(sql_text(
+                "SELECT COUNT(*) FROM predictions WHERE source_platform_id IS NOT NULL AND source_platform_id LIKE 'mbz_%%'"
+            )).scalar() or 0
+            print(f"[URL-DIAG] Predictions with mbz_ source_platform_id: {spid_count:,}")
+
+            # Fix 1: generic /stock/*/ratings URLs where we have bz_ external_id
+            if eid_count > 0:
+                fixed1 = _fix_db.execute(sql_text("""
+                    UPDATE predictions
+                    SET source_url = 'https://www.benzinga.com/analyst/ratings/' || REPLACE(external_id, 'bz_', '')
+                    WHERE external_id IS NOT NULL
+                      AND external_id LIKE 'bz_%%'
+                      AND source_url LIKE '%%/stock/%%/ratings%%'
+                """)).rowcount
+                _fix_db.commit()
+                print(f"[URL-FIX] Fixed {fixed1} URLs using bz_ external_id")
+
+            # Fix 2: generic /stock/*/ratings URLs where we have mbz_ source_platform_id with benzinga_id
+            fixed2 = _fix_db.execute(sql_text("""
                 UPDATE predictions
-                SET source_url = 'https://www.benzinga.com/stock/' || LOWER(ticker) || '/ratings',
-                    archive_url = 'https://www.benzinga.com/stock/' || LOWER(ticker) || '/ratings'
-                WHERE source_url LIKE '%benzinga.com/quote/%'
-                   OR source_url LIKE '%benzinga.com/stock/%/analyst-ratings'
+                SET source_url = 'https://www.benzinga.com/analyst/ratings/' || REPLACE(REPLACE(source_platform_id, 'mbz_', ''), 'fmp_g_', '')
+                WHERE source_url LIKE '%%/stock/%%/ratings%%'
+                  AND source_platform_id IS NOT NULL
+                  AND (source_platform_id LIKE 'mbz_%%' AND LENGTH(source_platform_id) < 20)
             """)).rowcount
             _fix_db.commit()
+            print(f"[URL-FIX] Fixed {fixed2} URLs using mbz_ source_platform_id")
+
+            # Fix 3: remaining /quote/ URLs
+            fixed3 = _fix_db.execute(sql_text("""
+                UPDATE predictions
+                SET source_url = 'https://www.benzinga.com/stock/' || LOWER(ticker) || '/ratings'
+                WHERE source_url LIKE '%%benzinga.com/quote/%%'
+            """)).rowcount
+            _fix_db.commit()
+            print(f"[URL-FIX] Fixed {fixed3} /quote/ URLs")
+
+            # Count remaining generic
+            remaining = _fix_db.execute(sql_text("""
+                SELECT COUNT(*) FROM predictions
+                WHERE source_url LIKE '%%/stock/%%/ratings%%'
+                   OR source_url LIKE '%%/forecast/%%'
+                   OR source_url LIKE '%%/stable/grades%%'
+            """)).scalar() or 0
+            print(f"[URL-FIX] {remaining:,} predictions still have generic URLs")
+
             _fix_db.close()
-            if fixed > 0:
-                print(f"[Startup] Fixed {fixed} generic Benzinga quote URLs")
         except Exception as e:
             print(f"[Startup] URL fix error: {e}")
+            import traceback; traceback.print_exc()
 
         # Check no_data backlog size — if large, skip non-evaluation FMP usage
         _no_data_count = 0
