@@ -1806,10 +1806,22 @@ async def lifespan(app):
 
     # JOB 4: FMP per-ticker grades — runs independently (no global lock)
     def _fmp_grades_standalone():
-        """FMP grades has zero data conflict with other jobs — no lock needed."""
+        """FMP grades — SKIPPED when no_data backlog > 1000 to save FMP budget for RetryNoData."""
         from datetime import datetime as _dt
         from admin_panel import scheduler_last_run
         scheduler_last_run["fmp_grades"] = _dt.utcnow()
+
+        # Check no_data backlog — if large, skip grades to save FMP budget
+        try:
+            _chk_db = BgSessionLocal()
+            _nd = _chk_db.execute(sql_text("SELECT COUNT(*) FROM predictions WHERE outcome = 'no_data'")).scalar() or 0
+            _chk_db.close()
+            if _nd > 1000:
+                print(f"[fmp_grades] SKIPPED — {_nd:,} no_data predictions need FMP budget. Grades will resume after backlog clears.")
+                return
+        except Exception:
+            pass
+
         if not db_is_healthy("fmp_grades"):
             return
         if not db_storage_ok("fmp_grades"):
@@ -1852,7 +1864,7 @@ async def lifespan(app):
             db = BgSessionLocal()
             try:
                 from jobs.retry_no_data import retry_no_data_batch
-                retry_no_data_batch(db, max_tickers=200)
+                retry_no_data_batch(db, max_tickers=100)
             except Exception as e:
                 print(f"[retry_no_data] Error: {e}")
             finally:
