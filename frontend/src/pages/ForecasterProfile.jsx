@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { ExternalLink, ArrowLeft } from 'lucide-react';
+import useSEO from '../hooks/useSEO';
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 import PredictionBadge from '../components/PredictionBadge';
 import ConflictBadge from '../components/ConflictBadge';
@@ -99,6 +100,12 @@ export default function ForecasterProfile() {
 
   const chartData = data.accuracy_over_time || [];
   const platformLabel = { youtube: 'YouTube', reddit: 'Reddit', x: 'X' }[data.platform] || 'Profile';
+
+  useSEO({
+    title: `${data.name} Accuracy — ${data.accuracy_rate?.toFixed(1)}% on ${data.total_predictions || 0} predictions | Eidolum`,
+    description: `${data.name}${data.firm ? ` at ${data.firm}` : ''} has ${data.accuracy_rate?.toFixed(1)}% accuracy across ${data.total_predictions || 0} tracked predictions. Verified against real market data.`,
+    url: `https://www.eidolum.com/forecaster/${id}`,
+  });
 
   const displayedPredictions = data.predictions || [];
 

@@ -6,6 +6,7 @@ import CompanyLogo from '../components/CompanyLogo';
 import TickerLink from '../components/TickerLink';
 import Footer from '../components/Footer';
 import { getAllConsensus } from '../api';
+import useSEO from '../hooks/useSEO';
 
 const SECTORS = [
   'All Sectors', 'Technology', 'Healthcare', 'Financial Services', 'Energy',
@@ -27,6 +28,12 @@ const TABS = [
 ];
 
 export default function Consensus() {
+  useSEO({
+    title: 'Stock Consensus — Bull vs Bear Analyst Ratings | Eidolum',
+    description: 'See what Wall Street analysts think about every stock. Bull/bear/hold consensus based on tracked predictions, verified against real market data.',
+    url: 'https://www.eidolum.com/consensus',
+  });
+
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [sector, setSector] = useState('All Sectors');

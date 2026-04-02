@@ -2051,6 +2051,67 @@ def health():
     return {"status": "ok", "app": "Eidolum API"}
 
 
+# ── SEO: sitemap.xml + robots.txt ──────────────────────────────────────────
+import time as _seo_time
+from fastapi.responses import Response as _RawResponse
+
+_sitemap_cache = None
+_sitemap_cache_time = 0
+_SITEMAP_TTL = 86400  # 24 hours
+
+
+@app.get("/sitemap.xml")
+def sitemap_xml():
+    global _sitemap_cache, _sitemap_cache_time
+    if _sitemap_cache and (_seo_time.time() - _sitemap_cache_time) < _SITEMAP_TTL:
+        return _RawResponse(content=_sitemap_cache, media_type="application/xml")
+
+    from database import SessionLocal
+    from sqlalchemy import text as _st
+    db = SessionLocal()
+    try:
+        today = datetime.utcnow().strftime("%Y-%m-%d")
+        urls = []
+
+        # Static pages
+        for path, priority in [("/", "1.0"), ("/leaderboard", "0.9"), ("/consensus", "0.8"),
+                                ("/activity", "0.7"), ("/discover", "0.7"), ("/compare", "0.6"),
+                                ("/how-it-works", "0.5")]:
+            urls.append(f"  <url><loc>https://www.eidolum.com{path}</loc><lastmod>{today}</lastmod><priority>{priority}</priority></url>")
+
+        # Forecaster profiles (10+ evaluated)
+        rows = db.execute(_st(
+            "SELECT id FROM forecasters WHERE COALESCE(total_predictions, 0) >= 10 AND COALESCE(accuracy_score, 0) > 0 ORDER BY total_predictions DESC LIMIT 5000"
+        )).fetchall()
+        for r in rows:
+            urls.append(f"  <url><loc>https://www.eidolum.com/forecaster/{r[0]}</loc><lastmod>{today}</lastmod><priority>0.8</priority></url>")
+
+        # Top tickers
+        ticker_rows = db.execute(_st(
+            "SELECT DISTINCT ticker FROM predictions WHERE ticker IS NOT NULL ORDER BY ticker LIMIT 2000"
+        )).fetchall()
+        for r in ticker_rows:
+            urls.append(f"  <url><loc>https://www.eidolum.com/asset/{r[0]}</loc><lastmod>{today}</lastmod><priority>0.6</priority></url>")
+
+    except Exception:
+        urls = []
+    finally:
+        db.close()
+
+    xml = '<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n' + "\n".join(urls) + "\n</urlset>"
+    _sitemap_cache = xml
+    _sitemap_cache_time = _seo_time.time()
+    return _RawResponse(content=xml, media_type="application/xml")
+
+
+@app.get("/robots.txt")
+def robots_txt():
+    return _RawResponse(
+        content="User-agent: *\nAllow: /\nSitemap: https://www.eidolum.com/sitemap.xml\n",
+        media_type="text/plain",
+    )
+
+
 @app.get("/api/health/infra")
 def health_infra():
     """Infrastructure health check — DB connectivity, connection pools, circuit breaker.

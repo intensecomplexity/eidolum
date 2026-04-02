@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { ChevronDown, Filter, Trophy, Flame, Clock } from 'lucide-react';
+import useSEO from '../hooks/useSEO';
 import Footer from '../components/Footer';
 import MiniPieChart from '../components/MiniPieChart';
 import PlatformBadge from '../components/PlatformBadge';
@@ -70,6 +71,12 @@ export default function Leaderboard() {
   const [expandedId, setExpandedId] = useState(null);
   const metricRef = useRef(null);
   const [timeframe, setTimeframe] = useState('all');
+
+  useSEO({
+    title: 'Analyst Leaderboard — Top Forecasters Ranked by Accuracy | Eidolum',
+    description: 'See which Wall Street analysts, YouTubers, and Reddit investors have the best prediction track records. Ranked by verified accuracy, not follower count.',
+    url: 'https://www.eidolum.com/leaderboard',
+  });
 
   function handleTabClick(key) {
     setActiveTab(key);

@@ -1,5 +1,6 @@
 import { useEffect, useState, useRef } from 'react';
 import { Link } from 'react-router-dom';
+import useSEO from '../hooks/useSEO';
 import { ArrowRight, ChevronDown, TrendingUp, TrendingDown, Satellite, Clock, BarChart3, Trophy, Briefcase, Target, Mail, Check } from 'lucide-react';
 import EidolumLogo from '../components/EidolumLogo';
 import RankNumber from '../components/RankNumber';
@@ -75,6 +76,12 @@ function timeAgo(dateStr) {
 }
 
 export default function LandingPublic() {
+  useSEO({
+    title: 'Eidolum — Who Should You Actually Listen To? Analyst Prediction Tracker',
+    description: 'Track predictions from Wall Street analysts, YouTubers, and Reddit investors. See who was actually right. Ranked by verified accuracy, not follower count.',
+    url: 'https://www.eidolum.com',
+  });
+
   const [top5, setTop5] = useState([]);
   const [stats, setStats] = useState(null);
   const [trending, setTrending] = useState([]);

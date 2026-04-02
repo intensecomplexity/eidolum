@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { TrendingUp, TrendingDown, Trophy, ArrowLeft, Check, X, BarChart3, Users, MessageSquare, ChevronDown, Clock, Target, Calendar, Minus } from 'lucide-react';
+import useSEO from '../hooks/useSEO';
 import PredictionBadge from '../components/PredictionBadge';
 import ConsensusBar from '../components/ConsensusBar';
 import StockChart from '../components/StockChart';
@@ -70,6 +71,12 @@ export default function TickerDetail() {
   const cc = data.current_consensus || {};
   const hist = data.historical || {};
   const stats = data.stats || {};
+
+  useSEO({
+    title: `${ticker}${data.company_name ? ` — ${data.company_name}` : ''} Analyst Predictions & Consensus | Eidolum`,
+    description: `${data.total_predictions || 0} analyst predictions tracked for ${ticker}${data.company_name ? ` (${data.company_name})` : ''}. ${hist.accuracy > 0 ? `Historical accuracy: ${hist.accuracy}%. ` : ''}See bull/bear consensus and top forecasters.`,
+    url: `https://www.eidolum.com/asset/${ticker}`,
+  });
   const pending = data.pending_predictions || [];
   const scored = data.recent_evaluated || [];
 
