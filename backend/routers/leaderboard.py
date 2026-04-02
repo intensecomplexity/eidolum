@@ -24,10 +24,7 @@ def _refresh_leaderboard(db: Session) -> list | dict:
     """Compute the full leaderboard. Falls back to lower thresholds if empty."""
     global _last_forecaster_count
 
-    try:
-        db.execute(sql_text("SET statement_timeout = '5000'"))
-    except Exception:
-        pass
+    # No manual statement_timeout — rely on RequestTimeoutMiddleware (8s)
 
     # Try descending thresholds so the leaderboard is NEVER empty without explanation
     for min_preds in [10, 5, 3, 1]:
@@ -82,6 +79,8 @@ def _refresh_leaderboard(db: Session) -> list | dict:
             "conflict_count": 0, "conflict_rate": 0,
             "verified_predictions": r[8] or 0,
             "sector_strengths": [],
+            "hits": 0, "nears": 0, "misses": 0, "pending_count": 0,
+            "bullish_count": 0, "bearish_count": 0, "neutral_count": 0,
         })
 
     # Detect count drop — possible stats sync issue
