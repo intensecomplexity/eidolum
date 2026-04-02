@@ -315,7 +315,16 @@ export default function ForecasterProfile() {
                 <ResponsiveContainer width="100%" height={220}>
                   <LineChart data={chartData} margin={{ top: 5, right: 5, bottom: 5, left: 0 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
-                    <XAxis dataKey="prediction_number" tick={{ fill: '#64748b', fontSize: 10 }} stroke="rgba(255,255,255,0.08)" tickLine={false} />
+                    <XAxis dataKey="prediction_number" tick={{ fill: '#64748b', fontSize: 10 }} stroke="rgba(255,255,255,0.08)" tickLine={false}
+                      ticks={(() => {
+                        const last = chartData[chartData.length - 1]?.prediction_number || 1;
+                        if (last <= 12) return undefined;
+                        const step = Math.ceil(last / 10);
+                        const t = [1];
+                        for (let i = step; i < last; i += step) t.push(i);
+                        if (t[t.length - 1] !== last) t.push(last);
+                        return t;
+                      })()} />
                     <YAxis domain={[0, 100]} tick={{ fill: '#64748b', fontSize: 10 }} stroke="rgba(255,255,255,0.08)" tickLine={false} axisLine={false} tickFormatter={(v) => `${v}%`} width={40} />
                     <Tooltip content={({ active, payload }) => {
                       if (!active || !payload?.length) return null;

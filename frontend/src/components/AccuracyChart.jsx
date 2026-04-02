@@ -45,7 +45,16 @@ export default function AccuracyChart({ data = [], onMonthClick }) {
         <ResponsiveContainer width="100%" height={220}>
           <LineChart data={data} margin={{ top: 5, right: 5, bottom: 5, left: 0 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
-            <XAxis dataKey="prediction_number" tick={{ fill: '#6b7280', fontSize: 10 }} axisLine={{ stroke: 'rgba(255,255,255,0.08)' }} tickLine={false} />
+            <XAxis dataKey="prediction_number" tick={{ fill: '#6b7280', fontSize: 10 }} axisLine={{ stroke: 'rgba(255,255,255,0.08)' }} tickLine={false}
+              ticks={(() => {
+                const last = data[data.length - 1]?.prediction_number || 1;
+                if (last <= 12) return undefined;
+                const step = Math.ceil(last / 10);
+                const t = [1];
+                for (let i = step; i < last; i += step) t.push(i);
+                if (t[t.length - 1] !== last) t.push(last);
+                return t;
+              })()} />
             <YAxis domain={[0, 100]} tick={{ fill: '#6b7280', fontSize: 10 }} axisLine={false} tickLine={false} tickFormatter={v => `${v}%`} />
             <Tooltip content={({ active, payload }) => {
               if (!active || !payload?.length) return null;
