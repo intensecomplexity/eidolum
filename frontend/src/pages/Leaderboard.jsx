@@ -266,6 +266,7 @@ export default function Leaderboard() {
                           <th className="px-6 py-3 w-24">Rank</th>
                           <th className="px-6 py-3">Forecaster</th>
                           <th className="px-6 py-3 text-right">Accuracy</th>
+                          <th className="px-6 py-3 text-center hidden lg:table-cell">Direction</th>
                           <th className="px-6 py-3 text-right">
                             <div className="relative inline-block" ref={metricRef}>
                               <button
@@ -322,30 +323,31 @@ export default function Leaderboard() {
                             <td className="px-6 py-4 text-right">
                               <div className="flex items-center justify-end gap-2">
                                 {f.total_predictions > 0 && (
-                                  <div className="hidden lg:flex items-center gap-1.5">
-                                    <MiniPieChart
-                                      hits={f.hits || 0}
-                                      nears={f.nears || 0}
-                                      misses={f.misses || 0}
-                                      pending={f.pending_count || 0}
-                                      correct={f.correct_predictions || 0}
-                                      incorrect={Math.max(0, (f.total_predictions || 0) - (f.correct_predictions || 0))}
-                                      size={28}
-                                    />
-                                    {(f.bullish_count > 0 || f.bearish_count > 0 || f.neutral_count > 0) && (
-                                      <MiniPieChart
-                                        bullish={f.bullish_count || 0}
-                                        bearish={f.bearish_count || 0}
-                                        neutral={f.neutral_count || 0}
-                                        size={28}
-                                      />
-                                    )}
-                                  </div>
+                                  <MiniPieChart
+                                    hits={f.hits || 0}
+                                    nears={f.nears || 0}
+                                    misses={f.misses || 0}
+                                    pending={f.pending_count || 0}
+                                    correct={f.correct_predictions || 0}
+                                    incorrect={Math.max(0, (f.total_predictions || 0) - (f.correct_predictions || 0))}
+                                    size={28}
+                                    className="hidden lg:block"
+                                  />
                                 )}
                                 <span className={`font-mono font-medium ${f.total_predictions === 0 ? 'text-muted' : f.accuracy_rate >= 60 ? 'text-positive' : 'text-negative'}`} style={{ letterSpacing: '-0.01em' }}>
                                   {f.total_predictions === 0 ? '—' : `${f.accuracy_rate.toFixed(1)}%`}
                                 </span>
                               </div>
+                            </td>
+                            <td className="px-6 py-4 text-center hidden lg:table-cell">
+                              {(f.bullish_count > 0 || f.bearish_count > 0 || f.neutral_count > 0) && (
+                                <MiniPieChart
+                                  bullish={f.bullish_count || 0}
+                                  bearish={f.bearish_count || 0}
+                                  neutral={f.neutral_count || 0}
+                                  size={28}
+                                />
+                              )}
                             </td>
                             <td className="px-6 py-4 text-right">
                               {(() => {
