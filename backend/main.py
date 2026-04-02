@@ -1313,7 +1313,21 @@ async def lifespan(app):
     print(f"[STARTUP] MASSIVE_API_KEY set: {bool(os.getenv('MASSIVE_API_KEY', '').strip())}")
     _fmp = os.getenv("FMP_KEY", "").strip()
     print(f"[STARTUP] FMP_KEY set: {bool(_fmp)}{' (first 5: ' + _fmp[:5] + '...)' if _fmp else ''}")
+    _tiingo = os.getenv("TIINGO_API_KEY", "").strip()
+    print(f"[STARTUP] TIINGO_API_KEY set: {bool(_tiingo)}")
     print("[STARTUP] ════════════════════════════════════════")
+
+    # Tiingo diagnostic — confirm API works from Railway
+    if _tiingo:
+        try:
+            import httpx as _hx
+            _tr = _hx.get("https://api.tiingo.com/tiingo/daily/AAPL/prices",
+                          params={"startDate": "2024-01-01", "token": _tiingo},
+                          headers={"Content-Type": "application/json"}, timeout=10)
+            _td = _tr.json() if _tr.status_code == 200 else []
+            print(f"[TIINGO-DIAG] AAPL: HTTP {_tr.status_code}, {len(_td)} rows")
+        except Exception as _te:
+            print(f"[TIINGO-DIAG] Failed: {_te}")
 
     # NOTE: Admin promote, outcome migration, and neutral reclassification
     # all moved to _startup_init() background thread to avoid blocking healthcheck.
@@ -1852,7 +1866,7 @@ async def lifespan(app):
             db2.close()
     run_sweep = _guarded_job("sweep_stuck", _sweep_stuck)
 
-    # JOB 7: Retry no_data predictions using FMP /api/v3/ (yfinance blocked on Railway)
+    # JOB 7: Retry no_data predictions using Tiingo (40 tickers/hr, 480/day limit)
     def _retry_no_data_standalone():
         from datetime import datetime as _dt
         from admin_panel import scheduler_last_run
@@ -1864,7 +1878,7 @@ async def lifespan(app):
             db = BgSessionLocal()
             try:
                 from jobs.retry_no_data import retry_no_data_batch
-                retry_no_data_batch(db, max_tickers=200)
+                retry_no_data_batch(db, max_tickers=40)
             except Exception as e:
                 print(f"[retry_no_data] Error: {e}")
             finally:
