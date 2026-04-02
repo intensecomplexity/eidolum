@@ -313,49 +313,50 @@ def get_ticker_chart(
     days = PERIOD_DAYS.get(period, 90)
     prices = []
 
-    # Try FMP first (reliable on Railway)
-    if FMP_KEY:
+    POLYGON_KEY = os.getenv("MASSIVE_API_KEY", "").strip()
+    from datetime import timedelta as _td
+    end_date = datetime.utcnow().strftime("%Y-%m-%d")
+    start_date = (datetime.utcnow() - _td(days=days)).strftime("%Y-%m-%d")
+
+    # 1. Try Polygon (free, 5 calls/min, 2 years of data)
+    if POLYGON_KEY and not prices:
         try:
             r = httpx.get(
-                f"https://financialmodelingprep.com/stable/historical-price-full/{ticker}",
-                params={"apikey": FMP_KEY},
+                f"https://api.polygon.io/v2/aggs/ticker/{ticker}/range/1/day/{start_date}/{end_date}",
+                params={"adjusted": "true", "sort": "asc", "limit": "5000", "apiKey": POLYGON_KEY},
+                timeout=15,
+            )
+            if r.status_code == 200:
+                for bar in (r.json().get("results") or []):
+                    ts_ms = bar.get("t")
+                    close = bar.get("c")
+                    if ts_ms and close and float(close) > 0:
+                        prices.append({
+                            "date": datetime.utcfromtimestamp(ts_ms / 1000).strftime("%Y-%m-%d"),
+                            "close": round(float(close), 2),
+                            "volume": int(bar.get("v", 0)),
+                        })
+        except Exception as e:
+            print(f"[Chart] Polygon error for {ticker}: {e}")
+
+    # 2. Fallback to FMP /api/v3/ (paid, full history)
+    if not prices and FMP_KEY:
+        try:
+            r = httpx.get(
+                f"https://financialmodelingprep.com/api/v3/historical-price-full/{ticker}",
+                params={"apikey": FMP_KEY, "serietype": "line"},
                 timeout=15,
             )
             if r.status_code == 200:
                 data = r.json()
-                historical = data.get("historical") or data if isinstance(data, list) else []
-                if isinstance(data, dict):
-                    historical = data.get("historical", [])
-                from datetime import timedelta as _td
-                cutoff = (datetime.utcnow() - _td(days=days)).strftime("%Y-%m-%d")
+                historical = data.get("historical", []) if isinstance(data, dict) else []
                 for item in historical:
                     d = item.get("date", "")
-                    if d < cutoff:
-                        continue
-                    prices.append({
-                        "date": d,
-                        "close": round(float(item.get("close", 0)), 2),
-                        "volume": int(item.get("volume", 0)),
-                    })
+                    if d >= start_date:
+                        prices.append({"date": d, "close": round(float(item.get("close", 0)), 2), "volume": 0})
                 prices.sort(key=lambda x: x["date"])
         except Exception as e:
             print(f"[Chart] FMP error for {ticker}: {e}")
-
-    # Fallback to yfinance if FMP returned nothing
-    if not prices:
-        try:
-            import yfinance as yf
-            yf_period_map = {"1w": "5d", "1m": "1mo", "3m": "3mo", "6m": "6mo", "1y": "1y", "all": "max"}
-            stock = yf.Ticker(ticker)
-            hist = stock.history(period=yf_period_map.get(period, "3mo"))
-            for date_idx, row in hist.iterrows():
-                prices.append({
-                    "date": date_idx.strftime("%Y-%m-%d"),
-                    "close": round(float(row["Close"]), 2),
-                    "volume": int(row.get("Volume", 0)),
-                })
-        except Exception as e:
-            print(f"[Chart] yfinance fallback error for {ticker}: {e}")
 
     # Fetch prediction markers from DB
     from models import Prediction, Forecaster
