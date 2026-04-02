@@ -124,14 +124,15 @@ def _refresh_leaderboard(db: Session) -> list | dict:
                         "count": row[2],
                     })
 
-            # Debug: check for ID type mismatch
-            if sector_by_fid and results:
-                sb_keys = list(sector_by_fid.keys())[:3]
-                r_ids = [r["id"] for r in results[:3]]
-                print(f"[Leaderboard] sector_by_fid keys (type={type(sb_keys[0]).__name__}): {sb_keys}")
-                print(f"[Leaderboard] result ids (type={type(r_ids[0]).__name__}): {r_ids}")
-                matched = sum(1 for r in results if int(r["id"]) in sector_by_fid)
-                print(f"[Leaderboard] Matched {matched}/{len(results)} forecasters with sector data")
+            # Debug: print both sides of the lookup
+            sb_sorted = sorted(sector_by_fid.keys())
+            r_sorted = sorted(int(r["id"]) for r in results)
+            print(f"[Leaderboard] sector fids ({len(sb_sorted)}): {sb_sorted[:10]}")
+            print(f"[Leaderboard] result fids ({len(r_sorted)}): {r_sorted[:10]}")
+            overlap = set(sb_sorted) & set(r_sorted)
+            print(f"[Leaderboard] Overlap: {len(overlap)} IDs match")
+            if sector_rows:
+                print(f"[Leaderboard] First sector row raw: {sector_rows[0]}")
 
             for r in results:
                 r["sector_strengths"] = sector_by_fid.get(int(r["id"]), [])
