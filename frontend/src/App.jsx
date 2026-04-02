@@ -52,6 +52,7 @@ import EarningsPage from './pages/Earnings';
 import ComparePage from './pages/Compare';
 import CompareForecasters from './pages/CompareForecasters';
 import Discover from './pages/Discover';
+import Tournaments from './pages/Tournaments';
 import HowItWorks from './pages/HowItWorks';
 import OnboardingOverlay from './components/OnboardingOverlay';
 import ComparisonTray from './components/ComparisonTray';
@@ -128,6 +129,7 @@ export default function App() {
         <Route path="/discover" element={<Discover />} />
         <Route path="/how-it-works" element={<HowItWorks />} />
         <Route path="/earnings" element={<EarningsPage />} />
+        <Route path="/compete/tournaments" element={<Tournaments />} />
       </Routes>
       <SaveToast />
       <ComparisonTray />

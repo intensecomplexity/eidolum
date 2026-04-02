@@ -7,13 +7,23 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func
 
 from database import get_db
-from models import DailyChallenge, DailyChallengeEntry, User
+from models import DailyChallenge, DailyChallengeEntry, User, Config
 from middleware.auth import require_user
 from rate_limit import limiter
 from auth import get_current_user as _decode_token
 
 router = APIRouter()
 _optional_bearer = HTTPBearer(auto_error=False)
+
+
+def _daily_challenge_enabled(db: Session) -> bool:
+    row = db.query(Config).filter(Config.key == "daily_challenge_enabled").first()
+    return row and row.value == "true"
+
+
+def _require_enabled(db: Session):
+    if not _daily_challenge_enabled(db):
+        raise HTTPException(status_code=404, detail="Not found")
 
 
 class EntryRequest(BaseModel):
@@ -61,6 +71,7 @@ def get_today_challenge(
     credentials: Optional[HTTPAuthorizationCredentials] = Depends(_optional_bearer),
     db: Session = Depends(get_db),
 ):
+    _require_enabled(db)
     today = datetime.date.today()
 
     challenge = db.query(DailyChallenge).filter(DailyChallenge.challenge_date == today).first()
@@ -103,6 +114,7 @@ def enter_challenge(
     user_id: int = Depends(require_user),
     db: Session = Depends(get_db),
 ):
+    _require_enabled(db)
     if req.direction not in ("bullish", "bearish"):
         raise HTTPException(status_code=400, detail="Direction must be 'bullish' or 'bearish'")
 
@@ -153,6 +165,7 @@ def challenge_history(
     credentials: Optional[HTTPAuthorizationCredentials] = Depends(_optional_bearer),
     db: Session = Depends(get_db),
 ):
+    _require_enabled(db)
     challenges = (
         db.query(DailyChallenge)
         .filter(DailyChallenge.status == "completed")
@@ -200,6 +213,7 @@ def challenge_history(
 @router.get("/daily-challenge/leaderboard")
 @limiter.limit("60/minute")
 def challenge_leaderboard(request: Request, db: Session = Depends(get_db)):
+    _require_enabled(db)
     # Get all users with entries
     user_stats = {}
     entries = (
@@ -276,3 +290,56 @@ def admin_score_challenge(request: Request, db: Session = Depends(get_db)):
     from jobs.daily_challenge import score_daily_challenge
     score_daily_challenge(db)
     return {"status": "scored"}
+
+
+@router.get("/daily-challenge/enabled")
+@limiter.limit("120/minute")
+def is_daily_challenge_enabled(request: Request, db: Session = Depends(get_db)):
+    return {"enabled": _daily_challenge_enabled(db)}
+
+
+@router.post("/admin/daily-challenge/toggle")
+@limiter.limit("5/minute")
+def toggle_daily_challenge(request: Request, db: Session = Depends(get_db)):
+    secret = request.headers.get("X-Admin-Secret", "") or request.query_params.get("secret", "")
+    if not ADMIN_SECRET or secret != ADMIN_SECRET:
+        raise HTTPException(status_code=403, detail="Forbidden")
+
+    row = db.query(Config).filter(Config.key == "daily_challenge_enabled").first()
+    if row:
+        new_val = "false" if row.value == "true" else "true"
+        row.value = new_val
+    else:
+        db.add(Config(key="daily_challenge_enabled", value="true"))
+        new_val = "true"
+    db.commit()
+    return {"enabled": new_val == "true"}
+
+
+@router.get("/daily-challenge/status")
+@limiter.limit("120/minute")
+def daily_challenge_status(
+    request: Request,
+    user_id: int = Depends(require_user),
+    db: Session = Depends(get_db),
+):
+    """Returns whether user has entered today's challenge. For notification dot."""
+    if not _daily_challenge_enabled(db):
+        return {"enabled": False, "entered": False, "ticker": None}
+
+    today = datetime.date.today()
+    challenge = db.query(DailyChallenge).filter(DailyChallenge.challenge_date == today).first()
+    if not challenge:
+        return {"enabled": True, "entered": False, "ticker": None}
+
+    entry = db.query(DailyChallengeEntry).filter(
+        DailyChallengeEntry.challenge_id == challenge.id,
+        DailyChallengeEntry.user_id == user_id,
+    ).first()
+
+    return {
+        "enabled": True,
+        "entered": entry is not None,
+        "ticker": challenge.ticker,
+        "direction": entry.direction if entry else None,
+    }

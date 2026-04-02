@@ -1123,6 +1123,56 @@ def run_phase2_migrations():
     except Exception:
         db.rollback()
 
+    # ── Tournament tables ──────────────────────────────────────────────
+    try:
+        db.execute(text("""
+            CREATE TABLE IF NOT EXISTS tournaments (
+                id SERIAL PRIMARY KEY,
+                name VARCHAR(200) NOT NULL,
+                status VARCHAR(20) DEFAULT 'upcoming',
+                start_date TIMESTAMP,
+                end_date TIMESTAMP,
+                entry_deadline TIMESTAMP,
+                max_participants INTEGER DEFAULT 100,
+                created_at TIMESTAMP DEFAULT NOW()
+            )
+        """))
+        db.commit()
+    except Exception:
+        db.rollback()
+    try:
+        db.execute(text("""
+            CREATE TABLE IF NOT EXISTS tournament_entries (
+                id SERIAL PRIMARY KEY,
+                tournament_id INTEGER REFERENCES tournaments(id),
+                user_id INTEGER REFERENCES users(id),
+                picks TEXT,
+                submitted_at TIMESTAMP DEFAULT NOW(),
+                UNIQUE(tournament_id, user_id)
+            )
+        """))
+        db.commit()
+    except Exception:
+        db.rollback()
+    try:
+        db.execute(text("""
+            CREATE TABLE IF NOT EXISTS tournament_results (
+                id SERIAL PRIMARY KEY,
+                tournament_id INTEGER REFERENCES tournaments(id),
+                user_id INTEGER REFERENCES users(id),
+                score NUMERIC(10,2) DEFAULT 0,
+                rank INTEGER,
+                hits INTEGER DEFAULT 0,
+                nears INTEGER DEFAULT 0,
+                misses INTEGER DEFAULT 0,
+                prize_badge VARCHAR(50),
+                UNIQUE(tournament_id, user_id)
+            )
+        """))
+        db.commit()
+    except Exception:
+        db.rollback()
+
     for col in [
         "email_notifications INTEGER DEFAULT 1",
         "notification_frequency VARCHAR(20) DEFAULT 'daily'",
@@ -1924,6 +1974,17 @@ async def lifespan(app):
     scheduler.add_job(run_sweep, "interval", hours=24, id="sweep_stuck", next_run_time=_first_run + timedelta(minutes=15))
     scheduler.add_job(_retry_no_data_standalone, "interval", hours=1, id="retry_no_data", next_run_time=_first_run + timedelta(minutes=30))
     scheduler.add_job(run_analyst_notif, "interval", hours=1, id="analyst_notifications", next_run_time=_first_run + timedelta(minutes=25))
+    # JOB: Tournament live scoring (only runs when active tournaments exist)
+    def _tournament_score():
+        try:
+            db = BgSessionLocal()
+            from jobs.tournament_scorer import update_live_scores
+            update_live_scores(db)
+            db.close()
+        except Exception as e:
+            print(f"[TournamentScore] Error: {e}")
+    scheduler.add_job(_tournament_score, "interval", hours=6, id="tournament_scorer", next_run_time=_first_run + timedelta(minutes=45))
+
     scheduler.add_job(_watchdog, "interval", minutes=5, id="watchdog")
 
     # JOB: Backfill real article URLs from Benzinga API (2,000/run, hourly)
@@ -2082,6 +2143,8 @@ app.include_router(admin_panel_router)  # /admin HTML + /api/admin/* endpoints
 app.include_router(admin_v2_router, prefix="/api")  # JWT-based admin panel
 from routers.og_image import router as og_image_router
 app.include_router(og_image_router, prefix="/api")
+from routers.tournaments import router as tournaments_router
+app.include_router(tournaments_router, prefix="/api")
 
 
 @app.get("/health")

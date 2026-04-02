@@ -446,6 +446,14 @@ export function getChallengeLeaderboard() {
   return api.get('/daily-challenge/leaderboard').then(r => r.data);
 }
 
+export function getDailyChallengeStatus() {
+  return api.get('/daily-challenge/status', { headers: authHeaders() }).then(r => r.data);
+}
+
+export function isDailyChallengeEnabled() {
+  return api.get('/daily-challenge/enabled').then(r => r.data);
+}
+
 // ——— Nudges ———
 
 export function getNudges() {
