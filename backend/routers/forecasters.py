@@ -318,7 +318,8 @@ def _get_preds(fid, page, limit, filter_type, sector, db):
                    p.sector, p.context, p.exact_quote, p.source_url, p.archive_url,
                    p.source_type, p.source_platform_id, p.video_timestamp_sec,
                    p.verified_by, p.has_conflict, p.conflict_note,
-                   ts.logo_domain, ts.logo_url, ts.company_name
+                   ts.logo_domain, ts.logo_url, ts.company_name,
+                   p.url_quality
             FROM predictions p
             LEFT JOIN ticker_sectors ts ON ts.ticker = p.ticker
             WHERE p.forecaster_id = :fid {where}
@@ -353,6 +354,7 @@ def _get_preds(fid, page, limit, filter_type, sector, db):
             "timestamp_display": format_timestamp(p[18]),
             "timestamp_url": get_youtube_timestamp_url(p[17], p[18]),
             "logo_domain": p[22], "logo_url": p[23], "company_name": p[24],
+            "url_quality": p[25],
         })
     return results
 

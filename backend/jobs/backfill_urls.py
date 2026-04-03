@@ -102,10 +102,13 @@ def backfill_real_urls(db=None, max_per_run: int = 2000):
                 real_url = url_map.get(p["bz_id"])
                 if real_url:
                     db.execute(sql_text(
-                        "UPDATE predictions SET source_url = :url WHERE id = :id"
+                        "UPDATE predictions SET source_url = :url, url_quality = 'real_article', url_backfill_attempted = 1 WHERE id = :id"
                     ), {"url": real_url, "id": p["id"]})
                     updated += 1
                 else:
+                    db.execute(sql_text(
+                        "UPDATE predictions SET url_backfill_attempted = 1 WHERE id = :id"
+                    ), {"id": p["id"]})
                     failed += 1
 
             # Commit every 5 tickers

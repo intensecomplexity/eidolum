@@ -48,7 +48,8 @@ function isRealArchive(url) {
 
 function ProofLinks({ p }) {
   const source = p.source_url || '';
-  if (!source) return null;
+  // Hide source link for generic/none URLs — only show real articles
+  if (!source || (p.url_quality && p.url_quality !== 'real_article')) return null;
 
   const archive = isRealArchive(p.archive_url) ? p.archive_url : null;
   const isYT = source.includes('youtube.com') || source.includes('youtu.be');

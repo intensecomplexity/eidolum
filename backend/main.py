@@ -1055,6 +1055,14 @@ def run_phase2_migrations():
     except Exception:
         db.rollback()
 
+    # ── 38b. predictions.url_quality + url_backfill_attempted columns ──
+    for col in ["url_quality VARCHAR(20)", "url_backfill_attempted INTEGER DEFAULT 0"]:
+        try:
+            db.execute(text(f"ALTER TABLE predictions ADD COLUMN {col}"))
+            db.commit()
+        except Exception:
+            db.rollback()
+
     # ── 39. forecasters.alpha column ────────────────────────────────
     try:
         db.execute(text("ALTER TABLE forecasters ADD COLUMN alpha FLOAT"))
@@ -1818,6 +1826,34 @@ async def lifespan(app):
         else:
             print(f"[Startup] Skipping description backfill — {_no_data_count:,} no_data predictions need FMP budget")
 
+        # URL quality classification (batched, idempotent)
+        try:
+            _uq_db = BgSessionLocal()
+            batch_num = 0
+            while True:
+                updated = _uq_db.execute(sql_text("""
+                    UPDATE predictions SET url_quality = CASE
+                        WHEN source_url IS NULL OR source_url = '' THEN 'none'
+                        WHEN source_url LIKE '%%benzinga.com/stock/%%/ratings%%' THEN 'generic'
+                        WHEN source_url LIKE '%%stockanalysis.com%%' THEN 'generic'
+                        WHEN source_url LIKE '%%/ratings' THEN 'generic'
+                        WHEN source_url LIKE '%%/quote/%%' THEN 'generic'
+                        WHEN source_url LIKE '%%/forecast/%%' THEN 'generic'
+                        WHEN source_url LIKE '%%benzinga.com/news%%' THEN 'real_article'
+                        WHEN source_url LIKE '%%benzinga.com/press%%' THEN 'real_article'
+                        ELSE 'generic'
+                    END
+                    WHERE id IN (SELECT id FROM predictions WHERE url_quality IS NULL LIMIT 10000)
+                """)).rowcount
+                _uq_db.commit()
+                batch_num += 1
+                if updated == 0:
+                    break
+                print(f"[Startup] URL quality: classified {batch_num * 10000} predictions")
+            _uq_db.close()
+        except Exception as _uqe:
+            print(f"[Startup] URL quality classification error: {_uqe}")
+
         # STEP 2: Catch-up evaluation — clear the backlog of overdue predictions
         try:
             from sqlalchemy import text as _eval_t
@@ -2036,6 +2072,33 @@ async def lifespan(app):
     scheduler.add_job(run_sweep, "interval", hours=24, id="sweep_stuck", next_run_time=_first_run + timedelta(minutes=15))
     scheduler.add_job(_retry_no_data_standalone, "interval", hours=1, id="retry_no_data", next_run_time=_first_run + timedelta(minutes=30))
     scheduler.add_job(run_analyst_notif, "interval", hours=1, id="analyst_notifications", next_run_time=_first_run + timedelta(minutes=25))
+
+    # JOB: URL backfill — find real article URLs for generic predictions
+    def _url_backfill_standalone():
+        from datetime import datetime as _dt
+        from admin_panel import scheduler_last_run
+        scheduler_last_run["url_backfill"] = _dt.utcnow()
+        if not db_is_healthy("url_backfill"):
+            return
+        mark_job_running("url_backfill")
+        try:
+            db = BgSessionLocal()
+            try:
+                from jobs.backfill_urls import backfill_real_urls
+                result = backfill_real_urls(db, max_per_run=2000)
+                # Update url_quality for any URLs we just fixed
+                db.execute(sql_text(
+                    "UPDATE predictions SET url_quality = 'real_article' "
+                    "WHERE url_quality != 'real_article' AND source_url LIKE '%%benzinga.com/news%%'"
+                ))
+                db.commit()
+            except Exception as e:
+                print(f"[url_backfill] Error: {e}")
+            finally:
+                db.close()
+        finally:
+            mark_job_done("url_backfill")
+    scheduler.add_job(_url_backfill_standalone, "interval", hours=1, id="url_backfill", next_run_time=_first_run + timedelta(minutes=40))
     # JOB: Tournament live scoring (only runs when active tournaments exist)
     def _tournament_score():
         try:
