@@ -82,30 +82,30 @@ export default function StockChart({ ticker }) {
     }));
 
   return (
-    <div className="card mb-6">
-      <div className="flex items-center justify-between mb-4">
-        <div>
-          {currentPrice && (
-            <span className="font-mono text-2xl font-bold text-accent">${currentPrice.toFixed(2)}</span>
-          )}
-          {changePct && (
-            <span className={`ml-2 text-sm font-mono font-semibold ${isUp ? 'text-positive' : 'text-negative'}`}>
-              {isUp ? '+' : ''}{changePct}%
-            </span>
-          )}
-        </div>
-        <div className="flex gap-1">
-          {PERIODS.map(p => (
-            <button key={p.key} onClick={() => setPeriod(p.key)}
-              className={`px-2.5 py-1 rounded text-[11px] font-mono font-semibold transition-colors ${
-                period === p.key
-                  ? 'bg-accent/15 text-accent border border-accent/30'
-                  : 'bg-surface-2 text-muted border border-border'
-              }`}>
-              {p.label}
-            </button>
-          ))}
-        </div>
+    <div className="card mb-6" style={{ background: 'var(--color-card-bg, #14161c)' }}>
+      {/* Row 1: Price + change */}
+      <div className="flex items-baseline gap-2 mb-2">
+        {currentPrice && (
+          <span className="font-mono text-2xl font-bold text-accent">${currentPrice.toFixed(2)}</span>
+        )}
+        {changePct && (
+          <span className={`text-sm font-mono font-semibold ${isUp ? 'text-positive' : 'text-negative'}`}>
+            {isUp ? '+' : ''}{changePct}%
+          </span>
+        )}
+      </div>
+      {/* Row 2: Period buttons */}
+      <div className="flex gap-1 mb-4 overflow-x-auto">
+        {PERIODS.map(p => (
+          <button key={p.key} onClick={() => setPeriod(p.key)}
+            className={`px-2.5 py-1 rounded text-[11px] font-mono font-semibold transition-colors shrink-0 ${
+              period === p.key
+                ? 'bg-accent/15 text-accent border border-accent/30'
+                : 'bg-surface-2 text-muted border border-border'
+            }`}>
+            {p.label}
+          </button>
+        ))}
       </div>
 
       <ResponsiveContainer width="100%" height={typeof window !== 'undefined' && window.innerWidth < 640 ? 200 : 300}>

@@ -156,10 +156,12 @@ export default function TickerDetail() {
 
         {/* ── SECTION 1: CURRENT ANALYST OUTLOOK ────────────────────────── */}
         <div className="mb-8">
-          <h2 className="text-sm font-semibold text-muted uppercase tracking-wider mb-3 flex items-center gap-1.5">
-            <Users className="w-4 h-4 text-accent" /> Current Analyst Outlook
-            {cc.total > 0 && <span className="text-muted font-normal">({cc.total} active prediction{cc.total !== 1 ? 's' : ''})</span>}
-          </h2>
+          <div className="mb-3">
+            <h2 className="text-sm font-semibold text-muted uppercase tracking-wider flex items-center gap-1.5">
+              <Users className="w-4 h-4 text-accent" /> Current Analyst Outlook
+            </h2>
+            {cc.total > 0 && <p className="text-muted text-xs mt-0.5">{cc.total} active prediction{cc.total !== 1 ? 's' : ''}</p>}
+          </div>
 
           {cc.total > 0 ? (
             <>
