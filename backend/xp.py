@@ -57,10 +57,20 @@ def _reset_daily_if_needed(user):
     """Reset xp_today if the date has changed."""
     today = datetime.date.today()
     last_reset = getattr(user, 'xp_last_reset', None)
-    if last_reset is None or (hasattr(last_reset, 'date') and last_reset.date() < today) or (isinstance(last_reset, datetime.date) and last_reset < today):
+    needs_reset = False
+    if last_reset is None:
+        needs_reset = True
+    else:
+        # Normalize to date for comparison (last_reset could be datetime or date)
+        last_date = last_reset.date() if hasattr(last_reset, 'date') and callable(last_reset.date) else last_reset
+        try:
+            needs_reset = last_date < today
+        except TypeError:
+            needs_reset = True
+    if needs_reset:
         try:
             user.xp_today = 0
-            user.xp_last_reset = today
+            user.xp_last_reset = datetime.datetime.utcnow()
         except Exception:
             pass
 

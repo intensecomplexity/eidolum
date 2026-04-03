@@ -1,86 +1,98 @@
 """
 Rival detection system — finds the user one position above on the leaderboard.
+Uses a single SQL query instead of loading all users into memory.
 """
 from sqlalchemy.orm import Session
-from sqlalchemy import func
-from models import User, UserPrediction
+from sqlalchemy import text as sql_text
 
 
-def _build_leaderboard(db: Session) -> list[dict]:
-    """Build the community leaderboard (users with 10+ scored predictions)."""
-    users = db.query(User).all()
-    results = []
-    for user in users:
-        scored = db.query(UserPrediction).filter(
-            UserPrediction.user_id == user.id,
-            UserPrediction.outcome.in_(["hit","near","miss","correct","incorrect"]),
-            UserPrediction.deleted_at.is_(None),
-        ).all()
-        scored_count = len(scored)
-        if scored_count < 10:
-            continue
-        correct_count = sum(1 for p in scored if p.outcome == "correct")
-        accuracy = round(correct_count / scored_count * 100, 1)
-        results.append({
-            "user_id": user.id,
-            "username": user.username,
-            "display_name": user.display_name,
-            "accuracy": accuracy,
-            "scored_count": scored_count,
-            "correct_count": correct_count,
-            "avatar_url": user.avatar_url,
-        })
-    results.sort(key=lambda x: (x["accuracy"], x["scored_count"]), reverse=True)
-    for i, r in enumerate(results):
-        r["rank"] = i + 1
-    return results
+def _get_user_rank_and_accuracy(user_id: int, db: Session) -> tuple[int | None, float]:
+    """Get a user's rank and accuracy from a SQL-based leaderboard."""
+    try:
+        row = db.execute(sql_text("""
+            WITH ranked AS (
+                SELECT user_id,
+                       ROUND(CAST(
+                           SUM(CASE WHEN outcome IN ('hit','correct') THEN 1.0 WHEN outcome='near' THEN 0.5 ELSE 0 END)
+                           / NULLIF(COUNT(*), 0) * 100 AS numeric), 1) as accuracy,
+                       COUNT(*) as scored,
+                       ROW_NUMBER() OVER (ORDER BY
+                           SUM(CASE WHEN outcome IN ('hit','correct') THEN 1.0 WHEN outcome='near' THEN 0.5 ELSE 0 END)
+                           / NULLIF(COUNT(*), 0) DESC,
+                           COUNT(*) DESC
+                       ) as rank
+                FROM user_predictions
+                WHERE outcome IN ('hit','near','miss','correct','incorrect')
+                  AND deleted_at IS NULL
+                GROUP BY user_id
+                HAVING COUNT(*) >= 10
+            )
+            SELECT rank, accuracy FROM ranked WHERE user_id = :uid
+        """), {"uid": user_id}).first()
+        if row:
+            return int(row[0]), float(row[1])
+    except Exception:
+        pass
+    return None, 0.0
 
 
 def get_rival(user_id: int, db: Session) -> dict | None:
-    """Find the user's rival (one position above on leaderboard)."""
-    lb = _build_leaderboard(db)
-    if not lb:
+    """Find the user's rival (one position above on the leaderboard)."""
+    user_rank, user_acc = _get_user_rank_and_accuracy(user_id, db)
+    if user_rank is None:
         return None
 
-    user_entry = next((e for e in lb if e["user_id"] == user_id), None)
-    if not user_entry:
+    target_rank = 2 if user_rank == 1 else user_rank - 1
+
+    try:
+        row = db.execute(sql_text("""
+            WITH ranked AS (
+                SELECT up.user_id,
+                       ROUND(CAST(
+                           SUM(CASE WHEN up.outcome IN ('hit','correct') THEN 1.0 WHEN up.outcome='near' THEN 0.5 ELSE 0 END)
+                           / NULLIF(COUNT(*), 0) * 100 AS numeric), 1) as accuracy,
+                       COUNT(*) as scored,
+                       ROW_NUMBER() OVER (ORDER BY
+                           SUM(CASE WHEN up.outcome IN ('hit','correct') THEN 1.0 WHEN up.outcome='near' THEN 0.5 ELSE 0 END)
+                           / NULLIF(COUNT(*), 0) DESC,
+                           COUNT(*) DESC
+                       ) as rank
+                FROM user_predictions up
+                WHERE up.outcome IN ('hit','near','miss','correct','incorrect')
+                  AND up.deleted_at IS NULL
+                GROUP BY up.user_id
+                HAVING COUNT(*) >= 10
+            )
+            SELECT r.user_id, r.accuracy, r.rank, u.username, u.display_name, u.avatar_url
+            FROM ranked r
+            JOIN users u ON u.id = r.user_id
+            WHERE r.rank = :target_rank
+        """), {"target_rank": target_rank}).first()
+
+        if not row or row[0] == user_id:
+            return None
+
+        return {
+            "rival_user_id": row[0],
+            "rival_username": row[3],
+            "rival_display_name": row[4],
+            "rival_accuracy": float(row[1]),
+            "rival_avatar_url": row[5],
+            "rival_rank": int(row[2]),
+            "user_rank": user_rank,
+            "user_accuracy": user_acc,
+            "accuracy_gap": round(float(row[1]) - user_acc, 1),
+        }
+    except Exception:
         return None
-
-    user_rank = user_entry["rank"]
-
-    if user_rank == 1:
-        # #1 user: rival is #2
-        rival = next((e for e in lb if e["rank"] == 2), None)
-    else:
-        # Everyone else: rival is the person above them
-        rival = next((e for e in lb if e["rank"] == user_rank - 1), None)
-
-    if not rival or rival["user_id"] == user_id:
-        return None
-
-    gap = round(rival["accuracy"] - user_entry["accuracy"], 1)
-
-    return {
-        "rival_user_id": rival["user_id"],
-        "rival_username": rival["username"],
-        "rival_display_name": rival["display_name"],
-        "rival_accuracy": rival["accuracy"],
-        "rival_avatar_url": rival.get("avatar_url"),
-        "rival_rank": rival["rank"],
-        "user_rank": user_rank,
-        "user_accuracy": user_entry["accuracy"],
-        "accuracy_gap": gap,  # positive = rival is ahead, negative = user is ahead
-    }
 
 
 def check_rival_changes(user_id: int, db: Session):
-    """Check if leaderboard positions changed after a prediction was scored.
-    Creates notifications if positions swapped. Caller must commit."""
+    """Check if leaderboard positions changed after a prediction was scored."""
     rival_info = get_rival(user_id, db)
     if not rival_info:
         return
 
-    # If the user is now ahead of their rival (gap is negative), they overtook them
     if rival_info["accuracy_gap"] < 0:
         try:
             from notifications import create_notification
@@ -88,8 +100,8 @@ def check_rival_changes(user_id: int, db: Session):
                 user_id=user_id,
                 type="rival_update",
                 title="You passed your rival!",
-                message=f"You overtook @{rival_info['rival_username']}! You're now #{rival_info['user_rank']}",
-                data={"rival_user_id": rival_info["rival_user_id"], "new_rank": rival_info["user_rank"]},
+                message=f"You overtook {rival_info['rival_username']} on the leaderboard!",
+                data=rival_info,
                 db=db,
             )
         except Exception:
