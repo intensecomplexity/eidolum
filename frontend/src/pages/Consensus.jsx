@@ -71,9 +71,9 @@ export default function Consensus() {
         <p className="text-text-secondary text-sm mb-6">What Wall Street thinks about every stock.</p>
 
         {/* Filter row */}
-        <div className="flex flex-wrap items-center gap-2 mb-4">
+        <div className="flex flex-wrap items-center gap-2 mb-4 min-w-0">
           {/* Search */}
-          <div className="relative flex-1 sm:max-w-[200px]">
+          <div className="relative w-full sm:w-auto sm:flex-1 sm:max-w-[200px]">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted" />
             <input type="text" value={search} onChange={e => setSearch(e.target.value)}
               placeholder="Search ticker..."
@@ -100,7 +100,7 @@ export default function Consensus() {
         </div>
 
         {/* Tabs */}
-        <div className="flex items-center gap-1 mb-6 bg-surface border border-border rounded-xl p-1 w-fit">
+        <div className="flex items-center gap-1 mb-6 bg-surface border border-border rounded-xl p-1 w-full sm:w-fit overflow-x-auto pills-scroll">
           {TABS.map(({ key, label, icon: Icon }) => (
             <button key={key} onClick={() => setTab(key)}
               className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
