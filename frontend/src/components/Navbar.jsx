@@ -3,6 +3,7 @@ import { Menu, X, Crosshair, HelpCircle, LogOut, Settings, Swords, Users, User, 
 import EidolumLogo from './EidolumLogo';
 import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { useFeatures } from '../context/FeatureContext';
 import useTheme from '../hooks/useTheme';
 import UniversalSearch from './UniversalSearch';
 import DuelModal from './DuelModal';
@@ -13,6 +14,7 @@ export default function Navbar() {
   const location = useLocation();
   const navigate = useNavigate();
   const { isAuthenticated, user, logout } = useAuth();
+  const features = useFeatures();
   const { theme, toggleTheme } = useTheme();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [userDropdown, setUserDropdown] = useState(false);
@@ -179,8 +181,8 @@ export default function Navbar() {
                       {/* Menu items */}
                       <div className="py-1">
                         <DropdownItem to="/my-calls" icon={BarChart3} label="My Calls" onClick={() => setUserDropdown(false)} />
-                        <DropdownItem to="/compete" icon={Trophy} label="Compete" onClick={() => setUserDropdown(false)} />
-                        <DropdownItem to="/duels" icon={Swords} label="Duels" onClick={() => setUserDropdown(false)} />
+                        {features.compete && <DropdownItem to="/compete" icon={Trophy} label="Compete" onClick={() => setUserDropdown(false)} />}
+                        {features.duels && <DropdownItem to="/duels" icon={Swords} label="Duels" onClick={() => setUserDropdown(false)} />}
                         <DropdownItem to="/friends" icon={Users} label="Friends" onClick={() => setUserDropdown(false)} />
                         <DropdownItem to="/badges" icon={Star} label="Badges" onClick={() => setUserDropdown(false)} />
                         <DropdownItem to="/watchlist" icon={BookmarkCheck} label="Watchlist" onClick={() => setUserDropdown(false)} />
@@ -219,8 +221,8 @@ export default function Navbar() {
                       </Link>
                       <div className="py-1">
                         <DropdownItem to="/my-calls" icon={BarChart3} label="My Calls" onClick={() => setUserDropdown(false)} />
-                        <DropdownItem to="/compete" icon={Trophy} label="Compete" onClick={() => setUserDropdown(false)} />
-                        <DropdownItem to="/duels" icon={Swords} label="Duels" onClick={() => setUserDropdown(false)} />
+                        {features.compete && <DropdownItem to="/compete" icon={Trophy} label="Compete" onClick={() => setUserDropdown(false)} />}
+                        {features.duels && <DropdownItem to="/duels" icon={Swords} label="Duels" onClick={() => setUserDropdown(false)} />}
                         <DropdownItem to="/friends" icon={Users} label="Friends" onClick={() => setUserDropdown(false)} />
                         <DropdownItem to="/badges" icon={Star} label="Badges" onClick={() => setUserDropdown(false)} />
                         <DropdownItem to="/watchlist" icon={BookmarkCheck} label="Watchlist" onClick={() => setUserDropdown(false)} />

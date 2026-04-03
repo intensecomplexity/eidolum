@@ -2178,6 +2178,57 @@ def health():
     return {"status": "ok", "app": "Eidolum API"}
 
 
+from fastapi import Depends as _Depends
+from sqlalchemy.orm import Session as _Session
+from database import get_db as _get_db
+from middleware.auth import require_admin_user as _require_admin
+
+
+@app.get("/api/features")
+def get_features(db: _Session = _Depends(_get_db)):
+    """Return all feature flags in one call. Cached by frontend."""
+    from sqlalchemy import text as _ft
+    flags = {
+        "tournaments": False, "daily_challenge": False,
+        "duels": False, "compete": False,
+    }
+    try:
+        rows = db.execute(_ft(
+            "SELECT key, value FROM config WHERE key IN ('tournaments_enabled','daily_challenge_enabled','duels_enabled','compete_enabled')"
+        )).fetchall()
+        for r in rows:
+            flags[r[0].replace("_enabled", "")] = r[1] == "true"
+    except Exception:
+        pass
+    return flags
+
+
+@app.post("/api/admin/toggle-duels")
+def toggle_duels(admin_id: int = _Depends(_require_admin), db: _Session = _Depends(_get_db)):
+    from models import Config
+    row = db.query(Config).filter(Config.key == "duels_enabled").first()
+    if row:
+        row.value = "false" if row.value == "true" else "true"
+    else:
+        db.add(Config(key="duels_enabled", value="true"))
+    db.commit()
+    new_val = db.query(Config).filter(Config.key == "duels_enabled").first()
+    return {"duels_enabled": new_val.value == "true" if new_val else False}
+
+
+@app.post("/api/admin/toggle-compete")
+def toggle_compete(admin_id: int = _Depends(_require_admin), db: _Session = _Depends(_get_db)):
+    from models import Config
+    row = db.query(Config).filter(Config.key == "compete_enabled").first()
+    if row:
+        row.value = "false" if row.value == "true" else "true"
+    else:
+        db.add(Config(key="compete_enabled", value="true"))
+    db.commit()
+    new_val = db.query(Config).filter(Config.key == "compete_enabled").first()
+    return {"compete_enabled": new_val.value == "true" if new_val else False}
+
+
 # ── SEO: sitemap.xml + robots.txt ──────────────────────────────────────────
 import time as _seo_time
 from fastapi.responses import Response as _RawResponse

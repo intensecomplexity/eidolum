@@ -10,11 +10,21 @@ from sqlalchemy.orm import Session
 from sqlalchemy import or_
 
 from database import get_db
-from models import User, Duel
+from models import User, Duel, Config
 from middleware.auth import require_user
 from rate_limit import limiter
 
 router = APIRouter()
+
+
+def _duels_enabled(db) -> bool:
+    row = db.query(Config).filter(Config.key == "duels_enabled").first()
+    return row and row.value == "true"
+
+
+def _require_enabled(db):
+    if not _duels_enabled(db):
+        raise HTTPException(status_code=404, detail="Not found")
 
 FINNHUB_KEY = os.getenv("FINNHUB_KEY", "")
 
@@ -99,6 +109,7 @@ def create_challenge(
     user_id: int = Depends(require_user),
     db: Session = Depends(get_db),
 ):
+    _require_enabled(db)
     if user_id == req.opponent_id:
         raise HTTPException(status_code=400, detail="Cannot challenge yourself")
 
@@ -204,6 +215,7 @@ def accept_duel(
     user_id: int = Depends(require_user),
     db: Session = Depends(get_db),
 ):
+    _require_enabled(db)
     duel = db.query(Duel).filter(Duel.id == duel_id).first()
     if not duel:
         raise HTTPException(status_code=404, detail="Duel not found")
@@ -245,6 +257,7 @@ def decline_duel(
     user_id: int = Depends(require_user),
     db: Session = Depends(get_db),
 ):
+    _require_enabled(db)
     duel = db.query(Duel).filter(Duel.id == duel_id).first()
     if not duel:
         raise HTTPException(status_code=404, detail="Duel not found")
@@ -272,6 +285,7 @@ def get_my_duels(
     user_id: int = Depends(require_user),
     db: Session = Depends(get_db),
 ):
+    _require_enabled(db)
     query = db.query(Duel).filter(
         or_(Duel.challenger_id == user_id, Duel.opponent_id == user_id)
     )
@@ -289,6 +303,7 @@ def get_my_duels(
 @router.get("/users/{user_id}/duel-record")
 @limiter.limit("60/minute")
 def get_duel_record(request: Request, user_id: int, db: Session = Depends(get_db)):
+    _require_enabled(db)
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")

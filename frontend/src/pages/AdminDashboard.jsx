@@ -6,6 +6,7 @@ import {
   getAdminDashboard, getAdminUsers, getAdminForecasters, getAdminAuditLog,
   banUser, unbanUser, deleteUserAccount, promoteAdmin, demoteAdmin,
   deleteForecasterAdmin, deletePredictionAdmin, listPredictionsAdmin,
+  getFeatureFlags, toggleDuelsAdmin, toggleCompeteAdmin,
 } from '../api';
 
 const TABS = ['Overview', 'Users', 'Forecasters', 'Predictions', 'Audit Log'];
@@ -81,10 +82,55 @@ function StatCard({ label, value }) {
 }
 
 
+function FeatureToggles() {
+  const [flags, setFlags] = useState(null);
+
+  useEffect(() => {
+    getFeatureFlags().then(setFlags).catch(() => {});
+  }, []);
+
+  async function toggle(name, fn) {
+    try {
+      await fn();
+      const updated = await getFeatureFlags();
+      setFlags(updated);
+    } catch {}
+  }
+
+  if (!flags) return null;
+  return (
+    <div className="card mb-6">
+      <h3 className="text-sm font-semibold text-muted uppercase tracking-wider mb-3">Feature Flags</h3>
+      <div className="space-y-2">
+        {[
+          { key: 'duels', label: 'Duels', fn: toggleDuelsAdmin },
+          { key: 'compete', label: 'Compete / Seasons', fn: toggleCompeteAdmin },
+        ].map(f => (
+          <div key={f.key} className="flex items-center justify-between py-2">
+            <span className="text-sm text-text-secondary">{f.label}</span>
+            <button
+              onClick={() => toggle(f.key, f.fn)}
+              className={`px-3 py-1 rounded-lg text-xs font-medium transition-colors ${
+                flags[f.key]
+                  ? 'bg-positive/10 text-positive border border-positive/30'
+                  : 'bg-surface-2 text-muted border border-border'
+              }`}
+            >
+              {flags[f.key] ? 'Enabled' : 'Disabled'}
+            </button>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+
 function OverviewTab({ dashboard }) {
   const d = dashboard || {};
   return (
     <div>
+      <FeatureToggles />
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
         <StatCard label="Predictions" value={d.total_predictions?.toLocaleString()} />
         <StatCard label="Forecasters" value={d.total_forecasters?.toLocaleString()} />

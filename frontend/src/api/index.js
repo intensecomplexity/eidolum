@@ -69,6 +69,18 @@ export function getHomepageData() {
   return cachedGet('/homepage-data').then(r => r.data);
 }
 
+export function getFeatureFlags() {
+  return cachedGet('/features', 300000).then(r => r.data);
+}
+
+export function toggleDuelsAdmin() {
+  return api.post('/admin/toggle-duels', {}, { headers: authHeaders() }).then(r => r.data);
+}
+
+export function toggleCompeteAdmin() {
+  return api.post('/admin/toggle-compete', {}, { headers: authHeaders() }).then(r => r.data);
+}
+
 export function getTrendingTickers() {
   return api.get('/trending-tickers').then(r => r.data);
 }

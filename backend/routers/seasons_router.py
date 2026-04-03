@@ -4,11 +4,22 @@ from sqlalchemy.orm import Session
 from sqlalchemy import text as sql_text
 
 from database import get_db
-from models import Season, SeasonEntry, User
+from models import Season, SeasonEntry, User, Config
 from rate_limit import limiter
 from seasons import ensure_current_season
+from fastapi import HTTPException
 
 router = APIRouter()
+
+
+def _compete_enabled(db) -> bool:
+    row = db.query(Config).filter(Config.key == "compete_enabled").first()
+    return row and row.value == "true"
+
+
+def _require_enabled(db):
+    if not _compete_enabled(db):
+        raise HTTPException(status_code=404, detail="Not found")
 
 
 def _season_dict(s: Season) -> dict:
@@ -33,6 +44,7 @@ def _season_dict(s: Season) -> dict:
 @router.get("/seasons")
 @limiter.limit("60/minute")
 def list_seasons(request: Request, db: Session = Depends(get_db)):
+    _require_enabled(db)
     seasons = db.query(Season).order_by(Season.starts_at.desc()).all()
     return [_season_dict(s) for s in seasons]
 
@@ -40,6 +52,7 @@ def list_seasons(request: Request, db: Session = Depends(get_db)):
 @router.get("/seasons/current")
 @limiter.limit("60/minute")
 def get_current_season(request: Request, db: Session = Depends(get_db)):
+    _require_enabled(db)
     season = ensure_current_season(db)
     return _season_dict(season)
 
@@ -47,6 +60,7 @@ def get_current_season(request: Request, db: Session = Depends(get_db)):
 @router.get("/seasons/{season_id}/leaderboard")
 @limiter.limit("60/minute")
 def season_leaderboard(request: Request, season_id: int, db: Session = Depends(get_db)):
+    _require_enabled(db)
     season = db.query(Season).filter(Season.id == season_id).first()
     if not season:
         raise HTTPException(status_code=404, detail="Season not found")

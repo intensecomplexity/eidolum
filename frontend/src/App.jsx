@@ -58,11 +58,23 @@ import HowItWorks from './pages/HowItWorks';
 import OnboardingOverlay from './components/OnboardingOverlay';
 import ComparisonTray from './components/ComparisonTray';
 import { useAuth } from './context/AuthContext';
+import { useFeatures } from './context/FeatureContext';
 import { CompareProvider } from './context/CompareContext';
 import { useState } from 'react';
 
+function ComingSoon({ feature }) {
+  return (
+    <div className="max-w-lg mx-auto px-4 py-20 text-center">
+      <div className="text-4xl mb-4">🚧</div>
+      <h1 className="text-xl font-bold mb-2">{feature} — Coming Soon</h1>
+      <p className="text-text-secondary text-sm">This feature is being built. Check back soon.</p>
+    </div>
+  );
+}
+
 export default function App() {
   const { isAuthenticated } = useAuth();
+  const features = useFeatures();
   const [showOnboarding, setShowOnboarding] = useState(() => {
     return !localStorage.getItem('eidolum_token') && !localStorage.getItem('eidolum_onboarding_complete');
   });
@@ -110,9 +122,9 @@ export default function App() {
         <Route path="/badges" element={<Badges />} />
         <Route path="/consensus" element={<Consensus />} />
         <Route path="/expiring" element={<Navigate to="/activity" replace />} />
-        <Route path="/duels" element={<Duels />} />
-        <Route path="/compete" element={<Seasons />} />
-        <Route path="/seasons" element={<Seasons />} />
+        <Route path="/duels" element={features.duels ? <Duels /> : <ComingSoon feature="Duels" />} />
+        <Route path="/compete" element={features.compete ? <Seasons /> : <ComingSoon feature="Compete" />} />
+        <Route path="/seasons" element={features.compete ? <Seasons /> : <ComingSoon feature="Compete" />} />
         <Route path="/friends" element={<Friends />} />
         <Route path="/notifications" element={<Notifications />} />
         <Route path="/ticker/:symbol" element={<TickerDetail />} />

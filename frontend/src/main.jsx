@@ -4,15 +4,18 @@ import { BrowserRouter } from 'react-router-dom'
 import App from './App'
 import { SavedPredictionsProvider } from './context/SavedPredictionsContext'
 import { AuthProvider } from './context/AuthContext'
+import { FeatureProvider } from './context/FeatureContext'
 import './index.css'
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
     <BrowserRouter>
       <AuthProvider>
-        <SavedPredictionsProvider>
-          <App />
-        </SavedPredictionsProvider>
+        <FeatureProvider>
+          <SavedPredictionsProvider>
+            <App />
+          </SavedPredictionsProvider>
+        </FeatureProvider>
       </AuthProvider>
     </BrowserRouter>
   </React.StrictMode>
