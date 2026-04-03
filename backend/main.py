@@ -2117,17 +2117,22 @@ async def lifespan(app):
         from datetime import datetime as _dt
         from admin_panel import scheduler_last_run
         scheduler_last_run["backfill_urls"] = _dt.utcnow()
+        print("[URLBackfill] Job triggered")
         if not db_is_healthy("backfill_urls"):
+            print("[URLBackfill] Skipped — DB not healthy")
             return
         mark_job_running("backfill_urls")
         try:
             from jobs.backfill_urls import backfill_real_urls
             backfill_real_urls(max_per_run=2000)
         except Exception as e:
-            print(f"[backfill_urls] Error: {e}")
+            print(f"[URLBackfill] Error: {e}")
+            import traceback; traceback.print_exc()
         finally:
             mark_job_done("backfill_urls")
-    scheduler.add_job(_backfill_urls, "interval", hours=1, id="backfill_urls", next_run_time=_first_run + timedelta(minutes=40))
+    _backfill_urls_first = _first_run + timedelta(minutes=3)
+    scheduler.add_job(_backfill_urls, "interval", hours=1, id="backfill_urls", next_run_time=_backfill_urls_first)
+    print(f"[URLBackfill] Scheduled: first run at {_backfill_urls_first.strftime('%H:%M:%S')}, then every 1h")
 
     # JOB: Enrich remaining generic URLs with Jina Search (fallback for non-Benzinga)
     def _enrich_urls():
