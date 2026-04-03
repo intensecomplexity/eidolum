@@ -161,8 +161,8 @@ def _fetch_urls_for_ticker(ticker: str, date_from: str, date_to: str, needed_ids
         data = r.json()
         diag["response_type"] = type(data).__name__
 
-        # The Massive API returns {"data": [...], "next_url": ...}
-        ratings = data.get("data", data) if isinstance(data, dict) else data
+        # Massive API: try "ratings", "results", then "data" (format varies)
+        ratings = data.get("ratings", data.get("results", data.get("data", []))) if isinstance(data, dict) else data
         if not isinstance(ratings, list):
             diag["response_type"] = f"not a list: {type(ratings).__name__}"
             return {}, diag
