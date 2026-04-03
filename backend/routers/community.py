@@ -160,60 +160,81 @@ def get_user_profile(request: Request, user_id: int, credentials: Optional[HTTPA
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
-    all_preds = db.query(UserPrediction).filter(UserPrediction.user_id == user_id, UserPrediction.deleted_at.is_(None)).all()
-    scored = [p for p in all_preds if p.outcome in ("correct", "incorrect")]
-    correct = [p for p in scored if p.outcome == "correct"]
-    pending = [p for p in all_preds if p.outcome == "pending"]
+    from sqlalchemy import text as _t
 
-    scored_count = len(scored)
-    correct_count = len(correct)
-    accuracy = round(correct_count / scored_count * 100, 1) if scored_count > 0 else 0.0
+    # Single aggregation query — no loading all predictions into memory
+    try:
+        stats_row = db.execute(_t("""
+            SELECT
+                COUNT(*) as total,
+                SUM(CASE WHEN outcome IN ('hit','near','miss','correct','incorrect') THEN 1 ELSE 0 END) as scored,
+                SUM(CASE WHEN outcome IN ('hit','correct') THEN 1 ELSE 0 END) as hits,
+                SUM(CASE WHEN outcome = 'near' THEN 1 ELSE 0 END) as nears,
+                SUM(CASE WHEN outcome = 'pending' THEN 1 ELSE 0 END) as pending,
+                SUM(CASE WHEN direction='bullish' AND outcome IN ('hit','near','miss','correct','incorrect') THEN 1 ELSE 0 END) as bull_scored,
+                SUM(CASE WHEN direction='bearish' AND outcome IN ('hit','near','miss','correct','incorrect') THEN 1 ELSE 0 END) as bear_scored,
+                SUM(CASE WHEN direction='bullish' AND outcome IN ('hit','correct') THEN 1 ELSE 0 END) as bull_hits,
+                SUM(CASE WHEN direction='bearish' AND outcome IN ('hit','correct') THEN 1 ELSE 0 END) as bear_hits,
+                SUM(CASE WHEN direction='bullish' AND outcome='pending' THEN 1 ELSE 0 END) as bull_pending,
+                SUM(CASE WHEN direction='bearish' AND outcome='pending' THEN 1 ELSE 0 END) as bear_pending,
+                MIN(CASE WHEN outcome IN ('hit','correct') THEN evaluation_window_days END) as fastest
+            FROM user_predictions
+            WHERE user_id = :uid AND deleted_at IS NULL
+        """), {"uid": user_id}).first()
+    except Exception:
+        stats_row = None
 
-    # Follow counts (accepted only)
+    total_preds = (stats_row[0] or 0) if stats_row else 0
+    scored_count = (stats_row[1] or 0) if stats_row else 0
+    hits = (stats_row[2] or 0) if stats_row else 0
+    nears = (stats_row[3] or 0) if stats_row else 0
+    pending_count = (stats_row[4] or 0) if stats_row else 0
+    accuracy = round((hits + nears * 0.5) / scored_count * 100, 1) if scored_count > 0 else 0.0
+
+    # Follow counts
     followers_count = db.query(func.count(Follow.id)).filter(Follow.following_id == user_id, Follow.status == "accepted").scalar() or 0
     following_count = db.query(func.count(Follow.id)).filter(Follow.follower_id == user_id, Follow.status == "accepted").scalar() or 0
 
-    # Level info
     user_level = getattr(user, 'xp_level', 1) or 1
 
-    # Sector accuracy
-    sector_stats = defaultdict(lambda: {"correct": 0, "total": 0})
-    for p in scored:
-        sector = SECTOR_MAP.get(p.ticker)
-        if sector:
-            sector_stats[sector]["total"] += 1
-            if p.outcome == "correct":
-                sector_stats[sector]["correct"] += 1
+    # Sector accuracy via SQL (not Python loop)
+    sector_accuracy = []
+    try:
+        sec_rows = db.execute(_t("""
+            SELECT up.ticker, ts.sector,
+                   SUM(CASE WHEN up.outcome IN ('hit','correct') THEN 1 ELSE 0 END) as hits,
+                   SUM(CASE WHEN up.outcome = 'near' THEN 1 ELSE 0 END) as nears,
+                   COUNT(*) as total
+            FROM user_predictions up
+            LEFT JOIN ticker_sectors ts ON ts.ticker = up.ticker
+            WHERE up.user_id = :uid AND up.deleted_at IS NULL
+              AND up.outcome IN ('hit','near','miss','correct','incorrect')
+              AND ts.sector IS NOT NULL AND ts.sector != ''
+            GROUP BY ts.sector
+            HAVING COUNT(*) >= 2
+            ORDER BY COUNT(*) DESC
+        """), {"uid": user_id}).fetchall()
+        for r in sec_rows:
+            s_total = r[4] or 0
+            s_hits = r[2] or 0
+            s_nears = r[3] or 0
+            sector_accuracy.append({
+                "sector": r[1], "accuracy": round((s_hits + s_nears * 0.5) / s_total * 100, 1) if s_total > 0 else 0,
+                "total_scored": s_total,
+            })
+    except Exception:
+        pass
 
-    sector_accuracy = [
-        {
-            "sector": s,
-            "accuracy": round(v["correct"] / v["total"] * 100, 1),
-            "total_scored": v["total"],
-        }
-        for s, v in sector_stats.items()
-        if v["total"] > 0
-    ]
-    sector_accuracy.sort(key=lambda x: x["total_scored"], reverse=True)
-
-    # Direction split (scored predictions)
-    bull_scored = [p for p in scored if p.direction == "bullish"]
-    bear_scored = [p for p in scored if p.direction == "bearish"]
-    bull_pending = sum(1 for p in pending if p.direction == "bullish")
-    bear_pending = sum(1 for p in pending if p.direction == "bearish")
     direction_split = {
-        "bullish_count": len(bull_scored),
-        "bearish_count": len(bear_scored),
-        "bullish_correct": sum(1 for p in bull_scored if p.outcome == "correct"),
-        "bearish_correct": sum(1 for p in bear_scored if p.outcome == "correct"),
-        "bullish_pending": bull_pending,
-        "bearish_pending": bear_pending,
+        "bullish_count": (stats_row[5] or 0) if stats_row else 0,
+        "bearish_count": (stats_row[6] or 0) if stats_row else 0,
+        "bullish_correct": (stats_row[7] or 0) if stats_row else 0,
+        "bearish_correct": (stats_row[8] or 0) if stats_row else 0,
+        "bullish_pending": (stats_row[9] or 0) if stats_row else 0,
+        "bearish_pending": (stats_row[10] or 0) if stats_row else 0,
     }
 
-    # Fastest correct
-    fastest = None
-    if correct:
-        fastest = min(p.evaluation_window_days for p in correct)
+    fastest = (stats_row[11]) if stats_row else None
 
     return {
         "id": user.id,
@@ -226,10 +247,10 @@ def get_user_profile(request: Request, user_id: int, credentials: Optional[HTTPA
         "created_at": user.created_at.isoformat() if user.created_at else None,
         "streak_current": user.streak_current,
         "streak_best": user.streak_best,
-        "total_predictions": len(all_preds),
+        "total_predictions": total_preds,
         "scored_predictions": scored_count,
-        "correct_predictions": correct_count,
-        "pending_predictions": len(pending),
+        "correct_predictions": hits,
+        "pending_predictions": pending_count,
         "accuracy_percentage": accuracy,
         "followers_count": followers_count,
         "following_count": following_count,
