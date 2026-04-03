@@ -156,6 +156,18 @@ def get_user_credibility(request: Request, user_id: int, db: Session = Depends(g
 @router.get("/users/{user_id}/profile")
 @limiter.limit("60/minute")
 def get_user_profile(request: Request, user_id: int, credentials: Optional[HTTPAuthorizationCredentials] = Depends(_optional_bearer), db: Session = Depends(get_db)):
+    try:
+        return _get_user_profile_inner(user_id, credentials, db)
+    except HTTPException:
+        raise
+    except Exception as e:
+        import traceback
+        print(f"[Profile] ERROR for user {user_id}: {e}")
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Profile error: {type(e).__name__}: {str(e)[:200]}")
+
+
+def _get_user_profile_inner(user_id, credentials, db):
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
@@ -201,12 +213,12 @@ def get_user_profile(request: Request, user_id: int, credentials: Optional[HTTPA
     sector_accuracy = []
     try:
         sec_rows = db.execute(_t("""
-            SELECT up.ticker, ts.sector,
+            SELECT ts.sector,
                    SUM(CASE WHEN up.outcome IN ('hit','correct') THEN 1 ELSE 0 END) as hits,
                    SUM(CASE WHEN up.outcome = 'near' THEN 1 ELSE 0 END) as nears,
                    COUNT(*) as total
             FROM user_predictions up
-            LEFT JOIN ticker_sectors ts ON ts.ticker = up.ticker
+            JOIN ticker_sectors ts ON ts.ticker = up.ticker
             WHERE up.user_id = :uid AND up.deleted_at IS NULL
               AND up.outcome IN ('hit','near','miss','correct','incorrect')
               AND ts.sector IS NOT NULL AND ts.sector != ''
@@ -215,11 +227,11 @@ def get_user_profile(request: Request, user_id: int, credentials: Optional[HTTPA
             ORDER BY COUNT(*) DESC
         """), {"uid": user_id}).fetchall()
         for r in sec_rows:
-            s_total = r[4] or 0
-            s_hits = r[2] or 0
-            s_nears = r[3] or 0
+            s_total = r[3] or 0
+            s_hits = r[1] or 0
+            s_nears = r[2] or 0
             sector_accuracy.append({
-                "sector": r[1], "accuracy": round((s_hits + s_nears * 0.5) / s_total * 100, 1) if s_total > 0 else 0,
+                "sector": r[0], "accuracy": round((s_hits + s_nears * 0.5) / s_total * 100, 1) if s_total > 0 else 0,
                 "total_scored": s_total,
             })
     except Exception:
