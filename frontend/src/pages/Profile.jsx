@@ -14,7 +14,7 @@ import { getUserProfile, getUserAchievements, getUserPredictions, followUser, un
 export default function Profile() {
   const navigate = useNavigate();
   const { userId } = useParams();
-  const { isAuthenticated, user } = useAuth();
+  const { isAuthenticated, user, loading: authLoading } = useAuth();
 
   const isOwnProfile = !userId || (user && (userId == user.id || userId == user.user_id));
   const targetId = isOwnProfile ? (user?.id || user?.user_id) : parseInt(userId);
@@ -25,11 +25,13 @@ export default function Profile() {
   const [accuracyHistory, setAccuracyHistory] = useState([]);
   const [categories, setCategories] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [friendshipStatus, setFriendshipStatus] = useState('none'); // none, pending_sent, pending_received, accepted
+  const [friendshipStatus, setFriendshipStatus] = useState('none');
   const [followLoading, setFollowLoading] = useState(false);
-  const [toast, setToast] = useState(null); // { message, type: 'success' | 'error' }
+  const [toast, setToast] = useState(null);
 
   useEffect(() => {
+    // Wait for auth to resolve before deciding targetId is missing
+    if (authLoading) return;
     if (!targetId) { setLoading(false); return; }
     setLoading(true);
     Promise.all([
@@ -49,9 +51,9 @@ export default function Profile() {
         setFriendshipStatus(p.friendship_status);
       }
     }).catch(() => {}).finally(() => setLoading(false));
-  }, [targetId]);
+  }, [targetId, authLoading]);
 
-  if (!isOwnProfile && loading) {
+  if (authLoading || (!isOwnProfile && loading)) {
     return <div className="flex items-center justify-center min-h-[60vh]"><div className="w-8 h-8 border-2 border-accent border-t-transparent rounded-full animate-spin" /></div>;
   }
 
