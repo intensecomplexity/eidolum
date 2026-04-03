@@ -48,7 +48,7 @@ export default function MiniPieChart({
   const titleText = segments.map(s => s.label).join(', ');
 
   return (
-    <svg width={size} height={size} viewBox="0 0 40 40" className={className} role="img" aria-label={titleText}>
+    <svg width={size} height={size} viewBox="0 0 40 40" className={`text-text-primary ${className}`} role="img" aria-label={titleText}>
       <title>{titleText}</title>
       {/* Colored ring segments — no background ring needed */}
       {/* Full background ring in first segment color to eliminate inter-segment gaps */}
@@ -73,7 +73,7 @@ export default function MiniPieChart({
       {/* Center text */}
       {showCenter && size >= 56 && (
         <text x={cx} y={cy} textAnchor="middle" dominantBaseline="central"
-          fill="#e0e0e0" fontSize="7" fontFamily="monospace" fontWeight="bold">
+          fill="currentColor" fontSize="7" fontFamily="monospace" fontWeight="bold">
           {centerText}
         </text>
       )}
