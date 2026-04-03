@@ -150,7 +150,12 @@ export default function Discover() {
                 <Link key={t.ticker} to={`/asset/${t.ticker}`}
                   className="card py-3 flex items-center justify-between hover:bg-surface-2 transition-colors">
                   <div className="flex items-center gap-2">
-                    <CompanyLogo ticker={t.ticker} size={20} />
+                    <CompanyLogo
+                      ticker={t.ticker}
+                      logoUrl={t.logo_url || `https://images.financialmodelingprep.com/symbol/${t.ticker}.png`}
+                      domain={t.logo_domain}
+                      size={20}
+                    />
                     <span className="font-mono text-accent font-bold">{t.ticker}</span>
                     <span className="text-text-secondary text-sm">{t.name}</span>
                   </div>
