@@ -179,5 +179,12 @@ def _extract_urls(data, needed_ids: set, url_map: dict):
         if not rid:
             continue
         news_url = rating.get("benzinga_news_url") or rating.get("url_news") or ""
-        if rid in needed_ids and news_url and news_url.startswith("http") and "/quote/" not in news_url:
+        # Only accept genuinely unique article URLs — reject all generic pages
+        if (rid in needed_ids and news_url and news_url.startswith("http")
+                and "/news/" in news_url  # Must contain /news/ (real article path)
+                and "/stock-articles/" not in news_url
+                and "/analyst-ratings" not in news_url
+                and "/quote/" not in news_url
+                and "/stock/" not in news_url
+                and "/ratings" not in news_url):
             url_map[rid] = news_url

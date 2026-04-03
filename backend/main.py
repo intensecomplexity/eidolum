@@ -1850,10 +1850,20 @@ async def lifespan(app):
                 if updated == 0:
                     break
                 print(f"[Startup] URL quality: classified {batch_num * 10000} predictions")
-            # Fix predictions that got real URLs but still have generic quality
+            # Revert bad backfill: stock-articles/analyst-ratings URLs are generic, not real
+            reverted = _uq_db.execute(sql_text(
+                "UPDATE predictions SET url_quality = 'generic' "
+                "WHERE source_url LIKE '%%/stock-articles/%%/analyst-ratings%%' AND url_quality = 'real_article'"
+            )).rowcount
+            _uq_db.commit()
+            if reverted:
+                print(f"[Startup] URL quality: reverted {reverted} stock-articles URLs from real_article to generic")
+
+            # Fix predictions that have genuine news URLs but wrong quality
             fixed = _uq_db.execute(sql_text(
                 "UPDATE predictions SET url_quality = 'real_article' "
-                "WHERE source_url LIKE '%%benzinga.com/news%%' AND (url_quality IS NULL OR url_quality = 'generic')"
+                "WHERE source_url LIKE '%%benzinga.com/news/%%' AND source_url NOT LIKE '%%/stock-articles/%%' "
+                "AND (url_quality IS NULL OR url_quality = 'generic')"
             )).rowcount
             _uq_db.commit()
             if fixed:
@@ -2110,7 +2120,7 @@ async def lifespan(app):
                 db.close()
         finally:
             mark_job_done("url_backfill")
-    scheduler.add_job(_url_backfill_standalone, "interval", hours=1, id="url_backfill", next_run_time=_first_run + timedelta(minutes=40))
+    scheduler.add_job(_url_backfill_standalone, "interval", hours=24, id="url_backfill", next_run_time=_first_run + timedelta(minutes=40))
     # JOB: Tournament live scoring (only runs when active tournaments exist)
     def _tournament_score():
         try:
