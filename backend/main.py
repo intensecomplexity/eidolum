@@ -1850,6 +1850,18 @@ async def lifespan(app):
                 if updated == 0:
                     break
                 print(f"[Startup] URL quality: classified {batch_num * 10000} predictions")
+            # Fix predictions that got real URLs but still have generic quality
+            fixed = _uq_db.execute(sql_text(
+                "UPDATE predictions SET url_quality = 'real_article' "
+                "WHERE source_url LIKE '%%benzinga.com/news%%' AND (url_quality IS NULL OR url_quality = 'generic')"
+            )).rowcount
+            _uq_db.commit()
+            if fixed:
+                print(f"[Startup] URL quality: reclassified {fixed} benzinga.com/news URLs to real_article")
+
+            # Log distribution
+            dist = _uq_db.execute(sql_text("SELECT url_quality, COUNT(*) FROM predictions GROUP BY url_quality")).fetchall()
+            print(f"[Startup] URL quality distribution: {dict((r[0] or 'NULL', r[1]) for r in dist)}")
             _uq_db.close()
         except Exception as _uqe:
             print(f"[Startup] URL quality classification error: {_uqe}")
