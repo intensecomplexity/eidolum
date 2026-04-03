@@ -41,7 +41,7 @@ export default function SmartMoney() {
     <div>
       <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-10">
         <div className="mb-1">
-          <h1 className="font-bold flex items-center gap-2" style={{ fontSize: 'clamp(24px, 5vw, 36px)' }}>
+          <h1 className="font-bold flex items-center gap-2 whitespace-nowrap" style={{ fontSize: 'clamp(20px, 5vw, 36px)' }}>
             <DollarSign className="w-7 h-7 text-accent" /> Follow the Smart Money
           </h1>
         </div>
@@ -112,31 +112,30 @@ export default function SmartMoney() {
           <div className="space-y-3">
             {items.map(item => (
               <div key={item.ticker} className="card">
-                <div className="flex items-start justify-between gap-4 mb-3">
-                  <div className="flex items-center gap-3 min-w-0">
-                    <CompanyLogo domain={item.logo_domain} logoUrl={item.logo_url} ticker={item.ticker} sector={item.sector} size={36} />
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-2">
-                        <Link to={`/asset/${item.ticker}`} className="font-mono text-accent font-bold text-lg hover:underline">{item.ticker}</Link>
-                        {item.sector && item.sector !== 'Other' && (
-                          <span className="text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded-full bg-accent/10 text-accent border border-accent/20">
-                            {item.sector}
-                          </span>
-                        )}
-                      </div>
-                      {item.company_name && <div className="text-text-secondary text-sm truncate">{item.company_name}</div>}
-                    </div>
-                  </div>
-                  <div className="text-right shrink-0">
-                    <div className={`font-mono text-xl font-bold ${tab === 'bullish' ? 'text-positive' : 'text-negative'}`}>
-                      {item.analyst_count} analysts
-                    </div>
-                    {item.upside_pct != null && (
-                      <div className={`font-mono text-sm ${item.upside_pct >= 0 ? 'text-positive' : 'text-negative'}`}>
-                        {item.upside_pct >= 0 ? '+' : ''}{item.upside_pct}% upside
-                      </div>
-                    )}
-                  </div>
+                {/* Row 1: Logo + Ticker + Sector */}
+                <div className="flex items-center gap-2.5 mb-1.5">
+                  <CompanyLogo domain={item.logo_domain} logoUrl={item.logo_url} ticker={item.ticker} sector={item.sector} size={32} />
+                  <Link to={`/asset/${item.ticker}`} className="font-mono text-accent font-bold text-lg hover:underline shrink-0">{item.ticker}</Link>
+                  {item.sector && item.sector !== 'Other' && (
+                    <span className="text-[8px] sm:text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded-full bg-accent/10 text-accent border border-accent/20 shrink-0">
+                      {item.sector}
+                    </span>
+                  )}
+                </div>
+
+                {/* Row 2: Company name */}
+                {item.company_name && <div className="text-text-secondary text-sm mb-2">{item.company_name}</div>}
+
+                {/* Row 3: Analyst count + upside */}
+                <div className="flex items-center gap-3 mb-3">
+                  <span className={`font-mono text-base sm:text-xl font-bold ${tab === 'bullish' ? 'text-positive' : 'text-negative'}`}>
+                    {item.analyst_count} analysts
+                  </span>
+                  {item.upside_pct != null && (
+                    <span className={`font-mono text-sm ${item.upside_pct >= 0 ? 'text-positive' : 'text-negative'}`}>
+                      {item.upside_pct >= 0 ? '+' : ''}{item.upside_pct}% upside
+                    </span>
+                  )}
                 </div>
 
                 {/* Conviction meter */}
