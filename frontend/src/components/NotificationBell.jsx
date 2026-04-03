@@ -107,8 +107,8 @@ export default function NotificationBell() {
   return (
     <>
       <div className="relative" ref={wrapperRef}>
-        <button onClick={() => setOpen(!open)} className="relative flex items-center justify-center w-9 h-9 rounded-lg text-text-secondary hover:text-text-primary transition-colors">
-          <Bell className={`w-5 h-5 ${unreadCount > 0 ? 'animate-[bell-ring_0.5s_ease-out]' : ''}`} />
+        <button onClick={() => setOpen(!open)} className="relative flex items-center justify-center w-9 h-9 rounded-lg text-text-secondary hover:text-accent transition-colors">
+          <Bell className={`w-[18px] h-[18px] ${unreadCount > 0 ? 'animate-[bell-ring_0.5s_ease-out]' : ''}`} />
           {unreadCount > 0 && (
             <span className="absolute -top-0.5 -right-0.5 bg-negative text-bg text-[9px] font-bold min-w-[16px] h-[16px] flex items-center justify-center rounded-full px-1">
               {unreadCount > 99 ? '99+' : unreadCount}
@@ -117,10 +117,11 @@ export default function NotificationBell() {
         </button>
 
         {open && (
-          <div className="fixed inset-x-0 top-14 bottom-0 sm:absolute sm:inset-auto sm:right-0 sm:top-full sm:mt-2 sm:w-96 sm:bottom-auto sm:max-h-[70vh] sm:rounded-lg bg-surface/95 backdrop-blur-md border-t sm:border border-border shadow-lg overflow-hidden z-[60] flex flex-col">
+          <div className="fixed inset-x-0 top-14 bottom-0 sm:absolute sm:inset-auto sm:right-0 sm:top-full sm:mt-2 sm:w-96 sm:bottom-auto sm:max-h-[70vh] sm:rounded-lg border-t sm:border border-border shadow-lg overflow-hidden z-[60] flex flex-col"
+            style={{ backgroundColor: '#14161c' }}>
             {/* Header */}
             <div className="flex items-center justify-between px-4 py-3 border-b border-border">
-              <span className="text-sm font-semibold">Notifications</span>
+              <span className="text-sm font-semibold text-text-primary">Notifications</span>
               {unreadCount > 0 && (
                 <button onClick={handleMarkAllRead} className="text-[10px] text-accent font-medium hover:text-accent/80">
                   Mark all as read
@@ -131,7 +132,7 @@ export default function NotificationBell() {
             {/* List */}
             <div className="overflow-y-auto flex-1">
               {notifications.length === 0 ? (
-                <div className="text-center py-8 text-muted text-sm">No notifications yet</div>
+                <div className="text-center py-8 text-sm" style={{ color: '#8b8f9a' }}>No notifications yet</div>
               ) : (
                 notifications.map(n => {
                   const cfg = TYPE_CONFIG[n.type] || { icon: Bell, color: 'text-muted' };
