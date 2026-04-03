@@ -315,8 +315,8 @@ export default function ForecasterProfile() {
           </div>
         )}
 
-        {/* Chart + Sector */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6 mb-6 sm:mb-8">
+        {/* Chart + Sector — items-start so chart doesn't stretch to match sector list height */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6 mb-6 sm:mb-8 items-start">
           <div className="card lg:col-span-2" style={{ backgroundColor: '#14161c' }}>
             <h2 className="text-base sm:text-lg font-semibold mb-3 sm:mb-4" style={{ color: '#e0e0e0' }}>Accuracy Trend</h2>
             {chartData.length > 0 ? (
