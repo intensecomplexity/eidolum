@@ -1741,21 +1741,26 @@ async def lifespan(app):
         except Exception as e:
             print(f"[Startup] Season init error: {e}")
 
-        # ROLLBACK: revert broken benzinga.com/analyst/ratings/{id} URLs (404s)
-        # back to safe generic format. Jina enrichment handles finding real URLs.
+        # Fix broken URLs: /analyst/ratings/ and /stock-articles/ → generic /stock/TICKER/ratings
         try:
             _fix_db = BgSessionLocal()
-            reverted = _fix_db.execute(sql_text("""
+            r1 = _fix_db.execute(sql_text("""
                 UPDATE predictions
                 SET source_url = 'https://www.benzinga.com/stock/' || LOWER(ticker) || '/ratings'
                 WHERE source_url LIKE '%%benzinga.com/analyst/ratings/%%'
             """)).rowcount
+            r2 = _fix_db.execute(sql_text("""
+                UPDATE predictions
+                SET source_url = 'https://www.benzinga.com/stock/' || LOWER(ticker) || '/ratings',
+                    url_quality = 'generic'
+                WHERE source_url LIKE '%%/stock-articles/%%'
+            """)).rowcount
             _fix_db.commit()
-            if reverted > 0:
-                print(f"[Startup] Reverted {reverted:,} broken /analyst/ratings/ URLs to /stock/TICKER/ratings")
+            if r1 + r2 > 0:
+                print(f"[Startup] Fixed URLs: {r1} /analyst/ratings/ + {r2} /stock-articles/ → /stock/TICKER/ratings")
             _fix_db.close()
         except Exception as e:
-            print(f"[Startup] URL rollback error: {e}")
+            print(f"[Startup] URL fix error: {e}")
 
         # ── Source URL diagnostic ─────────────────────────────────────
         try:
@@ -2134,33 +2139,33 @@ async def lifespan(app):
 
     scheduler.add_job(_watchdog, "interval", minutes=5, id="watchdog")
 
-    # JOB: Backfill real article URLs from Benzinga API (2,000/run, hourly)
-    def _backfill_urls():
+    # JOB: Backfill real article URLs from Benzinga API — DISABLED
+    # Massive API benzinga_news_url returns generic pages, not real articles.
+    # Keeping code but not scheduling.
+    print("[URLBackfill] DISABLED — Massive API returns generic URLs")
+
+    # JOB: Enrich generic URLs with real article URLs via Jina Search
+    # 500 predictions/run, 0.5s delay, runs hourly = ~12,000/day
+    def _enrich_urls():
         from datetime import datetime as _dt
         from admin_panel import scheduler_last_run
-        scheduler_last_run["backfill_urls"] = _dt.utcnow()
-        print("[URLBackfill] Job triggered")
-        if not db_is_healthy("backfill_urls"):
-            print("[URLBackfill] Skipped — DB not healthy")
+        scheduler_last_run["enrich_urls"] = _dt.utcnow()
+        print("[JinaEnrich] Job triggered")
+        if not db_is_healthy("enrich_urls"):
+            print("[JinaEnrich] Skipped — DB not healthy")
             return
-        mark_job_running("backfill_urls")
+        mark_job_running("enrich_urls")
         try:
-            from jobs.backfill_urls import backfill_real_urls
-            backfill_real_urls(max_per_run=20000)
+            from jobs.enrich_urls import enrich_source_urls
+            enrich_source_urls()
         except Exception as e:
-            print(f"[URLBackfill] Error: {e}")
+            print(f"[JinaEnrich] Error: {e}")
             import traceback; traceback.print_exc()
         finally:
-            mark_job_done("backfill_urls")
-    _backfill_urls_first = _first_run + timedelta(minutes=3)
-    scheduler.add_job(_backfill_urls, "interval", hours=1, id="backfill_urls", next_run_time=_backfill_urls_first)
-    print(f"[URLBackfill] Scheduled: first run at {_backfill_urls_first.strftime('%H:%M:%S')}, then every 1h")
-
-    # JOB: Enrich remaining generic URLs with Jina Search (fallback for non-Benzinga)
-    def _enrich_urls():
-        from jobs.enrich_urls import enrich_source_urls
-        enrich_source_urls()
-    scheduler.add_job(_enrich_urls, "interval", hours=2, id="enrich_urls", next_run_time=_first_run + timedelta(minutes=50))
+            mark_job_done("enrich_urls")
+    _enrich_first = _first_run + timedelta(minutes=5)
+    scheduler.add_job(_enrich_urls, "interval", hours=1, id="enrich_urls", next_run_time=_enrich_first)
+    print(f"[JinaEnrich] Scheduled: first run at {_enrich_first.strftime('%H:%M:%S')}, then every 1h")
 
     # JOB: Queue watchlist notifications (runs after scrapers, every 4 hours)
     def _queue_watchlist():
