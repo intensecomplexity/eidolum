@@ -51,19 +51,24 @@ export default function MiniPieChart({
     <svg width={size} height={size} viewBox="0 0 40 40" className={className} role="img" aria-label={titleText}>
       <title>{titleText}</title>
       {/* Colored ring segments — no background ring needed */}
+      {/* Full background ring in first segment color to eliminate inter-segment gaps */}
+      <circle cx={cx} cy={cy} r={midR} fill="none"
+        stroke={segments[0]?.color || '#3a3d4a'} strokeWidth={strokeW + 0.5}
+        shapeRendering="geometricPrecision" />
+      {/* Colored ring segments */}
       {segments.map((seg, i) => (
         <circle
           key={i} cx={cx} cy={cy} r={midR}
-          fill="none" stroke={seg.color} strokeWidth={strokeW}
-          strokeDasharray={`${(seg.pct / 100) * circumference} ${circumference}`}
+          fill="none" stroke={seg.color} strokeWidth={strokeW + 0.5}
+          strokeDasharray={`${(seg.pct / 100) * circumference + 0.5} ${circumference}`}
           strokeDashoffset={-((seg.offset / 100) * circumference)}
           transform={`rotate(-90 ${cx} ${cy})`}
           strokeLinecap="butt"
           shapeRendering="geometricPrecision"
         />
       ))}
-      {/* Center hole — covers inner edge, matches card background */}
-      <circle cx={cx} cy={cy} r={innerR + 0.3} fill="#14161c" stroke="none" />
+      {/* Center hole — slightly oversized to cover anti-aliasing at inner edge */}
+      <circle cx={cx} cy={cy} r={innerR + 0.5} fill="#14161c" stroke="none" />
       {/* Center text */}
       {showCenter && size >= 56 && (
         <text x={cx} y={cy} textAnchor="middle" dominantBaseline="central"
