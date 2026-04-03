@@ -26,7 +26,8 @@ POLYGON_KEY = os.getenv("MASSIVE_API_KEY", "").strip()
 FMP_KEY = os.getenv("FMP_KEY", "").strip()
 TIINGO_KEY = os.getenv("TIINGO_API_KEY", "").strip()
 
-POLYGON_EARLIEST = _date(2024, 4, 1)
+# Dynamic: Polygon has ~2 years of history from today
+POLYGON_EARLIEST = (datetime.utcnow() - timedelta(days=730)).date()
 
 _price_cache: dict[str, dict] = {}
 
@@ -269,7 +270,7 @@ def _score_predictions(preds, prices, now, ticker, verbose=False):
 
 def retry_no_data_batch(db, max_tickers: int = 500):
     """Re-evaluate no_data predictions. Polygon → FMP → Tiingo by date."""
-    _price_cache.clear()
+    # Don't clear price cache — FMP/Tiingo calls from previous runs are still valid
     _reset_counters()
     now = datetime.utcnow()
 
@@ -364,50 +365,75 @@ def retry_no_data_batch(db, max_tickers: int = 500):
     polygon_scored = total_scored
 
     # ── Phase 2: FMP (old predictions, 300/day) ──
+    print(f"[RetryNoData] FMP phase: attempting {len(fmp_batch)} tickers (budget: {_fmp_calls_today}/{FMP_DAILY_LIMIT})")
+    fmp_empty = 0
     for i, ticker in enumerate(fmp_batch):
         if _fmp_calls_today >= FMP_DAILY_LIMIT:
+            print(f"[RetryNoData] FMP daily limit reached at ticker {i}")
             break
+
         prices = _fetch_fmp(ticker)
+        if not prices:
+            fmp_empty += 1
 
-        verbose = i < 2
-        if verbose:
-            eval_dates = [p["evaluation_date"] for p in ticker_preds[ticker] if p["evaluation_date"]]
-            print(f"[RetryNoData] FMP {ticker}: {len(ticker_preds[ticker])} preds, "
-                  f"eval={min(eval_dates).strftime('%Y-%m-%d') if eval_dates else '?'}..{max(eval_dates).strftime('%Y-%m-%d') if eval_dates else '?'}, "
-                  f"{len(prices)} prices")
+        if i < 2:
+            print(f"[RetryNoData] FMP {ticker}: {len(prices)} prices, {len(ticker_preds[ticker])} preds")
 
-        updates, nd = _score_predictions(ticker_preds[ticker], prices, now, ticker, verbose=verbose)
+        updates, nd = _score_predictions(ticker_preds[ticker], prices, now, ticker)
         total_still_no_data += nd
         if updates:
             _write_updates(updates)
 
         if (i + 1) % 10 == 0:
             db.commit()
+        if (i + 1) % 100 == 0:
+            print(f"[RetryNoData] FMP {i + 1}/{len(fmp_batch)}, {total_scored - polygon_scored} scored")
         time.sleep(0.3)
 
+    print(f"[RetryNoData] FMP: {_fmp_calls_today} calls, {fmp_empty} returned empty")
     db.commit()
     fmp_scored = total_scored - polygon_scored
 
     # ── Phase 3: Tiingo (old predictions, 900/day, minimal bandwidth) ──
     tiingo_scored_start = total_scored
-    for i, ticker in enumerate(tiingo_batch):
-        if _tiingo_calls_today >= TIINGO_DAILY_LIMIT:
-            break
-        if _tiingo_blocked_until and datetime.utcnow() < _tiingo_blocked_until:
-            break
+    tiingo_attempted = 0
+    tiingo_empty = 0
+    if _tiingo_blocked_until and datetime.utcnow() < _tiingo_blocked_until:
+        print(f"[RetryNoData] Tiingo BLOCKED until {_tiingo_blocked_until.strftime('%H:%M')} — skipping {len(tiingo_batch)} tickers")
+    else:
+        print(f"[RetryNoData] Tiingo phase: attempting {len(tiingo_batch)} tickers (budget: {_tiingo_calls_today}/{TIINGO_DAILY_LIMIT})")
+        for i, ticker in enumerate(tiingo_batch):
+            if _tiingo_calls_today >= TIINGO_DAILY_LIMIT:
+                print(f"[RetryNoData] Tiingo daily limit reached at ticker {i}")
+                break
+            if _tiingo_blocked_until and datetime.utcnow() < _tiingo_blocked_until:
+                print(f"[RetryNoData] Tiingo 429 blocked at ticker {i}")
+                break
 
-        preds = ticker_preds[ticker]
-        start_date, end_date = _date_range(preds)
-        prices = _fetch_tiingo(ticker, start_date, end_date)
+            preds = ticker_preds[ticker]
+            start_date, end_date = _date_range(preds)
+            prices = _fetch_tiingo(ticker, start_date, end_date)
+            tiingo_attempted += 1
 
-        updates, nd = _score_predictions(preds, prices, now, ticker)
-        total_still_no_data += nd
-        if updates:
-            _write_updates(updates)
+            if not prices:
+                tiingo_empty += 1
 
-        if (i + 1) % 10 == 0:
-            db.commit()
-        time.sleep(0.5)
+            # Log first 3 tickers for diagnostics
+            if tiingo_attempted <= 3:
+                print(f"[RetryNoData] Tiingo {ticker}: {len(prices)} prices, {len(preds)} preds, range {start_date}..{end_date}")
+
+            updates, nd = _score_predictions(preds, prices, now, ticker)
+            total_still_no_data += nd
+            if updates:
+                _write_updates(updates)
+
+            if (i + 1) % 10 == 0:
+                db.commit()
+            if (i + 1) % 100 == 0:
+                print(f"[RetryNoData] Tiingo {i + 1}/{len(tiingo_batch)}, {total_scored - tiingo_scored_start} scored")
+            time.sleep(0.5)
+
+        print(f"[RetryNoData] Tiingo attempted {tiingo_attempted}, {tiingo_empty} returned empty")
 
     db.commit()
     tiingo_scored = total_scored - polygon_scored - fmp_scored
