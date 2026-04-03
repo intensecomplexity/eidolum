@@ -317,12 +317,12 @@ export default function ForecasterProfile() {
 
         {/* Chart + Sector */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6 mb-6 sm:mb-8">
-          <div className="card lg:col-span-2">
-            <h2 className="text-base sm:text-lg font-semibold mb-3 sm:mb-4">Accuracy Trend</h2>
+          <div className="card lg:col-span-2" style={{ backgroundColor: '#14161c' }}>
+            <h2 className="text-base sm:text-lg font-semibold mb-3 sm:mb-4" style={{ color: '#e0e0e0' }}>Accuracy Trend</h2>
             {chartData.length > 0 ? (
               <>
-                <ResponsiveContainer width="100%" height={220}>
-                  <LineChart data={chartData} margin={{ top: 5, right: 5, bottom: 5, left: 0 }}>
+                <ResponsiveContainer width="100%" height={220} style={{ background: 'transparent' }}>
+                  <LineChart data={chartData} margin={{ top: 5, right: 5, bottom: 5, left: 0 }} style={{ background: 'transparent' }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
                     <XAxis dataKey="prediction_number" tick={{ fill: '#64748b', fontSize: 10 }} stroke="rgba(255,255,255,0.08)" tickLine={false}
                       ticks={(() => {
@@ -339,9 +339,9 @@ export default function ForecasterProfile() {
                       if (!active || !payload?.length) return null;
                       const d = payload[0].payload;
                       return (
-                        <div className="bg-surface border border-border rounded-lg px-3 py-2 text-xs shadow-lg">
-                          <div className="font-mono text-accent">After {d.total} predictions: {d.cumulative_accuracy}%</div>
-                          <div className="text-muted">{d.correct}/{d.total} correct</div>
+                        <div style={{ background: '#14161c', border: '1px solid rgba(212,168,67,0.1)', borderRadius: 8, padding: '8px 12px', fontSize: 12, boxShadow: '0 4px 12px rgba(0,0,0,0.4)' }}>
+                          <div style={{ fontFamily: 'monospace', color: '#D4A843' }}>After {d.total} predictions: {d.cumulative_accuracy}%</div>
+                          <div style={{ color: '#8b8f9a' }}>{d.correct} hits / {d.total} scored</div>
                         </div>
                       );
                     }} />
@@ -370,7 +370,7 @@ export default function ForecasterProfile() {
           <div className="card">
             <h2 className="text-base sm:text-lg font-semibold mb-3 sm:mb-4">Sector Accuracy</h2>
             <div className="space-y-3">
-              {(data.sector_strengths || []).map((s) => (
+              {(sectorCounts.length > 0 ? sectorCounts : data.sector_strengths || []).map((s) => (
                 <div key={s.sector}>
                   <div className="flex items-center justify-between mb-1">
                     <span className="text-sm text-text-secondary">{s.sector}</span>
@@ -384,7 +384,7 @@ export default function ForecasterProfile() {
                   <div className="text-muted text-xs mt-0.5">{s.count} predictions</div>
                 </div>
               ))}
-              {(!data.sector_strengths || data.sector_strengths.length === 0) && (
+              {sectorCounts.length === 0 && (!data.sector_strengths || data.sector_strengths.length === 0) && (
                 <p className="text-muted text-sm">No sector data.</p>
               )}
             </div>
