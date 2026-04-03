@@ -28,6 +28,14 @@ def _fetch_price_data(symbol: str) -> dict | None:
     if cached and now - cached["_ts"] < _PRICE_TTL:
         return cached
 
+    # Check if crypto first
+    from crypto_prices import is_crypto, get_crypto_price_data
+    if is_crypto(symbol):
+        result = get_crypto_price_data(symbol)
+        if result:
+            _price_cache[symbol] = result
+            return result
+
     result = None
     if FINNHUB_KEY:
         try:

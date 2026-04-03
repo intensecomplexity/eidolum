@@ -83,6 +83,11 @@ def _not_deleted():
 
 
 def _fetch_finnhub_price(ticker: str) -> float | None:
+    # Check crypto first
+    from crypto_prices import is_crypto, get_crypto_price
+    if is_crypto(ticker):
+        return get_crypto_price(ticker)
+
     if FINNHUB_KEY:
         try:
             r = httpx.get(
