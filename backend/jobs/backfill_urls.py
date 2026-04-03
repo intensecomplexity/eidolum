@@ -15,7 +15,7 @@ MASSIVE_KEY = os.getenv("MASSIVE_API_KEY", "").strip()
 API_URL = "https://api.massive.com/benzinga/v1/ratings"
 
 
-def backfill_real_urls(db=None, max_per_run: int = 2000):
+def backfill_real_urls(db=None, max_per_run: int = 20000):
     """Re-fetch real article URLs for predictions with generic source URLs."""
     if not MASSIVE_KEY:
         print("[URLBackfill] MASSIVE_API_KEY not set, skipping")

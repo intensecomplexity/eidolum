@@ -2085,7 +2085,7 @@ async def lifespan(app):
             db = BgSessionLocal()
             try:
                 from jobs.backfill_urls import backfill_real_urls
-                result = backfill_real_urls(db, max_per_run=2000)
+                result = backfill_real_urls(db, max_per_run=20000)
                 # Update url_quality for any URLs we just fixed
                 db.execute(sql_text(
                     "UPDATE predictions SET url_quality = 'real_article' "
@@ -2124,7 +2124,7 @@ async def lifespan(app):
         mark_job_running("backfill_urls")
         try:
             from jobs.backfill_urls import backfill_real_urls
-            backfill_real_urls(max_per_run=2000)
+            backfill_real_urls(max_per_run=20000)
         except Exception as e:
             print(f"[URLBackfill] Error: {e}")
             import traceback; traceback.print_exc()
