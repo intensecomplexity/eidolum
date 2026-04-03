@@ -329,7 +329,7 @@ export default function ForecasterProfile() {
                         <stop offset="95%" stopColor="#D4A843" stopOpacity={0} />
                       </linearGradient>
                     </defs>
-                    <CartesianGrid stroke="rgba(128,128,128,0.15)" strokeWidth={0.5} />
+                    <CartesianGrid stroke="#1e2028" strokeDasharray="3 3" />
                     <XAxis dataKey="prediction_number" tick={{ fill: '#6b7280', fontSize: 10 }} axisLine={false} tickLine={false}
                       ticks={(() => {
                         const last = chartData[chartData.length - 1]?.prediction_number || 1;
@@ -341,12 +341,21 @@ export default function ForecasterProfile() {
                         return t;
                       })()} />
                     <YAxis
-                      domain={[
-                        (dataMin) => Math.max(0, Math.floor(dataMin / 10) * 10 - 10),
-                        100
-                      ]}
-                      tick={{ fill: '#6b7280', fontSize: 10 }} axisLine={false} tickLine={false}
-                      tickFormatter={(v) => `${v}%`} width={45} tickCount={5} />
+                      domain={[(() => {
+                        const vals = chartData.map(d => d.cumulative_accuracy);
+                        const minVal = vals.length > 0 ? Math.min(...vals) : 0;
+                        return Math.max(0, Math.floor(minVal / 10) * 10 - 10);
+                      })(), 100]}
+                      tick={{ fill: '#8b8f9a', fontSize: 10 }} axisLine={false} tickLine={false}
+                      tickFormatter={(v) => `${v}%`} width={45}
+                      ticks={(() => {
+                        const vals = chartData.map(d => d.cumulative_accuracy);
+                        const minVal = vals.length > 0 ? Math.min(...vals) : 0;
+                        const yMin = Math.max(0, Math.floor(minVal / 10) * 10 - 10);
+                        const ticks = [];
+                        for (let v = yMin; v <= 100; v += 10) ticks.push(v);
+                        return ticks;
+                      })()} />
                     <Tooltip content={({ active, payload }) => {
                       if (!active || !payload?.length) return null;
                       const d = payload[0].payload;
