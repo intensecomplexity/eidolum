@@ -77,7 +77,7 @@ export default function PortfolioSimulator({ forecasterId, forecasterName }) {
                 value={customCapital.toLocaleString()}
                 onChange={e => {
                   const v = parseInt(e.target.value.replace(/[^0-9]/g, '')) || 0;
-                  setCustomCapital(Math.max(100, Math.min(10000000, v)));
+                  setCustomCapital(Math.max(1, Math.min(10000000, v)));
                 }}
                 className="w-28 pl-5 pr-2 py-1.5 bg-surface-2 border border-accent/30 rounded-lg text-xs font-mono text-text-primary focus:outline-none focus:border-accent/60"
               />

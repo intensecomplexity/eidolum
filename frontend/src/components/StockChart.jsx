@@ -110,7 +110,7 @@ export default function StockChart({ ticker }) {
 
       <ResponsiveContainer width="100%" height={typeof window !== 'undefined' && window.innerWidth < 640 ? 200 : 300}>
         <LineChart data={prices} margin={{ top: 5, right: 5, bottom: 5, left: 0 }}>
-          <CartesianGrid strokeDasharray="3 3" stroke="#1e2028" />
+          <CartesianGrid stroke="#1e2028" strokeWidth={0.5} />
           <XAxis
             dataKey="date"
             tick={{ fill: '#8b8f9a', fontSize: 10 }}
