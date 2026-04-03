@@ -2137,6 +2137,28 @@ async def lifespan(app):
             print(f"[TournamentScore] Error: {e}")
     scheduler.add_job(_tournament_score, "interval", hours=6, id="tournament_scorer", next_run_time=_first_run + timedelta(minutes=45))
 
+    # JOB: YouTube scraper — V1 log only, every 8 hours, independent (no lock)
+    def _youtube_scraper():
+        from datetime import datetime as _dt
+        scheduler_last_run["youtube_scraper"] = _dt.utcnow()
+        if not db_is_healthy("youtube_scraper"):
+            return
+        mark_job_running("youtube_scraper")
+        try:
+            from jobs.youtube_scraper import run_youtube_scraper
+            db = BgSessionLocal()
+            try:
+                run_youtube_scraper(db)
+            finally:
+                db.close()
+        except Exception as e:
+            print(f"[YouTubeScraper] Error: {e}")
+            import traceback; traceback.print_exc()
+        finally:
+            mark_job_done("youtube_scraper")
+    scheduler.add_job(_youtube_scraper, "interval", hours=8, id="youtube_scraper", next_run_time=_first_run + timedelta(minutes=55))
+    print("[YouTubeScraper] Scheduled: every 8h (LOG ONLY — no DB inserts)")
+
     scheduler.add_job(_watchdog, "interval", minutes=5, id="watchdog")
 
     # JOB: Backfill real article URLs from Benzinga API — DISABLED
