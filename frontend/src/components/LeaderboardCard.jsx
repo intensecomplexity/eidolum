@@ -65,62 +65,55 @@ export default function LeaderboardCard({ forecaster: f, metric = 'avg_return' }
           </div>
         </div>
 
-        {/* Stats row */}
-        <div className="flex items-end justify-between">
-          <div className="flex gap-4 items-end">
-            {/* Accuracy + pies */}
-            <div>
-              <div className="flex items-end gap-3">
-                {/* Outcome pie */}
-                {(hasOutcome || useFallback) && (
-                  <div className="flex flex-col items-center flex-shrink-0 cursor-pointer hover:opacity-80"
-                    onClick={e => { e.preventDefault(); e.stopPropagation(); setExpanded(!expanded); }}>
-                    {hasOutcome
-                      ? <MiniPieChart hits={hits} nears={nears} misses={misses} pending={pending} size={36} />
-                      : <MiniPieChart correct={fallbackCorrect} incorrect={fallbackMiss} size={36} />
-                    }
-                    <span className="text-[9px] text-muted mt-0.5">Score</span>
-                  </div>
-                )}
-                {/* Direction pie */}
-                {hasDir && (
-                  <div className="flex flex-col items-center flex-shrink-0 cursor-pointer hover:opacity-80"
-                    onClick={e => { e.preventDefault(); e.stopPropagation(); setExpanded(!expanded); }}>
-                    <MiniPieChart bullish={bullish} bearish={bearish} neutral={neutral} size={36} />
-                    <span className="text-[9px] text-accent/60 mt-0.5">Dir</span>
-                  </div>
-                )}
-                <div>
-                  <div className={`font-mono text-[22px] font-bold leading-tight ${f.accuracy_rate >= 60 ? 'text-positive' : 'text-negative'}`}>
-                    {f.accuracy_rate.toFixed(1)}%
-                  </div>
-                  <div className="text-muted text-[11px]">accuracy</div>
-                </div>
-              </div>
+        {/* Stats — Row 1: Pies + accuracy */}
+        <div className="flex items-end gap-3 mb-2">
+          {(hasOutcome || useFallback) && (
+            <div className="flex flex-col items-center shrink-0 cursor-pointer hover:opacity-80"
+              onClick={e => { e.preventDefault(); e.stopPropagation(); setExpanded(!expanded); }}>
+              {hasOutcome
+                ? <MiniPieChart hits={hits} nears={nears} misses={misses} pending={pending} size={32} />
+                : <MiniPieChart correct={fallbackCorrect} incorrect={fallbackMiss} size={32} />
+              }
+              <span className="text-[8px] text-muted mt-0.5">Score</span>
             </div>
-
-            {/* Metric */}
-            <div>
-              {(() => {
-                const mv = getMetricValue(f, metric);
-                return (
-                  <>
-                    <div className={`font-mono text-[15px] font-semibold leading-tight mt-1.5 ${metric === 'hit_rate' ? 'text-text-secondary' : mv.positive ? 'text-positive' : 'text-negative'}`}>
-                      {mv.text}
-                    </div>
-                    <div className="text-muted text-[11px]">{mv.label}</div>
-                  </>
-                );
-              })()}
+          )}
+          {hasDir && (
+            <div className="flex flex-col items-center shrink-0 cursor-pointer hover:opacity-80"
+              onClick={e => { e.preventDefault(); e.stopPropagation(); setExpanded(!expanded); }}>
+              <MiniPieChart bullish={bullish} bearish={bearish} neutral={neutral} size={32} />
+              <span className="text-[8px] text-accent/60 mt-0.5">Dir</span>
             </div>
-            <div>
-              <div className="font-mono text-[15px] font-semibold text-text-secondary leading-tight mt-1.5">
-                {f.evaluated_predictions} scored
-              </div>
-              <div className="text-muted text-[11px]">{outcomeTotal} total</div>
+          )}
+          <div>
+            <div className={`font-mono text-[20px] font-bold leading-tight ${f.accuracy_rate >= 60 ? 'text-positive' : 'text-negative'}`}>
+              {f.accuracy_rate.toFixed(1)}%
             </div>
+            <div className="text-muted text-[10px]">accuracy</div>
           </div>
-          <StreakBadge streak={f.streak} />
+          <div className="ml-auto"><StreakBadge streak={f.streak} /></div>
+        </div>
+
+        {/* Stats — Row 2: Metric + scored count */}
+        <div className="flex items-center gap-4">
+          <div>
+            {(() => {
+              const mv = getMetricValue(f, metric);
+              return (
+                <>
+                  <div className={`font-mono text-[14px] font-semibold leading-tight ${metric === 'hit_rate' ? 'text-text-secondary' : mv.positive ? 'text-positive' : 'text-negative'}`}>
+                    {mv.text}
+                  </div>
+                  <div className="text-muted text-[10px]">{mv.label}</div>
+                </>
+              );
+            })()}
+          </div>
+          <div>
+            <div className="font-mono text-[14px] font-semibold text-text-secondary leading-tight">
+              {f.evaluated_predictions} scored
+            </div>
+            <div className="text-muted text-[10px]">{outcomeTotal} total</div>
+          </div>
         </div>
       </Link>
 
