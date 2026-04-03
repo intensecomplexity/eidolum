@@ -2,13 +2,8 @@ import { useState, useEffect } from 'react';
 
 export default function useTheme() {
   const [theme, setTheme] = useState(() => {
-    const stored = localStorage.getItem('eidolum_theme');
-    if (stored) return stored;
-    // Respect system preference on first visit
-    if (typeof window !== 'undefined' && window.matchMedia?.('(prefers-color-scheme: light)').matches) {
-      return 'light';
-    }
-    return 'dark';
+    // Eidolum is dark-theme only — always default to dark
+    return localStorage.getItem('eidolum_theme') || 'dark';
   });
 
   useEffect(() => {
