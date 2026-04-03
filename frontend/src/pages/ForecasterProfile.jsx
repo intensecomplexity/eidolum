@@ -321,10 +321,16 @@ export default function ForecasterProfile() {
             <h2 className="text-base sm:text-lg font-semibold mb-3 sm:mb-4" style={{ color: '#e0e0e0' }}>Accuracy Trend</h2>
             {chartData.length > 0 ? (
               <>
-                <ResponsiveContainer width="100%" height={220} style={{ background: 'transparent' }}>
-                  <LineChart data={chartData} margin={{ top: 5, right: 5, bottom: 5, left: 0 }} style={{ background: 'transparent' }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
-                    <XAxis dataKey="prediction_number" tick={{ fill: '#64748b', fontSize: 10 }} stroke="rgba(255,255,255,0.08)" tickLine={false}
+                <ResponsiveContainer width="100%" height={220}>
+                  <LineChart data={chartData} margin={{ top: 5, right: 10, bottom: 5, left: 10 }}>
+                    <defs>
+                      <linearGradient id="accGold" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#D4A843" stopOpacity={0.15} />
+                        <stop offset="95%" stopColor="#D4A843" stopOpacity={0} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid stroke="rgba(255,255,255,0.06)" strokeWidth={0.5} />
+                    <XAxis dataKey="prediction_number" tick={{ fill: '#6b7280', fontSize: 10 }} axisLine={false} tickLine={false}
                       ticks={(() => {
                         const last = chartData[chartData.length - 1]?.prediction_number || 1;
                         if (last <= 12) return undefined;
@@ -334,20 +340,28 @@ export default function ForecasterProfile() {
                         if (t[t.length - 1] !== last) t.push(last);
                         return t;
                       })()} />
-                    <YAxis domain={[0, 100]} tick={{ fill: '#64748b', fontSize: 10 }} stroke="rgba(255,255,255,0.08)" tickLine={false} axisLine={false} tickFormatter={(v) => `${v}%`} width={40} />
+                    <YAxis
+                      domain={[
+                        (dataMin) => Math.max(0, Math.floor(dataMin / 10) * 10 - 10),
+                        100
+                      ]}
+                      tick={{ fill: '#6b7280', fontSize: 10 }} axisLine={false} tickLine={false}
+                      tickFormatter={(v) => `${v}%`} width={45} tickCount={5} />
                     <Tooltip content={({ active, payload }) => {
                       if (!active || !payload?.length) return null;
                       const d = payload[0].payload;
                       return (
-                        <div style={{ background: '#14161c', border: '1px solid rgba(212,168,67,0.1)', borderRadius: 8, padding: '8px 12px', fontSize: 12, boxShadow: '0 4px 12px rgba(0,0,0,0.4)' }}>
+                        <div style={{ background: '#14161c', border: '1px solid rgba(212,168,67,0.15)', borderRadius: 8, padding: '8px 12px', fontSize: 12, boxShadow: '0 4px 12px rgba(0,0,0,0.4)' }}>
                           <div style={{ fontFamily: 'monospace', color: '#D4A843' }}>After {d.total} predictions: {d.cumulative_accuracy}%</div>
                           <div style={{ color: '#8b8f9a' }}>{d.correct} hits / {d.total} scored</div>
                         </div>
                       );
                     }} />
                     {/* 50% reference line */}
-                    <Line type="monotone" dataKey={() => 50} stroke="rgba(255,255,255,0.1)" strokeWidth={1} strokeDasharray="4 4" dot={false} isAnimationActive={false} />
-                    <Line type="monotone" dataKey="cumulative_accuracy" stroke="#D4A843" strokeWidth={2} dot={{ r: 2.5, fill: '#D4A843', stroke: '#0a0a0a', strokeWidth: 1.5 }} activeDot={{ r: 5 }} />
+                    <Line type="monotone" dataKey={() => 50} stroke="rgba(255,255,255,0.08)" strokeWidth={1} strokeDasharray="4 4" dot={false} isAnimationActive={false} />
+                    <Line type="monotone" dataKey="cumulative_accuracy" stroke="#D4A843" strokeWidth={2}
+                      fill="url(#accGold)"
+                      dot={{ r: 2, fill: '#D4A843', stroke: '#0a0a0a', strokeWidth: 1.5 }} activeDot={{ r: 5 }} />
                   </LineChart>
                 </ResponsiveContainer>
                 <div className="text-center text-muted text-[10px] mt-1 font-mono">
