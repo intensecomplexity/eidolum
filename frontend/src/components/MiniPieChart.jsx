@@ -68,7 +68,8 @@ export default function MiniPieChart({
         />
       ))}
       {/* Center hole — slightly oversized to cover anti-aliasing at inner edge */}
-      <circle cx={cx} cy={cy} r={innerR + 0.5} fill="#14161c" stroke="none" />
+      <circle cx={cx} cy={cy} r={innerR + 0.5} stroke="none"
+        style={{ fill: 'var(--color-card-bg, #0f1115)' }} />
       {/* Center text */}
       {showCenter && size >= 56 && (
         <text x={cx} y={cy} textAnchor="middle" dominantBaseline="central"
