@@ -302,6 +302,75 @@ def get_audit_log(request: Request, admin_id: int = Depends(require_admin_user),
     }
 
 
+# ── GET /api/admin/url-quality ──────────────────────────────────────────────
+
+
+@router.get("/admin/url-quality")
+@limiter.limit("30/minute")
+def get_url_quality(request: Request, admin_id: int = Depends(require_admin_user), db: Session = Depends(get_db)):
+    # Distribution
+    dist_rows = db.execute(sql_text("""
+        SELECT
+            COUNT(*) as total,
+            COUNT(CASE WHEN source_url LIKE '%%benzinga.com/news%%' OR source_url LIKE '%%benzinga.com/markets%%'
+                         OR source_url LIKE '%%seekingalpha.com/%%' OR source_url LIKE '%%cnbc.com/%%'
+                         OR source_url LIKE '%%reuters.com/%%' OR source_url LIKE '%%marketwatch.com/%%'
+                         THEN 1 END) as real_article,
+            COUNT(CASE WHEN source_url LIKE '%%/stock/%%/ratings%%' THEN 1 END) as generic_ratings,
+            COUNT(CASE WHEN source_url LIKE '%%stockanalysis%%' THEN 1 END) as stockanalysis,
+            COUNT(CASE WHEN source_url IS NULL OR source_url = '' THEN 1 END) as no_url
+        FROM predictions
+    """)).first()
+
+    total = dist_rows[0] or 0
+    real = dist_rows[1] or 0
+    generic = dist_rows[2] or 0
+    sa = dist_rows[3] or 0
+    none_count = dist_rows[4] or 0
+    other = total - real - generic - sa - none_count
+
+    distribution = {
+        "real_article": real,
+        "generic_ratings": generic,
+        "stockanalysis": sa,
+        "no_url": none_count,
+        "other": other,
+        "total": total,
+    }
+
+    # Recent backfill updates (predictions with real article URLs, most recently changed)
+    recent = db.execute(sql_text("""
+        SELECT p.ticker, f.name, p.prediction_date, p.source_url
+        FROM predictions p
+        JOIN forecasters f ON f.id = p.forecaster_id
+        WHERE (p.source_url LIKE '%%benzinga.com/news%%' OR p.source_url LIKE '%%benzinga.com/markets%%')
+        ORDER BY p.id DESC
+        LIMIT 10
+    """)).fetchall()
+
+    recent_updates = [{
+        "ticker": r[0], "forecaster": r[1],
+        "date": r[2].isoformat() if r[2] else None,
+        "source_url": r[3],
+    } for r in recent]
+
+    # Sample real article URLs
+    samples = db.execute(sql_text("""
+        SELECT p.ticker, f.name, p.source_url
+        FROM predictions p
+        JOIN forecasters f ON f.id = p.forecaster_id
+        WHERE p.source_url LIKE '%%benzinga.com/news%%'
+        ORDER BY RANDOM()
+        LIMIT 5
+    """)).fetchall()
+
+    sample_urls = [{
+        "ticker": r[0], "forecaster": r[1], "source_url": r[2],
+    } for r in samples]
+
+    return {"distribution": distribution, "recent_updates": recent_updates, "sample_real_urls": sample_urls}
+
+
 # ── GET /api/admin/forecasters ──────────────────────────────────────────────
 
 

@@ -908,6 +908,10 @@ export function getAdminAuditLog(params = {}) {
   return api.get('/admin/audit-log', { params, headers: authHeaders() }).then(r => r.data);
 }
 
+export function getAdminUrlQuality() {
+  return api.get('/admin/url-quality', { headers: authHeaders() }).then(r => r.data);
+}
+
 export function getAdminForecasters(params = {}) {
   return api.get('/admin/forecasters', { params, headers: authHeaders() }).then(r => r.data);
 }
