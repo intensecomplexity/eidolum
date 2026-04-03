@@ -241,7 +241,7 @@ export default function ForecasterProfile() {
                   </div>
                 )}
               <div className="grid grid-cols-2 sm:flex gap-3 sm:gap-5 shrink-0">
-                <div className="text-center bg-surface-2 sm:bg-transparent rounded-lg p-3 sm:p-0">
+                <div className="text-center p-3 sm:p-0">
                   <div className="flex items-center justify-center gap-2">
                     {/* Tiny pie on mobile only */}
                     {(data.prediction_counts?.evaluated > 0 || data.prediction_counts?.correct > 0) && (
@@ -263,19 +263,19 @@ export default function ForecasterProfile() {
                   </div>
                   <div className="text-muted text-[11px] sm:text-xs">Accuracy</div>
                 </div>
-                <div className="text-center bg-surface-2 sm:bg-transparent rounded-lg p-3 sm:p-0">
+                <div className="text-center p-3 sm:p-0">
                   <div className={`font-mono text-xl sm:text-2xl font-bold ${(data.avg_return ?? 0) >= 0 ? 'text-positive' : 'text-negative'}`}>
                     {(data.avg_return ?? 0) >= 0 ? '+' : ''}{(data.avg_return ?? 0).toFixed(2)}%
                   </div>
                   <div className="text-muted text-[11px] sm:text-xs">Avg Return</div>
                 </div>
-                <div className="text-center bg-surface-2 sm:bg-transparent rounded-lg p-3 sm:p-0">
+                <div className="text-center p-3 sm:p-0">
                   <div className={`font-mono text-xl sm:text-2xl font-bold ${data.alpha >= 0 ? 'text-positive' : 'text-negative'}`}>
                     {data.alpha >= 0 ? '+' : ''}{data.alpha.toFixed(2)}%
                   </div>
                   <div className="text-muted text-[11px] sm:text-xs">Alpha vs S&amp;P 500</div>
                 </div>
-                <div className="text-center bg-surface-2 sm:bg-transparent rounded-lg p-3 sm:p-0">
+                <div className="text-center p-3 sm:p-0">
                   <div className="font-mono text-xl sm:text-2xl font-bold text-accent">{data.total_predictions}</div>
                   <div className="text-muted text-[11px] sm:text-xs">Predictions</div>
                 </div>
