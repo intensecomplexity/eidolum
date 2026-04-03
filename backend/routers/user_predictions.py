@@ -428,8 +428,15 @@ def get_user_predictions(
         UserPrediction.user_id == user_id,
         _not_deleted(),
     )
-    if outcome and outcome in ("pending", "correct", "incorrect"):
-        query = query.filter(UserPrediction.outcome == outcome)
+    if outcome:
+        if outcome in ("correct", "hit"):
+            query = query.filter(UserPrediction.outcome.in_(["correct", "hit"]))
+        elif outcome == "near":
+            query = query.filter(UserPrediction.outcome == "near")
+        elif outcome in ("incorrect", "miss"):
+            query = query.filter(UserPrediction.outcome.in_(["incorrect", "miss"]))
+        elif outcome == "pending":
+            query = query.filter(UserPrediction.outcome == "pending")
     if template and template in PREDICTION_TEMPLATES:
         query = query.filter(UserPrediction.template == template)
 

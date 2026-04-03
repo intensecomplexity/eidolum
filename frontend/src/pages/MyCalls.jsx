@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { Crosshair, Clock, Check, X, Lock, Trash2 } from 'lucide-react';
+import { Crosshair, Clock, Check, X, Minus, Lock, Trash2 } from 'lucide-react';
 import timeLeft from '../utils/timeLeft';
 import { useAuth } from '../context/AuthContext';
 import Footer from '../components/Footer';
@@ -15,8 +15,9 @@ import { getUserPredictions, deletePrediction, getDeletionStatus } from '../api'
 const OUTCOME_FILTERS = [
   { key: null, label: 'All' },
   { key: 'pending', label: 'Pending' },
-  { key: 'correct', label: 'Correct' },
-  { key: 'incorrect', label: 'Incorrect' },
+  { key: 'correct', label: 'Hit' },
+  { key: 'near', label: 'Near' },
+  { key: 'incorrect', label: 'Miss' },
 ];
 
 const DELETE_WINDOW_MS = 5 * 60 * 1000;
@@ -154,8 +155,9 @@ export default function MyCalls() {
 // ── Shared helpers ───────────────────────────────────────────────────────────
 
 function OutcomeBadge({ outcome }) {
-  if (outcome === 'correct') return <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-mono font-semibold bg-positive/10 text-positive border border-positive/20"><Check className="w-3 h-3" /> Correct</span>;
-  if (outcome === 'incorrect') return <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-mono font-semibold bg-negative/10 text-negative border border-negative/20"><X className="w-3 h-3" /> Incorrect</span>;
+  if (outcome === 'correct' || outcome === 'hit') return <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-mono font-semibold bg-positive/10 text-positive border border-positive/20"><Check className="w-3 h-3" /> HIT</span>;
+  if (outcome === 'near') return <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-mono font-semibold bg-yellow-400/10 text-yellow-400 border border-yellow-400/20"><Minus className="w-3 h-3" /> NEAR</span>;
+  if (outcome === 'incorrect' || outcome === 'miss') return <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-mono font-semibold bg-negative/10 text-negative border border-negative/20"><X className="w-3 h-3" /> MISS</span>;
   return <span className="badge-pending"><Clock className="w-3 h-3 mr-1" /> Pending</span>;
 }
 
