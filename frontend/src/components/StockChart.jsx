@@ -126,24 +126,41 @@ export default function StockChart({ ticker }) {
         ))}
       </div>
 
-      <ResponsiveContainer width="100%" height={typeof window !== 'undefined' && window.innerWidth < 640 ? 200 : 300}>
-        <LineChart data={prices} margin={{ top: 5, right: 5, bottom: 5, left: 0 }}
-          onClick={() => setSelectedDot(null)}>
-          <CartesianGrid stroke="#1e2028" strokeWidth={0.5} />
-          <XAxis dataKey="date" tick={{ fill: '#8b8f9a', fontSize: 10 }} tickFormatter={d => d.slice(5)}
-            axisLine={{ stroke: '#1e2028' }} tickLine={false} minTickGap={40} />
-          <YAxis domain={['auto', 'auto']} tick={{ fill: '#8b8f9a', fontSize: 10 }}
-            axisLine={false} tickLine={false} tickFormatter={v => `$${v}`} />
-          <Tooltip content={<PriceTooltip />} cursor={{ stroke: 'rgba(255,255,255,0.1)' }} />
-          <Line type="monotone" dataKey="close" stroke="#D4A843" strokeWidth={2} dot={false}
-            activeDot={{ r: 4, fill: '#D4A843', stroke: '#0a0a0a', strokeWidth: 2 }} />
+      {(() => {
+        const isMobile = typeof window !== 'undefined' && window.innerWidth < 640;
+        const dotR = isMobile ? 4 : 6;
+        return (
+        <ResponsiveContainer width="100%" height={isMobile ? 200 : 300}>
+          <LineChart data={prices} margin={{ top: 5, right: 5, bottom: 5, left: isMobile ? -10 : 0 }}
+            onClick={() => setSelectedDot(null)}>
+            {!isMobile && <CartesianGrid stroke="#1e2028" strokeWidth={0.5} />}
+            <XAxis dataKey="date" tick={{ fill: '#6b7280', fontSize: isMobile ? 9 : 10 }}
+              tickFormatter={d => d.slice(5)}
+              axisLine={false} tickLine={false}
+              minTickGap={isMobile ? 60 : 40}
+              interval={isMobile ? Math.max(1, Math.floor(prices.length / 4)) : undefined} />
+            <YAxis domain={['auto', 'auto']} tick={{ fill: '#6b7280', fontSize: isMobile ? 9 : 10 }}
+              axisLine={false} tickLine={false} tickFormatter={v => `$${v}`}
+              tickCount={isMobile ? 4 : 6} width={isMobile ? 35 : 45} />
+            <Tooltip content={<PriceTooltip />} cursor={{ stroke: 'rgba(255,255,255,0.08)' }} />
+            <defs>
+              <linearGradient id="chartGold" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="5%" stopColor="#D4A843" stopOpacity={0.15} />
+                <stop offset="95%" stopColor="#D4A843" stopOpacity={0} />
+              </linearGradient>
+            </defs>
+            <Line type="monotone" dataKey="close" stroke="#D4A843" strokeWidth={isMobile ? 1.5 : 2}
+              dot={false} fill="url(#chartGold)"
+              activeDot={{ r: 3, fill: '#D4A843', stroke: '#0a0a0a', strokeWidth: 1.5 }} />
           {dots.map((d, i) => (
-            <ReferenceDot key={i} x={d.date} y={d.close} r={6} fill={d.color}
-              stroke="#0a0a0a" strokeWidth={2} isFront style={{ cursor: 'pointer' }}
+            <ReferenceDot key={i} x={d.date} y={d.close} r={dotR} fill={d.color}
+              stroke="#0a0a0a" strokeWidth={isMobile ? 1 : 2} isFront style={{ cursor: 'pointer' }}
               onClick={(e) => { e?.stopPropagation?.(); handleDotClick(d); }} />
           ))}
         </LineChart>
       </ResponsiveContainer>
+        );
+      })()}
 
       {/* Prediction detail popup */}
       {selectedDot && (
