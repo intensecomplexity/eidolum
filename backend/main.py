@@ -1749,6 +1749,45 @@ async def lifespan(app):
         except Exception as e:
             print(f"[Startup] URL rollback error: {e}")
 
+        # ── Source URL diagnostic ─────────────────────────────────────
+        try:
+            _url_db = BgSessionLocal()
+
+            # 1. Most common URLs
+            top_urls = _url_db.execute(sql_text("""
+                SELECT source_url, COUNT(*) as cnt
+                FROM predictions
+                GROUP BY source_url
+                ORDER BY cnt DESC
+                LIMIT 20
+            """)).fetchall()
+            print("[URL-DIAG] Top 20 source URLs:")
+            for r in top_urls:
+                print(f"  {r[1]:>6,}x  {(r[0] or 'NULL')[:80]}")
+
+            # 2. URL type breakdown
+            breakdown = _url_db.execute(sql_text("""
+                SELECT
+                    COUNT(*) as total,
+                    COUNT(CASE WHEN source_url IS NULL OR source_url = '' THEN 1 END) as no_url,
+                    COUNT(CASE WHEN source_url LIKE '%%stockanalysis%%' THEN 1 END) as stockanalysis,
+                    COUNT(CASE WHEN source_url LIKE '%%/stock/%%/ratings%%' THEN 1 END) as generic_ratings,
+                    COUNT(CASE WHEN source_url LIKE '%%benzinga.com/analyst/ratings%%' THEN 1 END) as bz_analyst,
+                    COUNT(CASE WHEN source_url LIKE '%%benzinga.com/news%%' OR source_url LIKE '%%benzinga.com/markets%%' THEN 1 END) as bz_article,
+                    COUNT(CASE WHEN source_url LIKE '%%financialmodelingprep%%' THEN 1 END) as fmp,
+                    COUNT(CASE WHEN source_url LIKE '%%/quote/%%' THEN 1 END) as quote_page
+                FROM predictions
+            """)).first()
+            if breakdown:
+                print(f"[URL-DIAG] Breakdown: total={breakdown[0]:,}, no_url={breakdown[1]:,}, "
+                      f"stockanalysis={breakdown[2]:,}, generic_ratings={breakdown[3]:,}, "
+                      f"bz_analyst={breakdown[4]:,}, bz_article={breakdown[5]:,}, "
+                      f"fmp={breakdown[6]:,}, quote_page={breakdown[7]:,}")
+
+            _url_db.close()
+        except Exception as e:
+            print(f"[URL-DIAG] Error: {e}")
+
         # Check no_data backlog size — if large, skip non-evaluation FMP usage
         _no_data_count = 0
         try:
