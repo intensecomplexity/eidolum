@@ -1,14 +1,8 @@
 """
 Backfill real article URLs from the Massive/Benzinga API.
 
-Strategy: fetch ratings by ticker+date from the Massive API (the same
-endpoint the scraper uses), then match by benzinga_id to find the
-benzinga_news_url for each prediction.
-
-Groups predictions by ticker, fetches one page of ratings per ticker,
-matches by ID. One API call covers many predictions for the same ticker.
-
-Rate: ~3 calls/sec (0.3s sleep). 2,000 predictions per run.
+Groups predictions by ticker, fetches ratings for each ticker+date range,
+matches by benzinga_id to find the real benzinga_news_url.
 """
 import os
 import time
@@ -33,7 +27,6 @@ def backfill_real_urls(db=None, max_per_run: int = 2000):
         db = BgSessionLocal()
 
     try:
-        # Find predictions with generic URLs that have a benzinga_id, grouped by ticker
         rows = db.execute(sql_text("""
             SELECT id, external_id, ticker, prediction_date
             FROM predictions
@@ -65,7 +58,7 @@ def backfill_real_urls(db=None, max_per_run: int = 2000):
             print("[URLBackfill] No predictions need URL backfill")
             return {"updated": 0, "remaining": 0}
 
-        # Group by ticker for efficient API calls
+        # Group by ticker
         ticker_preds = defaultdict(list)
         for r in rows:
             bz_id = r[1].replace("bz_", "") if r[1] else ""
@@ -81,23 +74,34 @@ def backfill_real_urls(db=None, max_per_run: int = 2000):
         api_calls = 0
 
         for ticker, preds in ticker_preds.items():
-            # Build a set of benzinga_ids we need
             needed_ids = {p["bz_id"] for p in preds if p["bz_id"]}
             if not needed_ids:
                 continue
 
-            # Find the date range for this ticker's predictions
             dates = [p["date"] for p in preds if p["date"]]
             if not dates:
                 continue
             date_from = min(dates)
             date_to = max(dates)
 
-            # Fetch ratings from the Massive API for this ticker+date range
-            url_map = _fetch_urls_for_ticker(ticker, date_from, date_to, needed_ids)
+            url_map, diag = _fetch_urls_for_ticker(ticker, date_from, date_to, needed_ids, verbose=(api_calls < 3))
             api_calls += 1
 
-            # Match and update
+            # Debug: first 3 tickers show full diagnostics
+            if api_calls <= 3:
+                print(f"[URLBackfill] DIAG {ticker}: needed {len(needed_ids)} IDs, "
+                      f"date range {date_from}..{date_to}, "
+                      f"API returned {diag.get('total_ratings', 0)} ratings, "
+                      f"matched {len(url_map)}")
+                if diag.get("sample_needed"):
+                    print(f"[URLBackfill]   needed IDs sample: {diag['sample_needed']}")
+                if diag.get("sample_api_ids"):
+                    print(f"[URLBackfill]   API IDs sample: {diag['sample_api_ids']}")
+                if diag.get("sample_keys"):
+                    print(f"[URLBackfill]   API first rating keys: {diag['sample_keys']}")
+                if diag.get("api_status"):
+                    print(f"[URLBackfill]   API status: {diag['api_status']}, response type: {diag.get('response_type')}")
+
             for p in preds:
                 real_url = url_map.get(p["bz_id"])
                 if real_url:
@@ -108,7 +112,6 @@ def backfill_real_urls(db=None, max_per_run: int = 2000):
                 else:
                     failed += 1
 
-            # Commit every 5 tickers
             if api_calls % 5 == 0:
                 db.commit()
 
@@ -131,9 +134,10 @@ def backfill_real_urls(db=None, max_per_run: int = 2000):
             db.close()
 
 
-def _fetch_urls_for_ticker(ticker: str, date_from: str, date_to: str, needed_ids: set) -> dict:
-    """Fetch ratings for a ticker from the Massive API and return {benzinga_id: news_url}.
-    Fetches up to 500 ratings in one call, covers the date range of predictions."""
+def _fetch_urls_for_ticker(ticker: str, date_from: str, date_to: str, needed_ids: set, verbose: bool = False) -> tuple[dict, dict]:
+    """Fetch ratings for a ticker and return ({bz_id: news_url}, diagnostics_dict)."""
+    diag = {"total_ratings": 0, "api_status": None, "response_type": None}
+
     try:
         r = httpx.get(
             API_URL,
@@ -148,25 +152,48 @@ def _fetch_urls_for_ticker(ticker: str, date_from: str, date_to: str, needed_ids
             headers={"Accept": "application/json"},
             timeout=15,
         )
+        diag["api_status"] = r.status_code
         if r.status_code != 200:
-            return {}
+            if verbose:
+                diag["response_type"] = f"error: {r.text[:200]}"
+            return {}, diag
 
         data = r.json()
+        diag["response_type"] = type(data).__name__
 
-        # Response: {"data": [...ratings...], "next_url": ...}
+        # The Massive API returns {"data": [...], "next_url": ...}
         ratings = data.get("data", data) if isinstance(data, dict) else data
         if not isinstance(ratings, list):
-            return {}
+            diag["response_type"] = f"not a list: {type(ratings).__name__}"
+            return {}, diag
+
+        diag["total_ratings"] = len(ratings)
+
+        if verbose:
+            diag["sample_needed"] = list(needed_ids)[:5]
+            if ratings:
+                diag["sample_keys"] = list(ratings[0].keys())
+                # Try MULTIPLE possible ID field names
+                diag["sample_api_ids"] = []
+                for rating in ratings[:5]:
+                    diag["sample_api_ids"].append({
+                        "id": str(rating.get("id", "")),
+                        "benzinga_id": str(rating.get("benzinga_id", "")),
+                        "rating_id": str(rating.get("rating_id", "")),
+                        "has_news_url": bool(rating.get("benzinga_news_url") or rating.get("url_news")),
+                    })
 
         url_map = {}
         for rating in ratings:
-            rid = str(rating.get("id") or "")
+            # Try multiple ID field names
+            rid = str(rating.get("id") or rating.get("benzinga_id") or rating.get("rating_id") or "")
             news_url = rating.get("benzinga_news_url") or rating.get("url_news") or ""
 
             if rid in needed_ids and news_url and news_url.startswith("http") and "/quote/" not in news_url:
                 url_map[rid] = news_url
 
-        return url_map
+        return url_map, diag
 
     except Exception as e:
-        return {}
+        diag["response_type"] = f"exception: {e}"
+        return {}, diag
