@@ -329,7 +329,7 @@ export default function ForecasterProfile() {
                         <stop offset="95%" stopColor="#D4A843" stopOpacity={0} />
                       </linearGradient>
                     </defs>
-                    <CartesianGrid stroke="rgba(255,255,255,0.06)" strokeWidth={0.5} />
+                    <CartesianGrid stroke="rgba(128,128,128,0.15)" strokeWidth={0.5} />
                     <XAxis dataKey="prediction_number" tick={{ fill: '#6b7280', fontSize: 10 }} axisLine={false} tickLine={false}
                       ticks={(() => {
                         const last = chartData[chartData.length - 1]?.prediction_number || 1;

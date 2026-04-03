@@ -44,7 +44,7 @@ export default function AccuracyChart({ data = [], onMonthClick }) {
       <div>
         <ResponsiveContainer width="100%" height={220}>
           <LineChart data={data} margin={{ top: 5, right: 5, bottom: 5, left: 0 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
+            <CartesianGrid strokeDasharray="3 3" stroke="rgba(128,128,128,0.15)" />
             <XAxis dataKey="prediction_number" tick={{ fill: '#6b7280', fontSize: 10 }} axisLine={{ stroke: 'rgba(255,255,255,0.08)' }} tickLine={false}
               ticks={(() => {
                 const last = data[data.length - 1]?.prediction_number || 1;
@@ -90,7 +90,7 @@ export default function AccuracyChart({ data = [], onMonthClick }) {
     <div>
       <ResponsiveContainer width="100%" height={220}>
         <LineChart data={data} onClick={handleClick} margin={{ top: 5, right: 5, bottom: 5, left: 0 }}>
-          <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
+          <CartesianGrid strokeDasharray="3 3" stroke="rgba(128,128,128,0.15)" />
           <XAxis
             dataKey="month"
             tick={{ fill: '#6b7280', fontSize: 10 }}

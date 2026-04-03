@@ -123,7 +123,7 @@ export default function PortfolioSimulator({ forecasterId, forecasterName }) {
                   <stop offset="95%" stopColor="#D4A843" stopOpacity={0} />
                 </linearGradient>
               </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="#1e2028" />
+              <CartesianGrid strokeDasharray="3 3" stroke="rgba(128,128,128,0.15)" />
               <XAxis
                 dataKey="date"
                 tick={{ fill: '#8b8f9a', fontSize: 10 }}

@@ -133,7 +133,7 @@ export default function StockChart({ ticker }) {
         <ResponsiveContainer width="100%" height={isMobile ? 200 : 300}>
           <LineChart data={prices} margin={{ top: 5, right: 5, bottom: 5, left: isMobile ? -10 : 0 }}
             onClick={() => setSelectedDot(null)}>
-            {!isMobile && <CartesianGrid stroke="#1e2028" strokeWidth={0.5} />}
+            {!isMobile && <CartesianGrid stroke="rgba(128,128,128,0.15)" strokeWidth={0.5} />}
             <XAxis dataKey="date" tick={{ fill: '#6b7280', fontSize: isMobile ? 9 : 10 }}
               tickFormatter={d => d.slice(5)}
               axisLine={false} tickLine={false}

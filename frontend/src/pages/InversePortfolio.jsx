@@ -185,7 +185,7 @@ export default function InversePortfolio() {
                 <h2 className="text-base sm:text-lg font-semibold mb-4">Portfolio Growth Over Time</h2>
                 <ResponsiveContainer width="100%" height={300}>
                   <LineChart data={data.portfolio_over_time}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#1e2d45" />
+                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(128,128,128,0.15)" />
                     <XAxis dataKey="date" tick={{ fill: '#64748b', fontSize: 10 }} tickFormatter={v => v.slice(5)} stroke="#1e2d45" />
                     <YAxis tick={{ fill: '#64748b', fontSize: 10 }} stroke="#1e2d45" tickFormatter={v => `$${(v / 1000).toFixed(0)}k`} />
                     <Tooltip
