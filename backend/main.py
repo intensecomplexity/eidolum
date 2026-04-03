@@ -1367,6 +1367,29 @@ async def lifespan(app):
     print(f"[STARTUP] TIINGO_API_KEY set: {bool(_tiingo)}")
     print("[STARTUP] ════════════════════════════════════════")
 
+    # Polygon API diagnostic — confirm MASSIVE_API_KEY works with Polygon
+    _polygon_key = os.getenv("MASSIVE_API_KEY", "").strip()
+    if _polygon_key:
+        try:
+            import httpx as _phx
+            _pr = _phx.get(
+                "https://api.polygon.io/v2/aggs/ticker/AAPL/range/1/day/2025-01-02/2025-01-10",
+                params={"adjusted": "true", "sort": "asc", "apiKey": _polygon_key},
+                timeout=10,
+            )
+            _pd = _pr.json() if _pr.status_code == 200 else {}
+            _bars = _pd.get("results", [])
+            print(f"[POLYGON-DIAG] AAPL 2025-01-02..10: HTTP {_pr.status_code}, {len(_bars)} bars")
+            if _bars:
+                from datetime import datetime as _pdt
+                _b = _bars[0]
+                _ds = _pdt.utcfromtimestamp(_b['t'] / 1000).strftime('%Y-%m-%d') if _b.get('t') else '?'
+                print(f"[POLYGON-DIAG] First bar: date={_ds}, close=${_b.get('c', '?')}")
+            elif _pr.status_code != 200:
+                print(f"[POLYGON-DIAG] Error response: {str(_pr.text)[:200]}")
+        except Exception as _pe:
+            print(f"[POLYGON-DIAG] Failed: {_pe}")
+
     # NOTE: Admin promote, outcome migration, and neutral reclassification
     # all moved to _startup_init() background thread to avoid blocking healthcheck.
 

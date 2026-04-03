@@ -1,24 +1,30 @@
 """
-Retry no_data predictions using FMP historical prices.
+Retry no_data predictions using Polygon (primary) + FMP (fallback for pre-2024).
 
-Polygon is NOT available (requires separate paid API key — MASSIVE_API_KEY is Benzinga).
-FMP /api/v3/historical-price-full is the only working historical source.
+Polygon.io (Massive rebrand): MASSIVE_API_KEY, Stocks Basic plan.
+- 5 calls/min (12s between calls), no daily limit
+- ~2 years of history (April 2024 to present)
+
+FMP /api/v3/historical-price-full: FMP_KEY
+- 300 calls/day, full history back to 2000
+- Fallback for predictions Polygon can't cover
 
 Strategy:
-- FMP returns full price history per ticker (one call = all dates)
-- 200 calls/day budget, process 200 tickers per run
-- Each ticker scores all its no_data predictions from the cached history
-- 0.3s between calls to stay within rate limits
+- Split tickers: recent eval_dates (2024+) → Polygon, old → FMP
+- Process Polygon tickers first (unlimited), then FMP (200/day budget)
 """
 import os
 import time
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date as _date
 from collections import defaultdict
 from sqlalchemy import text as sql_text
 
 from jobs.historical_evaluator import _get_tolerance, _TOLERANCE, _MIN_MOVEMENT, _build_summary
 
+POLYGON_KEY = os.getenv("MASSIVE_API_KEY", "").strip()
 FMP_KEY = os.getenv("FMP_KEY", "").strip()
+
+POLYGON_EARLIEST = _date(2024, 4, 1)  # Polygon ~2yr history cutoff
 
 _price_cache: dict[str, dict] = {}
 _fmp_calls_today = 0
@@ -32,6 +38,43 @@ def _reset_fmp_counter():
     if _fmp_day != today:
         _fmp_calls_today = 0
         _fmp_day = today
+
+
+def _fetch_polygon(ticker: str, start_date: str, end_date: str) -> dict:
+    """Fetch daily prices from Polygon. Returns {date_str: close, ...}."""
+    if ticker in _price_cache:
+        return _price_cache[ticker]
+    if not POLYGON_KEY:
+        return {}
+
+    import httpx
+    try:
+        url = f"https://api.polygon.io/v2/aggs/ticker/{ticker}/range/1/day/{start_date}/{end_date}"
+        r = httpx.get(
+            url,
+            params={"adjusted": "true", "sort": "asc", "limit": "5000", "apiKey": POLYGON_KEY},
+            timeout=15,
+        )
+        if r.status_code != 200:
+            _price_cache[ticker] = {}
+            return {}
+
+        data = r.json()
+        results = data.get("results") or []
+        prices = {}
+        for bar in results:
+            ts_ms = bar.get("t")
+            close = bar.get("c")
+            if ts_ms and close and float(close) > 0:
+                # Convert millisecond timestamp to YYYY-MM-DD
+                ds = datetime.utcfromtimestamp(ts_ms / 1000).strftime("%Y-%m-%d")
+                prices[ds] = round(float(close), 2)
+
+        _price_cache[ticker] = prices
+        return prices
+    except Exception as e:
+        _price_cache[ticker] = {}
+        return {}
 
 
 def _fetch_fmp(ticker: str) -> dict:
@@ -65,11 +108,11 @@ def _fetch_fmp(ticker: str) -> dict:
             ds = (day.get("date") or "")[:10]
             close = day.get("close")
             if ds and close and float(close) > 0:
-                prices[ds] = float(close)
+                prices[ds] = round(float(close), 2)
 
         _price_cache[ticker] = prices
         return prices
-    except Exception as e:
+    except Exception:
         _fmp_calls_today += 1
         _price_cache[ticker] = {}
         return {}
@@ -89,6 +132,35 @@ def _closest_price(prices: dict, target_date) -> float | None:
     return None
 
 
+def _date_range(preds: list) -> tuple[str, str]:
+    """Minimal date range for a ticker's predictions (30 day padding)."""
+    dates = []
+    for p in preds:
+        if p["prediction_date"]:
+            d = p["prediction_date"]
+            dates.append(d.date() if hasattr(d, 'date') else d)
+        if p["evaluation_date"]:
+            d = p["evaluation_date"]
+            dates.append(d.date() if hasattr(d, 'date') else d)
+    if not dates:
+        end = datetime.utcnow().date()
+        return str(end - timedelta(days=730)), str(end)
+    start = min(dates) - timedelta(days=30)
+    end = min(max(dates) + timedelta(days=30), datetime.utcnow().date())
+    return str(start), str(end)
+
+
+def _needs_polygon(preds: list) -> bool:
+    """Check if any prediction has an eval_date within Polygon's range."""
+    for p in preds:
+        ed = p["evaluation_date"]
+        if ed:
+            d = ed.date() if hasattr(ed, 'date') else ed
+            if d >= POLYGON_EARLIEST:
+                return True
+    return False
+
+
 def _score_predictions(preds: list, prices: dict, now: datetime, ticker: str, verbose: bool = False) -> tuple[list, int]:
     """Score predictions against price data. Returns (updates, still_no_data_count)."""
     updates = []
@@ -97,8 +169,7 @@ def _score_predictions(preds: list, prices: dict, now: datetime, ticker: str, ve
         eval_price = _closest_price(prices, p["evaluation_date"])
         if eval_price is None:
             if verbose:
-                ed = p["evaluation_date"]
-                print(f"  [SKIP] id={p['id']}: no price for eval_date={ed}")
+                print(f"  [SKIP] id={p['id']}: no price for eval_date={p['evaluation_date']}")
             no_data += 1
             continue
 
@@ -107,7 +178,7 @@ def _score_predictions(preds: list, prices: dict, now: datetime, ticker: str, ve
             ref = _closest_price(prices, p["prediction_date"])
             if not ref or ref <= 0:
                 if verbose:
-                    print(f"  [SKIP] id={p['id']}: no entry price and no price for pred_date={p['prediction_date']}")
+                    print(f"  [SKIP] id={p['id']}: no entry/pred price (pred_date={p['prediction_date']})")
                 no_data += 1
                 continue
 
@@ -147,14 +218,10 @@ def _score_predictions(preds: list, prices: dict, now: datetime, ticker: str, ve
 
 
 def retry_no_data_batch(db, max_tickers: int = 200):
-    """Re-evaluate no_data predictions using FMP historical prices."""
+    """Re-evaluate no_data predictions. Polygon for recent, FMP for old."""
     _price_cache.clear()
     _reset_fmp_counter()
     now = datetime.utcnow()
-
-    if not FMP_KEY:
-        print("[RetryNoData] FMP_KEY not set, cannot retry")
-        return {"scored": 0, "remaining": 0}
 
     rows = db.execute(sql_text("""
         SELECT p.id, p.ticker, p.direction, p.target_price, p.entry_price,
@@ -183,42 +250,40 @@ def retry_no_data_batch(db, max_tickers: int = 200):
             "forecaster_id": r[7], "window_days": r[8],
         })
 
-    tickers = list(ticker_preds.keys())[:max_tickers]
-    total_tickers = len(ticker_preds)
+    # Split: Polygon for recent, FMP for old
+    polygon_tickers = []
+    fmp_tickers = []
+    for ticker, preds in ticker_preds.items():
+        if _needs_polygon(preds):
+            polygon_tickers.append(ticker)
+        else:
+            fmp_tickers.append(ticker)
 
-    print(f"[RetryNoData] {remaining_total:,} no_data across {total_tickers} tickers. "
-          f"Processing {len(tickers)} tickers via FMP. Budget: {_fmp_calls_today}/{FMP_DAILY_LIMIT}")
+    # Limit Polygon to max_tickers, FMP gets the rest up to budget
+    polygon_batch = polygon_tickers[:max_tickers]
+    fmp_budget_left = max(0, max_tickers - len(polygon_batch))
+    fmp_batch = fmp_tickers[:min(fmp_budget_left, FMP_DAILY_LIMIT - _fmp_calls_today)]
+
+    print(f"[RetryNoData] {remaining_total:,} no_data across {len(ticker_preds)} tickers. "
+          f"This run: {len(polygon_batch)} Polygon + {len(fmp_batch)} FMP. "
+          f"FMP budget: {_fmp_calls_today}/{FMP_DAILY_LIMIT}")
 
     total_scored = 0
     total_still_no_data = 0
     affected_forecasters = set()
 
-    for i, ticker in enumerate(tickers):
-        if _fmp_calls_today >= FMP_DAILY_LIMIT:
-            print(f"[RetryNoData] FMP budget exhausted at ticker {i}/{len(tickers)}")
-            break
-
+    def _process_ticker(ticker, prices, verbose):
+        nonlocal total_scored, total_still_no_data
         preds = ticker_preds[ticker]
-        prices = _fetch_fmp(ticker)
 
-        # Verbose diagnostics for first 3 tickers
-        verbose = i < 3
         if verbose:
-            # Show date range of predictions
             eval_dates = [p["evaluation_date"] for p in preds if p["evaluation_date"]]
-            pred_dates = [p["prediction_date"] for p in preds if p["prediction_date"]]
-            min_eval = min(eval_dates).strftime("%Y-%m-%d") if eval_dates else "none"
-            max_eval = max(eval_dates).strftime("%Y-%m-%d") if eval_dates else "none"
-            entry_prices = [p["entry_price"] for p in preds if p["entry_price"] and p["entry_price"] > 0]
-
-            price_dates = sorted(prices.keys())
-            min_price = price_dates[0] if price_dates else "none"
-            max_price = price_dates[-1] if price_dates else "none"
-
-            print(f"[RetryNoData] DIAG {ticker}: {len(preds)} predictions, "
-                  f"eval_dates={min_eval}..{max_eval}, "
-                  f"{len(entry_prices)}/{len(preds)} have entry_price, "
-                  f"FMP returned {len(prices)} price days ({min_price}..{max_price})")
+            entry_count = sum(1 for p in preds if p["entry_price"] and p["entry_price"] > 0)
+            price_dates = sorted(prices.keys()) if prices else []
+            print(f"[RetryNoData] DIAG {ticker}: {len(preds)} preds, "
+                  f"eval={min(eval_dates).strftime('%Y-%m-%d') if eval_dates else 'none'}..{max(eval_dates).strftime('%Y-%m-%d') if eval_dates else 'none'}, "
+                  f"{entry_count}/{len(preds)} have entry_price, "
+                  f"prices: {len(prices)} days ({price_dates[0] if price_dates else 'none'}..{price_dates[-1] if price_dates else 'none'})")
 
         updates, no_data = _score_predictions(preds, prices, now, ticker, verbose=verbose)
         total_still_no_data += no_data
@@ -238,13 +303,35 @@ def retry_no_data_batch(db, max_tickers: int = 200):
         if verbose:
             print(f"[RetryNoData] DIAG {ticker}: scored {len(updates)}, still no_data {no_data}")
 
-        # Commit every 5 tickers
+    # Phase 1: Polygon (recent predictions, 5 calls/min = 12s between)
+    for i, ticker in enumerate(polygon_batch):
+        preds = ticker_preds[ticker]
+        start_date, end_date = _date_range(preds)
+        prices = _fetch_polygon(ticker, start_date, end_date)
+
+        _process_ticker(ticker, prices, verbose=(i < 3))
+
         if (i + 1) % 5 == 0:
             db.commit()
-            if (i + 1) % 50 == 0:
-                print(f"[RetryNoData] {i + 1}/{len(tickers)} tickers, {total_scored} scored, FMP: {_fmp_calls_today}/{FMP_DAILY_LIMIT}")
+            if (i + 1) % 20 == 0:
+                print(f"[RetryNoData] Polygon {i + 1}/{len(polygon_batch)}, {total_scored} scored")
 
-        time.sleep(0.3)  # FMP rate limit
+        time.sleep(12)  # 5 calls/min
+
+    db.commit()
+
+    # Phase 2: FMP (old predictions, 200/day budget)
+    for i, ticker in enumerate(fmp_batch):
+        if _fmp_calls_today >= FMP_DAILY_LIMIT:
+            print(f"[RetryNoData] FMP budget exhausted at ticker {i}/{len(fmp_batch)}")
+            break
+
+        prices = _fetch_fmp(ticker)
+        _process_ticker(ticker, prices, verbose=(i < 2 and len(polygon_batch) == 0))
+
+        if (i + 1) % 5 == 0:
+            db.commit()
+        time.sleep(0.3)
 
     db.commit()
 
