@@ -383,7 +383,7 @@ def get_portfolio_simulator(
     # Get all scored predictions ordered by date
     rows = db.execute(sql_text("""
         SELECT ticker, direction, prediction_date, evaluation_date,
-               entry_price, target_price, actual_return, outcome
+               entry_price, target_price, actual_return, outcome, window_days
         FROM predictions
         WHERE forecaster_id = :fid
           AND outcome IN ('correct', 'incorrect', 'hit', 'near', 'miss')
@@ -398,7 +398,20 @@ def get_portfolio_simulator(
         _sim_cache[forecaster_id] = (result, _time.time())
         return result
 
-    # Simulate portfolio
+    # Return caps by evaluation window — prevents corrupted data
+    # (evaluator used today's price instead of historical for some old predictions)
+    def _max_return(window_days):
+        if not window_days or window_days <= 0:
+            window_days = 90
+        if window_days <= 30:
+            return 50.0    # Max ±50% in 30 days
+        if window_days <= 90:
+            return 100.0   # Max ±100% in 90 days
+        if window_days <= 180:
+            return 150.0   # Max ±150% in 6 months
+        return 200.0       # Max ±200% in 1 year
+
+    # Simulate portfolio: $1,000 per trade, compounding portfolio value
     starting = 10000
     per_trade = 1000
     portfolio = starting
@@ -410,24 +423,29 @@ def get_portfolio_simulator(
     last_date = None
 
     for r in rows:
-        ticker, direction, pred_date, eval_date, entry, target, ret, outcome = r
+        ticker, direction, pred_date, eval_date, entry, target, ret, outcome, window = r
         if ret is None:
             continue
 
         ret_pct = float(ret)
+
+        # Cap returns at reasonable bounds for the evaluation window
+        cap = _max_return(window)
+        ret_pct = max(-cap, min(cap, ret_pct))
+
         pnl = per_trade * (ret_pct / 100)
         portfolio += pnl
 
-        date_str = pred_date.strftime("%Y-%m-%d") if pred_date else None
-        eval_str = eval_date.strftime("%Y-%m-%d") if eval_date else None
-        if not first_date and date_str:
-            first_date = date_str
-        if date_str:
-            last_date = date_str
+        date_str = eval_date.strftime("%Y-%m-%d") if eval_date else (pred_date.strftime("%Y-%m-%d") if pred_date else None)
+        pred_str = pred_date.strftime("%Y-%m-%d") if pred_date else None
+        if not first_date and pred_str:
+            first_date = pred_str
+        if pred_str:
+            last_date = pred_str
 
         trade = {
             "date": date_str,
-            "eval_date": eval_str,
+            "pred_date": pred_str,
             "ticker": ticker,
             "direction": direction,
             "entry": float(entry) if entry else None,
@@ -436,6 +454,7 @@ def get_portfolio_simulator(
             "pnl": round(pnl, 2),
             "portfolio_value": round(portfolio, 2),
             "outcome": outcome,
+            "window_days": window,
         }
         trades.append(trade)
         timeline.append({
