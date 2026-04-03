@@ -119,7 +119,12 @@ export default function Discover() {
                   <Link key={t.ticker} to={`/asset/${t.ticker}`}
                     className="card py-3 flex items-center justify-between hover:bg-surface-2 transition-colors">
                     <div className="flex items-center gap-2">
-                      <CompanyLogo ticker={t.ticker} size={20} />
+                      <CompanyLogo
+                        ticker={t.ticker}
+                        logoUrl={t.logo_url || `https://images.financialmodelingprep.com/symbol/${t.ticker}.png`}
+                        domain={t.logo_domain}
+                        size={24}
+                      />
                       <span className="font-mono text-accent font-bold">{t.ticker}</span>
                       <span className="text-text-secondary text-sm">{t.name}</span>
                     </div>
@@ -194,16 +199,20 @@ export default function Discover() {
               <BarChart3 className="w-4 h-4 text-accent" /> Top by Sector
             </h2>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-              {sectors.filter(s => s.name !== 'Other').slice(0, 9).map(s => (
-                <Link key={s.name} to={`/leaderboard?sector=${encodeURIComponent(s.name)}`}
-                  className="card py-3 text-center hover:bg-surface-2 transition-colors">
-                  <div className="text-sm font-medium text-text-primary">{s.name}</div>
-                  <div className="text-[10px] text-muted font-mono">{s.prediction_count || s.count || 0} predictions</div>
-                  {s.top_forecaster && (
-                    <div className="text-[10px] text-accent mt-1 truncate">{s.top_forecaster}</div>
-                  )}
-                </Link>
-              ))}
+              {sectors.filter(s => (s.sector || s.name) !== 'Other').slice(0, 9).map(s => {
+                const name = s.sector || s.name;
+                const count = s.total_predictions || s.prediction_count || s.count || 0;
+                const topName = s.top_forecasters?.[0]?.name;
+                return (
+                  <Link key={name} to={`/consensus?sector=${encodeURIComponent(name)}`}
+                    className="card py-3 text-center hover:bg-surface-2 transition-colors">
+                    <div className="text-sm font-medium text-text-primary">{name}</div>
+                    <div className="text-[10px] text-muted font-mono">{count.toLocaleString()} predictions</div>
+                    {s.accuracy > 0 && <div className="text-[10px] text-accent font-mono">{s.accuracy}% accuracy</div>}
+                    {topName && <div className="text-[10px] text-text-secondary mt-0.5 truncate">Top: {topName}</div>}
+                  </Link>
+                );
+              })}
             </div>
           </div>
         )}

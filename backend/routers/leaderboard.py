@@ -844,10 +844,20 @@ def get_trending_tickers(request: Request, db: Session = Depends(get_db)):
             ticker_map[t] = {"bullish": 0, "bearish": 0}
         ticker_map[t][r[1]] = r[2]
 
-    NAMES = {
-        "NVDA": "NVIDIA", "AAPL": "Apple", "TSLA": "Tesla", "META": "Meta",
-        "MSFT": "Microsoft", "AMD": "AMD", "AMZN": "Amazon", "GOOGL": "Alphabet",
-    }
+    # Get company names + logos from ticker_sectors
+    all_tickers = list(ticker_map.keys())
+    info_map = {}
+    if all_tickers:
+        try:
+            info_rows = db.execute(sql_text(
+                "SELECT ticker, company_name, logo_url, logo_domain FROM ticker_sectors WHERE ticker = ANY(:tickers)"
+            ), {"tickers": all_tickers}).fetchall()
+            for r in info_rows:
+                info_map[r[0]] = {"name": r[1], "logo_url": r[2], "logo_domain": r[3]}
+        except Exception:
+            pass
+
+    from ticker_lookup import TICKER_INFO
 
     tickers = []
     for t, counts in ticker_map.items():
@@ -855,8 +865,15 @@ def get_trending_tickers(request: Request, db: Session = Depends(get_db)):
         if total < 5:
             continue
         bull_pct = round(counts["bullish"] / total * 100)
-        consensus = "STRONG BULL" if bull_pct >= 75 else "BULLISH" if bull_pct >= 55 else "STRONG BEAR" if bull_pct <= 25 else "BEARISH" if bull_pct <= 45 else "MIXED"
-        tickers.append({"ticker": t, "name": NAMES.get(t, t), "total": total, "bullish": counts["bullish"], "bearish": counts["bearish"], "bull_pct": bull_pct, "consensus": consensus})
+        info = info_map.get(t, {})
+        name = info.get("name") or TICKER_INFO.get(t, t)
+        tickers.append({
+            "ticker": t, "name": name, "total": total,
+            "bullish": counts["bullish"], "bearish": counts["bearish"],
+            "bull_pct": bull_pct,
+            "logo_url": info.get("logo_url"),
+            "logo_domain": info.get("logo_domain"),
+        })
 
     tickers.sort(key=lambda x: x["total"], reverse=True)
     return tickers[:10]
