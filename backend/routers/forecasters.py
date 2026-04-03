@@ -204,17 +204,27 @@ def get_forecaster_by_slug(
 def get_forecaster_sectors(request: Request, forecaster_id: int, db: Session = Depends(get_db)):
     """Lazy-loaded sector strengths and prediction counts."""
     try:
+        # Show sector breakdown for ALL predictions (not just scored)
         sector_rows = db.execute(sql_text("""
-            SELECT sector, COUNT(*) as total,
-                   SUM(CASE WHEN outcome IN ('hit','correct') THEN 1 ELSE 0 END) as hits,
-                   SUM(CASE WHEN outcome = 'near' THEN 1 ELSE 0 END) as nears
-            FROM predictions
-            WHERE forecaster_id = :fid AND outcome IN ('hit','near','miss','correct','incorrect')
-              AND sector IS NOT NULL AND sector != ''
-            GROUP BY sector ORDER BY total DESC
+            SELECT COALESCE(p.sector, ts.sector) as sec,
+                   COUNT(*) as total,
+                   SUM(CASE WHEN p.outcome IN ('hit','correct') THEN 1 ELSE 0 END) as hits,
+                   SUM(CASE WHEN p.outcome = 'near' THEN 1 ELSE 0 END) as nears,
+                   SUM(CASE WHEN p.outcome IN ('hit','near','miss','correct','incorrect') THEN 1 ELSE 0 END) as scored
+            FROM predictions p
+            LEFT JOIN ticker_sectors ts ON ts.ticker = p.ticker
+            WHERE p.forecaster_id = :fid
+              AND COALESCE(p.sector, ts.sector) IS NOT NULL
+              AND COALESCE(p.sector, ts.sector) != ''
+            GROUP BY sec ORDER BY total DESC
         """), {"fid": forecaster_id}).fetchall()
-        sectors = [{"sector": r[0], "accuracy": round((r[2] + r[3] * 0.5) / r[1] * 100, 1) if r[1] > 0 else 0, "count": r[1]}
-                   for r in sector_rows if r[0] != "Other" or len(sector_rows) == 1]
+        sectors = []
+        for r in sector_rows:
+            if r[0] == "Other" and len(sector_rows) > 1:
+                continue
+            scored = r[4] or 0
+            acc = round((r[2] + r[3] * 0.5) / scored * 100, 1) if scored > 0 else 0
+            sectors.append({"sector": r[0], "accuracy": acc, "count": r[1], "scored": scored})
     except Exception:
         sectors = []
 
