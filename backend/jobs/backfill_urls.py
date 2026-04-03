@@ -84,23 +84,8 @@ def backfill_real_urls(db=None, max_per_run: int = 2000):
             date_from = min(dates)
             date_to = max(dates)
 
-            url_map, diag = _fetch_urls_for_ticker(ticker, date_from, date_to, needed_ids, verbose=(api_calls < 3))
+            url_map = _fetch_urls_for_ticker(ticker, date_from, date_to, needed_ids)
             api_calls += 1
-
-            # Debug: first 3 tickers show full diagnostics
-            if api_calls <= 3:
-                print(f"[URLBackfill] DIAG {ticker}: needed {len(needed_ids)} IDs, "
-                      f"date range {date_from}..{date_to}, "
-                      f"API returned {diag.get('total_ratings', 0)} ratings, "
-                      f"matched {len(url_map)}")
-                if diag.get("sample_needed"):
-                    print(f"[URLBackfill]   needed IDs sample: {diag['sample_needed']}")
-                if diag.get("sample_api_ids"):
-                    print(f"[URLBackfill]   API IDs sample: {diag['sample_api_ids']}")
-                if diag.get("sample_keys"):
-                    print(f"[URLBackfill]   API first rating keys: {diag['sample_keys']}")
-                if diag.get("api_status"):
-                    print(f"[URLBackfill]   API status: {diag['api_status']}, response type: {diag.get('response_type')}")
 
             for p in preds:
                 real_url = url_map.get(p["bz_id"])
@@ -134,9 +119,10 @@ def backfill_real_urls(db=None, max_per_run: int = 2000):
             db.close()
 
 
-def _fetch_urls_for_ticker(ticker: str, date_from: str, date_to: str, needed_ids: set, verbose: bool = False) -> tuple[dict, dict]:
-    """Fetch ratings for a ticker and return ({bz_id: news_url}, diagnostics_dict)."""
-    diag = {"total_ratings": 0, "api_status": None, "response_type": None}
+def _fetch_urls_for_ticker(ticker: str, date_from: str, date_to: str, needed_ids: set) -> dict:
+    """Fetch all ratings for a ticker from the Massive API, following pagination.
+    Returns {benzinga_id: news_url} for IDs in needed_ids."""
+    url_map = {}
 
     try:
         r = httpx.get(
@@ -147,53 +133,48 @@ def _fetch_urls_for_ticker(ticker: str, date_from: str, date_to: str, needed_ids
                 "date.gte": date_from,
                 "date.lte": date_to,
                 "sort": "date.desc",
-                "limit": 500,
+                "limit": 50000,
             },
             headers={"Accept": "application/json"},
-            timeout=15,
+            timeout=20,
         )
-        diag["api_status"] = r.status_code
         if r.status_code != 200:
-            if verbose:
-                diag["response_type"] = f"error: {r.text[:200]}"
-            return {}, diag
+            return {}
 
         data = r.json()
-        diag["response_type"] = type(data).__name__
+        _extract_urls(data, needed_ids, url_map)
 
-        # Massive API: try "ratings", "results", then "data" (format varies)
-        ratings = data.get("ratings", data.get("results", data.get("data", []))) if isinstance(data, dict) else data
-        if not isinstance(ratings, list):
-            diag["response_type"] = f"not a list: {type(ratings).__name__}"
-            return {}, diag
+        # Follow pagination (max 5 pages to avoid hammering)
+        for _ in range(5):
+            next_url = data.get("next_url") if isinstance(data, dict) else None
+            if not next_url:
+                break
+            try:
+                r = httpx.get(next_url, headers={"Accept": "application/json"}, timeout=20)
+                if r.status_code != 200:
+                    break
+                data = r.json()
+                _extract_urls(data, needed_ids, url_map)
+                time.sleep(0.3)
+            except Exception:
+                break
 
-        diag["total_ratings"] = len(ratings)
+        return url_map
 
-        if verbose:
-            diag["sample_needed"] = list(needed_ids)[:5]
-            if ratings:
-                diag["sample_keys"] = list(ratings[0].keys())
-                # Try MULTIPLE possible ID field names
-                diag["sample_api_ids"] = []
-                for rating in ratings[:5]:
-                    diag["sample_api_ids"].append({
-                        "id": str(rating.get("id", "")),
-                        "benzinga_id": str(rating.get("benzinga_id", "")),
-                        "rating_id": str(rating.get("rating_id", "")),
-                        "has_news_url": bool(rating.get("benzinga_news_url") or rating.get("url_news")),
-                    })
+    except Exception:
+        return {}
 
-        url_map = {}
-        for rating in ratings:
-            # Try multiple ID field names
-            rid = str(rating.get("id") or rating.get("benzinga_id") or rating.get("rating_id") or "")
-            news_url = rating.get("benzinga_news_url") or rating.get("url_news") or ""
 
-            if rid in needed_ids and news_url and news_url.startswith("http") and "/quote/" not in news_url:
-                url_map[rid] = news_url
+def _extract_urls(data, needed_ids: set, url_map: dict):
+    """Extract matching URLs from one page of API response into url_map."""
+    ratings = data.get("ratings", data.get("results", data.get("data", []))) if isinstance(data, dict) else data
+    if not isinstance(ratings, list):
+        return
 
-        return url_map, diag
-
-    except Exception as e:
-        diag["response_type"] = f"exception: {e}"
-        return {}, diag
+    for rating in ratings:
+        rid = str(rating.get("id") or rating.get("benzinga_id") or "")
+        if not rid:
+            continue
+        news_url = rating.get("benzinga_news_url") or rating.get("url_news") or ""
+        if rid in needed_ids and news_url and news_url.startswith("http") and "/quote/" not in news_url:
+            url_map[rid] = news_url
