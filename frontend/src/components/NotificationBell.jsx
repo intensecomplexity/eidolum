@@ -107,7 +107,12 @@ export default function NotificationBell() {
   return (
     <>
       <div className="relative" ref={wrapperRef}>
-        <button onClick={() => setOpen(!open)} className="relative flex items-center justify-center w-9 h-9 rounded-lg text-text-secondary hover:text-accent transition-colors">
+        <button
+          type="button"
+          onClick={(e) => { e.stopPropagation(); setOpen(!open); }}
+          className="relative flex items-center justify-center w-11 h-11 sm:w-9 sm:h-9 rounded-lg text-text-secondary hover:text-accent active:text-accent transition-colors"
+          style={{ WebkitTapHighlightColor: 'transparent', touchAction: 'manipulation' }}
+        >
           <Bell className={`w-[18px] h-[18px] ${unreadCount > 0 ? 'animate-[bell-ring_0.5s_ease-out]' : ''}`} />
           {unreadCount > 0 && (
             <span className="absolute -top-0.5 -right-0.5 bg-negative text-bg text-[9px] font-bold min-w-[16px] h-[16px] flex items-center justify-center rounded-full px-1">
@@ -122,11 +127,16 @@ export default function NotificationBell() {
             {/* Header */}
             <div className="flex items-center justify-between px-4 py-3 border-b border-border">
               <span className="text-sm font-semibold text-text-primary">Notifications</span>
-              {unreadCount > 0 && (
-                <button onClick={handleMarkAllRead} className="text-[10px] text-accent font-medium hover:text-accent/80">
-                  Mark all as read
+              <div className="flex items-center gap-3">
+                {unreadCount > 0 && (
+                  <button onClick={handleMarkAllRead} className="text-[10px] text-accent font-medium hover:text-accent/80">
+                    Mark all read
+                  </button>
+                )}
+                <button onClick={() => setOpen(false)} className="sm:hidden text-muted text-xs font-medium">
+                  Close
                 </button>
-              )}
+              </div>
             </div>
 
             {/* List */}
