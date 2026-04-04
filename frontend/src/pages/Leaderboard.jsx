@@ -311,22 +311,21 @@ export default function Leaderboard() {
                       <tbody key={metric}>
                         {data.map((f, idx) => (
                           <React.Fragment key={f.id}>
-                          <tr className="border-b border-border/50 hover:bg-surface-2/50 transition-colors cursor-pointer"
-                            style={{ animation: `leaderboardFadeIn 0.3s ease-out ${idx * 0.02}s both` }}
-                            onClick={() => navigate(f.slug ? `/analyst/${f.slug}` : `/forecaster/${f.id}`)}>
+                          <tr className="border-b border-border/50"
+                            style={{ animation: `leaderboardFadeIn 0.3s ease-out ${idx * 0.02}s both` }}>
                             <td className="px-3 py-4"><RankBadge rank={f.rank} movement={f.rank_movement} /></td>
                             <td className="px-3 py-3">
-                              <Link to={`/forecaster/${f.id}`} className="hover:text-accent transition-colors">
-                                <div className="flex items-center gap-1.5">
-                                  <span className="font-medium text-[0.93rem]">{f.name}</span>
-                                  <PlatformBadge platform={f.platform} />
-                                </div>
-                                {f.firm ? (
-                                  <div className="text-muted text-xs">{f.firm}</div>
-                                ) : (
-                                  <div className="text-muted text-xs font-mono">{f.handle}</div>
-                                )}
-                              </Link>
+                              <div className="flex items-center gap-1.5">
+                                <Link to={f.slug ? `/analyst/${f.slug}` : `/forecaster/${f.id}`} className="font-medium text-[0.93rem] hover:text-accent transition-colors">
+                                  {f.name}
+                                </Link>
+                                <PlatformBadge platform={f.platform} />
+                              </div>
+                              {f.firm ? (
+                                <div className="text-muted text-xs">{f.firm}</div>
+                              ) : (
+                                <div className="text-muted text-xs font-mono">{f.handle}</div>
+                              )}
                             </td>
                             <td className="px-3 py-3 text-right">
                               <div className="flex items-center justify-end gap-1.5">

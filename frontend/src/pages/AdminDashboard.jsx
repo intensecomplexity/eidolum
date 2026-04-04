@@ -127,48 +127,37 @@ function FeatureToggles() {
 }
 
 
-function UrlQualityCard() {
+function UrlQualitySection() {
   const [data, setData] = useState(null);
   useEffect(() => { getAdminUrlQuality().then(setData).catch(() => {}); }, []);
   if (!data) return null;
   const d = data.distribution || {};
-  const pct = (n) => d.total > 0 ? `${(n / d.total * 100).toFixed(1)}%` : '0%';
   return (
-    <div className="card mb-6">
-      <h3 className="text-sm font-semibold text-muted uppercase tracking-wider mb-3">URL Quality</h3>
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mb-4">
-        {[
-          { label: 'Real Articles', value: d.real_article, color: 'text-positive' },
-          { label: 'Generic Ratings', value: d.generic_ratings, color: 'text-warning' },
-          { label: 'StockAnalysis', value: d.stockanalysis, color: 'text-warning' },
-          { label: 'No URL', value: d.no_url, color: 'text-negative' },
-          { label: 'Other', value: d.other, color: 'text-text-secondary' },
-          { label: 'Total', value: d.total, color: 'text-accent' },
-        ].map(s => (
-          <div key={s.label} className="bg-surface-2 rounded-lg p-2.5 text-center">
-            <div className={`font-mono text-sm font-bold ${s.color}`}>{(s.value || 0).toLocaleString()}</div>
-            <div className="text-[10px] text-muted">{s.label} {s.label !== 'Total' && <span className="font-mono">({pct(s.value || 0)})</span>}</div>
-          </div>
-        ))}
+    <>
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
+        <StatCard label="Real Article URLs" value={(d.real_article || 0).toLocaleString()} />
+        <StatCard label="Generic URLs" value={(d.generic_ratings || 0).toLocaleString()} />
+        <StatCard label="StockAnalysis URLs" value={(d.stockanalysis || 0).toLocaleString()} />
+        <StatCard label="No URL" value={(d.no_url || 0).toLocaleString()} />
       </div>
       {data.recent_updates?.length > 0 && (
-        <div className="mb-4">
-          <div className="text-xs text-muted uppercase tracking-wider mb-2">Recent Backfills</div>
-          <div className="space-y-1">
+        <div className="card mb-6">
+          <h3 className="text-sm font-semibold text-muted uppercase tracking-wider mb-3">Recent Backfills</h3>
+          <div className="space-y-1.5">
             {data.recent_updates.map((r, i) => (
               <div key={i} className="flex items-center gap-2 text-xs">
                 <span className="font-mono text-accent font-bold w-12">{r.ticker}</span>
                 <span className="text-text-secondary truncate flex-1">{r.forecaster}</span>
-                <a href={r.source_url} target="_blank" rel="noopener noreferrer" className="text-positive truncate max-w-[200px] hover:underline">{r.source_url?.slice(0, 60)}...</a>
+                <a href={r.source_url} target="_blank" rel="noopener noreferrer" className="text-positive truncate max-w-[250px] hover:underline">{r.source_url?.slice(0, 70)}</a>
               </div>
             ))}
           </div>
         </div>
       )}
       {data.sample_real_urls?.length > 0 && (
-        <div>
-          <div className="text-xs text-muted uppercase tracking-wider mb-2">Sample Real URLs</div>
-          <div className="space-y-1">
+        <div className="card mb-6">
+          <h3 className="text-sm font-semibold text-muted uppercase tracking-wider mb-3">Sample Real URLs</h3>
+          <div className="space-y-1.5">
             {data.sample_real_urls.map((r, i) => (
               <div key={i} className="flex items-center gap-2 text-xs">
                 <span className="font-mono text-accent font-bold w-12">{r.ticker}</span>
@@ -179,7 +168,7 @@ function UrlQualityCard() {
           </div>
         </div>
       )}
-    </div>
+    </>
   );
 }
 
@@ -189,7 +178,6 @@ function OverviewTab({ dashboard }) {
   return (
     <div>
       <FeatureToggles />
-      <UrlQualityCard />
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
         <StatCard label="Predictions" value={d.total_predictions?.toLocaleString()} />
         <StatCard label="Forecasters" value={d.total_forecasters?.toLocaleString()} />
@@ -221,6 +209,9 @@ function OverviewTab({ dashboard }) {
           </div>
         </div>
       )}
+
+      {/* URL Quality */}
+      <UrlQualitySection />
 
       {/* Admins list */}
       {d.admins?.length > 0 && (

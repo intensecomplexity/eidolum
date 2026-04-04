@@ -42,14 +42,16 @@ export default function LeaderboardCard({ forecaster: f, metric = 'avg_return' }
 
   return (
     <div className="bg-surface border border-border rounded-xl p-4 transition-colors">
-      <Link to={f.slug ? `/analyst/${f.slug}` : `/forecaster/${f.id}`} className="block active:bg-surface-2">
+      <div>
         {/* Top row */}
         <div className="flex items-start justify-between mb-3">
           <div className="flex items-center gap-2.5">
             <RankBadge rank={f.rank} movement={f.rank_movement} />
             <div>
               <div className="flex items-center gap-1.5 flex-wrap">
-                <span className="font-medium text-[15px]">{f.name}</span>
+                <Link to={f.slug ? `/analyst/${f.slug}` : `/forecaster/${f.id}`} className="font-medium text-[15px] hover:text-accent transition-colors">
+                  {f.name}
+                </Link>
                 <PlatformBadge platform={f.platform} />
               </div>
               {f.firm ? (
@@ -61,7 +63,6 @@ export default function LeaderboardCard({ forecaster: f, metric = 'avg_return' }
           </div>
           <div className="flex items-center gap-1 shrink-0">
             <CompareButton forecaster={f} size="icon" />
-            <ChevronRight className="w-5 h-5 text-muted" />
           </div>
         </div>
 
@@ -115,9 +116,9 @@ export default function LeaderboardCard({ forecaster: f, metric = 'avg_return' }
             <div className="text-muted text-[10px]">{outcomeTotal} total</div>
           </div>
         </div>
-      </Link>
+      </div>
 
-      {/* Inline expanded breakdown (not inside Link, no navigation issues) */}
+      {/* Inline expanded breakdown */}
       {expanded && (
         <div className="mt-3 pt-3 border-t border-border/30 grid grid-cols-2 gap-4" onClick={e => e.stopPropagation()}>
           {/* Outcome breakdown */}
