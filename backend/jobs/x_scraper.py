@@ -5,113 +5,152 @@ Uses Apify Twitter scraper to find forward-looking stock predictions on X.
 Seven-layer filter pipeline rejects spam, past-tense brags, questions, and noise.
 V1: Logs qualifying predictions. No database writes.
 
-Schedule: every 6 hours, independent (no SCRAPER_LOCK).
+Schedule: every 8 hours (3 runs/day = ~$22/month on Apify Starter $29).
 Requires: APIFY_API_TOKEN env var.
 """
 import os
 import re
 import time
+import json
 import httpx
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 APIFY_API_TOKEN = os.getenv("APIFY_API_TOKEN", "").strip()
 APIFY_API = "https://api.apify.com/v2"
-APIFY_ACTOR = "apidojo/tweet-scraper"
+APIFY_ACTOR = "apidojo~tweet-scraper"
 
-# ── Search query batches (rotate each run) ────────────────────────────────────
+BATCH_INDEX_FILE = "/tmp/x_scraper_batch_index.txt"
+
+# ── Search batches with Twitter Advanced Search filters ──────────────────────
+# min_faves:10 filters at Twitter level (free, cuts 90% noise)
 SEARCH_BATCHES = [
-    ["price target $", "PT $", "target $"],
-    ["buy $", "sell $", "long $", "short $"],
-    ["breakout $", "breakdown $", "heading to $", "downside to $"],
-    ["calls for $", "expecting $", "looking for $", "next stop $"],
+    [
+        '"price target" min_faves:10 lang:en -filter:replies -filter:retweets',
+        '"PT $" min_faves:10 lang:en -filter:replies -filter:retweets',
+        '"target $" min_faves:10 lang:en -filter:replies -filter:retweets',
+    ],
+    [
+        '"buy $" min_faves:10 lang:en -filter:replies -filter:retweets',
+        '"sell $" min_faves:10 lang:en -filter:replies -filter:retweets',
+        '"long $" min_faves:10 lang:en -filter:replies -filter:retweets',
+        '"short $" min_faves:10 lang:en -filter:replies -filter:retweets',
+    ],
+    [
+        '"breakout $" min_faves:10 lang:en -filter:replies -filter:retweets',
+        '"breakdown $" min_faves:10 lang:en -filter:replies -filter:retweets',
+        '"heading to $" min_faves:10 lang:en -filter:replies -filter:retweets',
+        '"downside to $" min_faves:10 lang:en -filter:replies -filter:retweets',
+    ],
+    [
+        '"looking for $" min_faves:10 lang:en -filter:replies -filter:retweets',
+        '"next stop $" min_faves:10 lang:en -filter:replies -filter:retweets',
+        '"calls for $" min_faves:10 lang:en -filter:replies -filter:retweets',
+        '"expecting $" min_faves:10 lang:en -filter:replies -filter:retweets',
+    ],
 ]
-_batch_index = 0
 
-# ── Engagement minimums ──────────────────────────────────────────────────────
-MIN_LIKES = 10
 MIN_FOLLOWERS = 1000
 MAX_CASHTAGS = 3
+CURRENCY_IGNORE = {"USD", "EUR", "GBP", "JPY", "CAD", "AUD"}
 
-# ── Spam patterns ────────────────────────────────────────────────────────────
-SPAM_PATTERNS = [
-    re.compile(p, re.IGNORECASE) for p in [
-        r'join\s+(my|our)\s+(discord|telegram|group|channel)',
-        r'free\s+signals?', r'DM\s+(me|for)', r'link\s+in\s+bio',
-        r'subscribe', r'alert\s+service', r'paid\s+(group|channel|membership)',
-        r'sign\s+up', r'promo\s+code', r'discord\.gg', r't\.me/',
-    ]
-]
+# ── Compiled filter patterns ─────────────────────────────────────────────────
+SPAM_PATTERNS = [re.compile(p, re.IGNORECASE) for p in [
+    r'join\s+(my|our)\s+(discord|telegram|group|channel)',
+    r'free\s+signals?', r'DM\s+(me|for)', r'link\s+in\s+bio',
+    r'subscribe\s+(to|for|now)', r'alert\s+service',
+    r'paid\s+(group|channel|membership)', r'sign\s+up',
+    r'promo\s+code', r'discord\.gg', r't\.me/', r'bit\.ly/',
+    r'use\s+code\b', r'limited\s+spots', r'join\s+now',
+]]
 
-# ── Past-tense patterns (reject brags about old trades) ──────────────────────
-PAST_PATTERNS = [
-    re.compile(p, re.IGNORECASE) for p in [
-        r'\bi\s+bought\b', r'\bi\s+sold\b', r'\btook\s+profit',
-        r'\bclosed\s+(my\s+)?position', r'\bnailed\s+it\b', r'\bcalled\s+it\b',
-        r'\bwas\s+right\b', r'\btold\s+you\b', r'\balready\s+in\b',
-        r'\bexited\b', r'\bbanked\b', r'\blocked\s+in\s+profit',
-        r'\bcashed\s+out\b', r'\btook\s+the\s+trade\b',
-        r'\bentered\s+(at|around)\b', r'\bgot\s+in\s+at\b',
-        r'\bup\s+\d+%\s+(on|from)\b', r'\bbooked\b', r'\bclosed\s+for\b',
-        r'\bsold\s+(half|some|all)\b', r'\btrimmed\b', r'\btrade\s+recap\b',
-    ]
-]
+PAST_PATTERNS = [re.compile(p, re.IGNORECASE) for p in [
+    r'\bi\s+bought\b', r'\bi\s+sold\b', r'\btook\s+profit',
+    r'\bclosed\s+(my\s+)?position', r'\bnailed\s+it\b', r'\bcalled\s+it\b',
+    r'\bwas\s+right\b', r'\btold\s+you\b', r'\balready\s+in\b',
+    r'\bexited\b', r'\bbanked\b', r'\blocked\s+in\s+profit',
+    r'\bcashed\s+out\b', r'\btook\s+the\s+trade\b',
+    r'\bentered\s+(at|around)\b', r'\bgot\s+in\s+at\b',
+    r'\bmy\s+entry\s+was\b', r'\bup\s+\d+%\s+(on|from)\b',
+    r'\bbooked\b', r'\bclosed\s+for\b', r'\bsold\s+(half|some|all)\b',
+    r'\btrimmed\b', r'\btrade\s+recap\b', r'\brecap\b',
+    r'\bi\s+made\b.*\$\d', r'\bprofit\s+secured\b', r'\bin\s+at\s+\$\d',
+]]
 
-# ── Forward-looking patterns (at least one required) ─────────────────────────
-FORWARD_PATTERNS = [
-    re.compile(p, re.IGNORECASE) for p in [
-        r'\btarget\b', r'\bPT\s*\$', r'\bprice\s+target\b',
-        r'\bheading\s+to\b', r'\bwill\s+(reach|hit|break|test)\b',
-        r'\bexpecting\b', r'\bsetup\b', r'\bbreakout\b', r'\bbreakdown\b',
-        r'\bgoing\s+to\s+\$?\d', r'\blooking\s+for\b', r'\bnext\s+stop\b',
-        r'\bdownside\s+to\b', r'\bupside\s+to\b', r'\bsupport\s+at\b',
-        r'\bresistance\s+at\b', r'\bcalls?\s+for\b', r'\bsee\s+(it\s+)?hitting\b',
-        r'\bbuy\b', r'\bsell\b', r'\blong\b', r'\bshort\b',
-        r'\bbullish\b', r'\bbearish\b', r'\baccumulate\b', r'\bavoid\b',
-    ]
-]
+FORWARD_PATTERNS = [re.compile(p, re.IGNORECASE) for p in [
+    r'\btarget\b', r'\bPT\s*\$', r'\bprice\s+target\b',
+    r'\bheading\s+to\b', r'\bwill\s+(reach|hit|break|test)\b',
+    r'\bexpecting\b', r'\bsetup\b', r'\bbreakout\b', r'\bbreakdown\b',
+    r'\bgoing\s+to\s+\$?\d', r'\blooking\s+for\b', r'\bnext\s+stop\b',
+    r'\bdownside\s+to\b', r'\bupside\s+to\b', r'\bsupport\s+at\b',
+    r'\bresistance\s+at\b', r'\bcalls?\s+for\b',
+    r'\bbuy\b', r'\bsell\b', r'\blong\b', r'\bshort\b',
+    r'\bbullish\b', r'\bbearish\b', r'\baccumulate\b', r'\bavoid\b',
+]]
 
-# ── Direction signals ────────────────────────────────────────────────────────
+NEWS_PATTERNS = [re.compile(p, re.IGNORECASE) for p in [
+    r'\breports\s+earnings\b', r'\bearnings\s+(call|report|release)\b',
+    r'\bIPO\s+(date|priced)\b', r'\bjust\s+announced\b',
+    r'\bbreaking\b.*\bnews\b', r'\bFDA\s+(approval|decision)\b',
+]]
+
+QUESTION_START = re.compile(r'^(will|should|would|could|do you think|is)\b', re.IGNORECASE)
+
 BULL_WORDS = {
     "buy", "long", "calls", "bull", "bullish", "breakout", "upside",
     "moon", "ripping", "accumulate", "adding", "loading", "bounce",
-    "undervalued", "cheap", "dip buy", "higher",
+    "undervalued", "cheap", "dip buy", "higher", "oversold",
 }
 BEAR_WORDS = {
     "sell", "short", "puts", "bear", "bearish", "breakdown", "downside",
     "drilling", "dump", "avoid", "cutting", "overvalued", "fade",
-    "rejected", "lower", "top is in",
+    "rejected", "lower", "top is in", "overbought",
 }
 
-# ── Price target patterns ────────────────────────────────────────────────────
-PRICE_PATTERNS = [
-    re.compile(p, re.IGNORECASE) for p in [
-        r'(?:target|PT|price\s+target)\s*\$?([\d,.]+)',
-        r'\$[A-Z]{1,5}\s+(?:to|at|towards?)\s+\$?([\d,.]+)',
-        r'(?:heading|going|path)\s+to\s+\$?([\d,.]+)',
-        r'(?:downside|upside)\s+(?:to|target)\s+\$?([\d,.]+)',
-        r'next\s+stop\s+\$?([\d,.]+)',
-    ]
+PRICE_PATS = [re.compile(p, re.IGNORECASE) for p in [
+    r'(?:target|PT|price\s+target)\s*\$?([\d,]+(?:\.\d{1,2})?)',
+    r'\$[A-Z]{1,5}\s+(?:to|at|towards?)\s+\$?([\d,]+(?:\.\d{1,2})?)',
+    r'(?:heading|going|path)\s+to\s+\$?([\d,]+(?:\.\d{1,2})?)',
+    r'(?:downside|upside)\s+(?:to|target)\s+\$?([\d,]+(?:\.\d{1,2})?)',
+    r'next\s+stop\s+\$?([\d,]+(?:\.\d{1,2})?)',
+]]
+
+TIMEFRAME_PATS = [
+    (re.compile(r'\btoday\b', re.I), 1),
+    (re.compile(r'\bthis\s+week\b|\bEOW\b', re.I), 7),
+    (re.compile(r'\bnext\s+week\b|\bswing\b|\bshort[\s-]term\b', re.I), 14),
+    (re.compile(r'\bthis\s+month\b|\bEOM\b', re.I), 30),
+    (re.compile(r'\blong[\s-]term\b', re.I), 365),
+    (re.compile(r'\b(by\s+(end\s+of\s+)?year|EOY)\b', re.I), None),
 ]
 
-# ── Question-only patterns ───────────────────────────────────────────────────
-QUESTION_STARTS = re.compile(r'^(will|should|would|could|do you think|is)\b', re.IGNORECASE)
+
+def _get_batch_index() -> int:
+    try:
+        with open(BATCH_INDEX_FILE) as f:
+            return (int(f.read().strip()) + 1) % len(SEARCH_BATCHES)
+    except Exception:
+        return 0
 
 
-def _get_batch():
-    """Get the next search query batch (rotates across runs)."""
-    global _batch_index
-    batch = SEARCH_BATCHES[_batch_index % len(SEARCH_BATCHES)]
-    _batch_index += 1
-    return batch
+def _save_batch_index(idx: int):
+    try:
+        with open(BATCH_INDEX_FILE, "w") as f:
+            f.write(str(idx))
+    except Exception:
+        pass
 
 
-def _run_apify(search_terms: list, max_tweets: int = 200) -> list:
-    """Run Apify Twitter scraper. Returns list of tweet dicts."""
+def _call_apify(search_terms: list, max_per_query: int = 150) -> list:
+    """Run Apify tweet scraper and return results."""
     try:
         r = httpx.post(
             f"{APIFY_API}/acts/{APIFY_ACTOR}/runs",
             params={"token": APIFY_API_TOKEN},
-            json={"searchTerms": search_terms, "maxTweets": max_tweets, "sort": "Latest", "tweetLanguage": "en"},
+            json={
+                "searchTerms": search_terms,
+                "maxItems": max_per_query * len(search_terms),
+                "sort": "Latest",
+            },
             timeout=30,
         )
         if r.status_code != 201:
@@ -121,26 +160,27 @@ def _run_apify(search_terms: list, max_tweets: int = 200) -> list:
         run_id = r.json().get("data", {}).get("id")
         if not run_id:
             return []
-
         print(f"[X-SCRAPER] Apify run {run_id} started, polling...")
 
+        dataset_id = None
         for _ in range(30):
             time.sleep(10)
             sr = httpx.get(f"{APIFY_API}/actor-runs/{run_id}", params={"token": APIFY_API_TOKEN}, timeout=15)
             data = sr.json().get("data", {})
             status = data.get("status", "")
-            if status in ("SUCCEEDED", "FAILED", "ABORTED", "TIMED-OUT"):
+            if status == "SUCCEEDED":
+                dataset_id = data.get("defaultDatasetId")
                 break
+            if status in ("FAILED", "ABORTED", "TIMED-OUT"):
+                print(f"[X-SCRAPER] Apify run {status}")
+                return []
 
-        if status != "SUCCEEDED":
-            print(f"[X-SCRAPER] Apify run ended: {status}")
-            return []
-
-        dataset_id = data.get("defaultDatasetId")
         if not dataset_id:
+            print("[X-SCRAPER] Apify run timed out or no dataset")
             return []
 
-        dr = httpx.get(f"{APIFY_API}/datasets/{dataset_id}/items", params={"token": APIFY_API_TOKEN}, timeout=30)
+        dr = httpx.get(f"{APIFY_API}/datasets/{dataset_id}/items",
+                       params={"token": APIFY_API_TOKEN, "format": "json"}, timeout=60)
         items = dr.json() if dr.status_code == 200 else []
         return items if isinstance(items, list) else []
 
@@ -149,37 +189,21 @@ def _run_apify(search_terms: list, max_tweets: int = 200) -> list:
         return []
 
 
-def _extract_tweet_fields(tweet: dict) -> dict | None:
-    """Normalize tweet fields from Apify response (format varies by actor)."""
-    text = tweet.get("full_text") or tweet.get("text") or ""
-    if not text:
-        return None
-    author = tweet.get("user", {}).get("screen_name") or tweet.get("author", {}).get("userName") or ""
-    tweet_id = tweet.get("id_str") or str(tweet.get("id", ""))
-    url = tweet.get("url") or (f"https://x.com/{author}/status/{tweet_id}" if author and tweet_id else "")
-    date_str = (tweet.get("created_at") or tweet.get("createdAt") or "")[:19]
-    likes = int(tweet.get("favorite_count") or tweet.get("likeCount") or 0)
-    followers = int(tweet.get("user", {}).get("followers_count") or tweet.get("author", {}).get("followers") or 0)
-    is_rt = bool(tweet.get("retweeted")) or text.startswith("RT @")
-    is_reply = bool(tweet.get("in_reply_to_status_id") or tweet.get("inReplyToStatusId"))
-    return {"text": text, "author": author, "url": url, "date": date_str,
-            "likes": likes, "followers": followers, "is_rt": is_rt, "is_reply": is_reply}
+def _extract_cashtags(text: str) -> list[str]:
+    tags = re.findall(r'\$([A-Z]{1,5})\b', text)
+    return [t for t in tags if t not in CURRENCY_IGNORE]
 
 
-def _classify_direction(text: str) -> str:
-    text_lower = text.lower()
-    bull = sum(1 for w in BULL_WORDS if w in text_lower)
-    bear = sum(1 for w in BEAR_WORDS if w in text_lower)
-    if bull > bear:
-        return "bullish"
-    if bear > bull:
-        return "bearish"
-    return "unknown"
+def _classify(text: str) -> str:
+    lo = text.lower()
+    b = sum(1 for w in BULL_WORDS if w in lo)
+    r = sum(1 for w in BEAR_WORDS if w in lo)
+    return "bullish" if b > r else "bearish" if r > b else "unknown"
 
 
-def _extract_price_target(text: str) -> float | None:
-    for pat in PRICE_PATTERNS:
-        m = pat.search(text)
+def _price_target(text: str) -> float | None:
+    for p in PRICE_PATS:
+        m = p.search(text)
         if m:
             try:
                 return float(m.group(1).replace(",", ""))
@@ -188,109 +212,117 @@ def _extract_price_target(text: str) -> float | None:
     return None
 
 
+def _timeframe(text: str) -> int:
+    for pat, days in TIMEFRAME_PATS:
+        if pat.search(text):
+            if days is not None:
+                return days
+            now = datetime.now(timezone.utc)
+            return max((datetime(now.year, 12, 31, tzinfo=timezone.utc) - now).days, 1)
+    return 30
+
+
 def run_x_scraper(db=None):
-    """Main entry point. LOG ONLY — does not insert predictions."""
+    """Main entry point. LOG ONLY."""
     if not APIFY_API_TOKEN:
         print("[X-SCRAPER] APIFY_API_TOKEN not set — skipping")
         return
 
-    batch = _get_batch()
-    batch_num = (_batch_index - 1) % len(SEARCH_BATCHES) + 1
-    print(f"[X-SCRAPER] Starting run — batch {batch_num}/{len(SEARCH_BATCHES)}: {batch}")
+    batch_idx = _get_batch_index()
+    batch = SEARCH_BATCHES[batch_idx]
+    _save_batch_index(batch_idx)
+    print(f"[X-SCRAPER] Starting — batch {batch_idx + 1}/{len(SEARCH_BATCHES)}")
 
-    tweets = _run_apify(batch, max_tweets=200)
+    tweets = _call_apify(batch, max_per_query=150)
     print(f"[X-SCRAPER] Fetched {len(tweets)} tweets")
 
-    # Filter funnel counters
-    c = {"fetched": len(tweets), "engagement": 0, "cashtag": 0, "spam": 0,
-         "past": 0, "forward": 0, "question": 0, "qualifying": 0}
-    seen_ids = set()
-    predictions = []
+    # Log sample structure on first run
+    if tweets:
+        print(f"[X-SCRAPER] Sample tweet keys: {list(tweets[0].keys())[:15]}")
+
+    stats = {k: 0 for k in ["fetched", "dedup", "followers", "cashtag", "spam",
+                              "past", "forward", "question", "news", "qualifying",
+                              "bullish", "bearish", "unknown", "with_target"]}
+    stats["fetched"] = len(tweets)
+    seen = set()
+    unique_tickers = set()
 
     for tweet in tweets:
-        t = _extract_tweet_fields(tweet)
-        if not t:
+        tid = str(tweet.get("id_str") or tweet.get("id", ""))
+        text = tweet.get("full_text") or tweet.get("text") or ""
+        if not tid or not text or tid in seen:
             continue
+        seen.add(tid)
+        stats["dedup"] += 1
 
-        # Dedup
-        if t["url"] in seen_ids:
+        user = tweet.get("user", {})
+        author = user.get("screen_name") or tweet.get("author", {}).get("userName", "")
+        followers = int(user.get("followers_count") or tweet.get("author", {}).get("followers") or 0)
+        likes = int(tweet.get("favorite_count") or tweet.get("likeCount") or 0)
+        created = (tweet.get("created_at") or tweet.get("createdAt") or "")[:19]
+
+        # F1: Followers
+        if followers < MIN_FOLLOWERS:
             continue
-        seen_ids.add(t["url"])
+        stats["followers"] += 1
 
-        text = t["text"]
-
-        # Filter 1: Engagement
-        if t["is_rt"] or t["is_reply"] or t["likes"] < MIN_LIKES or t["followers"] < MIN_FOLLOWERS:
-            continue
-        c["engagement"] += 1
-
-        # Filter 2: Cashtags
-        tickers = re.findall(r'\$([A-Z]{1,5})\b', text)
+        # F2: Cashtags
+        tickers = _extract_cashtags(text)
         if not tickers or len(tickers) > MAX_CASHTAGS:
             continue
-        c["cashtag"] += 1
+        stats["cashtag"] += 1
 
-        # Filter 3: Spam
+        # F3: Spam
         if any(p.search(text) for p in SPAM_PATTERNS):
             continue
-        c["spam"] += 1
+        stats["spam"] += 1
 
-        # Filter 4: Past tense
+        # F4: Past tense
         if any(p.search(text) for p in PAST_PATTERNS):
             continue
-        c["past"] += 1
+        stats["past"] += 1
 
-        # Filter 5: Forward-looking
+        # F5: Forward-looking
         if not any(p.search(text) for p in FORWARD_PATTERNS):
             continue
-        c["forward"] += 1
+        stats["forward"] += 1
 
-        # Filter 6: Question-only
-        stripped = text.strip()
-        if stripped.endswith("?") and QUESTION_STARTS.match(stripped):
+        # F6: Question-only
+        s = text.strip()
+        if s.endswith("?") and QUESTION_START.match(s) and not re.search(r'\b(target|PT|heading|expect)\b', s, re.I):
             continue
-        c["question"] += 1
+        stats["question"] += 1
 
-        # ── Passed all filters → extract prediction ──────────────────────
-        direction = _classify_direction(text)
-        price_target = _extract_price_target(text)
-        c["qualifying"] += 1
+        # F7: News-only
+        if any(p.search(text) for p in NEWS_PATTERNS) and not any(p.search(text) for p in FORWARD_PATTERNS):
+            continue
+        stats["news"] += 1
 
-        for ticker in tickers:
-            target_str = f", target=${price_target:.0f}" if price_target else ""
-            predictions.append({
-                "ticker": ticker, "direction": direction, "price_target": price_target,
-                "author": t["author"], "url": t["url"], "date": t["date"],
-                "likes": t["likes"], "followers": t["followers"],
-            })
+        # ── Passed all filters ───────────────────────────────────────────
+        direction = _classify(text)
+        pt = _price_target(text)
+        tf = _timeframe(text)
+        url = f"https://x.com/{author}/status/{tid}"
 
-            print(f"[X-SCRAPER] PREDICTION FOUND:")
-            print(f"  Ticker: ${ticker}")
-            print(f"  Direction: {direction.upper()}")
-            if price_target:
-                print(f"  Price Target: ${price_target:.2f}")
-            print(f"  Author: @{t['author']} ({t['followers']:,} followers)")
-            print(f"  Likes: {t['likes']:,}")
-            print(f"  Tweet: {text[:150]}")
-            print(f"  URL: {t['url']}")
+        stats["qualifying"] += 1
+        if direction == "bullish": stats["bullish"] += 1
+        elif direction == "bearish": stats["bearish"] += 1
+        else: stats["unknown"] += 1
+        if pt: stats["with_target"] += 1
+        unique_tickers.update(tickers)
 
-    # Summary
-    unique_tickers = len(set(p["ticker"] for p in predictions))
-    bull_count = sum(1 for p in predictions if p["direction"] == "bullish")
-    bear_count = sum(1 for p in predictions if p["direction"] == "bearish")
-    with_target = sum(1 for p in predictions if p["price_target"])
+        pt_str = f"${pt:.2f}" if pt else "none"
+        print(f"[X-SCRAPER] PREDICTION: @{author} ({followers:,} flw, {likes} likes) "
+              f"→ {direction.upper()} {' '.join('$'+t for t in tickers)} "
+              f"PT={pt_str} TF={tf}d")
+        if stats["qualifying"] <= 15:
+            print(f"  Tweet: {text[:180]}")
+            print(f"  URL: {url}")
 
-    print(f"[X-SCRAPER] RUN COMPLETE:")
-    print(f"  Batch: {batch_num}/{len(SEARCH_BATCHES)}")
-    print(f"  Tweets fetched: {c['fetched']}")
-    print(f"  After engagement filter: {c['engagement']}")
-    print(f"  After cashtag filter: {c['cashtag']}")
-    print(f"  After spam filter: {c['spam']}")
-    print(f"  After past-tense filter: {c['past']}")
-    print(f"  After forward-looking filter: {c['forward']}")
-    print(f"  After question filter: {c['question']}")
-    print(f"  Qualifying predictions: {c['qualifying']}")
-    print(f"  Direction: {bull_count} bullish, {bear_count} bearish")
-    print(f"  Unique tickers: {unique_tickers}")
-    print(f"  With price targets: {with_target}")
-    print(f"  Total predictions logged: {len(predictions)}")
+    print(f"[X-SCRAPER] RUN COMPLETE (batch {batch_idx+1}/{len(SEARCH_BATCHES)}):")
+    print(f"  Fetched: {stats['fetched']} → dedup: {stats['dedup']} → followers: {stats['followers']}")
+    print(f"  → cashtag: {stats['cashtag']} → spam: {stats['spam']} → past: {stats['past']}")
+    print(f"  → forward: {stats['forward']} → question: {stats['question']} → news: {stats['news']}")
+    print(f"  Qualifying: {stats['qualifying']} ({stats['bullish']} bull, {stats['bearish']} bear, {stats['unknown']} unk)")
+    print(f"  Unique tickers: {len(unique_tickers)} | With PT: {stats['with_target']}")
+    print(f"  Est. cost: ${stats['fetched'] * 0.40 / 1000:.2f}")
