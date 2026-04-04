@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import LoadingSpinner from '../components/LoadingSpinner';
 import { useParams, Link } from 'react-router-dom';
 import { Swords } from 'lucide-react';
 import TypeBadge from '../components/TypeBadge';
@@ -17,7 +18,7 @@ export default function Compare() {
     compareUsers(id1, id2).then(setData).catch(() => {}).finally(() => setLoading(false));
   }, [id1, id2]);
 
-  if (loading) return <div className="flex items-center justify-center min-h-[60vh]"><div className="w-8 h-8 border-2 border-accent border-t-transparent rounded-full animate-spin" /></div>;
+  if (loading) return <div className="flex items-center justify-center min-h-[60vh]"><LoadingSpinner size="lg" /></div>;
   if (!data) return <div className="max-w-lg mx-auto px-4 py-20 text-center"><p className="text-text-secondary">Could not load comparison.</p></div>;
 
   const u1 = data.user1;

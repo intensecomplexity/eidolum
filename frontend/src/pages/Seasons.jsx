@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import LoadingSpinner from '../components/LoadingSpinner';
 import { Link } from 'react-router-dom';
 import { Swords, Calendar, Trophy, Zap, TrendingUp, TrendingDown, ChevronRight, Target } from 'lucide-react';
 import Footer from '../components/Footer';
@@ -49,9 +50,7 @@ export default function Seasons() {
   }, [current]);
 
   if (loading) return (
-    <div className="flex items-center justify-center min-h-[60vh]">
-      <div className="w-8 h-8 border-2 border-accent border-t-transparent rounded-full animate-spin" />
-    </div>
+    <div className="flex items-center justify-center min-h-[60vh]"><LoadingSpinner size="lg" /></div>
   );
 
   const activeColor = current?.theme_color || '#D4A843';

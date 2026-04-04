@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
+import LoadingSpinner from '../components/LoadingSpinner';
 import { Link } from 'react-router-dom';
 import { Clock } from 'lucide-react';
 import Footer from '../components/Footer';
@@ -40,9 +41,7 @@ export default function Expiring() {
   }, [preds]);
 
   if (loading) return (
-    <div className="flex items-center justify-center min-h-[60vh]">
-      <div className="w-8 h-8 border-2 border-accent border-t-transparent rounded-full animate-spin" />
-    </div>
+    <div className="flex items-center justify-center min-h-[60vh]"><LoadingSpinner size="lg" /></div>
   );
 
   return (

@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import LoadingSpinner from '../components/LoadingSpinner';
 import { Link } from 'react-router-dom';
 import { ArrowLeft, ChevronDown, ArrowUp, ArrowDown, Minus } from 'lucide-react';
 import PlatformBadge from '../components/PlatformBadge';
@@ -52,9 +53,7 @@ export default function ReportCards() {
         </div>
 
         {loading ? (
-          <div className="flex items-center justify-center py-20">
-            <div className="w-6 h-6 border-2 border-accent border-t-transparent rounded-full animate-spin" />
-          </div>
+          <div className="flex items-center justify-center py-16"><LoadingSpinner size="lg" /></div>
         ) : !data || data.report_cards.length === 0 ? (
           <div className="card text-center py-12">
             <p className="text-text-secondary">No report cards available for this month yet.</p>

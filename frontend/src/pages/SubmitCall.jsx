@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import LoadingSpinner from '../components/LoadingSpinner';
 import { useNavigate } from 'react-router-dom';
 import { Crosshair, TrendingUp, TrendingDown, AlertCircle, Lock, Calendar } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';

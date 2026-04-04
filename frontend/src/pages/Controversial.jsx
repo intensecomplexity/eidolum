@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import LoadingSpinner from '../components/LoadingSpinner';
 import { Link } from 'react-router-dom';
 import { Zap, Flame, TrendingUp, TrendingDown, AlertCircle } from 'lucide-react';
 import TypeBadge from '../components/TypeBadge';
@@ -24,7 +25,7 @@ export default function Controversial() {
       .finally(() => setLoading(false));
   }, []);
 
-  if (loading) return <div className="flex items-center justify-center min-h-[60vh]"><div className="w-8 h-8 border-2 border-accent border-t-transparent rounded-full animate-spin" /></div>;
+  if (loading) return <div className="flex items-center justify-center min-h-[60vh]"><LoadingSpinner size="lg" /></div>;
 
   return (
     <div>

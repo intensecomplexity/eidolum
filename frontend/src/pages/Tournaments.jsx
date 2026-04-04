@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import LoadingSpinner from '../components/LoadingSpinner';
 import { Link } from 'react-router-dom';
 import { Trophy, Clock, Users, Lock, Check } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
@@ -54,7 +55,7 @@ export default function Tournaments() {
     setPicks(next);
   }
 
-  if (loading) return <div className="flex items-center justify-center min-h-[60vh]"><div className="w-8 h-8 border-2 border-accent border-t-transparent rounded-full animate-spin" /></div>;
+  if (loading) return <div className="flex items-center justify-center min-h-[60vh]"><LoadingSpinner size="lg" /></div>;
 
   if (tournaments.length === 0) return (
     <div className="max-w-3xl mx-auto px-4 py-20 text-center">

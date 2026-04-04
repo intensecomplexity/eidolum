@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import LoadingSpinner from '../components/LoadingSpinner';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { ArrowLeft, ChevronDown, Filter, Clock, Trophy, Flame } from 'lucide-react';
 import Footer from '../components/Footer';
@@ -47,9 +48,7 @@ export default function PlatformDetail() {
 
   if (loading && !data) {
     return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <div className="w-8 h-8 border-2 border-accent border-t-transparent rounded-full animate-spin" />
-      </div>
+      <div className="flex items-center justify-center min-h-[60vh]"><LoadingSpinner size="lg" /></div>
     );
   }
 
@@ -239,9 +238,7 @@ export default function PlatformDetail() {
 
         {/* Loading overlay for tab changes */}
         {loading ? (
-          <div className="flex items-center justify-center py-20">
-            <div className="w-6 h-6 border-2 border-accent border-t-transparent rounded-full animate-spin" />
-          </div>
+          <div className="flex items-center justify-center py-16"><LoadingSpinner size="lg" /></div>
         ) : (
           <>
             {/* Mobile: card list */}

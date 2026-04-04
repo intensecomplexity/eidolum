@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import LoadingSpinner from '../components/LoadingSpinner';
 import { useSearchParams, Link } from 'react-router-dom';
 import { Search, ArrowLeftRight, Trophy, TrendingUp, Target, BarChart3, Zap } from 'lucide-react';
 import Footer from '../components/Footer';
@@ -146,9 +147,7 @@ export default function CompareForecasters() {
         )}
 
         {loading && !data && (
-          <div className="flex items-center justify-center py-16">
-            <div className="w-8 h-8 border-2 border-accent border-t-transparent rounded-full animate-spin" />
-          </div>
+          <div className="flex items-center justify-center py-16"><LoadingSpinner size="lg" /></div>
         )}
 
         {data && data.a && data.b && (

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import LoadingSpinner from '../components/LoadingSpinner';
 import { useNavigate, useParams, Link } from 'react-router-dom';
 import { User, TrendingUp, TrendingDown, Flame, Target, Crosshair, ExternalLink, Play } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
@@ -56,7 +57,7 @@ export default function Profile() {
   }, [targetId, authLoading]);
 
   if (authLoading || (!isOwnProfile && loading)) {
-    return <div className="flex items-center justify-center min-h-[60vh]"><div className="w-8 h-8 border-2 border-accent border-t-transparent rounded-full animate-spin" /></div>;
+    return <div className="flex items-center justify-center min-h-[60vh]"><LoadingSpinner size="lg" /></div>;
   }
 
   if (isOwnProfile && !isAuthenticated) {
@@ -69,7 +70,7 @@ export default function Profile() {
     );
   }
 
-  if (loading) return <div className="flex items-center justify-center min-h-[60vh]"><div className="w-8 h-8 border-2 border-accent border-t-transparent rounded-full animate-spin" /></div>;
+  if (loading) return <div className="flex items-center justify-center min-h-[60vh]"><LoadingSpinner size="lg" /></div>;
 
   if (!profile) return <div className="max-w-lg mx-auto px-4 py-20 text-center"><p className="text-text-secondary">Could not load profile.</p></div>;
 

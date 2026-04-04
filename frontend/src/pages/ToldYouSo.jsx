@@ -1,4 +1,5 @@
 import { useEffect, useState, useRef } from 'react';
+import LoadingSpinner from '../components/LoadingSpinner';
 import { useParams, useSearchParams, Link } from 'react-router-dom';
 import { TrendingUp, TrendingDown } from 'lucide-react';
 import EidolumLogo from '../components/EidolumLogo';
@@ -40,7 +41,7 @@ export default function ToldYouSo() {
     }).catch(() => {}).finally(() => setLoading(false));
   }, [predictionId]);
 
-  if (loading) return <div className="flex items-center justify-center min-h-[60vh]"><div className="w-8 h-8 border-2 border-accent border-t-transparent rounded-full animate-spin" /></div>;
+  if (loading) return <div className="flex items-center justify-center min-h-[60vh]"><LoadingSpinner size="lg" /></div>;
   if (!data) return <div className="max-w-lg mx-auto px-4 py-20 text-center"><p className="text-text-secondary">Prediction not found or not yet correct.</p></div>;
 
   return (

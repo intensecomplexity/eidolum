@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import LoadingSpinner from '../components/LoadingSpinner';
 import { Link } from 'react-router-dom';
 import { ArrowLeft, Mail } from 'lucide-react';
 import { forgotPassword } from '../api';

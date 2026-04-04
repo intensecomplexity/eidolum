@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import LoadingSpinner from '../components/LoadingSpinner';
 import { Link } from 'react-router-dom';
 import { Trophy, TrendingUp, TrendingDown, Flame } from 'lucide-react';
 import PlatformBadge from '../components/PlatformBadge';
@@ -24,9 +25,7 @@ export default function PowerRankings() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <div className="w-8 h-8 border-2 border-accent border-t-transparent rounded-full animate-spin" />
-      </div>
+      <div className="flex items-center justify-center min-h-[60vh]"><LoadingSpinner size="lg" /></div>
     );
   }
 

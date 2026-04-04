@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import LoadingSpinner from '../components/LoadingSpinner';
 import { Link } from 'react-router-dom';
 import { Grid3x3, TrendingUp, TrendingDown, AlertTriangle } from 'lucide-react';
 import SectorBlock from '../components/SectorBlock';
@@ -19,7 +20,7 @@ export default function Heatmap() {
       .finally(() => setLoading(false));
   }, []);
 
-  if (loading) return <div className="flex items-center justify-center min-h-[60vh]"><div className="w-8 h-8 border-2 border-accent border-t-transparent rounded-full animate-spin" /></div>;
+  if (loading) return <div className="flex items-center justify-center min-h-[60vh]"><LoadingSpinner size="lg" /></div>;
 
   const filteredTickers = sectorFilter ? tickers.filter(t => t.sector === sectorFilter) : tickers;
   const divergent = tickers.filter(t => t.sentiment_vs_price === 'divergent');

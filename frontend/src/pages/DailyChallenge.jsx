@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import LoadingSpinner from '../components/LoadingSpinner';
 import { Zap, Check, X, Trophy, Flame } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import DailyChallengeCard from '../components/DailyChallengeCard';
@@ -41,7 +42,7 @@ export default function DailyChallenge() {
         </div>
 
         {loading ? (
-          <div className="flex items-center justify-center py-12"><div className="w-8 h-8 border-2 border-accent border-t-transparent rounded-full animate-spin" /></div>
+          <div className="flex items-center justify-center py-16"><LoadingSpinner size="lg" /></div>
         ) : tab === 'history' ? (
           /* History */
           history.length === 0 ? (

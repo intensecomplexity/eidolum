@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import LoadingSpinner from '../components/LoadingSpinner';
 import { Link } from 'react-router-dom';
 import { RefreshCw, ChevronDown } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend } from 'recharts';
@@ -92,9 +93,7 @@ export default function InversePortfolio() {
 
         {/* Loading */}
         {loading && (
-          <div className="flex items-center justify-center py-20">
-            <div className="w-6 h-6 border-2 border-accent border-t-transparent rounded-full animate-spin" />
-          </div>
+          <div className="flex items-center justify-center py-16"><LoadingSpinner size="lg" /></div>
         )}
 
         {/* Results */}
