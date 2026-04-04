@@ -61,7 +61,7 @@ export default function PortfolioSimulator({ forecasterId, forecasterName }) {
   const timeline = scaledTimeline;
 
   return (
-    <div className="card mb-6 sm:mb-8">
+    <div className="card mb-6 sm:mb-8 overflow-hidden">
       {/* Headline + capital input */}
       <div className="mb-4">
         <div className="flex items-center justify-between flex-wrap gap-2 mb-2">
@@ -114,8 +114,8 @@ export default function PortfolioSimulator({ forecasterId, forecasterName }) {
 
       {/* Chart */}
       {timeline.length > 0 && (
-        <div className="mb-4">
-          <ResponsiveContainer width="100%" height={typeof window !== 'undefined' && window.innerWidth < 640 ? 180 : 250}>
+        <div className="mb-4 w-full" style={{ minHeight: 180 }}>
+          <ResponsiveContainer width="100%" height={180} minWidth={0}>
             <AreaChart data={timeline} margin={{ top: 5, right: 5, bottom: 5, left: -15 }}>
               <defs>
                 <linearGradient id="simGrad" x1="0" y1="0" x2="0" y2="1">
@@ -130,13 +130,14 @@ export default function PortfolioSimulator({ forecasterId, forecasterName }) {
                 tickFormatter={d => d?.slice(5) || ''}
                 axisLine={{ stroke: '#1e2028' }}
                 tickLine={false}
-                minTickGap={40}
+                minTickGap={30}
               />
               <YAxis
                 tick={{ fill: '#8b8f9a', fontSize: 10 }}
                 axisLine={false}
                 tickLine={false}
                 tickFormatter={v => `$${(v / 1000).toFixed(0)}k`}
+                width={45}
               />
               <Tooltip content={<SimTooltip />} cursor={{ stroke: 'rgba(255,255,255,0.1)' }} />
               <ReferenceLine y={customCapital} stroke="#8b8f9a" strokeDasharray="3 3" strokeWidth={1} />
@@ -146,8 +147,8 @@ export default function PortfolioSimulator({ forecasterId, forecasterName }) {
                 stroke="#D4A843"
                 strokeWidth={2}
                 fill="url(#simGrad)"
-                dot={{ r: 3, fill: '#D4A843', stroke: '#0a0a0a', strokeWidth: 1.5 }}
-                activeDot={{ r: 5, fill: '#D4A843', stroke: '#fff', strokeWidth: 2 }}
+                dot={false}
+                activeDot={{ r: 4, fill: '#D4A843', stroke: '#fff', strokeWidth: 2 }}
               />
             </AreaChart>
           </ResponsiveContainer>
