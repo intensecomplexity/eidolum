@@ -284,6 +284,58 @@ def _get_user_profile_inner(user_id, credentials, db):
     }
 
 
+# ── GET /api/users/{user_id}/personal-bests ──────────────────────────────────
+
+
+@router.get("/users/{user_id}/personal-bests")
+@limiter.limit("30/minute")
+def get_personal_bests(request: Request, user_id: int, db: Session = Depends(get_db)):
+    from sqlalchemy import text as _t
+    try:
+        # Best/worst single prediction return
+        best = db.execute(_t("""
+            SELECT ticker, actual_return, prediction_date FROM user_predictions
+            WHERE user_id = :uid AND outcome IN ('hit','correct') AND actual_return IS NOT NULL AND deleted_at IS NULL
+            ORDER BY actual_return DESC LIMIT 1
+        """), {"uid": user_id}).first()
+
+        worst = db.execute(_t("""
+            SELECT ticker, actual_return, prediction_date FROM user_predictions
+            WHERE user_id = :uid AND outcome IN ('miss','incorrect') AND actual_return IS NOT NULL AND deleted_at IS NULL
+            ORDER BY actual_return ASC LIMIT 1
+        """), {"uid": user_id}).first()
+
+        # Total hits and scored
+        counts = db.execute(_t("""
+            SELECT
+                SUM(CASE WHEN outcome IN ('hit','correct') THEN 1 ELSE 0 END) as hits,
+                COUNT(*) as scored
+            FROM user_predictions
+            WHERE user_id = :uid AND outcome IN ('hit','near','miss','correct','incorrect') AND deleted_at IS NULL
+        """), {"uid": user_id}).first()
+
+        # Longest streak from profile
+        user = db.query(User).filter(User.id == user_id).first()
+
+        return {
+            "longest_streak": user.streak_best if user else 0,
+            "best_return": float(best[1]) if best else None,
+            "best_ticker": best[0] if best else None,
+            "best_date": best[2].strftime("%Y-%m-%d") if best and best[2] else None,
+            "worst_return": float(worst[1]) if worst else None,
+            "worst_ticker": worst[0] if worst else None,
+            "worst_date": worst[2].strftime("%Y-%m-%d") if worst and worst[2] else None,
+            "total_hits": int(counts[0] or 0) if counts else 0,
+            "total_scored": int(counts[1] or 0) if counts else 0,
+            "best_month_rate": 0,
+            "best_month_label": None,
+            "most_predictions_week": 0,
+            "busiest_week_label": None,
+        }
+    except Exception:
+        return {}
+
+
 # ── GET /api/users/{user_id}/accuracy-history ─────────────────────────────────
 
 

@@ -506,6 +506,10 @@ export function getUserAccuracyTrend(userId) {
   return api.get(`/users/${userId}/accuracy-trend`).then(r => r.data);
 }
 
+export function getPersonalBests(userId) {
+  return api.get(`/users/${userId}/personal-bests`).then(r => r.data);
+}
+
 export function getUserAccuracyByCategory(userId) {
   return api.get(`/users/${userId}/accuracy-by-category`).then(r => r.data);
 }

@@ -27,9 +27,9 @@ function timeAgo(dateStr) {
 function borderColor(item) {
   if (item.type === 'prediction') return 'border-l-amber-400';
   if (item.type === 'scored') {
-    if (item.outcome === 'hit' || item.outcome === 'correct') return 'border-l-emerald-500';
-    if (item.outcome === 'near') return 'border-l-yellow-400';
-    return 'border-l-red-500';
+    if (item.outcome === 'hit' || item.outcome === 'correct') return 'border-l-emerald-500 verdict-hit';
+    if (item.outcome === 'near') return 'border-l-yellow-400 verdict-near';
+    return 'border-l-red-500 verdict-miss';
   }
   if (item.type === 'expiring') return 'border-l-gray-500';
   if (item.type === 'friend') return 'border-l-blue-400';

@@ -217,6 +217,39 @@ html {
   display: inline-block;
 }
 
+/* Win/loss verdict pulse — plays once on scored prediction cards */
+@keyframes verdictPulseHit {
+  0% { border-left-color: transparent; }
+  30% { border-left-color: #34d399; }
+  100% { border-left-color: #34d399; }
+}
+@keyframes verdictPulseNear {
+  0% { border-left-color: transparent; }
+  30% { border-left-color: #fbbf24; }
+  100% { border-left-color: #fbbf24; }
+}
+@keyframes verdictPulseMiss {
+  0% { border-left-color: transparent; }
+  30% { border-left-color: #f87171; }
+  100% { border-left-color: #f87171; }
+}
+.verdict-hit { animation: verdictPulseHit 0.5s ease-out forwards; }
+.verdict-near { animation: verdictPulseNear 0.5s ease-out forwards; }
+.verdict-miss { animation: verdictPulseMiss 0.5s ease-out forwards; }
+
+/* Accuracy milestone shimmer for Legendary badge */
+@keyframes shimmer {
+  0% { background-position: -100% 0; }
+  100% { background-position: 200% 0; }
+}
+.badge-shimmer {
+  background: linear-gradient(90deg, #D4A843 0%, #FDE68A 50%, #D4A843 100%);
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: shimmer 3s ease-in-out infinite;
+}
+
 /* Fade in for feed items */
 @keyframes fade-slide-in {
   from { opacity: 0; transform: translateY(-8px); }

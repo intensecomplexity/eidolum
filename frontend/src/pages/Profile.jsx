@@ -6,6 +6,8 @@ import Footer from '../components/Footer';
 import TypeBadge from '../components/TypeBadge';
 import FriendButton from '../components/FriendButton';
 import StreakCalendar from '../components/StreakCalendar';
+import AccuracyBadge from '../components/AccuracyBadge';
+import PersonalBests from '../components/PersonalBests';
 import AccuracyChart from '../components/AccuracyChart';
 import AccuracyBreakdown from '../components/AccuracyBreakdown';
 import ShareButton from '../components/ShareButton';
@@ -139,9 +141,10 @@ export default function Profile() {
                 </div>
               )}
               <div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
                   <h1 className="font-bold text-lg sm:text-xl">{profile.display_name || profile.username}</h1>
                   <TypeBadge type={profile.user_type} showLabel size={14} />
+                  <AccuracyBadge accuracy={profile.accuracy_percentage} scoredCount={profile.scored_predictions} />
                 </div>
                 <p className="text-muted text-sm font-mono">@{profile.username}{profile.custom_title && <span className="text-text-secondary ml-1">· {profile.custom_title}</span>}</p>
                 {/* Social links */}
@@ -229,6 +232,9 @@ export default function Profile() {
             <StreakCalendar predictions={predictions} />
           </div>
         )}
+
+        {/* Personal records */}
+        <PersonalBests userId={profile.id} />
 
         {/* Direction split + Sector accuracy */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6">
