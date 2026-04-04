@@ -19,7 +19,7 @@ function getMetricValue(f, metricKey) {
   return { text: `${f.correct_predictions}/${f.total_predictions}`, positive: true, label: 'hit rate' };
 }
 
-export default function LeaderboardCard({ forecaster: f, metric = 'avg_return' }) {
+export default function LeaderboardCard({ forecaster: f, metric = 'avg_return', onSectorClick }) {
   const [expanded, setExpanded] = useState(false);
 
   const hits = f.hits || 0;
@@ -179,9 +179,10 @@ export default function LeaderboardCard({ forecaster: f, metric = 'avg_return' }
         return (
           <div className="mt-3">
             <div className="text-[9px] text-muted uppercase tracking-wider mb-1">Top Sector</div>
-            <span className="inline-block px-2 py-0.5 rounded text-[11px] font-mono font-medium whitespace-nowrap"
+            <span className={`inline-block px-2 py-0.5 rounded text-[11px] font-mono font-medium whitespace-nowrap ${onSectorClick ? 'cursor-pointer hover:brightness-125 transition-all' : ''}`}
               style={{ backgroundColor: `${color}15`, color, border: `1px solid ${color}30` }}
-              title={`${s.sector}: ${correct}/${s.count}`}>
+              title={`${s.sector}: ${correct}/${s.count}${onSectorClick ? ' — tap to filter' : ''}`}
+              onClick={onSectorClick ? (e) => { e.preventDefault(); e.stopPropagation(); onSectorClick(s.sector); } : undefined}>
               {label}: {correct}/{s.count}
             </span>
           </div>

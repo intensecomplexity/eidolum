@@ -23,14 +23,16 @@ const SHORT_SECTOR = {
   'Diversified Consumer Services': 'Consumer Svcs',
 };
 
-function SectorBadge({ sector, accuracy, count }) {
+function SectorBadge({ sector, accuracy, count, onClick }) {
   const color = accuracy >= 60 ? '#00c896' : accuracy >= 30 ? '#e5a100' : '#ef4444';
   const label = SHORT_SECTOR[sector] || sector;
   const correct = count > 0 ? Math.round(accuracy * count / 100) : 0;
   return (
-    <span className="inline-block px-2 py-0.5 rounded text-[11px] font-mono font-medium whitespace-nowrap"
+    <span
+      className={`inline-block px-2 py-0.5 rounded text-[11px] font-mono font-medium whitespace-nowrap ${onClick ? 'cursor-pointer hover:brightness-125 transition-all' : ''}`}
       style={{ backgroundColor: `${color}15`, color, border: `1px solid ${color}30` }}
-      title={`${sector}: ${correct}/${count}`}>
+      title={`${sector}: ${correct}/${count}${onClick ? ' — click to filter' : ''}`}
+      onClick={onClick ? (e) => { e.preventDefault(); e.stopPropagation(); onClick(sector); } : undefined}>
       {label}: {correct}/{count}
     </span>
   );
@@ -264,7 +266,7 @@ export default function Leaderboard() {
                 <div className="sm:hidden space-y-3" key={metric}>
                   {data.map((f, idx) => (
                     <div key={f.id} style={{ animation: `leaderboardFadeIn 0.3s ease-out ${idx * 0.03}s both` }}>
-                      <LeaderboardCard forecaster={f} metric={metric} />
+                      <LeaderboardCard forecaster={f} metric={metric} onSectorClick={setSector} />
                     </div>
                   ))}
                 </div>
@@ -374,7 +376,7 @@ export default function Leaderboard() {
                             <td className="px-3 py-3 text-center hidden xl:table-cell"><StreakBadge streak={f.streak} /></td>
                             <td className="px-3 py-3 hidden xl:table-cell max-w-[180px]">
                               {f.sector_strengths?.[0] && (
-                                <SectorBadge sector={f.sector_strengths[0].sector} accuracy={f.sector_strengths[0].accuracy} count={f.sector_strengths[0].count} />
+                                <SectorBadge sector={f.sector_strengths[0].sector} accuracy={f.sector_strengths[0].accuracy} count={f.sector_strengths[0].count} onClick={setSector} />
                               )}
                             </td>
                             <td className="px-2 py-3 text-center hidden lg:table-cell">
