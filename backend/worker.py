@@ -209,6 +209,19 @@ def main():
     sched.add_job(_standalone("youtube_scraper", _youtube), "interval", hours=8, id="youtube_scraper", next_run_time=t0 + timedelta(minutes=55))
     sched.add_job(_standalone("enrich_urls", _enrich), "interval", hours=1, id="enrich_urls", next_run_time=t0 + timedelta(minutes=35))
 
+    # YouTube Channel Monitor — Claude-powered extraction, every 12h
+    def _channel_monitor():
+        try:
+            from jobs.youtube_channel_monitor import run_channel_monitor
+            db = BgSessionLocal()
+            try:
+                run_channel_monitor(db)
+            finally:
+                db.close()
+        except Exception as e:
+            log.error(f"[channel_monitor] {e}")
+    sched.add_job(_standalone("channel_monitor", _channel_monitor), "interval", hours=12, id="channel_monitor", next_run_time=t0 + timedelta(minutes=90))
+
     # Cron jobs
     sched.add_job(_watchlist_queue, "interval", hours=4, id="watchlist_queue", next_run_time=t0 + timedelta(minutes=35))
     sched.add_job(_watchlist_digest, "cron", day_of_week="mon-fri", hour=13, minute=0, id="watchlist_digest")
