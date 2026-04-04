@@ -56,6 +56,7 @@ import SmartMoney from './pages/SmartMoney';
 import Tournaments from './pages/Tournaments';
 import HowItWorks from './pages/HowItWorks';
 import OnboardingOverlay from './components/OnboardingOverlay';
+import VaultDoorSplash from './components/VaultDoorSplash';
 import ComparisonTray from './components/ComparisonTray';
 import { useAuth } from './context/AuthContext';
 import { useFeatures } from './context/FeatureContext';
@@ -78,10 +79,12 @@ export default function App() {
   const [showOnboarding, setShowOnboarding] = useState(() => {
     return !localStorage.getItem('eidolum_token') && !localStorage.getItem('eidolum_onboarding_complete');
   });
+  const [splashDone, setSplashDone] = useState(() => !!sessionStorage.getItem('eidolum_splash_seen'));
 
   return (
     <CompareProvider>
     <div className="min-h-screen bg-bg pb-bottom-nav sm:pb-0">
+      {!splashDone && <VaultDoorSplash onComplete={() => setSplashDone(true)} />}
       <Navbar />
       {showOnboarding && !isAuthenticated && (
         <OnboardingOverlay onComplete={() => setShowOnboarding(false)} />
