@@ -66,14 +66,8 @@ export default function Discover() {
 
   return (
     <div>
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-10">
-        <div className="flex items-center justify-between mb-1">
-          <h1 className="headline-serif" style={{ fontSize: 'clamp(28px, 5vw, 42px)', color: '#D4A843' }}>Discover</h1>
-          <Link to="/compare" className="text-xs text-accent font-medium flex items-center gap-1 hover:underline">
-            Compare Analysts
-          </Link>
-        </div>
-        <p className="text-text-secondary text-sm mb-6">Explore tickers, trending calls, and rising analysts.</p>
+      <PageHeader title="Discover" subtitle="Explore tickers, trending calls, and rising analysts." />
+      <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 pb-6 sm:pb-10">
 
         {/* ── SECTION 1: Search ─────────────────────────────────────── */}
         <form onSubmit={handleSearch} className="flex items-center gap-2 mb-8">
@@ -248,6 +242,16 @@ export default function Discover() {
             </div>
           </div>
         )}
+        {/* ── SECTION 7: Compare Analysts ──────────────────────────── */}
+        <div className="mb-8">
+          <Link to="/compare" className="card flex items-center justify-between py-4 hover:border-accent/30 transition-colors">
+            <div>
+              <h3 className="text-sm font-semibold text-text-primary mb-0.5">Compare Analysts</h3>
+              <p className="text-xs text-muted">Pick any two forecasters and see who has the better track record.</p>
+            </div>
+            <span className="text-accent text-xs font-medium shrink-0 ml-4">Compare &rarr;</span>
+          </Link>
+        </div>
       </div>
       <Footer />
     </div>
