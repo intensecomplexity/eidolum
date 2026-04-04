@@ -106,7 +106,7 @@ def _retry_no_data():
     db = BgSessionLocal()
     try:
         from jobs.retry_no_data import retry_no_data_batch
-        retry_no_data_batch(db, max_tickers=80)
+        retry_no_data_batch(db, max_tickers=1000)
     finally: db.close()
 
 def _analyst_notif(db):
@@ -203,7 +203,7 @@ def main():
     sched.add_job(_standalone("auto_evaluate", _evaluator), "interval", minutes=30, id="auto_evaluate", next_run_time=t0 + timedelta(minutes=5))
     sched.add_job(_standalone("refresh_stats", _refresh_stats), "interval", hours=2, id="refresh_stats", next_run_time=t0 + timedelta(minutes=10))
     sched.add_job(_standalone("fmp_grades", _fmp_grades), "interval", hours=24, id="fmp_grades", next_run_time=t0 + timedelta(minutes=20))
-    sched.add_job(_standalone("retry_no_data", _retry_no_data), "interval", hours=1, id="retry_no_data", next_run_time=t0 + timedelta(minutes=30))
+    sched.add_job(_standalone("retry_no_data", _retry_no_data), "interval", minutes=30, id="retry_no_data", next_run_time=t0 + timedelta(minutes=5))
     sched.add_job(_standalone("url_backfill", _url_backfill), "interval", hours=24, id="url_backfill", next_run_time=t0 + timedelta(minutes=40))
     sched.add_job(_standalone("tournament_scorer", _tournament), "interval", hours=6, id="tournament_scorer", next_run_time=t0 + timedelta(minutes=45))
     sched.add_job(_standalone("youtube_scraper", _youtube), "interval", hours=8, id="youtube_scraper", next_run_time=t0 + timedelta(minutes=55))
