@@ -222,13 +222,13 @@ export default function Leaderboard() {
               {activeTab !== 'week' && (
                 <div className="flex gap-1 shrink-0">
                   {[
-                    { key: 'all', label: 'All' },
-                    { key: 'short', label: '<30d' },
-                    { key: 'medium', label: '30-180d' },
-                    { key: 'long', label: '>180d' },
+                    { key: 'all', label: 'All Time', tip: 'All prediction timeframes' },
+                    { key: 'short', label: 'Short Term', tip: 'Predictions under 30 days' },
+                    { key: 'medium', label: 'Mid Term', tip: 'Predictions between 30 and 180 days' },
+                    { key: 'long', label: 'Long Term', tip: 'Predictions over 180 days' },
                   ].map(tf => (
-                    <button key={tf.key} onClick={() => setTimeframe(tf.key)}
-                      className={`px-2 py-1 rounded text-[11px] font-mono font-semibold transition-colors ${
+                    <button key={tf.key} onClick={() => setTimeframe(tf.key)} title={tf.tip}
+                      className={`px-2.5 py-1 rounded text-[11px] font-semibold transition-colors ${
                         timeframe === tf.key
                           ? 'bg-accent/15 text-accent border border-accent/30'
                           : 'bg-surface-2 text-muted border border-border'
