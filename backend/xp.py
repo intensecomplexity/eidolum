@@ -1,6 +1,6 @@
 """
 XP (Experience Points) system — awards XP for every user action.
-Daily cap of 300 XP. 25 levels from Newcomer to Eidolon.
+Daily cap of 300 XP. 25 levels from Newcomer to Seer.
 """
 import datetime
 from sqlalchemy.orm import Session

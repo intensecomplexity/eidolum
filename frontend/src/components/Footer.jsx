@@ -12,7 +12,10 @@ export default function Footer() {
         <div className="flex flex-col items-center mb-5">
           <EidolumLogo size={28} />
           <span className="font-serif text-lg text-accent mt-1.5">Eidolum</span>
-          <p className="text-muted text-[11px] italic mt-1">Truth is the only currency.</p>
+          <p className="text-muted text-[10px] mt-0.5">(eye-DOL-um)</p>
+          <p className="text-muted text-[9px] uppercase tracking-[0.15em] mt-0.5">illuminated seeing</p>
+          <div className="w-10 h-px mt-2 mb-2" style={{ backgroundColor: 'rgba(212,168,67,0.3)' }} />
+          <p className="text-[13px] italic" style={{ color: '#D4A843' }}>Truth is the only currency.</p>
         </div>
         <div className="flex flex-col items-center gap-4 sm:flex-row sm:justify-between sm:gap-4">
           <div className="hidden sm:flex items-center gap-2">

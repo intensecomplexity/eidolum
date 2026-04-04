@@ -77,7 +77,7 @@ BADGE_INFO = {
     "flip-master":       {"name": "Flip Master",       "description": "Correct bull & bear on same ticker",       "icon": "🔀", "category": "Conviction"},
     # Prestige
     "level-5":           {"name": "Sharpshooter",       "description": "Reach Level 5",                            "icon": "🎯", "category": "Prestige"},
-    "level-10":          {"name": "Eidolon",            "description": "Reach Level 10 — the ultimate level",      "icon": "👁️", "category": "Prestige"},
+    "level-10":          {"name": "Seer",               "description": "Reach Level 10 — the ultimate level",      "icon": "👁️", "category": "Prestige"},
     "top-10":            {"name": "Top 10",            "description": "Reach top 10 on community leaderboard",    "icon": "🎯", "category": "Prestige"},
     "summit":            {"name": "The Summit",        "description": "Reach #1 on community leaderboard",        "icon": "🏔️", "category": "Prestige"},
     "duel-win":          {"name": "Duelist",           "description": "Win 10 duels",                             "icon": "⚔️", "category": "Prestige"},

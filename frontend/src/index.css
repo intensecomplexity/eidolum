@@ -316,13 +316,15 @@ html {
 }
 .profile-border-animated { border-color: rgba(212, 168, 67, 0.4); animation: border-pulse 3s ease-in-out infinite; }
 .profile-border-legendary { border-color: rgba(212, 168, 67, 0.6); box-shadow: 0 0 20px rgba(212, 168, 67, 0.25); }
-@keyframes eidolon-border {
+@keyframes seer-ring {
   0% { border-color: rgba(212, 168, 67, 0.5); box-shadow: 0 0 15px rgba(212, 168, 67, 0.2); }
   33% { border-color: rgba(79, 70, 229, 0.5); box-shadow: 0 0 15px rgba(79, 70, 229, 0.2); }
   66% { border-color: rgba(253, 230, 138, 0.5); box-shadow: 0 0 15px rgba(253, 230, 138, 0.2); }
   100% { border-color: rgba(212, 168, 67, 0.5); box-shadow: 0 0 15px rgba(212, 168, 67, 0.2); }
 }
-.profile-border-eidolon { animation: eidolon-border 6s ease-in-out infinite; }
+.profile-border-seer { animation: seer-ring 6s ease-in-out infinite; }
+/* Backward compat — old class name still works */
+.profile-border-eidolon { animation: seer-ring 6s ease-in-out infinite; }
 
 /* Price flash animations */
 @keyframes price-flash-up {

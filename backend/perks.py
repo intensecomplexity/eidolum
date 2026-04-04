@@ -24,10 +24,10 @@ LEVEL_PERKS = {
     8: {"name": "Master", "xp_required": 8000, "max_predictions_per_day": 30, "comment_highlight": True, "max_active_duels": 10, "reasoning_max_chars": 750},
     9: {"name": "Oracle", "xp_required": 14000, "profile_border": "animated", "pin_predictions": 2, "endorse_limit": 5},
     10: {
-        "name": "Eidolon", "xp_required": 25000,
+        "name": "Seer", "xp_required": 25000,
         "max_predictions_per_day": -1, "max_active_duels": -1,
         "deletion_window_minutes": 30, "reasoning_max_chars": 1000,
-        "profile_border": "eidolon", "endorse_limit": 10,
+        "profile_border": "seer", "endorse_limit": 10,
     },
 }
 
@@ -40,7 +40,7 @@ PERK_DESCRIPTIONS = {
     7: "Glowing profile border, 15 min delete",
     8: "Highlighted comments, 30/day, 10 duels",
     9: "Animated border, pin 2, endorse 5 users",
-    10: "Unlimited predictions and duels, Eidolon border",
+    10: "Unlimited predictions and duels, Seer ring",
 }
 
 TITLE_OPTIONS = [
