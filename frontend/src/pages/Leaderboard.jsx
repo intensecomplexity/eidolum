@@ -172,7 +172,7 @@ export default function Leaderboard() {
       <style>{`@keyframes leaderboardFadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }`}</style>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-10">
         <div className="mb-5 sm:mb-8">
-          <h1 className="font-bold mb-1 sm:mb-2" style={{ fontSize: 'clamp(24px, 5vw, 36px)' }}>
+          <h1 className="headline-serif mb-1 sm:mb-2" style={{ fontSize: 'clamp(28px, 5vw, 42px)', color: '#D4A843' }}>
             The Eidolum 100
           </h1>
           <p className="text-text-secondary text-sm sm:text-base">
