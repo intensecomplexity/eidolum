@@ -79,8 +79,8 @@ export default function Leaderboard() {
   const [timeframe, setTimeframe] = useState('all');
 
   useSEO({
-    title: 'Analyst Leaderboard — Top Forecasters Ranked by Accuracy | Eidolum',
-    description: 'See which Wall Street analysts, YouTubers, and Reddit investors have the best prediction track records. Ranked by verified accuracy, not follower count.',
+    title: 'The Eidolum 100 — Top Analyst Accuracy Rankings | Eidolum',
+    description: 'The definitive ranking of the top 100 financial forecasters, scored against real market data. See who actually gets it right.',
     url: 'https://www.eidolum.com/leaderboard',
   });
 
@@ -172,10 +172,10 @@ export default function Leaderboard() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-10">
         <div className="mb-5 sm:mb-8">
           <h1 className="font-bold mb-1 sm:mb-2" style={{ fontSize: 'clamp(24px, 5vw, 36px)' }}>
-            Forecaster Leaderboard
+            The Eidolum 100
           </h1>
           <p className="text-text-secondary text-sm sm:text-base">
-            Ranked by {metric === 'avg_return' ? 'average return' : metric === 'alpha' ? 'alpha vs S&P 500' : 'prediction accuracy'}, verified against real market data.
+            The top 100 financial forecasters, ranked by accuracy against real market data.
           </p>
         </div>
 
@@ -439,9 +439,9 @@ export default function Leaderboard() {
             )}
 
             {data.length > 0 && activeTab !== 'week' && (
-              <div className="text-center text-muted text-xs mt-4 font-mono">
-                Showing {data.length} of top 100
-              </div>
+              <p className="text-center text-xs mt-4 italic" style={{ color: '#666' }}>
+                Only forecasters with 10+ scored predictions qualify for The Eidolum 100
+              </p>
             )}
 
             {activeTab === 'week' && data.length > 0 && (
