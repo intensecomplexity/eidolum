@@ -143,14 +143,19 @@ def _save_batch_index(idx: int):
 def _call_apify(search_terms: list, max_per_query: int = 150) -> list:
     """Run Apify tweet scraper and return results."""
     try:
+        payload = {
+            "searchTerms": search_terms,
+            "maxItems": max_per_query * len(search_terms),
+            "sort": "Latest",
+        }
+        # Log exact payload so we can verify in Railway logs / Apify console
+        import json as _json
+        print(f"[X-SCRAPER] Apify payload: {_json.dumps(payload)}")
+
         r = httpx.post(
             f"{APIFY_API}/acts/{APIFY_ACTOR}/runs",
             params={"token": APIFY_API_TOKEN},
-            json={
-                "searchTerms": search_terms,
-                "maxItems": max_per_query * len(search_terms),
-                "sort": "Latest",
-            },
+            json=payload,
             timeout=30,
         )
         if r.status_code != 201:
@@ -248,18 +253,28 @@ def run_x_scraper(db=None):
     unique_tickers = set()
 
     for tweet in tweets:
-        tid = str(tweet.get("id_str") or tweet.get("id", ""))
-        text = tweet.get("full_text") or tweet.get("text") or ""
+        # apidojo actor fields: id, text, url, likeCount, retweetCount, replyCount,
+        # createdAt, isRetweet, isQuote, author.userName, author.name, author.followers
+        tid = str(tweet.get("id", ""))
+        text = tweet.get("text") or tweet.get("full_text") or ""
         if not tid or not text or tid in seen:
             continue
         seen.add(tid)
         stats["dedup"] += 1
 
-        user = tweet.get("user", {})
-        author = user.get("screen_name") or tweet.get("author", {}).get("userName", "")
-        followers = int(user.get("followers_count") or tweet.get("author", {}).get("followers") or 0)
-        likes = int(tweet.get("favorite_count") or tweet.get("likeCount") or 0)
-        created = (tweet.get("created_at") or tweet.get("createdAt") or "")[:19]
+        # Handle both apidojo format (author object) and Twitter API v1 format (user object)
+        author_obj = tweet.get("author") or {}
+        user_obj = tweet.get("user") or {}
+        author = author_obj.get("userName") or user_obj.get("screen_name") or ""
+        followers = int(author_obj.get("followers") or user_obj.get("followers_count") or 0)
+        likes = int(tweet.get("likeCount") or tweet.get("favorite_count") or 0)
+        is_rt = bool(tweet.get("isRetweet") or tweet.get("retweeted") or text.startswith("RT @"))
+        tweet_url = tweet.get("url") or (f"https://x.com/{author}/status/{tid}" if author else "")
+        created = (tweet.get("createdAt") or tweet.get("created_at") or "")[:19]
+
+        # Skip retweets (may pass through despite search filter)
+        if is_rt:
+            continue
 
         # F1: Followers
         if followers < MIN_FOLLOWERS:
@@ -302,7 +317,7 @@ def run_x_scraper(db=None):
         direction = _classify(text)
         pt = _price_target(text)
         tf = _timeframe(text)
-        url = f"https://x.com/{author}/status/{tid}"
+        url = tweet_url or f"https://x.com/{author}/status/{tid}"
 
         stats["qualifying"] += 1
         if direction == "bullish": stats["bullish"] += 1
