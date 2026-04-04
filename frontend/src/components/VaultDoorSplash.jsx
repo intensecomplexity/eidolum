@@ -1,264 +1,364 @@
-import { useState, useEffect, useRef } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 
 /**
- * VaultDoorSplash — Premium splash screen animation.
+ * VaultDoorSplash — Luxury splash animation.
  *
- * Sequence (~3.5s):
- * 1. Faint E outline appears, dots visible
- * 2. Dots illuminate one by one
- * 3. Dots detach and trace a circular vault ring
- * 4. Circle completes, E flickers to full brightness
- * 5. Gold ping expands, "Eidolum" + tagline fade in
- * 6. Everything fades out, page revealed
+ * Timeline (~4s):
+ *  0–350ms   E fades in dim
+ *  250–450   E dots brighten sequentially
+ *  450–700   Dots fly outward to circle circumference
+ *  700–1900  9 arc segments draw simultaneously (1.2s ease-in-out)
+ *  1900–2700 E bars flicker independently to full brightness
+ *  2500–2800 Warm glow behind E fades in
+ *  2700–3300 Gold pressure-wave ping expands
+ *  2700–3100 "Eidolum" text reveals (vertical clip from center)
+ *  3000–3300 Tagline fades in
+ *  3400–3600 Text fades out
+ *  3600–3900 Inner group scales to 0.9× and fades
+ *  3900–4100 Background fades to transparent
  */
+
+const GOLD = '#D4A843';
+const BG = '#0d0f13';
+
+/* ── Easing ──────────────────────────────────────────────────── */
+const easeInOut = t =>
+  t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+const easeOut = t => 1 - Math.pow(1 - t, 3);
+
+/* ── E Flicker keyframes per bar [ms, opacity] ───────────────── */
+const FLICKER = [
+  [0, 0], [30, 0.3], [110, 0.05], [150, 0.5],
+  [250, 0.15], [310, 0.7], [390, 0.4], [430, 0.85], [490, 1.0],
+];
+function flickerAt(ms) {
+  if (ms < 0) return 0.15; // pre-flicker: dim
+  for (let i = FLICKER.length - 1; i >= 0; i--)
+    if (ms >= FLICKER[i][0]) return FLICKER[i][1];
+  return 0;
+}
+
+/* ── Geometry ────────────────────────────────────────────────── */
+const CX = 150, CY = 150, R = 95;
+const CIRC = 2 * Math.PI * R;   // ≈596.9
+const SEG = CIRC / 9;            // ≈66.3
+const ARC_DEG = 40;              // 360 / 9
+
+// E logo: viewBox 40×48 scaled 1.25× and centered
+const ES = 1.25;
+const EX = CX - (40 * ES) / 2;  // 125
+const EY = CY - (48 * ES) / 2;  // 120
+
+// 9 dot source positions (E arm tips in splash SVG coords)
+const SRC = [
+  [EX + 30 * ES, EY + 6 * ES],    [EX + 34 * ES, EY + 6 * ES],    [EX + 37.5 * ES, EY + 6 * ES],
+  [EX + 24 * ES, EY + 24 * ES],   [EX + 27.5 * ES, EY + 24 * ES], [EX + 30.5 * ES, EY + 24 * ES],
+  [EX + 30 * ES, EY + 42 * ES],   [EX + 34 * ES, EY + 42 * ES],   [EX + 37.5 * ES, EY + 42 * ES],
+];
+
+// 9 target positions evenly spaced on circumference (clockwise from top)
+const TGT = Array.from({ length: 9 }, (_, i) => {
+  const a = -Math.PI / 2 + (i / 9) * Math.PI * 2;
+  return [CX + R * Math.cos(a), CY + R * Math.sin(a)];
+});
+
+/* ── Helpers ─────────────────────────────────────────────────── */
+const clamp01 = v => Math.min(Math.max(v, 0), 1);
+const prog = (ms, s, e) => clamp01((ms - s) / (e - s));
+const lerp = (a, b, t) => a + (b - a) * t;
+
+/* ── Component ───────────────────────────────────────────────── */
 export default function VaultDoorSplash({ onComplete }) {
-  const [stage, setStage] = useState(0);
-  const [dismissed, setDismissed] = useState(false);
-  const canvasRef = useRef(null);
-  const rafRef = useRef(null);
+  const [gone, setGone] = useState(false);
+  const r = useRef({ bars: [], arcs: [], eDots: [], dots: [] });
+  const raf = useRef(null);
+  const t0 = useRef(null);
 
-  // Skip splash if already seen this session
+  const finish = useCallback(() => {
+    if (raf.current) cancelAnimationFrame(raf.current);
+    raf.current = null;
+    setGone(true);
+    sessionStorage.setItem('eidolum_splash_seen', '1');
+    onComplete?.();
+  }, [onComplete]);
+
   useEffect(() => {
-    if (sessionStorage.getItem('eidolum_splash_seen')) {
-      setDismissed(true);
-      onComplete?.();
-      return;
-    }
+    if (sessionStorage.getItem('eidolum_splash_seen')) { finish(); return; }
 
-    // Progress through stages
-    const timers = [
-      setTimeout(() => setStage(1), 100),   // E appears
-      setTimeout(() => setStage(2), 500),   // Dots light up
-      setTimeout(() => setStage(3), 800),   // Dots trace circle
-      setTimeout(() => setStage(4), 1800),  // Circle complete, E flickers
-      setTimeout(() => setStage(5), 2500),  // Ping + text
-      setTimeout(() => setStage(6), 3000),  // Fade out
-      setTimeout(() => {
-        setDismissed(true);
-        sessionStorage.setItem('eidolum_splash_seen', '1');
-        onComplete?.();
-      }, 3500),
-    ];
+    // Skip for reduced-motion preference
+    if (window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches) { finish(); return; }
 
-    return () => timers.forEach(clearTimeout);
-  }, []);
-
-  // Canvas animation for dot trails
-  useEffect(() => {
-    if (stage < 3 || stage > 4 || !canvasRef.current) return;
-
-    const canvas = canvasRef.current;
-    const ctx = canvas.getContext('2d');
-    const dpr = window.devicePixelRatio || 1;
-    const size = 280;
-    canvas.width = size * dpr;
-    canvas.height = size * dpr;
-    ctx.scale(dpr, dpr);
-
-    const cx = size / 2;
-    const cy = size / 2;
-    const radius = 95;
-    const gold = '#D4A843';
-
-    // 9 dots from the E (3 per arm × 3 arms)
-    const dotAngles = [
-      -Math.PI * 0.4,  // top arm dots
-      -Math.PI * 0.25,
-      -Math.PI * 0.1,
-      Math.PI * 0.05,  // middle arm dots
-      Math.PI * 0.2,
-      Math.PI * 0.35,
-      Math.PI * 0.55,  // bottom arm dots
-      Math.PI * 0.7,
-      Math.PI * 0.85,
-    ];
-
-    let startTime = null;
-    const duration = 1000; // 1s to trace the full circle
-
-    function draw(timestamp) {
-      if (!startTime) startTime = timestamp;
-      const elapsed = timestamp - startTime;
-      const progress = Math.min(elapsed / duration, 1);
-
-      ctx.clearRect(0, 0, size, size);
-
-      // Draw completed trail segments
-      ctx.strokeStyle = gold;
-      ctx.lineWidth = 1.5;
-      ctx.globalAlpha = 0.8;
-
-      const trailProgress = progress;
-      const fullCircle = Math.PI * 2;
-
-      // Each dot traces a portion of the circle
-      for (let i = 0; i < dotAngles.length; i++) {
-        const dotProgress = Math.max(0, Math.min(1, (trailProgress - i * 0.05) / 0.6));
-        if (dotProgress <= 0) continue;
-
-        const startAngle = dotAngles[i];
-        const arcLength = (fullCircle / dotAngles.length) * dotProgress;
-
-        ctx.beginPath();
-        ctx.arc(cx, cy, radius, startAngle, startAngle + arcLength);
-        ctx.stroke();
-
-        // Draw the dot at the leading edge
-        if (dotProgress < 1) {
-          const dotAngle = startAngle + arcLength;
-          const dx = cx + radius * Math.cos(dotAngle);
-          const dy = cy + radius * Math.sin(dotAngle);
-          ctx.beginPath();
-          ctx.arc(dx, dy, 2.5, 0, Math.PI * 2);
-          ctx.fillStyle = gold;
-          ctx.globalAlpha = 1;
-          ctx.fill();
-          ctx.globalAlpha = 0.8;
-        }
-      }
-
-      // If circle is complete, draw full ring
-      if (progress >= 1) {
-        ctx.globalAlpha = 1;
-        ctx.beginPath();
-        ctx.arc(cx, cy, radius, 0, Math.PI * 2);
-        ctx.stroke();
-
-        // Inner decorative ring
-        ctx.globalAlpha = 0.15;
-        ctx.lineWidth = 0.5;
-        ctx.beginPath();
-        ctx.arc(cx, cy, radius - 8, 0, Math.PI * 2);
-        ctx.stroke();
-      }
-
-      if (progress < 1) {
-        rafRef.current = requestAnimationFrame(draw);
-      }
-    }
-
-    rafRef.current = requestAnimationFrame(draw);
-    return () => {
-      if (rafRef.current) cancelAnimationFrame(rafRef.current);
+    t0.current = performance.now();
+    const tick = now => {
+      const ms = now - t0.current;
+      render(ms, r.current);
+      if (ms < 4100) raf.current = requestAnimationFrame(tick);
+      else finish();
     };
-  }, [stage]);
+    raf.current = requestAnimationFrame(tick);
+    return () => { if (raf.current) cancelAnimationFrame(raf.current); };
+  }, [finish]);
 
-  if (dismissed) return null;
+  if (gone) return null;
 
-  // E flicker keyframes for stage 4
-  const eOpacity = stage < 1 ? 0
-    : stage < 4 ? 0.1
-    : stage >= 5 ? 1
-    : undefined; // Stage 4 uses CSS animation
+  const dotR = i => [2.8, 2.0, 1.4][i % 3];
+  const dotOp = i => [0.5, 0.3, 0.15][i % 3];
 
   return (
     <div
-      className="fixed inset-0 z-[100] flex items-center justify-center"
+      ref={el => (r.current.bg = el)}
+      onClick={finish}
+      aria-hidden="true"
       style={{
-        backgroundColor: '#0d0f13',
-        opacity: stage >= 6 ? 0 : 1,
-        transform: stage >= 6 ? 'scale(0.95)' : 'scale(1)',
-        transition: stage >= 6 ? 'opacity 0.5s ease-out, transform 0.5s ease-out' : 'none',
-        pointerEvents: stage >= 6 ? 'none' : 'auto',
-      }}
-      onClick={() => {
-        setDismissed(true);
-        sessionStorage.setItem('eidolum_splash_seen', '1');
-        onComplete?.();
+        position: 'fixed', inset: 0, zIndex: 100,
+        backgroundColor: BG,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        cursor: 'pointer', overflow: 'hidden',
       }}
     >
-      <div className="flex flex-col items-center">
-        {/* Canvas for dot trails + circle */}
-        <div className="relative" style={{ width: 280, height: 280 }}>
-          <canvas
-            ref={canvasRef}
-            style={{ width: 280, height: 280, position: 'absolute', top: 0, left: 0 }}
+      <div
+        ref={el => (r.current.inner = el)}
+        style={{
+          display: 'flex', flexDirection: 'column', alignItems: 'center',
+          willChange: 'transform, opacity',
+        }}
+      >
+        {/* ── Main SVG canvas ── */}
+        <svg
+          viewBox="0 0 300 300"
+          style={{ width: 'min(280px, 75vw)', height: 'min(280px, 75vw)' }}
+          fill="none"
+          xmlns="http://www.w3.org/2000/svg"
+        >
+          <defs>
+            <radialGradient id="eidolum-splash-glow">
+              <stop offset="0%" stopColor={GOLD} stopOpacity="0.05" />
+              <stop offset="100%" stopColor={GOLD} stopOpacity="0" />
+            </radialGradient>
+          </defs>
+
+          {/* Warm glow behind E */}
+          <circle
+            ref={el => (r.current.glow = el)}
+            cx={CX} cy={CY} r={55}
+            fill="url(#eidolum-splash-glow)" opacity={0}
           />
 
-          {/* E logo centered in the circle */}
-          <div className="absolute inset-0 flex items-center justify-center">
-            <svg
-              viewBox="0 0 40 48"
-              fill="none"
-              xmlns="http://www.w3.org/2000/svg"
-              width={52}
-              height={62}
-              style={{
-                opacity: eOpacity,
-                animation: stage === 4 ? 'eFlicker 0.7s steps(1) forwards' : 'none',
-              }}
-            >
-              {/* Vertical spine */}
-              <line x1="5" y1="6" x2="5" y2="42" stroke="#D4A843" strokeWidth="4" strokeLinecap="round"/>
-              {/* Top arm */}
-              <line x1="5" y1="6" x2="26" y2="6" stroke="#D4A843" strokeWidth="4" strokeLinecap="round"/>
-              {/* Middle arm */}
-              <line x1="5" y1="24" x2="20" y2="24" stroke="#D4A843" strokeWidth="4" strokeLinecap="round"/>
-              {/* Bottom arm */}
-              <line x1="5" y1="42" x2="26" y2="42" stroke="#D4A843" strokeWidth="4" strokeLinecap="round"/>
+          {/* 9 ring arc segments — same cx/cy/r guarantees zero-gap circle */}
+          {Array.from({ length: 9 }, (_, i) => (
+            <circle
+              key={`arc-${i}`}
+              ref={el => (r.current.arcs[i] = el)}
+              cx={CX} cy={CY} r={R}
+              stroke={GOLD} strokeWidth={2} fill="none"
+              strokeDasharray={`${SEG} ${CIRC - SEG}`}
+              strokeDashoffset={SEG}
+              transform={`rotate(${-90 + i * ARC_DEG} ${CX} ${CY})`}
+              opacity={0}
+            />
+          ))}
 
-              {/* Dots — visible in stages 1-2, hidden after */}
-              {stage <= 2 && (
-                <>
-                  <circle cx="30" cy="6" r="2.2" fill="#D4A843" opacity={stage >= 2 ? 1 : 0.4} style={{ transition: 'opacity 0.1s' }}/>
-                  <circle cx="34" cy="6" r="1.6" fill="#D4A843" opacity={stage >= 2 ? 0.8 : 0.2} style={{ transition: 'opacity 0.15s 0.05s' }}/>
-                  <circle cx="37.5" cy="6" r="1.1" fill="#D4A843" opacity={stage >= 2 ? 0.5 : 0.1} style={{ transition: 'opacity 0.15s 0.1s' }}/>
-                  <circle cx="24" cy="24" r="2.2" fill="#D4A843" opacity={stage >= 2 ? 1 : 0.4} style={{ transition: 'opacity 0.1s 0.1s' }}/>
-                  <circle cx="27.5" cy="24" r="1.6" fill="#D4A843" opacity={stage >= 2 ? 0.8 : 0.2} style={{ transition: 'opacity 0.15s 0.15s' }}/>
-                  <circle cx="30.5" cy="24" r="1.1" fill="#D4A843" opacity={stage >= 2 ? 0.5 : 0.1} style={{ transition: 'opacity 0.15s 0.2s' }}/>
-                  <circle cx="30" cy="42" r="2.2" fill="#D4A843" opacity={stage >= 2 ? 1 : 0.4} style={{ transition: 'opacity 0.1s 0.2s' }}/>
-                  <circle cx="34" cy="42" r="1.6" fill="#D4A843" opacity={stage >= 2 ? 0.8 : 0.2} style={{ transition: 'opacity 0.15s 0.25s' }}/>
-                  <circle cx="37.5" cy="42" r="1.1" fill="#D4A843" opacity={stage >= 2 ? 0.5 : 0.1} style={{ transition: 'opacity 0.15s 0.3s' }}/>
-                </>
-              )}
-            </svg>
-          </div>
+          {/* Decorative inner ring */}
+          <circle
+            ref={el => (r.current.decor = el)}
+            cx={CX} cy={CY} r={R - 8}
+            stroke={GOLD} strokeWidth={0.5} fill="none" opacity={0}
+          />
 
-          {/* Gold ping ring — stage 5 */}
-          {stage >= 5 && (
-            <div
-              className="absolute inset-0 flex items-center justify-center pointer-events-none"
-              style={{ animation: 'goldPing 0.8s ease-out forwards' }}
-            >
-              <div style={{
-                width: 190, height: 190, borderRadius: '50%',
-                border: '1px solid #D4A843', opacity: 0,
-              }} />
-            </div>
-          )}
+          {/* E logo bars */}
+          <g
+            ref={el => (r.current.eGroup = el)}
+            transform={`translate(${EX} ${EY}) scale(${ES})`}
+            opacity={0}
+          >
+            <line ref={el => (r.current.bars[0] = el)} x1="5" y1="6" x2="5" y2="42" stroke={GOLD} strokeWidth="4" strokeLinecap="round" />
+            <line ref={el => (r.current.bars[1] = el)} x1="5" y1="6" x2="26" y2="6" stroke={GOLD} strokeWidth="4" strokeLinecap="round" />
+            <line ref={el => (r.current.bars[2] = el)} x1="5" y1="24" x2="20" y2="24" stroke={GOLD} strokeWidth="4" strokeLinecap="round" />
+            <line ref={el => (r.current.bars[3] = el)} x1="5" y1="42" x2="26" y2="42" stroke={GOLD} strokeWidth="4" strokeLinecap="round" />
+          </g>
+
+          {/* E dots (visible before flight) */}
+          <g ref={el => (r.current.eDotG = el)} opacity={0}>
+            {SRC.map(([x, y], i) => (
+              <circle
+                key={`ed-${i}`}
+                ref={el => (r.current.eDots[i] = el)}
+                cx={x} cy={y} r={dotR(i)} fill={GOLD} opacity={dotOp(i)}
+              />
+            ))}
+          </g>
+
+          {/* Flying / circumference dots */}
+          {SRC.map(([x, y], i) => (
+            <circle
+              key={`fd-${i}`}
+              ref={el => (r.current.dots[i] = el)}
+              cx={x} cy={y} r={2.5} fill={GOLD} opacity={0}
+            />
+          ))}
+
+          {/* Ping ring — thick, pressure-wave feel */}
+          <circle
+            ref={el => (r.current.ping = el)}
+            cx={CX} cy={CY} r={R}
+            stroke={GOLD} strokeWidth={3.5} fill="none" opacity={0}
+          />
+        </svg>
+
+        {/* ── Text ── */}
+        <div
+          ref={el => (r.current.text = el)}
+          className="font-serif"
+          style={{
+            marginTop: 16, fontSize: 28, color: GOLD,
+            letterSpacing: '0.04em',
+            clipPath: 'inset(50% 0 50% 0)',
+            opacity: 0,
+            willChange: 'clip-path, opacity',
+          }}
+        >
+          Eidolum
         </div>
-
-        {/* Text */}
-        <div className="flex flex-col items-center mt-4" style={{
-          opacity: stage >= 5 ? 1 : 0,
-          transform: stage >= 5 ? 'translateY(0)' : 'translateY(8px)',
-          transition: 'opacity 0.4s ease-out, transform 0.4s ease-out',
-        }}>
-          <span className="font-serif text-2xl" style={{ color: '#D4A843' }}>Eidolum</span>
-          <span className="text-sm italic mt-1" style={{ color: '#D4A843', opacity: 0.6 }}>
-            Truth is the only currency.
-          </span>
+        <div
+          ref={el => (r.current.tag = el)}
+          style={{
+            marginTop: 6, fontStyle: 'italic', fontSize: 14, color: GOLD,
+            opacity: 0, willChange: 'opacity',
+          }}
+        >
+          Truth is the only currency.
         </div>
       </div>
-
-      {/* CSS keyframes */}
-      <style>{`
-        @keyframes eFlicker {
-          0% { opacity: 0.1; }
-          10% { opacity: 0.4; }
-          20% { opacity: 0.1; }
-          30% { opacity: 0.6; }
-          40% { opacity: 0.2; }
-          55% { opacity: 0.8; }
-          65% { opacity: 0.3; }
-          80% { opacity: 0.9; }
-          100% { opacity: 1; }
-        }
-        @keyframes goldPing {
-          0% { transform: scale(1); opacity: 0.3; }
-          100% { transform: scale(1.8); opacity: 0; }
-        }
-      `}</style>
     </div>
   );
+}
+
+/* ── requestAnimationFrame render loop ───────────────────────── */
+function render(ms, r) {
+  if (!r.bg) return;
+
+  /* ═══ Phase 1: E appears dim (0 → 350ms) ═══ */
+  const dimOp = lerp(0, 0.15, easeOut(prog(ms, 0, 350)));
+
+  // During flicker (≥1900) eGroup is controlled by flicker logic
+  if (ms < 1900) r.eGroup?.setAttribute('opacity', String(dimOp));
+  if (ms < 450)  r.eDotG?.setAttribute('opacity', String(dimOp));
+
+  /* ═══ Phase 2: E dots brighten (250 → 450ms) ═══ */
+  if (ms >= 250 && ms < 450) {
+    const p = prog(ms, 250, 450);
+    for (let i = 0; i < 9; i++) {
+      const dp = clamp01((p - i * 0.06) / 0.35);
+      const base = [0.5, 0.3, 0.15][i % 3];
+      r.eDots[i]?.setAttribute('opacity', String(lerp(base, 1, easeOut(dp))));
+    }
+  }
+
+  /* ═══ Phase 3: Dots fly to circumference (450 → 700ms) ═══ */
+  if (ms >= 450 && ms < 700) {
+    r.eDotG?.setAttribute('opacity', '0');
+    const p = easeInOut(prog(ms, 450, 700));
+    for (let i = 0; i < 9; i++) {
+      const d = r.dots[i]; if (!d) continue;
+      d.setAttribute('cx', String(lerp(SRC[i][0], TGT[i][0], p)));
+      d.setAttribute('cy', String(lerp(SRC[i][1], TGT[i][1], p)));
+      d.setAttribute('opacity', '1');
+    }
+  }
+
+  /* ═══ Phase 4: Ring draws (700 → 1900ms, 1.2s ease-in-out) ═══ */
+  if (ms >= 700) {
+    const p = easeInOut(prog(ms, 700, 1900));
+
+    // Reveal arc segments (9 circles, same geometry → perfect ring)
+    for (let i = 0; i < 9; i++) {
+      const arc = r.arcs[i]; if (!arc) continue;
+      arc.setAttribute('opacity', '1');
+      arc.setAttribute('stroke-dashoffset', String(SEG * (1 - p)));
+    }
+
+    // Dots ride the leading edge of their arc segment
+    if (ms < 1900) {
+      for (let i = 0; i < 9; i++) {
+        const d = r.dots[i]; if (!d) continue;
+        const a0 = -Math.PI / 2 + (i / 9) * Math.PI * 2;
+        const angle = a0 + p * (Math.PI * 2 / 9);
+        d.setAttribute('cx', String(CX + R * Math.cos(angle)));
+        d.setAttribute('cy', String(CY + R * Math.sin(angle)));
+      }
+    }
+  }
+
+  // Dots fade after ring completes
+  if (ms >= 1900 && ms < 2100) {
+    const fade = clamp01((ms - 1900) / 200);
+    for (const d of r.dots) d?.setAttribute('opacity', String(1 - fade));
+  } else if (ms >= 2100) {
+    for (const d of r.dots) d?.setAttribute('opacity', '0');
+  }
+
+  // Decorative inner ring fades in
+  if (ms >= 1900) {
+    r.decor?.setAttribute('opacity', String(lerp(0, 0.15, easeOut(prog(ms, 1900, 2200)))));
+  }
+
+  /* ═══ Phase 5: E flicker (1900 → 2700ms, 0.8s) ═══ */
+  if (ms >= 1900) {
+    r.eGroup?.setAttribute('opacity', '1');
+    const base = ms - 1900;
+    for (let i = 0; i < 4; i++) {
+      const op = ms >= 2700 ? 1 : flickerAt(base - i * 40);
+      r.bars[i]?.setAttribute('opacity', String(op));
+    }
+  }
+
+  // Warm glow behind E
+  if (ms >= 2500) {
+    r.glow?.setAttribute('opacity', String(easeOut(prog(ms, 2500, 2800))));
+  }
+
+  /* ═══ Phase 6: Ping + text (2700 → 3300ms) ═══ */
+  if (ms >= 2700 && ms < 3400) {
+    const p = easeOut(prog(ms, 2700, 3300));
+    if (r.ping) {
+      r.ping.setAttribute('r', String(R * lerp(1, 1.8, p)));
+      r.ping.setAttribute('opacity', String(lerp(0.5, 0, p)));
+      r.ping.setAttribute('stroke-width', String(lerp(3.5, 1.5, p)));
+    }
+  }
+
+  // "Eidolum" — vertical clip reveal from center
+  if (r.text && ms >= 2700) {
+    r.text.style.opacity = '1';
+    const inset = lerp(50, 0, easeOut(prog(ms, 2700, 3100)));
+    r.text.style.clipPath = `inset(${inset}% 0 ${inset}% 0)`;
+  }
+
+  // Tagline
+  if (r.tag && ms >= 3000) {
+    r.tag.style.opacity = String(lerp(0, 0.6, easeOut(prog(ms, 3000, 3300))));
+  }
+
+  /* ═══ Phase 7: Staggered fadeout ═══ */
+
+  // Text fades first (3400 → 3600ms)
+  if (ms >= 3400) {
+    const p = prog(ms, 3400, 3600);
+    if (r.text) r.text.style.opacity = String(1 - p);
+    if (r.tag)  r.tag.style.opacity = String(0.6 * (1 - p));
+  }
+
+  // Circle + E scale to 0.9× and fade (3600 → 3900ms)
+  if (r.inner && ms >= 3600) {
+    const p = easeOut(prog(ms, 3600, 3900));
+    r.inner.style.transform = `scale(${lerp(1, 0.9, p)})`;
+    r.inner.style.opacity = String(1 - p);
+  }
+
+  // Background fades to transparent (3900 → 4100ms)
+  if (r.bg && ms >= 3900) {
+    const p = prog(ms, 3900, 4100);
+    r.bg.style.opacity = String(1 - p);
+    if (p >= 1) r.bg.style.pointerEvents = 'none';
+  }
 }
