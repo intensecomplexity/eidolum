@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { ExternalLink, ArrowLeft } from 'lucide-react';
+import { ExternalLink, ArrowLeft, ChevronUp, ChevronDown } from 'lucide-react';
 import useSEO from '../hooks/useSEO';
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 import PredictionBadge from '../components/PredictionBadge';
@@ -29,6 +29,7 @@ export default function ForecasterProfile() {
   const [reportCard, setReportCard] = useState(null);
   const [activeSector, setActiveSector] = useState('All');
   const [sectorCounts, setSectorCounts] = useState([]);
+  const [sectorPage, setSectorPage] = useState(0);
   // Map forecaster platform to platformId for routing
   const PLATFORM_ID_MAP = { youtube: 'youtube', x: 'twitter', reddit: 'reddit', congress: 'congress', institutional: 'institutional' };
 
@@ -315,8 +316,8 @@ export default function ForecasterProfile() {
           </div>
         )}
 
-        {/* Chart + Sector — items-start so chart doesn't stretch to match sector list height */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6 mb-6 sm:mb-8 items-start">
+        {/* Chart + Sector — items-stretch so both panels match height */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6 mb-6 sm:mb-8 lg:items-stretch">
           <div className="card lg:col-span-2" style={{ backgroundColor: '#14161c' }}>
             <h2 className="text-base sm:text-lg font-semibold mb-3 sm:mb-4" style={{ color: '#e0e0e0' }}>Accuracy Trend</h2>
             {chartData.length > 0 ? (
@@ -390,28 +391,50 @@ export default function ForecasterProfile() {
             )}
           </div>
 
-          <div className="card">
-            <h2 className="text-base sm:text-lg font-semibold mb-3 sm:mb-4">Sector Accuracy</h2>
-            <div className="space-y-3">
-              {(sectorCounts.length > 0 ? sectorCounts : data.sector_strengths || []).map((s) => (
-                <div key={s.sector}>
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-sm text-text-secondary">{s.sector}</span>
-                    <span className={`font-mono text-sm font-semibold ${s.accuracy >= 60 ? 'text-positive' : 'text-negative'}`}>
-                      {s.accuracy.toFixed(0)}%
-                    </span>
-                  </div>
-                  <div className="w-full h-1.5 bg-surface-2 rounded-full overflow-hidden">
-                    <div className={`h-full rounded-full ${s.accuracy >= 60 ? 'bg-positive' : 'bg-negative'}`} style={{ width: `${Math.min(s.accuracy, 100)}%` }} />
-                  </div>
-                  <div className="text-muted text-xs mt-0.5">{s.count} predictions</div>
+          {(() => {
+            const allSectors = sectorCounts.length > 0 ? sectorCounts : data.sector_strengths || [];
+            const perPage = 4;
+            const totalPages = Math.max(1, Math.ceil(allSectors.length / perPage));
+            const page = Math.min(sectorPage, totalPages - 1);
+            const visible = allSectors.slice(page * perPage, (page + 1) * perPage);
+            return (
+              <div className="card flex flex-col">
+                <h2 className="text-base sm:text-lg font-semibold mb-3 sm:mb-4">Sector Accuracy</h2>
+                <div className="flex-1 space-y-3">
+                  {visible.map((s) => (
+                    <div key={s.sector}>
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-sm text-text-secondary">{s.sector}</span>
+                        <span className={`font-mono text-sm font-semibold ${s.accuracy >= 60 ? 'text-positive' : 'text-negative'}`}>
+                          {s.accuracy.toFixed(0)}%
+                        </span>
+                      </div>
+                      <div className="w-full h-1.5 bg-surface-2 rounded-full overflow-hidden">
+                        <div className={`h-full rounded-full ${s.accuracy >= 60 ? 'bg-positive' : 'bg-negative'}`} style={{ width: `${Math.min(s.accuracy, 100)}%` }} />
+                      </div>
+                      <div className="text-muted text-xs mt-0.5">{s.count} predictions</div>
+                    </div>
+                  ))}
+                  {allSectors.length === 0 && (
+                    <p className="text-muted text-sm">No sector data.</p>
+                  )}
                 </div>
-              ))}
-              {sectorCounts.length === 0 && (!data.sector_strengths || data.sector_strengths.length === 0) && (
-                <p className="text-muted text-sm">No sector data.</p>
-              )}
-            </div>
-          </div>
+                {totalPages > 1 && (
+                  <div className="flex items-center justify-center gap-3 mt-3 pt-3 border-t border-border/20">
+                    <button onClick={() => setSectorPage(p => Math.max(0, p - 1))} disabled={page === 0}
+                      className={`p-1 rounded transition-opacity ${page === 0 ? 'opacity-20' : 'opacity-60 hover:opacity-100'}`}>
+                      <ChevronUp className="w-4 h-4" />
+                    </button>
+                    <span className="text-[10px] text-muted font-mono">{page + 1} / {totalPages}</span>
+                    <button onClick={() => setSectorPage(p => Math.min(totalPages - 1, p + 1))} disabled={page >= totalPages - 1}
+                      className={`p-1 rounded transition-opacity ${page >= totalPages - 1 ? 'opacity-20' : 'opacity-60 hover:opacity-100'}`}>
+                      <ChevronDown className="w-4 h-4" />
+                    </button>
+                  </div>
+                )}
+              </div>
+            );
+          })()}
         </div>
 
         {/* Direction breakdown — bull/bear/neutral split */}
