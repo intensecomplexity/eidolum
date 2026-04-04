@@ -130,9 +130,9 @@ def _tournament():
 
 def _youtube():
     try:
-        from jobs.youtube_scraper import scrape_youtube_predictions
+        from jobs.youtube_scraper import run_youtube_scraper
         db = BgSessionLocal()
-        try: scrape_youtube_predictions(db)
+        try: run_youtube_scraper(db)
         finally: db.close()
     except Exception as e: log.error(f"[youtube] {e}")
 
