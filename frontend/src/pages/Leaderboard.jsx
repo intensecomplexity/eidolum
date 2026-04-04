@@ -16,9 +16,11 @@ const SECTORS = ['All', 'Technology', 'Healthcare', 'Financial Services', 'Consu
 const DIRECTIONS = ['All', 'bullish', 'bearish', 'neutral'];
 
 const SHORT_SECTOR = {
-  'Financial Services': 'Finance', 'Communication Services': 'Comms',
-  'Consumer Cyclical': 'Consumer', 'Consumer Defensive': 'Staples',
-  'Basic Materials': 'Materials', 'Real Estate': 'RE',
+  'Technology': 'Tech', 'Financial Services': 'Finance',
+  'Communication Services': 'Comms', 'Consumer Cyclical': 'Consumer',
+  'Consumer Defensive': 'Consumer Def.', 'Basic Materials': 'Materials',
+  'Commercial Services & Supplies': 'Commercial Svcs',
+  'Diversified Consumer Services': 'Consumer Svcs',
 };
 
 function SectorBadge({ sector, accuracy, count }) {
@@ -26,7 +28,7 @@ function SectorBadge({ sector, accuracy, count }) {
   const label = SHORT_SECTOR[sector] || sector;
   const correct = count > 0 ? Math.round(accuracy * count / 100) : 0;
   return (
-    <span className="inline-block px-2 py-0.5 rounded text-[11px] font-mono font-medium truncate max-w-[180px]"
+    <span className="inline-block px-2 py-0.5 rounded text-[11px] font-mono font-medium whitespace-nowrap"
       style={{ backgroundColor: `${color}15`, color, border: `1px solid ${color}30` }}
       title={`${sector}: ${correct}/${count}`}>
       {label}: {correct}/{count}

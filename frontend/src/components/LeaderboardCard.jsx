@@ -173,13 +173,13 @@ export default function LeaderboardCard({ forecaster: f, metric = 'avg_return' }
       {f.sector_strengths?.[0] && (() => {
         const s = f.sector_strengths[0];
         const color = s.accuracy >= 60 ? '#00c896' : s.accuracy >= 30 ? '#e5a100' : '#ef4444';
-        const SHORT = { 'Financial Services': 'Finance', 'Communication Services': 'Comms', 'Consumer Cyclical': 'Consumer', 'Consumer Defensive': 'Staples', 'Basic Materials': 'Materials' };
+        const SHORT = { 'Technology': 'Tech', 'Financial Services': 'Finance', 'Communication Services': 'Comms', 'Consumer Cyclical': 'Consumer', 'Consumer Defensive': 'Consumer Def.', 'Basic Materials': 'Materials', 'Commercial Services & Supplies': 'Commercial Svcs', 'Diversified Consumer Services': 'Consumer Svcs' };
         const label = SHORT[s.sector] || s.sector;
         const correct = s.count > 0 ? Math.round(s.accuracy * s.count / 100) : 0;
         return (
           <div className="mt-3">
             <div className="text-[9px] text-muted uppercase tracking-wider mb-1">Top Sector</div>
-            <span className="inline-block px-2 py-0.5 rounded text-[11px] font-mono font-medium truncate max-w-[180px]"
+            <span className="inline-block px-2 py-0.5 rounded text-[11px] font-mono font-medium whitespace-nowrap"
               style={{ backgroundColor: `${color}15`, color, border: `1px solid ${color}30` }}
               title={`${s.sector}: ${correct}/${s.count}`}>
               {label}: {correct}/{s.count}
