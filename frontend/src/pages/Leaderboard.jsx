@@ -26,8 +26,9 @@ function SectorBadge({ sector, accuracy, count }) {
   const label = SHORT_SECTOR[sector] || sector;
   const correct = count > 0 ? Math.round(accuracy * count / 100) : 0;
   return (
-    <span className="inline-block px-2 py-0.5 rounded text-[11px] font-mono font-medium whitespace-nowrap"
-      style={{ backgroundColor: `${color}15`, color, border: `1px solid ${color}30` }}>
+    <span className="inline-block px-2 py-0.5 rounded text-[11px] font-mono font-medium truncate max-w-[180px]"
+      style={{ backgroundColor: `${color}15`, color, border: `1px solid ${color}30` }}
+      title={`${sector}: ${correct}/${count}`}>
       {label}: {correct}/{count}
     </span>
   );
@@ -304,7 +305,7 @@ export default function Leaderboard() {
                           </th>
                           <th className="px-3 py-3 text-right">Predictions</th>
                           <th className="px-3 py-3 text-center hidden xl:table-cell w-16">Streak</th>
-                          <th className="px-3 py-3 hidden xl:table-cell max-w-[160px]">Sectors</th>
+                          <th className="px-3 py-3 hidden xl:table-cell max-w-[180px]">Top Sector</th>
                           <th className="px-2 py-3 text-center hidden lg:table-cell w-14">Follow</th>
                         </tr>
                       </thead>
@@ -369,12 +370,10 @@ export default function Leaderboard() {
                               <div className="text-muted text-[10px] font-mono">{f.total_predictions} total</div>
                             </td>
                             <td className="px-3 py-3 text-center hidden xl:table-cell"><StreakBadge streak={f.streak} /></td>
-                            <td className="px-3 py-3 hidden xl:table-cell max-w-[160px]">
-                              <div className="flex gap-1.5 flex-wrap">
-                                {f.sector_strengths.slice(0, 2).map((s) => (
-                                  <SectorBadge key={s.sector} sector={s.sector} accuracy={s.accuracy} count={s.count} />
-                                ))}
-                              </div>
+                            <td className="px-3 py-3 hidden xl:table-cell max-w-[180px]">
+                              {f.sector_strengths?.[0] && (
+                                <SectorBadge sector={f.sector_strengths[0].sector} accuracy={f.sector_strengths[0].accuracy} count={f.sector_strengths[0].count} />
+                              )}
                             </td>
                             <td className="px-2 py-3 text-center hidden lg:table-cell">
                               <FollowButton forecaster={f} compact />

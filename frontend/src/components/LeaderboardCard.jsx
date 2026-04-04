@@ -169,23 +169,24 @@ export default function LeaderboardCard({ forecaster: f, metric = 'avg_return' }
         </div>
       )}
 
-      {/* Sector tags */}
-      {f.sector_strengths?.length > 0 && (
-        <div className="flex gap-2 flex-wrap mt-3">
-          {f.sector_strengths.slice(0, 2).map((s) => {
-            const color = s.accuracy >= 60 ? '#00c896' : s.accuracy >= 30 ? '#e5a100' : '#ef4444';
-            const SHORT = { 'Financial Services': 'Finance', 'Communication Services': 'Comms', 'Consumer Cyclical': 'Consumer', 'Consumer Defensive': 'Staples', 'Basic Materials': 'Materials' };
-            const label = SHORT[s.sector] || s.sector;
-            const correct = s.count > 0 ? Math.round(s.accuracy * s.count / 100) : 0;
-            return (
-              <span key={s.sector} className="inline-block px-2 py-0.5 rounded text-[11px] font-mono font-medium whitespace-nowrap"
-                style={{ backgroundColor: `${color}15`, color, border: `1px solid ${color}30` }}>
-                {label}: {correct}/{s.count}
-              </span>
-            );
-          })}
-        </div>
-      )}
+      {/* Top sector */}
+      {f.sector_strengths?.[0] && (() => {
+        const s = f.sector_strengths[0];
+        const color = s.accuracy >= 60 ? '#00c896' : s.accuracy >= 30 ? '#e5a100' : '#ef4444';
+        const SHORT = { 'Financial Services': 'Finance', 'Communication Services': 'Comms', 'Consumer Cyclical': 'Consumer', 'Consumer Defensive': 'Staples', 'Basic Materials': 'Materials' };
+        const label = SHORT[s.sector] || s.sector;
+        const correct = s.count > 0 ? Math.round(s.accuracy * s.count / 100) : 0;
+        return (
+          <div className="mt-3">
+            <div className="text-[9px] text-muted uppercase tracking-wider mb-1">Top Sector</div>
+            <span className="inline-block px-2 py-0.5 rounded text-[11px] font-mono font-medium truncate max-w-[180px]"
+              style={{ backgroundColor: `${color}15`, color, border: `1px solid ${color}30` }}
+              title={`${s.sector}: ${correct}/${s.count}`}>
+              {label}: {correct}/{s.count}
+            </span>
+          </div>
+        );
+      })()}
     </div>
   );
 }
