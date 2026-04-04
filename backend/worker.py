@@ -216,7 +216,7 @@ def main():
     sched.add_job(_watchdog, "interval", minutes=5, id="watchdog")
 
     for j in sched.get_jobs():
-        log.info(f"[Worker] {j.id} → next={j.next_run_time}")
+        log.info(f"[Worker] {j.id} → next={getattr(j, 'next_run_time', 'pending')}")
     log.info(f"[Worker] {len(sched.get_jobs())} jobs. API deploys won't affect these.")
 
     try:
