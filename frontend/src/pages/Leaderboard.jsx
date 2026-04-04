@@ -439,11 +439,6 @@ export default function Leaderboard() {
               </>
             )}
 
-            {data.length > 0 && activeTab !== 'week' && (
-              <p className="text-center text-xs mt-4 italic" style={{ color: '#666' }}>
-                Only forecasters with 10+ scored predictions qualify for The Eidolum 100
-              </p>
-            )}
 
             {activeTab === 'week' && data.length > 0 && (
               <NotificationBanner text="Get weekly leaderboard updates delivered to your inbox every Monday." />
