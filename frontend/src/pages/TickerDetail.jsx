@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { TrendingUp, TrendingDown, Trophy, ArrowLeft, Check, X, BarChart3, Users, MessageSquare, ChevronDown, Clock, Target, Calendar, Minus } from 'lucide-react';
 import useSEO from '../hooks/useSEO';
+import EidolumSpinner from '../components/EidolumSpinner';
 import PredictionBadge from '../components/PredictionBadge';
 import ConsensusBar from '../components/ConsensusBar';
 import StockChart from '../components/StockChart';
@@ -62,7 +63,7 @@ export default function TickerDetail() {
 
   if (loading) return (
     <div className="flex items-center justify-center min-h-[60vh]">
-      <div className="w-8 h-8 border-2 border-accent border-t-transparent rounded-full animate-spin" />
+      <EidolumSpinner size={40} />
     </div>
   );
 

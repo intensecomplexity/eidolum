@@ -2,6 +2,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { ChevronDown, Filter, Trophy, Flame, Clock } from 'lucide-react';
 import useSEO from '../hooks/useSEO';
+import EidolumSpinner from '../components/EidolumSpinner';
 import Footer from '../components/Footer';
 import MiniPieChart from '../components/MiniPieChart';
 import PlatformBadge from '../components/PlatformBadge';
@@ -252,7 +253,7 @@ export default function Leaderboard() {
             {/* Loading */}
             {loading ? (
               <div className="flex items-center justify-center py-20">
-                <div className="w-6 h-6 border-2 border-accent border-t-transparent rounded-full animate-spin" />
+                <EidolumSpinner size={32} />
               </div>
             ) : emptyMessage && activeTab !== 'week' ? (
               <div className="card text-center py-12">
@@ -310,7 +311,7 @@ export default function Leaderboard() {
                           <th className="px-3 py-3 text-right">Predictions</th>
                           <th className="px-3 py-3 text-center hidden xl:table-cell w-16">Streak</th>
                           <th className="px-3 py-3 hidden xl:table-cell max-w-[180px]">Top Sector</th>
-                          <th className="px-2 py-3 text-center hidden lg:table-cell w-14">Follow</th>
+                          <th className="px-2 py-3 text-center hidden lg:table-cell w-14">Watch</th>
                         </tr>
                       </thead>
                       <tbody key={metric}>

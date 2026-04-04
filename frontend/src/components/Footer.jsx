@@ -8,10 +8,15 @@ export default function Footer() {
   return (
     <footer className="border-t border-border bg-surface mt-12 sm:mt-20">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-10">
+        {/* Centered brand mark */}
+        <div className="flex flex-col items-center mb-5">
+          <EidolumLogo size={28} />
+          <span className="font-serif text-lg text-accent mt-1.5">Eidolum</span>
+          <p className="text-muted text-[11px] italic mt-1">Truth is the only currency.</p>
+        </div>
         <div className="flex flex-col items-center gap-4 sm:flex-row sm:justify-between sm:gap-4">
-          <div className="flex items-center gap-2">
-            <EidolumLogo size={20} />
-            <span className="font-serif text-base text-accent">Eidolum</span>
+          <div className="hidden sm:flex items-center gap-2">
+            <span className="text-muted text-xs">eidolum.com</span>
           </div>
           <nav className="flex items-center gap-1.5 text-xs text-text-secondary">
             <Link to="/" className="hover:text-accent transition-colors">Home</Link>

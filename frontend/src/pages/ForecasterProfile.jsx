@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { ExternalLink, ArrowLeft, ChevronUp, ChevronDown } from 'lucide-react';
+import EidolumSpinner from '../components/EidolumSpinner';
 import useSEO from '../hooks/useSEO';
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 import PredictionBadge from '../components/PredictionBadge';
@@ -83,7 +84,7 @@ export default function ForecasterProfile() {
 
   // SEO hook MUST be before any early returns (React hooks rule)
   useSEO({
-    title: data ? `${data.name} Accuracy — ${data.accuracy_rate?.toFixed(1)}% on ${data.total_predictions || 0} predictions | Eidolum` : 'Forecaster | Eidolum',
+    title: data ? `${data.name}'s Vault — ${data.accuracy_rate?.toFixed(1)}% on ${data.total_predictions || 0} predictions | Eidolum` : 'The Vault | Eidolum',
     description: data ? `${data.name}${data.firm ? ` at ${data.firm}` : ''} has ${data.accuracy_rate?.toFixed(1)}% accuracy across ${data.total_predictions || 0} tracked predictions.` : undefined,
     url: `https://www.eidolum.com/forecaster/${id}`,
     image: data ? `https://eidolum-production.up.railway.app/api/og-image/forecaster/${id}` : undefined,
@@ -92,7 +93,7 @@ export default function ForecasterProfile() {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
-        <div className="w-8 h-8 border-2 border-accent border-t-transparent rounded-full animate-spin" />
+        <EidolumSpinner size={40} />
       </div>
     );
   }
@@ -128,6 +129,7 @@ export default function ForecasterProfile() {
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 sm:gap-6">
             <div>
               <div className="flex items-center gap-2 sm:gap-3 mb-1 flex-wrap">
+                <div className="text-[10px] text-accent/60 uppercase tracking-widest font-mono mb-0.5">The Vault</div>
                 <h1 className="headline-serif" style={{ fontSize: 'clamp(24px, 5vw, 36px)' }}>{data.name}</h1>
                 <PlatformBadge platform={data.platform} size={20} showLabel />
                 <StreakBadge streak={data.streak} />
