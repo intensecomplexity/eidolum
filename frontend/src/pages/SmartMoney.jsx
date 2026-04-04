@@ -47,7 +47,6 @@ export default function SmartMoney() {
         </div>
         <p className="text-text-secondary text-sm mb-6">
           What the highest-accuracy analysts are betting on right now.
-          {data && <span className="text-muted ml-1">({data.top_analyst_count} qualified analysts)</span>}
         </p>
 
         {/* Tabs */}
