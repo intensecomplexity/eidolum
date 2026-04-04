@@ -16,8 +16,8 @@ const SORTS = [
 
 export default function SmartMoney() {
   useSEO({
-    title: 'Follow the Smart Money — Top Analyst Picks | Eidolum',
-    description: 'See what the highest-accuracy analysts are betting on right now. Only includes analysts with 60%+ accuracy and 35+ scored predictions.',
+    title: 'The Oracle List — Top Analyst Picks | Eidolum',
+    description: 'See what the most accurate analysts on Wall Street are predicting right now. Ranked by real accuracy data.',
     url: 'https://www.eidolum.com/smart-money',
   });
 
@@ -42,11 +42,11 @@ export default function SmartMoney() {
       <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-10">
         <div className="mb-1">
           <h1 className="font-bold flex items-center gap-2 whitespace-nowrap" style={{ fontSize: 'clamp(20px, 5vw, 36px)' }}>
-            <DollarSign className="w-7 h-7 text-accent" /> Follow the Smart Money
+            <DollarSign className="w-7 h-7 text-accent" /> The Oracle List
           </h1>
         </div>
         <p className="text-text-secondary text-sm mb-6">
-          What the highest-accuracy analysts are betting on right now.
+          What the highest-accuracy analysts are betting on right now. Only the most proven forecasters make this list.
         </p>
 
         {/* Tabs */}

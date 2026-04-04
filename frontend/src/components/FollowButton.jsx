@@ -80,12 +80,12 @@ export default function FollowButton({ forecaster, compact = false }) {
         {isFollowing ? (
           <>
             <UserCheck className={`${compact ? 'w-3 h-3' : 'w-4 h-4'}`} />
-            {!compact && 'Following'}
+            {!compact && 'Watching'}
           </>
         ) : (
           <>
             <UserPlus className={`${compact ? 'w-3 h-3' : 'w-4 h-4'}`} />
-            {!compact && 'Follow'}
+            {!compact && 'Watch'}
           </>
         )}
       </button>

@@ -54,7 +54,7 @@ export default function ToldYouSo() {
               <span className="font-serif text-lg text-accent">Eidolum</span>
             </div>
 
-            <h1 className="headline-serif text-2xl sm:text-3xl text-warning mb-4">I TOLD YOU SO</h1>
+            <h1 className="headline-serif text-2xl sm:text-3xl text-warning mb-4">THE RECEIPT</h1>
 
             <div className="flex items-center gap-3 mb-2">
               <span className="font-mono text-3xl font-bold tracking-wider">{data.ticker}</span>

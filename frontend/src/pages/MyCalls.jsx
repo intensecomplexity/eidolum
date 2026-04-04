@@ -253,7 +253,7 @@ function PredictionCard({ p, onDelete }) {
       <CommentSection predictionId={p.id} source="user" />
       {p.outcome === 'correct' && (
         <button onClick={() => setShowBrag(true)} className="mt-2 text-xs text-warning/70 hover:text-warning transition-colors font-medium">
-          I Told You So
+          Drop the Receipt
         </button>
       )}
       {showBrag && <ToldYouSoModal predictionId={p.id} onClose={() => setShowBrag(false)} />}

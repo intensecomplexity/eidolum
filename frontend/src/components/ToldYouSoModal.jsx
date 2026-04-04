@@ -55,7 +55,7 @@ export default function ToldYouSoModal({ predictionId, onClose }) {
     <div className="fixed inset-0 z-[80] flex items-center justify-center bg-bg/85 backdrop-blur-sm p-4" onClick={onClose}>
       <div className="bg-surface border border-border rounded-xl w-full max-w-md overflow-hidden max-h-[90vh] overflow-y-auto relative" onClick={e => e.stopPropagation()} ref={confettiRef}>
         <div className="flex items-center justify-between px-5 py-3 border-b border-border">
-          <span className="text-sm font-semibold text-warning">I Told You So</span>
+          <span className="text-sm font-semibold text-warning">The Receipt</span>
           <button onClick={onClose} className="text-muted hover:text-text-primary"><X className="w-5 h-5" /></button>
         </div>
 

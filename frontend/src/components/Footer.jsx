@@ -43,6 +43,9 @@ export default function Footer() {
             &copy; {new Date().getFullYear()} Eidolum
           </p>
         </div>
+        <p className="text-center mt-4 italic text-sm" style={{ color: '#D4A843' }}>
+          Truth is the only currency.
+        </p>
       </div>
     </footer>
   );

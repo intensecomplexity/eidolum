@@ -219,7 +219,7 @@ export default function LandingPublic() {
             Who should you <span className="font-serif italic text-accent">actually</span> listen to?
           </h1>
           <p className="text-text-secondary text-base sm:text-lg leading-relaxed max-w-xl mx-auto mb-8">
-            Look up any analyst or stock to see their real track record. No opinions. Just accuracy scores verified against market data.
+            We scored 274,000+ predictions to find out. Look up any analyst or stock to see their real track record.
           </p>
 
           {/* Search bar */}

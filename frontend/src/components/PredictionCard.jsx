@@ -117,8 +117,11 @@ export default function PredictionCard({ prediction: p, showForecaster = false, 
           <PredictionBadge direction={p.direction} windowDays={windowDays} />
           {p.has_conflict && <ConflictBadge note={p.conflict_note} size="small" />}
         </div>
-        <div className="flex items-center gap-1 shrink-0">
+        <div className="flex items-center gap-1.5 shrink-0">
           {predId && !compact && <BookmarkButton predictionId={predId} />}
+          {p.outcome && p.outcome !== 'pending' && p.outcome !== 'no_data' && (
+            <span className="text-[9px] text-muted italic">The verdict:</span>
+          )}
           <PredictionBadge outcome={p.outcome} />
         </div>
       </div>

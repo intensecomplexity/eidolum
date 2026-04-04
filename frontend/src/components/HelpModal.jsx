@@ -41,7 +41,7 @@ const SECTIONS = [
     items: [
       { icon: Star, label: 'Levels & XP', desc: 'Earn XP from every action. Progress through 10 levels from Newcomer to Eidolon.', link: '/profile' },
       { icon: Award, label: 'Badges & Achievements', desc: '49 badges across 7 categories: Accuracy, Streaks, Volume, Timing, and more.', link: '/badges' },
-      { icon: Share2, label: 'Sharing', desc: 'Share your wins on X with timestamped proof. Use the "I Told You So" button.', link: null },
+      { icon: Share2, label: 'Sharing', desc: 'Share your wins on X with timestamped proof. Use the "Drop the Receipt" button.', link: null },
     ],
   },
   {
