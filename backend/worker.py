@@ -222,6 +222,19 @@ def main():
             log.error(f"[channel_monitor] {e}")
     sched.add_job(_standalone("channel_monitor", _channel_monitor), "interval", hours=12, id="channel_monitor", next_run_time=t0 + timedelta(minutes=90))
 
+    # X/Twitter scraper — Apify-powered, every 6h, log only
+    def _x_scraper():
+        try:
+            from jobs.x_scraper import run_x_scraper
+            db = BgSessionLocal()
+            try:
+                run_x_scraper(db)
+            finally:
+                db.close()
+        except Exception as e:
+            log.error(f"[x_scraper] {e}")
+    sched.add_job(_standalone("x_scraper", _x_scraper), "interval", hours=6, id="x_scraper", next_run_time=t0 + timedelta(minutes=100))
+
     # Cron jobs
     sched.add_job(_watchlist_queue, "interval", hours=4, id="watchlist_queue", next_run_time=t0 + timedelta(minutes=35))
     sched.add_job(_watchlist_digest, "cron", day_of_week="mon-fri", hour=13, minute=0, id="watchlist_digest")
