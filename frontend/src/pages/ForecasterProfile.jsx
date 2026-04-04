@@ -61,8 +61,8 @@ export default function ForecasterProfile() {
             if (card) setReportCard({ ...card, month: rc.month });
           })
           .catch(() => {});
-        // Fetch sector counts
-        getForecasterSectors(id)
+        // Fetch sector counts (use d.id from API response, not route param which may be undefined for slug routes)
+        getForecasterSectors(d.id)
           .then((r) => {
             const sc = r.sector_strengths || [];
             setSectorCounts(sc);
@@ -71,7 +71,7 @@ export default function ForecasterProfile() {
       })
       .catch(() => {})
       .finally(() => setLoading(false));
-  }, [id]);
+  }, [id, slug]);
 
   useEffect(() => {
     if (!id) return;
@@ -466,10 +466,10 @@ export default function ForecasterProfile() {
         })()}
 
         {/* Portfolio Simulator */}
-        <PortfolioSimulator forecasterId={parseInt(id)} forecasterName={data.name} />
+        <PortfolioSimulator forecasterId={data.id} forecasterName={data.name} />
 
         {/* Disclosed Positions */}
-        <DisclosedPositions forecasterId={parseInt(id)} platform={data.platform} />
+        <DisclosedPositions forecasterId={data.id} platform={data.platform} />
 
         {/* Monthly Report Card */}
         {reportCard && (
