@@ -5,6 +5,7 @@ import ConsensusBar from '../components/ConsensusBar';
 import CompanyLogo from '../components/CompanyLogo';
 import TickerLink from '../components/TickerLink';
 import Footer from '../components/Footer';
+import PageHeader from '../components/PageHeader';
 import { getAllConsensus } from '../api';
 import useSEO from '../hooks/useSEO';
 
@@ -63,12 +64,8 @@ export default function Consensus() {
 
   return (
     <div>
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-10">
-        <div className="flex items-center gap-2 mb-1">
-          <TrendingUp className="w-6 h-6 text-accent" />
-          <h1 className="headline-serif" style={{ fontSize: 'clamp(28px, 5vw, 42px)', color: '#D4A843' }}>Consensus</h1>
-        </div>
-        <p className="text-text-secondary text-sm mb-6">What Wall Street thinks about every stock.</p>
+      <PageHeader title="Consensus" subtitle="What Wall Street thinks about every stock." icon={TrendingUp} />
+      <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 pb-6 sm:pb-10">
 
         {/* Filter row */}
         <div className="flex flex-wrap items-center gap-2 mb-4 min-w-0">

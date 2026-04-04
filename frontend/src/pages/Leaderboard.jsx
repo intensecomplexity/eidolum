@@ -4,6 +4,7 @@ import { ChevronDown, Filter, Trophy, Flame, Clock } from 'lucide-react';
 import useSEO from '../hooks/useSEO';
 import EidolumSpinner from '../components/EidolumSpinner';
 import Footer from '../components/Footer';
+import PageHeader from '../components/PageHeader';
 import MiniPieChart from '../components/MiniPieChart';
 import PlatformBadge from '../components/PlatformBadge';
 import RankBadge from '../components/RankBadge';
@@ -175,15 +176,8 @@ export default function Leaderboard() {
   return (
     <div>
       <style>{`@keyframes leaderboardFadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }`}</style>
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-10">
-        <div className="mb-5 sm:mb-8">
-          <h1 className="headline-serif mb-1 sm:mb-2" style={{ fontSize: 'clamp(28px, 5vw, 42px)', color: '#D4A843' }}>
-            The Eidolum 100
-          </h1>
-          <p className="text-text-secondary text-sm sm:text-base">
-            The top 100 financial forecasters, ranked by accuracy against real market data.
-          </p>
-        </div>
+      <PageHeader title="The Eidolum 100" subtitle="The top 100 financial forecasters, ranked by accuracy against real market data." />
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-6 sm:pb-10">
 
         {/* Tabs — horizontal scroll on mobile */}
         <div className="flex items-center gap-1 mb-4 sm:mb-6 bg-surface border border-border rounded-xl p-1 overflow-x-auto pills-scroll w-full sm:w-fit">

@@ -4,6 +4,7 @@ import { Zap, TrendingUp, TrendingDown, Minus, Check, X, Clock, Users } from 'lu
 import { useAuth } from '../context/AuthContext';
 import TickerLink from '../components/TickerLink';
 import Footer from '../components/Footer';
+import PageHeader from '../components/PageHeader';
 import { getActivityRecentCalls, getActivityScoredCalls, getActivityExpiring, getActivityFriendsCalls } from '../api';
 import timeLeft from '../utils/timeLeft';
 
@@ -228,12 +229,8 @@ export default function Activity() {
 
   return (
     <div>
-      <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-10">
-        <div className="flex items-center gap-2 mb-1">
-          <Zap className="w-6 h-6 text-accent" />
-          <h1 className="headline-serif" style={{ fontSize: 'clamp(28px, 5vw, 42px)', color: '#D4A843' }}>Activity</h1>
-        </div>
-        <p className="text-text-secondary text-sm mb-6">Live feed of everything happening on Eidolum.</p>
+      <PageHeader title="Activity" subtitle="Live feed of everything happening on Eidolum." icon={Zap} />
+      <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 pb-6 sm:pb-10">
 
         {/* Tabs */}
         <div className="flex gap-1.5 mb-6 overflow-x-auto pills-scroll">

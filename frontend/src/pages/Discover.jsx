@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Search, TrendingUp, TrendingDown, Flame, AlertTriangle, Clock, BarChart3, Star } from 'lucide-react';
 import Footer from '../components/Footer';
+import PageHeader from '../components/PageHeader';
 import CompanyLogo from '../components/CompanyLogo';
 import { searchTickers, getTrendingTickers, getSectors, getExpiringPredictions, getLeaderboard } from '../api';
 

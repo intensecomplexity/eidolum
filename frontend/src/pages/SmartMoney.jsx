@@ -4,6 +4,7 @@ import { TrendingUp, TrendingDown, ChevronDown, DollarSign } from 'lucide-react'
 import useSEO from '../hooks/useSEO';
 import CompanyLogo from '../components/CompanyLogo';
 import Footer from '../components/Footer';
+import PageHeader from '../components/PageHeader';
 import { getSmartMoney } from '../api';
 
 const SECTORS = ['All Sectors', 'Technology', 'Healthcare', 'Financial Services', 'Energy', 'Consumer Cyclical', 'Consumer Defensive', 'Industrials', 'Communication Services'];
@@ -39,15 +40,8 @@ export default function SmartMoney() {
 
   return (
     <div>
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-10">
-        <div className="mb-1">
-          <h1 className="headline-serif flex items-center gap-2 whitespace-nowrap" style={{ fontSize: 'clamp(24px, 5vw, 42px)', color: '#D4A843' }}>
-            <DollarSign className="w-7 h-7 text-accent" /> The Oracle List
-          </h1>
-        </div>
-        <p className="text-text-secondary text-sm mb-6">
-          What the highest-accuracy analysts are betting on right now. Only the most proven forecasters make this list.
-        </p>
+      <PageHeader title="The Oracle List" subtitle="What the highest-accuracy analysts are betting on right now. Only the most proven forecasters make this list." icon={DollarSign} />
+      <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 pb-6 sm:pb-10">
 
         {/* Tabs */}
         <div className="flex items-center gap-1 mb-4 bg-surface border border-border rounded-xl p-1 w-fit">
