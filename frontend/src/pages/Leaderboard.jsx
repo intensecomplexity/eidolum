@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { ChevronDown, Filter, Trophy, Flame, Clock } from 'lucide-react';
 import useSEO from '../hooks/useSEO';
 import Footer from '../components/Footer';
@@ -60,6 +60,7 @@ function getMetricValue(f, metricKey) {
 
 export default function Leaderboard() {
   const [data, setData] = useState([]);
+  const navigate = useNavigate();
   const [weekData, setWeekData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('alltime');
@@ -311,7 +312,8 @@ export default function Leaderboard() {
                         {data.map((f, idx) => (
                           <React.Fragment key={f.id}>
                           <tr className="border-b border-border/50 hover:bg-surface-2/50 transition-colors cursor-pointer"
-                            style={{ animation: `leaderboardFadeIn 0.3s ease-out ${idx * 0.02}s both` }}>
+                            style={{ animation: `leaderboardFadeIn 0.3s ease-out ${idx * 0.02}s both` }}
+                            onClick={() => navigate(f.slug ? `/analyst/${f.slug}` : `/forecaster/${f.id}`)}>
                             <td className="px-3 py-4"><RankBadge rank={f.rank} movement={f.rank_movement} /></td>
                             <td className="px-3 py-3">
                               <Link to={`/forecaster/${f.id}`} className="hover:text-accent transition-colors">
