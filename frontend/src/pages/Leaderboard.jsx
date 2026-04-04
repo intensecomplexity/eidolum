@@ -85,6 +85,11 @@ export default function Leaderboard() {
     url: 'https://www.eidolum.com/leaderboard',
   });
 
+  // Scroll to top on any filter change
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, [activeTab, sector, direction, metric, timeframe]);
+
   function handleTabClick(key) {
     setActiveTab(key);
   }
