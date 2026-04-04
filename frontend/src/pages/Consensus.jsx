@@ -65,7 +65,7 @@ export default function Consensus() {
   return (
     <div>
       <PageHeader title="Consensus" subtitle="What Wall Street thinks about every stock." icon={TrendingUp} />
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 pb-6 sm:pb-10">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-6 sm:pb-10">
 
         {/* Filter row */}
         <div className="flex flex-wrap items-center gap-2 mb-4 min-w-0">

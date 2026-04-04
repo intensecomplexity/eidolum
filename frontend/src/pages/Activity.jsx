@@ -230,7 +230,7 @@ export default function Activity() {
   return (
     <div>
       <PageHeader title="Activity" subtitle="Live feed of everything happening on Eidolum." icon={Zap} />
-      <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 pb-6 sm:pb-10">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-6 sm:pb-10">
 
         {/* Tabs */}
         <div className="flex gap-1.5 mb-6 overflow-x-auto pills-scroll">

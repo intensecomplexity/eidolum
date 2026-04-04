@@ -32,7 +32,7 @@ export default function PowerRankings() {
 
   if (!data || data.rankings.length === 0) {
     return (
-      <div className="max-w-5xl mx-auto px-4 py-20 text-center">
+      <div className="max-w-7xl mx-auto px-4 py-20 text-center">
         <Trophy className="w-10 h-10 text-muted/30 mx-auto mb-3" />
         <p className="text-text-secondary">Not enough recent data for power rankings.</p>
         <p className="text-muted text-sm mt-1">Rankings require 3+ predictions resolved in the last 30 days.</p>
@@ -44,7 +44,7 @@ export default function PowerRankings() {
 
   return (
     <div>
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-10">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-10">
         {/* Header */}
         <div className="mb-6 sm:mb-8">
           <div className="flex items-center gap-2 mb-1">

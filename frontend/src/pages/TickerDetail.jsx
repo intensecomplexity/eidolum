@@ -55,7 +55,7 @@ export default function TickerDetail() {
   useEffect(() => { fetchData(); }, [ticker]);
 
   if (!ticker) return (
-    <div className="max-w-5xl mx-auto px-4 py-20 text-center">
+    <div className="max-w-7xl mx-auto px-4 py-20 text-center">
       <p className="text-text-secondary text-lg">No ticker specified.</p>
       <Link to="/consensus" className="text-accent mt-4 inline-block">Browse all tickers</Link>
     </div>
@@ -68,7 +68,7 @@ export default function TickerDetail() {
   );
 
   if (error || !data) return (
-    <div className="max-w-5xl mx-auto px-4 py-20 text-center">
+    <div className="max-w-7xl mx-auto px-4 py-20 text-center">
       <p className="text-text-secondary text-lg">{error ? `Could not load data for ${ticker}.` : `No data found for ${ticker}.`}</p>
       {error && <p className="text-muted text-sm mt-1">The request timed out or the server returned an error.</p>}
       <button onClick={fetchData} className="text-accent mt-4 inline-block hover:underline cursor-pointer">Try again</button>
@@ -86,7 +86,7 @@ export default function TickerDetail() {
 
   return (
     <div>
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-10">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-10">
 
         {/* Back */}
         <Link to="/consensus" className="inline-flex items-center gap-1 text-muted text-sm mb-4 sm:mb-6 min-h-[44px]">

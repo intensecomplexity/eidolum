@@ -68,7 +68,7 @@ export default function Discover() {
   return (
     <div>
       <PageHeader title="Discover" subtitle="Explore tickers, trending calls, and rising analysts." />
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 pb-6 sm:pb-10">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-6 sm:pb-10">
 
         {/* ── SECTION 1: Search ─────────────────────────────────────── */}
         <form onSubmit={handleSearch} className="flex items-center gap-2 mb-8">

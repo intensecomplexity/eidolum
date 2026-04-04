@@ -41,7 +41,7 @@ export default function SmartMoney() {
   return (
     <div>
       <PageHeader title="The Oracle List" subtitle="What the highest-accuracy analysts are betting on right now. Only the most proven forecasters make this list." icon={DollarSign} />
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 pb-6 sm:pb-10">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-6 sm:pb-10">
 
         {/* Tabs */}
         <div className="flex items-center gap-1 mb-4 bg-surface border border-border rounded-xl p-1 w-fit">
