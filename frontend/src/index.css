@@ -250,6 +250,15 @@ html {
   animation: shimmer 3s ease-in-out infinite;
 }
 
+/* The Breathing Seal — loading animation */
+@keyframes eidolumBreath {
+  0%, 100% { opacity: 0.2; }
+  50% { opacity: 1; }
+}
+.eidolum-breath {
+  animation: eidolumBreath 2.2s ease-in-out infinite;
+}
+
 /* Fade in for feed items */
 @keyframes fade-slide-in {
   from { opacity: 0; transform: translateY(-8px); }
