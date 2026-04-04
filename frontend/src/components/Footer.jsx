@@ -13,28 +13,28 @@ export default function Footer() {
             <EidolumLogo size={20} />
             <span className="font-serif text-base text-accent">Eidolum</span>
           </div>
-          <nav className="flex items-center gap-1.5 text-xs text-muted">
+          <nav className="flex items-center gap-1.5 text-xs text-text-secondary">
             <Link to="/" className="hover:text-accent transition-colors">Home</Link>
-            <span className="opacity-30">·</span>
+            <span className="text-muted opacity-30">·</span>
             <Link to="/leaderboard" className="hover:text-accent transition-colors">Leaderboard</Link>
-            <span className="opacity-30">·</span>
+            <span className="text-muted opacity-30">·</span>
             <Link to="/how-it-works" className="hover:text-accent transition-colors">How It Works</Link>
-            <span className="opacity-30">·</span>
+            <span className="text-muted opacity-30">·</span>
             {isAuthenticated ? (
               <>
                 <Link to="/submit" className="hover:text-accent transition-colors">Submit</Link>
-                <span className="opacity-30">·</span>
+                <span className="text-muted opacity-30">·</span>
                 <Link to="/profile" className="hover:text-accent transition-colors">Profile</Link>
               </>
             ) : (
               <>
                 <Link to="/consensus" className="hover:text-accent transition-colors">Consensus</Link>
-                <span className="opacity-30">·</span>
+                <span className="text-muted opacity-30">·</span>
                 <Link to="/login" className="hover:text-accent transition-colors">Log In</Link>
               </>
             )}
           </nav>
-          <p className="text-muted text-xs">
+          <p className="text-text-secondary text-xs">
             &copy; {new Date().getFullYear()} Eidolum
           </p>
         </div>
