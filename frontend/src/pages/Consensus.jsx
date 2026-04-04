@@ -66,7 +66,7 @@ export default function Consensus() {
       <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-10">
         <div className="flex items-center gap-2 mb-1">
           <TrendingUp className="w-6 h-6 text-accent" />
-          <h1 className="font-bold" style={{ fontSize: 'clamp(24px, 5vw, 36px)' }}>Consensus</h1>
+          <h1 className="headline-serif" style={{ fontSize: 'clamp(28px, 5vw, 42px)', color: '#D4A843' }}>Consensus</h1>
         </div>
         <p className="text-text-secondary text-sm mb-6">What Wall Street thinks about every stock.</p>
 

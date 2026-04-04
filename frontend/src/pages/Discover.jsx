@@ -68,7 +68,7 @@ export default function Discover() {
     <div>
       <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-10">
         <div className="flex items-center justify-between mb-1">
-          <h1 className="font-bold" style={{ fontSize: 'clamp(24px, 5vw, 36px)' }}>Discover</h1>
+          <h1 className="headline-serif" style={{ fontSize: 'clamp(28px, 5vw, 42px)', color: '#D4A843' }}>Discover</h1>
           <Link to="/compare" className="text-xs text-accent font-medium flex items-center gap-1 hover:underline">
             Compare Analysts
           </Link>
