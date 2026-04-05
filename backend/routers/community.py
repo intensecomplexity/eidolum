@@ -718,14 +718,15 @@ def get_all_consensus(
         params["sector"] = sector
 
     rows = db.execute(_consensus_text(f"""
-        SELECT ticker, sector,
+        SELECT ticker,
+               MODE() WITHIN GROUP (ORDER BY COALESCE(sector, 'Other')) as sector,
                COUNT(*) as total,
                SUM(CASE WHEN direction = 'bullish' THEN 1 ELSE 0 END) as bullish,
                SUM(CASE WHEN direction = 'bearish' THEN 1 ELSE 0 END) as bearish,
                SUM(CASE WHEN direction = 'neutral' THEN 1 ELSE 0 END) as neutral
         FROM predictions
         {where}
-        GROUP BY ticker, sector
+        GROUP BY ticker
         HAVING COUNT(*) >= 5
         ORDER BY COUNT(*) DESC
         LIMIT 200

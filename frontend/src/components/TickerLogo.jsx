@@ -5,15 +5,24 @@ const CACHE_PREFIX = 'eidolum_logo:';
 const SUCCESS_TTL = 7 * 24 * 60 * 60 * 1000; // 7 days
 const FAIL_TTL = 4 * 60 * 60 * 1000;          // 4 hours
 
-// White/light logos — need filter treatment so they're visible
+// White/light logos on transparent bg — need filter to be visible on dark mode
 const WHITE_LOGOS = new Set([
-  'NKE', 'AMZN', 'AAPL', 'META', 'UBER', 'SQ', 'BLOCK',
+  'NKE', 'AMZN', 'LLY', 'UBER', 'SQ', 'BLOCK',
   'ABNB', 'SNAP', 'HOOD', 'COIN', 'RBLX', 'U', 'ZM',
-  'SHOP', 'SPOT', 'NET', 'CRWD', 'DDOG', 'MDB',
-  'LLY', 'REGN', 'VRTX', 'BIIB', 'DASH', 'SNOW',
+  'SHOP', 'SPOT', 'NET', 'CRWD', 'DDOG', 'MDB', 'SNOW', 'DASH',
 ]);
 
-// Multicolor logos — skip all filters and blend modes
+// Dark logos on transparent bg — need inversion on dark mode
+const DARK_LOGOS = new Set([
+  'SPLK', 'BLK', 'SCHW', 'GS', 'MS',
+]);
+
+// Logos with baked-in opaque backgrounds — use screen blend to drop the bg
+const BAKED_BG_LOGOS = new Set([
+  'AAPL', 'META', 'REGN', 'VRTX', 'BIIB',
+]);
+
+// Multicolor logos — no filters, no blend, show exactly as-is
 const MULTICOLOR_LOGOS = new Set([
   'MSFT', 'GOOGL', 'GOOG', 'JPM', 'BAC', 'WFC', 'C',
   'V', 'MA', 'PYPL', 'INTC', 'IBM', 'ORCL', 'CRM',
@@ -81,8 +90,12 @@ function fmpUrls(ticker) {
  * TickerLogo -- renders a stock/company logo floating on the page background.
  *
  * No containers or borders. Logos float directly on the page.
- * White logos get CSS filters. Multicolor logos are untouched.
- * Others get mix-blend-mode to handle baked-in backgrounds.
+ * Smart handling per logo type:
+ *   - White logos: brightness filter (dark mode) / invert (light mode)
+ *   - Dark logos: invert on dark mode so they're visible
+ *   - Baked-bg logos: screen blend drops dark backgrounds
+ *   - Multicolor: no treatment, show as-is
+ *   - Default: multiply blend to handle misc baked backgrounds
  */
 export default function TickerLogo({ ticker, logoUrl, size = 32, className = '' }) {
   const symbol = (ticker || '?').toUpperCase();
@@ -107,9 +120,7 @@ export default function TickerLogo({ ticker, logoUrl, size = 32, className = '' 
     }
   }, [logoUrl]);
 
-  // Read theme on every render (parent re-renders on theme change)
   const isDark = (document.documentElement.getAttribute('data-theme') || 'dark') === 'dark';
-
   const container = { width: size, height: size, minWidth: size, minHeight: size };
   const fontSize = size * 0.42;
 
@@ -156,23 +167,30 @@ export default function TickerLogo({ ticker, logoUrl, size = 32, className = '' 
     );
   }
 
-  // Determine image styles based on logo type
-  const isWhite = WHITE_LOGOS.has(symbol);
-  const isMulticolor = MULTICOLOR_LOGOS.has(symbol);
-
+  // Determine image styles based on logo category
   let imgFilter = 'none';
   let imgBlend = 'normal';
 
-  if (isMulticolor) {
-    // Multicolor: no filter, no blend — just show as-is
-  } else if (isWhite) {
+  if (MULTICOLOR_LOGOS.has(symbol)) {
+    // Multicolor: untouched
+  } else if (BAKED_BG_LOGOS.has(symbol)) {
+    // Logos with baked-in opaque dark/colored backgrounds
+    // screen blend drops dark pixels, keeping the light logo visible
+    imgBlend = isDark ? 'screen' : 'multiply';
+  } else if (WHITE_LOGOS.has(symbol)) {
+    // White/light logos on transparent bg
     if (isDark) {
       imgFilter = 'brightness(0.9)';
     } else {
       imgFilter = 'invert(1) brightness(0.2)';
     }
+  } else if (DARK_LOGOS.has(symbol)) {
+    // Dark logos on transparent bg — invisible on dark mode without inversion
+    if (isDark) {
+      imgFilter = 'invert(1) brightness(0.85)';
+    }
   } else {
-    // Default: blend mode to handle baked-in backgrounds
+    // Default: blend mode handles misc baked backgrounds
     imgBlend = isDark ? 'multiply' : 'darken';
   }
 
