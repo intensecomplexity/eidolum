@@ -236,7 +236,8 @@ def main():
                 db.close()
         except Exception as e:
             log.error(f"[X-SCRAPER] Job failed: {e}", exc_info=True)
-    sched.add_job(_standalone("x_scraper", _x_scraper), "interval", hours=8, id="x_scraper", next_run_time=t0 + timedelta(minutes=2))
+    print("[Worker] Registering X scraper job...", flush=True)
+    sched.add_job(_standalone("x_scraper", _x_scraper), "interval", hours=8, id="x_scraper", next_run_time=datetime.utcnow(), misfire_grace_time=300)
 
     # Logo processor — process new ticker logos (runs 5 min after start, then daily)
     def _process_logos():
