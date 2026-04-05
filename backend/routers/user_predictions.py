@@ -176,26 +176,38 @@ def search_tickers_endpoint(request: Request, q: str = Query(""), db: Session = 
 
     try:
         from sqlalchemy import text as sql_text
-        db_rows = db.execute(sql_text("""
-            SELECT DISTINCT p.ticker, ts.company_name, COUNT(*) as cnt
-            FROM predictions p
-            LEFT JOIN ticker_sectors ts ON ts.ticker = p.ticker
-            WHERE (UPPER(p.ticker) = :exact
-                   OR UPPER(p.ticker) LIKE :prefix
+        # Search ticker_sectors directly (includes tickers without predictions)
+        ts_rows = db.execute(sql_text("""
+            SELECT ts.ticker, ts.company_name
+            FROM ticker_sectors ts
+            WHERE (UPPER(ts.ticker) = :exact
+                   OR UPPER(ts.ticker) LIKE :prefix
                    OR LOWER(ts.company_name) LIKE :name_pat)
-            GROUP BY p.ticker, ts.company_name
-            ORDER BY CASE WHEN UPPER(p.ticker) = :exact THEN 0 ELSE 1 END, cnt DESC
+            ORDER BY CASE WHEN UPPER(ts.ticker) = :exact THEN 0
+                          WHEN UPPER(ts.ticker) LIKE :prefix THEN 1
+                          ELSE 2 END
             LIMIT 10
         """), {"exact": query_upper, "prefix": query_upper + "%", "name_pat": "%" + query_lower + "%"}).fetchall()
 
-        for r in db_rows:
+        for r in ts_rows:
             if r[0] not in found_tickers:
-                results.append({
-                    "ticker": r[0],
-                    "name": r[1] or r[0],
-                    "match_type": "database",
-                    "prediction_count": r[2],
-                })
+                results.append({"ticker": r[0], "name": r[1] or r[0], "match_type": "database"})
+                found_tickers.add(r[0])
+
+        # Also search predictions for tickers not in ticker_sectors
+        pred_rows = db.execute(sql_text("""
+            SELECT p.ticker, COUNT(*) as cnt
+            FROM predictions p
+            WHERE UPPER(p.ticker) = :exact OR UPPER(p.ticker) LIKE :prefix
+            GROUP BY p.ticker
+            ORDER BY CASE WHEN UPPER(p.ticker) = :exact THEN 0 ELSE 1 END, cnt DESC
+            LIMIT 5
+        """), {"exact": query_upper, "prefix": query_upper + "%"}).fetchall()
+
+        for r in pred_rows:
+            if r[0] not in found_tickers:
+                from ticker_lookup import TICKER_INFO
+                results.append({"ticker": r[0], "name": TICKER_INFO.get(r[0], r[0]), "match_type": "predictions"})
                 found_tickers.add(r[0])
     except Exception:
         pass
