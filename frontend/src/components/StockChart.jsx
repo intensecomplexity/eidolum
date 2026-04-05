@@ -225,16 +225,24 @@ export default function StockChart({ ticker }) {
             {uniqueDots.map((d, i) => {
               const isPending = !d.isMixed && (d.outcome === 'pending' || !d.outcome);
               const r = isPending ? pendingR : dotR;
+              const isCluster = d.count > 1;
+              const clusterR = isCluster ? r + 2 : r;
               const glowId = d.isMixed ? 'url(#glowMixed)'
                 : (d.outcome === 'hit' || d.outcome === 'correct') ? 'url(#glowHit)'
                 : (d.outcome === 'miss' || d.outcome === 'incorrect') ? 'url(#glowMiss)'
                 : d.outcome === 'near' ? 'url(#glowNear)' : undefined;
               return (
-                <ReferenceDot key={i} x={d.date} y={d.close} r={d.count > 1 ? r + 1 : r} fill={d.color}
+                <ReferenceDot key={i} x={d.date} y={d.close} r={clusterR} fill={d.color}
                   stroke={borderStroke} strokeWidth={isMobile ? 1 : 2} isFront
-                  style={{ cursor: 'pointer', filter: !isPending && !isMobile ? glowId : undefined }}
-                  onClick={(e) => { e?.stopPropagation?.(); handleDotClick(d); }}
-                  label={d.count > 1 ? { value: d.count, fill: '#fff', fontSize: 8, fontWeight: 700, position: 'center' } : undefined} />
+                  style={{ cursor: 'pointer', filter: !isPending && !isMobile ? glowId : undefined, pointerEvents: 'all' }}
+                  onClick={(e) => { e?.stopPropagation?.(); dotClickedRef.current = true; setTimeout(() => { dotClickedRef.current = false; }, 50); handleDotClick(d); }}>
+                  {isCluster && (
+                    <text textAnchor="middle" dominantBaseline="central" fill="#fff"
+                      fontSize={isMobile ? 7 : 8} fontWeight="700" style={{ pointerEvents: 'none' }}>
+                      {d.count}
+                    </text>
+                  )}
+                </ReferenceDot>
               );
             })}
           </AreaChart>
