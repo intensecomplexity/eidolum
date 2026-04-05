@@ -1,7 +1,6 @@
 <svg viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
   <rect width="48" height="48" fill="#0d0f13"/>
   <circle cx="24" cy="24" r="20" fill="none" stroke="#D4A843" stroke-width="1.5"/>
-  <!-- Eidolum E: spine + 3 arms + dissolving dots -->
   <g transform="translate(9.5, 8.5) scale(0.72)">
     <line x1="5" y1="6" x2="5" y2="42" stroke="#D4A843" stroke-width="3.5" stroke-linecap="round"/>
     <line x1="5" y1="6" x2="26" y2="6" stroke="#D4A843" stroke-width="3.5" stroke-linecap="round"/>
