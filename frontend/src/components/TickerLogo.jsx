@@ -1,14 +1,14 @@
 import { useState, useEffect } from 'react';
 
 // Logos that are WHITE on transparent — invert them on LIGHT mode
-const INVERT_ON_LIGHT = new Set([
+const INVERT_ON_LIGHT = new Set([]);
+
+// Logos that are BLACK/DARK on transparent — invert them on DARK mode
+const INVERT_ON_DARK = new Set([
   'AAPL', 'EOG', 'ULTA', 'CSX', 'V', 'VRTX', 'ADSK', 'REGN', 'EXPE',
   'BA', 'DHI', 'SLB', 'RF', 'URBN', 'ALB', 'WYNN', 'INTU', 'ATVI',
-  'VFC', 'RCL', 'SPLK', 'ANET', 'KNX', 'NTAP', 'DIS',
+  'VFC', 'RCL', 'SPLK', 'ANET', 'KNX', 'NTAP', 'DIS', 'SAVE',
 ]);
-
-// Logos that are BLACK on transparent — invert them on DARK mode
-const INVERT_ON_DARK = new Set(['SAVE']);
 
 // Logos that need to be scaled down to fit their container
 const SIZE_OVERRIDE = { 'DRI': 0.7 };
