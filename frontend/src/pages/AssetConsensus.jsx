@@ -10,6 +10,7 @@ import BookmarkButton from '../components/BookmarkButton';
 import NotificationBanner from '../components/NotificationBanner';
 import WatchButton from '../components/WatchButton';
 import RareSignalBanner from '../components/RareSignalBanner';
+import TickerLogo from '../components/TickerLogo';
 import Footer from '../components/Footer';
 import { getAssetConsensus } from '../api';
 
@@ -55,12 +56,7 @@ export default function AssetConsensus() {
               <ArrowLeft className="w-4 h-4" /> Back
             </Link>
             <div className="flex items-center gap-3 sm:gap-4 flex-wrap">
-              {data?.logo_url ? (
-                <img src={data.logo_url} alt={ticker} className="w-10 h-10 sm:w-12 sm:h-12 rounded-lg bg-surface-2 object-contain" onError={(e) => { e.target.style.display='none'; e.target.nextElementSibling && (e.target.nextElementSibling.style.display='flex'); }} />
-              ) : null}
-              {!data?.logo_url && (
-                <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-lg bg-surface-2 flex items-center justify-center text-accent font-bold text-lg">{ticker[0]?.toUpperCase()}</div>
-              )}
+              <TickerLogo ticker={ticker} logoUrl={data?.logo_url} size={40} />
               <div>
                 <div className="flex items-center gap-3">
                   <h1 className="font-bold" style={{ fontSize: 'clamp(24px, 5vw, 36px)' }}>

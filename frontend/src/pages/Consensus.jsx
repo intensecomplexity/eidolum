@@ -3,7 +3,7 @@ import LoadingSpinner from '../components/LoadingSpinner';
 import { Link } from 'react-router-dom';
 import { TrendingUp, ChevronDown, Search, AlertTriangle, CheckCircle } from 'lucide-react';
 import ConsensusBar from '../components/ConsensusBar';
-import CompanyLogo from '../components/CompanyLogo';
+import TickerLogo from '../components/TickerLogo';
 import TickerLink from '../components/TickerLink';
 import Footer from '../components/Footer';
 import PageHeader from '../components/PageHeader';
@@ -140,7 +140,7 @@ export default function Consensus() {
                 <div className="flex items-center justify-between mb-2">
                   <div className="min-w-0">
                     <div className="flex items-center gap-2">
-                      <CompanyLogo domain={c.logo_domain} logoUrl={c.logo_url} ticker={c.ticker} sector={c.sector} size={32} />
+                      <TickerLogo ticker={c.ticker} logoUrl={c.logo_url} size={32} />
                       <span className="font-mono text-accent font-bold text-lg">{c.ticker}</span>
                       {c.company_name && (
                         <span className="text-text-secondary text-sm truncate">{c.company_name}</span>

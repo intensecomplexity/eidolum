@@ -3,7 +3,7 @@ import LoadingSpinner from '../components/LoadingSpinner';
 import { Link } from 'react-router-dom';
 import { Calendar, Crosshair } from 'lucide-react';
 import ConsensusBar from '../components/ConsensusBar';
-import CompanyLogo from '../components/CompanyLogo';
+import TickerLogo from '../components/TickerLogo';
 import Footer from '../components/Footer';
 import { getUpcomingEarnings } from '../api';
 
@@ -76,7 +76,7 @@ export default function Earnings() {
                           className={`card hover:bg-surface-2 transition-colors ${urgent ? 'border-warning/20' : ''} ${!hasPreds ? 'opacity-50' : ''}`}>
                           <div className="flex items-center justify-between mb-2">
                             <div className="flex items-center gap-2">
-                              <CompanyLogo logoUrl={e.logo_url} domain={e.logo_domain} ticker={e.ticker} sector={e.sector} size={28} />
+                              <TickerLogo ticker={e.ticker} logoUrl={e.logo_url} size={28} />
                               <div>
                                 <span className="font-mono text-accent font-bold">{e.ticker}</span>
                                 <span className="text-text-secondary text-sm ml-2">{e.name}</span>

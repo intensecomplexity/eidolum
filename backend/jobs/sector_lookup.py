@@ -129,7 +129,7 @@ def _cache_to_db(ticker: str, sector: str, db=None, company_name: str = "", indu
         return
     # Always ensure a logo_url — fall back to FMP CDN pattern
     if not logo_url:
-        logo_url = f"https://financialmodelingprep.com/image-stock/{ticker}.png"
+        logo_url = f"https://financialmodelingprep.com/image-stock/{ticker.upper()}.png"
     try:
         db.execute(sql_text("""
             INSERT INTO ticker_sectors (ticker, sector, company_name, industry, description, logo_url, logo_domain)

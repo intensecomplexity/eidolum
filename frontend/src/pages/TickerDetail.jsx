@@ -7,7 +7,7 @@ import PredictionBadge from '../components/PredictionBadge';
 import ConsensusBar from '../components/ConsensusBar';
 import StockChart from '../components/StockChart';
 import StockPrice from '../components/StockPrice';
-import CompanyLogo from '../components/CompanyLogo';
+import TickerLogo from '../components/TickerLogo';
 import Footer from '../components/Footer';
 import TickerDiscussionSection from '../components/TickerDiscussionSection';
 import { ExplainerLine } from '../utils/predictionExplainer';
@@ -97,7 +97,7 @@ export default function TickerDetail() {
         <div className="card mb-6">
           <div>
             <div className="flex items-center gap-3 mb-1">
-              <CompanyLogo domain={data.logo_domain} logoUrl={data.logo_url} ticker={ticker} sector={data.sector} size={36} />
+              <TickerLogo ticker={ticker} logoUrl={data.logo_url} size={40} />
               <span className="font-mono text-3xl sm:text-4xl font-bold tracking-wider text-text-primary">{ticker}</span>
               <StockPrice ticker={ticker} size="large" autoRefresh />
             </div>

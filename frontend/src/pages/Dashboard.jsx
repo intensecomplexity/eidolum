@@ -9,7 +9,7 @@ import Countdown from '../components/Countdown';
 import LivePnL from '../components/LivePnL';
 import TickerLink from '../components/TickerLink';
 import RankNumber from '../components/RankNumber';
-import CompanyLogo from '../components/CompanyLogo';
+import TickerLogo from '../components/TickerLogo';
 import ConsensusBar from '../components/ConsensusBar';
 import PredictionBadge from '../components/PredictionBadge';
 import Footer from '../components/Footer';
@@ -195,7 +195,7 @@ export default function Dashboard() {
               {biggestCalls.map(p => (
                 <Link key={p.id} to={`/asset/${p.ticker}`}
                   className="flex items-center gap-3 card py-3 hover:border-accent/20 transition-colors">
-                  <CompanyLogo domain={p.logo_domain} logoUrl={p.logo_url} ticker={p.ticker} size={28} />
+                  <TickerLogo ticker={p.ticker} logoUrl={p.logo_url} size={28} />
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
                       <span className="font-mono text-accent font-bold text-sm">{p.ticker}</span>
@@ -276,7 +276,7 @@ export default function Dashboard() {
                 <Link key={t.ticker} to={`/asset/${t.ticker}`}
                   className="shrink-0 w-44 sm:w-48 card py-3 px-4 hover:border-accent/30 transition-colors">
                   <div className="flex items-center gap-2 mb-2">
-                    <CompanyLogo domain={t.logo_domain} logoUrl={t.logo_url} ticker={t.ticker} size={22} />
+                    <TickerLogo ticker={t.ticker} logoUrl={t.logo_url} size={22} />
                     <span className="font-mono font-bold text-accent text-sm">{t.ticker}</span>
                     <span className="text-muted text-[10px] font-mono ml-auto">{t.total}</span>
                   </div>

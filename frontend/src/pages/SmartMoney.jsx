@@ -3,7 +3,7 @@ import LoadingSpinner from '../components/LoadingSpinner';
 import { Link } from 'react-router-dom';
 import { TrendingUp, TrendingDown, ChevronDown } from 'lucide-react';
 import useSEO from '../hooks/useSEO';
-import CompanyLogo from '../components/CompanyLogo';
+import TickerLogo from '../components/TickerLogo';
 import Footer from '../components/Footer';
 import PageHeader from '../components/PageHeader';
 import { getSmartMoney } from '../api';
@@ -106,7 +106,7 @@ export default function SmartMoney() {
               <div key={item.ticker} className="card">
                 {/* Row 1: Logo + Ticker + Sector */}
                 <div className="flex items-center gap-2.5 mb-1.5">
-                  <CompanyLogo domain={item.logo_domain} logoUrl={item.logo_url} ticker={item.ticker} sector={item.sector} size={32} />
+                  <TickerLogo ticker={item.ticker} logoUrl={item.logo_url} size={32} />
                   <Link to={`/asset/${item.ticker}`} className="font-mono text-accent font-bold text-lg hover:underline shrink-0">{item.ticker}</Link>
                   {item.sector && item.sector !== 'Other' && (
                     <span className="text-[8px] sm:text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded-full bg-accent/10 text-accent border border-accent/20 shrink-0">

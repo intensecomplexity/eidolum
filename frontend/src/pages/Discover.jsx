@@ -5,7 +5,7 @@ import { Search, TrendingUp, TrendingDown, Flame, AlertTriangle, Clock, BarChart
 import Footer from '../components/Footer';
 import PageHeader from '../components/PageHeader';
 import { useFeatures } from '../context/FeatureContext';
-import CompanyLogo from '../components/CompanyLogo';
+import TickerLogo from '../components/TickerLogo';
 import { searchTickers, getTrendingTickers, getSectors, getExpiringPredictions, getLeaderboard } from '../api';
 
 function formatBullBear(bull, bear) {
@@ -117,12 +117,7 @@ export default function Discover() {
                   <Link key={t.ticker} to={`/asset/${t.ticker}`}
                     className="card py-3 flex items-center justify-between hover:bg-surface-2 transition-colors">
                     <div className="flex items-center gap-2">
-                      <CompanyLogo
-                        ticker={t.ticker}
-                        logoUrl={t.logo_url}
-                        domain={t.logo_domain}
-                        size={24}
-                      />
+                      <TickerLogo ticker={t.ticker} logoUrl={t.logo_url} size={24} />
                       <span className="font-mono text-accent font-bold">{t.ticker}</span>
                       <span className="text-text-secondary text-sm">{t.name}</span>
                     </div>
@@ -148,12 +143,7 @@ export default function Discover() {
                 <Link key={t.ticker} to={`/asset/${t.ticker}`}
                   className="card py-3 flex items-center justify-between hover:bg-surface-2 transition-colors">
                   <div className="flex items-center gap-2">
-                    <CompanyLogo
-                      ticker={t.ticker}
-                      logoUrl={t.logo_url}
-                      domain={t.logo_domain}
-                      size={20}
-                    />
+                    <TickerLogo ticker={t.ticker} logoUrl={t.logo_url} size={20} />
                     <span className="font-mono text-accent font-bold">{t.ticker}</span>
                     <span className="text-text-secondary text-sm">{t.name}</span>
                   </div>

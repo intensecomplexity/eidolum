@@ -1760,7 +1760,7 @@ async def lifespan(app):
             _logo_db = BgSessionLocal()
             filled = _logo_db.execute(sql_text("""
                 UPDATE ticker_sectors
-                SET logo_url = 'https://financialmodelingprep.com/image-stock/' || ticker || '.png'
+                SET logo_url = 'https://financialmodelingprep.com/image-stock/' || UPPER(ticker) || '.png'
                 WHERE logo_url IS NULL OR logo_url = '' OR logo_url LIKE '%%clearbit%%'
             """)).rowcount
             _logo_db.commit()
