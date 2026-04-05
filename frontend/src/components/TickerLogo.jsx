@@ -158,11 +158,11 @@ export default function TickerLogo({ ticker, logoUrl, size = 32, className = '' 
     );
   }
 
-  // White rounded container for loaded logos
+  // Dark rounded container for loaded logos (dark bg makes white logos like NKE visible)
   const boxStyle = {
     ...container,
-    backgroundColor: '#ffffff',
-    border: '1px solid rgba(0,0,0,0.08)',
+    backgroundColor: '#1e2028',
+    border: '1px solid rgba(255,255,255,0.06)',
     borderRadius: 8,
     padding: pad,
   };
