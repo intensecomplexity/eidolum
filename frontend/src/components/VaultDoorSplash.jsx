@@ -3,19 +3,20 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 /**
  * VaultDoorSplash — Luxury splash animation.
  *
- * Timeline (~4s):
+ * Timeline (~4.9s):
  *  0–350ms   E fades in dim
  *  250–450   E dots brighten sequentially
  *  450–700   Dots fly outward to circle circumference
  *  700–1900  9 arc segments draw simultaneously (1.2s ease-in-out)
  *  1900–2700 E bars flicker independently to full brightness
+ *  2200–2800 Gold pressure-wave ping (fires during late flicker)
+ *  2200–2600 "Eidolum" text reveals (vertical clip from center)
+ *  2400–2700 Tagline fades in
  *  2500–2800 Warm glow behind E fades in
- *  2700–3300 Gold pressure-wave ping expands
- *  2700–3100 "Eidolum" text reveals (vertical clip from center)
- *  3000–3300 Tagline fades in
- *  3400–3600 Text fades out
- *  3600–3900 Inner group scales to 0.9× and fades
- *  3900–4100 Background fades to transparent
+ *  2700–4200 Reading hold (~1.5s)
+ *  4200–4400 Text fades out
+ *  4400–4700 Inner group scales to 0.9× and fades
+ *  4600–4800 Background fades to transparent
  */
 
 const GOLD = '#D4A843';
@@ -93,7 +94,7 @@ export default function VaultDoorSplash({ onComplete }) {
     const tick = now => {
       const ms = now - t0.current;
       render(ms, r.current);
-      if (ms < 4100) raf.current = requestAnimationFrame(tick);
+      if (ms < 4900) raf.current = requestAnimationFrame(tick);
       else finish();
     };
     raf.current = requestAnimationFrame(tick);
@@ -318,9 +319,9 @@ function render(ms, r) {
     r.glow?.setAttribute('opacity', String(easeOut(prog(ms, 2500, 2800))));
   }
 
-  /* ═══ Phase 6: Ping + text (2700 → 3300ms) ═══ */
-  if (ms >= 2700 && ms < 3400) {
-    const p = easeOut(prog(ms, 2700, 3300));
+  /* ═══ Phase 6: Ping + text (2200ms — fires during late flicker) ═══ */
+  if (ms >= 2200 && ms < 2900) {
+    const p = easeOut(prog(ms, 2200, 2800));
     if (r.ping) {
       r.ping.setAttribute('r', String(R * lerp(1, 1.8, p)));
       r.ping.setAttribute('opacity', String(lerp(0.5, 0, p)));
@@ -329,36 +330,36 @@ function render(ms, r) {
   }
 
   // "Eidolum" — vertical clip reveal from center
-  if (r.text && ms >= 2700) {
+  if (r.text && ms >= 2200) {
     r.text.style.opacity = '1';
-    const inset = lerp(50, 0, easeOut(prog(ms, 2700, 3100)));
+    const inset = lerp(50, 0, easeOut(prog(ms, 2200, 2600)));
     r.text.style.clipPath = `inset(${inset}% 0 ${inset}% 0)`;
   }
 
   // Tagline
-  if (r.tag && ms >= 3000) {
-    r.tag.style.opacity = String(lerp(0, 0.6, easeOut(prog(ms, 3000, 3300))));
+  if (r.tag && ms >= 2400) {
+    r.tag.style.opacity = String(lerp(0, 0.6, easeOut(prog(ms, 2400, 2700))));
   }
 
-  /* ═══ Phase 7: Staggered fadeout ═══ */
+  /* ═══ Phase 7: Staggered fadeout (after 1.5s reading hold) ═══ */
 
-  // Text fades first (3400 → 3600ms)
-  if (ms >= 3400) {
-    const p = prog(ms, 3400, 3600);
+  // Text fades first (4200 → 4400ms)
+  if (ms >= 4200) {
+    const p = prog(ms, 4200, 4400);
     if (r.text) r.text.style.opacity = String(1 - p);
     if (r.tag)  r.tag.style.opacity = String(0.6 * (1 - p));
   }
 
-  // Circle + E scale to 0.9× and fade (3600 → 3900ms)
-  if (r.inner && ms >= 3600) {
-    const p = easeOut(prog(ms, 3600, 3900));
+  // Circle + E scale to 0.9× and fade (4400 → 4700ms)
+  if (r.inner && ms >= 4400) {
+    const p = easeOut(prog(ms, 4400, 4700));
     r.inner.style.transform = `scale(${lerp(1, 0.9, p)})`;
     r.inner.style.opacity = String(1 - p);
   }
 
-  // Background fades to transparent (3900 → 4100ms)
-  if (r.bg && ms >= 3900) {
-    const p = prog(ms, 3900, 4100);
+  // Background fades to transparent (4600 → 4800ms)
+  if (r.bg && ms >= 4600) {
+    const p = prog(ms, 4600, 4800);
     r.bg.style.opacity = String(1 - p);
     if (p >= 1) r.bg.style.pointerEvents = 'none';
   }
