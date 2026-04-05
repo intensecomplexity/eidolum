@@ -29,6 +29,10 @@ export function getLeaderboard(params = {}) {
   return api.get('/leaderboard', { params }).then(r => r.data);
 }
 
+export function getAvailableTimeframes() {
+  return cachedGet('/leaderboard/available-timeframes').then(r => r.data);
+}
+
 export function getForecaster(id, params = {}) {
   return api.get(`/forecaster/${id}`, { params }).then(r => r.data);
 }

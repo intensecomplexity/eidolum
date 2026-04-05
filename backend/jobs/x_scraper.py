@@ -228,7 +228,7 @@ def _timeframe(text: str) -> int:
 
 
 def run_x_scraper(db=None):
-    """Main entry point. LOG ONLY."""
+    """Main entry point. Finds predictions on X/Twitter and inserts into database."""
     if not APIFY_API_TOKEN:
         print("[X-SCRAPER] APIFY_API_TOKEN not set — skipping")
         return
@@ -315,6 +315,9 @@ def run_x_scraper(db=None):
 
         # ── Passed all filters ───────────────────────────────────────────
         direction = _classify(text)
+        if direction == "unknown":
+            continue  # Skip if can't determine direction
+
         pt = _price_target(text)
         tf = _timeframe(text)
         url = tweet_url or f"https://x.com/{author}/status/{tid}"
@@ -322,22 +325,70 @@ def run_x_scraper(db=None):
         stats["qualifying"] += 1
         if direction == "bullish": stats["bullish"] += 1
         elif direction == "bearish": stats["bearish"] += 1
-        else: stats["unknown"] += 1
         if pt: stats["with_target"] += 1
         unique_tickers.update(tickers)
 
-        pt_str = f"${pt:.2f}" if pt else "none"
-        print(f"[X-SCRAPER] PREDICTION: @{author} ({followers:,} flw, {likes} likes) "
-              f"→ {direction.upper()} {' '.join('$'+t for t in tickers)} "
-              f"PT={pt_str} TF={tf}d")
-        if stats["qualifying"] <= 15:
-            print(f"  Tweet: {text[:180]}")
-            print(f"  URL: {url}")
+        # ── Insert into database ────────────────────────────────────────
+        if db:
+            for ticker in tickers:
+                try:
+                    source_id = f"x_{tid}_{ticker}"
+                    # Dedup by source_platform_id
+                    from sqlalchemy import text as sql_text
+                    if db.execute(sql_text("SELECT 1 FROM predictions WHERE source_platform_id = :sid LIMIT 1"),
+                                  {"sid": source_id}).first():
+                        continue
 
+                    # Find or create forecaster
+                    display_name = (tweet.get("author") or {}).get("name") or author
+                    from jobs.news_scraper import find_forecaster
+                    forecaster = find_forecaster(display_name or author, db)
+                    if not forecaster:
+                        continue
+
+                    # Cross-scraper dedup
+                    from jobs.prediction_validator import prediction_exists_cross_scraper
+                    pred_date = datetime.strptime(created, "%Y-%m-%dT%H:%M:%S") if created and "T" in created else datetime.utcnow()
+                    if prediction_exists_cross_scraper(ticker, forecaster.id, direction, pred_date, db):
+                        continue
+
+                    context = f"@{author}: {text[:300]}"
+                    from models import Prediction
+                    db.add(Prediction(
+                        forecaster_id=forecaster.id, ticker=ticker, direction=direction,
+                        prediction_date=pred_date,
+                        evaluation_date=pred_date + timedelta(days=tf),
+                        window_days=tf,
+                        target_price=pt,
+                        source_url=url, archive_url=None,
+                        source_type="x", source_platform_id=source_id,
+                        context=context[:500], exact_quote=text[:500],
+                        outcome="pending", verified_by="x_scraper",
+                    ))
+                    stats["inserted"] = stats.get("inserted", 0) + 1
+                except Exception as e:
+                    if stats.get("insert_errors", 0) < 3:
+                        print(f"[X-SCRAPER] Insert error for {ticker}: {e}")
+                    stats["insert_errors"] = stats.get("insert_errors", 0) + 1
+
+        pt_str = f"${pt:.2f}" if pt else "none"
+        if stats["qualifying"] <= 10:
+            print(f"[X-SCRAPER] @{author} → {direction.upper()} {' '.join('$'+t for t in tickers)} PT={pt_str} TF={tf}d")
+
+    # Commit all inserts
+    if db and stats.get("inserted", 0) > 0:
+        try:
+            db.commit()
+        except Exception as e:
+            print(f"[X-SCRAPER] Commit error: {e}")
+            db.rollback()
+
+    inserted = stats.get("inserted", 0)
+    errors = stats.get("insert_errors", 0)
     print(f"[X-SCRAPER] RUN COMPLETE (batch {batch_idx+1}/{len(SEARCH_BATCHES)}):")
     print(f"  Fetched: {stats['fetched']} → dedup: {stats['dedup']} → followers: {stats['followers']}")
     print(f"  → cashtag: {stats['cashtag']} → spam: {stats['spam']} → past: {stats['past']}")
     print(f"  → forward: {stats['forward']} → question: {stats['question']} → news: {stats['news']}")
-    print(f"  Qualifying: {stats['qualifying']} ({stats['bullish']} bull, {stats['bearish']} bear, {stats['unknown']} unk)")
-    print(f"  Unique tickers: {len(unique_tickers)} | With PT: {stats['with_target']}")
+    print(f"  Qualifying: {stats['qualifying']} ({stats['bullish']} bull, {stats['bearish']} bear)")
+    print(f"  INSERTED: {inserted} | Errors: {errors} | Unique tickers: {len(unique_tickers)} | With PT: {stats['with_target']}")
     print(f"  Est. cost: ${stats['fetched'] * 0.40 / 1000:.2f}")

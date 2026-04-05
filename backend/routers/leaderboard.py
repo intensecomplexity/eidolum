@@ -694,6 +694,46 @@ def get_pending_predictions(request: Request, db: Session = Depends(get_db)):
     return results
 
 
+_tf_cache = None
+_tf_cache_time: float = 0
+
+@router.get("/leaderboard/available-timeframes")
+@limiter.limit("60/minute")
+def get_available_timeframes(request: Request, db: Session = Depends(get_db)):
+    """Return which timeframe filters have enough data (5+ forecasters with 5+ scored predictions)."""
+    global _tf_cache, _tf_cache_time
+    if _tf_cache and (_time.time() - _tf_cache_time) < 600:
+        return _tf_cache
+
+    min_forecasters = 5
+    min_preds = 5
+    buckets = {
+        "short": "p.window_days <= 90",
+        "medium": "p.window_days > 90 AND p.window_days <= 365",
+        "long": "p.window_days > 365",
+    }
+    result = {"all": True}  # always available
+    for key, where in buckets.items():
+        try:
+            count = db.execute(sql_text(f"""
+                SELECT COUNT(*) FROM (
+                    SELECT forecaster_id
+                    FROM predictions p
+                    WHERE p.outcome IN ('hit','near','miss','correct','incorrect')
+                      AND {where}
+                    GROUP BY forecaster_id
+                    HAVING COUNT(*) >= :min_preds
+                ) sub
+            """), {"min_preds": min_preds}).scalar() or 0
+            result[key] = count >= min_forecasters
+        except Exception:
+            result[key] = False
+
+    _tf_cache = result
+    _tf_cache_time = _time.time()
+    return result
+
+
 _stats_cache = None
 _stats_cache_time: float = 0
 

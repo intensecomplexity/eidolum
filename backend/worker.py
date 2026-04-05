@@ -222,7 +222,7 @@ def main():
             log.error(f"[channel_monitor] {e}")
     sched.add_job(_standalone("channel_monitor", _channel_monitor), "interval", hours=12, id="channel_monitor", next_run_time=t0 + timedelta(minutes=90))
 
-    # X/Twitter scraper — Apify-powered, every 6h, log only
+    # X/Twitter scraper — Apify-powered, every 8h, inserts predictions
     def _x_scraper():
         try:
             from jobs.x_scraper import run_x_scraper
