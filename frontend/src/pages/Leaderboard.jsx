@@ -12,7 +12,7 @@ import StreakBadge from '../components/StreakBadge';
 import LeaderboardCard from '../components/LeaderboardCard';
 import NotificationBanner from '../components/NotificationBanner';
 import FollowButton from '../components/FollowButton';
-import { getLeaderboard } from '../api';
+import { getLeaderboard, getAvailableTimeframes } from '../api';
 
 const SECTORS = ['All', 'Technology', 'Healthcare', 'Financial Services', 'Consumer Cyclical', 'Consumer Defensive', 'Energy', 'Industrials', 'Communication Services', 'Crypto'];
 const DIRECTIONS = ['All', 'bullish', 'bearish', 'neutral'];
@@ -79,6 +79,15 @@ export default function Leaderboard() {
   const [expandedId, setExpandedId] = useState(null);
   const metricRef = useRef(null);
   const [timeframe, setTimeframe] = useState('all');
+  const [availableTf, setAvailableTf] = useState({ all: true, short: true, medium: true, long: true });
+
+  useEffect(() => {
+    getAvailableTimeframes().then(tf => {
+      setAvailableTf(tf);
+      // Reset to 'all' if current selection became unavailable
+      if (timeframe !== 'all' && !tf[timeframe]) setTimeframe('all');
+    }).catch(() => {});
+  }, []);
 
   useSEO({
     title: 'The Eidolum 100 — Top Analyst Accuracy Rankings | Eidolum',
@@ -225,7 +234,7 @@ export default function Leaderboard() {
                 </div>
               )}
 
-              {/* Timeframe filter — available on all tabs except week */}
+              {/* Timeframe filter — only show buttons with enough data */}
               {activeTab !== 'week' && (
                 <div className="flex gap-1 shrink-0">
                   {[
@@ -233,7 +242,7 @@ export default function Leaderboard() {
                     { key: 'short', label: 'Short Term', tip: 'Predictions 90 days or less' },
                     { key: 'medium', label: 'Mid Term', tip: 'Predictions between 91 and 365 days' },
                     { key: 'long', label: 'Long Term', tip: 'Predictions over 1 year' },
-                  ].map(tf => (
+                  ].filter(tf => tf.key === 'all' || availableTf[tf.key]).map(tf => (
                     <button key={tf.key} onClick={() => setTimeframe(tf.key)} title={tf.tip}
                       className={`px-2.5 py-1 rounded text-[11px] font-semibold transition-colors ${
                         timeframe === tf.key
