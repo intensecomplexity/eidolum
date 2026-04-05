@@ -1,7 +1,35 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+
+// Logos that are WHITE on transparent — invert them on LIGHT mode
+const INVERT_ON_LIGHT = new Set([
+  'AAPL', 'EOG', 'ULTA', 'CSX', 'V', 'VRTX', 'ADSK', 'REGN', 'EXPE',
+  'BA', 'DHI', 'SLB', 'RF', 'URBN', 'ALB', 'WYNN', 'INTU', 'ATVI',
+  'VFC', 'RCL', 'SPLK', 'ANET', 'KNX', 'NTAP', 'DIS',
+]);
+
+// Logos that are BLACK on transparent — invert them on DARK mode
+const INVERT_ON_DARK = new Set(['SAVE']);
+
+// Logos that need to be scaled down to fit their container
+const SIZE_OVERRIDE = { 'DRI': 0.7 };
+
+function useTheme() {
+  const [theme, setTheme] = useState(
+    () => document.documentElement.getAttribute('data-theme') || 'dark'
+  );
+  useEffect(() => {
+    const observer = new MutationObserver(() => {
+      setTheme(document.documentElement.getAttribute('data-theme') || 'dark');
+    });
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+    return () => observer.disconnect();
+  }, []);
+  return theme;
+}
 
 export default function TickerLogo({ ticker, logoUrl, size = 32 }) {
   const [failed, setFailed] = useState(false);
+  const theme = useTheme();
   const letter = ticker?.[0]?.toUpperCase() || '?';
   const processedUrl = `/api/logo/${ticker}.png`;
 
@@ -20,6 +48,11 @@ export default function TickerLogo({ ticker, logoUrl, size = 32 }) {
     );
   }
 
+  const shouldInvert =
+    (theme === 'light' && INVERT_ON_LIGHT.has(ticker)) ||
+    (theme === 'dark' && INVERT_ON_DARK.has(ticker));
+  const scale = SIZE_OVERRIDE[ticker];
+
   return (
     <div style={{
       width: size, height: size, borderRadius: 8,
@@ -29,7 +62,11 @@ export default function TickerLogo({ ticker, logoUrl, size = 32 }) {
       <img
         src={processedUrl}
         alt={ticker}
-        style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+        style={{
+          width: '100%', height: '100%', objectFit: 'contain',
+          filter: shouldInvert ? 'invert(1)' : 'none',
+          transform: scale ? `scale(${scale})` : undefined,
+        }}
         onError={() => setFailed(true)}
         loading="lazy"
       />
