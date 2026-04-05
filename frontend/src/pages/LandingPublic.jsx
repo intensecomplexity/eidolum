@@ -100,10 +100,7 @@ export default function LandingPublic() {
       {/* -- FEATURED PREDICTION CARD -- */}
       {featured && (
         <section className="max-w-2xl mx-auto px-4 sm:px-6 pt-8 sm:pt-12 pb-4">
-          <div
-            className="rounded-lg border-l-4 py-4 px-5"
-            style={{ backgroundColor: '#14161c', borderColor: '#1e2028', borderLeftColor: '#D4A843' }}
-          >
+          <div className="rounded-lg border-l-4 border border-border py-4 px-5 bg-surface" style={{ borderLeftColor: '#D4A843' }}>
             <div className="flex items-center justify-between gap-3">
               <div className="flex items-center gap-2.5 min-w-0">
                 <TickerLogo ticker={featured.ticker} logoUrl={featured.logo_url} size={28} />
@@ -157,17 +154,17 @@ export default function LandingPublic() {
       <section className="max-w-3xl mx-auto px-4 sm:px-6 py-10 sm:py-14">
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 sm:gap-8 text-center">
           <div>
-            <div className="font-mono text-2xl font-bold mb-2" style={{ color: '#D4A843' }}>1</div>
+            <div className="font-mono text-2xl font-bold mb-2 text-accent">1</div>
             <div className="text-text-primary text-sm font-medium mb-1">Analysts make predictions</div>
             <div className="text-muted text-xs">Upgrades, downgrades, price targets</div>
           </div>
           <div>
-            <div className="font-mono text-2xl font-bold mb-2" style={{ color: '#D4A843' }}>2</div>
+            <div className="font-mono text-2xl font-bold mb-2 text-accent">2</div>
             <div className="text-text-primary text-sm font-medium mb-1">We track every call</div>
             <div className="text-muted text-xs">Timestamped, locked, no changes allowed</div>
           </div>
           <div>
-            <div className="font-mono text-2xl font-bold mb-2" style={{ color: '#D4A843' }}>3</div>
+            <div className="font-mono text-2xl font-bold mb-2 text-accent">3</div>
             <div className="text-text-primary text-sm font-medium mb-1">Reality scores them</div>
             <div className="text-muted text-xs">HIT, NEAR, or MISS when the window expires</div>
           </div>
@@ -197,12 +194,12 @@ export default function LandingPublic() {
             <p className="text-muted text-sm">No leaderboard data available yet.</p>
           </div>
         ) : (
-          <div className="rounded-lg border overflow-hidden" style={{ backgroundColor: '#14161c', borderColor: '#1e2028' }}>
+          <div className="rounded-lg border border-border overflow-hidden bg-surface">
             {/* Desktop table */}
             <div className="hidden sm:block">
               <table className="w-full">
                 <thead>
-                  <tr className="text-left text-muted text-xs uppercase tracking-wider border-b" style={{ borderColor: '#1e2028' }}>
+                  <tr className="text-left text-muted text-xs uppercase tracking-wider border-b border-border">
                     <th className="px-5 py-3 w-14">#</th>
                     <th className="px-5 py-3">Forecaster</th>
                     <th className="px-5 py-3 text-right">Accuracy</th>
@@ -216,12 +213,12 @@ export default function LandingPublic() {
                     const misses = f.misses || Math.max(0, (f.evaluated_predictions || f.total_predictions || 0) - hits - (f.nears || 0));
                     const profileUrl = f.slug ? `/analyst/${f.slug}` : `/forecaster/${f.id}`;
                     return (
-                      <tr key={f.id} className="border-b hover:bg-white/[0.02] transition-colors" style={{ borderColor: '#1e2028' }}>
+                      <tr key={f.id} className="border-b border-border/50 hover:bg-surface-2/50 transition-colors">
                         <td className="px-5 py-4">
                           <RankNumber rank={f.rank} />
                         </td>
                         <td className="px-5 py-4">
-                          <Link to={profileUrl} className="font-medium hover:text-accent transition-colors">
+                          <Link to={profileUrl} className="font-medium text-text-primary hover:text-accent transition-colors">
                             {f.name}
                           </Link>
                           {f.firm && (
@@ -240,12 +237,7 @@ export default function LandingPublic() {
                         </td>
                         <td className="px-5 py-4 text-center">
                           <div className="flex justify-center">
-                            <MiniPieChart
-                              hits={hits}
-                              nears={f.nears || 0}
-                              misses={misses}
-                              size={26}
-                            />
+                            <MiniPieChart hits={hits} nears={f.nears || 0} misses={misses} size={26} />
                           </div>
                         </td>
                       </tr>
@@ -256,16 +248,16 @@ export default function LandingPublic() {
             </div>
 
             {/* Mobile card list */}
-            <div className="sm:hidden divide-y" style={{ borderColor: '#1e2028' }}>
+            <div className="sm:hidden divide-y divide-border">
               {top5.map(f => {
                 const hits = f.hits || f.correct_predictions || 0;
                 const misses = f.misses || Math.max(0, (f.evaluated_predictions || f.total_predictions || 0) - hits - (f.nears || 0));
                 const profileUrl = f.slug ? `/analyst/${f.slug}` : `/forecaster/${f.id}`;
                 return (
-                  <div key={f.id} className="flex items-center gap-3 px-4 py-3.5" style={{ borderColor: '#1e2028' }}>
+                  <div key={f.id} className="flex items-center gap-3 px-4 py-3.5">
                     <RankNumber rank={f.rank} />
                     <div className="flex-1 min-w-0">
-                      <Link to={profileUrl} className="font-medium text-sm hover:text-accent transition-colors block truncate">
+                      <Link to={profileUrl} className="font-medium text-sm text-text-primary hover:text-accent transition-colors block truncate">
                         {f.name}
                       </Link>
                       {f.firm && (
@@ -286,38 +278,34 @@ export default function LandingPublic() {
         )}
 
         <div className="text-center mt-8">
-          <Link
-            to="/leaderboard"
-            className="text-accent text-sm font-medium hover:underline"
-          >
+          <Link to="/leaderboard" className="text-accent text-sm font-medium hover:underline">
             View Full Leaderboard
           </Link>
         </div>
       </section>
 
       {/* -- COUNTER BANNER -- */}
-      <section style={{ borderTop: '1px solid #1e2028', borderBottom: '1px solid #1e2028' }} className="py-10 sm:py-14">
+      <section className="border-y border-border py-10 sm:py-14">
         <div className="max-w-4xl mx-auto px-4 sm:px-6">
           <div className="flex flex-col sm:flex-row items-center justify-center gap-8 sm:gap-0 text-center">
             <div className="flex-1">
-              <div className="font-mono text-[28px] sm:text-[32px] font-bold" style={{ color: '#D4A843' }}>274,000+</div>
-              <div className="text-[13px] mt-1" style={{ color: '#9ca3af' }}>Predictions Tracked</div>
+              <div className="font-mono text-[28px] sm:text-[32px] font-bold text-accent">274,000+</div>
+              <div className="text-[13px] mt-1 text-muted">Predictions Tracked</div>
             </div>
-            <div className="hidden sm:block w-px h-10 self-center" style={{ backgroundColor: '#1e2028' }} />
+            <div className="hidden sm:block w-px h-10 self-center bg-border" />
             <div className="flex-1">
-              <div className="font-mono text-[28px] sm:text-[32px] font-bold" style={{ color: '#D4A843' }}>6,000+</div>
-              <div className="text-[13px] mt-1" style={{ color: '#9ca3af' }}>Analysts Monitored</div>
+              <div className="font-mono text-[28px] sm:text-[32px] font-bold text-accent">6,000+</div>
+              <div className="text-[13px] mt-1 text-muted">Analysts Monitored</div>
             </div>
-            <div className="hidden sm:block w-px h-10 self-center" style={{ backgroundColor: '#1e2028' }} />
+            <div className="hidden sm:block w-px h-10 self-center bg-border" />
             <div className="flex-1">
-              <div className="font-mono text-[28px] sm:text-[32px] font-bold" style={{ color: '#D4A843' }}>31,000+</div>
-              <div className="text-[13px] mt-1" style={{ color: '#9ca3af' }}>Predictions Scored</div>
+              <div className="font-mono text-[28px] sm:text-[32px] font-bold text-accent">31,000+</div>
+              <div className="text-[13px] mt-1 text-muted">Predictions Scored</div>
             </div>
           </div>
         </div>
       </section>
 
-      {/* -- FOOTER -- */}
       <Footer />
     </div>
   );

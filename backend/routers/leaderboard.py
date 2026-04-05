@@ -873,7 +873,7 @@ def get_homepage_data(request: Request, db: Session = Depends(get_db)):
     except Exception:
         pass
 
-    # Featured prediction: best recent HIT from a firm, with high return
+    # Featured prediction: best HIT from a recognizable firm with realistic return
     featured = None
     try:
         feat_row = db.execute(sql_text("""
@@ -886,8 +886,12 @@ def get_homepage_data(request: Request, db: Session = Depends(get_db)):
             LEFT JOIN ticker_sectors ts ON ts.ticker = p.ticker
             WHERE p.outcome IN ('hit', 'correct')
               AND p.actual_return IS NOT NULL
-              AND p.actual_return > 3
-              AND f.total_predictions >= 5
+              AND p.actual_return BETWEEN 5 AND 100
+              AND f.firm IS NOT NULL AND f.firm != ''
+              AND p.ticker IN (
+                  SELECT ticker FROM predictions
+                  GROUP BY ticker HAVING COUNT(*) >= 50
+              )
             ORDER BY p.actual_return DESC
             LIMIT 1
         """)).first()
