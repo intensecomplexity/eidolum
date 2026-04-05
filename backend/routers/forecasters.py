@@ -114,6 +114,27 @@ def get_forecaster(
         sector_count = 0
         total_all = f.total_predictions or 0
 
+    # Primary source for this forecaster
+    primary_source = None
+    primary_verified_by = None
+    try:
+        src_row = db.execute(sql_text("""
+            SELECT source_type, COUNT(*) as cnt FROM predictions
+            WHERE forecaster_id = :fid AND source_type IS NOT NULL
+            GROUP BY source_type ORDER BY cnt DESC LIMIT 1
+        """), {"fid": forecaster_id}).first()
+        if src_row:
+            primary_source = src_row[0]
+        vb_row = db.execute(sql_text("""
+            SELECT verified_by, COUNT(*) as cnt FROM predictions
+            WHERE forecaster_id = :fid AND verified_by IS NOT NULL
+            GROUP BY verified_by ORDER BY cnt DESC LIMIT 1
+        """), {"fid": forecaster_id}).first()
+        if vb_row:
+            primary_verified_by = vb_row[0]
+    except Exception:
+        pass
+
     # Prediction counts by outcome + direction (single query)
     pred_counts = {"all": 0, "evaluated": 0, "pending": 0, "hits": 0, "nears": 0, "misses": 0, "correct": 0, "incorrect": 0, "bullish": 0, "bearish": 0, "neutral": 0}
     try:
@@ -155,7 +176,9 @@ def get_forecaster(
     result = {
         "id": f.id, "name": f.name, "handle": f.handle,
         "slug": getattr(f, 'slug', None) or slugify(f.name),
-        "platform": f.platform or "youtube", "channel_url": f.channel_url,
+        "platform": f.platform or "youtube",
+        "primary_source": primary_source, "primary_verified_by": primary_verified_by,
+        "channel_url": f.channel_url,
         "subscriber_count": f.subscriber_count, "profile_image_url": f.profile_image_url,
         "bio": f.bio,
         "firm": getattr(f, 'firm', None),
