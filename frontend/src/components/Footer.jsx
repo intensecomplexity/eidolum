@@ -13,28 +13,24 @@ export default function Footer() {
             <EidolumLogo size={28} />
             <span className="font-serif text-lg text-accent mt-1.5">Eidolum</span>
           </div>
-          <nav className="flex items-center gap-1.5 text-xs text-text-secondary">
-            <Link to="/" className="hover:text-accent transition-colors">Home</Link>
+          <nav className="flex items-center justify-center flex-wrap gap-x-1.5 gap-y-1 text-xs text-text-secondary">
+            <Link to="/" className="hover:text-accent transition-colors whitespace-nowrap">Home</Link>
             <span className="text-muted opacity-30">&middot;</span>
-            <Link to="/leaderboard" className="hover:text-accent transition-colors">Leaderboard</Link>
+            <Link to="/leaderboard" className="hover:text-accent transition-colors whitespace-nowrap">Leaderboard</Link>
             <span className="text-muted opacity-30">&middot;</span>
-            <Link to="/how-it-works" className="hover:text-accent transition-colors">How It Works</Link>
+            <Link to="/consensus" className="hover:text-accent transition-colors whitespace-nowrap">Consensus</Link>
             <span className="text-muted opacity-30">&middot;</span>
             {isAuthenticated ? (
               <>
-                <Link to="/submit" className="hover:text-accent transition-colors">Submit</Link>
+                <Link to="/submit" className="hover:text-accent transition-colors whitespace-nowrap">Submit</Link>
                 <span className="text-muted opacity-30">&middot;</span>
-                <Link to="/profile" className="hover:text-accent transition-colors">Profile</Link>
+                <Link to="/profile" className="hover:text-accent transition-colors whitespace-nowrap">Profile</Link>
               </>
             ) : (
-              <>
-                <Link to="/consensus" className="hover:text-accent transition-colors">Consensus</Link>
-                <span className="text-muted opacity-30">&middot;</span>
-                <Link to="/login" className="hover:text-accent transition-colors">Log In</Link>
-              </>
+              <Link to="/login" className="hover:text-accent transition-colors whitespace-nowrap">Log In</Link>
             )}
           </nav>
-          <p className="italic text-sm" style={{ color: '#D4A843' }}>Truth is the only currency.</p>
+          <p className="italic text-sm text-accent">Truth is the only currency.</p>
         </div>
       </div>
     </footer>
