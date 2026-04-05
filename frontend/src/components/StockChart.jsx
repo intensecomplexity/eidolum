@@ -40,6 +40,7 @@ export default function StockChart({ ticker }) {
   const [loading, setLoading] = useState(true);
   const [selectedDot, setSelectedDot] = useState(null);
   const chartRef = useRef(null);
+  const dotClickedRef = useRef(false);
 
   useEffect(() => {
     if (!ticker) return;
@@ -114,8 +115,11 @@ export default function StockChart({ ticker }) {
   }
 
   function handleDotClick(dot) {
+    dotClickedRef.current = true;
     const group = dotsByDate[dot.date] || [dot];
     setSelectedDot(selectedDot?.date === dot.date ? null : { date: dot.date, predictions: group });
+    // Reset flag after event cycle
+    setTimeout(() => { dotClickedRef.current = false; }, 50);
   }
 
   const isDark = (document.documentElement.getAttribute('data-theme') || 'dark') === 'dark';
@@ -177,7 +181,10 @@ export default function StockChart({ ticker }) {
         return (
         <ResponsiveContainer width="100%" height={isMobile ? 200 : 300}>
           <AreaChart data={prices} margin={{ top: 10, right: 5, bottom: 5, left: isMobile ? -10 : 0 }}
-            onClick={() => setSelectedDot(null)}>
+            onClick={() => {
+              // Don't close popup if a dot was just clicked (dot click fires first)
+              if (!dotClickedRef.current) setSelectedDot(null);
+            }}>
             <defs>
               <linearGradient id="stockGold" x1="0" y1="0" x2="0" y2="1">
                 <stop offset="5%" stopColor="#D4A843" stopOpacity={isDark ? 0.2 : 0.15} />
