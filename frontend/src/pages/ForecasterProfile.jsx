@@ -3,7 +3,7 @@ import { useParams, Link } from 'react-router-dom';
 import { ExternalLink, ArrowLeft, ChevronUp, ChevronDown } from 'lucide-react';
 import LoadingSpinner from '../components/LoadingSpinner';
 import useSEO from '../hooks/useSEO';
-import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
+import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, ReferenceLine } from 'recharts';
 import PredictionBadge from '../components/PredictionBadge';
 import ConflictBadge from '../components/ConflictBadge';
 import DisclosedPositions from '../components/DisclosedPositions';
@@ -335,20 +335,25 @@ export default function ForecasterProfile() {
 
         {/* Chart + Sector — items-stretch so both panels match height */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6 mb-6 sm:mb-8 lg:items-stretch">
-          <div className="card lg:col-span-2" style={{ backgroundColor: '#14161c' }}>
-            <h2 className="text-base sm:text-lg font-semibold mb-3 sm:mb-4" style={{ color: '#e0e0e0' }}>Accuracy Trend</h2>
+          <div className="card lg:col-span-2">
+            <h2 className="text-xs text-muted uppercase tracking-wider font-semibold mb-3 sm:mb-4">Accuracy Trend</h2>
             {chartData.length > 0 ? (
               <>
                 <ResponsiveContainer width="100%" height={220}>
-                  <LineChart data={chartData} margin={{ top: 5, right: 10, bottom: 5, left: 10 }}>
+                  <AreaChart data={chartData} margin={{ top: 5, right: 5, bottom: 5, left: -15 }}>
                     <defs>
-                      <linearGradient id="accGold" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#D4A843" stopOpacity={0.15} />
+                      <linearGradient id="accGrad" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#D4A843" stopOpacity={0.2} />
                         <stop offset="95%" stopColor="#D4A843" stopOpacity={0} />
                       </linearGradient>
                     </defs>
-                    <CartesianGrid stroke="#1e2028" strokeDasharray="3 3" />
-                    <XAxis dataKey="prediction_number" tick={{ fill: '#6b7280', fontSize: 10 }} axisLine={false} tickLine={false}
+                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(128,128,128,0.15)" vertical={false} />
+                    <XAxis
+                      dataKey="prediction_number"
+                      tick={{ fill: '#6b7280', fontSize: 10 }}
+                      axisLine={false}
+                      tickLine={false}
+                      minTickGap={30}
                       ticks={(() => {
                         const last = chartData[chartData.length - 1]?.prediction_number || 1;
                         if (last <= 12) return undefined;
@@ -357,39 +362,44 @@ export default function ForecasterProfile() {
                         for (let i = step; i < last; i += step) t.push(i);
                         if (t[t.length - 1] !== last) t.push(last);
                         return t;
-                      })()} />
+                      })()}
+                    />
                     <YAxis
                       domain={[(() => {
                         const vals = chartData.map(d => d.cumulative_accuracy);
                         const minVal = vals.length > 0 ? Math.min(...vals) : 0;
                         return Math.max(0, Math.floor(minVal / 10) * 10 - 10);
                       })(), 100]}
-                      tick={{ fill: '#8b8f9a', fontSize: 10 }} axisLine={false} tickLine={false}
-                      tickFormatter={(v) => `${v}%`} width={45}
-                      ticks={(() => {
-                        const vals = chartData.map(d => d.cumulative_accuracy);
-                        const minVal = vals.length > 0 ? Math.min(...vals) : 0;
-                        const yMin = Math.max(0, Math.floor(minVal / 10) * 10 - 10);
-                        const ticks = [];
-                        for (let v = yMin; v <= 100; v += 10) ticks.push(v);
-                        return ticks;
-                      })()} />
-                    <Tooltip content={({ active, payload }) => {
-                      if (!active || !payload?.length) return null;
-                      const d = payload[0].payload;
-                      return (
-                        <div style={{ background: '#14161c', border: '1px solid rgba(212,168,67,0.15)', borderRadius: 8, padding: '8px 12px', fontSize: 12, boxShadow: '0 4px 12px rgba(0,0,0,0.4)' }}>
-                          <div style={{ fontFamily: 'monospace', color: '#D4A843' }}>After {d.total} predictions: {d.cumulative_accuracy}%</div>
-                          <div style={{ color: '#8b8f9a' }}>{d.correct} hits / {d.total} scored</div>
-                        </div>
-                      );
-                    }} />
-                    {/* 50% reference line */}
-                    <Line type="monotone" dataKey={() => 50} stroke="rgba(255,255,255,0.08)" strokeWidth={1} strokeDasharray="4 4" dot={false} isAnimationActive={false} />
-                    <Line type="monotone" dataKey="cumulative_accuracy" stroke="#D4A843" strokeWidth={2}
-                      fill="url(#accGold)"
-                      dot={{ r: 2, fill: '#D4A843', stroke: '#0a0a0a', strokeWidth: 1.5 }} activeDot={{ r: 5 }} />
-                  </LineChart>
+                      tick={{ fill: '#6b7280', fontSize: 10 }}
+                      axisLine={false}
+                      tickLine={false}
+                      tickFormatter={v => `${v}%`}
+                      width={45}
+                    />
+                    <Tooltip
+                      content={({ active, payload }) => {
+                        if (!active || !payload?.length) return null;
+                        const d = payload[0].payload;
+                        return (
+                          <div className="bg-surface border border-border rounded-lg px-3 py-2 text-xs shadow-lg">
+                            <div className="font-mono text-accent font-bold">After {d.total} predictions: {d.cumulative_accuracy}%</div>
+                            <div className="text-muted">{d.correct} hits / {d.total} scored</div>
+                          </div>
+                        );
+                      }}
+                      cursor={{ stroke: 'rgba(255,255,255,0.1)' }}
+                    />
+                    <ReferenceLine y={50} stroke="rgba(128,128,128,0.2)" strokeDasharray="3 3" strokeWidth={1} />
+                    <Area
+                      type="monotone"
+                      dataKey="cumulative_accuracy"
+                      stroke="#D4A843"
+                      strokeWidth={2}
+                      fill="url(#accGrad)"
+                      dot={false}
+                      activeDot={{ r: 4, fill: '#D4A843', stroke: '#fff', strokeWidth: 2 }}
+                    />
+                  </AreaChart>
                 </ResponsiveContainer>
                 <div className="text-center text-muted text-[10px] mt-1 font-mono">
                   Based on {chartData[chartData.length - 1]?.total || 0} scored predictions

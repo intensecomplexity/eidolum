@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { TrendingUp, TrendingDown, DollarSign, ChevronDown } from 'lucide-react';
+import { ChevronDown } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, ReferenceLine } from 'recharts';
 import { getForecasterSimulator } from '../api';
 
@@ -66,7 +66,7 @@ export default function PortfolioSimulator({ forecasterId, forecasterName }) {
       <div className="mb-4">
         <div className="flex items-center justify-between flex-wrap gap-2 mb-2">
           <p className="text-xs text-muted uppercase tracking-wider font-semibold">
-            <DollarSign className="w-3.5 h-3.5 inline -mt-0.5" /> Portfolio Simulator
+            Portfolio Simulator
           </p>
           <div className="flex items-center gap-1.5">
             <span className="text-xs text-muted">Starting:</span>
