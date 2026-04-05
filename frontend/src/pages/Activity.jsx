@@ -38,23 +38,23 @@ function borderColor(item) {
 }
 
 function DirectionBadge({ direction }) {
-  if (direction === 'bullish') return <span className="text-[10px] font-bold uppercase px-1.5 py-0.5 rounded text-positive bg-positive/10">BULL</span>;
-  if (direction === 'bearish') return <span className="text-[10px] font-bold uppercase px-1.5 py-0.5 rounded text-negative bg-negative/10">BEAR</span>;
-  return <span className="text-[10px] font-bold uppercase px-1.5 py-0.5 rounded text-muted bg-surface-2">HOLD</span>;
+  if (direction === 'bullish') return <span title="Expects the stock price to go up" className="text-[10px] font-bold uppercase px-1.5 py-0.5 rounded text-positive bg-positive/10">BULL</span>;
+  if (direction === 'bearish') return <span title="Expects the stock price to go down" className="text-[10px] font-bold uppercase px-1.5 py-0.5 rounded text-negative bg-negative/10">BEAR</span>;
+  return <span title="Expects the stock to stay roughly flat" className="text-[10px] font-bold uppercase px-1.5 py-0.5 rounded text-muted bg-surface-2">HOLD</span>;
 }
 
 function OutcomeBadge({ outcome, actualReturn }) {
   const cfg = {
-    hit: { label: 'HIT', cls: 'text-positive bg-positive/10', icon: Check },
-    correct: { label: 'HIT', cls: 'text-positive bg-positive/10', icon: Check },
-    near: { label: 'NEAR', cls: 'text-yellow-400 bg-yellow-400/10', icon: Minus },
-    miss: { label: 'MISS', cls: 'text-negative bg-negative/10', icon: X },
-    incorrect: { label: 'MISS', cls: 'text-negative bg-negative/10', icon: X },
+    hit: { label: 'HIT', cls: 'text-positive bg-positive/10', icon: Check, tip: 'Prediction was correct within tolerance' },
+    correct: { label: 'HIT', cls: 'text-positive bg-positive/10', icon: Check, tip: 'Prediction was correct within tolerance' },
+    near: { label: 'NEAR', cls: 'text-yellow-400 bg-yellow-400/10', icon: Minus, tip: 'Right direction but missed the target' },
+    miss: { label: 'MISS', cls: 'text-negative bg-negative/10', icon: X, tip: 'Wrong direction or barely moved' },
+    incorrect: { label: 'MISS', cls: 'text-negative bg-negative/10', icon: X, tip: 'Wrong direction or barely moved' },
   };
   const c = cfg[outcome] || cfg.miss;
   const Icon = c.icon;
   return (
-    <span className={`inline-flex items-center gap-0.5 text-[10px] font-bold uppercase px-1.5 py-0.5 rounded ${c.cls}`}>
+    <span title={c.tip} className={`inline-flex items-center gap-0.5 text-[10px] font-bold uppercase px-1.5 py-0.5 rounded ${c.cls}`}>
       <Icon className="w-3 h-3" /> {c.label}
       {actualReturn != null && <span className="ml-0.5 font-mono">({actualReturn >= 0 ? '+' : ''}{actualReturn}%)</span>}
     </span>

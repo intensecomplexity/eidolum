@@ -374,6 +374,25 @@ def get_url_quality(request: Request, admin_id: int = Depends(require_admin_user
 # ── GET /api/admin/forecasters ──────────────────────────────────────────────
 
 
+@router.post("/admin/process-logos")
+@limiter.limit("2/minute")
+def admin_process_logos(request: Request, admin_id: int = Depends(require_admin_user), db: Session = Depends(get_db)):
+    """Trigger logo processing in a background thread."""
+    import threading
+    def _run():
+        try:
+            from jobs.process_logos import process_all_logos
+            result = process_all_logos()
+            print(f"[Admin] Logo processing complete: {result}")
+        except Exception as e:
+            print(f"[Admin] Logo processing error: {e}")
+    threading.Thread(target=_run, daemon=True).start()
+
+    # Return current count
+    count = db.execute(sql_text("SELECT COUNT(*) FROM processed_logos")).scalar() or 0
+    return {"status": "processing_started", "current_count": count}
+
+
 @router.get("/admin/forecasters")
 @limiter.limit("30/minute")
 def admin_forecasters(request: Request, admin_id: int = Depends(require_admin_user), db: Session = Depends(get_db),
