@@ -1755,17 +1755,32 @@ async def lifespan(app):
         except Exception as e:
             print(f"[Startup] URL fix error: {e}")
 
-        # ── Backfill missing logo_url with FMP CDN pattern ────────────
+        # ── Backfill logo_url: update existing + insert missing ticker_sectors rows ──
         try:
             _logo_db = BgSessionLocal()
+
+            # Step 1: Update existing rows with NULL/empty/clearbit logo_url
             filled = _logo_db.execute(sql_text("""
                 UPDATE ticker_sectors
                 SET logo_url = 'https://financialmodelingprep.com/image-stock/' || UPPER(ticker) || '.png'
                 WHERE logo_url IS NULL OR logo_url = '' OR logo_url LIKE '%%clearbit%%'
             """)).rowcount
             _logo_db.commit()
-            if filled:
-                print(f"[Startup] Backfilled logo_url for {filled} tickers (FMP CDN)")
+
+            # Step 2: Create ticker_sectors rows for tickers that have predictions but no row
+            inserted = _logo_db.execute(sql_text("""
+                INSERT INTO ticker_sectors (ticker, sector, logo_url)
+                SELECT DISTINCT p.ticker, 'Other',
+                       'https://financialmodelingprep.com/image-stock/' || UPPER(p.ticker) || '.png'
+                FROM predictions p
+                WHERE NOT EXISTS (SELECT 1 FROM ticker_sectors ts WHERE ts.ticker = p.ticker)
+                  AND p.ticker IS NOT NULL AND p.ticker != ''
+                ON CONFLICT (ticker) DO NOTHING
+            """)).rowcount
+            _logo_db.commit()
+
+            if filled or inserted:
+                print(f"[Startup] Logo backfill: {filled} updated, {inserted} new rows inserted")
             _logo_db.close()
         except Exception as e:
             print(f"[Startup] Logo backfill error: {e}")
