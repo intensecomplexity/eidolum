@@ -1,7 +1,20 @@
 <svg viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
   <rect width="48" height="48" fill="#0d0f13"/>
   <circle cx="24" cy="24" r="20" fill="none" stroke="#D4A843" stroke-width="1.5"/>
-  <text x="24" y="33" text-anchor="middle" fill="#D4A843"
-    font-family="'Cormorant Garamond','Georgia','Times New Roman',serif"
-    font-size="28" font-weight="600">E</text>
+  <!-- Eidolum E: spine + 3 arms + dissolving dots -->
+  <g transform="translate(9.5, 8.5) scale(0.72)">
+    <line x1="5" y1="6" x2="5" y2="42" stroke="#D4A843" stroke-width="3.5" stroke-linecap="round"/>
+    <line x1="5" y1="6" x2="26" y2="6" stroke="#D4A843" stroke-width="3.5" stroke-linecap="round"/>
+    <line x1="5" y1="24" x2="20" y2="24" stroke="#D4A843" stroke-width="3.5" stroke-linecap="round"/>
+    <line x1="5" y1="42" x2="26" y2="42" stroke="#D4A843" stroke-width="3.5" stroke-linecap="round"/>
+    <circle cx="30" cy="6" r="1.8" fill="#D4A843"/>
+    <circle cx="34" cy="6" r="1.2" fill="#D4A843" opacity="0.6"/>
+    <circle cx="37.5" cy="6" r="0.8" fill="#D4A843" opacity="0.3"/>
+    <circle cx="24" cy="24" r="1.8" fill="#D4A843"/>
+    <circle cx="27.5" cy="24" r="1.2" fill="#D4A843" opacity="0.6"/>
+    <circle cx="30.5" cy="24" r="0.8" fill="#D4A843" opacity="0.3"/>
+    <circle cx="30" cy="42" r="1.8" fill="#D4A843"/>
+    <circle cx="34" cy="42" r="1.2" fill="#D4A843" opacity="0.6"/>
+    <circle cx="37.5" cy="42" r="0.8" fill="#D4A843" opacity="0.3"/>
+  </g>
 </svg>
