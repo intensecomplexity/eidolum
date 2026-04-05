@@ -1,10 +1,14 @@
 import { useEffect } from 'react';
 
+const JSONLD_ID = 'eidolum-jsonld';
+
 /**
- * Set page title, meta description, Open Graph, and Twitter card tags.
- * @param {{ title?: string, description?: string, url?: string, image?: string }} opts
+ * Set page title, meta description, Open Graph, Twitter card tags,
+ * and optional JSON-LD structured data.
+ *
+ * @param {{ title?: string, description?: string, url?: string, image?: string, jsonLd?: object|object[] }} opts
  */
-export default function useSEO({ title, description, url, image } = {}) {
+export default function useSEO({ title, description, url, image, jsonLd } = {}) {
   useEffect(() => {
     if (title) {
       document.title = title;
@@ -27,8 +31,26 @@ export default function useSEO({ title, description, url, image } = {}) {
       setMeta('twitter:card', 'summary');
     }
     setMeta('og:type', 'website');
-    setMeta('og:site_name', 'Eidolum');
-  }, [title, description, url, image]);
+    setMeta('og:site_name', 'Eidolum \u2014 Analyst Accuracy Scored by Reality');
+
+    // JSON-LD structured data
+    if (jsonLd) {
+      let el = document.getElementById(JSONLD_ID);
+      if (!el) {
+        el = document.createElement('script');
+        el.id = JSONLD_ID;
+        el.type = 'application/ld+json';
+        document.head.appendChild(el);
+      }
+      el.textContent = JSON.stringify(jsonLd);
+    }
+
+    return () => {
+      // Clean up JSON-LD on unmount so pages don't inherit stale data
+      const el = document.getElementById(JSONLD_ID);
+      if (el) el.remove();
+    };
+  }, [title, description, url, image, jsonLd]);
 }
 
 function setMeta(name, content) {

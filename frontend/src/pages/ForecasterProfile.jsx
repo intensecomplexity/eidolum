@@ -85,7 +85,7 @@ export default function ForecasterProfile() {
   // SEO hook MUST be before any early returns (React hooks rule)
   useSEO({
     title: data ? `${data.name}'s Vault — ${data.accuracy_rate?.toFixed(1)}% on ${data.total_predictions || 0} predictions | Eidolum` : 'The Vault | Eidolum',
-    description: data ? `${data.name}${data.firm ? ` at ${data.firm}` : ''} has ${data.accuracy_rate?.toFixed(1)}% accuracy across ${data.total_predictions || 0} tracked predictions.` : undefined,
+    description: data ? `${data.name}${data.firm ? ` at ${data.firm}` : ''}: ${data.accuracy_rate?.toFixed(1)}% accuracy on ${data.total_predictions || 0} predictions scored against real market data.` : undefined,
     url: `https://www.eidolum.com/forecaster/${id}`,
     image: data ? `https://eidolum-production.up.railway.app/api/og-image/forecaster/${id}` : undefined,
   });

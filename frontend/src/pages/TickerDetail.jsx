@@ -34,7 +34,7 @@ export default function TickerDetail() {
   // SEO hook MUST be before any early returns (React hooks rule)
   useSEO({
     title: data ? `${ticker}${data.company_name ? ` — ${data.company_name}` : ''} Analyst Predictions & Consensus | Eidolum` : `${ticker} | Eidolum`,
-    description: data ? `${data.total_predictions || 0} analyst predictions tracked for ${ticker}. See bull/bear consensus and top forecasters.` : undefined,
+    description: data ? `${ticker} analyst predictions and consensus. ${data.total_predictions || 0} calls tracked and scored against reality. See who's bullish or bearish.` : undefined,
     url: `https://www.eidolum.com/asset/${ticker}`,
   });
 

@@ -91,7 +91,7 @@ export default function Leaderboard() {
 
   useSEO({
     title: 'The Eidolum 100 — Top Analyst Accuracy Rankings | Eidolum',
-    description: 'The definitive ranking of the top 100 financial forecasters, scored against real market data. See who actually gets it right.',
+    description: 'Top 100 forecasters ranked by accuracy. 31,000+ predictions scored against reality. Goldman Sachs to Reddit — see who beats the market.',
     url: 'https://www.eidolum.com/leaderboard',
   });
 

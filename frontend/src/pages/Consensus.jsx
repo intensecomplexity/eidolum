@@ -32,7 +32,7 @@ const TABS = [
 export default function Consensus() {
   useSEO({
     title: 'Stock Consensus — Bull vs Bear Analyst Ratings | Eidolum',
-    description: 'See what Wall Street analysts think about every stock. Bull/bear/hold consensus based on tracked predictions, verified against real market data.',
+    description: 'Bull, bear, and hold consensus for every stock, scored against reality. 6,000+ analysts tracked. See what Wall Street predicts for any ticker.',
     url: 'https://www.eidolum.com/consensus',
   });
 

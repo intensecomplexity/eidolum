@@ -19,7 +19,7 @@ const SORTS = [
 export default function SmartMoney() {
   useSEO({
     title: 'Top Calls — Best Analyst Predictions | Eidolum',
-    description: 'See what the most accurate analysts on Wall Street are predicting right now. Ranked by real accuracy data.',
+    description: 'Active predictions from the highest-accuracy analysts. Every call tracked and scored against reality. Only proven forecasters make this list.',
     url: 'https://www.eidolum.com/smart-money',
   });
 

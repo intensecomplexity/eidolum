@@ -11,6 +11,19 @@ export default function LandingPublic() {
     title: 'Eidolum — Analyst Accuracy Scored by Reality',
     description: '6,000+ analyst predictions tracked and scored against real stock prices. Goldman Sachs, Morgan Stanley, JP Morgan — see who actually gets it right.',
     url: 'https://www.eidolum.com',
+    jsonLd: {
+      '@context': 'https://schema.org',
+      '@type': 'WebSite',
+      name: 'Eidolum',
+      alternateName: 'Eidolum — Analyst Accuracy Scored by Reality',
+      url: 'https://eidolum.com',
+      description: 'Track 6,000+ financial analysts. 274,000+ predictions scored against real stock prices.',
+      potentialAction: {
+        '@type': 'SearchAction',
+        target: 'https://eidolum.com/discover?q={search_term_string}',
+        'query-input': 'required name=search_term_string',
+      },
+    },
   });
 
   const [top5, setTop5] = useState([]);
