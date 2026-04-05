@@ -8,8 +8,8 @@ import { getLeaderboard } from '../api';
 
 export default function LandingPublic() {
   useSEO({
-    title: 'Eidolum — Who Should You Actually Listen To? Analyst Accuracy Scored by Reality',
-    description: 'Track 6,000+ financial analysts. 274,000+ predictions scored against real stock prices. See who actually gets it right.',
+    title: 'Eidolum — Analyst Accuracy Scored by Reality',
+    description: '6,000+ analyst predictions tracked and scored against real stock prices. Goldman Sachs, Morgan Stanley, JP Morgan — see who actually gets it right.',
     url: 'https://www.eidolum.com',
   });
 
