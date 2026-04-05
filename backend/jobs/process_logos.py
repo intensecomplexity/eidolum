@@ -130,6 +130,7 @@ def process_ticker_logo(ticker: str, db, force: bool = False) -> bool:
     client.close()
 
     if not raw_bytes:
+        print(f"[LogoProcessor] {ticker}: no image found from any source")
         return False
 
     # Process
@@ -137,7 +138,8 @@ def process_ticker_logo(ticker: str, db, force: bool = False) -> bool:
         img = Image.open(io.BytesIO(raw_bytes))
         processed = _normalize(img)
         png_bytes = _to_png_bytes(processed)
-    except Exception:
+    except Exception as e:
+        print(f"[LogoProcessor] {ticker}: Pillow processing failed: {e}")
         return False
 
     # Store in DB
@@ -149,7 +151,8 @@ def process_ticker_logo(ticker: str, db, force: bool = False) -> bool:
         """), {"t": ticker, "img": png_bytes})
         db.commit()
         return True
-    except Exception:
+    except Exception as e:
+        print(f"[LogoProcessor] {ticker}: DB insert failed: {e}")
         db.rollback()
         return False
 
