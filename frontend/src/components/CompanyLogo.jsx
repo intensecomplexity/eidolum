@@ -105,33 +105,44 @@ export default function CompanyLogo({ domain, logoUrl, ticker, size = 24 }) {
     setCachedLogoUrl(symbol, null);
   }
 
+  const pad = Math.max(Math.round(size * 0.12), 2); // ~3-4px padding scales with size
+  const innerSize = size - pad * 2;
+
+  // Shared white container style
+  const boxStyle = {
+    ...container,
+    backgroundColor: '#ffffff',
+    border: '1px solid rgba(0,0,0,0.08)',
+    borderRadius: 8,
+    padding: pad,
+  };
+
   // Fallback: ticker letter
   if (failed || !effectiveUrl) {
     return (
-      <div className="flex items-center justify-center rounded-lg shrink-0 bg-surface-2 text-text-primary"
-        style={{ ...container, fontSize, fontWeight: 700, fontFamily: 'monospace', letterSpacing: '-0.02em' }}>
+      <div className="flex items-center justify-center shrink-0"
+        style={{ ...boxStyle, color: '#6b7280', fontSize, fontWeight: 700, fontFamily: 'monospace', letterSpacing: '-0.02em' }}>
         {symbol}
       </div>
     );
   }
 
   return (
-    <div className="flex items-center justify-center rounded-lg shrink-0 overflow-hidden relative bg-surface-2"
-      style={container}>
+    <div className="flex items-center justify-center shrink-0 overflow-hidden relative"
+      style={boxStyle}>
       <img
         src={effectiveUrl}
         alt=""
-        width={imgSize}
-        height={imgSize}
+        width={innerSize}
+        height={innerSize}
         loading="lazy"
         className="object-contain"
         onLoad={handleLoad}
         onError={handleError}
-        style={{ opacity: loaded ? 1 : 0, transition: 'opacity 200ms ease-in',
-          backgroundColor: loaded ? '#ffffff' : 'transparent', borderRadius: loaded ? 2 : 0 }}
+        style={{ opacity: loaded ? 1 : 0, transition: 'opacity 200ms ease-in' }}
       />
       {!loaded && (
-        <span className="absolute text-text-primary" style={{ fontSize, fontWeight: 700, fontFamily: 'monospace' }}>
+        <span className="absolute" style={{ color: '#6b7280', fontSize, fontWeight: 700, fontFamily: 'monospace' }}>
           {symbol}
         </span>
       )}
