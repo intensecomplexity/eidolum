@@ -53,9 +53,13 @@ export default function TickerLogo({ ticker, logoUrl, size = 32 }) {
     (theme === 'dark' && INVERT_ON_DARK.has(ticker));
   const scale = SIZE_OVERRIDE[ticker];
 
+  const borderColor = theme === 'light' ? 'rgba(0,0,0,0.1)' : 'rgba(255,255,255,0.1)';
+
   return (
     <div style={{
       width: size, height: size, borderRadius: 8,
+      backgroundColor: '#ffffff', padding: 3,
+      border: `1px solid ${borderColor}`,
       display: 'flex', alignItems: 'center', justifyContent: 'center',
       overflow: 'hidden', flexShrink: 0,
     }}>
