@@ -119,7 +119,7 @@ export default function Discover() {
                     <div className="flex items-center gap-2">
                       <CompanyLogo
                         ticker={t.ticker}
-                        logoUrl={t.logo_url || `https://images.financialmodelingprep.com/symbol/${t.ticker}.png`}
+                        logoUrl={t.logo_url}
                         domain={t.logo_domain}
                         size={24}
                       />
@@ -150,7 +150,7 @@ export default function Discover() {
                   <div className="flex items-center gap-2">
                     <CompanyLogo
                       ticker={t.ticker}
-                      logoUrl={t.logo_url || `https://images.financialmodelingprep.com/symbol/${t.ticker}.png`}
+                      logoUrl={t.logo_url}
                       domain={t.logo_domain}
                       size={20}
                     />

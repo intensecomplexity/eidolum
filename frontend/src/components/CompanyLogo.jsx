@@ -1,22 +1,46 @@
 import { useState, useEffect } from 'react';
 
-// ── Logo cache in localStorage ──────────────────────────────────────────────
+// ── Logo cache with TTL ───────────────────────────────────────────────────────
 const CACHE_PREFIX = 'eidolum_logo:';
+const SUCCESS_TTL = 7 * 24 * 60 * 60 * 1000; // 7 days
+const FAIL_TTL = 4 * 60 * 60 * 1000;          // 4 hours
 
 function getCachedLogoUrl(ticker) {
   if (!ticker) return null;
   try {
-    const val = localStorage.getItem(CACHE_PREFIX + ticker);
-    if (val === 'no_logo') return 'no_logo';
-    return val || null;
+    const raw = localStorage.getItem(CACHE_PREFIX + ticker);
+    if (!raw) return null;
+
+    // New JSON format: { url, ts } or { failed, ts }
+    try {
+      const entry = JSON.parse(raw);
+      const age = Date.now() - (entry.ts || 0);
+      if (entry.failed) {
+        if (age > FAIL_TTL) { localStorage.removeItem(CACHE_PREFIX + ticker); return null; }
+        return 'no_logo';
+      }
+      if (entry.url) {
+        if (age > SUCCESS_TTL) { localStorage.removeItem(CACHE_PREFIX + ticker); return null; }
+        return entry.url;
+      }
+      return null;
+    } catch {
+      // Old plain-string format — clear poisoned 'no_logo' entries
+      if (raw === 'no_logo') { localStorage.removeItem(CACHE_PREFIX + ticker); return null; }
+      return raw; // old cached URL string, still usable
+    }
   } catch { return null; }
 }
 
 function setCachedLogoUrl(ticker, url) {
   if (!ticker) return;
   try {
-    localStorage.setItem(CACHE_PREFIX + ticker, url || 'no_logo');
-  } catch { /* localStorage full — continue without caching */ }
+    if (!url) {
+      localStorage.setItem(CACHE_PREFIX + ticker, JSON.stringify({ failed: true, ts: Date.now() }));
+    } else {
+      localStorage.setItem(CACHE_PREFIX + ticker, JSON.stringify({ url, ts: Date.now() }));
+    }
+  } catch { /* localStorage full */ }
 }
 
 /** Clear all cached logos (for admin/debug use) */
@@ -32,58 +56,27 @@ export function clearLogoCache() {
   } catch { return 0; }
 }
 
-// ── Preload queue for top tickers ───────────────────────────────────────────
-let _preloaded = false;
 
-export function preloadLogos(tickers) {
-  if (_preloaded || !tickers?.length) return;
-  _preloaded = true;
-
-  // Only preload tickers not already cached
-  const uncached = tickers.filter(t => !getCachedLogoUrl(t));
-  if (!uncached.length) return;
-
-  // Batch preload 5 at a time via hidden Image objects
-  let idx = 0;
-  function loadBatch() {
-    const batch = uncached.slice(idx, idx + 5);
-    if (!batch.length) return;
-    batch.forEach(ticker => {
-      // Try Clearbit as a lightweight preload (just validates the URL)
-      const img = new Image();
-      img.onload = () => {
-        // We don't know the exact URL to cache without domain info
-        // The real caching happens in CompanyLogo on first render
-      };
-      img.onerror = () => {};
-      // Can't preload FMP logos without the URL — skip
-    });
-    idx += 5;
-    if (idx < uncached.length) {
-      setTimeout(loadBatch, 500);
-    }
-  }
-  setTimeout(loadBatch, 2000); // Start 2s after app load
-}
-
-
-// ── Component ───────��──────────────────────────────────���────────────────────
+// ── Component ─────────────────────────────────────────────────────────────────
 export default function CompanyLogo({ domain, logoUrl, ticker, size = 24 }) {
   const symbol = ticker || '?';
   const imgSize = Math.round(size * 0.75);
   const fontSize = symbol.length <= 2 ? size * 0.4 : symbol.length <= 3 ? size * 0.32 : size * 0.25;
 
-  // Check cache first
+  // Built-in FMP CDN fallback — works for most US tickers without API key
+  const fmpFallback = symbol !== '?' ? `https://images.financialmodelingprep.com/symbol/${symbol}.png` : null;
+
+  // Resolve initial URL: cache → prop → FMP CDN
   const cached = getCachedLogoUrl(symbol);
   const [effectiveUrl, setEffectiveUrl] = useState(() => {
     if (cached && cached !== 'no_logo') return cached;
-    return logoUrl || null;
+    return logoUrl || fmpFallback;
   });
   const [loaded, setLoaded] = useState(!!cached && cached !== 'no_logo');
   const [failed, setFailed] = useState(cached === 'no_logo');
-  const [triedClearbit, setTriedClearbit] = useState(false);
+  const [triedFmp, setTriedFmp] = useState(false);
 
-  // If logoUrl prop changes (e.g. data loaded after mount), try it
+  // If logoUrl prop arrives after mount (async data), try it
   useEffect(() => {
     if (logoUrl && !effectiveUrl && !failed) {
       setEffectiveUrl(logoUrl);
@@ -96,40 +89,35 @@ export default function CompanyLogo({ domain, logoUrl, ticker, size = 24 }) {
 
   function handleLoad() {
     setLoaded(true);
-    // Cache the working URL
-    if (effectiveUrl) {
-      setCachedLogoUrl(symbol, effectiveUrl);
-    }
+    if (effectiveUrl) setCachedLogoUrl(symbol, effectiveUrl);
   }
 
   function handleError() {
-    // If FMP URL failed, try Clearbit
-    if (!triedClearbit && domain) {
-      setTriedClearbit(true);
-      const clearbitUrl = `https://logo.clearbit.com/${domain}`;
-      setEffectiveUrl(clearbitUrl);
+    // If the explicit logoUrl failed, try FMP CDN
+    if (!triedFmp && fmpFallback && effectiveUrl !== fmpFallback) {
+      setTriedFmp(true);
+      setEffectiveUrl(fmpFallback);
       setLoaded(false);
       return;
     }
-    // All sources failed — mark as no_logo
+    // All sources exhausted — mark as failed (with TTL, will retry later)
     setFailed(true);
-    setCachedLogoUrl(symbol, 'no_logo');
+    setCachedLogoUrl(symbol, null);
   }
 
-  // Fallback: ticker letter on dark background
+  // Fallback: ticker letter
   if (failed || !effectiveUrl) {
     return (
-      <div className="flex items-center justify-center rounded-lg shrink-0"
-        style={{ ...container, backgroundColor: '#1e2028', color: '#ffffff',
-          fontSize, fontWeight: 700, fontFamily: 'monospace', letterSpacing: '-0.02em' }}>
+      <div className="flex items-center justify-center rounded-lg shrink-0 bg-surface-2 text-text-primary"
+        style={{ ...container, fontSize, fontWeight: 700, fontFamily: 'monospace', letterSpacing: '-0.02em' }}>
         {symbol}
       </div>
     );
   }
 
   return (
-    <div className="flex items-center justify-center rounded-lg shrink-0 overflow-hidden relative"
-      style={{ ...container, backgroundColor: loaded ? '#ffffff' : '#1e2028' }}>
+    <div className="flex items-center justify-center rounded-lg shrink-0 overflow-hidden relative bg-surface-2"
+      style={container}>
       <img
         src={effectiveUrl}
         alt=""
@@ -139,10 +127,11 @@ export default function CompanyLogo({ domain, logoUrl, ticker, size = 24 }) {
         className="object-contain"
         onLoad={handleLoad}
         onError={handleError}
-        style={{ opacity: loaded ? 1 : 0, transition: 'opacity 200ms ease-in' }}
+        style={{ opacity: loaded ? 1 : 0, transition: 'opacity 200ms ease-in',
+          backgroundColor: loaded ? '#ffffff' : 'transparent', borderRadius: loaded ? 2 : 0 }}
       />
       {!loaded && (
-        <span className="absolute" style={{ color: '#fff', fontSize, fontWeight: 700, fontFamily: 'monospace' }}>
+        <span className="absolute text-text-primary" style={{ fontSize, fontWeight: 700, fontFamily: 'monospace' }}>
           {symbol}
         </span>
       )}
