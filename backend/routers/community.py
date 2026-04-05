@@ -780,7 +780,7 @@ def get_all_consensus(
         top = top_by_ticker.get(ticker)
         company_name = name_by_ticker.get(ticker) or TICKER_INFO.get(ticker)
         logo_domain = domain_by_ticker.get(ticker) or get_domain(ticker)
-        logo_url = logo_by_ticker.get(ticker)
+        logo_url = logo_by_ticker.get(ticker) or f"https://financialmodelingprep.com/image-stock/{ticker}.png"
         results.append({
             "ticker": ticker,
             "company_name": company_name,

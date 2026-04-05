@@ -145,21 +145,23 @@ export default function Consensus() {
             {display.map(c => (
               <Link key={c.ticker} to={`/asset/${c.ticker}`} className="card hover:bg-surface-2 transition-colors">
                 <div className="flex items-center justify-between mb-2">
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2">
-                      <TickerLogo ticker={c.ticker} logoUrl={c.logo_url} size={32} />
-                      <span className="font-mono text-accent font-bold text-lg">{c.ticker}</span>
-                      {c.company_name && (
-                        <span className="text-text-secondary text-sm truncate">{c.company_name}</span>
+                  <div className="flex items-center gap-2 min-w-0">
+                    <TickerLogo ticker={c.ticker} logoUrl={c.logo_url} size={28} className="shrink-0" />
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-1.5">
+                        <span className="font-mono text-accent font-bold text-lg shrink-0">{c.ticker}</span>
+                        {c.company_name && (
+                          <span className="text-text-secondary text-sm truncate" title={c.company_name}>{c.company_name}</span>
+                        )}
+                      </div>
+                      {c.sector && c.sector !== 'Other' && (
+                        <span className="text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded-full bg-accent/10 text-accent border border-accent/20 inline-block mt-0.5">
+                          {c.sector}
+                        </span>
                       )}
                     </div>
-                    {c.sector && c.sector !== 'Other' && (
-                      <span className="text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded-full bg-accent/10 text-accent border border-accent/20 inline-block mt-1">
-                        {c.sector}
-                      </span>
-                    )}
                   </div>
-                  <span className="text-muted text-xs font-mono flex-shrink-0">{c.total_predictions} calls</span>
+                  <span className="text-muted text-xs font-mono shrink-0 ml-2">{c.total_predictions} calls</span>
                 </div>
                 <ConsensusBar bullish={c.bullish_count} bearish={c.bearish_count} neutral={c.neutral_count || 0} />
                 {c.top_caller && (
