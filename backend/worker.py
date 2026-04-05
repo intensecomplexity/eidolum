@@ -235,6 +235,15 @@ def main():
             log.error(f"[x_scraper] {e}")
     sched.add_job(_standalone("x_scraper", _x_scraper), "interval", hours=8, id="x_scraper", next_run_time=t0 + timedelta(minutes=100))
 
+    # Logo processor — process new ticker logos daily
+    def _process_logos():
+        try:
+            from jobs.process_logos import process_new_logos
+            process_new_logos()
+        except Exception as e:
+            log.error(f"[process_logos] {e}")
+    sched.add_job(_standalone("process_logos", _process_logos), "interval", hours=24, id="process_logos", next_run_time=t0 + timedelta(minutes=120))
+
     # Cron jobs
     sched.add_job(_watchlist_queue, "interval", hours=4, id="watchlist_queue", next_run_time=t0 + timedelta(minutes=35))
     sched.add_job(_watchlist_digest, "cron", day_of_week="mon-fri", hour=13, minute=0, id="watchlist_digest")

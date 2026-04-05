@@ -1413,6 +1413,21 @@ async def lifespan(app):
             print(f"[Startup] Table creation error: {e}")
             return  # Can't continue without tables
 
+        # ── Create processed_logos table ──────────────────────────────
+        try:
+            with engine.connect() as _pl_c:
+                _pl_c.execute(sql_text("""
+                    CREATE TABLE IF NOT EXISTS processed_logos (
+                        ticker VARCHAR(20) PRIMARY KEY,
+                        image_data BYTEA NOT NULL,
+                        processed_at TIMESTAMP DEFAULT NOW()
+                    )
+                """))
+                _pl_c.commit()
+                print("[Startup] processed_logos table ready")
+        except Exception as e:
+            print(f"[Startup] processed_logos table error: {e}")
+
         # ── Log outcome distribution (no migration — accept both old and new values) ──
         try:
             with engine.connect() as _mc:
@@ -2061,6 +2076,8 @@ from routers.tournaments import router as tournaments_router
 app.include_router(tournaments_router, prefix="/api")
 from routers.firms import router as firms_router
 app.include_router(firms_router, prefix="/api")
+from routers.logo_serve import router as logo_serve_router
+app.include_router(logo_serve_router, prefix="/api")
 
 
 @app.get("/health")

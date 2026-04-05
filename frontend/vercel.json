@@ -6,6 +6,7 @@
     { "source": "/sitemap.xml", "destination": "https://eidolum-production.up.railway.app/sitemap.xml" },
     { "source": "/robots.txt", "destination": "https://eidolum-production.up.railway.app/robots.txt" },
     { "source": "/api/og-image/:path*", "destination": "https://eidolum-production.up.railway.app/api/og-image/:path*" },
+    { "source": "/api/logo/:path*", "destination": "https://eidolum-production.up.railway.app/api/logo/:path*" },
     { "source": "/(.*)", "destination": "/index.html" }
   ],
   "headers": [
