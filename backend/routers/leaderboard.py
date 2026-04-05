@@ -782,18 +782,31 @@ def get_homepage_data(request: Request, db: Session = Depends(get_db)):
     # Stats
     stats = get_homepage_stats(request, db)
 
-    # Top 5 leaderboard — direct SQL (get_leaderboard needs Query params that don't resolve internally)
+    # Top 5 leaderboard — direct SQL with outcome + direction breakdowns
     top5 = []
     try:
-        # Progressive thresholds: try 10+, then 5+, then 1+ to always show data
         lb_rows = None
         for min_preds in [10, 5, 1]:
             lb_rows = db.execute(sql_text("""
                 SELECT f.id, f.name, f.handle, f.platform, f.firm,
                        f.accuracy_score, f.total_predictions, f.correct_predictions,
                        COALESCE(f.avg_return, 0) as avg_return,
-                       f.slug
+                       f.slug,
+                       COALESCE(s.hits, 0), COALESCE(s.nears, 0), COALESCE(s.misses, 0),
+                       COALESCE(s.bullish, 0), COALESCE(s.bearish, 0), COALESCE(s.neutral, 0),
+                       COALESCE(s.pending, 0)
                 FROM forecasters f
+                LEFT JOIN LATERAL (
+                    SELECT
+                        SUM(CASE WHEN outcome IN ('hit','correct') THEN 1 ELSE 0 END) as hits,
+                        SUM(CASE WHEN outcome = 'near' THEN 1 ELSE 0 END) as nears,
+                        SUM(CASE WHEN outcome IN ('miss','incorrect') THEN 1 ELSE 0 END) as misses,
+                        SUM(CASE WHEN direction = 'bullish' THEN 1 ELSE 0 END) as bullish,
+                        SUM(CASE WHEN direction = 'bearish' THEN 1 ELSE 0 END) as bearish,
+                        SUM(CASE WHEN direction = 'neutral' THEN 1 ELSE 0 END) as neutral,
+                        SUM(CASE WHEN outcome = 'pending' OR outcome IS NULL THEN 1 ELSE 0 END) as pending
+                    FROM predictions p WHERE p.forecaster_id = f.id
+                ) s ON true
                 WHERE COALESCE(f.total_predictions, 0) >= :min
                   AND COALESCE(f.accuracy_score, 0) > 0
                 ORDER BY f.accuracy_score DESC, f.total_predictions DESC
@@ -813,6 +826,9 @@ def get_homepage_data(request: Request, db: Session = Depends(get_db)):
                 "scored_count": r[6] or 0,
                 "avg_return": round(float(r[8] or 0), 2),
                 "rank": i + 1,
+                "hits": r[10], "nears": r[11], "misses": r[12],
+                "bullish_count": r[13], "bearish_count": r[14], "neutral_count": r[15],
+                "pending_count": r[16],
             })
     except Exception as e:
         print(f"[HomepageData] Top 5 error: {e}")
