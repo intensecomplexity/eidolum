@@ -99,7 +99,7 @@ export default function Navbar() {
               </Link>
               <Link to="/leaderboard" className={`hidden sm:flex ${linkClass('/leaderboard')}`}>Leaderboard</Link>
               <Link to="/consensus" className={`hidden sm:flex ${linkClass('/consensus')}`}>Consensus</Link>
-              <Link to="/smart-money" className={`hidden sm:flex ${linkClass('/smart-money')}`}>Smart Money</Link>
+              <Link to="/smart-money" className={`hidden sm:flex ${linkClass('/smart-money')}`}>Top Calls</Link>
               <Link to="/activity" className={`hidden sm:flex ${linkClass('/activity')}`}>Activity</Link>
               <Link to="/discover" className={`hidden sm:flex ${linkClass('/discover')}`}>Discover</Link>
               {isAuthenticated && (
@@ -261,7 +261,7 @@ export default function Navbar() {
               </div>
               <MobileLink to="/leaderboard">Leaderboard</MobileLink>
               <MobileLink to="/consensus">Consensus</MobileLink>
-              <MobileLink to="/smart-money">Smart Money</MobileLink>
+              <MobileLink to="/smart-money">Top Calls</MobileLink>
               <MobileLink to="/activity">Activity</MobileLink>
               <MobileLink to="/discover">Discover</MobileLink>
               {isAuthenticated && (
