@@ -336,9 +336,9 @@ export default function SubmitCall() {
         <div className="mb-6 sm:mb-8">
           <div className="flex items-center gap-2 mb-1">
             <Crosshair className="w-6 h-6 text-accent" />
-            <h1 className="font-bold" style={{ fontSize: 'clamp(24px, 5vw, 36px)' }}>Submit a Call</h1>
+            <h1 className="headline-serif" style={{ fontSize: 'clamp(28px, 5vw, 42px)', color: '#D4A843' }}>Submit a Call</h1>
           </div>
-          <p className="text-text-secondary text-sm sm:text-base">Make your prediction and we'll track it automatically.</p>
+          <p className="text-text-secondary text-sm sm:text-base">Put your prediction on record.</p>
         </div>
 
         {/* Error */}

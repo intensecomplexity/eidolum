@@ -85,7 +85,7 @@ export default function MyCalls() {
           <div>
             <div className="flex items-center gap-2 mb-1">
               <Crosshair className="w-6 h-6 text-accent" />
-              <h1 className="font-bold" style={{ fontSize: 'clamp(24px, 5vw, 36px)' }}>My Calls</h1>
+              <h1 className="headline-serif" style={{ fontSize: 'clamp(28px, 5vw, 42px)', color: '#D4A843' }}>My Calls</h1>
             </div>
             <p className="text-text-secondary text-sm">
               {predictions.length} prediction{predictions.length !== 1 ? 's' : ''}
