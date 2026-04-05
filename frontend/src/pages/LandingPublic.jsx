@@ -57,25 +57,18 @@ export default function LandingPublic() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
 
-  // Static fallback featured prediction — used when API returns no scored HITs yet
-  const FALLBACK_FEATURED = {
-    ticker: 'AAPL', company_name: 'Apple Inc.', direction: 'bullish',
-    outcome: 'hit', actual_return: 18.2,
-    entry_price: 169.50, target_price: 200.00,
-    forecaster_name: 'Example Analyst', firm: 'Wall Street Firm',
-    forecaster_id: null, evaluation_date: '2025-03-15',
-  };
-
   useEffect(() => {
     getHomepageData()
       .then(result => {
         const analysts = result?.top_analysts || [];
         setTop5(Array.isArray(analysts) ? analysts.slice(0, 5) : []);
-        setFeatured(result?.featured_prediction || FALLBACK_FEATURED);
+        // Only show featured if it has real data (not null, has a real forecaster name)
+        const feat = result?.featured_prediction;
+        setFeatured(feat && feat.forecaster_name ? feat : null);
         setLoading(false);
       })
       .catch(() => {
-        setFeatured(FALLBACK_FEATURED);
+        setFeatured(null);
         setError(true);
         setLoading(false);
       });

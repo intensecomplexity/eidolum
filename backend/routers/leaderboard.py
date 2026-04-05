@@ -785,23 +785,32 @@ def get_homepage_data(request: Request, db: Session = Depends(get_db)):
     # Top 5 leaderboard — direct SQL (get_leaderboard needs Query params that don't resolve internally)
     top5 = []
     try:
-        lb_rows = db.execute(sql_text("""
-            SELECT f.id, f.name, f.handle, f.platform, f.firm,
-                   f.accuracy_score, f.total_predictions, f.correct_predictions,
-                   COALESCE(f.avg_return, 0) as avg_return
-            FROM forecasters f
-            WHERE COALESCE(f.total_predictions, 0) >= 10
-              AND COALESCE(f.accuracy_score, 0) > 0
-            ORDER BY f.accuracy_score DESC, f.total_predictions DESC
-            LIMIT 5
-        """)).fetchall()
-        for i, r in enumerate(lb_rows):
+        # Progressive thresholds: try 10+, then 5+, then 1+ to always show data
+        lb_rows = None
+        for min_preds in [10, 5, 1]:
+            lb_rows = db.execute(sql_text("""
+                SELECT f.id, f.name, f.handle, f.platform, f.firm,
+                       f.accuracy_score, f.total_predictions, f.correct_predictions,
+                       COALESCE(f.avg_return, 0) as avg_return,
+                       f.slug
+                FROM forecasters f
+                WHERE COALESCE(f.total_predictions, 0) >= :min
+                  AND COALESCE(f.accuracy_score, 0) > 0
+                ORDER BY f.accuracy_score DESC, f.total_predictions DESC
+                LIMIT 5
+            """), {"min": min_preds}).fetchall()
+            if lb_rows:
+                break
+        for i, r in enumerate(lb_rows or []):
             top5.append({
                 "id": r[0], "name": r[1], "handle": r[2],
+                "slug": r[9] if len(r) > 9 else None,
                 "platform": r[3] or "youtube", "firm": r[4],
                 "accuracy_rate": float(r[5] or 0),
                 "total_predictions": r[6] or 0,
                 "correct_predictions": r[7] or 0,
+                "evaluated_predictions": r[6] or 0,
+                "scored_count": r[6] or 0,
                 "avg_return": round(float(r[8] or 0), 2),
                 "rank": i + 1,
             })
