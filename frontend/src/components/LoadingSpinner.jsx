@@ -35,8 +35,8 @@ export default function LoadingSpinner({ size = 'md', text }) {
           </>
         )}
 
-        {/* E mark centered — scaled down from EidolumLogo viewBox 0 0 40 48 */}
-        <g transform="translate(18, 16) scale(0.6)">
+        {/* E mark optically centered — shifted 2u right to compensate for left-heavy spine */}
+        <g transform="translate(20, 16) scale(0.6)">
           <line x1="5" y1="6" x2="5" y2="42" stroke="#D4A843" strokeWidth="2.5" strokeLinecap="round" />
           <line x1="5" y1="6" x2="26" y2="6" stroke="#D4A843" strokeWidth="2.5" strokeLinecap="round" />
           <line x1="5" y1="24" x2="20" y2="24" stroke="#D4A843" strokeWidth="2.5" strokeLinecap="round" />

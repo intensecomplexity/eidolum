@@ -2,7 +2,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { ChevronDown, Filter, Trophy, Flame, Clock } from 'lucide-react';
 import useSEO from '../hooks/useSEO';
-import EidolumSpinner from '../components/EidolumSpinner';
+import LoadingSpinner from '../components/LoadingSpinner';
 import Footer from '../components/Footer';
 import PageHeader from '../components/PageHeader';
 import MiniPieChart from '../components/MiniPieChart';
@@ -252,7 +252,7 @@ export default function Leaderboard() {
             {/* Loading */}
             {loading ? (
               <div className="flex items-center justify-center py-20">
-                <EidolumSpinner size={32} />
+                <LoadingSpinner size="lg" />
               </div>
             ) : emptyMessage && activeTab !== 'week' ? (
               <div className="card text-center py-12">

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { ExternalLink, ArrowLeft, ChevronUp, ChevronDown } from 'lucide-react';
-import EidolumSpinner from '../components/EidolumSpinner';
+import LoadingSpinner from '../components/LoadingSpinner';
 import useSEO from '../hooks/useSEO';
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 import PredictionBadge from '../components/PredictionBadge';
@@ -93,7 +93,7 @@ export default function ForecasterProfile() {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
-        <EidolumSpinner size={40} />
+        <LoadingSpinner size="lg" />
       </div>
     );
   }

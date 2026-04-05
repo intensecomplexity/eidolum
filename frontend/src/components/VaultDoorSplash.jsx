@@ -44,10 +44,11 @@ const CIRC = 2 * Math.PI * R;   // ≈596.9
 const SEG = CIRC / 9;            // ≈66.3
 const ARC_DEG = 40;              // 360 / 9
 
-// E logo: viewBox 40×48 scaled 1.25× and centered
+// E logo: viewBox 40×48 scaled 1.25× and optically centered
+// +3 SVG units rightward to compensate for left-heavy vertical spine
 const ES = 1.25;
-const EX = CX - (40 * ES) / 2;  // 125
-const EY = CY - (48 * ES) / 2;  // 120
+const EX = CX - (40 * ES) / 2 + 3;  // 128 (optically centered)
+const EY = CY - (48 * ES) / 2;       // 120
 
 // 9 dot source positions (E arm tips in splash SVG coords)
 const SRC = [
