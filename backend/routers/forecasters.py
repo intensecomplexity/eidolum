@@ -24,17 +24,22 @@ def slugify(name: str) -> str:
     return s or 'unknown'
 
 
-def _build_accuracy_trend(forecaster_id: int, db: Session) -> list:
+def _build_accuracy_trend(forecaster_id: int, db: Session, sector: str = None) -> list:
     """Build prediction-by-prediction cumulative accuracy trend.
-    Uses three-tier scoring: hit/correct=1.0, near=0.5, miss/incorrect=0."""
+    Uses three-tier scoring: hit/correct=1.0, near=0.5, miss/incorrect=0.
+    Optionally filter by sector."""
     try:
-        rows = db.execute(sql_text("""
+        where = "WHERE forecaster_id = :fid AND outcome IN ('hit','near','miss','correct','incorrect') AND actual_return IS NOT NULL"
+        params = {"fid": forecaster_id}
+        if sector and sector != "All":
+            where += " AND sector = :sector"
+            params["sector"] = sector
+        rows = db.execute(sql_text(f"""
             SELECT outcome
             FROM predictions
-            WHERE forecaster_id = :fid AND outcome IN ('hit','near','miss','correct','incorrect')
-              AND actual_return IS NOT NULL
+            {where}
             ORDER BY COALESCE(evaluated_at, evaluation_date, prediction_date) ASC
-        """), {"fid": forecaster_id}).fetchall()
+        """), params).fetchall()
     except Exception:
         return []
 
@@ -166,7 +171,7 @@ def get_forecaster(
         "sector_count": sector_count,
         "total_all_predictions": total_all,
         "sector_strengths": [],
-        "accuracy_over_time": _build_accuracy_trend(forecaster_id, db),
+        "accuracy_over_time": _build_accuracy_trend(forecaster_id, db, sector),
         "prediction_counts": pred_counts,
         "predictions": _get_preds(forecaster_id, page, limit, filter, sector, db),
         "disclosed_positions": [],
