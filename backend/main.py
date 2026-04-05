@@ -1755,6 +1755,21 @@ async def lifespan(app):
         except Exception as e:
             print(f"[Startup] URL fix error: {e}")
 
+        # ── Backfill missing logo_url with FMP CDN pattern ────────────
+        try:
+            _logo_db = BgSessionLocal()
+            filled = _logo_db.execute(sql_text("""
+                UPDATE ticker_sectors
+                SET logo_url = 'https://financialmodelingprep.com/image-stock/' || ticker || '.png'
+                WHERE logo_url IS NULL OR logo_url = '' OR logo_url LIKE '%%clearbit%%'
+            """)).rowcount
+            _logo_db.commit()
+            if filled:
+                print(f"[Startup] Backfilled logo_url for {filled} tickers (FMP CDN)")
+            _logo_db.close()
+        except Exception as e:
+            print(f"[Startup] Logo backfill error: {e}")
+
         # ── Source URL diagnostic ─────────────────────────────────────
         try:
             _url_db = BgSessionLocal()

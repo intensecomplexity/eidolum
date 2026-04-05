@@ -127,23 +127,20 @@ def _cache_to_db(ticker: str, sector: str, db=None, company_name: str = "", indu
     """Cache sector, company name, industry, description, logo_url, and logo_domain to DB table."""
     if not db:
         return
+    # Always ensure a logo_url — fall back to FMP CDN pattern
+    if not logo_url:
+        logo_url = f"https://financialmodelingprep.com/image-stock/{ticker}.png"
     try:
-        if company_name or description or logo_url or logo_domain:
-            db.execute(sql_text("""
-                INSERT INTO ticker_sectors (ticker, sector, company_name, industry, description, logo_url, logo_domain)
-                VALUES (:t, :s, :cn, :ind, :desc, :logo, :dom)
-                ON CONFLICT (ticker) DO UPDATE SET sector = :s,
-                    company_name = COALESCE(NULLIF(:cn, ''), ticker_sectors.company_name),
-                    industry = COALESCE(NULLIF(:ind, ''), ticker_sectors.industry),
-                    description = COALESCE(NULLIF(:desc, ''), ticker_sectors.description),
-                    logo_url = COALESCE(NULLIF(:logo, ''), ticker_sectors.logo_url),
-                    logo_domain = COALESCE(NULLIF(:dom, ''), ticker_sectors.logo_domain)
-            """), {"t": ticker, "s": sector, "cn": company_name, "ind": industry, "desc": description, "logo": logo_url, "dom": logo_domain})
-        else:
-            db.execute(sql_text("""
-                INSERT INTO ticker_sectors (ticker, sector) VALUES (:t, :s)
-                ON CONFLICT (ticker) DO UPDATE SET sector = :s
-            """), {"t": ticker, "s": sector})
+        db.execute(sql_text("""
+            INSERT INTO ticker_sectors (ticker, sector, company_name, industry, description, logo_url, logo_domain)
+            VALUES (:t, :s, :cn, :ind, :desc, :logo, :dom)
+            ON CONFLICT (ticker) DO UPDATE SET sector = :s,
+                company_name = COALESCE(NULLIF(:cn, ''), ticker_sectors.company_name),
+                industry = COALESCE(NULLIF(:ind, ''), ticker_sectors.industry),
+                description = COALESCE(NULLIF(:desc, ''), ticker_sectors.description),
+                logo_url = COALESCE(NULLIF(:logo, ''), ticker_sectors.logo_url),
+                logo_domain = COALESCE(NULLIF(:dom, ''), ticker_sectors.logo_domain)
+        """), {"t": ticker, "s": sector, "cn": company_name, "ind": industry, "desc": description, "logo": logo_url, "dom": logo_domain})
         db.commit()
     except Exception:
         try:
