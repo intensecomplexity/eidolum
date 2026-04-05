@@ -411,7 +411,8 @@ def get_ticker_chart(
         rows = db.execute(_t("""
             SELECT p.prediction_date, p.entry_price, p.target_price,
                    p.direction, p.outcome, p.actual_return,
-                   f.name as forecaster_name
+                   f.name as forecaster_name, f.id as forecaster_id,
+                   f.firm, p.context, p.evaluation_date
             FROM predictions p
             JOIN forecasters f ON f.id = p.forecaster_id
             WHERE p.ticker = :t AND p.prediction_date >= :start
@@ -428,6 +429,10 @@ def get_ticker_chart(
                 "direction": r[3],
                 "outcome": r[4],
                 "forecaster": r[6],
+                "forecaster_id": r[7],
+                "firm": r[8],
+                "context": (r[9] or "")[:200] if r[9] else None,
+                "evaluation_date": r[10].strftime("%Y-%m-%d") if r[10] else None,
                 "return_pct": round(float(r[5]), 1) if r[5] is not None else None,
             })
     except Exception as e:

@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
-import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, ReferenceDot } from 'recharts';
+import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, ReferenceDot } from 'recharts';
+import { X as XIcon } from 'lucide-react';
 import { getTickerChart } from '../api';
 
 const PERIODS = [
@@ -15,7 +16,7 @@ const OUTCOME_COLORS = {
   hit: '#34d399', correct: '#34d399',
   near: '#fbbf24',
   miss: '#f87171', incorrect: '#f87171',
-  pending: '#8b8f9a',
+  pending: '#6b7280',
 };
 
 const OUTCOME_LABELS = {
@@ -27,7 +28,7 @@ function PriceTooltip({ active, payload }) {
   const d = payload[0].payload;
   return (
     <div style={{ background: '#14161c', border: '1px solid rgba(212,168,67,0.15)', borderRadius: 8, padding: '8px 12px', fontSize: 12, boxShadow: '0 4px 12px rgba(0,0,0,0.4)' }}>
-      <div style={{ color: '#8b8f9a', marginBottom: 2 }}>{d.date}</div>
+      <div style={{ color: '#6b7280', marginBottom: 2 }}>{d.date}</div>
       <div style={{ fontFamily: 'monospace', color: '#D4A843', fontWeight: 600 }}>${d.close?.toFixed(2)}</div>
     </div>
   );
@@ -102,13 +103,27 @@ export default function StockChart({ ticker }) {
     dotsByDate[d.date].push(d);
   }
 
+  // For rendering: deduplicate dots per date, show cluster count
+  const uniqueDots = [];
+  const seenDates = new Set();
+  for (const d of dots) {
+    if (!seenDates.has(d.date)) {
+      seenDates.add(d.date);
+      uniqueDots.push({ ...d, count: dotsByDate[d.date].length });
+    }
+  }
+
   function handleDotClick(dot) {
     const group = dotsByDate[dot.date] || [dot];
     setSelectedDot(selectedDot?.date === dot.date ? null : { date: dot.date, predictions: group });
   }
 
+  const isDark = (document.documentElement.getAttribute('data-theme') || 'dark') === 'dark';
+  const gridColor = isDark ? '#1e2028' : '#f0f0f0';
+
   return (
-    <div className="card mb-6 relative" style={{ background: 'var(--color-card-bg, #14161c)' }} ref={chartRef}>
+    <div className="card mb-6 relative" ref={chartRef}>
+      {/* Price + change */}
       <div className="flex items-baseline gap-2 mb-2">
         {currentPrice && <span className="font-mono text-2xl font-bold text-accent">${currentPrice.toFixed(2)}</span>}
         {changePct && (
@@ -117,95 +132,158 @@ export default function StockChart({ ticker }) {
           </span>
         )}
       </div>
+
+      {/* Period buttons — gold active state */}
       <div className="flex gap-1 mb-4 overflow-x-auto">
         {PERIODS.map(p => (
           <button key={p.key} onClick={() => { setPeriod(p.key); setSelectedDot(null); }}
-            className={`px-2.5 py-1 rounded text-[11px] font-mono font-semibold transition-colors shrink-0 ${
-              period === p.key ? 'bg-accent/15 text-accent border border-accent/30' : 'bg-surface-2 text-muted border border-border'
-            }`}>{p.label}</button>
+            className="px-2.5 py-1 rounded text-[11px] font-mono font-semibold transition-colors shrink-0"
+            style={period === p.key
+              ? { backgroundColor: '#D4A843', color: '#07090a' }
+              : { backgroundColor: 'transparent', border: '1px solid ' + gridColor, color: '#6b7280' }
+            }>{p.label}</button>
         ))}
       </div>
 
+      {/* Glow filter definitions for dots */}
+      <svg width="0" height="0" style={{ position: 'absolute' }}>
+        <defs>
+          <filter id="glowHit" x="-50%" y="-50%" width="200%" height="200%">
+            <feGaussianBlur stdDeviation="2" result="blur" />
+            <feFlood floodColor="#34d399" floodOpacity="0.4" />
+            <feComposite in2="blur" operator="in" />
+            <feMerge><feMergeNode /><feMergeNode in="SourceGraphic" /></feMerge>
+          </filter>
+          <filter id="glowMiss" x="-50%" y="-50%" width="200%" height="200%">
+            <feGaussianBlur stdDeviation="2" result="blur" />
+            <feFlood floodColor="#f87171" floodOpacity="0.4" />
+            <feComposite in2="blur" operator="in" />
+            <feMerge><feMergeNode /><feMergeNode in="SourceGraphic" /></feMerge>
+          </filter>
+          <filter id="glowNear" x="-50%" y="-50%" width="200%" height="200%">
+            <feGaussianBlur stdDeviation="2" result="blur" />
+            <feFlood floodColor="#fbbf24" floodOpacity="0.4" />
+            <feComposite in2="blur" operator="in" />
+            <feMerge><feMergeNode /><feMergeNode in="SourceGraphic" /></feMerge>
+          </filter>
+        </defs>
+      </svg>
+
       {(() => {
         const isMobile = typeof window !== 'undefined' && window.innerWidth < 640;
-        const dotR = isMobile ? 4 : 6;
+        const dotR = isMobile ? 4 : 5;
+        const pendingR = isMobile ? 3 : 4;
+        const borderStroke = isDark ? '#ffffff' : '#1a1a1a';
         return (
         <ResponsiveContainer width="100%" height={isMobile ? 200 : 300}>
-          <LineChart data={prices} margin={{ top: 5, right: 5, bottom: 5, left: isMobile ? -10 : 0 }}
+          <AreaChart data={prices} margin={{ top: 10, right: 5, bottom: 5, left: isMobile ? -10 : 0 }}
             onClick={() => setSelectedDot(null)}>
-            {!isMobile && <CartesianGrid stroke="rgba(128,128,128,0.15)" strokeWidth={0.5} />}
+            <defs>
+              <linearGradient id="stockGold" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="5%" stopColor="#D4A843" stopOpacity={isDark ? 0.2 : 0.15} />
+                <stop offset="95%" stopColor="#D4A843" stopOpacity={0} />
+              </linearGradient>
+            </defs>
+            <CartesianGrid horizontal vertical={false} stroke={gridColor} strokeWidth={0.5} />
             <XAxis dataKey="date" tick={{ fill: '#6b7280', fontSize: isMobile ? 9 : 10 }}
               tickFormatter={d => d.slice(5)}
               axisLine={false} tickLine={false}
               minTickGap={isMobile ? 60 : 40}
               interval={isMobile ? Math.max(1, Math.floor(prices.length / 4)) : undefined} />
             <YAxis domain={['auto', 'auto']} tick={{ fill: '#6b7280', fontSize: isMobile ? 9 : 10 }}
-              axisLine={false} tickLine={false} tickFormatter={v => `$${v}`}
-              tickCount={isMobile ? 4 : 6} width={isMobile ? 35 : 45} />
-            <Tooltip content={<PriceTooltip />} cursor={{ stroke: 'rgba(255,255,255,0.08)' }} />
-            <defs>
-              <linearGradient id="chartGold" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="#D4A843" stopOpacity={0.15} />
-                <stop offset="95%" stopColor="#D4A843" stopOpacity={0} />
-              </linearGradient>
-            </defs>
-            <Line type="monotone" dataKey="close" stroke="#D4A843" strokeWidth={isMobile ? 1.5 : 2}
-              dot={false} fill="url(#chartGold)"
-              activeDot={{ r: 3, fill: '#D4A843', stroke: '#0a0a0a', strokeWidth: 1.5 }} />
-          {dots.map((d, i) => (
-            <ReferenceDot key={i} x={d.date} y={d.close} r={dotR} fill={d.color}
-              stroke="#0a0a0a" strokeWidth={isMobile ? 1 : 2} isFront style={{ cursor: 'pointer' }}
-              onClick={(e) => { e?.stopPropagation?.(); handleDotClick(d); }} />
-          ))}
-        </LineChart>
-      </ResponsiveContainer>
+              axisLine={false} tickLine={false}
+              tickFormatter={v => `$${v >= 1000 ? Math.round(v) : v}`}
+              tickCount={isMobile ? 4 : 6} width={isMobile ? 40 : 50} />
+            <Tooltip content={<PriceTooltip />} cursor={{ stroke: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)' }} />
+            <Area
+              type="monotone"
+              dataKey="close"
+              stroke="#D4A843"
+              strokeWidth={isMobile ? 1.5 : 2}
+              fill="url(#stockGold)"
+              dot={false}
+              activeDot={{ r: 3, fill: '#D4A843', stroke: isDark ? '#0a0a0a' : '#ffffff', strokeWidth: 1.5 }}
+            />
+            {uniqueDots.map((d, i) => {
+              const isPending = d.outcome === 'pending' || !d.outcome;
+              const r = isPending ? pendingR : dotR;
+              const glowId = (d.outcome === 'hit' || d.outcome === 'correct') ? 'url(#glowHit)'
+                : (d.outcome === 'miss' || d.outcome === 'incorrect') ? 'url(#glowMiss)'
+                : d.outcome === 'near' ? 'url(#glowNear)' : undefined;
+              return (
+                <ReferenceDot key={i} x={d.date} y={d.close} r={r} fill={d.color}
+                  stroke={borderStroke} strokeWidth={isMobile ? 1 : 2} isFront
+                  style={{ cursor: 'pointer', filter: !isPending && !isMobile ? glowId : undefined }}
+                  onClick={(e) => { e?.stopPropagation?.(); handleDotClick(d); }} />
+              );
+            })}
+          </AreaChart>
+        </ResponsiveContainer>
         );
       })()}
 
       {/* Prediction detail popup */}
       {selectedDot && (
-        <div className="absolute left-4 right-4 sm:left-auto sm:right-4 sm:w-72 z-50 feed-item-enter"
-          style={{ top: typeof window !== 'undefined' && window.innerWidth < 640 ? 'auto' : '80px', bottom: typeof window !== 'undefined' && window.innerWidth < 640 ? '10px' : 'auto' }}>
-          <div style={{ background: '#14161c', border: '1px solid rgba(212,168,67,0.2)', borderRadius: 12, padding: 12, boxShadow: '0 8px 24px rgba(0,0,0,0.5)' }}>
-            <div className="text-[10px] text-muted mb-2">{selectedDot.date}</div>
-            <div className="space-y-2.5">
+        <div className="absolute left-3 right-3 sm:left-auto sm:right-4 sm:w-80 z-50 feed-item-enter"
+          style={{ top: typeof window !== 'undefined' && window.innerWidth < 640 ? 'auto' : '90px', bottom: typeof window !== 'undefined' && window.innerWidth < 640 ? '10px' : 'auto' }}>
+          <div style={{
+            background: isDark ? '#14161c' : '#ffffff',
+            border: `1px solid ${isDark ? 'rgba(212,168,67,0.2)' : '#e5e7eb'}`,
+            borderRadius: 12,
+            padding: 14,
+            boxShadow: isDark ? '0 8px 24px rgba(0,0,0,0.5)' : '0 8px 24px rgba(0,0,0,0.12)',
+          }}>
+            {/* Header with date and close button */}
+            <div className="flex items-center justify-between mb-3">
+              <span className="text-[10px] text-muted font-mono">{selectedDot.date}</span>
+              <button onClick={() => setSelectedDot(null)} className="text-muted hover:text-text-primary transition-colors p-0.5">
+                <XIcon className="w-3.5 h-3.5" />
+              </button>
+            </div>
+            <div className="space-y-3">
               {selectedDot.predictions.map((p, i) => {
                 const outcomeColor = OUTCOME_COLORS[p.outcome] || OUTCOME_COLORS.pending;
+                const outcomeLabel = OUTCOME_LABELS[p.outcome] || 'Pending';
                 return (
-                  <div key={i} className="flex items-start gap-2">
-                    <span className="w-2.5 h-2.5 rounded-full shrink-0 mt-1" style={{ backgroundColor: outcomeColor }} />
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-1.5 flex-wrap">
-                        {p.forecaster ? (
-                          <Link to={`/forecaster/${p.forecaster_id || 0}`}
-                            className="text-accent text-xs font-medium hover:underline"
-                            onClick={e => e.stopPropagation()}>
-                            {p.forecaster}
-                          </Link>
-                        ) : (
-                          <span className="text-text-secondary text-xs">Unknown</span>
-                        )}
-                        <span className={`text-[10px] font-mono font-bold px-1.5 py-0.5 rounded ${
-                          p.direction === 'bullish' ? 'bg-positive/10 text-positive' :
-                          p.direction === 'neutral' ? 'bg-warning/10 text-warning' :
-                          'bg-negative/10 text-negative'
-                        }`}>
-                          {p.direction === 'bullish' ? 'BULL' : p.direction === 'neutral' ? 'HOLD' : 'BEAR'}
-                        </span>
-                        <span className="text-[10px] font-mono font-bold" style={{ color: outcomeColor }}>
-                          {OUTCOME_LABELS[p.outcome] || 'Pending'}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-2 text-[10px] text-muted mt-0.5">
-                        {p.price_at_prediction && <span>Entry: ${p.price_at_prediction.toFixed(2)}</span>}
-                        {p.target && <span>Target: ${p.target.toFixed(0)}</span>}
-                        {p.return_pct != null && (
-                          <span className={`font-mono font-semibold ${p.return_pct >= 0 ? 'text-positive' : 'text-negative'}`}>
-                            {p.return_pct >= 0 ? '+' : ''}{p.return_pct}%
-                          </span>
-                        )}
-                      </div>
+                  <div key={i} className="border-l-2 pl-3" style={{ borderColor: outcomeColor }}>
+                    {/* Forecaster + firm */}
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      {p.forecaster ? (
+                        <Link to={`/forecaster/${p.forecaster_id || 0}`}
+                          className="text-xs font-semibold text-text-primary hover:text-accent transition-colors"
+                          onClick={e => e.stopPropagation()}>
+                          {p.forecaster}
+                        </Link>
+                      ) : (
+                        <span className="text-xs text-text-secondary">Unknown</span>
+                      )}
+                      {p.firm && <span className="text-[10px] text-muted">{p.firm}</span>}
                     </div>
+                    {/* Direction + Outcome badges */}
+                    <div className="flex items-center gap-1.5 mt-1">
+                      <span className={`text-[10px] font-bold uppercase px-1.5 py-0.5 rounded ${
+                        p.direction === 'bullish' ? 'bg-positive/10 text-positive' :
+                        p.direction === 'neutral' ? 'bg-yellow-400/10 text-yellow-400' :
+                        'bg-negative/10 text-negative'
+                      }`}>
+                        {p.direction === 'bullish' ? 'BULL' : p.direction === 'neutral' ? 'HOLD' : 'BEAR'}
+                      </span>
+                      <span className="text-[10px] font-bold uppercase px-1.5 py-0.5 rounded"
+                        style={{ backgroundColor: outcomeColor + '1a', color: outcomeColor }}>
+                        {outcomeLabel}
+                        {p.return_pct != null && <span className="ml-0.5 font-mono">({p.return_pct >= 0 ? '+' : ''}{p.return_pct}%)</span>}
+                      </span>
+                    </div>
+                    {/* Price details */}
+                    <div className="flex items-center gap-3 mt-1 text-[10px] text-muted font-mono">
+                      {p.price_at_prediction && <span>Entry ${p.price_at_prediction.toFixed(2)}</span>}
+                      {p.target && <span>Target ${p.target.toFixed(0)}</span>}
+                      {p.evaluation_date && <span>Eval {p.evaluation_date.slice(5)}</span>}
+                    </div>
+                    {/* Context */}
+                    {p.context && (
+                      <p className="text-[10px] text-muted mt-1 leading-snug">{p.context}</p>
+                    )}
                   </div>
                 );
               })}
@@ -216,7 +294,7 @@ export default function StockChart({ ticker }) {
 
       {/* Legend */}
       {dots.length > 0 && (
-        <div className="flex items-center justify-center gap-3 mt-3 text-[10px] text-muted">
+        <div className="flex items-center justify-center gap-4 mt-3 text-[10px] text-muted">
           {dots.some(d => d.outcome === 'hit' || d.outcome === 'correct') && (
             <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full" style={{ backgroundColor: '#34d399' }} /> Hit</span>
           )}
@@ -227,7 +305,7 @@ export default function StockChart({ ticker }) {
             <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full" style={{ backgroundColor: '#f87171' }} /> Miss</span>
           )}
           {dots.some(d => d.outcome === 'pending' || !d.outcome) && (
-            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full" style={{ backgroundColor: '#8b8f9a' }} /> Pending</span>
+            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full" style={{ backgroundColor: '#6b7280' }} /> Pending</span>
           )}
         </div>
       )}
