@@ -119,7 +119,7 @@ export default function Navbar() {
                 </button>
               </div>
               {searchExpanded && (
-                <div className="hidden sm:block fixed inset-x-0 top-0 z-[60] bg-bg/95 backdrop-blur-md" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+                <div className="hidden sm:block fixed inset-x-0 top-0 z-[60] bg-bg/95 backdrop-blur-md border-b border-border">
                   <div className="max-w-2xl mx-auto px-4 py-3">
                     <UniversalSearch
                       className="w-full"
