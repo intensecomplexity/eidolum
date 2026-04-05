@@ -239,6 +239,21 @@ def main():
     print("[Worker] Registering X scraper job...", flush=True)
     sched.add_job(_standalone("x_scraper", _x_scraper), "interval", hours=6, id="x_scraper", next_run_time=datetime.utcnow(), misfire_grace_time=300)
 
+    # StockTwits scraper — Apify-powered, every 6h, offset from X scraper
+    def _stocktwits_scraper():
+        log.info("[STOCKTWITS] Scheduler fired _stocktwits_scraper job")
+        try:
+            from jobs.stocktwits_scraper import run_stocktwits_scraper
+            db = BgSessionLocal()
+            try:
+                run_stocktwits_scraper(db)
+            finally:
+                db.close()
+        except Exception as e:
+            log.error(f"[STOCKTWITS] Job failed: {e}", exc_info=True)
+    print("[Worker] Registering StockTwits scraper job...", flush=True)
+    sched.add_job(_standalone("stocktwits_scraper", _stocktwits_scraper), "interval", hours=6, id="stocktwits_scraper", next_run_time=datetime.utcnow() + timedelta(minutes=3), misfire_grace_time=300)
+
     # Logo processor — process new ticker logos (runs 5 min after start, then daily)
     # First run after deploy reprocesses all logos with improved bg stripping
     _logos_reprocessed = False
