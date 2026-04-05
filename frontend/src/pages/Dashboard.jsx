@@ -14,6 +14,7 @@ import ConsensusBar from '../components/ConsensusBar';
 import PredictionBadge from '../components/PredictionBadge';
 import Footer from '../components/Footer';
 import HeroSearch from '../components/HeroSearch';
+import MiniPieChart from '../components/MiniPieChart';
 import {
   getUserProfile, getUserPredictions, getLivePrices,
   getHomepageData, getWatchlistFeed,
@@ -238,12 +239,29 @@ export default function Dashboard() {
                     <tr key={f.id} className="border-b border-border/50 last:border-b-0 hover:bg-surface-2/30 transition-colors">
                       <td className="px-4 py-2.5"><RankNumber rank={f.rank} /></td>
                       <td className="px-4 py-2.5">
-                        <Link to={`/forecaster/${f.id}`} className="text-sm font-medium hover:text-accent transition-colors">{f.name}</Link>
+                        <Link to={f.slug ? `/analyst/${f.slug}` : `/forecaster/${f.id}`} className="text-sm font-medium hover:text-accent transition-colors">{f.name}</Link>
+                        {f.firm && <div className="text-[10px] text-muted">{f.firm}</div>}
                       </td>
-                      <td className="px-4 py-2.5 text-right">
-                        <span className={`font-mono text-sm font-semibold ${(f.accuracy_rate || 0) >= 60 ? 'text-positive' : 'text-negative'}`}>
-                          {(f.accuracy_rate || 0).toFixed(1)}%
-                        </span>
+                      <td className="px-4 py-2.5">
+                        <div className="flex items-center justify-end gap-1.5">
+                          {(f.hits > 0 || f.misses > 0 || f.correct_predictions > 0) && (
+                            <MiniPieChart
+                              hits={f.hits || 0} nears={f.nears || 0} misses={f.misses || 0}
+                              pending={f.pending_count || 0}
+                              correct={f.correct_predictions || 0}
+                              incorrect={Math.max(0, (f.evaluated_predictions || 0) - (f.correct_predictions || 0))}
+                              size={24}
+                            />
+                          )}
+                          {(f.bullish_count > 0 || f.bearish_count > 0) && (
+                            <span className="hidden sm:inline">
+                              <MiniPieChart bullish={f.bullish_count || 0} bearish={f.bearish_count || 0} neutral={f.neutral_count || 0} size={24} />
+                            </span>
+                          )}
+                          <span className={`font-mono text-sm font-semibold ${(f.accuracy_rate || 0) >= 60 ? 'text-positive' : 'text-negative'}`}>
+                            {(f.accuracy_rate || 0).toFixed(1)}%
+                          </span>
+                        </div>
                       </td>
                       <td className="px-4 py-2.5 text-right hidden sm:table-cell">
                         <span className={`font-mono text-sm ${(f.avg_return || 0) >= 0 ? 'text-positive' : 'text-negative'}`}>
