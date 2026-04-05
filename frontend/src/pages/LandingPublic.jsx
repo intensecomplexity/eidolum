@@ -1,15 +1,41 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { Check, Minus, X } from 'lucide-react';
 import useSEO from '../hooks/useSEO';
 import RankNumber from '../components/RankNumber';
 import MiniPieChart from '../components/MiniPieChart';
 import Footer from '../components/Footer';
-import { getLeaderboard } from '../api';
+import TickerLogo from '../components/TickerLogo';
+import { getHomepageData } from '../api';
+
+function DirectionBadge({ direction }) {
+  if (direction === 'bullish') return <span className="text-[10px] font-bold uppercase px-1.5 py-0.5 rounded text-positive bg-positive/10">BULL</span>;
+  if (direction === 'bearish') return <span className="text-[10px] font-bold uppercase px-1.5 py-0.5 rounded text-negative bg-negative/10">BEAR</span>;
+  return <span className="text-[10px] font-bold uppercase px-1.5 py-0.5 rounded text-muted bg-surface-2">HOLD</span>;
+}
+
+function OutcomeBadge({ outcome, actualReturn }) {
+  const cfg = {
+    hit: { label: 'HIT', cls: 'text-positive bg-positive/10', icon: Check },
+    correct: { label: 'HIT', cls: 'text-positive bg-positive/10', icon: Check },
+    near: { label: 'NEAR', cls: 'text-yellow-400 bg-yellow-400/10', icon: Minus },
+    miss: { label: 'MISS', cls: 'text-negative bg-negative/10', icon: X },
+    incorrect: { label: 'MISS', cls: 'text-negative bg-negative/10', icon: X },
+  };
+  const c = cfg[outcome] || cfg.miss;
+  const Icon = c.icon;
+  return (
+    <span className={`inline-flex items-center gap-0.5 text-[10px] font-bold uppercase px-1.5 py-0.5 rounded ${c.cls}`}>
+      <Icon className="w-3 h-3" /> {c.label}
+      {actualReturn != null && <span className="ml-0.5 font-mono">({actualReturn >= 0 ? '+' : ''}{actualReturn}%)</span>}
+    </span>
+  );
+}
 
 export default function LandingPublic() {
   useSEO({
-    title: 'Eidolum — Analyst Accuracy Scored by Reality',
-    description: '6,000+ analyst predictions tracked and scored against real stock prices. Goldman Sachs, Morgan Stanley, JP Morgan — see who actually gets it right.',
+    title: 'Eidolum — Who Should You Actually Listen To? Analyst Accuracy Scored by Reality',
+    description: 'Track 6,000+ financial analysts. 274,000+ predictions scored against real stock prices. See who actually gets it right.',
     url: 'https://www.eidolum.com',
     jsonLd: {
       '@context': 'https://schema.org',
@@ -27,14 +53,16 @@ export default function LandingPublic() {
   });
 
   const [top5, setTop5] = useState([]);
+  const [featured, setFeatured] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
 
   useEffect(() => {
-    getLeaderboard()
+    getHomepageData()
       .then(result => {
-        const arr = Array.isArray(result) ? result : [];
-        setTop5(arr.slice(0, 5));
+        const analysts = result?.top_analysts || [];
+        setTop5(Array.isArray(analysts) ? analysts.slice(0, 5) : []);
+        setFeatured(result?.featured_prediction || null);
         setLoading(false);
       })
       .catch(() => {
@@ -69,8 +97,85 @@ export default function LandingPublic() {
         </div>
       </section>
 
+      {/* -- FEATURED PREDICTION CARD -- */}
+      {featured && (
+        <section className="max-w-2xl mx-auto px-4 sm:px-6 pt-8 sm:pt-12 pb-4">
+          <div
+            className="rounded-lg border-l-4 py-4 px-5"
+            style={{ backgroundColor: '#14161c', borderColor: '#1e2028', borderLeftColor: '#D4A843' }}
+          >
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <TickerLogo ticker={featured.ticker} logoUrl={featured.logo_url} size={28} />
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <Link
+                      to={`/forecaster/${featured.forecaster_id}`}
+                      className="text-sm font-medium text-text-primary hover:text-accent transition-colors"
+                    >
+                      {featured.forecaster_name}
+                    </Link>
+                    {featured.firm && (
+                      <span className="text-xs text-muted">{featured.firm}</span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-1.5 mt-0.5">
+                    <span className="text-xs text-muted">on</span>
+                    <span className="text-sm font-mono font-medium text-text-primary">{featured.ticker}</span>
+                    {featured.company_name && (
+                      <span className="text-xs text-muted hidden sm:inline">{featured.company_name}</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+              <div className="flex flex-col items-end gap-1 shrink-0">
+                <OutcomeBadge outcome={featured.outcome} actualReturn={featured.actual_return} />
+                <DirectionBadge direction={featured.direction} />
+              </div>
+            </div>
+            {(featured.entry_price || featured.target_price) && (
+              <div className="flex items-center gap-3 mt-2.5 text-xs font-mono text-text-secondary">
+                {featured.entry_price != null && (
+                  <span>Entry ${featured.entry_price.toFixed(2)}</span>
+                )}
+                {featured.target_price != null && (
+                  <span>Target ${featured.target_price.toFixed(2)}</span>
+                )}
+                {featured.evaluation_date && (
+                  <span className="text-muted">Scored {new Date(featured.evaluation_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
+                )}
+              </div>
+            )}
+          </div>
+          <p className="text-center text-muted text-xs mt-4 tracking-wide">
+            Every prediction. Timestamped. Scored against reality.
+          </p>
+        </section>
+      )}
+
+      {/* -- HOW IT WORKS -- */}
+      <section className="max-w-3xl mx-auto px-4 sm:px-6 py-10 sm:py-14">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 sm:gap-8 text-center">
+          <div>
+            <div className="font-mono text-2xl font-bold mb-2" style={{ color: '#D4A843' }}>1</div>
+            <div className="text-text-primary text-sm font-medium mb-1">Analysts make predictions</div>
+            <div className="text-muted text-xs">Upgrades, downgrades, price targets</div>
+          </div>
+          <div>
+            <div className="font-mono text-2xl font-bold mb-2" style={{ color: '#D4A843' }}>2</div>
+            <div className="text-text-primary text-sm font-medium mb-1">We track every call</div>
+            <div className="text-muted text-xs">Timestamped, locked, no changes allowed</div>
+          </div>
+          <div>
+            <div className="font-mono text-2xl font-bold mb-2" style={{ color: '#D4A843' }}>3</div>
+            <div className="text-text-primary text-sm font-medium mb-1">Reality scores them</div>
+            <div className="text-muted text-xs">HIT, NEAR, or MISS when the window expires</div>
+          </div>
+        </div>
+      </section>
+
       {/* -- LIVE LEADERBOARD PREVIEW -- */}
-      <section className="max-w-4xl mx-auto px-4 sm:px-6 py-14 sm:py-20">
+      <section className="max-w-4xl mx-auto px-4 sm:px-6 py-10 sm:py-16">
         <h2
           className="headline-serif text-accent text-center mb-10"
           style={{ fontSize: 'clamp(1.6rem, 4vw, 2.4rem)' }}

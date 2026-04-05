@@ -858,11 +858,47 @@ def get_homepage_data(request: Request, db: Session = Depends(get_db)):
     except Exception:
         pass
 
+    # Featured prediction: best recent HIT from a firm, with high return
+    featured = None
+    try:
+        feat_row = db.execute(sql_text("""
+            SELECT p.id, p.ticker, p.direction, p.target_price, p.entry_price,
+                   p.outcome, p.actual_return, p.prediction_date, p.evaluation_date,
+                   f.id AS fid, f.name AS fname, f.firm,
+                   ts.company_name, ts.logo_url
+            FROM predictions p
+            JOIN forecasters f ON f.id = p.forecaster_id
+            LEFT JOIN ticker_sectors ts ON ts.ticker = p.ticker
+            WHERE p.outcome IN ('hit', 'correct')
+              AND p.actual_return IS NOT NULL
+              AND p.actual_return > 5
+              AND f.firm IS NOT NULL
+              AND f.firm != ''
+            ORDER BY p.actual_return DESC
+            LIMIT 1
+        """)).first()
+        if feat_row:
+            featured = {
+                "id": feat_row[0], "ticker": feat_row[1], "direction": feat_row[2],
+                "target_price": float(feat_row[3]) if feat_row[3] else None,
+                "entry_price": float(feat_row[4]) if feat_row[4] else None,
+                "outcome": feat_row[5],
+                "actual_return": round(float(feat_row[6]), 1) if feat_row[6] is not None else None,
+                "prediction_date": feat_row[7].isoformat() if feat_row[7] else None,
+                "evaluation_date": feat_row[8].isoformat() if feat_row[8] else None,
+                "forecaster_id": feat_row[9], "forecaster_name": feat_row[10],
+                "firm": feat_row[11],
+                "company_name": feat_row[12], "logo_url": feat_row[13],
+            }
+    except Exception:
+        pass
+
     _homepage_data_cache = {
         "stats": stats,
         "top_analysts": top5,
         "biggest_calls": biggest_calls,
         "most_divided": most_divided,
+        "featured_prediction": featured,
     }
     _homepage_data_cache_time = _time.time()
     return _homepage_data_cache
