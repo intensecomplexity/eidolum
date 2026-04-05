@@ -27,9 +27,9 @@ function PriceTooltip({ active, payload }) {
   if (!active || !payload?.length) return null;
   const d = payload[0].payload;
   return (
-    <div style={{ background: '#14161c', border: '1px solid rgba(212,168,67,0.15)', borderRadius: 8, padding: '8px 12px', fontSize: 12, boxShadow: '0 4px 12px rgba(0,0,0,0.4)' }}>
-      <div style={{ color: '#6b7280', marginBottom: 2 }}>{d.date}</div>
-      <div style={{ fontFamily: 'monospace', color: '#D4A843', fontWeight: 600 }}>${d.close?.toFixed(2)}</div>
+    <div className="bg-surface border border-border rounded-lg px-3 py-2 text-xs shadow-lg">
+      <div className="text-muted mb-0.5">{d.date}</div>
+      <div className="font-mono text-accent font-bold">${d.close?.toFixed(2)}</div>
     </div>
   );
 }
@@ -226,13 +226,7 @@ export default function StockChart({ ticker }) {
       {selectedDot && (
         <div className="absolute left-3 right-3 sm:left-auto sm:right-4 sm:w-80 z-50 feed-item-enter"
           style={{ top: typeof window !== 'undefined' && window.innerWidth < 640 ? 'auto' : '90px', bottom: typeof window !== 'undefined' && window.innerWidth < 640 ? '10px' : 'auto' }}>
-          <div style={{
-            background: isDark ? '#14161c' : '#ffffff',
-            border: `1px solid ${isDark ? 'rgba(212,168,67,0.2)' : '#e5e7eb'}`,
-            borderRadius: 12,
-            padding: 14,
-            boxShadow: isDark ? '0 8px 24px rgba(0,0,0,0.5)' : '0 8px 24px rgba(0,0,0,0.12)',
-          }}>
+          <div className="bg-surface border border-border rounded-xl p-3.5 shadow-lg">
             {/* Header with date and close button */}
             <div className="flex items-center justify-between mb-3">
               <span className="text-[10px] text-muted font-mono">{selectedDot.date}</span>
