@@ -873,28 +873,55 @@ def get_homepage_data(request: Request, db: Session = Depends(get_db)):
     except Exception:
         pass
 
-    # Featured prediction: best HIT from a recognizable firm with realistic return
+    # Featured prediction: best HIT from a named firm with realistic return
+    # Progressively looser queries to ensure we always find something
     featured = None
+    _feat_queries = [
+        # Tier 1: top-tier firm, popular ticker, good return
+        """SELECT p.id, p.ticker, p.direction, p.target_price, p.entry_price,
+                  p.outcome, p.actual_return, p.prediction_date, p.evaluation_date,
+                  f.id AS fid, f.name AS fname, f.firm,
+                  ts.company_name, ts.logo_url
+           FROM predictions p
+           JOIN forecasters f ON f.id = p.forecaster_id
+           LEFT JOIN ticker_sectors ts ON ts.ticker = p.ticker
+           WHERE p.outcome IN ('hit', 'correct')
+             AND p.actual_return IS NOT NULL AND p.actual_return > 0 AND p.actual_return < 200
+             AND f.firm IN ('Goldman Sachs','Morgan Stanley','JPMorgan','Wedbush','Bank of America',
+                            'Barclays','UBS','Citigroup','Wells Fargo','Deutsche Bank','Bernstein',
+                            'Piper Sandler','Raymond James','Jefferies','Evercore','BMO Capital','RBC Capital')
+             AND ts.company_name IS NOT NULL
+           ORDER BY p.actual_return DESC LIMIT 1""",
+        # Tier 2: any named firm, any ticker with a company name
+        """SELECT p.id, p.ticker, p.direction, p.target_price, p.entry_price,
+                  p.outcome, p.actual_return, p.prediction_date, p.evaluation_date,
+                  f.id AS fid, f.name AS fname, f.firm,
+                  ts.company_name, ts.logo_url
+           FROM predictions p
+           JOIN forecasters f ON f.id = p.forecaster_id
+           LEFT JOIN ticker_sectors ts ON ts.ticker = p.ticker
+           WHERE p.outcome IN ('hit', 'correct')
+             AND p.actual_return IS NOT NULL AND p.actual_return > 0 AND p.actual_return < 200
+             AND f.firm IS NOT NULL AND f.firm != ''
+             AND ts.company_name IS NOT NULL
+           ORDER BY p.actual_return DESC LIMIT 1""",
+        # Tier 3: any HIT with realistic return
+        """SELECT p.id, p.ticker, p.direction, p.target_price, p.entry_price,
+                  p.outcome, p.actual_return, p.prediction_date, p.evaluation_date,
+                  f.id AS fid, f.name AS fname, f.firm,
+                  ts.company_name, ts.logo_url
+           FROM predictions p
+           JOIN forecasters f ON f.id = p.forecaster_id
+           LEFT JOIN ticker_sectors ts ON ts.ticker = p.ticker
+           WHERE p.outcome IN ('hit', 'correct')
+             AND p.actual_return IS NOT NULL AND p.actual_return > 0 AND p.actual_return < 200
+           ORDER BY p.actual_return DESC LIMIT 1""",
+    ]
     try:
-        feat_row = db.execute(sql_text("""
-            SELECT p.id, p.ticker, p.direction, p.target_price, p.entry_price,
-                   p.outcome, p.actual_return, p.prediction_date, p.evaluation_date,
-                   f.id AS fid, f.name AS fname, f.firm,
-                   ts.company_name, ts.logo_url
-            FROM predictions p
-            JOIN forecasters f ON f.id = p.forecaster_id
-            LEFT JOIN ticker_sectors ts ON ts.ticker = p.ticker
-            WHERE p.outcome IN ('hit', 'correct')
-              AND p.actual_return IS NOT NULL
-              AND p.actual_return BETWEEN 5 AND 100
-              AND f.firm IS NOT NULL AND f.firm != ''
-              AND p.ticker IN (
-                  SELECT ticker FROM predictions
-                  GROUP BY ticker HAVING COUNT(*) >= 50
-              )
-            ORDER BY p.actual_return DESC
-            LIMIT 1
-        """)).first()
+        for q in _feat_queries:
+            feat_row = db.execute(sql_text(q)).first()
+            if feat_row:
+                break
         if feat_row:
             featured = {
                 "id": feat_row[0], "ticker": feat_row[1], "direction": feat_row[2],

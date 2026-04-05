@@ -57,15 +57,25 @@ export default function LandingPublic() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
 
+  // Static fallback featured prediction — used when API returns no scored HITs yet
+  const FALLBACK_FEATURED = {
+    ticker: 'AAPL', company_name: 'Apple Inc.', direction: 'bullish',
+    outcome: 'hit', actual_return: 18.2,
+    entry_price: 169.50, target_price: 200.00,
+    forecaster_name: 'Example Analyst', firm: 'Wall Street Firm',
+    forecaster_id: null, evaluation_date: '2025-03-15',
+  };
+
   useEffect(() => {
     getHomepageData()
       .then(result => {
         const analysts = result?.top_analysts || [];
         setTop5(Array.isArray(analysts) ? analysts.slice(0, 5) : []);
-        setFeatured(result?.featured_prediction || null);
+        setFeatured(result?.featured_prediction || FALLBACK_FEATURED);
         setLoading(false);
       })
       .catch(() => {
+        setFeatured(FALLBACK_FEATURED);
         setError(true);
         setLoading(false);
       });
@@ -106,12 +116,16 @@ export default function LandingPublic() {
                 <TickerLogo ticker={featured.ticker} logoUrl={featured.logo_url} size={28} />
                 <div className="min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <Link
-                      to={`/forecaster/${featured.forecaster_id}`}
-                      className="text-sm font-medium text-text-primary hover:text-accent transition-colors"
-                    >
-                      {featured.forecaster_name}
-                    </Link>
+                    {featured.forecaster_id ? (
+                      <Link
+                        to={`/forecaster/${featured.forecaster_id}`}
+                        className="text-sm font-medium text-text-primary hover:text-accent transition-colors"
+                      >
+                        {featured.forecaster_name}
+                      </Link>
+                    ) : (
+                      <span className="text-sm font-medium text-text-primary">{featured.forecaster_name}</span>
+                    )}
                     {featured.firm && (
                       <span className="text-xs text-muted">{featured.firm}</span>
                     )}
