@@ -230,7 +230,7 @@ export default function Activity() {
 
   return (
     <div>
-      <PageHeader title="Activity" subtitle="Live feed of everything happening on Eidolum." icon={Zap} />
+      <PageHeader title="Activity" subtitle="Live feed of everything happening on Eidolum." />
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-6 sm:pb-10">
 
         {/* Tabs */}

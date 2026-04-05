@@ -41,7 +41,7 @@ export default function SmartMoney() {
 
   return (
     <div>
-      <PageHeader title="Top Calls" subtitle="The highest-accuracy analysts' active predictions right now." icon={DollarSign} />
+      <PageHeader title="Top Calls" subtitle="The highest-accuracy analysts' active predictions right now." />
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-6 sm:pb-10">
 
         {/* Tabs */}
