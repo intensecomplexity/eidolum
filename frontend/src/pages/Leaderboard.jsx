@@ -93,6 +93,13 @@ export default function Leaderboard() {
     title: 'The Eidolum 100 — Top Analyst Accuracy Rankings | Eidolum',
     description: 'Top 100 forecasters ranked by accuracy. 31,000+ predictions scored against reality. Goldman Sachs to Reddit — see who beats the market.',
     url: 'https://www.eidolum.com/leaderboard',
+    jsonLd: {
+      '@context': 'https://schema.org',
+      '@type': 'CollectionPage',
+      name: 'The Eidolum 100 — Top Financial Forecasters',
+      description: 'Top 100 financial forecasters ranked by accuracy against real market data.',
+      url: 'https://eidolum.com/leaderboard',
+    },
   });
 
   // Scroll to top on any filter change

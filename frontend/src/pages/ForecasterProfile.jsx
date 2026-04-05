@@ -83,11 +83,28 @@ export default function ForecasterProfile() {
   }, [activeSector]);
 
   // SEO hook MUST be before any early returns (React hooks rule)
+  const forecasterJsonLd = data ? (() => {
+    const ld = {
+      '@context': 'https://schema.org',
+      '@type': 'Person',
+      name: data.name,
+      jobTitle: 'Financial Analyst',
+      description: `${data.name} prediction accuracy: ${data.accuracy_rate?.toFixed(1)}% on ${data.total_predictions || 0} predictions scored against real market data`,
+      url: `https://eidolum.com/forecaster/${id}`,
+      knowsAbout: ['Stock Market', 'Financial Analysis', 'Investment Research'],
+    };
+    if (data.firm) {
+      ld.worksFor = { '@type': 'Organization', name: data.firm };
+    }
+    return ld;
+  })() : undefined;
+
   useSEO({
     title: data ? `${data.name}'s Vault — ${data.accuracy_rate?.toFixed(1)}% on ${data.total_predictions || 0} predictions | Eidolum` : 'The Vault | Eidolum',
     description: data ? `${data.name}${data.firm ? ` at ${data.firm}` : ''}: ${data.accuracy_rate?.toFixed(1)}% accuracy on ${data.total_predictions || 0} predictions scored against real market data.` : undefined,
     url: `https://www.eidolum.com/forecaster/${id}`,
     image: data ? `https://eidolum-production.up.railway.app/api/og-image/forecaster/${id}` : undefined,
+    jsonLd: forecasterJsonLd,
   });
 
   if (loading) {

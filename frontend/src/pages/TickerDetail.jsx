@@ -32,10 +32,24 @@ export default function TickerDetail() {
   const [error, setError] = useState(false);
 
   // SEO hook MUST be before any early returns (React hooks rule)
+  const tickerJsonLd = data ? {
+    '@context': 'https://schema.org',
+    '@type': 'WebPage',
+    name: `${ticker} Analyst Predictions and Consensus`,
+    description: `${data.company_name || ticker} (${ticker}) analyst consensus. ${data.total_predictions || 0} predictions tracked.`,
+    url: `https://eidolum.com/asset/${ticker}`,
+    about: {
+      '@type': 'Corporation',
+      name: data.company_name || ticker,
+      tickerSymbol: ticker,
+    },
+  } : undefined;
+
   useSEO({
     title: data ? `${ticker}${data.company_name ? ` — ${data.company_name}` : ''} Analyst Predictions & Consensus | Eidolum` : `${ticker} | Eidolum`,
     description: data ? `${ticker} analyst predictions and consensus. ${data.total_predictions || 0} calls tracked and scored against reality. See who's bullish or bearish.` : undefined,
     url: `https://www.eidolum.com/asset/${ticker}`,
+    jsonLd: tickerJsonLd,
   });
 
   function fetchData() {

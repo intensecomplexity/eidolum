@@ -34,6 +34,13 @@ export default function Consensus() {
     title: 'Stock Consensus — Bull vs Bear Analyst Ratings | Eidolum',
     description: 'Bull, bear, and hold consensus for every stock, scored against reality. 6,000+ analysts tracked. See what Wall Street predicts for any ticker.',
     url: 'https://www.eidolum.com/consensus',
+    jsonLd: {
+      '@context': 'https://schema.org',
+      '@type': 'CollectionPage',
+      name: 'Stock Consensus — Bull vs Bear Analyst Ratings',
+      description: 'Bull, bear, and hold consensus for every stock, scored against reality.',
+      url: 'https://eidolum.com/consensus',
+    },
   });
 
   const [data, setData] = useState([]);
