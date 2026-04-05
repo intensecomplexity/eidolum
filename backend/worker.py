@@ -240,11 +240,16 @@ def main():
     sched.add_job(_standalone("x_scraper", _x_scraper), "interval", hours=8, id="x_scraper", next_run_time=datetime.utcnow(), misfire_grace_time=300)
 
     # Logo processor — process new ticker logos (runs 5 min after start, then daily)
+    # First run after deploy reprocesses all logos with improved bg stripping
+    _logos_reprocessed = False
     def _process_logos():
+        nonlocal _logos_reprocessed
         try:
             from jobs.process_logos import process_all_logos
-            result = process_all_logos(batch_size=50, rate_limit=0.3)
-            log.info(f"[process_logos] Done: {result}")
+            reprocess = not _logos_reprocessed
+            result = process_all_logos(batch_size=50, rate_limit=0.3, reprocess=reprocess)
+            _logos_reprocessed = True
+            log.info(f"[process_logos] Done (reprocess={reprocess}): {result}")
         except Exception as e:
             log.error(f"[process_logos] {e}", exc_info=True)
     sched.add_job(_standalone("process_logos", _process_logos), "interval", hours=24, id="process_logos", next_run_time=t0 + timedelta(minutes=5))

@@ -23,7 +23,6 @@ export default function TickerLogo({ ticker, logoUrl, size = 32 }) {
   return (
     <div style={{
       width: size, height: size, borderRadius: 8,
-      backgroundColor: '#1e2028', padding: 3,
       display: 'flex', alignItems: 'center', justifyContent: 'center',
       overflow: 'hidden', flexShrink: 0,
     }}>

@@ -23,6 +23,42 @@ def _logo_urls(ticker: str) -> list[str]:
 
 
 # ── Image processing ─────────────────────────────────────────────────────────
+def _rgb_distance(a, b):
+    """Euclidean distance between two RGB tuples."""
+    return sum((a[i] - b[i]) ** 2 for i in range(3)) ** 0.5
+
+
+def _detect_bg_color(img: Image.Image):
+    """Sample 8 points (corners + edge midpoints) to detect background color.
+    Returns the median RGB or None if samples are too inconsistent."""
+    w, h = img.size
+    samples = [
+        img.getpixel((1, 1)),                # top-left
+        img.getpixel((w - 2, 1)),            # top-right
+        img.getpixel((1, h - 2)),            # bottom-left
+        img.getpixel((w - 2, h - 2)),        # bottom-right
+        img.getpixel((w // 2, 1)),           # top-center
+        img.getpixel((w // 2, h - 2)),       # bottom-center
+        img.getpixel((1, h // 2)),           # left-center
+        img.getpixel((w - 2, h // 2)),       # right-center
+    ]
+
+    # All samples must be opaque
+    opaque = [s for s in samples if s[3] > 200]
+    if len(opaque) < 5:
+        return None  # image already has transparency
+
+    # Check if opaque samples are similar (within RGB distance 30)
+    ref = opaque[0][:3]
+    matching = [s for s in opaque if _rgb_distance(s[:3], ref) < 30]
+    if len(matching) < 5:
+        return None  # samples too varied, no consistent background
+
+    # Return average of matching samples
+    n = len(matching)
+    return tuple(sum(s[i] for s in matching) // n for i in range(3))
+
+
 def _strip_background(img: Image.Image) -> Image.Image:
     """Remove solid background color from logo image."""
     img = img.convert("RGBA")
@@ -30,41 +66,44 @@ def _strip_background(img: Image.Image) -> Image.Image:
     if w < 4 or h < 4:
         return img
 
-    # Sample corner pixels to detect background color
-    corners = [
-        img.getpixel((1, 1)),
-        img.getpixel((w - 2, 1)),
-        img.getpixel((1, h - 2)),
-        img.getpixel((w - 2, h - 2)),
-    ]
+    # Detect background color from border samples
+    bg = _detect_bg_color(img)
 
-    # All corners must be opaque and similar color
-    if not all(c[3] > 200 for c in corners):
-        return img  # has transparency already, skip
+    # Also check for known problematic backgrounds even if detection fails
+    if bg is None:
+        # Try: is this a dark-background image? Sample just the corners
+        corners = [img.getpixel((1, 1)), img.getpixel((w-2, 1)),
+                   img.getpixel((1, h-2)), img.getpixel((w-2, h-2))]
+        opaque_corners = [c for c in corners if c[3] > 200]
+        if len(opaque_corners) >= 3:
+            avg = tuple(sum(c[i] for c in opaque_corners) // len(opaque_corners) for i in range(3))
+            if all(v < 30 for v in avg):       # near-black
+                bg = avg
+            elif all(v > 225 for v in avg):    # near-white
+                bg = avg
+        if bg is None:
+            return img
 
-    bg = corners[0][:3]
-    threshold = 40
-    if not all(
-        all(abs(c[i] - bg[i]) < threshold for i in range(3))
-        for c in corners
-    ):
-        return img  # corners differ, not a solid background
+    # Determine removal threshold — more aggressive for black/white backgrounds
+    is_dark = all(v < 30 for v in bg)
+    is_light = all(v > 225 for v in bg)
+    threshold = 50 if (is_dark or is_light) else 40
 
     # Count how many pixels match the background
     data = list(img.getdata())
     bg_count = sum(
         1 for px in data
-        if px[3] > 200 and all(abs(px[i] - bg[i]) < threshold for i in range(3))
+        if px[3] > 200 and _rgb_distance(px[:3], bg) < threshold
     )
     bg_ratio = bg_count / len(data)
 
-    if bg_ratio < 0.25:
-        return img  # background is less than 25%, probably not a solid bg
+    if bg_ratio < 0.20:
+        return img  # background is less than 20%, probably not a solid bg
 
     # Replace background pixels with transparent
     new_data = []
     for px in data:
-        if px[3] > 200 and all(abs(px[i] - bg[i]) < threshold for i in range(3)):
+        if px[3] > 200 and _rgb_distance(px[:3], bg) < threshold:
             new_data.append((0, 0, 0, 0))
         else:
             new_data.append(px)
@@ -158,14 +197,19 @@ def process_ticker_logo(ticker: str, db, force: bool = False) -> bool:
 
 
 # ── Batch process all tickers ────────────────────────────────────────────────
-def process_all_logos(db=None, batch_size: int = 50, rate_limit: float = 0.5) -> dict:
-    """Process logos for all tickers that don't have one yet."""
+def process_all_logos(db=None, batch_size: int = 50, rate_limit: float = 0.5, reprocess: bool = False) -> dict:
+    """Process logos for all tickers that don't have one yet (or all if reprocess=True)."""
     from database import BgSessionLocal
     own_db = db is None
     if own_db:
         db = BgSessionLocal()
 
     try:
+        if reprocess:
+            db.execute(sql_text("DELETE FROM processed_logos"))
+            db.commit()
+            print("[LogoProcessor] Cleared processed_logos table for reprocessing")
+
         # Get all tickers that need processing
         rows = db.execute(sql_text("""
             SELECT DISTINCT p.ticker
