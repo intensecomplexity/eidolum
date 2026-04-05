@@ -10,8 +10,6 @@ function getCachedLogoUrl(ticker) {
   try {
     const raw = localStorage.getItem(CACHE_PREFIX + ticker);
     if (!raw) return null;
-
-    // New JSON format: { url, ts } or { failed, ts }
     try {
       const entry = JSON.parse(raw);
       const age = Date.now() - (entry.ts || 0);
@@ -25,9 +23,8 @@ function getCachedLogoUrl(ticker) {
       }
       return null;
     } catch {
-      // Old plain-string format — clear poisoned 'no_logo' entries
       if (raw === 'no_logo') { localStorage.removeItem(CACHE_PREFIX + ticker); return null; }
-      return raw; // old cached URL string, still usable
+      return raw;
     }
   } catch { return null; }
 }
@@ -40,10 +37,10 @@ function setCachedLogoUrl(ticker, url) {
     } else {
       localStorage.setItem(CACHE_PREFIX + ticker, JSON.stringify({ url, ts: Date.now() }));
     }
-  } catch { /* localStorage full */ }
+  } catch {}
 }
 
-/** Clear all cached logos (for admin/debug use) */
+/** Clear all cached logos */
 export function clearLogoCache() {
   try {
     const keys = [];
@@ -56,30 +53,39 @@ export function clearLogoCache() {
   } catch { return 0; }
 }
 
+// ── FMP logo URL sources (static CDN, no API key needed) ─────────────────────
+function fmpUrls(ticker) {
+  if (!ticker || ticker === '?') return [];
+  return [
+    `https://financialmodelingprep.com/image-stock/${ticker}.png`,
+    `https://images.financialmodelingprep.com/symbol/${ticker}.png`,
+  ];
+}
+
 
 // ── Component ─────────────────────────────────────────────────────────────────
 export default function CompanyLogo({ domain, logoUrl, ticker, size = 24 }) {
   const symbol = ticker || '?';
-  const imgSize = Math.round(size * 0.75);
   const fontSize = symbol.length <= 2 ? size * 0.4 : symbol.length <= 3 ? size * 0.32 : size * 0.25;
 
-  // Built-in FMP CDN fallback — works for most US tickers without API key
-  const fmpFallback = symbol !== '?' ? `https://images.financialmodelingprep.com/symbol/${symbol}.png` : null;
+  // Build ordered list of URLs to try: prop → FMP primary → FMP fallback
+  const fallbacks = fmpUrls(symbol);
+  const allUrls = [logoUrl, ...fallbacks].filter(Boolean);
 
-  // Resolve initial URL: cache → prop → FMP CDN
   const cached = getCachedLogoUrl(symbol);
+  const [urlIndex, setUrlIndex] = useState(0);
   const [effectiveUrl, setEffectiveUrl] = useState(() => {
     if (cached && cached !== 'no_logo') return cached;
-    return logoUrl || fmpFallback;
+    return allUrls[0] || null;
   });
   const [loaded, setLoaded] = useState(!!cached && cached !== 'no_logo');
   const [failed, setFailed] = useState(cached === 'no_logo');
-  const [triedFmp, setTriedFmp] = useState(false);
 
-  // If logoUrl prop arrives after mount (async data), try it
+  // If logoUrl prop arrives after mount, reset to try it
   useEffect(() => {
     if (logoUrl && !effectiveUrl && !failed) {
       setEffectiveUrl(logoUrl);
+      setUrlIndex(0);
     }
   }, [logoUrl]);
 
@@ -87,28 +93,46 @@ export default function CompanyLogo({ domain, logoUrl, ticker, size = 24 }) {
     width: size, height: size, minWidth: size, minHeight: size,
   };
 
-  function handleLoad() {
+  function handleLoad(e) {
+    // Guard against blank/tiny placeholder images returned by CDNs
+    const img = e.target;
+    if (img.naturalWidth <= 1 || img.naturalHeight <= 1) {
+      handleError();
+      return;
+    }
     setLoaded(true);
     if (effectiveUrl) setCachedLogoUrl(symbol, effectiveUrl);
   }
 
   function handleError() {
-    // If the explicit logoUrl failed, try FMP CDN
-    if (!triedFmp && fmpFallback && effectiveUrl !== fmpFallback) {
-      setTriedFmp(true);
-      setEffectiveUrl(fmpFallback);
+    // Try next URL in the list
+    const nextIdx = urlIndex + 1;
+    const nextUrl = allUrls[nextIdx];
+    if (nextUrl && nextUrl !== effectiveUrl) {
+      setUrlIndex(nextIdx);
+      setEffectiveUrl(nextUrl);
       setLoaded(false);
       return;
     }
-    // All sources exhausted — mark as failed (with TTL, will retry later)
     setFailed(true);
     setCachedLogoUrl(symbol, null);
   }
 
-  const pad = Math.max(Math.round(size * 0.12), 2); // ~3-4px padding scales with size
+  const pad = Math.max(Math.round(size * 0.12), 2);
   const innerSize = size - pad * 2;
 
-  // Shared white container style
+  // Fallback: dark container with gold ticker letter
+  if (failed || !effectiveUrl) {
+    return (
+      <div className="flex items-center justify-center shrink-0"
+        style={{ ...container, backgroundColor: '#14161c', borderRadius: 8, padding: pad,
+          color: '#D4A843', fontSize, fontWeight: 700, fontFamily: 'monospace', letterSpacing: '-0.02em' }}>
+        {symbol.slice(0, 3)}
+      </div>
+    );
+  }
+
+  // White container for loaded logos
   const boxStyle = {
     ...container,
     backgroundColor: '#ffffff',
@@ -116,16 +140,6 @@ export default function CompanyLogo({ domain, logoUrl, ticker, size = 24 }) {
     borderRadius: 8,
     padding: pad,
   };
-
-  // Fallback: ticker letter
-  if (failed || !effectiveUrl) {
-    return (
-      <div className="flex items-center justify-center shrink-0"
-        style={{ ...boxStyle, color: '#6b7280', fontSize, fontWeight: 700, fontFamily: 'monospace', letterSpacing: '-0.02em' }}>
-        {symbol}
-      </div>
-    );
-  }
 
   return (
     <div className="flex items-center justify-center shrink-0 overflow-hidden relative"
@@ -142,8 +156,8 @@ export default function CompanyLogo({ domain, logoUrl, ticker, size = 24 }) {
         style={{ opacity: loaded ? 1 : 0, transition: 'opacity 200ms ease-in' }}
       />
       {!loaded && (
-        <span className="absolute" style={{ color: '#6b7280', fontSize, fontWeight: 700, fontFamily: 'monospace' }}>
-          {symbol}
+        <span className="absolute" style={{ color: '#D4A843', fontSize, fontWeight: 700, fontFamily: 'monospace' }}>
+          {symbol.slice(0, 3)}
         </span>
       )}
     </div>
