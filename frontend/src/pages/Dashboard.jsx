@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Flame, Crosshair, TrendingUp, TrendingDown, ArrowRight, Clock, Trophy, Zap } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
@@ -47,6 +47,8 @@ export default function Dashboard() {
   const [homeStats, setHomeStats] = useState(null);
   const [biggestCalls, setBiggestCalls] = useState([]);
   const [mostDivided, setMostDivided] = useState([]);
+
+  const [expandedId, setExpandedId] = useState(null);
 
   // Personalized extras
   const [expiring, setExpiring] = useState([]);
@@ -233,8 +235,20 @@ export default function Dashboard() {
                   </tr>
                 </thead>
                 <tbody>
-                  {top5.map(f => (
-                    <tr key={f.id} className="border-b border-border/50 last:border-b-0 hover:bg-surface-2/30 transition-colors">
+                  {top5.map(f => {
+                    const hits = f.hits || f.correct_predictions || 0;
+                    const nears = f.nears || 0;
+                    const misses = f.misses || Math.max(0, (f.total_predictions || 0) - (f.correct_predictions || 0));
+                    const pending = f.pending_count || 0;
+                    const oTotal = hits + nears + misses;
+                    const bull = f.bullish_count || 0;
+                    const bear = f.bearish_count || 0;
+                    const neut = f.neutral_count || 0;
+                    const dTotal = bull + bear + neut;
+                    const pct = (n, t) => t > 0 ? Math.round(n / t * 100) : 0;
+                    return (
+                    <React.Fragment key={f.id}>
+                    <tr className="border-b border-border/50 last:border-b-0 hover:bg-surface-2/30 transition-colors">
                       <td className="px-4 py-2.5"><RankNumber rank={f.rank} /></td>
                       <td className="px-4 py-2.5">
                         <Link to={f.slug ? `/analyst/${f.slug}` : `/forecaster/${f.id}`} className="text-sm font-medium hover:text-accent transition-colors">{f.name}</Link>
@@ -242,19 +256,16 @@ export default function Dashboard() {
                       </td>
                       <td className="px-4 py-2.5">
                         <div className="flex items-center justify-end gap-1.5">
-                          {(f.hits > 0 || f.misses > 0 || f.correct_predictions > 0) && (
-                            <MiniPieChart
-                              hits={f.hits || 0} nears={f.nears || 0} misses={f.misses || 0}
-                              pending={f.pending_count || 0}
-                              correct={f.correct_predictions || 0}
-                              incorrect={Math.max(0, (f.evaluated_predictions || 0) - (f.correct_predictions || 0))}
-                              size={24}
-                            />
+                          {oTotal > 0 && (
+                            <div className="cursor-pointer hover:opacity-80" onClick={() => setExpandedId(expandedId === f.id ? null : f.id)}>
+                              <MiniPieChart hits={hits} nears={nears} misses={misses} pending={pending}
+                                correct={f.correct_predictions || 0} incorrect={misses} size={24} />
+                            </div>
                           )}
-                          {(f.bullish_count > 0 || f.bearish_count > 0) && (
-                            <span className="hidden sm:inline">
-                              <MiniPieChart bullish={f.bullish_count || 0} bearish={f.bearish_count || 0} neutral={f.neutral_count || 0} size={24} />
-                            </span>
+                          {dTotal > 0 && (
+                            <div className="hidden sm:block cursor-pointer hover:opacity-80" onClick={() => setExpandedId(expandedId === f.id ? null : f.id)}>
+                              <MiniPieChart bullish={bull} bearish={bear} neutral={neut} size={24} />
+                            </div>
                           )}
                           <span className={`font-mono text-sm font-semibold ${(f.accuracy_rate || 0) >= 60 ? 'text-positive' : 'text-negative'}`}>
                             {(f.accuracy_rate || 0).toFixed(1)}%
@@ -270,7 +281,42 @@ export default function Dashboard() {
                         <span className="font-mono text-text-secondary text-sm">{f.scored_count || f.evaluated_predictions || 0}</span>
                       </td>
                     </tr>
-                  ))}
+                    {expandedId === f.id && (
+                      <tr>
+                        <td colSpan={5} className="bg-surface-2/30 border-t border-accent/10 py-4 px-4">
+                          <div className="grid grid-cols-2 gap-6 max-w-md mx-auto">
+                            <div>
+                              <div className="text-[10px] text-muted uppercase tracking-wider mb-2">Scoring</div>
+                              <div className="flex items-start gap-3">
+                                <MiniPieChart hits={hits} nears={nears} misses={misses} pending={pending} size={56} showCenter />
+                                <div className="space-y-1 text-[10px]">
+                                  {hits > 0 && <div className="flex items-center gap-1"><span className="w-2 h-2 rounded-full" style={{backgroundColor:'#34d399'}} />{hits} Hits ({pct(hits,oTotal)}%)</div>}
+                                  {nears > 0 && <div className="flex items-center gap-1"><span className="w-2 h-2 rounded-full" style={{backgroundColor:'#fbbf24'}} />{nears} Nears ({pct(nears,oTotal)}%)</div>}
+                                  {misses > 0 && <div className="flex items-center gap-1"><span className="w-2 h-2 rounded-full" style={{backgroundColor:'#f87171'}} />{misses} Misses ({pct(misses,oTotal)}%)</div>}
+                                  {pending > 0 && <div className="flex items-center gap-1 text-muted"><span className="w-2 h-2 rounded-full" style={{backgroundColor:'#6b7280'}} />{pending} Pending</div>}
+                                </div>
+                              </div>
+                            </div>
+                            {dTotal > 0 && (
+                              <div>
+                                <div className="text-[10px] text-muted uppercase tracking-wider mb-2">Direction</div>
+                                <div className="flex items-start gap-3">
+                                  <MiniPieChart bullish={bull} bearish={bear} neutral={neut} size={56} showCenter />
+                                  <div className="space-y-1 text-[10px]">
+                                    {bull > 0 && <div className="flex items-center gap-1"><span className="w-2 h-2 rounded-full" style={{backgroundColor:'#22c55e'}} />{bull} Bull ({pct(bull,dTotal)}%)</div>}
+                                    {neut > 0 && <div className="flex items-center gap-1"><span className="w-2 h-2 rounded-full" style={{backgroundColor:'#F59E0B'}} />{neut} Hold ({pct(neut,dTotal)}%)</div>}
+                                    {bear > 0 && <div className="flex items-center gap-1"><span className="w-2 h-2 rounded-full" style={{backgroundColor:'#ef4444'}} />{bear} Bear ({pct(bear,dTotal)}%)</div>}
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                    </React.Fragment>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
