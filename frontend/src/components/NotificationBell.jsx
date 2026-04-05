@@ -122,8 +122,7 @@ export default function NotificationBell() {
         </button>
 
         {open && (
-          <div className="fixed inset-x-0 top-14 bottom-0 sm:absolute sm:inset-auto sm:right-0 sm:top-full sm:mt-2 sm:w-96 sm:bottom-auto sm:max-h-[70vh] sm:rounded-lg border-t sm:border border-border shadow-lg overflow-hidden z-[60] flex flex-col"
-            style={{ backgroundColor: '#14161c' }}>
+          <div className="fixed inset-x-0 top-14 bottom-0 sm:absolute sm:inset-auto sm:right-0 sm:top-full sm:mt-2 sm:w-96 sm:bottom-auto sm:max-h-[70vh] sm:rounded-lg border-t sm:border border-border shadow-lg overflow-hidden z-[60] flex flex-col bg-surface">
             {/* Header */}
             <div className="flex items-center justify-between px-4 py-3 border-b border-border">
               <span className="text-sm font-semibold text-text-primary">Notifications</span>
@@ -142,7 +141,7 @@ export default function NotificationBell() {
             {/* List */}
             <div className="overflow-y-auto flex-1">
               {notifications.length === 0 ? (
-                <div className="text-center py-8 text-sm" style={{ color: '#8b8f9a' }}>No notifications yet</div>
+                <div className="text-center py-8 text-sm text-muted">No notifications yet</div>
               ) : (
                 notifications.map(n => {
                   const cfg = TYPE_CONFIG[n.type] || { icon: Bell, color: 'text-muted' };
