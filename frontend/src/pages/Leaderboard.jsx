@@ -131,7 +131,14 @@ export default function Leaderboard() {
           setWeekData(null);
           const arr = Array.isArray(result) ? result : [];
           setData(arr);
-          setEmptyMessage(arr.length === 0 ? 'The leaderboard is being updated. Predictions are being scored.' : null);
+          if (arr.length === 0) {
+            const hasFilter = sector !== 'All' || direction !== 'All' || timeframe !== 'all';
+            setEmptyMessage(hasFilter
+              ? 'No forecasters have enough scored predictions with these filters yet. Try broadening your selection.'
+              : 'The leaderboard is loading. Predictions are being scored.');
+          } else {
+            setEmptyMessage(null);
+          }
         }
       })
       .catch(() => {
@@ -223,9 +230,9 @@ export default function Leaderboard() {
                 <div className="flex gap-1 shrink-0">
                   {[
                     { key: 'all', label: 'All Time', tip: 'All prediction timeframes' },
-                    { key: 'short', label: 'Short Term', tip: 'Predictions under 30 days' },
-                    { key: 'medium', label: 'Mid Term', tip: 'Predictions between 30 and 180 days' },
-                    { key: 'long', label: 'Long Term', tip: 'Predictions over 180 days' },
+                    { key: 'short', label: 'Short Term', tip: 'Predictions 90 days or less' },
+                    { key: 'medium', label: 'Mid Term', tip: 'Predictions between 91 and 365 days' },
+                    { key: 'long', label: 'Long Term', tip: 'Predictions over 1 year' },
                   ].map(tf => (
                     <button key={tf.key} onClick={() => setTimeframe(tf.key)} title={tf.tip}
                       className={`px-2.5 py-1 rounded text-[11px] font-semibold transition-colors ${

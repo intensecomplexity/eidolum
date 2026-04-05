@@ -412,11 +412,11 @@ def _build_filtered_leaderboard(db: Session, sector=None, call_type=None, sort="
         where_clauses.append("p.direction = :direction")
         params["direction"] = direction
     if timeframe == "short":
-        where_clauses.append("p.window_days < 30")
+        where_clauses.append("p.window_days <= 90")
     elif timeframe == "medium":
-        where_clauses.append("p.window_days >= 30 AND p.window_days <= 180")
+        where_clauses.append("p.window_days > 90 AND p.window_days <= 365")
     elif timeframe == "long":
-        where_clauses.append("p.window_days > 180")
+        where_clauses.append("p.window_days > 365")
 
     where_sql = " AND ".join(where_clauses)
     params["min_preds"] = min_predictions
