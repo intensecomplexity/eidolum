@@ -1,58 +1,62 @@
+import EidolumLogo from './EidolumLogo';
+
 /**
- * The Breathing Seal — Eidolum loading indicator.
- * E mark inside a circle with 3 orbiting dots at different speeds.
- * The dots create an ever-changing, non-repeating pattern.
+ * The Breathing Seal — premium Eidolum loading indicator.
+ * Uses the real EidolumLogo SVG (same E mark as Vault Door splash and navbar).
+ * Gold circle ring + 3 orbiting dots + pulsing E. All CSS animations.
  *
- * Pure CSS animations — zero JS overhead.
- *
- * Props:
- *  - size: "sm" (24px) | "md" (40px) | "lg" (64px) | number
- *  - text: optional muted text below
+ * size="sm" (24px): just the E pulsing, no ring/dots
+ * size="md" (40px): E + ring + dots
+ * size="lg" (64px): E + ring + dots, primary between-page usage
  */
 const SIZES = { sm: 24, md: 40, lg: 64 };
 
 export default function LoadingSpinner({ size = 'md', text }) {
   const px = typeof size === 'number' ? size : (SIZES[size] || 40);
-  const showDots = px >= 32;
+  const showRing = px >= 36;
+  // E logo size: ~55% of container for proper padding inside the ring
+  const logoSize = Math.round(px * 0.5);
+  // Ring radius and orbit radius
+  const ringR = px / 2 - 2;
 
   return (
-    <div className="flex flex-col items-center gap-2">
-      <div className="relative" style={{ width: px, height: px }}>
-        {/* Static SVG: circle ring + E mark */}
-        <svg
-          width={px}
-          height={px}
-          viewBox="0 0 60 60"
-          fill="none"
-          xmlns="http://www.w3.org/2000/svg"
-          className="eidolum-breath"
-        >
-          {/* Circle ring */}
-          <circle cx="30" cy="30" r="27" stroke="#D4A843" strokeWidth="1" fill="none" />
+    <div className="flex flex-col items-center justify-center" style={{ gap: 16 }}>
+      <div className="relative flex items-center justify-center eidolum-breath" style={{ width: px, height: px }}>
+        {/* Circle ring */}
+        {showRing && (
+          <svg
+            className="absolute inset-0"
+            width={px} height={px}
+            viewBox={`0 0 ${px} ${px}`}
+            fill="none"
+          >
+            <circle
+              cx={px / 2} cy={px / 2} r={ringR}
+              stroke="#D4A843" strokeWidth="1.5" fill="none" opacity="0.3"
+            />
+          </svg>
+        )}
 
-          {/* E mark */}
-          <g transform="translate(20, 16) scale(0.6)">
-            <line x1="5" y1="6" x2="5" y2="42" stroke="#D4A843" strokeWidth="2.5" strokeLinecap="round" />
-            <line x1="5" y1="6" x2="26" y2="6" stroke="#D4A843" strokeWidth="2.5" strokeLinecap="round" />
-            <line x1="5" y1="24" x2="20" y2="24" stroke="#D4A843" strokeWidth="2.5" strokeLinecap="round" />
-            <line x1="5" y1="42" x2="26" y2="42" stroke="#D4A843" strokeWidth="2.5" strokeLinecap="round" />
-            <circle cx="29" cy="6" r="1.2" fill="#D4A843" />
-            <circle cx="23" cy="24" r="1.2" fill="#D4A843" />
-            <circle cx="29" cy="42" r="1.2" fill="#D4A843" />
-          </g>
-        </svg>
+        {/* The real E mark — centered */}
+        <EidolumLogo size={logoSize} />
 
-        {/* 3 orbiting dots — each wrapper rotates at a different speed */}
-        {showDots && (
+        {/* 3 orbiting dots — clean CSS rotation at different speeds */}
+        {showRing && (
           <>
-            <div className="seal-orbit" style={{ animationDuration: '3s' }}>
-              <div className="seal-dot" style={{ animationDuration: '3s' }} />
+            <div className="absolute inset-0" style={{ animation: 'sealOrbit 3s linear infinite' }}>
+              <svg width={px} height={px} viewBox={`0 0 ${px} ${px}`} className="absolute inset-0">
+                <circle cx={px / 2} cy={2} r="2.5" fill="#D4A843" opacity="0.7" />
+              </svg>
             </div>
-            <div className="seal-orbit" style={{ animationDuration: '5s' }}>
-              <div className="seal-dot" style={{ animationDuration: '5s' }} />
+            <div className="absolute inset-0" style={{ animation: 'sealOrbit 5s linear infinite', animationDelay: '-1.5s' }}>
+              <svg width={px} height={px} viewBox={`0 0 ${px} ${px}`} className="absolute inset-0">
+                <circle cx={px / 2} cy={2} r="2" fill="#D4A843" opacity="0.5" />
+              </svg>
             </div>
-            <div className="seal-orbit" style={{ animationDuration: '7s' }}>
-              <div className="seal-dot" style={{ animationDuration: '7s' }} />
+            <div className="absolute inset-0" style={{ animation: 'sealOrbit 7s linear infinite', animationDelay: '-3s' }}>
+              <svg width={px} height={px} viewBox={`0 0 ${px} ${px}`} className="absolute inset-0">
+                <circle cx={px / 2} cy={2} r="1.5" fill="#D4A843" opacity="0.35" />
+              </svg>
             </div>
           </>
         )}
