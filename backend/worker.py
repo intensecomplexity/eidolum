@@ -302,6 +302,71 @@ def main():
             log.error(f"[yfinance] {e}")
     sched.add_job(_standalone("yfinance", _yfinance), "interval", hours=6, id="yfinance", next_run_time=t0 + timedelta(minutes=60))
 
+    # AlphaVantage news sentiment — free tier (25 calls/day), every 8h
+    def _alphavantage():
+        try:
+            from jobs.rss_scrapers import scrape_alphavantage_news
+            db = BgSessionLocal()
+            try:
+                scrape_alphavantage_news(db)
+            finally:
+                db.close()
+        except Exception as e:
+            log.error(f"[alphavantage] {e}")
+    sched.add_job(_standalone("alphavantage", _alphavantage), "interval", hours=8, id="alphavantage", next_run_time=t0 + timedelta(minutes=65))
+
+    # Finnhub upgrades/downgrades — requires FINNHUB_KEY, every 8h
+    def _finnhub_upgrades():
+        try:
+            from jobs.upgrade_scrapers import scrape_finnhub_upgrades
+            db = BgSessionLocal()
+            try:
+                scrape_finnhub_upgrades(db)
+            finally:
+                db.close()
+        except Exception as e:
+            log.error(f"[finnhub_upgrades] {e}")
+    sched.add_job(_standalone("finnhub_upgrades", _finnhub_upgrades), "interval", hours=8, id="finnhub_upgrades", next_run_time=t0 + timedelta(minutes=70))
+
+    # FMP latest grades (upgrades RSS) — requires FMP_KEY, every 4h
+    def _fmp_upgrades():
+        try:
+            from jobs.upgrade_scrapers import scrape_fmp_upgrades
+            db = BgSessionLocal()
+            try:
+                scrape_fmp_upgrades(db)
+            finally:
+                db.close()
+        except Exception as e:
+            log.error(f"[fmp_upgrades] {e}")
+    sched.add_job(_standalone("fmp_upgrades", _fmp_upgrades), "interval", hours=4, id="fmp_upgrades", next_run_time=t0 + timedelta(minutes=54))
+
+    # FMP price target changes — requires FMP_KEY, every 4h
+    def _fmp_price_targets():
+        try:
+            from jobs.upgrade_scrapers import scrape_fmp_price_targets
+            db = BgSessionLocal()
+            try:
+                scrape_fmp_price_targets(db)
+            finally:
+                db.close()
+        except Exception as e:
+            log.error(f"[fmp_price_targets] {e}")
+    sched.add_job(_standalone("fmp_price_targets", _fmp_price_targets), "interval", hours=4, id="fmp_price_targets", next_run_time=t0 + timedelta(minutes=56))
+
+    # FMP daily grades (all upgrades/downgrades for today+yesterday) — requires FMP_KEY, every 6h
+    def _fmp_daily_grades():
+        try:
+            from jobs.upgrade_scrapers import scrape_fmp_daily_grades
+            db = BgSessionLocal()
+            try:
+                scrape_fmp_daily_grades(db)
+            finally:
+                db.close()
+        except Exception as e:
+            log.error(f"[fmp_daily_grades] {e}")
+    sched.add_job(_standalone("fmp_daily_grades", _fmp_daily_grades), "interval", hours=6, id="fmp_daily_grades", next_run_time=t0 + timedelta(minutes=62))
+
     # FMP ratings backfill — month-by-month from 2018, runs once then done
     _fmp_backfill_done = False
     def _fmp_ratings_backfill():
