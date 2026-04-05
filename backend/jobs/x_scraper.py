@@ -150,7 +150,7 @@ def _call_apify(search_terms: list, max_per_query: int = 150) -> list:
         }
         # Log exact payload so we can verify in Railway logs / Apify console
         import json as _json
-        print(f"[X-SCRAPER] Apify payload: {_json.dumps(payload)}")
+        print(f"[X-SCRAPER] Apify payload: {_json.dumps(payload)}", flush=True)
 
         r = httpx.post(
             f"{APIFY_API}/acts/{APIFY_ACTOR}/runs",
@@ -159,13 +159,13 @@ def _call_apify(search_terms: list, max_per_query: int = 150) -> list:
             timeout=30,
         )
         if r.status_code != 201:
-            print(f"[X-SCRAPER] Apify start failed: HTTP {r.status_code}")
+            print(f"[X-SCRAPER] Apify start failed: HTTP {r.status_code}", flush=True)
             return []
 
         run_id = r.json().get("data", {}).get("id")
         if not run_id:
             return []
-        print(f"[X-SCRAPER] Apify run {run_id} started, polling...")
+        print(f"[X-SCRAPER] Apify run {run_id} started, polling...", flush=True)
 
         dataset_id = None
         for _ in range(30):
@@ -177,11 +177,11 @@ def _call_apify(search_terms: list, max_per_query: int = 150) -> list:
                 dataset_id = data.get("defaultDatasetId")
                 break
             if status in ("FAILED", "ABORTED", "TIMED-OUT"):
-                print(f"[X-SCRAPER] Apify run {status}")
+                print(f"[X-SCRAPER] Apify run {status}", flush=True)
                 return []
 
         if not dataset_id:
-            print("[X-SCRAPER] Apify run timed out or no dataset")
+            print("[X-SCRAPER] Apify run timed out or no dataset", flush=True)
             return []
 
         dr = httpx.get(f"{APIFY_API}/datasets/{dataset_id}/items",
@@ -190,7 +190,7 @@ def _call_apify(search_terms: list, max_per_query: int = 150) -> list:
         return items if isinstance(items, list) else []
 
     except Exception as e:
-        print(f"[X-SCRAPER] Apify error: {e}")
+        print(f"[X-SCRAPER] Apify error: {e}", flush=True)
         return []
 
 
@@ -229,17 +229,18 @@ def _timeframe(text: str) -> int:
 
 def run_x_scraper(db=None):
     """Main entry point. Finds predictions on X/Twitter and inserts into database."""
+    print("[X-SCRAPER] run_x_scraper() called", flush=True)
     if not APIFY_API_TOKEN:
-        print("[X-SCRAPER] APIFY_API_TOKEN not set — skipping")
+        print("[X-SCRAPER] APIFY_API_TOKEN not set — skipping", flush=True)
         return
 
     batch_idx = _get_batch_index()
     batch = SEARCH_BATCHES[batch_idx]
     _save_batch_index(batch_idx)
-    print(f"[X-SCRAPER] Starting — batch {batch_idx + 1}/{len(SEARCH_BATCHES)}")
+    print(f"[X-SCRAPER] Starting — batch {batch_idx + 1}/{len(SEARCH_BATCHES)}", flush=True)
 
     tweets = _call_apify(batch, max_per_query=150)
-    print(f"[X-SCRAPER] Fetched {len(tweets)} tweets")
+    print(f"[X-SCRAPER] Fetched {len(tweets)} tweets", flush=True)
 
     # Log sample structure on first run
     if tweets:
@@ -385,10 +386,10 @@ def run_x_scraper(db=None):
 
     inserted = stats.get("inserted", 0)
     errors = stats.get("insert_errors", 0)
-    print(f"[X-SCRAPER] RUN COMPLETE (batch {batch_idx+1}/{len(SEARCH_BATCHES)}):")
+    print(f"[X-SCRAPER] RUN COMPLETE (batch {batch_idx+1}/{len(SEARCH_BATCHES)}):", flush=True)
     print(f"  Fetched: {stats['fetched']} → dedup: {stats['dedup']} → followers: {stats['followers']}")
     print(f"  → cashtag: {stats['cashtag']} → spam: {stats['spam']} → past: {stats['past']}")
     print(f"  → forward: {stats['forward']} → question: {stats['question']} → news: {stats['news']}")
     print(f"  Qualifying: {stats['qualifying']} ({stats['bullish']} bull, {stats['bearish']} bear)")
     print(f"  INSERTED: {inserted} | Errors: {errors} | Unique tickers: {len(unique_tickers)} | With PT: {stats['with_target']}")
-    print(f"  Est. cost: ${stats['fetched'] * 0.40 / 1000:.2f}")
+    print(f"  Est. cost: ${stats['fetched'] * 0.40 / 1000:.2f}", flush=True)

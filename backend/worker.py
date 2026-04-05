@@ -176,6 +176,7 @@ def main():
     log.info(f"[Worker] MASSIVE_API_KEY: {bool(os.getenv('MASSIVE_API_KEY', '').strip())}")
     log.info(f"[Worker] FMP_KEY: {bool(os.getenv('FMP_KEY', '').strip())}")
     log.info(f"[Worker] TIINGO_API_KEY: {bool(os.getenv('TIINGO_API_KEY', '').strip())}")
+    log.info(f"[Worker] APIFY_API_TOKEN: {bool(os.getenv('APIFY_API_TOKEN', '').strip())}")
     log.info("=" * 60)
 
     # Health server
@@ -224,16 +225,18 @@ def main():
 
     # X/Twitter scraper — Apify-powered, every 8h, inserts predictions
     def _x_scraper():
+        log.info("[X-SCRAPER] Scheduler fired _x_scraper job")
         try:
             from jobs.x_scraper import run_x_scraper
+            log.info("[X-SCRAPER] Import OK, creating DB session")
             db = BgSessionLocal()
             try:
                 run_x_scraper(db)
             finally:
                 db.close()
         except Exception as e:
-            log.error(f"[x_scraper] {e}")
-    sched.add_job(_standalone("x_scraper", _x_scraper), "interval", hours=8, id="x_scraper", next_run_time=t0 + timedelta(minutes=100))
+            log.error(f"[X-SCRAPER] Job failed: {e}", exc_info=True)
+    sched.add_job(_standalone("x_scraper", _x_scraper), "interval", hours=8, id="x_scraper", next_run_time=t0 + timedelta(minutes=2))
 
     # Logo processor — process new ticker logos (runs 5 min after start, then daily)
     def _process_logos():
