@@ -510,11 +510,7 @@ function WeekView({ weekData, data }) {
                       <Link to={f.source === 'player' ? `/profile/${f.handle}` : `/forecaster/${f.id}`} className="font-medium text-sm hover:text-accent transition-colors">
                         {f.name}
                       </Link>
-                      {f.source === 'player' ? (
-                        <span className="ml-1.5 text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-accent/10 text-accent">Player</span>
-                      ) : (
-                        <span className="ml-1.5 text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-warning/10 text-warning">Analyst</span>
-                      )}
+                      <PlatformBadge platform={f.platform || f.source || 'institutional'} showLabel />
                     </td>
                     <td className="px-5 py-3 text-right">
                       <span className={`font-mono font-semibold ${f.accuracy_rate >= 60 ? 'text-positive' : 'text-negative'}`}>
@@ -545,11 +541,7 @@ function WeekView({ weekData, data }) {
                 className="card py-3 flex items-center justify-between hover:border-accent/20 transition-colors">
                 <div>
                   <span className="text-sm font-medium">{f.name}</span>
-                  {f.source === 'player' ? (
-                    <span className="ml-1 text-[10px] font-semibold px-1 py-0.5 rounded-full bg-accent/10 text-accent">Player</span>
-                  ) : (
-                    <span className="ml-1 text-[10px] font-semibold px-1 py-0.5 rounded-full bg-warning/10 text-warning">Analyst</span>
-                  )}
+                  <PlatformBadge platform={f.platform || f.source || 'institutional'} showLabel />
                   <span className="text-muted text-xs ml-1.5 font-mono">({(f.alltime_accuracy || 0).toFixed(0)}% acc)</span>
                 </div>
                 <span className="font-mono text-accent text-sm font-semibold">{f.new_predictions} new</span>

@@ -7,10 +7,10 @@ const PLATFORM_CONFIG = {
   x:             { Icon: FaXTwitter, iconColor: '#ffffff', label: 'X', bg: '#000000', text: '#ffffff' },
   reddit:        { Icon: FaReddit, iconColor: '#FF4500', label: 'Reddit', bg: '#FF4500', text: '#ffffff' },
   congress:      { Icon: null, label: 'Gov', bg: '#3b82f6', text: '#ffffff' },
-  institutional: { Icon: null, label: 'Wall St', bg: '#D4A843', text: '#0d0f13' },
+  institutional: { Icon: null, label: 'Wall St', bg: '#3b82f6', text: '#ffffff' },
   player:        { Icon: null, label: 'Community', bg: '#34d399', text: '#0d0f13' },
   user:          { Icon: null, label: 'Community', bg: '#34d399', text: '#0d0f13' },
-  article:       { Icon: null, label: 'Wall St', bg: '#D4A843', text: '#0d0f13' },
+  article:       { Icon: null, label: 'Wall St', bg: '#3b82f6', text: '#ffffff' },
 };
 
 export default function PlatformBadge({ platform, size = 16, showLabel = false }) {
