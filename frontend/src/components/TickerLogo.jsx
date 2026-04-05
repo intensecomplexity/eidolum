@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react';
 
 // Logos that are WHITE on transparent — invert them on LIGHT mode
-const INVERT_ON_LIGHT = new Set([]);
+const INVERT_ON_LIGHT = new Set([
+  'UBER', 'RH', 'ALL', 'BLK', 'OSK', 'ABBV', 'STT', 'ROKU',
+]);
 
 // Logos that are BLACK/DARK on transparent — invert them on DARK mode
 const INVERT_ON_DARK = new Set([
