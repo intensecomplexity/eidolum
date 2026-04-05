@@ -263,11 +263,97 @@ def main():
             log.error(f"[desc_backfill_polygon] {e}", exc_info=True)
     sched.add_job(_standalone("desc_backfill_polygon", _desc_backfill_polygon), "interval", hours=24, id="desc_backfill_polygon", next_run_time=t0 + timedelta(minutes=15))
 
+    # Benzinga RSS — free, no API key, every 4h
+    def _benzinga_rss():
+        try:
+            from jobs.rss_scrapers import scrape_benzinga_rss
+            db = BgSessionLocal()
+            try:
+                scrape_benzinga_rss(db)
+            finally:
+                db.close()
+        except Exception as e:
+            log.error(f"[benzinga_rss] {e}")
+    sched.add_job(_standalone("benzinga_rss", _benzinga_rss), "interval", hours=4, id="benzinga_rss", next_run_time=t0 + timedelta(minutes=50))
+
+    # MarketBeat RSS — free, no API key, every 4h
+    def _marketbeat_rss():
+        try:
+            from jobs.rss_scrapers import scrape_marketbeat_rss
+            db = BgSessionLocal()
+            try:
+                scrape_marketbeat_rss(db)
+            finally:
+                db.close()
+        except Exception as e:
+            log.error(f"[marketbeat_rss] {e}")
+    sched.add_job(_standalone("marketbeat_rss", _marketbeat_rss), "interval", hours=4, id="marketbeat_rss", next_run_time=t0 + timedelta(minutes=52))
+
+    # yfinance recommendations — free, every 6h
+    def _yfinance():
+        try:
+            from jobs.rss_scrapers import scrape_yfinance_recommendations
+            db = BgSessionLocal()
+            try:
+                scrape_yfinance_recommendations(db)
+            finally:
+                db.close()
+        except Exception as e:
+            log.error(f"[yfinance] {e}")
+    sched.add_job(_standalone("yfinance", _yfinance), "interval", hours=6, id="yfinance", next_run_time=t0 + timedelta(minutes=60))
+
+    # FMP ratings backfill — month-by-month from 2018, runs once then done
+    _fmp_backfill_done = False
+    def _fmp_ratings_backfill():
+        nonlocal _fmp_backfill_done
+        if _fmp_backfill_done:
+            return
+        try:
+            from jobs.fmp_scraper import backfill_fmp_ratings
+            db = BgSessionLocal()
+            try:
+                result = backfill_fmp_ratings(db)
+                log.info(f"[fmp_backfill] {result}")
+                _fmp_backfill_done = True
+            finally:
+                db.close()
+        except Exception as e:
+            log.error(f"[fmp_backfill] {e}")
+    sched.add_job(_standalone("fmp_ratings_backfill", _fmp_ratings_backfill), "interval", hours=24, id="fmp_ratings_backfill", next_run_time=t0 + timedelta(minutes=8))
+
+    # FMP grades full backfill — 5000 tickers with full history, runs once
+    _fmp_grades_backfill_done = False
+    def _fmp_grades_backfill():
+        nonlocal _fmp_grades_backfill_done
+        if _fmp_grades_backfill_done:
+            return
+        try:
+            from jobs.upgrade_scrapers import backfill_fmp_grades
+            db = BgSessionLocal()
+            try:
+                backfill_fmp_grades(db)
+                _fmp_grades_backfill_done = True
+                log.info("[fmp_grades_backfill] Complete")
+            finally:
+                db.close()
+        except Exception as e:
+            log.error(f"[fmp_grades_backfill] {e}")
+    sched.add_job(_standalone("fmp_grades_backfill", _fmp_grades_backfill), "interval", hours=24, id="fmp_grades_backfill", next_run_time=t0 + timedelta(minutes=12))
+
     # Cron jobs
     sched.add_job(_watchlist_queue, "interval", hours=4, id="watchlist_queue", next_run_time=t0 + timedelta(minutes=35))
     sched.add_job(_watchlist_digest, "cron", day_of_week="mon-fri", hour=13, minute=0, id="watchlist_digest")
     sched.add_job(_weekly_digest, "cron", day_of_week="mon", hour=13, minute=0, id="site_weekly_digest")
     sched.add_job(_watchdog, "interval", minutes=5, id="watchdog")
+
+    # Benzinga historical backfill — runs as daemon thread (forward + reverse)
+    # This is the biggest volume lever: 2020→today (forward) then 2019→2011 (reverse)
+    try:
+        from jobs.benzinga_backfill import auto_resume_backfill
+        log.info("[Worker] Starting Benzinga historical backfill daemon")
+        auto_resume_backfill()  # spawns its own daemon thread internally
+    except Exception as e:
+        log.error(f"[Worker] Benzinga backfill failed to start: {e}")
 
     for j in sched.get_jobs():
         log.info(f"[Worker] {j.id} → next={getattr(j, 'next_run_time', 'pending')}")

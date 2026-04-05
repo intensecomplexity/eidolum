@@ -1,9 +1,9 @@
 """
-Benzinga historical backfill: forward only.
+Benzinga historical backfill: forward + reverse.
 
 Forward backfill: 2020-01-01 -> today, day by day, chronologically.
+Reverse backfill: 2019-12-31 -> backwards until API data runs out.
 Progress stored in Config table so it survives restarts.
-Processes 30 days per batch, sleeps 10 seconds between batches.
 
 Connection-safe: opens/closes DB per day, never holds connections during API calls.
 """
@@ -173,12 +173,12 @@ def _run_forward() -> bool:
         _backfill_status["current_date"] = str(current)
 
         current += timedelta(days=1)
-        time.sleep(0.2)
+        time.sleep(0.1)
 
         if batch_days >= 90:
             _refresh_stats_if_needed()
-            print(f"[Forward] Batch done. {days_done}/{total_days} days, {total_inserted} inserted. Pausing 5s.")
-            time.sleep(5)
+            print(f"[Forward] Batch done. {days_done}/{total_days} days, {total_inserted} inserted. Pausing 2s.")
+            time.sleep(2)
             batch_days = 0
 
     # Mark forward complete
@@ -264,12 +264,12 @@ def _run_reverse() -> bool:
             break
 
         current -= timedelta(days=1)
-        time.sleep(0.2)
+        time.sleep(0.1)
 
         if batch_days >= 90:
             _refresh_stats_if_needed()
-            print(f"[Reverse] Batch done. {days_done} days, {total_inserted} inserted. At {current}. Pausing 5s.")
-            time.sleep(5)
+            print(f"[Reverse] Batch done. {days_done} days, {total_inserted} inserted. At {current}. Pausing 2s.")
+            time.sleep(2)
             batch_days = 0
 
     db = BgSessionLocal()
