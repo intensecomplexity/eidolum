@@ -782,16 +782,31 @@ def get_homepage_data(request: Request, db: Session = Depends(get_db)):
     # Stats
     stats = get_homepage_stats(request, db)
 
-    # Top 5 leaderboard (reuse the main leaderboard function with defaults)
+    # Top 5 leaderboard — direct SQL (get_leaderboard needs Query params that don't resolve internally)
     top5 = []
     try:
-        all_lb = get_leaderboard(request, db)
-        if isinstance(all_lb, list):
-            top5 = all_lb[:5]
-        elif isinstance(all_lb, dict) and "data" in all_lb:
-            top5 = all_lb["data"][:5]
-    except Exception:
-        pass
+        lb_rows = db.execute(sql_text("""
+            SELECT f.id, f.name, f.handle, f.platform, f.firm,
+                   f.accuracy_score, f.total_predictions, f.correct_predictions,
+                   COALESCE(f.avg_return, 0) as avg_return
+            FROM forecasters f
+            WHERE COALESCE(f.total_predictions, 0) >= 10
+              AND COALESCE(f.accuracy_score, 0) > 0
+            ORDER BY f.accuracy_score DESC, f.total_predictions DESC
+            LIMIT 5
+        """)).fetchall()
+        for i, r in enumerate(lb_rows):
+            top5.append({
+                "id": r[0], "name": r[1], "handle": r[2],
+                "platform": r[3] or "youtube", "firm": r[4],
+                "accuracy_rate": float(r[5] or 0),
+                "total_predictions": r[6] or 0,
+                "correct_predictions": r[7] or 0,
+                "avg_return": round(float(r[8] or 0), 2),
+                "rank": i + 1,
+            })
+    except Exception as e:
+        print(f"[HomepageData] Top 5 error: {e}")
 
     # Biggest Calls: recently scored predictions with highest absolute return
     biggest_calls = []
@@ -871,9 +886,8 @@ def get_homepage_data(request: Request, db: Session = Depends(get_db)):
             LEFT JOIN ticker_sectors ts ON ts.ticker = p.ticker
             WHERE p.outcome IN ('hit', 'correct')
               AND p.actual_return IS NOT NULL
-              AND p.actual_return > 5
-              AND f.firm IS NOT NULL
-              AND f.firm != ''
+              AND p.actual_return > 3
+              AND f.total_predictions >= 5
             ORDER BY p.actual_return DESC
             LIMIT 1
         """)).first()
