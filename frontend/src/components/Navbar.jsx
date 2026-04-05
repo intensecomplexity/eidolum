@@ -259,17 +259,9 @@ export default function Navbar() {
                   onClose={() => setMobileOpen(false)}
                 />
               </div>
-              <MobileLink to="/leaderboard">Leaderboard</MobileLink>
               <MobileLink to="/consensus">Consensus</MobileLink>
               <MobileLink to="/smart-money">Top Calls</MobileLink>
-              <MobileLink to="/activity">Activity</MobileLink>
               <MobileLink to="/discover">Discover</MobileLink>
-              {isAuthenticated && (
-                <MobileLink to="/submit" accent><Crosshair className="w-4 h-4 inline mr-1" />Submit Call</MobileLink>
-              )}
-              {!isAuthenticated && (
-                <MobileLink to="/login" accent>Log In / Sign Up</MobileLink>
-              )}
               <button onClick={() => { setMobileOpen(false); setShowHelp(true); }}
                 className="flex items-center gap-2 px-3 py-3 rounded-lg text-text-secondary min-h-[44px] w-full text-left">
                 <HelpCircle className="w-4 h-4" /> How it works
