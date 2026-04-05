@@ -1897,15 +1897,21 @@ async def lifespan(app):
         except Exception as e:
             print(f"[Startup] Company name backfill error: {e}")
 
-        # Description backfill — SKIP if no_data backlog exists (saves FMP budget)
+        # Description backfill — try FMP first (50 tickers), then Polygon (50 more, free)
         if _no_data_count < 1000:
             try:
                 from jobs.sector_lookup import backfill_descriptions
                 backfill_descriptions()
             except Exception as e:
-                print(f"[Startup] Description backfill error: {e}")
+                print(f"[Startup] FMP description backfill error: {e}")
         else:
-            print(f"[Startup] Skipping description backfill — {_no_data_count:,} no_data predictions need FMP budget")
+            print(f"[Startup] Skipping FMP description backfill — {_no_data_count:,} no_data predictions need FMP budget")
+        # Polygon fallback: free, unlimited, 5 calls/min — fills gaps FMP missed
+        try:
+            from jobs.sector_lookup import backfill_descriptions_polygon
+            backfill_descriptions_polygon()
+        except Exception as e:
+            print(f"[Startup] Polygon description backfill error: {e}")
 
         # URL quality classification (batched, idempotent)
         try:

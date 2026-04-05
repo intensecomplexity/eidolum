@@ -273,18 +273,37 @@ def _first_sentence(text: str, max_len: int = 250) -> str:
     return text.strip()
 
 
-def _first_two_sentences(text: str, max_len: int = 280) -> str:
-    """Extract the first two sentences for a meaningful description."""
+def _clean_description(text: str, max_len: int = 150) -> str:
+    """Extract clean first sentence, strip SEC jargon, cap at max_len."""
     if not text:
         return ""
     import re
-    sentences = re.split(r'(?<=\.)\s+', text.strip())
-    result = ""
-    for s in sentences[:2]:
-        if len(result) + len(s) + 1 > max_len:
-            break
-        result = (result + " " + s).strip()
-    return result or text[:max_len].strip()
+    # Strip common SEC boilerplate
+    text = text.strip()
+    for junk in [
+        ", together with its subsidiaries,", " together with its subsidiaries,",
+        ", and its subsidiaries,", " and its subsidiaries,",
+        ", through its subsidiaries,", " through its subsidiaries,",
+        ", through its subsidiary,",
+    ]:
+        text = text.replace(junk, "")
+
+    # Take first sentence
+    sentences = re.split(r'(?<=\.)\s+', text)
+    first = sentences[0] if sentences else text
+    # If first sentence is very short (<30 chars), include second
+    if len(first) < 30 and len(sentences) > 1:
+        first = first + " " + sentences[1]
+    # Cap at max_len on a word boundary
+    if len(first) > max_len:
+        truncated = first[:max_len].rsplit(' ', 1)[0]
+        first = truncated.rstrip('.,;: ')
+    return first.strip()
+
+
+def _first_two_sentences(text: str, max_len: int = 280) -> str:
+    """Extract the first two sentences for a meaningful description."""
+    return _clean_description(text, max_len)
 
 
 def _extract_domain(url: str) -> str:
@@ -413,6 +432,75 @@ def backfill_descriptions():
         time.sleep(0.5)
 
     print(f"[DescBackfill-FMP] Done: {updated} updated, {errors} errors, {len(tickers)} total")
+
+
+# ── POLYGON: Free unlimited descriptions (5 calls/min rate limit) ─────────────
+
+def backfill_descriptions_polygon():
+    """Backfill descriptions using Polygon.io (free via MASSIVE_API_KEY or dedicated POLYGON_KEY).
+    5 calls/min rate limit → 12s between calls. 50 tickers per run (~10 min)."""
+    import httpx
+    from database import BgSessionLocal as SessionLocal
+
+    poly_key = os.getenv("POLYGON_KEY", "") or os.getenv("MASSIVE_API_KEY", "")
+    if not poly_key:
+        print("[DescBackfill-Polygon] No POLYGON_KEY or MASSIVE_API_KEY set")
+        return
+
+    tickers = _get_tickers_needing_data(50)
+    if not tickers:
+        print("[DescBackfill-Polygon] All tickers have descriptions")
+        return
+
+    updated = 0
+    errors = 0
+    print(f"[DescBackfill-Polygon] Starting: {len(tickers)} tickers")
+
+    for i, ticker in enumerate(tickers):
+        try:
+            r = httpx.get(
+                f"https://api.polygon.io/v3/reference/tickers/{ticker}",
+                params={"apiKey": poly_key},
+                timeout=10,
+            )
+            if r.status_code != 200:
+                errors += 1
+                time.sleep(12)
+                continue
+
+            data = r.json().get("results", {})
+            if not data:
+                time.sleep(12)
+                continue
+
+            description_raw = data.get("description") or ""
+            description = _clean_description(description_raw, 150)
+            company_name = data.get("name") or ""
+            homepage = data.get("homepage_url") or ""
+            logo_domain = _extract_domain(homepage)
+            sic_desc = data.get("sic_description") or ""
+            sector = _normalize_sector(sic_desc) if sic_desc else KNOWN_SECTORS.get(ticker, "Other")
+
+            if description or company_name:
+                db = SessionLocal()
+                try:
+                    _cache_to_db(ticker, sector, db,
+                                 company_name=company_name,
+                                 description=description,
+                                 logo_domain=logo_domain)
+                    updated += 1
+                    if updated <= 3 or updated % 10 == 0:
+                        print(f"[DescBackfill-Polygon] {ticker}: {description[:60]}...")
+                finally:
+                    db.close()
+        except Exception as e:
+            errors += 1
+            if i < 3:
+                print(f"[DescBackfill-Polygon] {ticker}: {e}")
+
+        time.sleep(12)  # 5 calls/min rate limit
+
+    print(f"[DescBackfill-Polygon] Done: {updated} updated, {errors} errors")
 
 
 # ── FALLBACK: yfinance version (slower, no API key needed) ──────────────────
