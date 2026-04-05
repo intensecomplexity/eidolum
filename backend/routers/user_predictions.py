@@ -163,8 +163,44 @@ def get_prediction_templates(request: Request):
 
 @router.get("/tickers/search")
 @limiter.limit("60/minute")
-def search_tickers_endpoint(request: Request, q: str = Query("")):
-    return _search_tickers(q)
+def search_tickers_endpoint(request: Request, q: str = Query(""), db: Session = Depends(get_db)):
+    """Search tickers — checks hardcoded list + ticker_sectors table + predictions table."""
+    results = _search_tickers(q)
+    if not q.strip():
+        return results
+
+    # Also search the database for tickers not in the hardcoded list
+    found_tickers = {r["ticker"] for r in results}
+    query_upper = q.strip().upper()
+    query_lower = q.strip().lower()
+
+    try:
+        from sqlalchemy import text as sql_text
+        db_rows = db.execute(sql_text("""
+            SELECT DISTINCT p.ticker, ts.company_name, COUNT(*) as cnt
+            FROM predictions p
+            LEFT JOIN ticker_sectors ts ON ts.ticker = p.ticker
+            WHERE (UPPER(p.ticker) = :exact
+                   OR UPPER(p.ticker) LIKE :prefix
+                   OR LOWER(ts.company_name) LIKE :name_pat)
+            GROUP BY p.ticker, ts.company_name
+            ORDER BY CASE WHEN UPPER(p.ticker) = :exact THEN 0 ELSE 1 END, cnt DESC
+            LIMIT 10
+        """), {"exact": query_upper, "prefix": query_upper + "%", "name_pat": "%" + query_lower + "%"}).fetchall()
+
+        for r in db_rows:
+            if r[0] not in found_tickers:
+                results.append({
+                    "ticker": r[0],
+                    "name": r[1] or r[0],
+                    "match_type": "database",
+                    "prediction_count": r[2],
+                })
+                found_tickers.add(r[0])
+    except Exception:
+        pass
+
+    return results[:15]
 
 
 # ── POST /api/user-predictions/submit ─────────────────────────────────────────

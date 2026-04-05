@@ -121,7 +121,7 @@ export default function UniversalSearch({
       </div>
 
       {open && results && (hasTickers || hasUsers) && (
-        <div className="absolute z-[60] w-full sm:w-80 mt-1 bg-surface/95 backdrop-blur-md border border-border rounded-lg shadow-lg overflow-hidden max-h-[70vh] overflow-y-auto">
+        <div className="absolute z-[60] w-full sm:w-80 mt-1 bg-surface border border-border rounded-lg shadow-lg overflow-hidden max-h-[70vh] overflow-y-auto">
           {/* Tickers */}
           {hasTickers && (
             <div>

@@ -257,16 +257,20 @@ def backfill_company_names():
     print(f"[CompanyBackfill] Processed {len(tickers)} tickers, updated {updated} company names")
 
 
-def _first_sentence(text: str, max_len: int = 150) -> str:
-    """Extract the first sentence, capped at max_len characters."""
+def _first_sentence(text: str, max_len: int = 250) -> str:
+    """Extract the first complete sentence. No trailing '...' or mid-word cuts."""
     if not text:
         return ""
-    for end in (".", ".\n"):
+    # Find first sentence ending with period
+    for end in (". ", ".\n", ".,"):
         idx = text.find(end)
-        if idx > 0 and idx < 200:
-            sentence = text[:idx + 1].strip()
-            return sentence[:max_len]
-    return text[:max_len].strip()
+        if 10 < idx < max_len:
+            return text[:idx + 1].strip()
+    # No sentence found — cut at last word boundary before max_len
+    if len(text) > max_len:
+        cut = text[:max_len].rfind(" ")
+        return text[:cut].rstrip(",.;:") + "." if cut > 50 else text[:max_len].rstrip(",.;:")
+    return text.strip()
 
 
 def _first_two_sentences(text: str, max_len: int = 280) -> str:
