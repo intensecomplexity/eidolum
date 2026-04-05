@@ -178,20 +178,22 @@ export default function LandingPublic() {
       </section>
 
       {/* -- COUNTER BANNER -- */}
-      <section className="border-y border-border py-10 sm:py-14">
+      <section style={{ borderTop: '1px solid #1e2028', borderBottom: '1px solid #1e2028' }} className="py-10 sm:py-14">
         <div className="max-w-4xl mx-auto px-4 sm:px-6">
-          <div className="grid grid-cols-3 gap-4 text-center">
-            <div>
-              <div className="font-mono text-xl sm:text-3xl font-bold text-accent">274,000+</div>
-              <div className="text-xs sm:text-sm text-muted mt-1">Predictions Tracked</div>
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-8 sm:gap-0 text-center">
+            <div className="flex-1">
+              <div className="font-mono text-[28px] sm:text-[32px] font-bold" style={{ color: '#D4A843' }}>274,000+</div>
+              <div className="text-[13px] mt-1" style={{ color: '#9ca3af' }}>Predictions Tracked</div>
             </div>
-            <div>
-              <div className="font-mono text-xl sm:text-3xl font-bold text-accent">6,000+</div>
-              <div className="text-xs sm:text-sm text-muted mt-1">Analysts</div>
+            <div className="hidden sm:block w-px h-10 self-center" style={{ backgroundColor: '#1e2028' }} />
+            <div className="flex-1">
+              <div className="font-mono text-[28px] sm:text-[32px] font-bold" style={{ color: '#D4A843' }}>6,000+</div>
+              <div className="text-[13px] mt-1" style={{ color: '#9ca3af' }}>Analysts Monitored</div>
             </div>
-            <div>
-              <div className="font-mono text-xl sm:text-3xl font-bold text-accent">31,000+</div>
-              <div className="text-xs sm:text-sm text-muted mt-1">Scored</div>
+            <div className="hidden sm:block w-px h-10 self-center" style={{ backgroundColor: '#1e2028' }} />
+            <div className="flex-1">
+              <div className="font-mono text-[28px] sm:text-[32px] font-bold" style={{ color: '#D4A843' }}>31,000+</div>
+              <div className="text-[13px] mt-1" style={{ color: '#9ca3af' }}>Predictions Scored</div>
             </div>
           </div>
         </div>
