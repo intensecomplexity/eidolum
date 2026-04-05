@@ -104,13 +104,18 @@ export default function StockChart({ ticker }) {
     dotsByDate[d.date].push(d);
   }
 
-  // For rendering: deduplicate dots per date, show cluster count
+  // For rendering: deduplicate dots per date, determine cluster color
   const uniqueDots = [];
   const seenDates = new Set();
   for (const d of dots) {
     if (!seenDates.has(d.date)) {
       seenDates.add(d.date);
-      uniqueDots.push({ ...d, count: dotsByDate[d.date].length });
+      const group = dotsByDate[d.date];
+      const outcomes = new Set(group.map(p => p.outcome || 'pending'));
+      // Mixed outcomes → gold; uniform → use that outcome's color
+      const isMixed = outcomes.size > 1;
+      const dotColor = isMixed ? '#D4A843' : (OUTCOME_COLORS[group[0].outcome] || OUTCOME_COLORS.pending);
+      uniqueDots.push({ ...d, count: group.length, color: dotColor, isMixed });
     }
   }
 
@@ -170,6 +175,12 @@ export default function StockChart({ ticker }) {
             <feComposite in2="blur" operator="in" />
             <feMerge><feMergeNode /><feMergeNode in="SourceGraphic" /></feMerge>
           </filter>
+          <filter id="glowMixed" x="-50%" y="-50%" width="200%" height="200%">
+            <feGaussianBlur stdDeviation="2" result="blur" />
+            <feFlood floodColor="#D4A843" floodOpacity="0.4" />
+            <feComposite in2="blur" operator="in" />
+            <feMerge><feMergeNode /><feMergeNode in="SourceGraphic" /></feMerge>
+          </filter>
         </defs>
       </svg>
 
@@ -212,16 +223,18 @@ export default function StockChart({ ticker }) {
               activeDot={{ r: 3, fill: '#D4A843', stroke: isDark ? '#0a0a0a' : '#ffffff', strokeWidth: 1.5 }}
             />
             {uniqueDots.map((d, i) => {
-              const isPending = d.outcome === 'pending' || !d.outcome;
+              const isPending = !d.isMixed && (d.outcome === 'pending' || !d.outcome);
               const r = isPending ? pendingR : dotR;
-              const glowId = (d.outcome === 'hit' || d.outcome === 'correct') ? 'url(#glowHit)'
+              const glowId = d.isMixed ? 'url(#glowMixed)'
+                : (d.outcome === 'hit' || d.outcome === 'correct') ? 'url(#glowHit)'
                 : (d.outcome === 'miss' || d.outcome === 'incorrect') ? 'url(#glowMiss)'
                 : d.outcome === 'near' ? 'url(#glowNear)' : undefined;
               return (
-                <ReferenceDot key={i} x={d.date} y={d.close} r={r} fill={d.color}
+                <ReferenceDot key={i} x={d.date} y={d.close} r={d.count > 1 ? r + 1 : r} fill={d.color}
                   stroke={borderStroke} strokeWidth={isMobile ? 1 : 2} isFront
                   style={{ cursor: 'pointer', filter: !isPending && !isMobile ? glowId : undefined }}
-                  onClick={(e) => { e?.stopPropagation?.(); handleDotClick(d); }} />
+                  onClick={(e) => { e?.stopPropagation?.(); handleDotClick(d); }}
+                  label={d.count > 1 ? { value: d.count, fill: '#fff', fontSize: 8, fontWeight: 700, position: 'center' } : undefined} />
               );
             })}
           </AreaChart>
@@ -234,20 +247,28 @@ export default function StockChart({ ticker }) {
         <div className="absolute left-3 right-3 sm:left-auto sm:right-4 sm:w-80 z-50 feed-item-enter"
           style={{ top: typeof window !== 'undefined' && window.innerWidth < 640 ? 'auto' : '90px', bottom: typeof window !== 'undefined' && window.innerWidth < 640 ? '10px' : 'auto' }}>
           <div className="bg-surface border border-border rounded-xl p-3.5 shadow-lg">
-            {/* Header with date and close button */}
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-[10px] text-muted font-mono">{selectedDot.date}</span>
+            {/* Header: count + date + close */}
+            <div className="flex items-center justify-between mb-2">
+              <div>
+                <span className="text-xs font-semibold text-text-primary">
+                  {selectedDot.predictions.length} prediction{selectedDot.predictions.length !== 1 ? 's' : ''}
+                </span>
+                <span className="text-[10px] text-muted font-mono ml-1.5">
+                  {new Date(selectedDot.date + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                </span>
+              </div>
               <button onClick={() => setSelectedDot(null)} className="text-muted hover:text-text-primary transition-colors p-0.5">
                 <XIcon className="w-3.5 h-3.5" />
               </button>
             </div>
-            <div className="space-y-3">
+            {/* Scrollable prediction list */}
+            <div className="space-y-2.5 overflow-y-auto" style={{ maxHeight: 260 }}>
               {selectedDot.predictions.map((p, i) => {
                 const outcomeColor = OUTCOME_COLORS[p.outcome] || OUTCOME_COLORS.pending;
                 const outcomeLabel = OUTCOME_LABELS[p.outcome] || 'Pending';
+                const evalDate = p.evaluation_date ? new Date(p.evaluation_date + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : null;
                 return (
-                  <div key={i} className="border-l-2 pl-3" style={{ borderColor: outcomeColor }}>
-                    {/* Forecaster + firm */}
+                  <div key={i} className={`border-l-2 pl-3 ${i > 0 ? 'pt-2.5 border-t border-border/50' : ''}`} style={{ borderLeftColor: outcomeColor }}>
                     <div className="flex items-center gap-1.5 flex-wrap">
                       {p.forecaster ? (
                         <Link to={`/forecaster/${p.forecaster_id || 0}`}
@@ -260,7 +281,6 @@ export default function StockChart({ ticker }) {
                       )}
                       {p.firm && <span className="text-[10px] text-muted">{p.firm}</span>}
                     </div>
-                    {/* Direction + Outcome badges */}
                     <div className="flex items-center gap-1.5 mt-1">
                       <span className={`text-[10px] font-bold uppercase px-1.5 py-0.5 rounded ${
                         p.direction === 'bullish' ? 'bg-positive/10 text-positive' :
@@ -275,16 +295,11 @@ export default function StockChart({ ticker }) {
                         {p.return_pct != null && <span className="ml-0.5 font-mono">({p.return_pct >= 0 ? '+' : ''}{p.return_pct}%)</span>}
                       </span>
                     </div>
-                    {/* Price details */}
                     <div className="flex items-center gap-3 mt-1 text-[10px] text-muted font-mono">
                       {p.price_at_prediction && <span>Entry ${p.price_at_prediction.toFixed(2)}</span>}
                       {p.target && <span>Target ${p.target.toFixed(0)}</span>}
-                      {p.evaluation_date && <span>Eval {p.evaluation_date.slice(5)}</span>}
+                      {evalDate && <span>Expires {evalDate}</span>}
                     </div>
-                    {/* Context */}
-                    {p.context && (
-                      <p className="text-[10px] text-muted mt-1 leading-snug">{p.context}</p>
-                    )}
                   </div>
                 );
               })}
