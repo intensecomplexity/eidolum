@@ -164,25 +164,19 @@ export default function Dashboard() {
               </div>
               {pending.length > 5 && <Link to="/my-calls" className="text-[10px] text-accent font-medium">See all {pending.length}</Link>}
             </div>
-            <div className="card p-0 overflow-hidden">
-              {pendingSorted.slice(0, 5).map((p, i) => (
-                <div key={p.id} className={`flex items-center justify-between px-4 py-2.5 ${i > 0 ? 'border-t border-border/50' : ''}`}>
-                  <div className="flex items-center gap-2">
-                    <TickerLink ticker={p.ticker} className="text-sm" />
-                    <span className={`text-[9px] font-bold uppercase px-1 py-0.5 rounded ${
-                      p.direction === 'bullish' ? 'text-positive bg-positive/10' :
-                      p.direction === 'neutral' ? 'text-yellow-400 bg-yellow-400/10' :
-                      'text-negative bg-negative/10'
-                    }`}>
-                      {p.direction === 'bullish' ? 'BULL' : p.direction === 'neutral' ? 'HOLD' : 'BEAR'}
-                    </span>
-                    {p.price_target > 0 && <span className="font-mono text-xs text-muted">${p.price_target}</span>}
+            <div className="space-y-1.5">
+              {pendingSorted.slice(0, 5).map(p => (
+                <div key={p.id} className="card py-3 flex items-center justify-between">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <TickerLink ticker={p.ticker} className="text-sm font-bold" />
+                    <PredictionBadge direction={p.direction} />
+                    {p.price_target > 0 && <span className="font-mono text-xs text-muted hidden sm:inline">Target ${p.price_target}</span>}
                   </div>
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-2 shrink-0">
                     {p.price_at_call && p._current && (
                       <LivePnL direction={p.direction} priceAtCall={parseFloat(p.price_at_call)} currentPrice={p._current} compact />
                     )}
-                    {p.expires_at && <Countdown expiresAt={p.expires_at} className="text-xs" />}
+                    {p.expires_at && <Countdown expiresAt={p.expires_at} className="text-[10px]" />}
                   </div>
                 </div>
               ))}
@@ -193,8 +187,8 @@ export default function Dashboard() {
         {/* ── SECTION 2: BIGGEST CALLS ─────────────────────────────────── */}
         {biggestCalls.length > 0 && (
           <div className="mb-6">
-            <h2 className="font-semibold text-base mb-3 flex items-center gap-1.5">
-              <Zap className="w-4 h-4 text-accent" /> Biggest Calls
+            <h2 className="font-semibold text-sm text-muted uppercase tracking-wider mb-3">
+              Biggest Calls
             </h2>
             <div className="space-y-2">
               {biggestCalls.map(p => (
@@ -226,7 +220,7 @@ export default function Dashboard() {
         {/* ── SECTION 3: TOP ANALYSTS RIGHT NOW ───────────────────────── */}
         {top5.length > 0 && (
           <div className="mb-6">
-            <h2 className="font-semibold text-base mb-3">Top Analysts Right Now</h2>
+            <h2 className="font-semibold text-sm text-muted uppercase tracking-wider mb-3">Top Analysts Right Now</h2>
             <div className="card overflow-hidden p-0 border-accent/10">
               <table className="w-full">
                 <thead>
@@ -291,7 +285,7 @@ export default function Dashboard() {
         {/* ── SECTION 4: MOST DIVIDED ──────────────────────────────────── */}
         {mostDivided.length > 0 && (
           <div className="mb-6">
-            <h2 className="font-semibold text-base mb-3">Most Divided</h2>
+            <h2 className="font-semibold text-sm text-muted uppercase tracking-wider mb-3">Most Divided</h2>
             <p className="text-xs text-muted mb-3">Analysts can't agree on these stocks</p>
             <div className="flex gap-3 overflow-x-auto pills-scroll pb-2">
               {mostDivided.map(t => (
@@ -319,7 +313,7 @@ export default function Dashboard() {
         {watchlistFeed.length > 0 && (
           <div className="mb-6">
             <div className="flex items-center justify-between mb-3">
-              <h2 className="font-semibold text-base">Your Watchlist</h2>
+              <h2 className="font-semibold text-sm text-muted uppercase tracking-wider">Your Watchlist</h2>
               <Link to="/watchlist" className="text-[10px] text-accent font-medium">Manage</Link>
             </div>
             <div className="space-y-2">
@@ -343,7 +337,7 @@ export default function Dashboard() {
         {/* ── SECTION 6: PREDICTIONS EXPIRING SOON ────────────────────── */}
         {expiring.length > 0 && (
           <div className="mb-6">
-            <h2 className="font-semibold text-base mb-1">Expiring Soon</h2>
+            <h2 className="font-semibold text-sm text-muted uppercase tracking-wider mb-1">Expiring Soon</h2>
             <p className="text-xs text-muted mb-3">These calls are about to be scored — check back for results.</p>
             <div className="space-y-2">
               {expiring.map(p => (
@@ -379,24 +373,22 @@ export default function Dashboard() {
         )}
 
         {/* ── SECTION 7: THE NUMBERS ──────────────────────────────────── */}
-        {homeStats && (
-          <div className="border-t border-border pt-8 pb-6 mb-4">
-            <div className="grid grid-cols-3 gap-6 text-center">
-              <div>
-                <div className="font-mono text-xl sm:text-2xl font-bold text-accent">{formatRoundNumber(homeStats.total_predictions)}</div>
-                <div className="text-[10px] text-muted mt-1">Predictions Tracked</div>
-              </div>
-              <div>
-                <div className="font-mono text-xl sm:text-2xl font-bold text-text-primary">{formatRoundNumber(homeStats.forecasters_tracked)}</div>
-                <div className="text-[10px] text-muted mt-1">Analysts Monitored</div>
-              </div>
-              <div>
-                <div className="font-mono text-xl sm:text-2xl font-bold text-positive">2+</div>
-                <div className="text-[10px] text-muted mt-1">Years of Data</div>
-              </div>
+        <div className="pt-6 pb-4">
+          <div className="grid grid-cols-3 gap-6 text-center">
+            <div>
+              <div className="font-mono text-xl sm:text-2xl font-bold text-accent">274,000+</div>
+              <div className="text-[10px] text-muted mt-1">Predictions Tracked</div>
+            </div>
+            <div>
+              <div className="font-mono text-xl sm:text-2xl font-bold text-accent">6,000+</div>
+              <div className="text-[10px] text-muted mt-1">Analysts Monitored</div>
+            </div>
+            <div>
+              <div className="font-mono text-xl sm:text-2xl font-bold text-accent">31,000+</div>
+              <div className="text-[10px] text-muted mt-1">Predictions Scored</div>
             </div>
           </div>
-        )}
+        </div>
       </div>
       <Footer />
     </div>
