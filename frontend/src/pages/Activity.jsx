@@ -98,7 +98,7 @@ function ScoredCard({ item }) {
           <span className="text-muted text-xs">on</span>
           <TickerLink ticker={item.ticker} className="text-sm" />
         </div>
-        <span className="text-[10px] text-muted flex-shrink-0">{timeAgo(item.evaluation_date)}</span>
+        <span className="text-[10px] text-muted flex-shrink-0">{timeAgo(item.scored_at || item.evaluation_date)}</span>
       </div>
       <div className="flex items-center gap-2 mt-1.5">
         <OutcomeBadge outcome={item.outcome} actualReturn={item.actual_return} />
@@ -212,7 +212,7 @@ export default function Activity() {
     // Interleave all types, sorted by timestamp desc
     const all = [
       ...predictions.map(p => ({ ...p, _ts: p.created_at || p.prediction_date })),
-      ...scored.map(s => ({ ...s, _ts: s.evaluation_date })),
+      ...scored.map(s => ({ ...s, _ts: s.scored_at || s.evaluation_date })),
       ...expiring.slice(0, 5).map(e => ({ ...e, _ts: e.prediction_date })),
       ...friends.map(f => ({ ...f, _ts: f.created_at })),
     ];

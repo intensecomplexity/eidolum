@@ -67,7 +67,7 @@ def recently_scored(request: Request, db: Session = Depends(get_db)):
                p.outcome, p.actual_return, p.evaluation_date, p.prediction_date,
                p.context, p.exact_quote,
                f.id AS fid, f.name AS fname, f.accuracy_score,
-               ts.company_name
+               ts.company_name, p.evaluated_at
         FROM predictions p
         JOIN forecasters f ON f.id = p.forecaster_id
         LEFT JOIN ticker_sectors ts ON ts.ticker = p.ticker
@@ -86,7 +86,7 @@ def recently_scored(request: Request, db: Session = Depends(get_db)):
                    p.outcome, p.actual_return, p.evaluation_date, p.prediction_date,
                    p.context, p.exact_quote,
                    f.id AS fid, f.name AS fname, f.accuracy_score,
-                   ts.company_name
+                   ts.company_name, p.evaluated_at
             FROM predictions p
             JOIN forecasters f ON f.id = p.forecaster_id
             LEFT JOIN ticker_sectors ts ON ts.ticker = p.ticker
@@ -110,6 +110,7 @@ def recently_scored(request: Request, db: Session = Depends(get_db)):
             "forecaster_id": r[11], "forecaster_name": r[12],
             "accuracy": round(float(r[13]), 1) if r[13] else None,
             "company_name": r[14],
+            "scored_at": r[15].isoformat() if r[15] else (r[7].isoformat() if r[7] else None),
             "type": "scored",
         }
         for r in rows
