@@ -711,13 +711,11 @@ def get_all_consensus(
     if not sector and not sort and _consensus_cache and (_consensus_time.time() - _consensus_cache_time) < _CONSENSUS_TTL:
         return _consensus_cache
 
-    # Merge share-class duplicates into primary ticker
+    # Merge share-class duplicates: normalize tickers before querying
     _TICKER_MERGE = {
         'GOOG': 'GOOGL', 'BRK.A': 'BRK.B', 'FOX': 'FOXA',
         'NWSA': 'NWS', 'DISCK': 'DISCA', 'LBTYA': 'LBTYK',
     }
-    _merge_cases = " ".join(f"WHEN '{k}' THEN '{v}'" for k, v in _TICKER_MERGE.items())
-    _ticker_col = f"CASE ticker {_merge_cases} ELSE ticker END" if _merge_cases else "ticker"
 
     where = "WHERE direction IN ('bullish', 'bearish', 'neutral')"
     params = {}
@@ -726,19 +724,35 @@ def get_all_consensus(
         params["sector"] = sector
 
     rows = db.execute(_consensus_text(f"""
-        SELECT {_ticker_col} as merged_ticker,
-               MODE() WITHIN GROUP (ORDER BY COALESCE(sector, 'Other')) as sector,
+        SELECT ticker,
+               MAX(COALESCE(sector, 'Other')) as sector,
                COUNT(*) as total,
                SUM(CASE WHEN direction = 'bullish' THEN 1 ELSE 0 END) as bullish,
                SUM(CASE WHEN direction = 'bearish' THEN 1 ELSE 0 END) as bearish,
                SUM(CASE WHEN direction = 'neutral' THEN 1 ELSE 0 END) as neutral
         FROM predictions
         {where}
-        GROUP BY {_ticker_col}
+        GROUP BY ticker
         HAVING COUNT(*) >= 5
         ORDER BY COUNT(*) DESC
         LIMIT 200
     """), params).fetchall()
+
+    # Merge share-class duplicates in Python (simpler than SQL CASE)
+    merged = {}
+    for r in rows:
+        ticker = _TICKER_MERGE.get(r[0], r[0])
+        if ticker in merged:
+            m = merged[ticker]
+            m[2] += r[2]  # total
+            m[3] += r[3]  # bullish
+            m[4] += r[4]  # bearish
+            m[5] += r[5]  # neutral
+        else:
+            merged[ticker] = list(r)
+            merged[ticker][0] = ticker
+    rows = [tuple(v) for v in merged.values()]
+    rows.sort(key=lambda x: x[2], reverse=True)
 
     # Batch-fetch top forecaster per ticker
     tickers = [r[0] for r in rows]
