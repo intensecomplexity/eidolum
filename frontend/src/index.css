@@ -38,8 +38,8 @@ html {
 [data-theme="light"] .text-positive { color: #16a34a !important; }
 [data-theme="light"] .text-negative { color: #dc2626 !important; }
 [data-theme="light"] .text-warning { color: #d97706 !important; }
-[data-theme="light"] nav { background: rgba(245,245,247,0.8) !important; border-color: #e4e4e7 !important; }
-[data-theme="light"] nav * { --tw-border-opacity: 1; }
+[data-theme="light"] nav.sticky { background: rgba(245,245,247,0.8) !important; border-color: #e4e4e7 !important; }
+[data-theme="light"] nav.sticky * { --tw-border-opacity: 1; }
 [data-theme="light"] input, [data-theme="light"] select, [data-theme="light"] textarea {
   background-color: #f0f0f3 !important; border-color: #d4d4d8 !important; color: #18181b !important;
 }
