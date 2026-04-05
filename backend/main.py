@@ -1428,6 +1428,44 @@ async def lifespan(app):
         except Exception as e:
             print(f"[Startup] processed_logos table error: {e}")
 
+        # ── Clean up company descriptions — first sentence only, no "..." ──
+        try:
+            with engine.connect() as _desc_c:
+                # Get long descriptions (> 150 chars or containing "...")
+                long_descs = _desc_c.execute(sql_text(
+                    "SELECT ticker, description FROM ticker_sectors "
+                    "WHERE description IS NOT NULL AND (LENGTH(description) > 150 OR description LIKE '%...')"
+                )).fetchall()
+                cleaned = 0
+                for row in long_descs:
+                    old = row[1]
+                    # Take first sentence (split on ". " and take the first part)
+                    first_sentence = old.split('. ')[0]
+                    # Remove trailing "..." if present
+                    if first_sentence.endswith('...'):
+                        first_sentence = first_sentence[:-3].strip()
+                    # If still too long, truncate at last word boundary before 150 chars
+                    if len(first_sentence) > 150:
+                        cut = first_sentence[:150]
+                        last_space = cut.rfind(' ')
+                        if last_space > 80:
+                            first_sentence = cut[:last_space]
+                        else:
+                            first_sentence = cut
+                    # Add period if it doesn't end with one
+                    if first_sentence and not first_sentence.endswith('.'):
+                        first_sentence = first_sentence + '.'
+                    if first_sentence != old:
+                        _desc_c.execute(sql_text(
+                            "UPDATE ticker_sectors SET description = :desc WHERE ticker = :t"
+                        ), {"desc": first_sentence, "t": row[0]})
+                        cleaned += 1
+                _desc_c.commit()
+                if cleaned:
+                    print(f"[Startup] Cleaned {cleaned} company descriptions (first sentence only)")
+        except Exception as _de:
+            print(f"[Startup] Description cleanup error: {_de}")
+
         # ── Log outcome distribution (no migration — accept both old and new values) ──
         try:
             with engine.connect() as _mc:

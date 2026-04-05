@@ -15,8 +15,9 @@ from ticker_lookup import TICKER_INFO
 router = APIRouter()
 
 FINNHUB_KEY = os.getenv("FINNHUB_KEY", "")
+POLYGON_KEY = os.getenv("MASSIVE_API_KEY", "").strip()
 
-# ── Price cache (5 min TTL) ──────────────────────────────────────────────────
+# ── Price cache (5 min TTL) ────────────────────────────────────────��─────────
 
 _price_cache: dict[str, dict] = {}
 _PRICE_TTL = 300  # seconds
@@ -37,6 +38,8 @@ def _fetch_price_data(symbol: str) -> dict | None:
             return result
 
     result = None
+
+    # 1. Finnhub — real-time quote (best quality when available)
     if FINNHUB_KEY:
         try:
             r = httpx.get(
@@ -61,6 +64,35 @@ def _fetch_price_data(symbol: str) -> dict | None:
         except Exception:
             pass
 
+    # 2. Polygon — previous day close (broad coverage, no daily limit)
+    if not result and POLYGON_KEY:
+        try:
+            r = httpx.get(
+                f"https://api.polygon.io/v2/aggs/ticker/{symbol}/prev",
+                params={"apiKey": POLYGON_KEY},
+                timeout=10,
+            )
+            data = r.json()
+            results = data.get("results", [])
+            if results:
+                bar = results[0]
+                close = bar.get("c")
+                open_price = bar.get("o")
+                if close and close > 0:
+                    change = round(close - open_price, 2) if open_price else 0
+                    pct = round((change / open_price) * 100, 2) if open_price and open_price > 0 else 0
+                    result = {
+                        "ticker": symbol,
+                        "name": TICKER_INFO.get(symbol, symbol),
+                        "current_price": round(close, 2),
+                        "price_change_24h": change,
+                        "price_change_percent": pct,
+                        "_ts": now,
+                    }
+        except Exception:
+            pass
+
+    # 3. Evaluator fallback (Tiingo/FMP)
     if not result:
         try:
             from jobs.evaluator import get_current_price
@@ -114,8 +146,6 @@ def _prediction_dict(p, username=None, user_type=None):
 @limiter.limit("60/minute")
 def get_ticker_price(request: Request, symbol: str):
     symbol = symbol.upper().strip()
-    if symbol not in TICKER_INFO:
-        raise HTTPException(status_code=404, detail=f"Unknown ticker: {symbol}")
 
     data = _fetch_price_data(symbol)
     if not data:

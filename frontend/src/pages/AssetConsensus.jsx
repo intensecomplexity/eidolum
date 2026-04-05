@@ -11,6 +11,7 @@ import NotificationBanner from '../components/NotificationBanner';
 import WatchButton from '../components/WatchButton';
 import RareSignalBanner from '../components/RareSignalBanner';
 import TickerLogo from '../components/TickerLogo';
+import StockPrice from '../components/StockPrice';
 import Footer from '../components/Footer';
 import { getAssetConsensus } from '../api';
 
@@ -62,6 +63,7 @@ export default function AssetConsensus() {
                   <h1 className="font-bold" style={{ fontSize: 'clamp(24px, 5vw, 36px)' }}>
                     <span className="font-mono text-accent">{ticker.toUpperCase()}</span>
                   </h1>
+                  <StockPrice ticker={ticker.toUpperCase()} size="large" autoRefresh />
                   <WatchButton ticker={ticker.toUpperCase()} />
                 </div>
                 {data?.company_name && <div className="text-text-secondary text-sm sm:text-base -mt-1">{data.company_name}</div>}
@@ -69,7 +71,7 @@ export default function AssetConsensus() {
               </div>
             </div>
             {data?.description && data.description !== data?.company_name && (
-              <p className="text-text-secondary text-xs sm:text-sm mt-2 max-w-2xl leading-relaxed">{data.description.length > 200 ? data.description.slice(0, 200) + '...' : data.description}</p>
+              <p className="text-muted text-xs sm:text-sm mt-2 max-w-2xl leading-relaxed" title={data.description}>{data.description}</p>
             )}
           </div>
 
