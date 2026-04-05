@@ -2052,7 +2052,12 @@ app.add_middleware(
 # Serve archived screenshots
 from fastapi.staticfiles import StaticFiles
 _archive_dir = os.getenv("ARCHIVE_DIR", "/app/archive")
-os.makedirs(_archive_dir, exist_ok=True)
+try:
+    os.makedirs(_archive_dir, exist_ok=True)
+except PermissionError:
+    _archive_dir = "/tmp/archive"
+    os.makedirs(_archive_dir, exist_ok=True)
+    print(f"[WARNING] Cannot write to /app/archive, using {_archive_dir}")
 app.mount("/archive", StaticFiles(directory=_archive_dir), name="archive")
 
 app.include_router(leaderboard.router, prefix="/api")
