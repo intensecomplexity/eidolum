@@ -36,7 +36,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Sora:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
   </head>
   <body>
-    <script>document.documentElement.setAttribute('data-theme','dark')</script>
+    <script>document.documentElement.setAttribute('data-theme',localStorage.getItem('eidolum_theme')||'dark')</script>
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
   </body>

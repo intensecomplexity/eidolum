@@ -131,8 +131,8 @@ export default function Navbar() {
 
               {/* Help button */}
               {/* Theme toggle */}
-              <button onClick={toggleTheme} className="hidden sm:flex items-center justify-center w-9 h-9 rounded-lg text-text-secondary hover:text-accent transition-colors" title={theme === 'dark' ? 'Light mode' : 'Dark mode'}>
-                {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+              <button onClick={toggleTheme} className="flex items-center justify-center w-11 h-11 sm:w-9 sm:h-9 rounded-lg text-text-secondary hover:text-accent active:text-accent transition-colors" title={theme === 'dark' ? 'Light mode' : 'Dark mode'} style={{ WebkitTapHighlightColor: 'transparent' }}>
+                {theme === 'dark' ? <Sun className="w-[18px] h-[18px]" /> : <Moon className="w-[18px] h-[18px]" />}
               </button>
 
               <button onClick={() => setShowHelp(true)} className="hidden sm:flex items-center justify-center w-9 h-9 rounded-lg text-text-secondary hover:text-accent transition-colors" title="How it works">

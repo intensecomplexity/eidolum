@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import LoadingSpinner from '../components/LoadingSpinner';
 import { Link } from 'react-router-dom';
-import { TrendingUp, TrendingDown, ChevronDown, DollarSign } from 'lucide-react';
+import { TrendingUp, TrendingDown, ChevronDown } from 'lucide-react';
 import useSEO from '../hooks/useSEO';
 import CompanyLogo from '../components/CompanyLogo';
 import Footer from '../components/Footer';
