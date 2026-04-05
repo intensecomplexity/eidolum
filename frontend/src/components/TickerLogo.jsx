@@ -1,16 +1,16 @@
 import { useState, useEffect, useRef } from 'react';
 
 /**
- * TickerLogo -- bulletproof stock logo component.
+ * TickerLogo -- stock logo component with fallback chain.
  *
- * Fallback chain:
- *   1. /api/logo/{TICKER}.png  (processed, bg-stripped — best quality)
- *   2. FMP CDN primary          (raw — may need CSS treatment)
- *   3. FMP CDN alternate         (raw — may need CSS treatment)
- *   4. Gold letter on circle     (always works)
+ * Source priority:
+ *   1. /api/logo/{TICKER}.png  (processed, bg-stripped)
+ *   2. FMP CDN primary
+ *   3. FMP CDN alternate
+ *   4. Gold letter on circle
  *
- * Each level has a 4-second timeout. Failed URLs are cached in
- * localStorage so re-renders skip them instantly.
+ * White logos get filter: invert() on light mode so they're visible.
+ * No mix-blend-mode — it's unreliable across themes.
  */
 
 // -- Failure cache (localStorage) --
@@ -33,14 +33,16 @@ function markFailed(url) {
   try { localStorage.setItem(FAIL_PREFIX + url, String(Date.now())); } catch {}
 }
 
-// -- White/light logos that are invisible on light backgrounds --
+// White/light logos — invisible on light backgrounds without treatment
 const WHITE_LOGOS = new Set([
-  'NKE', 'AMZN', 'LLY', 'UBER', 'SQ', 'BLOCK',
-  'ABNB', 'SNAP', 'HOOD', 'COIN', 'RBLX', 'U', 'ZM',
-  'SHOP', 'SPOT', 'NET', 'CRWD', 'DDOG', 'MDB', 'SNOW', 'DASH',
+  'NKE', 'AMZN', 'AAPL', 'META', 'UBER', 'ABNB', 'SNAP',
+  'HOOD', 'COIN', 'RBLX', 'ZM', 'SHOP', 'SPOT', 'NET',
+  'CRWD', 'DDOG', 'MDB', 'ALB', 'INTC', 'AXGN', 'ZS', 'NXPI',
+  'SQ', 'U', 'ROKU', 'DASH', 'PLTR', 'PATH', 'SNOW', 'BLOCK',
+  'LLY', 'REGN', 'VRTX', 'BIIB',
 ]);
 
-/** Clear all cached logo failures from localStorage */
+/** Clear all cached logo data from localStorage */
 export function clearLogoCache() {
   try {
     const keys = [];
@@ -77,12 +79,10 @@ export default function TickerLogo({ ticker, logoUrl, size = 32, className = '' 
   const timerRef = useRef(null);
   const currentUrl = allUrls[idx] || null;
 
-  // Clear timeout on unmount
   useEffect(() => {
     return () => { if (timerRef.current) clearTimeout(timerRef.current); };
   }, []);
 
-  // 4-second timeout per URL — move to next if too slow
   useEffect(() => {
     if (loaded || failed || !currentUrl) return;
     if (timerRef.current) clearTimeout(timerRef.current);
@@ -144,20 +144,14 @@ export default function TickerLogo({ ticker, logoUrl, size = 32, className = '' 
     );
   }
 
-  // Determine if current URL is a processed logo (no CSS needed) or raw CDN
-  const isProcessed = currentUrl.startsWith('/api/logo/');
-  const isWhiteLogo = WHITE_LOGOS.has(symbol);
-
-  // CSS treatment for raw CDN logos
+  // Simple filter logic — no mix-blend-mode
+  const isWhite = WHITE_LOGOS.has(symbol);
   let imgFilter = 'none';
-  let imgBlend = 'normal';
-  if (!isProcessed && loaded) {
-    if (isWhiteLogo) {
-      // White logos: slightly dim on dark, invert on light
-      imgFilter = isDark ? 'brightness(0.85)' : 'brightness(0.15)';
-    } else {
-      // Default: blend mode drops baked-in backgrounds
-      imgBlend = isDark ? 'screen' : 'multiply';
+  if (loaded && isWhite) {
+    // White logos: invert on light mode so they become dark and visible
+    // On dark mode: leave as-is (white on dark = already visible)
+    if (!isDark) {
+      imgFilter = 'invert(1) hue-rotate(180deg)';
     }
   }
 
@@ -182,7 +176,6 @@ export default function TickerLogo({ ticker, logoUrl, size = 32, className = '' 
           opacity: loaded ? 1 : 0,
           transition: 'opacity 200ms ease-in',
           filter: imgFilter,
-          mixBlendMode: imgBlend,
         }}
       />
       {!loaded && (
