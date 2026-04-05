@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Check, Minus, X } from 'lucide-react';
 import useSEO from '../hooks/useSEO';
 import RankNumber from '../components/RankNumber';
@@ -53,6 +53,7 @@ export default function LandingPublic() {
     },
   });
 
+  const navigate = useNavigate();
   const [top5, setTop5] = useState([]);
   const [featured, setFeatured] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -224,7 +225,7 @@ export default function LandingPublic() {
                     const profileUrl = f.slug ? `/analyst/${f.slug}` : `/forecaster/${f.id}`;
                     return (
                       <tr key={f.id} className="border-b border-border/50 hover:bg-surface-2/30 transition-colors cursor-pointer"
-                        onClick={() => window.location.href = profileUrl}>
+                        onClick={() => navigate(profileUrl)}>
                         <td className="px-4 py-3.5">
                           <RankNumber rank={f.rank} />
                         </td>
@@ -285,8 +286,11 @@ export default function LandingPublic() {
                         <span className="text-muted text-[11px]">{f.firm}</span>
                       )}
                     </div>
-                    <div className="flex items-center gap-2 shrink-0">
+                    <div className="flex items-center gap-1.5 shrink-0">
                       <MiniPieChart hits={hits} nears={nears} misses={misses} size={20} />
+                      {(f.bullish_count > 0 || f.bearish_count > 0 || f.neutral_count > 0) && (
+                        <MiniPieChart bullish={f.bullish_count || 0} bearish={f.bearish_count || 0} neutral={f.neutral_count || 0} size={20} />
+                      )}
                       <span className={`font-mono text-sm font-semibold ${(f.accuracy_rate || 0) >= 60 ? 'text-positive' : 'text-negative'}`}>
                         {(f.accuracy_rate || 0).toFixed(1)}%
                       </span>
