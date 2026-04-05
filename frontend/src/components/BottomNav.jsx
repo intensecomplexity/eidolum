@@ -47,27 +47,27 @@ export default function BottomNav() {
       <nav className="fixed bottom-0 left-0 right-0 z-50 bg-bg border-t border-border sm:hidden"
            style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
         <div className="flex items-center justify-around h-[60px]">
-          <Link to="/" className={`flex flex-col items-center justify-center gap-0.5 w-full h-full active:bg-surface-2 transition-colors ${isActive('/') && !isActive('/login') && !isActive('/register') ? 'text-accent' : 'text-muted'}`}>
+          <Link to="/" className={`flex flex-col items-center justify-center gap-0.5 w-full h-full transition-colors ${isActive('/') && !isActive('/login') && !isActive('/register') ? 'text-accent' : 'text-muted'}`}>
             <Home className="w-5 h-5" /><span className="text-[10px] font-medium whitespace-nowrap">Home</span>
           </Link>
-          <Link to="/leaderboard" className={`flex flex-col items-center justify-center gap-0.5 w-full h-full active:bg-surface-2 transition-colors ${isActive('/leaderboard') ? 'text-accent' : 'text-muted'}`}>
+          <Link to="/leaderboard" className={`flex flex-col items-center justify-center gap-0.5 w-full h-full transition-colors ${isActive('/leaderboard') ? 'text-accent' : 'text-muted'}`}>
             <BarChart3 className="w-5 h-5" /><span className="text-[10px] font-medium whitespace-nowrap">Leaders</span>
           </Link>
-          <Link to="/activity" className={`relative flex flex-col items-center justify-center gap-0.5 w-full h-full active:bg-surface-2 transition-colors ${isActive('/activity') ? 'text-accent' : 'text-muted'}`}>
+          <Link to="/activity" className={`relative flex flex-col items-center justify-center gap-0.5 w-full h-full transition-colors ${isActive('/activity') ? 'text-accent' : 'text-muted'}`}>
             <Zap className="w-5 h-5" />
             {challengeDot && <span className="absolute top-2 right-[calc(50%-2px)] w-2 h-2 rounded-full bg-accent" />}
             <span className="text-[10px] font-medium whitespace-nowrap">Activity</span>
           </Link>
           {isAuthenticated ? (
-            <Link to="/submit" className={`flex flex-col items-center justify-center gap-0.5 w-full h-full active:bg-surface-2 transition-colors ${isActive('/submit') ? 'text-accent' : 'text-muted'}`}>
+            <Link to="/submit" className={`flex flex-col items-center justify-center gap-0.5 w-full h-full transition-colors ${isActive('/submit') ? 'text-accent' : 'text-muted'}`}>
               <Crosshair className="w-5 h-5" /><span className="text-[10px] font-medium whitespace-nowrap">Submit</span>
             </Link>
           ) : (
-            <button onClick={() => setShowSearch(true)} className="flex flex-col items-center justify-center gap-0.5 w-full h-full text-muted active:bg-surface-2 transition-colors">
+            <button onClick={() => setShowSearch(true)} className="flex flex-col items-center justify-center gap-0.5 w-full h-full text-muted transition-colors">
               <Search className="w-5 h-5" /><span className="text-[10px] font-medium whitespace-nowrap">Search</span>
             </button>
           )}
-          <Link to={isAuthenticated ? '/profile' : '/login'} className={`flex flex-col items-center justify-center gap-0.5 w-full h-full active:bg-surface-2 transition-colors ${isActive('/profile') || isActive('/login') ? 'text-accent' : 'text-muted'}`}>
+          <Link to={isAuthenticated ? '/profile' : '/login'} className={`flex flex-col items-center justify-center gap-0.5 w-full h-full transition-colors ${isActive('/profile') || isActive('/login') ? 'text-accent' : 'text-muted'}`}>
             <User className="w-5 h-5" /><span className="text-[10px] font-medium whitespace-nowrap">{isAuthenticated ? 'Profile' : 'Log In'}</span>
           </Link>
         </div>

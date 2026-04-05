@@ -241,7 +241,7 @@ export default function Navbar() {
               )}
 
               {/* Mobile hamburger */}
-              <button onClick={() => setMobileOpen(!mobileOpen)} className="sm:hidden flex items-center justify-center w-10 h-10 rounded-lg active:bg-surface-2 text-text-secondary" aria-label="Menu">
+              <button onClick={() => setMobileOpen(!mobileOpen)} className="sm:hidden flex items-center justify-center w-10 h-10 rounded-lg text-text-secondary" aria-label="Menu">
                 {mobileOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
               </button>
             </div>
@@ -271,7 +271,7 @@ export default function Navbar() {
                 <MobileLink to="/login" accent>Log In / Sign Up</MobileLink>
               )}
               <button onClick={() => { setMobileOpen(false); setShowHelp(true); }}
-                className="flex items-center gap-2 px-3 py-3 rounded-lg text-text-secondary active:bg-surface-2 min-h-[44px] w-full text-left">
+                className="flex items-center gap-2 px-3 py-3 rounded-lg text-text-secondary min-h-[44px] w-full text-left">
                 <HelpCircle className="w-4 h-4" /> How it works
               </button>
             </div>
@@ -290,7 +290,7 @@ function DropdownItem({ to, icon: Icon, label, onClick }) {
     <Link
       to={to}
       onClick={onClick}
-      className="flex items-center gap-3 px-4 py-2.5 text-sm text-text-secondary hover:bg-surface-2 hover:text-accent transition-colors min-h-[44px] cursor-pointer"
+      className="flex items-center gap-3 px-4 py-2.5 text-sm text-text-secondary hover:text-accent transition-colors min-h-[44px] cursor-pointer"
     >
       <Icon className="w-4 h-4" /> {label}
     </Link>
@@ -299,7 +299,7 @@ function DropdownItem({ to, icon: Icon, label, onClick }) {
 
 function MobileLink({ to, children, accent }) {
   return (
-    <Link to={to} className={`flex items-center px-3 py-3 rounded-lg font-medium active:bg-surface-2 min-h-[44px] ${accent ? 'text-accent' : 'text-text-primary'}`}>
+    <Link to={to} className={`flex items-center px-3 py-3 rounded-lg font-medium min-h-[44px] ${accent ? 'text-accent' : 'text-text-primary'}`}>
       {children}
     </Link>
   );
