@@ -28,6 +28,7 @@ SEARCH_BATCHES = [
         '"price target" min_faves:10 lang:en -filter:replies -filter:retweets',
         '"PT $" min_faves:10 lang:en -filter:replies -filter:retweets',
         '"target $" min_faves:10 lang:en -filter:replies -filter:retweets',
+        '"my target" min_faves:10 lang:en -filter:replies -filter:retweets',
     ],
     [
         '"buy $" min_faves:10 lang:en -filter:replies -filter:retweets',
@@ -47,9 +48,21 @@ SEARCH_BATCHES = [
         '"calls for $" min_faves:10 lang:en -filter:replies -filter:retweets',
         '"expecting $" min_faves:10 lang:en -filter:replies -filter:retweets',
     ],
+    [
+        '"bull case" min_faves:10 lang:en -filter:replies -filter:retweets',
+        '"bear case" min_faves:10 lang:en -filter:replies -filter:retweets',
+        '"price prediction" min_faves:10 lang:en -filter:replies -filter:retweets',
+        '"will hit $" min_faves:10 lang:en -filter:replies -filter:retweets',
+    ],
+    [
+        '"buy rating" min_faves:10 lang:en -filter:replies -filter:retweets',
+        '"sell rating" min_faves:10 lang:en -filter:replies -filter:retweets',
+        '"upgrade" "$" min_faves:10 lang:en -filter:replies -filter:retweets',
+        '"downgrade" "$" min_faves:10 lang:en -filter:replies -filter:retweets',
+    ],
 ]
 
-MIN_FOLLOWERS = 1000
+MIN_FOLLOWERS = 500
 MAX_CASHTAGS = 3
 CURRENCY_IGNORE = {"USD", "EUR", "GBP", "JPY", "CAD", "AUD"}
 
@@ -259,7 +272,7 @@ def run_x_scraper(db=None):
     _save_batch_index(batch_idx)
     print(f"[X-SCRAPER] Starting — batch {batch_idx + 1}/{len(SEARCH_BATCHES)}", flush=True)
 
-    tweets = _call_apify(batch, max_per_query=150)
+    tweets = _call_apify(batch, max_per_query=250)
     print(f"[X-SCRAPER] Fetched {len(tweets)} tweets", flush=True)
 
     # Log sample structure on first run
