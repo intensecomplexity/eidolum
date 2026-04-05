@@ -55,6 +55,7 @@ import Discover from './pages/Discover';
 import SmartMoney from './pages/SmartMoney';
 import Tournaments from './pages/Tournaments';
 import HowItWorks from './pages/HowItWorks';
+import FirmProfile from './pages/FirmProfile';
 import OnboardingOverlay from './components/OnboardingOverlay';
 import VaultDoorSplash from './components/VaultDoorSplash';
 import ComparisonTray from './components/ComparisonTray';
@@ -145,6 +146,7 @@ export default function App() {
         <Route path="/discover" element={<Discover />} />
         <Route path="/smart-money" element={<SmartMoney />} />
         <Route path="/how-it-works" element={<HowItWorks />} />
+        <Route path="/firm/:slug" element={<FirmProfile />} />
         <Route path="/earnings" element={<EarningsPage />} />
         <Route path="/compete/tournaments" element={<Tournaments />} />
       </Routes>

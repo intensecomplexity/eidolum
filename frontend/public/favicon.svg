@@ -1,7 +1,6 @@
-<svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <!-- Dark circle background with gold border -->
-  <circle cx="24" cy="24" r="22" fill="#0d0f13" stroke="#D4A843" stroke-width="1.5"/>
-  <!-- Serif E in gold -->
+<svg viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
+  <rect width="48" height="48" fill="#0d0f13"/>
+  <circle cx="24" cy="24" r="20" fill="none" stroke="#D4A843" stroke-width="1.5"/>
   <text x="24" y="33" text-anchor="middle" fill="#D4A843"
     font-family="'Cormorant Garamond','Georgia','Times New Roman',serif"
     font-size="28" font-weight="600">E</text>

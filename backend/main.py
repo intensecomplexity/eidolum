@@ -2059,6 +2059,8 @@ from routers.smart_money import router as smart_money_router
 app.include_router(smart_money_router, prefix="/api")
 from routers.tournaments import router as tournaments_router
 app.include_router(tournaments_router, prefix="/api")
+from routers.firms import router as firms_router
+app.include_router(firms_router, prefix="/api")
 
 
 @app.get("/health")
@@ -2165,6 +2167,17 @@ def sitemap_xml():
         )).fetchall()
         for r in rows:
             urls.append(f"  <url><loc>https://www.eidolum.com/forecaster/{r[0]}</loc><lastmod>{today}</lastmod><priority>0.8</priority></url>")
+
+        # Firm pages
+        firm_rows = db.execute(_st(
+            "SELECT DISTINCT firm FROM forecasters WHERE firm IS NOT NULL AND firm != '' "
+            "GROUP BY firm HAVING COUNT(*) >= 2 OR SUM(COALESCE(total_predictions, 0)) >= 10 "
+            "ORDER BY SUM(COALESCE(total_predictions, 0)) DESC LIMIT 200"
+        )).fetchall()
+        import re as _slug_re
+        for r in firm_rows:
+            slug = _slug_re.sub(r'[^a-z0-9]+', '-', r[0].lower().strip()).strip('-')
+            urls.append(f"  <url><loc>https://www.eidolum.com/firm/{slug}</loc><lastmod>{today}</lastmod><priority>0.7</priority></url>")
 
         # Top tickers
         ticker_rows = db.execute(_st(

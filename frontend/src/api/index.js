@@ -33,6 +33,14 @@ export function getAvailableTimeframes() {
   return cachedGet('/leaderboard/available-timeframes').then(r => r.data);
 }
 
+export function getFirm(slug) {
+  return api.get(`/firm/${slug}`).then(r => r.data);
+}
+
+export function getFirms() {
+  return cachedGet('/firms').then(r => r.data);
+}
+
 export function getForecaster(id, params = {}) {
   return api.get(`/forecaster/${id}`, { params }).then(r => r.data);
 }
