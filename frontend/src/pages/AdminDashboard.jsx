@@ -43,9 +43,8 @@ export default function AdminDashboard() {
 
   return (
     <div className="max-w-6xl mx-auto px-4 py-6">
-      <div className="flex items-center justify-between mb-6">
+      <div className="mb-6">
         <h1 className="text-xl font-bold text-accent">Admin Panel</h1>
-        <span className="text-muted text-xs font-mono">{user.email}</span>
       </div>
 
       {/* Tabs */}
@@ -102,28 +101,26 @@ function FeatureToggles() {
   if (!flags) return null;
   return (
     <div className="card mb-6">
-      <h3 className="text-sm font-semibold text-muted uppercase tracking-wider mb-3">Feature Flags</h3>
-      <div className="space-y-2">
-        {[
-          { key: 'duels', label: 'Duels', fn: toggleDuelsAdmin },
-          { key: 'compete', label: 'Compete / Seasons', fn: toggleCompeteAdmin },
-          { key: 'compare_analysts', label: 'Compare Analysts', fn: toggleCompareAnalystsAdmin },
-        ].map(f => (
-          <div key={f.key} className="flex items-center justify-between py-2">
-            <span className="text-sm text-text-secondary">{f.label}</span>
-            <button
-              onClick={() => toggle(f.key, f.fn)}
-              className={`px-3 py-1 rounded-lg text-xs font-medium transition-colors ${
-                flags[f.key]
-                  ? 'bg-positive/10 text-positive border border-positive/30'
-                  : 'bg-surface-2 text-muted border border-border'
-              }`}
-            >
-              {flags[f.key] ? 'Enabled' : 'Disabled'}
-            </button>
-          </div>
-        ))}
-      </div>
+      <h3 className="text-sm font-semibold text-muted uppercase tracking-wider mb-2">Feature Flags</h3>
+      {[
+        { key: 'duels', label: 'Duels', fn: toggleDuelsAdmin },
+        { key: 'compete', label: 'Compete / Seasons', fn: toggleCompeteAdmin },
+        { key: 'compare_analysts', label: 'Compare Analysts', fn: toggleCompareAnalystsAdmin },
+      ].map(f => (
+        <div key={f.key} className="flex items-center justify-between py-1.5">
+          <span className="text-sm text-text-secondary">{f.label}</span>
+          <button
+            onClick={() => toggle(f.key, f.fn)}
+            className={`px-2.5 py-0.5 rounded text-[10px] font-semibold transition-colors ${
+              flags[f.key]
+                ? 'bg-positive/15 text-positive'
+                : 'bg-surface-2 text-muted'
+            }`}
+          >
+            {flags[f.key] ? 'ON' : 'OFF'}
+          </button>
+        </div>
+      ))}
     </div>
   );
 }
