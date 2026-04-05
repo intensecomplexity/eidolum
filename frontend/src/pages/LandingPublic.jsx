@@ -306,7 +306,7 @@ export default function LandingPublic() {
       </section>
 
       {/* -- COUNTER BANNER -- */}
-      <section className="border-y border-border py-10 sm:py-14">
+      <section className="border-t border-border py-10 sm:py-14">
         <div className="max-w-4xl mx-auto px-4 sm:px-6">
           <div className="flex flex-col sm:flex-row items-center justify-center gap-8 sm:gap-0 text-center">
             <div className="flex-1">
