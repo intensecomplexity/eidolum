@@ -1,9 +1,16 @@
 import { useState, useEffect } from 'react';
 
-// -- Logo cache with TTL (shared with CompanyLogo) --
+// -- Logo cache with TTL --
 const CACHE_PREFIX = 'eidolum_logo:';
+const DARK_BG_PREFIX = 'logo_dark_';
 const SUCCESS_TTL = 7 * 24 * 60 * 60 * 1000; // 7 days
 const FAIL_TTL = 4 * 60 * 60 * 1000;          // 4 hours
+
+// Known white/light logos that always need dark background (CORS fallback)
+const WHITE_LOGOS = new Set([
+  'NKE', 'AMZN', 'AAPL', 'LLY', 'REGN', 'VRTX', 'BIIB', 'ZM',
+  'UBER', 'ABNB', 'DASH', 'RBLX', 'U', 'SNOW', 'NET',
+]);
 
 function getCachedLogoUrl(ticker) {
   if (!ticker) return null;
@@ -40,20 +47,28 @@ function setCachedLogoUrl(ticker, url) {
   } catch {}
 }
 
+function getCachedDarkBg(ticker) {
+  try { return localStorage.getItem(DARK_BG_PREFIX + ticker) === '1'; } catch { return false; }
+}
+
+function setCachedDarkBg(ticker) {
+  try { localStorage.setItem(DARK_BG_PREFIX + ticker, '1'); } catch {}
+}
+
 /** Clear all cached logos */
 export function clearLogoCache() {
   try {
     const keys = [];
     for (let i = 0; i < localStorage.length; i++) {
       const key = localStorage.key(i);
-      if (key && key.startsWith(CACHE_PREFIX)) keys.push(key);
+      if (key && (key.startsWith(CACHE_PREFIX) || key.startsWith(DARK_BG_PREFIX))) keys.push(key);
     }
     keys.forEach(k => localStorage.removeItem(k));
     return keys.length;
   } catch { return 0; }
 }
 
-// -- FMP logo URL sources (static CDN, no API key needed) --
+// -- FMP logo URL sources --
 function fmpUrls(ticker) {
   if (!ticker || ticker === '?') return [];
   return [
@@ -63,25 +78,15 @@ function fmpUrls(ticker) {
 }
 
 /**
- * TickerLogo -- renders a stock/company logo with fallback.
+ * TickerLogo -- renders a stock/company logo with smart background detection.
  *
- * Props:
- *   ticker   - ticker symbol (e.g. "AAPL")
- *   logoUrl  - optional explicit logo URL from API
- *   size     - pixel dimensions (default 32)
- *   className - optional extra class names on the outer wrapper
- *
- * Behavior:
- *   1. If logoUrl is provided, try it first.
- *   2. Then try FMP CDN URLs.
- *   3. Uses localStorage caching (shared with CompanyLogo).
- *   4. On all failures, render letter-in-circle fallback.
+ * Default: white container. If the logo image is mostly white/light,
+ * switches to dark container so the logo remains visible.
  */
 export default function TickerLogo({ ticker, logoUrl, size = 32, className = '' }) {
   const symbol = (ticker || '?').toUpperCase();
   const letter = symbol[0] || '?';
 
-  // Build ordered list of URLs to try: prop -> FMP primary -> FMP fallback
   const fallbacks = fmpUrls(symbol);
   const allUrls = [logoUrl, ...fallbacks].filter(Boolean);
 
@@ -93,8 +98,10 @@ export default function TickerLogo({ ticker, logoUrl, size = 32, className = '' 
   });
   const [loaded, setLoaded] = useState(!!cached && cached !== 'no_logo');
   const [failed, setFailed] = useState(cached === 'no_logo');
+  const [needsDarkBg, setNeedsDarkBg] = useState(() => {
+    return WHITE_LOGOS.has(symbol) || getCachedDarkBg(symbol);
+  });
 
-  // If logoUrl prop arrives after mount, reset to try it
   useEffect(() => {
     if (logoUrl && !effectiveUrl && !failed) {
       setEffectiveUrl(logoUrl);
@@ -102,15 +109,36 @@ export default function TickerLogo({ ticker, logoUrl, size = 32, className = '' 
     }
   }, [logoUrl]);
 
-  const container = {
-    width: size,
-    height: size,
-    minWidth: size,
-    minHeight: size,
-  };
+  const container = { width: size, height: size, minWidth: size, minHeight: size };
+
+  function detectWhiteLogo(img) {
+    if (needsDarkBg || WHITE_LOGOS.has(symbol)) return;
+    try {
+      const canvas = document.createElement('canvas');
+      const w = Math.min(img.naturalWidth, 64);
+      const h = Math.min(img.naturalHeight, 64);
+      canvas.width = w;
+      canvas.height = h;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, w, h);
+      const data = ctx.getImageData(0, 0, w, h).data;
+      let whitePixels = 0, visiblePixels = 0;
+      for (let i = 0; i < data.length; i += 4) {
+        if (data[i + 3] > 128) {
+          visiblePixels++;
+          if (data[i] > 240 && data[i + 1] > 240 && data[i + 2] > 240) whitePixels++;
+        }
+      }
+      if (visiblePixels > 0 && whitePixels / visiblePixels > 0.7) {
+        setNeedsDarkBg(true);
+        setCachedDarkBg(symbol);
+      }
+    } catch {
+      // CORS error — silent fallback, white bg stays
+    }
+  }
 
   function handleLoad(e) {
-    // Guard against blank/tiny placeholder images returned by CDNs
     const img = e.target;
     if (img.naturalWidth <= 1 || img.naturalHeight <= 1) {
       handleError();
@@ -118,10 +146,10 @@ export default function TickerLogo({ ticker, logoUrl, size = 32, className = '' 
     }
     setLoaded(true);
     if (effectiveUrl) setCachedLogoUrl(symbol, effectiveUrl);
+    detectWhiteLogo(img);
   }
 
   function handleError() {
-    // Try next URL in the list
     const nextIdx = urlIndex + 1;
     const nextUrl = allUrls[nextIdx];
     if (nextUrl && nextUrl !== effectiveUrl) {
@@ -158,14 +186,10 @@ export default function TickerLogo({ ticker, logoUrl, size = 32, className = '' 
     );
   }
 
-  // Dark rounded container for loaded logos (dark bg makes white logos like NKE visible)
-  const boxStyle = {
-    ...container,
-    backgroundColor: '#1e2028',
-    border: '1px solid rgba(255,255,255,0.06)',
-    borderRadius: 8,
-    padding: pad,
-  };
+  // Container: white by default, dark for white/light logos
+  const boxStyle = needsDarkBg
+    ? { ...container, backgroundColor: '#1e2028', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 8, padding: pad }
+    : { ...container, backgroundColor: '#ffffff', border: '1px solid rgba(0,0,0,0.08)', borderRadius: 8, padding: pad };
 
   return (
     <div
@@ -178,6 +202,7 @@ export default function TickerLogo({ ticker, logoUrl, size = 32, className = '' 
         width={innerSize}
         height={innerSize}
         loading="lazy"
+        crossOrigin="anonymous"
         className="object-contain"
         onLoad={handleLoad}
         onError={handleError}
@@ -187,7 +212,7 @@ export default function TickerLogo({ ticker, logoUrl, size = 32, className = '' 
         <span
           className="absolute"
           style={{
-            color: '#D4A843',
+            color: needsDarkBg ? '#D4A843' : '#9ca3af',
             fontSize: size * 0.32,
             fontWeight: 700,
             fontFamily: 'monospace',
