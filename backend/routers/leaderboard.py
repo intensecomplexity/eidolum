@@ -882,47 +882,38 @@ def get_homepage_data(request: Request, db: Session = Depends(get_db)):
     except Exception:
         pass
 
-    # Featured prediction: best HIT from a named firm with realistic return
-    # Progressively looser queries to ensure we always find something
+    # Featured prediction: best HIT from a named firm on a well-known stock
+    # Progressively looser queries; all require popular tickers (100+ predictions)
     featured = None
-    _feat_queries = [
-        # Tier 1: top-tier firm, popular ticker, good return
-        """SELECT p.id, p.ticker, p.direction, p.target_price, p.entry_price,
+    _FEAT_SELECT = """SELECT p.id, p.ticker, p.direction, p.target_price, p.entry_price,
                   p.outcome, p.actual_return, p.prediction_date, p.evaluation_date,
                   f.id AS fid, f.name AS fname, f.firm,
                   ts.company_name, ts.logo_url
            FROM predictions p
            JOIN forecasters f ON f.id = p.forecaster_id
-           LEFT JOIN ticker_sectors ts ON ts.ticker = p.ticker
+           LEFT JOIN ticker_sectors ts ON ts.ticker = p.ticker"""
+    _feat_queries = [
+        # Tier 1: top firm, popular ticker, return 5-80%
+        _FEAT_SELECT + """
            WHERE p.outcome IN ('hit', 'correct')
-             AND p.actual_return IS NOT NULL AND p.actual_return > 0 AND p.actual_return < 200
+             AND p.actual_return BETWEEN 5 AND 80
              AND f.firm IN ('Goldman Sachs','Morgan Stanley','JPMorgan','Wedbush','Bank of America',
                             'Barclays','UBS','Citigroup','Wells Fargo','Deutsche Bank','Bernstein',
                             'Piper Sandler','Raymond James','Jefferies','Evercore','BMO Capital','RBC Capital')
-             AND ts.company_name IS NOT NULL
+             AND p.ticker IN (SELECT ticker FROM predictions GROUP BY ticker HAVING COUNT(*) >= 100)
            ORDER BY p.actual_return DESC LIMIT 1""",
-        # Tier 2: any named firm, any ticker with a company name
-        """SELECT p.id, p.ticker, p.direction, p.target_price, p.entry_price,
-                  p.outcome, p.actual_return, p.prediction_date, p.evaluation_date,
-                  f.id AS fid, f.name AS fname, f.firm,
-                  ts.company_name, ts.logo_url
-           FROM predictions p
-           JOIN forecasters f ON f.id = p.forecaster_id
-           LEFT JOIN ticker_sectors ts ON ts.ticker = p.ticker
+        # Tier 2: any firm, popular ticker (50+), return 5-80%
+        _FEAT_SELECT + """
            WHERE p.outcome IN ('hit', 'correct')
-             AND p.actual_return IS NOT NULL AND p.actual_return > 0 AND p.actual_return < 200
+             AND p.actual_return BETWEEN 5 AND 80
              AND f.firm IS NOT NULL AND f.firm != ''
-             AND ts.company_name IS NOT NULL
+             AND p.ticker IN (SELECT ticker FROM predictions GROUP BY ticker HAVING COUNT(*) >= 50)
            ORDER BY p.actual_return DESC LIMIT 1""",
-        # Tier 3: any HIT with realistic return
-        """SELECT p.id, p.ticker, p.direction, p.target_price, p.entry_price,
-                  p.outcome, p.actual_return, p.prediction_date, p.evaluation_date,
-                  f.id AS fid, f.name AS fname, f.firm,
-                  ts.company_name, ts.logo_url
-           FROM predictions p
-           JOIN forecasters f ON f.id = p.forecaster_id
-           LEFT JOIN ticker_sectors ts ON ts.ticker = p.ticker
+        # Tier 3: any firm, any ticker with 20+ predictions, return 3-80%
+        _FEAT_SELECT + """
            WHERE p.outcome IN ('hit', 'correct')
+             AND p.actual_return BETWEEN 3 AND 80
+             AND p.ticker IN (SELECT ticker FROM predictions GROUP BY ticker HAVING COUNT(*) >= 20)
              AND p.actual_return IS NOT NULL AND p.actual_return > 0 AND p.actual_return < 200
            ORDER BY p.actual_return DESC LIMIT 1""",
     ]

@@ -4,6 +4,7 @@ import { Check, Minus, X } from 'lucide-react';
 import useSEO from '../hooks/useSEO';
 import RankNumber from '../components/RankNumber';
 import MiniPieChart from '../components/MiniPieChart';
+import PlatformBadge from '../components/PlatformBadge';
 import Footer from '../components/Footer';
 import TickerLogo from '../components/TickerLogo';
 import { getHomepageData } from '../api';
@@ -206,46 +207,57 @@ export default function LandingPublic() {
             <div className="hidden sm:block">
               <table className="w-full">
                 <thead>
-                  <tr className="text-left text-muted text-xs uppercase tracking-wider border-b border-border">
-                    <th className="px-5 py-3 w-14">#</th>
-                    <th className="px-5 py-3">Forecaster</th>
-                    <th className="px-5 py-3 text-right">Accuracy</th>
-                    <th className="px-5 py-3 text-right">Scored</th>
-                    <th className="px-5 py-3 text-center w-16">HIT/MISS</th>
+                  <tr className="text-left text-muted text-[11px] uppercase tracking-wider border-b border-border">
+                    <th className="px-4 py-3 w-12">#</th>
+                    <th className="px-4 py-3">Forecaster</th>
+                    <th className="px-4 py-3 text-right">Accuracy</th>
+                    <th className="px-4 py-3 text-right">Scored</th>
+                    <th className="px-4 py-3 text-center w-14">Outcome</th>
+                    <th className="px-4 py-3 text-center w-14">Direction</th>
                   </tr>
                 </thead>
                 <tbody>
                   {top5.map(f => {
                     const hits = f.hits || f.correct_predictions || 0;
-                    const misses = f.misses || Math.max(0, (f.evaluated_predictions || f.total_predictions || 0) - hits - (f.nears || 0));
+                    const nears = f.nears || 0;
+                    const misses = f.misses || Math.max(0, (f.evaluated_predictions || f.total_predictions || 0) - hits - nears);
                     const profileUrl = f.slug ? `/analyst/${f.slug}` : `/forecaster/${f.id}`;
                     return (
-                      <tr key={f.id} className="border-b border-border/50 hover:bg-surface-2/50 transition-colors">
-                        <td className="px-5 py-4">
+                      <tr key={f.id} className="border-b border-border/50 hover:bg-surface-2/30 transition-colors cursor-pointer"
+                        onClick={() => window.location.href = profileUrl}>
+                        <td className="px-4 py-3.5">
                           <RankNumber rank={f.rank} />
                         </td>
-                        <td className="px-5 py-4">
-                          <Link to={profileUrl} className="font-medium text-text-primary hover:text-accent transition-colors">
-                            {f.name}
-                          </Link>
-                          {f.firm && (
-                            <div className="text-muted text-xs mt-0.5">{f.firm}</div>
-                          )}
+                        <td className="px-4 py-3.5">
+                          <div className="flex items-center gap-1.5">
+                            <Link to={profileUrl} className="font-medium text-text-primary hover:text-accent transition-colors" onClick={e => e.stopPropagation()}>
+                              {f.name}
+                            </Link>
+                            <PlatformBadge platform={f.platform || 'institutional'} />
+                          </div>
+                          {f.firm && <div className="text-muted text-[11px] mt-0.5">{f.firm}</div>}
                         </td>
-                        <td className="px-5 py-4 text-right">
+                        <td className="px-4 py-3.5 text-right">
                           <span className={`font-mono font-semibold ${(f.accuracy_rate || 0) >= 60 ? 'text-positive' : 'text-negative'}`}>
                             {(f.accuracy_rate || 0).toFixed(1)}%
                           </span>
                         </td>
-                        <td className="px-5 py-4 text-right">
+                        <td className="px-4 py-3.5 text-right">
                           <span className="font-mono text-text-secondary text-sm">
                             {f.evaluated_predictions || f.total_predictions || 0}
                           </span>
                         </td>
-                        <td className="px-5 py-4 text-center">
+                        <td className="px-4 py-3.5 text-center">
                           <div className="flex justify-center">
-                            <MiniPieChart hits={hits} nears={f.nears || 0} misses={misses} size={26} />
+                            <MiniPieChart hits={hits} nears={nears} misses={misses} size={24} />
                           </div>
+                        </td>
+                        <td className="px-4 py-3.5 text-center">
+                          {(f.bullish_count > 0 || f.bearish_count > 0 || f.neutral_count > 0) && (
+                            <div className="flex justify-center">
+                              <MiniPieChart bullish={f.bullish_count || 0} bearish={f.bearish_count || 0} neutral={f.neutral_count || 0} size={24} />
+                            </div>
+                          )}
                         </td>
                       </tr>
                     );
@@ -258,26 +270,28 @@ export default function LandingPublic() {
             <div className="sm:hidden divide-y divide-border">
               {top5.map(f => {
                 const hits = f.hits || f.correct_predictions || 0;
-                const misses = f.misses || Math.max(0, (f.evaluated_predictions || f.total_predictions || 0) - hits - (f.nears || 0));
+                const nears = f.nears || 0;
+                const misses = f.misses || Math.max(0, (f.evaluated_predictions || f.total_predictions || 0) - hits - nears);
                 const profileUrl = f.slug ? `/analyst/${f.slug}` : `/forecaster/${f.id}`;
                 return (
-                  <div key={f.id} className="flex items-center gap-3 px-4 py-3.5">
+                  <Link key={f.id} to={profileUrl} className="flex items-center gap-3 px-4 py-3.5 hover:bg-surface-2/30 transition-colors">
                     <RankNumber rank={f.rank} />
                     <div className="flex-1 min-w-0">
-                      <Link to={profileUrl} className="font-medium text-sm text-text-primary hover:text-accent transition-colors block truncate">
-                        {f.name}
-                      </Link>
+                      <div className="flex items-center gap-1.5">
+                        <span className="font-medium text-sm text-text-primary truncate">{f.name}</span>
+                        <PlatformBadge platform={f.platform || 'institutional'} />
+                      </div>
                       {f.firm && (
-                        <span className="text-muted text-xs">{f.firm}</span>
+                        <span className="text-muted text-[11px]">{f.firm}</span>
                       )}
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
-                      <MiniPieChart hits={hits} nears={f.nears || 0} misses={misses} size={22} />
+                      <MiniPieChart hits={hits} nears={nears} misses={misses} size={20} />
                       <span className={`font-mono text-sm font-semibold ${(f.accuracy_rate || 0) >= 60 ? 'text-positive' : 'text-negative'}`}>
                         {(f.accuracy_rate || 0).toFixed(1)}%
                       </span>
                     </div>
-                  </div>
+                  </Link>
                 );
               })}
             </div>

@@ -6,7 +6,6 @@ export default function Footer() {
   const { isAuthenticated } = useAuth();
 
   return (
-    {/* NO BACKGROUND ON FOOTER LINKS — bg-bg matches page, not bg-surface which looks grey */}
     <footer className="border-t border-border bg-bg mt-12 sm:mt-20">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-10">
         <div className="flex flex-col items-center gap-4">
@@ -14,7 +13,6 @@ export default function Footer() {
             <EidolumLogo size={28} />
             <span className="font-serif text-lg text-accent mt-1.5">Eidolum</span>
           </div>
-          {/* NO BACKGROUND ON THESE LINKS - plain text only, gold on hover */}
           <nav className="flex items-center gap-1.5 text-xs text-text-secondary">
             <Link to="/" className="hover:text-accent transition-colors">Home</Link>
             <span className="text-muted opacity-30">&middot;</span>
