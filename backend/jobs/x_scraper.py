@@ -5,7 +5,7 @@ Uses Apify Twitter scraper to find forward-looking stock predictions on X.
 Seven-layer filter pipeline rejects spam, past-tense brags, questions, and noise.
 V1: Logs qualifying predictions. No database writes.
 
-Schedule: every 8 hours (3 runs/day = ~$22/month on Apify Starter $29).
+Schedule: every 6 hours (4 runs/day).
 Requires: APIFY_API_TOKEN env var.
 """
 import os
@@ -60,9 +60,33 @@ SEARCH_BATCHES = [
         '"upgrade" "$" min_faves:10 lang:en -filter:replies -filter:retweets',
         '"downgrade" "$" min_faves:10 lang:en -filter:replies -filter:retweets',
     ],
+    [
+        '"my target" stock min_faves:10 lang:en -filter:replies -filter:retweets',
+        '"will reach $" min_faves:10 lang:en -filter:replies -filter:retweets',
+        '"going to $" min_faves:10 lang:en -filter:replies -filter:retweets',
+        '"path to $" min_faves:10 lang:en -filter:replies -filter:retweets',
+    ],
+    [
+        '"overweight" "$" min_faves:10 lang:en -filter:replies -filter:retweets',
+        '"underweight" "$" min_faves:10 lang:en -filter:replies -filter:retweets',
+        '"outperform" "$" min_faves:10 lang:en -filter:replies -filter:retweets',
+        '"underperform" "$" min_faves:10 lang:en -filter:replies -filter:retweets',
+    ],
+    [
+        '"accumulate $" min_faves:10 lang:en -filter:replies -filter:retweets',
+        '"adding $" min_faves:10 lang:en -filter:replies -filter:retweets',
+        '"initiated coverage" min_faves:10 lang:en -filter:replies -filter:retweets',
+        '"raises target" min_faves:10 lang:en -filter:replies -filter:retweets',
+    ],
+    [
+        '"support at $" min_faves:10 lang:en -filter:replies -filter:retweets',
+        '"resistance at $" min_faves:10 lang:en -filter:replies -filter:retweets',
+        '"upside to $" min_faves:10 lang:en -filter:replies -filter:retweets',
+        '"fair value" "$" min_faves:10 lang:en -filter:replies -filter:retweets',
+    ],
 ]
 
-MIN_FOLLOWERS = 500
+MIN_FOLLOWERS = 1000
 MAX_CASHTAGS = 3
 CURRENCY_IGNORE = {"USD", "EUR", "GBP", "JPY", "CAD", "AUD"}
 
