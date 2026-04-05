@@ -20,7 +20,13 @@ import { useEffect, useRef, useState, useCallback } from 'react';
  */
 
 const GOLD = '#D4A843';
-const BG = '#0d0f13';
+
+// Match the page background color for seamless transition
+function getThemeBG() {
+  const theme = localStorage.getItem('eidolum_theme') || document.documentElement.getAttribute('data-theme') || 'dark';
+  return theme === 'light' ? '#f5f5f7' : '#0d0f13';
+}
+const BG = getThemeBG();
 
 /* ── Easing ──────────────────────────────────────────────────── */
 const easeInOut = t =>
