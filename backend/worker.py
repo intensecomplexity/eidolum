@@ -245,6 +245,15 @@ def main():
             log.error(f"[process_logos] {e}", exc_info=True)
     sched.add_job(_standalone("process_logos", _process_logos), "interval", hours=24, id="process_logos", next_run_time=t0 + timedelta(minutes=5))
 
+    # Polygon description backfill — fills gaps FMP missed (free, 5 calls/min)
+    def _desc_backfill_polygon():
+        try:
+            from jobs.sector_lookup import backfill_descriptions_polygon
+            backfill_descriptions_polygon()
+        except Exception as e:
+            log.error(f"[desc_backfill_polygon] {e}", exc_info=True)
+    sched.add_job(_standalone("desc_backfill_polygon", _desc_backfill_polygon), "interval", hours=24, id="desc_backfill_polygon", next_run_time=t0 + timedelta(minutes=15))
+
     # Cron jobs
     sched.add_job(_watchlist_queue, "interval", hours=4, id="watchlist_queue", next_run_time=t0 + timedelta(minutes=35))
     sched.add_job(_watchlist_digest, "cron", day_of_week="mon-fri", hour=13, minute=0, id="watchlist_digest")

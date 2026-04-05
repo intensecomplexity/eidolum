@@ -1906,12 +1906,8 @@ async def lifespan(app):
                 print(f"[Startup] FMP description backfill error: {e}")
         else:
             print(f"[Startup] Skipping FMP description backfill — {_no_data_count:,} no_data predictions need FMP budget")
-        # Polygon fallback: free, unlimited, 5 calls/min — fills gaps FMP missed
-        try:
-            from jobs.sector_lookup import backfill_descriptions_polygon
-            backfill_descriptions_polygon()
-        except Exception as e:
-            print(f"[Startup] Polygon description backfill error: {e}")
+        # Polygon description backfill moved to worker.py — too slow for API startup (50 tickers * 12s = 10 min)
+        print("[Startup] Polygon description backfill runs in worker (not API startup)")
 
         # URL quality classification (batched, idempotent)
         try:
