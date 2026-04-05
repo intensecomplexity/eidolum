@@ -8,6 +8,7 @@ import PredictionBadge from '../components/PredictionBadge';
 import ConflictBadge from '../components/ConflictBadge';
 import DisclosedPositions from '../components/DisclosedPositions';
 import PlatformBadge from '../components/PlatformBadge';
+import { getSourceBadgeKey } from '../utils/getSourceBadgeKey';
 import StreakBadge from '../components/StreakBadge';
 import PredictionCard from '../components/PredictionCard';
 import EvidenceCard from '../components/EvidenceCard';
@@ -148,7 +149,7 @@ export default function ForecasterProfile() {
               <div className="flex items-center gap-2 sm:gap-3 mb-1 flex-wrap">
                 <div className="text-[10px] text-accent/60 uppercase tracking-widest font-mono mb-0.5">The Vault</div>
                 <h1 className="headline-serif" style={{ fontSize: 'clamp(24px, 5vw, 36px)' }}>{data.name}</h1>
-                <PlatformBadge platform={data.platform} size={20} showLabel />
+                <PlatformBadge platform={getSourceBadgeKey(data)} size={20} showLabel />
                 <StreakBadge streak={data.streak} />
                 <FollowButton forecaster={data} />
                 <CompareButton forecaster={data} />

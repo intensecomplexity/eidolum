@@ -8,6 +8,8 @@ import Footer from '../components/Footer';
 import PageHeader from '../components/PageHeader';
 import { getActivityRecentCalls, getActivityScoredCalls, getActivityExpiring, getActivityFriendsCalls } from '../api';
 import timeLeft from '../utils/timeLeft';
+import PlatformBadge from '../components/PlatformBadge';
+import { getSourceBadgeKey } from '../utils/getSourceBadgeKey';
 
 const TABS = [
   { key: 'all', label: 'All' },
@@ -66,6 +68,7 @@ function PredictionCard({ item }) {
     <div className={`card border-l-4 ${borderColor(item)} py-3 px-4`}>
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2 min-w-0 flex-1">
+          <PlatformBadge platform={getSourceBadgeKey(item)} size={12} />
           <Link to={`/forecaster/${item.forecaster_id}`} className="text-sm font-medium text-text-primary hover:text-accent truncate flex-shrink-0">
             {item.forecaster_name}
           </Link>
@@ -92,6 +95,7 @@ function ScoredCard({ item }) {
     <div className={`card border-l-4 ${borderColor(item)} py-3 px-4`}>
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2 min-w-0 flex-1">
+          <PlatformBadge platform={getSourceBadgeKey(item)} size={12} />
           <Link to={`/forecaster/${item.forecaster_id}`} className="text-sm font-medium text-text-primary hover:text-accent truncate flex-shrink-0">
             {item.forecaster_name}
           </Link>

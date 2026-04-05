@@ -7,6 +7,7 @@ import Footer from '../components/Footer';
 import PageHeader from '../components/PageHeader';
 import MiniPieChart from '../components/MiniPieChart';
 import PlatformBadge from '../components/PlatformBadge';
+import { getSourceBadgeKey } from '../utils/getSourceBadgeKey';
 import RankBadge from '../components/RankBadge';
 import StreakBadge from '../components/StreakBadge';
 import LeaderboardCard from '../components/LeaderboardCard';
@@ -79,6 +80,7 @@ export default function Leaderboard() {
   const [expandedId, setExpandedId] = useState(null);
   const metricRef = useRef(null);
   const [timeframe, setTimeframe] = useState('all');
+  const [source, setSource] = useState('all');
   const [availableTf, setAvailableTf] = useState({ all: true, short: true, medium: true, long: true });
 
   useEffect(() => {
@@ -105,7 +107,7 @@ export default function Leaderboard() {
   // Scroll to top on any filter change
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
-  }, [activeTab, sector, direction, metric, timeframe]);
+  }, [activeTab, sector, direction, metric, timeframe, source]);
 
   function handleTabClick(key) {
     setActiveTab(key);
@@ -126,6 +128,7 @@ export default function Leaderboard() {
     if (sector !== 'All') params.sector = sector;
     if (direction !== 'All') params.direction = direction;
     if (timeframe !== 'all') params.timeframe = timeframe;
+    if (source !== 'all') params.source = source;
     return params;
   }
 
@@ -148,7 +151,7 @@ export default function Leaderboard() {
           const arr = Array.isArray(result) ? result : [];
           setData(arr);
           if (arr.length === 0) {
-            const hasFilter = sector !== 'All' || direction !== 'All' || timeframe !== 'all';
+            const hasFilter = sector !== 'All' || direction !== 'All' || timeframe !== 'all' || source !== 'all';
             setEmptyMessage(hasFilter
               ? 'No forecasters have enough scored predictions with these filters yet. Try broadening your selection.'
               : 'The leaderboard is loading. Predictions are being scored.');
@@ -161,7 +164,7 @@ export default function Leaderboard() {
         setEmptyMessage('Could not load leaderboard. Retrying...');
       })
       .finally(() => setLoading(false));
-  }, [activeTab, sector, direction, metric, timeframe]);
+  }, [activeTab, sector, direction, metric, timeframe, source]);
 
   // Auto-retry every 30 seconds when leaderboard is empty
   useEffect(() => {
@@ -180,7 +183,7 @@ export default function Leaderboard() {
         .catch(() => {});
     }, 30000);
     return () => clearInterval(timer);
-  }, [emptyMessage, loading, activeTab, sector, direction, metric, timeframe]);
+  }, [emptyMessage, loading, activeTab, sector, direction, metric, timeframe, source]);
 
   // Persist metric choice
   useEffect(() => {
@@ -238,6 +241,33 @@ export default function Leaderboard() {
                     ))}
                   </select>
                   <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-muted pointer-events-none" />
+                </div>
+              )}
+
+              {/* Source filter */}
+              {activeTab !== 'week' && (
+                <div className="flex gap-1 shrink-0">
+                  {[
+                    { key: 'all', label: 'All Sources' },
+                    { key: 'wallst', label: 'Wall St', color: '#3b82f6' },
+                    { key: 'x', label: 'X', color: '#000000' },
+                    { key: 'youtube', label: 'YouTube', color: '#FF0000' },
+                    { key: 'community', label: 'Community', color: '#34d399' },
+                  ].map(s => (
+                    <button key={s.key} onClick={() => setSource(s.key)}
+                      className={`px-2.5 py-1 rounded text-[11px] font-semibold transition-colors ${
+                        source === s.key
+                          ? 'border'
+                          : 'bg-surface-2 text-muted border border-border'
+                      }`}
+                      style={source === s.key && s.color
+                        ? { backgroundColor: `${s.color}20`, color: s.color, borderColor: `${s.color}50` }
+                        : source === s.key
+                        ? { backgroundColor: 'rgba(var(--accent-rgb, 212, 168, 67), 0.15)', color: 'var(--accent)', borderColor: 'rgba(var(--accent-rgb, 212, 168, 67), 0.3)' }
+                        : undefined}>
+                      {s.label}
+                    </button>
+                  ))}
                 </div>
               )}
 
@@ -347,7 +377,7 @@ export default function Leaderboard() {
                                 <Link to={f.slug ? `/analyst/${f.slug}` : `/forecaster/${f.id}`} className="font-medium text-[0.93rem] hover:text-accent transition-colors">
                                   {f.name}
                                 </Link>
-                                <PlatformBadge platform={f.platform} />
+                                <PlatformBadge platform={getSourceBadgeKey(f)} />
                               </div>
                               {f.firm ? (
                                 <div className="text-muted text-xs">{f.firm}</div>
@@ -510,7 +540,7 @@ function WeekView({ weekData, data }) {
                       <Link to={f.source === 'player' ? `/profile/${f.handle}` : `/forecaster/${f.id}`} className="font-medium text-sm hover:text-accent transition-colors">
                         {f.name}
                       </Link>
-                      <PlatformBadge platform={f.platform || f.source || 'institutional'} showLabel />
+                      <PlatformBadge platform={getSourceBadgeKey(f)} showLabel />
                     </td>
                     <td className="px-5 py-3 text-right">
                       <span className={`font-mono font-semibold ${f.accuracy_rate >= 60 ? 'text-positive' : 'text-negative'}`}>
@@ -541,7 +571,7 @@ function WeekView({ weekData, data }) {
                 className="card py-3 flex items-center justify-between hover:border-accent/20 transition-colors">
                 <div>
                   <span className="text-sm font-medium">{f.name}</span>
-                  <PlatformBadge platform={f.platform || f.source || 'institutional'} showLabel />
+                  <PlatformBadge platform={getSourceBadgeKey(f)} showLabel />
                   <span className="text-muted text-xs ml-1.5 font-mono">({(f.alltime_accuracy || 0).toFixed(0)}% acc)</span>
                 </div>
                 <span className="font-mono text-accent text-sm font-semibold">{f.new_predictions} new</span>

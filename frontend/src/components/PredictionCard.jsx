@@ -6,6 +6,7 @@ import BookmarkButton from './BookmarkButton';
 import PlatformBadge from './PlatformBadge';
 import CredibilityBadge from './CredibilityBadge';
 import { annotateContext, ExplainerLine, ratingChangeLabel } from '../utils/predictionExplainer';
+import { getSourceBadgeKey } from '../utils/getSourceBadgeKey';
 import CommentSection from './CommentSection';
 import ScoringBreakdown from './ScoringBreakdown';
 import TickerLogo from './TickerLogo';
@@ -90,7 +91,7 @@ export default function PredictionCard({ prediction: p, showForecaster = false, 
       {/* Line 1: Forecaster + credibility badge + firm */}
       {(showForecaster || fc) && fc && (
         <div className="flex items-center gap-1.5 mb-2 flex-wrap">
-          <PlatformBadge platform={fc.platform || p.source_type} size={14} />
+          <PlatformBadge platform={getSourceBadgeKey(p, fc)} size={14} />
           <Link to={`/forecaster/${fc.id}`} className="text-sm font-medium text-text-primary hover:text-accent transition-colors">
             {fc.name}
           </Link>

@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { ChevronRight } from 'lucide-react';
 import MiniPieChart from './MiniPieChart';
 import PlatformBadge from './PlatformBadge';
+import { getSourceBadgeKey } from '../utils/getSourceBadgeKey';
 import RankBadge from './RankBadge';
 import StreakBadge from './StreakBadge';
 import CompareButton from './CompareButton';
@@ -52,7 +53,7 @@ export default function LeaderboardCard({ forecaster: f, metric = 'avg_return', 
                 <Link to={f.slug ? `/analyst/${f.slug}` : `/forecaster/${f.id}`} className="font-medium text-[15px] hover:text-accent transition-colors">
                   {f.name}
                 </Link>
-                <PlatformBadge platform={f.platform} />
+                <PlatformBadge platform={getSourceBadgeKey(f)} />
               </div>
               {f.firm ? (
                 <div className="text-muted text-xs">{f.firm}</div>
