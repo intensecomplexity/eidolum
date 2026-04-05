@@ -137,8 +137,8 @@ export default function App() {
         <Route path="/prediction/:predictionId/told-you-so" element={<ToldYouSo />} />
         <Route path="/settings" element={<SettingsPage />} />
         <Route path="/controversial" element={<ControversialPage />} />
-        <Route path="/compare/:id1/:id2" element={<ComparePage />} />
-        <Route path="/compare" element={<CompareForecasters />} />
+        <Route path="/compare/:id1/:id2" element={features.compare_analysts ? <ComparePage /> : <ComingSoon feature="Compare Analysts" />} />
+        <Route path="/compare" element={features.compare_analysts ? <CompareForecasters /> : <ComingSoon feature="Compare Analysts" />} />
         <Route path="/analysts" element={<AnalystsPage />} />
         <Route path="/analyst/:name" element={<AnalystProfilePage />} />
         <Route path="/heatmap" element={<HeatmapPage />} />

@@ -2,12 +2,12 @@ import { createContext, useContext, useEffect, useState } from 'react';
 import { getFeatureFlags } from '../api';
 
 const FeatureContext = createContext({
-  tournaments: false, daily_challenge: false, duels: false, compete: false, loaded: false,
+  tournaments: false, daily_challenge: false, duels: false, compete: false, compare_analysts: false, loaded: false,
 });
 
 export function FeatureProvider({ children }) {
   const [flags, setFlags] = useState({
-    tournaments: false, daily_challenge: false, duels: false, compete: false, loaded: false,
+    tournaments: false, daily_challenge: false, duels: false, compete: false, compare_analysts: false, loaded: false,
   });
 
   useEffect(() => {

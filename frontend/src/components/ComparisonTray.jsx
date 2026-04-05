@@ -1,10 +1,13 @@
 import { Link } from 'react-router-dom';
 import { X, ArrowLeftRight } from 'lucide-react';
 import { useCompare } from '../context/CompareContext';
+import { useFeatures } from '../context/FeatureContext';
 
 export default function ComparisonTray() {
   const { tray, removeFromCompare, clearCompare } = useCompare();
+  const features = useFeatures();
 
+  if (!features.compare_analysts) return null;
   if (tray.length === 0) return null;
 
   const compareUrl = tray.length >= 2

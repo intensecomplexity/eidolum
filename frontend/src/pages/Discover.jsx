@@ -4,6 +4,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { Search, TrendingUp, TrendingDown, Flame, AlertTriangle, Clock, BarChart3, Star } from 'lucide-react';
 import Footer from '../components/Footer';
 import PageHeader from '../components/PageHeader';
+import { useFeatures } from '../context/FeatureContext';
 import CompanyLogo from '../components/CompanyLogo';
 import { searchTickers, getTrendingTickers, getSectors, getExpiringPredictions, getLeaderboard } from '../api';
 
@@ -16,6 +17,7 @@ function formatBullBear(bull, bear) {
 
 export default function Discover() {
   const navigate = useNavigate();
+  const features = useFeatures();
   const [query, setQuery] = useState('');
   const [results, setResults] = useState([]);
   const [searching, setSearching] = useState(false);
@@ -244,16 +246,18 @@ export default function Discover() {
             </div>
           </div>
         )}
-        {/* ── SECTION 7: Compare Analysts ──────────────────────────── */}
-        <div className="mb-8">
-          <Link to="/compare" className="card flex items-center justify-between py-4 hover:border-accent/30 transition-colors">
-            <div>
-              <h3 className="text-sm font-semibold text-text-primary mb-0.5">Compare Analysts</h3>
-              <p className="text-xs text-muted">Pick any two forecasters and see who has the better track record.</p>
-            </div>
-            <span className="text-accent text-xs font-medium shrink-0 ml-4">Compare &rarr;</span>
-          </Link>
-        </div>
+        {/* ── SECTION 7: Compare Analysts (feature-flagged) ───────── */}
+        {features.compare_analysts && (
+          <div className="mb-8">
+            <Link to="/compare" className="card flex items-center justify-between py-4 hover:border-accent/30 transition-colors">
+              <div>
+                <h3 className="text-sm font-semibold text-text-primary mb-0.5">Compare Analysts</h3>
+                <p className="text-xs text-muted">Pick any two forecasters and see who has the better track record.</p>
+              </div>
+              <span className="text-accent text-xs font-medium shrink-0 ml-4">Compare &rarr;</span>
+            </Link>
+          </div>
+        )}
       </div>
       <Footer />
     </div>

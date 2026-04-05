@@ -1,8 +1,11 @@
 import { ArrowLeftRight, Check } from 'lucide-react';
 import { useCompare } from '../context/CompareContext';
+import { useFeatures } from '../context/FeatureContext';
 
 export default function CompareButton({ forecaster, size = 'small' }) {
   const { addToCompare, isInCompare, removeFromCompare } = useCompare();
+  const features = useFeatures();
+  if (!features.compare_analysts) return null;
   if (!forecaster?.id) return null;
 
   const inCompare = isInCompare(forecaster.id);

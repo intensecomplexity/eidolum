@@ -2049,11 +2049,11 @@ def get_features(db: _Session = _Depends(_get_db)):
     from sqlalchemy import text as _ft
     flags = {
         "tournaments": False, "daily_challenge": False,
-        "duels": False, "compete": False,
+        "duels": False, "compete": False, "compare_analysts": False,
     }
     try:
         rows = db.execute(_ft(
-            "SELECT key, value FROM config WHERE key IN ('tournaments_enabled','daily_challenge_enabled','duels_enabled','compete_enabled')"
+            "SELECT key, value FROM config WHERE key IN ('tournaments_enabled','daily_challenge_enabled','duels_enabled','compete_enabled','compare_analysts_enabled')"
         )).fetchall()
         for r in rows:
             flags[r[0].replace("_enabled", "")] = r[1] == "true"
@@ -2086,6 +2086,19 @@ def toggle_compete(admin_id: int = _Depends(_require_admin), db: _Session = _Dep
     db.commit()
     new_val = db.query(Config).filter(Config.key == "compete_enabled").first()
     return {"compete_enabled": new_val.value == "true" if new_val else False}
+
+
+@app.post("/api/admin/toggle-compare-analysts")
+def toggle_compare_analysts(admin_id: int = _Depends(_require_admin), db: _Session = _Depends(_get_db)):
+    from models import Config
+    row = db.query(Config).filter(Config.key == "compare_analysts_enabled").first()
+    if row:
+        row.value = "false" if row.value == "true" else "true"
+    else:
+        db.add(Config(key="compare_analysts_enabled", value="true"))
+    db.commit()
+    new_val = db.query(Config).filter(Config.key == "compare_analysts_enabled").first()
+    return {"compare_analysts_enabled": new_val.value == "true" if new_val else False}
 
 
 # ── SEO: sitemap.xml + robots.txt ──────────────────────────────────────────

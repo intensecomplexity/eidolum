@@ -7,7 +7,7 @@ import {
   getAdminDashboard, getAdminUsers, getAdminForecasters, getAdminAuditLog,
   banUser, unbanUser, deleteUserAccount, promoteAdmin, demoteAdmin,
   deleteForecasterAdmin, deletePredictionAdmin, listPredictionsAdmin,
-  getFeatureFlags, toggleDuelsAdmin, toggleCompeteAdmin,
+  getFeatureFlags, toggleDuelsAdmin, toggleCompeteAdmin, toggleCompareAnalystsAdmin,
   getAdminUrlQuality,
 } from '../api';
 
@@ -107,6 +107,7 @@ function FeatureToggles() {
         {[
           { key: 'duels', label: 'Duels', fn: toggleDuelsAdmin },
           { key: 'compete', label: 'Compete / Seasons', fn: toggleCompeteAdmin },
+          { key: 'compare_analysts', label: 'Compare Analysts', fn: toggleCompareAnalystsAdmin },
         ].map(f => (
           <div key={f.key} className="flex items-center justify-between py-2">
             <span className="text-sm text-text-secondary">{f.label}</span>
