@@ -44,7 +44,7 @@ export default function BottomNav() {
         </div>
       )}
 
-      <nav className="fixed bottom-0 left-0 right-0 z-50 bg-surface border-t border-border sm:hidden"
+      <nav className="fixed bottom-0 left-0 right-0 z-50 bg-bg border-t border-border sm:hidden"
            style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
         <div className="flex items-center justify-around h-[60px]">
           <Link to="/" className={`flex flex-col items-center justify-center gap-0.5 w-full h-full active:bg-surface-2 transition-colors ${isActive('/') && !isActive('/login') && !isActive('/register') ? 'text-accent' : 'text-muted'}`}>
