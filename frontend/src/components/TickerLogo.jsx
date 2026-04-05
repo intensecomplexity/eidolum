@@ -2,14 +2,22 @@ import { useState, useEffect } from 'react';
 
 // -- Logo cache with TTL --
 const CACHE_PREFIX = 'eidolum_logo:';
-const DARK_BG_PREFIX = 'logo_dark_';
 const SUCCESS_TTL = 7 * 24 * 60 * 60 * 1000; // 7 days
 const FAIL_TTL = 4 * 60 * 60 * 1000;          // 4 hours
 
-// Known white/light logos that always need dark background (CORS fallback)
+// White/light logos — need filter treatment so they're visible
 const WHITE_LOGOS = new Set([
-  'NKE', 'AMZN', 'AAPL', 'LLY', 'REGN', 'VRTX', 'BIIB', 'ZM',
-  'UBER', 'ABNB', 'DASH', 'RBLX', 'U', 'SNOW', 'NET',
+  'NKE', 'AMZN', 'AAPL', 'META', 'UBER', 'SQ', 'BLOCK',
+  'ABNB', 'SNAP', 'HOOD', 'COIN', 'RBLX', 'U', 'ZM',
+  'SHOP', 'SPOT', 'NET', 'CRWD', 'DDOG', 'MDB',
+  'LLY', 'REGN', 'VRTX', 'BIIB', 'DASH', 'SNOW',
+]);
+
+// Multicolor logos — skip all filters and blend modes
+const MULTICOLOR_LOGOS = new Set([
+  'MSFT', 'GOOGL', 'GOOG', 'JPM', 'BAC', 'WFC', 'C',
+  'V', 'MA', 'PYPL', 'INTC', 'IBM', 'ORCL', 'CRM',
+  'ADBE', 'PEP', 'KO', 'DIS', 'NFLX', 'WMT', 'TGT',
 ]);
 
 function getCachedLogoUrl(ticker) {
@@ -47,28 +55,20 @@ function setCachedLogoUrl(ticker, url) {
   } catch {}
 }
 
-function getCachedDarkBg(ticker) {
-  try { return localStorage.getItem(DARK_BG_PREFIX + ticker) === '1'; } catch { return false; }
-}
-
-function setCachedDarkBg(ticker) {
-  try { localStorage.setItem(DARK_BG_PREFIX + ticker, '1'); } catch {}
-}
-
 /** Clear all cached logos */
 export function clearLogoCache() {
   try {
     const keys = [];
     for (let i = 0; i < localStorage.length; i++) {
       const key = localStorage.key(i);
-      if (key && (key.startsWith(CACHE_PREFIX) || key.startsWith(DARK_BG_PREFIX))) keys.push(key);
+      if (key && key.startsWith(CACHE_PREFIX)) keys.push(key);
     }
     keys.forEach(k => localStorage.removeItem(k));
     return keys.length;
   } catch { return 0; }
 }
 
-// -- FMP logo URL sources --
+// FMP logo URL sources (static CDN)
 function fmpUrls(ticker) {
   if (!ticker || ticker === '?') return [];
   return [
@@ -78,10 +78,11 @@ function fmpUrls(ticker) {
 }
 
 /**
- * TickerLogo -- renders a stock/company logo with smart background detection.
+ * TickerLogo -- renders a stock/company logo floating on the page background.
  *
- * Default: white container. If the logo image is mostly white/light,
- * switches to dark container so the logo remains visible.
+ * No containers or borders. Logos float directly on the page.
+ * White logos get CSS filters. Multicolor logos are untouched.
+ * Others get mix-blend-mode to handle baked-in backgrounds.
  */
 export default function TickerLogo({ ticker, logoUrl, size = 32, className = '' }) {
   const symbol = (ticker || '?').toUpperCase();
@@ -98,9 +99,6 @@ export default function TickerLogo({ ticker, logoUrl, size = 32, className = '' 
   });
   const [loaded, setLoaded] = useState(!!cached && cached !== 'no_logo');
   const [failed, setFailed] = useState(cached === 'no_logo');
-  const [needsDarkBg, setNeedsDarkBg] = useState(() => {
-    return WHITE_LOGOS.has(symbol) || getCachedDarkBg(symbol);
-  });
 
   useEffect(() => {
     if (logoUrl && !effectiveUrl && !failed) {
@@ -109,34 +107,11 @@ export default function TickerLogo({ ticker, logoUrl, size = 32, className = '' 
     }
   }, [logoUrl]);
 
-  const container = { width: size, height: size, minWidth: size, minHeight: size };
+  // Read theme on every render (parent re-renders on theme change)
+  const isDark = (document.documentElement.getAttribute('data-theme') || 'dark') === 'dark';
 
-  function detectWhiteLogo(img) {
-    if (needsDarkBg || WHITE_LOGOS.has(symbol)) return;
-    try {
-      const canvas = document.createElement('canvas');
-      const w = Math.min(img.naturalWidth, 64);
-      const h = Math.min(img.naturalHeight, 64);
-      canvas.width = w;
-      canvas.height = h;
-      const ctx = canvas.getContext('2d');
-      ctx.drawImage(img, 0, 0, w, h);
-      const data = ctx.getImageData(0, 0, w, h).data;
-      let whitePixels = 0, visiblePixels = 0;
-      for (let i = 0; i < data.length; i += 4) {
-        if (data[i + 3] > 128) {
-          visiblePixels++;
-          if (data[i] > 240 && data[i + 1] > 240 && data[i + 2] > 240) whitePixels++;
-        }
-      }
-      if (visiblePixels > 0 && whitePixels / visiblePixels > 0.7) {
-        setNeedsDarkBg(true);
-        setCachedDarkBg(symbol);
-      }
-    } catch {
-      // CORS error — silent fallback, white bg stays
-    }
-  }
+  const container = { width: size, height: size, minWidth: size, minHeight: size };
+  const fontSize = size * 0.42;
 
   function handleLoad(e) {
     const img = e.target;
@@ -146,7 +121,6 @@ export default function TickerLogo({ ticker, logoUrl, size = 32, className = '' 
     }
     setLoaded(true);
     if (effectiveUrl) setCachedLogoUrl(symbol, effectiveUrl);
-    detectWhiteLogo(img);
   }
 
   function handleError() {
@@ -162,18 +136,14 @@ export default function TickerLogo({ ticker, logoUrl, size = 32, className = '' 
     setCachedLogoUrl(symbol, null);
   }
 
-  const pad = Math.max(Math.round(size * 0.12), 2);
-  const innerSize = size - pad * 2;
-  const fontSize = size * 0.42;
-
-  // Fallback: dark circle with gold letter
+  // Fallback: subtle circle with gold letter
   if (failed || !effectiveUrl) {
     return (
       <div
         className={`flex items-center justify-center shrink-0 ${className}`}
         style={{
           ...container,
-          backgroundColor: '#1e2028',
+          backgroundColor: isDark ? '#1e2028' : '#f0f0f0',
           borderRadius: '50%',
           color: '#D4A843',
           fontSize,
@@ -186,33 +156,54 @@ export default function TickerLogo({ ticker, logoUrl, size = 32, className = '' 
     );
   }
 
-  // Container: white by default, dark for white/light logos
-  const boxStyle = needsDarkBg
-    ? { ...container, backgroundColor: '#1e2028', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 8, padding: pad }
-    : { ...container, backgroundColor: '#ffffff', border: '1px solid rgba(0,0,0,0.08)', borderRadius: 8, padding: pad };
+  // Determine image styles based on logo type
+  const isWhite = WHITE_LOGOS.has(symbol);
+  const isMulticolor = MULTICOLOR_LOGOS.has(symbol);
+
+  let imgFilter = 'none';
+  let imgBlend = 'normal';
+
+  if (isMulticolor) {
+    // Multicolor: no filter, no blend — just show as-is
+  } else if (isWhite) {
+    if (isDark) {
+      imgFilter = 'brightness(0.9)';
+    } else {
+      imgFilter = 'invert(1) brightness(0.2)';
+    }
+  } else {
+    // Default: blend mode to handle baked-in backgrounds
+    imgBlend = isDark ? 'multiply' : 'darken';
+  }
 
   return (
     <div
       className={`flex items-center justify-center shrink-0 overflow-hidden relative ${className}`}
-      style={boxStyle}
+      style={container}
     >
       <img
         src={effectiveUrl}
         alt=""
-        width={innerSize}
-        height={innerSize}
+        width={size}
+        height={size}
         loading="lazy"
-        crossOrigin="anonymous"
-        className="object-contain"
         onLoad={handleLoad}
         onError={handleError}
-        style={{ opacity: loaded ? 1 : 0, transition: 'opacity 200ms ease-in' }}
+        style={{
+          objectFit: 'contain',
+          width: size,
+          height: size,
+          opacity: loaded ? 1 : 0,
+          transition: 'opacity 200ms ease-in',
+          filter: imgFilter,
+          mixBlendMode: imgBlend,
+        }}
       />
       {!loaded && (
         <span
           className="absolute"
           style={{
-            color: needsDarkBg ? '#D4A843' : '#9ca3af',
+            color: '#D4A843',
             fontSize: size * 0.32,
             fontWeight: 700,
             fontFamily: 'monospace',
