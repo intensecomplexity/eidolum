@@ -124,6 +124,26 @@ TIMEFRAME_PATS = [
 ]
 
 
+def _parse_tweet_date(date_str: str) -> datetime:
+    """Parse tweet dates from various Apify/Twitter formats."""
+    if not date_str:
+        return datetime.utcnow()
+    s = date_str.strip()
+    for fmt in (
+        "%Y-%m-%dT%H:%M:%S",           # ISO without Z
+        "%Y-%m-%dT%H:%M:%S.%fZ",       # ISO with ms and Z
+        "%Y-%m-%dT%H:%M:%SZ",          # ISO with Z
+        "%a %b %d %H:%M:%S +0000 %Y",  # Twitter native
+        "%a %b %d %H:%M:%S %Y",        # Without timezone
+        "%a %b %d %H:%M:%S",           # Without year/timezone
+    ):
+        try:
+            return datetime.strptime(s, fmt)
+        except ValueError:
+            continue
+    return datetime.utcnow()
+
+
 def _get_batch_index() -> int:
     try:
         with open(BATCH_INDEX_FILE) as f:
@@ -349,7 +369,7 @@ def run_x_scraper(db=None):
 
                     # Cross-scraper dedup
                     from jobs.prediction_validator import prediction_exists_cross_scraper
-                    pred_date = datetime.strptime(created, "%Y-%m-%dT%H:%M:%S") if created and "T" in created else datetime.utcnow()
+                    pred_date = _parse_tweet_date(created)
                     if prediction_exists_cross_scraper(ticker, forecaster.id, direction, pred_date, db):
                         continue
 
