@@ -711,6 +711,14 @@ def get_all_consensus(
     if not sector and not sort and _consensus_cache and (_consensus_time.time() - _consensus_cache_time) < _CONSENSUS_TTL:
         return _consensus_cache
 
+    # Merge share-class duplicates into primary ticker
+    _TICKER_MERGE = {
+        'GOOG': 'GOOGL', 'BRK.A': 'BRK.B', 'FOX': 'FOXA',
+        'NWSA': 'NWS', 'DISCK': 'DISCA', 'LBTYA': 'LBTYK',
+    }
+    _merge_cases = " ".join(f"WHEN '{k}' THEN '{v}'" for k, v in _TICKER_MERGE.items())
+    _ticker_col = f"CASE ticker {_merge_cases} ELSE ticker END" if _merge_cases else "ticker"
+
     where = "WHERE direction IN ('bullish', 'bearish', 'neutral')"
     params = {}
     if sector:
@@ -718,7 +726,7 @@ def get_all_consensus(
         params["sector"] = sector
 
     rows = db.execute(_consensus_text(f"""
-        SELECT ticker,
+        SELECT {_ticker_col} as merged_ticker,
                MODE() WITHIN GROUP (ORDER BY COALESCE(sector, 'Other')) as sector,
                COUNT(*) as total,
                SUM(CASE WHEN direction = 'bullish' THEN 1 ELSE 0 END) as bullish,
@@ -726,7 +734,7 @@ def get_all_consensus(
                SUM(CASE WHEN direction = 'neutral' THEN 1 ELSE 0 END) as neutral
         FROM predictions
         {where}
-        GROUP BY ticker
+        GROUP BY {_ticker_col}
         HAVING COUNT(*) >= 5
         ORDER BY COUNT(*) DESC
         LIMIT 200
