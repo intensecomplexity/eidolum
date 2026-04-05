@@ -1,22 +1,18 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 
 /**
- * VaultDoorSplash — Luxury splash animation.
+ * VaultDoorSplash — Luxury splash animation. Pure visual, no text.
  *
- * Timeline (~4.9s):
+ * Timeline (~3.5s):
  *  0–350ms   E fades in dim
  *  250–450   E dots brighten sequentially
  *  450–700   Dots fly outward to circle circumference
- *  700–1900  9 arc segments draw simultaneously (1.2s ease-in-out)
+ *  700���1900  9 arc segments draw simultaneously (1.2s ease-in-out)
  *  1900–2700 E bars flicker independently to full brightness
- *  2200–2800 Gold pressure-wave ping (fires during late flicker)
- *  2200–2600 "Eidolum" text reveals (vertical clip from center)
- *  2400–2700 Tagline fades in
  *  2500–2800 Warm glow behind E fades in
- *  2700–4200 Reading hold (~1.5s)
- *  4200–4400 Text fades out
- *  4400–4700 Inner group scales to 0.9× and fades
- *  4600–4800 Background fades to transparent
+ *  2700–3300 Gold pressure-wave ping expands
+ *  3100–3400 Inner group scales to 0.9× and fades
+ *  3300–3500 Background fades to transparent
  */
 
 const GOLD = '#D4A843';
@@ -28,7 +24,7 @@ function getThemeBG() {
 }
 const BG = getThemeBG();
 
-/* ── Easing ──────────────────────────────────────────────────── */
+/* ── Easing ──────────��───────────────────────────────────────── */
 const easeInOut = t =>
   t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
 const easeOut = t => 1 - Math.pow(1 - t, 3);
@@ -45,7 +41,7 @@ function flickerAt(ms) {
   return 0;
 }
 
-/* ── Geometry ────────────────────────────────────────────────── */
+/* ── Geometry ───────────��────────────────────────────────────── */
 const CX = 150, CY = 150, R = 95;
 const CIRC = 2 * Math.PI * R;   // ≈596.9
 const SEG = CIRC / 9;            // ≈66.3
@@ -70,12 +66,12 @@ const TGT = Array.from({ length: 9 }, (_, i) => {
   return [CX + R * Math.cos(a), CY + R * Math.sin(a)];
 });
 
-/* ── Helpers ─────────────────────────────────────────────────── */
+/* ── Helpers ──────────────��─────────────────────��────────────── */
 const clamp01 = v => Math.min(Math.max(v, 0), 1);
 const prog = (ms, s, e) => clamp01((ms - s) / (e - s));
 const lerp = (a, b, t) => a + (b - a) * t;
 
-/* ── Component ───────────────────────────────────────────────── */
+/* ── Component ────────��──────────────────────────────────────── */
 export default function VaultDoorSplash({ onComplete }) {
   const [gone, setGone] = useState(false);
   const r = useRef({ bars: [], arcs: [], eDots: [], dots: [] });
@@ -100,7 +96,7 @@ export default function VaultDoorSplash({ onComplete }) {
     const tick = now => {
       const ms = now - t0.current;
       render(ms, r.current);
-      if (ms < 4900) raf.current = requestAnimationFrame(tick);
+      if (ms < 3600) raf.current = requestAnimationFrame(tick);
       else finish();
     };
     raf.current = requestAnimationFrame(tick);
@@ -131,7 +127,6 @@ export default function VaultDoorSplash({ onComplete }) {
           willChange: 'transform, opacity',
         }}
       >
-        {/* ── Main SVG canvas ── */}
         <svg
           viewBox="0 0 300 300"
           style={{ width: 'min(280px, 75vw)', height: 'min(280px, 75vw)' }}
@@ -212,30 +207,6 @@ export default function VaultDoorSplash({ onComplete }) {
             stroke={GOLD} strokeWidth={3.5} fill="none" opacity={0}
           />
         </svg>
-
-        {/* ── Text ── */}
-        <div
-          ref={el => (r.current.text = el)}
-          className="font-serif"
-          style={{
-            marginTop: 16, fontSize: 28, color: GOLD,
-            letterSpacing: '0.04em',
-            clipPath: 'inset(50% 0 50% 0)',
-            opacity: 0,
-            willChange: 'clip-path, opacity',
-          }}
-        >
-          Eidolum
-        </div>
-        <div
-          ref={el => (r.current.tag = el)}
-          style={{
-            marginTop: 6, fontStyle: 'italic', fontSize: 14, color: GOLD,
-            opacity: 0, willChange: 'opacity',
-          }}
-        >
-          Truth is the only currency.
-        </div>
       </div>
     </div>
   );
@@ -310,7 +281,7 @@ function render(ms, r) {
     r.decor?.setAttribute('opacity', String(lerp(0, 0.15, easeOut(prog(ms, 1900, 2200)))));
   }
 
-  /* ═══ Phase 5: E flicker (1900 → 2700ms, 0.8s) ═══ */
+  /* ═��═ Phase 5: E flicker (1900 → 2700ms, 0.8s) ═══ */
   if (ms >= 1900) {
     r.eGroup?.setAttribute('opacity', '1');
     const base = ms - 1900;
@@ -325,9 +296,9 @@ function render(ms, r) {
     r.glow?.setAttribute('opacity', String(easeOut(prog(ms, 2500, 2800))));
   }
 
-  /* ═══ Phase 6: Ping + text (2200ms — fires during late flicker) ═══ */
-  if (ms >= 2200 && ms < 2900) {
-    const p = easeOut(prog(ms, 2200, 2800));
+  /* ═══ Phase 6: Ping (2700 → 3300ms) ═══ */
+  if (ms >= 2700 && ms < 3400) {
+    const p = easeOut(prog(ms, 2700, 3300));
     if (r.ping) {
       r.ping.setAttribute('r', String(R * lerp(1, 1.8, p)));
       r.ping.setAttribute('opacity', String(lerp(0.5, 0, p)));
@@ -335,37 +306,18 @@ function render(ms, r) {
     }
   }
 
-  // "Eidolum" — vertical clip reveal from center
-  if (r.text && ms >= 2200) {
-    r.text.style.opacity = '1';
-    const inset = lerp(50, 0, easeOut(prog(ms, 2200, 2600)));
-    r.text.style.clipPath = `inset(${inset}% 0 ${inset}% 0)`;
-  }
+  /* ═══ Phase 7: Staggered fadeout ��══ */
 
-  // Tagline
-  if (r.tag && ms >= 2400) {
-    r.tag.style.opacity = String(lerp(0, 0.6, easeOut(prog(ms, 2400, 2700))));
-  }
-
-  /* ═══ Phase 7: Staggered fadeout (after 1.5s reading hold) ═══ */
-
-  // Text fades first (4200 → 4400ms)
-  if (ms >= 4200) {
-    const p = prog(ms, 4200, 4400);
-    if (r.text) r.text.style.opacity = String(1 - p);
-    if (r.tag)  r.tag.style.opacity = String(0.6 * (1 - p));
-  }
-
-  // Circle + E scale to 0.9× and fade (4400 → 4700ms)
-  if (r.inner && ms >= 4400) {
-    const p = easeOut(prog(ms, 4400, 4700));
+  // Inner scales to 0.9× and fades (3100 → 3400ms)
+  if (r.inner && ms >= 3100) {
+    const p = easeOut(prog(ms, 3100, 3400));
     r.inner.style.transform = `scale(${lerp(1, 0.9, p)})`;
     r.inner.style.opacity = String(1 - p);
   }
 
-  // Background fades to transparent (4600 → 4800ms)
-  if (r.bg && ms >= 4600) {
-    const p = prog(ms, 4600, 4800);
+  // Background fades to transparent (3300 → 3500ms)
+  if (r.bg && ms >= 3300) {
+    const p = prog(ms, 3300, 3500);
     r.bg.style.opacity = String(1 - p);
     if (p >= 1) r.bg.style.pointerEvents = 'none';
   }
