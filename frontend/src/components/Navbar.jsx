@@ -78,7 +78,7 @@ export default function Navbar() {
 
   const linkClass = (path) => {
     const isActive = location.pathname === path || location.pathname.startsWith(path + '/');
-    return `text-sm font-normal transition-colors min-h-[44px] flex items-center ${isActive ? 'text-accent' : 'text-text-secondary hover:text-text-primary'}`;
+    return `text-sm font-normal transition-colors min-h-[44px] flex items-center whitespace-nowrap ${isActive ? 'text-accent' : 'text-text-secondary hover:text-text-primary'}`;
   };
 
   const accuracy = user?.accuracy_percentage || user?.accuracy || 0;
@@ -111,23 +111,26 @@ export default function Navbar() {
 
             {/* ── RIGHT: Search + Help + Bell + User dropdown ─────── */}
             <div className="flex items-center gap-2">
-              {/* Desktop search — icon only, expands on click */}
-              <div className="hidden sm:block relative" ref={searchRef}>
-                {searchExpanded ? (
-                  <UniversalSearch
-                    className="w-64"
-                    inputClassName="font-mono text-sm"
-                    onStartDuel={(u) => { setDuelTarget(u); setSearchExpanded(false); }}
-                    onClose={() => setSearchExpanded(false)}
-                    autoFocus
-                  />
-                ) : (
-                  <button onClick={() => setSearchExpanded(true)}
-                    className="flex items-center justify-center w-9 h-9 rounded-lg text-text-secondary hover:text-accent transition-colors" title="Search">
-                    <Search className="w-4.5 h-4.5" />
-                  </button>
-                )}
+              {/* Desktop search — icon opens an absolute overlay */}
+              <div className="hidden sm:block" ref={searchRef}>
+                <button onClick={() => setSearchExpanded(true)}
+                  className="flex items-center justify-center w-9 h-9 rounded-lg text-text-secondary hover:text-accent transition-colors" title="Search">
+                  <Search className="w-4.5 h-4.5" />
+                </button>
               </div>
+              {searchExpanded && (
+                <div className="hidden sm:block fixed inset-x-0 top-0 z-[60] bg-bg/95 backdrop-blur-md" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+                  <div className="max-w-2xl mx-auto px-4 py-3">
+                    <UniversalSearch
+                      className="w-full"
+                      inputClassName="font-mono text-sm"
+                      onStartDuel={(u) => { setDuelTarget(u); setSearchExpanded(false); }}
+                      onClose={() => setSearchExpanded(false)}
+                      autoFocus
+                    />
+                  </div>
+                </div>
+              )}
 
               {/* Help button */}
               {/* Theme toggle */}
