@@ -45,6 +45,8 @@ def get_today_predictions(request: Request, db: Session = Depends(get_db)):
             "forecaster_name": forecaster.name if forecaster else "Unknown",
             "forecaster_id": p.forecaster_id,
             "outcome": p.outcome,
+            "source_type": p.source_type,
+            "verified_by": p.verified_by,
         })
 
     return results
@@ -95,6 +97,8 @@ def get_recent_predictions(
             "outcome": p.outcome,
             "target_price": p.target_price,
             "window_days": p.window_days,
+            "source_type": p.source_type,
+            "verified_by": p.verified_by,
         })
 
     return {

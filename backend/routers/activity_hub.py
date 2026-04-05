@@ -29,7 +29,8 @@ def recent_predictions(request: Request, db: Session = Depends(get_db)):
                p.prediction_date, p.window_days, p.context, p.exact_quote,
                p.created_at,
                f.id AS fid, f.name AS fname, f.accuracy_score,
-               ts.company_name
+               ts.company_name,
+               p.source_type, p.verified_by
         FROM predictions p
         JOIN forecasters f ON f.id = p.forecaster_id
         LEFT JOIN ticker_sectors ts ON ts.ticker = p.ticker
@@ -49,6 +50,7 @@ def recent_predictions(request: Request, db: Session = Depends(get_db)):
             "forecaster_id": r[10], "forecaster_name": r[11],
             "accuracy": round(float(r[12]), 1) if r[12] else None,
             "company_name": r[13],
+            "source_type": r[14], "verified_by": r[15],
             "type": "prediction",
         }
         for r in rows
@@ -67,7 +69,8 @@ def recently_scored(request: Request, db: Session = Depends(get_db)):
                p.outcome, p.actual_return, p.evaluation_date, p.prediction_date,
                p.context, p.exact_quote,
                f.id AS fid, f.name AS fname, f.accuracy_score,
-               ts.company_name, p.evaluated_at
+               ts.company_name, p.evaluated_at,
+               p.source_type, p.verified_by
         FROM predictions p
         JOIN forecasters f ON f.id = p.forecaster_id
         LEFT JOIN ticker_sectors ts ON ts.ticker = p.ticker
@@ -86,7 +89,8 @@ def recently_scored(request: Request, db: Session = Depends(get_db)):
                    p.outcome, p.actual_return, p.evaluation_date, p.prediction_date,
                    p.context, p.exact_quote,
                    f.id AS fid, f.name AS fname, f.accuracy_score,
-                   ts.company_name, p.evaluated_at
+                   ts.company_name, p.evaluated_at,
+                   p.source_type, p.verified_by
             FROM predictions p
             JOIN forecasters f ON f.id = p.forecaster_id
             LEFT JOIN ticker_sectors ts ON ts.ticker = p.ticker
@@ -111,6 +115,7 @@ def recently_scored(request: Request, db: Session = Depends(get_db)):
             "accuracy": round(float(r[13]), 1) if r[13] else None,
             "company_name": r[14],
             "scored_at": r[15].isoformat() if r[15] else (r[7].isoformat() if r[7] else None),
+            "source_type": r[16], "verified_by": r[17],
             "type": "scored",
         }
         for r in rows
@@ -129,7 +134,8 @@ def expiring_predictions(request: Request, db: Session = Depends(get_db)):
                p.evaluation_date, p.prediction_date, p.window_days,
                p.context, p.exact_quote,
                f.id AS fid, f.name AS fname, f.accuracy_score,
-               ts.company_name
+               ts.company_name,
+               p.source_type, p.verified_by
         FROM predictions p
         JOIN forecasters f ON f.id = p.forecaster_id
         LEFT JOIN ticker_sectors ts ON ts.ticker = p.ticker
@@ -155,6 +161,7 @@ def expiring_predictions(request: Request, db: Session = Depends(get_db)):
             "forecaster_id": r[10], "forecaster_name": r[11],
             "accuracy": round(float(r[12]), 1) if r[12] else None,
             "company_name": r[13],
+            "source_type": r[14], "verified_by": r[15],
             "type": "expiring",
         }
         for r in rows

@@ -20,6 +20,44 @@ INTEGRITY_CHECK_TTL = 600
 _last_forecaster_count: int = 0
 
 
+def _enrich_primary_source(results: list, db: Session):
+    """Batch-fetch the primary source_type for each forecaster based on their most common prediction source."""
+    if not results:
+        return
+    fids = [r["id"] for r in results]
+    try:
+        fid_placeholders = ",".join(str(int(f)) for f in fids)
+        rows = db.execute(sql_text(f"""
+            SELECT forecaster_id,
+                   (SELECT source_type FROM predictions p2
+                    WHERE p2.forecaster_id = p.forecaster_id
+                      AND p2.source_type IS NOT NULL
+                    GROUP BY source_type
+                    ORDER BY COUNT(*) DESC
+                    LIMIT 1) as primary_source,
+                   (SELECT verified_by FROM predictions p3
+                    WHERE p3.forecaster_id = p.forecaster_id
+                      AND p3.verified_by IS NOT NULL
+                    GROUP BY verified_by
+                    ORDER BY COUNT(*) DESC
+                    LIMIT 1) as primary_verified_by
+            FROM predictions p
+            WHERE p.forecaster_id IN ({fid_placeholders})
+            GROUP BY p.forecaster_id
+        """)).fetchall()
+
+        source_by_fid = {}
+        for row in rows:
+            source_by_fid[int(row[0])] = (row[1], row[2])
+
+        for r in results:
+            src_info = source_by_fid.get(int(r["id"]), (None, None))
+            r["primary_source"] = src_info[0]
+            r["primary_verified_by"] = src_info[1]
+    except Exception as e:
+        print(f"[Leaderboard] Primary source error: {e}")
+
+
 def _enrich_sector_strengths(results: list, db: Session):
     """Batch-fetch sector strengths for a list of forecaster results. Modifies in-place."""
     if not results:
@@ -133,6 +171,9 @@ def _refresh_leaderboard(db: Session) -> list | dict:
     if _last_forecaster_count > 0 and new_count < _last_forecaster_count * 0.5:
         print(f"[Leaderboard] WARNING: forecaster count dropped from {_last_forecaster_count} to {new_count} — possible stats sync issue")
     _last_forecaster_count = new_count
+
+    # Batch-fetch primary source
+    _enrich_primary_source(results, db)
 
     # Batch-fetch sector strengths
     _enrich_sector_strengths(results, db)
@@ -391,10 +432,22 @@ CALL_TYPE_MAP = {
 
 
 def _build_filtered_leaderboard(db: Session, sector=None, call_type=None, sort="accuracy",
-                                 limit=100, min_predictions=35, direction=None, timeframe=None) -> list:
+                                 limit=100, min_predictions=35, direction=None, timeframe=None,
+                                 source=None) -> list:
     """SQL-based filtered leaderboard. Returns ranked list."""
     where_clauses = ["p.outcome IN ('hit','near','miss','correct','incorrect')"]
     params = {}
+
+    if source and source != "all":
+        # Map source filter to source_type / verified_by values
+        if source == "x":
+            where_clauses.append("(p.source_type IN ('x', 'twitter') OR p.verified_by = 'x_scraper')")
+        elif source == "wallst":
+            where_clauses.append("(p.source_type = 'article' OR p.verified_by IN ('benzinga_api', 'fmp_ratings', 'alphavantage', 'benzinga_rss', 'marketbeat_rss', 'yfinance'))")
+        elif source == "youtube":
+            where_clauses.append("p.source_type = 'youtube'")
+        elif source == "community":
+            where_clauses.append("p.verified_by IN ('manual', 'user')")
 
     if sector:
         where_clauses.append("p.sector = :sector")
@@ -518,6 +571,9 @@ def _build_filtered_leaderboard(db: Session, sector=None, call_type=None, sort="
         except Exception:
             pass
 
+    # Batch-fetch primary source for each forecaster
+    _enrich_primary_source(results, db)
+
     # Batch-fetch sector strengths (same as default leaderboard)
     _enrich_sector_strengths(results, db)
 
@@ -539,6 +595,7 @@ def get_leaderboard(
     limit: int = Query(100, ge=1, le=100),
     min_predictions: int = Query(None),
     timeframe: str = Query(None),
+    source: str = Query(None),
 ):
     global _leaderboard_cache, _cache_time
 
@@ -547,25 +604,25 @@ def get_leaderboard(
         return _week_leaderboard(db)
 
     # Any filter/sort beyond default -> use SQL-based filtered leaderboard
-    has_filter = sector or call_type or direction or timeframe or (sort and sort != "accuracy")
+    has_filter = sector or call_type or direction or timeframe or source or (sort and sort != "accuracy")
     if has_filter:
-        cache_key = f"{sector}|{call_type}|{sort}|{limit}|{min_predictions}|{direction}|{timeframe}"
+        cache_key = f"{sector}|{call_type}|{sort}|{limit}|{min_predictions}|{direction}|{timeframe}|{source}"
         cached = _filtered_cache.get(cache_key)
         if cached and (_time.time() - cached[1]) < FILTERED_CACHE_TTL:
             return cached[0]
 
-        min_preds = min_predictions or (10 if sector or call_type or timeframe else 35)
+        min_preds = min_predictions or (10 if sector or call_type or timeframe or source else 35)
         results = _build_filtered_leaderboard(
             db, sector=sector, call_type=call_type, sort=sort or "accuracy",
             limit=limit, min_predictions=min_preds, direction=direction,
-            timeframe=timeframe,
+            timeframe=timeframe, source=source,
         )
         # Fallback: if "recent" returns empty, show top evaluated forecasters instead
         if not results and sort == "recent":
             results = _build_filtered_leaderboard(
                 db, sector=sector, call_type=call_type, sort="accuracy",
                 limit=limit, min_predictions=min_preds, direction=direction,
-                timeframe=timeframe,
+                timeframe=timeframe, source=source,
             )
         _filtered_cache[cache_key] = (results, _time.time())
         return results
