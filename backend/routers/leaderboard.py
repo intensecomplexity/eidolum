@@ -817,7 +817,7 @@ def get_homepage_data(request: Request, db: Session = Depends(get_db)):
     except Exception as e:
         print(f"[HomepageData] Top 5 error: {e}")
 
-    # Biggest Calls: recently scored predictions with highest absolute return
+    # Biggest Calls: recently scored predictions with highest realistic return
     biggest_calls = []
     try:
         bc_rows = db.execute(sql_text("""
@@ -829,7 +829,13 @@ def get_homepage_data(request: Request, db: Session = Depends(get_db)):
             JOIN forecasters f ON f.id = p.forecaster_id
             LEFT JOIN ticker_sectors ts ON ts.ticker = p.ticker
             WHERE p.outcome IN ('hit','near','miss','correct','incorrect')
-              AND p.actual_return IS NOT NULL AND p.actual_return != 0
+              AND p.actual_return IS NOT NULL
+              AND ABS(p.actual_return) BETWEEN 5 AND 200
+              AND p.target_price IS NOT NULL AND p.target_price > 0
+              AND p.entry_price IS NOT NULL AND p.entry_price > 0
+              AND p.ticker IN (
+                  SELECT ticker FROM predictions GROUP BY ticker HAVING COUNT(*) >= 20
+              )
             ORDER BY ABS(p.actual_return) DESC
             LIMIT 5
         """)).fetchall()

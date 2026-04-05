@@ -155,7 +155,7 @@ export default function Dashboard() {
           <div className="mb-6">
             <div className="flex items-center justify-between mb-2">
               <div className="flex items-center gap-3">
-                <h2 className="headline-serif text-base">Your Open Calls</h2>
+                <h2 className="font-semibold text-sm text-muted uppercase tracking-wider">Your Open Calls</h2>
                 {overallPnl !== null && (
                   <span className={`font-mono text-xs font-bold ${overallPnl >= 0 ? 'text-positive' : 'text-negative'}`}>
                     {overallPnl >= 0 ? '+' : ''}{overallPnl.toFixed(1)}% avg
@@ -167,12 +167,16 @@ export default function Dashboard() {
             <div className="card p-0 overflow-hidden">
               {pendingSorted.slice(0, 5).map((p, i) => (
                 <div key={p.id} className={`flex items-center justify-between px-4 py-2.5 ${i > 0 ? 'border-t border-border/50' : ''}`}>
-                  <div className="flex items-center gap-2.5">
+                  <div className="flex items-center gap-2">
                     <TickerLink ticker={p.ticker} className="text-sm" />
-                    <span className={`text-[10px] ${p.direction === 'bullish' ? 'text-positive' : 'text-negative'}`}>
-                      {p.direction === 'bullish' ? '\u25B2' : '\u25BC'}
+                    <span className={`text-[9px] font-bold uppercase px-1 py-0.5 rounded ${
+                      p.direction === 'bullish' ? 'text-positive bg-positive/10' :
+                      p.direction === 'neutral' ? 'text-yellow-400 bg-yellow-400/10' :
+                      'text-negative bg-negative/10'
+                    }`}>
+                      {p.direction === 'bullish' ? 'BULL' : p.direction === 'neutral' ? 'HOLD' : 'BEAR'}
                     </span>
-                    <span className="font-mono text-xs text-muted">{p.price_target}</span>
+                    {p.price_target > 0 && <span className="font-mono text-xs text-muted">${p.price_target}</span>}
                   </div>
                   <div className="flex items-center gap-3">
                     {p.price_at_call && p._current && (
