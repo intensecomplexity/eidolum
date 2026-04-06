@@ -252,7 +252,7 @@ def main():
         except Exception as e:
             log.error(f"[STOCKTWITS] Job failed: {e}", exc_info=True)
     print("[Worker] Registering StockTwits scraper job...", flush=True)
-    sched.add_job(_standalone("stocktwits_scraper", _stocktwits_scraper), "interval", hours=6, id="stocktwits_scraper", next_run_time=datetime.utcnow() + timedelta(minutes=3), misfire_grace_time=300)
+    sched.add_job(_standalone("stocktwits_scraper", _stocktwits_scraper), "interval", hours=6, id="stocktwits_scraper", next_run_time=datetime.utcnow(), misfire_grace_time=300)
 
     # Logo processor — process new ticker logos (runs 5 min after start, then daily)
     # First run after deploy reprocesses all logos with improved bg stripping
