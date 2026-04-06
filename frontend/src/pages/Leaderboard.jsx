@@ -81,6 +81,7 @@ export default function Leaderboard() {
   const metricRef = useRef(null);
   const [timeframe, setTimeframe] = useState('all');
   const [source, setSource] = useState('all');
+  const [minPreds, setMinPreds] = useState(10);
   const [availableTf, setAvailableTf] = useState({ all: true, short: true, medium: true, long: true });
 
   useEffect(() => {
@@ -107,7 +108,7 @@ export default function Leaderboard() {
   // Scroll to top on any filter change
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
-  }, [activeTab, sector, direction, metric, timeframe, source]);
+  }, [activeTab, sector, direction, metric, timeframe, source, minPreds]);
 
   function handleTabClick(key) {
     setActiveTab(key);
@@ -129,6 +130,7 @@ export default function Leaderboard() {
     if (direction !== 'All') params.direction = direction;
     if (timeframe !== 'all') params.timeframe = timeframe;
     if (source !== 'all') params.source = source;
+    if (minPreds > 10) params.min_predictions = minPreds;
     return params;
   }
 
@@ -151,7 +153,7 @@ export default function Leaderboard() {
           const arr = Array.isArray(result) ? result : [];
           setData(arr);
           if (arr.length === 0) {
-            const hasFilter = sector !== 'All' || direction !== 'All' || timeframe !== 'all' || source !== 'all';
+            const hasFilter = sector !== 'All' || direction !== 'All' || timeframe !== 'all' || source !== 'all' || minPreds > 10;
             setEmptyMessage(hasFilter
               ? 'No forecasters have enough scored predictions with these filters yet. Try broadening your selection.'
               : 'The leaderboard is loading. Predictions are being scored.');
@@ -164,7 +166,7 @@ export default function Leaderboard() {
         setEmptyMessage('Could not load leaderboard. Retrying...');
       })
       .finally(() => setLoading(false));
-  }, [activeTab, sector, direction, metric, timeframe, source]);
+  }, [activeTab, sector, direction, metric, timeframe, source, minPreds]);
 
   // Auto-retry every 30 seconds when leaderboard is empty
   useEffect(() => {
@@ -238,6 +240,22 @@ export default function Leaderboard() {
                   >
                     {SECTORS.map((s) => (
                       <option key={s} value={s}>{s === 'All' ? 'All Sectors' : s}</option>
+                    ))}
+                  </select>
+                  <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-muted pointer-events-none" />
+                </div>
+              )}
+
+              {/* Min Predictions dropdown */}
+              {activeTab !== 'week' && (
+                <div className="relative shrink-0">
+                  <select
+                    value={minPreds}
+                    onChange={(e) => setMinPreds(Number(e.target.value))}
+                    className="appearance-none bg-surface border border-border rounded-lg px-3 py-1.5 pr-8 text-sm text-text-primary focus:outline-none focus:border-accent/50 cursor-pointer"
+                  >
+                    {[10, 25, 50, 100, 250, 500].map(n => (
+                      <option key={n} value={n}>{n}+ calls</option>
                     ))}
                   </select>
                   <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-muted pointer-events-none" />

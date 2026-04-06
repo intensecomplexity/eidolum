@@ -606,7 +606,7 @@ def get_leaderboard(
         return _week_leaderboard(db)
 
     # Any filter/sort beyond default -> use SQL-based filtered leaderboard
-    has_filter = sector or call_type or direction or timeframe or source or (sort and sort != "accuracy")
+    has_filter = sector or call_type or direction or timeframe or source or (sort and sort != "accuracy") or (min_predictions and min_predictions > 10)
     if has_filter:
         cache_key = f"{sector}|{call_type}|{sort}|{limit}|{min_predictions}|{direction}|{timeframe}|{source}"
         cached = _filtered_cache.get(cache_key)
