@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import LoadingSpinner from '../components/LoadingSpinner';
 import { Link } from 'react-router-dom';
-import { Zap, TrendingUp, TrendingDown, Minus, Check, X, Clock, Users } from 'lucide-react';
+import { Zap, TrendingUp, TrendingDown, Minus, Check, X, Clock, Users, Lock } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import TickerLink from '../components/TickerLink';
 import Footer from '../components/Footer';
@@ -63,6 +63,37 @@ function OutcomeBadge({ outcome, actualReturn }) {
   );
 }
 
+function getSourceLabel(verifiedBy) {
+  if (!verifiedBy) return 'Community';
+  const map = {
+    massive_benzinga: 'Benzinga', benzinga_api: 'Benzinga', benzinga_web: 'Benzinga',
+    benzinga_rss: 'Benzinga', fmp_grades: 'FMP', fmp_ratings: 'FMP', fmp_pt: 'FMP',
+    fmp_daily_grades: 'FMP', finnhub_upgrade: 'Finnhub', finnhub_news: 'Finnhub',
+    finnhub_api: 'Finnhub', x_scraper: 'X', stocktwits_scraper: 'StockTwits',
+    alphavantage: 'Alpha Vantage', marketbeat_rss: 'MarketBeat',
+    yfinance: 'Yahoo Finance', newsapi: 'NewsAPI', ai_parsed: 'AI Parsed',
+    user: 'Community', manual: 'Community',
+  };
+  return map[verifiedBy] || 'Community';
+}
+
+function TrustSignals({ item }) {
+  const dateStr = item.prediction_date;
+  const formatted = dateStr ? new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : null;
+  return (
+    <div className="flex items-center gap-2 mt-1.5">
+      <span style={{ fontSize: 10, padding: '1px 7px', borderRadius: 12, background: 'rgba(100,100,100,0.15)', color: 'var(--color-text-secondary)', whiteSpace: 'nowrap' }}>
+        {getSourceLabel(item.verified_by)}
+      </span>
+      {formatted && (
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: 11, color: 'var(--color-text-tertiary)' }}>
+          <Lock size={11} /> Locked {formatted}
+        </span>
+      )}
+    </div>
+  );
+}
+
 function PredictionCard({ item }) {
   return (
     <div className={`card border-l-4 ${borderColor(item)} py-3 px-4`}>
@@ -86,6 +117,7 @@ function PredictionCard({ item }) {
         {item.window_days && <span className="text-[10px] text-muted flex-shrink-0">({item.window_days <= 30 ? '1m' : item.window_days <= 90 ? '3m' : item.window_days <= 180 ? '6m' : '1y'})</span>}
       </div>
       {item.context && <p className="text-xs text-muted mt-1 truncate">{item.context}</p>}
+      <TrustSignals item={item} />
     </div>
   );
 }
@@ -109,6 +141,7 @@ function ScoredCard({ item }) {
         <DirectionBadge direction={item.direction} />
         {item.company_name && <span className="text-xs text-muted truncate hidden sm:inline">{item.company_name}</span>}
       </div>
+      <TrustSignals item={item} />
     </div>
   );
 }
@@ -135,6 +168,7 @@ function ExpiringCard({ item }) {
         {item.target_price != null && <span className="text-xs font-mono text-text-secondary">${item.target_price.toFixed(0)}</span>}
         {item.company_name && <span className="text-xs text-muted truncate hidden sm:inline">{item.company_name}</span>}
       </div>
+      <TrustSignals item={item} />
     </div>
   );
 }
