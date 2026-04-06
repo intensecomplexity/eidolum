@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Flame, Crosshair, TrendingUp, TrendingDown, ArrowRight, Clock, Trophy, Zap } from 'lucide-react';
+import { Flame, Crosshair, TrendingUp, TrendingDown, ArrowRight, Clock, Trophy, Zap, Lock } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import DailyChallengeCard from '../components/DailyChallengeCard';
 import WeeklyChallengeCard from '../components/WeeklyChallengeCard';
@@ -12,6 +12,8 @@ import RankNumber from '../components/RankNumber';
 import TickerLogo from '../components/TickerLogo';
 import ConsensusBar from '../components/ConsensusBar';
 import PredictionBadge from '../components/PredictionBadge';
+import PlatformBadge from '../components/PlatformBadge';
+import { getSourceBadgeKey } from '../utils/getSourceBadgeKey';
 import Footer from '../components/Footer';
 import HeroSearch from '../components/HeroSearch';
 import MiniPieChart from '../components/MiniPieChart';
@@ -211,6 +213,14 @@ export default function Dashboard() {
                       </Link>
                       <span className="text-muted"> {p.direction === 'bullish' ? 'Bull' : p.direction === 'neutral' ? 'Hold' : 'Bear'}</span>
                       {p.target_price && <span className="text-muted">, target ${p.target_price.toFixed(0)}</span>}
+                    </div>
+                    <div className="flex items-center gap-2 mt-0.5">
+                      <PlatformBadge platform={getSourceBadgeKey(p)} size={10} showLabel />
+                      {p.prediction_date && (
+                        <span className="inline-flex items-center gap-1 text-[9px] text-muted">
+                          <Lock size={9} /> {new Date(p.prediction_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                        </span>
+                      )}
                     </div>
                   </div>
                 </Link>

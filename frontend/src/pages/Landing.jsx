@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { Search, Filter, CheckCircle, ArrowRight, TrendingUp, TrendingDown } from 'lucide-react';
 import TickerBar from '../components/TickerBar';
 import PlatformBadge from '../components/PlatformBadge';
+import { getSourceBadgeKey } from '../utils/getSourceBadgeKey';
 import RankBadge from '../components/RankBadge';
 import StreakBadge from '../components/StreakBadge';
 import LeaderboardCard from '../components/LeaderboardCard';
@@ -106,7 +107,7 @@ export default function Landing() {
                       <Link to={`/forecaster/${f.id}`} className="hover:text-accent transition-colors">
                         <div className="flex items-center gap-2">
                           <span style={{ fontWeight: 600, fontSize: '0.95rem' }}>{f.name}</span>
-                          <PlatformBadge platform={f.platform} />
+                          <PlatformBadge platform={getSourceBadgeKey(f)} />
                         </div>
                         <div className="text-muted text-xs">{f.handle}</div>
                       </Link>

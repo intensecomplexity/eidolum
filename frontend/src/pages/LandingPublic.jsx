@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Check, Minus, X } from 'lucide-react';
+import { Check, Minus, X, Lock } from 'lucide-react';
 import useSEO from '../hooks/useSEO';
 import RankNumber from '../components/RankNumber';
 import MiniPieChart from '../components/MiniPieChart';
 import PlatformBadge from '../components/PlatformBadge';
+import { getSourceBadgeKey } from '../utils/getSourceBadgeKey';
 import Footer from '../components/Footer';
 import TickerLogo from '../components/TickerLogo';
 import { getHomepageData } from '../api';
@@ -152,6 +153,14 @@ export default function LandingPublic() {
                 )}
               </div>
             )}
+            <div className="flex items-center gap-2 mt-2">
+              <PlatformBadge platform={getSourceBadgeKey(featured)} size={12} showLabel />
+              {featured.prediction_date && (
+                <span className="inline-flex items-center gap-1 text-[10px]" style={{ color: 'var(--color-text-tertiary)' }}>
+                  <Lock size={10} /> Locked {new Date(featured.prediction_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                </span>
+              )}
+            </div>
           </div>
           <p className="text-center text-muted text-xs mt-4 tracking-wide">
             Every prediction. Timestamped. Scored against reality.

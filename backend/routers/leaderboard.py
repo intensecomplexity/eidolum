@@ -897,7 +897,8 @@ def get_homepage_data(request: Request, db: Session = Depends(get_db)):
             SELECT p.id, p.ticker, p.direction, p.target_price, p.entry_price,
                    p.outcome, p.actual_return, p.prediction_date,
                    f.id AS fid, f.name AS fname, f.accuracy_score,
-                   ts.logo_domain, ts.logo_url, ts.company_name
+                   ts.logo_domain, ts.logo_url, ts.company_name,
+                   p.verified_by, p.source_type
             FROM predictions p
             JOIN forecasters f ON f.id = p.forecaster_id
             LEFT JOIN ticker_sectors ts ON ts.ticker = p.ticker
@@ -922,6 +923,7 @@ def get_homepage_data(request: Request, db: Session = Depends(get_db)):
                 "forecaster_id": r[8], "forecaster_name": r[9],
                 "accuracy": round(float(r[10]), 1) if r[10] else 0,
                 "logo_domain": r[11], "logo_url": r[12], "company_name": r[13],
+                "verified_by": r[14], "source_type": r[15],
             })
     except Exception:
         pass
@@ -967,7 +969,7 @@ def get_homepage_data(request: Request, db: Session = Depends(get_db)):
     _FEAT_SELECT = """SELECT p.id, p.ticker, p.direction, p.target_price, p.entry_price,
                   p.outcome, p.actual_return, p.prediction_date, p.evaluation_date,
                   f.id AS fid, f.name AS fname, f.firm,
-                  ts.company_name, ts.logo_url
+                  ts.company_name, ts.logo_url, p.verified_by, p.source_type
            FROM predictions p
            JOIN forecasters f ON f.id = p.forecaster_id
            LEFT JOIN ticker_sectors ts ON ts.ticker = p.ticker"""
@@ -1013,6 +1015,7 @@ def get_homepage_data(request: Request, db: Session = Depends(get_db)):
                 "forecaster_id": feat_row[9], "forecaster_name": feat_row[10],
                 "firm": feat_row[11],
                 "company_name": feat_row[12], "logo_url": feat_row[13],
+                "verified_by": feat_row[14], "source_type": feat_row[15],
             }
     except Exception:
         pass
