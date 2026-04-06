@@ -91,29 +91,53 @@ def _set_config(db: Session, key: str, value: str):
         print(f"[FMP-ULTIMATE] Config save error: {e}", flush=True)
 
 
-def _fetch_all_tickers() -> list[str]:
-    """Fetch all tradeable tickers from FMP."""
+def _fetch_all_tickers(db) -> list[str]:
+    """Fetch all tickers — DB first, then try FMP stock list endpoints to discover more."""
     tickers = set()
 
+    # Primary: all distinct tickers already in our predictions table
+    try:
+        rows = db.execute(text("SELECT DISTINCT ticker FROM predictions")).fetchall()
+        db_tickers = {r[0] for r in rows if r[0]}
+        tickers.update(db_tickers)
+        print(f"[FMP-ULTIMATE] DB tickers: {len(db_tickers)}", flush=True)
+    except Exception as e:
+        print(f"[FMP-ULTIMATE] DB ticker query error: {e}", flush=True)
+
+    # Also pull distinct tickers from forecasters and ticker_sectors
+    for tbl in ["ticker_sectors"]:
+        try:
+            rows = db.execute(text(f"SELECT DISTINCT ticker FROM {tbl}")).fetchall()
+            extra = {r[0] for r in rows if r[0]}
+            tickers.update(extra)
+            print(f"[FMP-ULTIMATE] {tbl} tickers: {len(extra)}", flush=True)
+        except Exception:
+            pass
+
+    # Secondary: try FMP stock list endpoints (may or may not work depending on plan)
     for endpoint in [
+        "https://financialmodelingprep.com/stable/stock-list",
         "https://financialmodelingprep.com/api/v3/stock/list",
+        "https://financialmodelingprep.com/stable/available-traded-list",
         "https://financialmodelingprep.com/api/v3/available-traded/list",
     ]:
         try:
             r = httpx.get(endpoint, params={"apikey": FMP_KEY}, timeout=30)
             if r.status_code != 200:
-                print(f"[FMP-ULTIMATE] {endpoint} returned {r.status_code}", flush=True)
+                print(f"[FMP-ULTIMATE] {endpoint} → {r.status_code} (skipping)", flush=True)
                 continue
             items = r.json()
             if not isinstance(items, list):
                 continue
+            before = len(tickers)
             for item in items:
                 sym = item.get("symbol", "")
                 if sym and 1 <= len(sym) <= 10:
                     tickers.add(sym)
-            print(f"[FMP-ULTIMATE] {endpoint}: {len(items)} items", flush=True)
+            print(f"[FMP-ULTIMATE] {endpoint}: +{len(tickers) - before} new tickers", flush=True)
+            break  # One working endpoint is enough
         except Exception as e:
-            print(f"[FMP-ULTIMATE] Fetch tickers error: {e}", flush=True)
+            print(f"[FMP-ULTIMATE] {endpoint} error: {e}", flush=True)
 
     # Sort: US tickers first (no dot), then international (has dot like AAPL.L)
     us = sorted([t for t in tickers if '.' not in t])
@@ -236,7 +260,7 @@ def run_fmp_ultimate_backfill(db=None):
         return
 
     # Fetch all tickers
-    all_tickers = _fetch_all_tickers()
+    all_tickers = _fetch_all_tickers(db)
     if not all_tickers:
         print("[FMP-ULTIMATE] No tickers found — check FMP_KEY and plan", flush=True)
         return
