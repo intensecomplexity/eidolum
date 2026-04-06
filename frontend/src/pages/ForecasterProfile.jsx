@@ -150,9 +150,12 @@ export default function ForecasterProfile() {
   }, [id, slug]);
 
   useEffect(() => {
-    if (!id) return;
+    if (!data) return;
     const params = activeSector !== 'All' ? { sector: activeSector } : {};
-    getForecaster(id, params).then(d => {
+    const fetchFn = slug
+      ? () => getForecasterBySlug(slug, params)
+      : () => getForecaster(data.id, params);
+    fetchFn().then(d => {
       setData(d);
     }).catch(() => {});
   }, [activeSector]);
