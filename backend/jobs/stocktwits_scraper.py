@@ -16,7 +16,7 @@ from datetime import datetime, timedelta
 
 APIFY_API_TOKEN = os.getenv("APIFY_API_TOKEN", "").strip()
 APIFY_API = "https://api.apify.com/v2"
-APIFY_ACTOR = "W0l4v1eFh3MKb0s5r"
+APIFY_ACTOR = "shahidirfan~stocktwits-sentiment-scraper"
 
 MIN_LIKES = 5
 MIN_BODY_LEN = 20
