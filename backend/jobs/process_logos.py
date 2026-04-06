@@ -253,3 +253,52 @@ def process_all_logos(db=None, batch_size: int = 50, rate_limit: float = 0.5, re
 def process_new_logos(db=None) -> dict:
     """Process logos for recently added tickers only. Called periodically by worker."""
     return process_all_logos(db, batch_size=20, rate_limit=1.0)
+
+
+def bulk_fill_missing_logos(db=None, rate_limit: float = 0.15) -> dict:
+    """Fast bulk fill: process ALL tickers missing logos, ordered by prediction count (most popular first).
+    Does NOT reprocess existing logos. Designed for one-time catch-up."""
+    from database import BgSessionLocal
+    own_db = db is None
+    if own_db:
+        db = BgSessionLocal()
+
+    try:
+        rows = db.execute(sql_text("""
+            SELECT p.ticker, COUNT(*) as cnt
+            FROM predictions p
+            WHERE p.ticker IS NOT NULL AND p.ticker != ''
+              AND NOT EXISTS (SELECT 1 FROM processed_logos pl WHERE pl.ticker = p.ticker)
+            GROUP BY p.ticker
+            ORDER BY cnt DESC
+        """)).fetchall()
+
+        tickers = [r[0] for r in rows]
+        total = len(tickers)
+        success = 0
+        failed = 0
+
+        if total == 0:
+            print("[LogoBulkFill] All tickers already have logos", flush=True)
+            return {"total": 0, "success": 0, "failed": 0}
+
+        print(f"[LogoBulkFill] {total} tickers missing logos (top: {', '.join(t for t in tickers[:10])})", flush=True)
+
+        for i, ticker in enumerate(tickers):
+            ok = process_ticker_logo(ticker, db)
+            if ok:
+                success += 1
+            else:
+                failed += 1
+
+            if (i + 1) % 50 == 0:
+                print(f"[LogoBulkFill] {i + 1}/{total} — {success} ok, {failed} failed", flush=True)
+
+            time.sleep(rate_limit)
+
+        print(f"[LogoBulkFill] DONE: {success} processed, {failed} failed out of {total}", flush=True)
+        return {"total": total, "success": success, "failed": failed}
+
+    finally:
+        if own_db:
+            db.close()
