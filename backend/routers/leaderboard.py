@@ -443,9 +443,11 @@ def _build_filtered_leaderboard(db: Session, sector=None, call_type=None, sort="
         if source == "x":
             where_clauses.append("(p.source_type IN ('x', 'twitter') OR p.verified_by = 'x_scraper')")
         elif source == "wallst":
-            where_clauses.append("(p.source_type = 'article' OR p.verified_by IN ('benzinga_api', 'fmp_ratings', 'alphavantage', 'benzinga_rss', 'marketbeat_rss', 'yfinance'))")
+            where_clauses.append("(p.source_type = 'article' OR p.verified_by IN ('massive_benzinga', 'benzinga_api', 'fmp_ratings', 'fmp_grades', 'fmp_pt', 'fmp_daily_grades', 'alphavantage', 'benzinga_rss', 'marketbeat_rss', 'yfinance'))")
         elif source == "youtube":
             where_clauses.append("p.source_type = 'youtube'")
+        elif source == "stocktwits":
+            where_clauses.append("p.verified_by = 'stocktwits_scraper'")
         elif source == "community":
             where_clauses.append("p.verified_by IN ('manual', 'user')")
 
