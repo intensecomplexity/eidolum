@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react';
 import LoadingSpinner from '../components/LoadingSpinner';
 import { useParams, Link } from 'react-router-dom';
-import { Shield, TrendingUp, TrendingDown, Check, X, ExternalLink, Bell, BellOff } from 'lucide-react';
+import { Shield, TrendingUp, TrendingDown, Check, X, ExternalLink, Bell, BellOff, Lock } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import TypeBadge from '../components/TypeBadge';
 import TickerLink from '../components/TickerLink';
 import AccuracyChart from '../components/AccuracyChart';
+import PlatformBadge from '../components/PlatformBadge';
+import { getSourceBadgeKey } from '../utils/getSourceBadgeKey';
 import Footer from '../components/Footer';
 import { getAnalystProfile, getAnalystAccuracyHistory, getAnalystSubscriptionStatus, subscribeAnalyst, unsubscribeAnalyst } from '../api';
 
@@ -221,6 +223,7 @@ export default function AnalystProfile() {
                   <tr className="text-left text-muted text-xs uppercase tracking-wider border-b border-border">
                     <th className="px-4 py-2.5">Ticker</th>
                     <th className="px-4 py-2.5">Direction</th>
+                    <th className="px-4 py-2.5">Source</th>
                     <th className="px-4 py-2.5">Target</th>
                     <th className="px-4 py-2.5 text-center">Outcome</th>
                     <th className="px-4 py-2.5 text-right">Return</th>
@@ -232,6 +235,16 @@ export default function AnalystProfile() {
                     <tr key={p.id} className="border-b border-border/50 hover:bg-surface-2/50">
                       <td className="px-4 py-3"><TickerLink ticker={p.ticker} className="text-sm" /></td>
                       <td className="px-4 py-3"><span className={p.direction === 'bullish' ? 'badge-bull' : 'badge-bear'}>{p.direction}</span></td>
+                      <td className="px-4 py-3">
+                        <div className="flex flex-col gap-0.5">
+                          <PlatformBadge platform={getSourceBadgeKey(p)} size={12} showLabel />
+                          {p.prediction_date && (
+                            <span className="inline-flex items-center gap-1 text-[10px] text-muted">
+                              <Lock size={10} /> {new Date(p.prediction_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                            </span>
+                          )}
+                        </div>
+                      </td>
                       <td className="px-4 py-3 font-mono text-sm">{p.target_price ? `$${p.target_price}` : '-'}</td>
                       <td className="px-4 py-3 text-center">
                         {p.outcome === 'correct' && <span className="text-positive text-xs font-mono"><Check className="w-3 h-3 inline" /> Correct</span>}
