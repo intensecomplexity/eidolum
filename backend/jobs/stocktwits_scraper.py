@@ -201,33 +201,47 @@ def run_stocktwits_scraper(db=None):
 
     print(f"[STOCKTWITS] Processing {len(messages)} messages", flush=True)
 
-    stats = {k: 0 for k in ["total", "sentiment", "likes", "length", "spam",
+    # Log first 5 raw items so we can see the data shape
+    for i, raw in enumerate(messages[:5]):
+        import json as _j
+        try:
+            dump = _j.dumps(raw, default=str)[:500]
+        except Exception:
+            dump = str(raw)[:500]
+        print(f"[STOCKTWITS] RAW[{i}]: {dump}", flush=True)
+
+    stats = {k: 0 for k in ["total", "no_id_body", "dedup", "sentiment", "likes", "length", "spam",
                               "past", "ticker", "qualifying",
                               "bullish", "bearish", "with_target"]}
+    rejections = {k: [] for k in ["no_id_body", "sentiment", "likes", "length", "spam", "past", "ticker"]}
     stats["total"] = len(messages)
     seen = set()
     unique_tickers = set()
 
     for msg in messages:
         # ── Extract fields ──────────────────────────────────────────────
-        # Handle different possible shapes from the actor
         mid = str(msg.get("id") or msg.get("messageId") or msg.get("_id") or "")
         body = msg.get("body") or msg.get("message") or msg.get("text") or ""
         if not mid or not body:
+            stats["no_id_body"] += 1
+            if len(rejections["no_id_body"]) < 3:
+                rejections["no_id_body"].append(f"id={mid!r}, body_len={len(body)}, keys={list(msg.keys())[:10]}")
             continue
         if mid in seen:
+            stats["dedup"] += 1
             continue
         seen.add(mid)
 
         # Sentiment from the actor
         sentiment = (msg.get("sentimentLabel") or msg.get("sentiment") or "").lower()
-        # Also check nested sentiment object
         if not sentiment and isinstance(msg.get("entities"), dict):
             sent_obj = msg.get("entities", {}).get("sentiment", {})
             sentiment = (sent_obj.get("basic") or "").lower()
 
         # F1: Must have bullish/bearish sentiment (skip neutral/unknown)
         if sentiment not in ("positive", "negative", "bullish", "bearish"):
+            if len(rejections["sentiment"]) < 5:
+                rejections["sentiment"].append(f"sentiment={sentiment!r}, body={body[:80]!r}")
             continue
         stats["sentiment"] += 1
 
@@ -236,26 +250,33 @@ def run_stocktwits_scraper(db=None):
         # F2: Likes threshold
         likes = int(msg.get("likes") or msg.get("likeCount") or msg.get("liked_count") or 0)
         if likes < MIN_LIKES:
+            if len(rejections["likes"]) < 5:
+                rejections["likes"].append(f"likes={likes}, sentiment={sentiment}, body={body[:60]!r}")
             continue
         stats["likes"] += 1
 
         # F3: Minimum length
         if len(body.strip()) < MIN_BODY_LEN:
+            if len(rejections["length"]) < 3:
+                rejections["length"].append(f"len={len(body.strip())}, body={body!r}")
             continue
         stats["length"] += 1
 
         # F4: Spam filter
         if any(p.search(body) for p in SPAM_PATTERNS):
+            if len(rejections["spam"]) < 3:
+                rejections["spam"].append(f"body={body[:80]!r}")
             continue
         stats["spam"] += 1
 
         # F5: Past tense filter
         if any(p.search(body) for p in PAST_PATTERNS):
+            if len(rejections["past"]) < 3:
+                rejections["past"].append(f"body={body[:80]!r}")
             continue
         stats["past"] += 1
 
         # ── Extract tickers ─────────────────────────────────────────────
-        # Try structured symbols first
         symbols = msg.get("symbols") or msg.get("tickers") or []
         if isinstance(symbols, list):
             tickers = [s.get("symbol") or s.get("ticker") or s if isinstance(s, dict) else str(s)
@@ -264,11 +285,12 @@ def run_stocktwits_scraper(db=None):
         else:
             tickers = []
 
-        # Fallback: extract cashtags from body
         if not tickers:
             tickers = _extract_tickers(body)
 
         if not tickers or len(tickers) > 3:
+            if len(rejections["ticker"]) < 3:
+                rejections["ticker"].append(f"tickers={tickers}, symbols_raw={symbols}, body={body[:80]!r}")
             continue
         stats["ticker"] += 1
 
@@ -343,9 +365,27 @@ def run_stocktwits_scraper(db=None):
 
     inserted = stats.get("inserted", 0)
     errors = stats.get("insert_errors", 0)
-    print(f"[STOCKTWITS] RUN COMPLETE:", flush=True)
-    print(f"  Total: {stats['total']} → sentiment: {stats['sentiment']} → likes: {stats['likes']}")
-    print(f"  → length: {stats['length']} → spam: {stats['spam']} → past: {stats['past']}")
-    print(f"  → ticker: {stats['ticker']} → qualifying: {stats['qualifying']}")
-    print(f"  Direction: {stats['bullish']} bull, {stats['bearish']} bear | With PT: {stats['with_target']}")
-    print(f"  INSERTED: {inserted} | Errors: {errors} | Unique tickers: {len(unique_tickers)}", flush=True)
+
+    # Filter funnel: show where messages were lost
+    lost_no_id = stats["no_id_body"]
+    lost_dedup = stats["dedup"]
+    lost_sentiment = stats["total"] - lost_no_id - lost_dedup - stats["sentiment"]
+    lost_likes = stats["sentiment"] - stats["likes"]
+    lost_length = stats["likes"] - stats["length"]
+    lost_spam = stats["length"] - stats["spam"]
+    lost_past = stats["spam"] - stats["past"]
+    lost_ticker = stats["past"] - stats["ticker"]
+
+    print(f"[STOCKTWITS] FILTER FUNNEL: {stats['total']} total", flush=True)
+    print(f"  → {lost_no_id} no id/body, {lost_dedup} dedup", flush=True)
+    print(f"  → {lost_sentiment} neutral/no sentiment, {lost_likes} low likes (<{MIN_LIKES})", flush=True)
+    print(f"  → {lost_length} too short (<{MIN_BODY_LEN} chars), {lost_spam} spam, {lost_past} past-tense", flush=True)
+    print(f"  → {lost_ticker} no ticker → {stats['qualifying']} qualifying ({stats['bullish']} bull, {stats['bearish']} bear)", flush=True)
+    print(f"  INSERTED: {inserted} | Errors: {errors} | Unique tickers: {len(unique_tickers)} | With PT: {stats['with_target']}", flush=True)
+
+    # Log sample rejections for each filter
+    for stage, samples in rejections.items():
+        if samples:
+            print(f"[STOCKTWITS] Rejected by {stage}:", flush=True)
+            for s in samples:
+                print(f"    {s}", flush=True)
