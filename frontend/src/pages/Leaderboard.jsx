@@ -251,6 +251,7 @@ export default function Leaderboard() {
                     { key: 'all', label: 'All Sources' },
                     { key: 'wallst', label: 'Wall St', color: '#3b82f6' },
                     { key: 'x', label: 'X', color: '#000000' },
+                    { key: 'stocktwits', label: 'StockTwits', color: '#1DA1F2' },
                     { key: 'youtube', label: 'YouTube', color: '#FF0000' },
                     { key: 'community', label: 'Community', color: '#34d399' },
                   ].map(s => (
