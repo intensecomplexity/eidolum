@@ -1,8 +1,14 @@
 import { Link } from 'react-router-dom';
-import { Check, Crosshair, BarChart3, Trophy, Users, Clock, TrendingUp, TrendingDown } from 'lucide-react';
+import { Check, Crosshair, BarChart3, Trophy, Users, Clock, TrendingUp, Shield, Database, Lock } from 'lucide-react';
 import Footer from '../components/Footer';
+import useSEO from '../hooks/useSEO';
 
 export default function HowItWorks() {
+  useSEO({
+    title: 'How Eidolum Scores Predictions | Eidolum',
+    description: 'Learn where our data comes from, how we score analyst predictions, and why every prediction is locked and tamper-proof.',
+  });
+
   return (
     <div>
       <div className="max-w-3xl mx-auto px-4 sm:px-6 py-10 sm:py-16">
@@ -15,27 +21,76 @@ export default function HowItWorks() {
           </p>
         </section>
 
-        {/* ── 2. How Scoring Works ─────────────────────────────────── */}
+        {/* ── 2. Where Our Data Comes From ─────────────────────────── */}
         <section className="mb-12">
-          <h2 className="font-bold text-xl sm:text-2xl mb-4">How Scoring Works</h2>
-          <p className="text-text-secondary text-sm mb-6">Every prediction gets one of three scores:</p>
+          <h2 className="font-bold text-xl sm:text-2xl mb-4" style={{ color: '#D4A843' }}>Where Our Data Comes From</h2>
+          <div className="space-y-4">
+            <div className="card py-4">
+              <div className="flex items-start gap-3">
+                <Database className="w-5 h-5 text-accent shrink-0 mt-0.5" />
+                <div>
+                  <h3 className="font-semibold text-sm mb-1">Licensed Financial Data APIs</h3>
+                  <p className="text-sm text-text-secondary leading-relaxed">
+                    We pull analyst ratings from Benzinga and Financial Modeling Prep (FMP). These are the same data sources used by Bloomberg terminals and institutional trading desks.
+                  </p>
+                </div>
+              </div>
+            </div>
+            <div className="card py-4">
+              <div className="flex items-start gap-3">
+                <Users className="w-5 h-5 text-accent shrink-0 mt-0.5" />
+                <div>
+                  <h3 className="font-semibold text-sm mb-1">Social Predictions</h3>
+                  <p className="text-sm text-text-secondary leading-relaxed">
+                    We also track predictions from X/Twitter and StockTwits — real people making real calls, held to the same scoring standard as Wall Street.
+                  </p>
+                </div>
+              </div>
+            </div>
+            <div className="card py-4">
+              <div className="flex items-start gap-3">
+                <Lock className="w-5 h-5 text-accent shrink-0 mt-0.5" />
+                <div>
+                  <h3 className="font-semibold text-sm mb-1">Tamper-Proof Timestamps</h3>
+                  <p className="text-sm text-text-secondary leading-relaxed">
+                    Every prediction is timestamped when we receive it. It cannot be edited, backdated, or deleted.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* ── 3. How Scoring Works ─────────────────────────────────── */}
+        <section className="mb-12">
+          <h2 className="font-bold text-xl sm:text-2xl mb-4" style={{ color: '#D4A843' }}>How Scoring Works</h2>
+          <p className="text-text-secondary text-sm mb-4">
+            When a prediction's evaluation window expires, we look up the actual stock price using Polygon.io market data. Every prediction gets one of three scores:
+          </p>
 
           <div className="grid gap-4 sm:grid-cols-3 mb-8">
             <div className="card py-5 text-center">
               <div className="w-12 h-12 rounded-full mx-auto mb-3 flex items-center justify-center text-sm font-bold" style={{ backgroundColor: '#34d399', color: '#000' }}>HIT</div>
               <h3 className="font-semibold mb-1">Hit</h3>
-              <p className="text-xs text-text-secondary">Target reached within tolerance. The analyst nailed it.</p>
+              <p className="text-xs text-text-secondary">The stock reached the target price within tolerance. Score: 1.0</p>
             </div>
             <div className="card py-5 text-center">
               <div className="w-12 h-12 rounded-full mx-auto mb-3 flex items-center justify-center text-sm font-bold" style={{ backgroundColor: '#fbbf24', color: '#000' }}>NEAR</div>
               <h3 className="font-semibold mb-1">Near</h3>
-              <p className="text-xs text-text-secondary">Right direction, meaningful movement, but missed the target.</p>
+              <p className="text-xs text-text-secondary">The stock moved in the right direction but missed the target. Score: 0.5</p>
             </div>
             <div className="card py-5 text-center">
               <div className="w-12 h-12 rounded-full mx-auto mb-3 flex items-center justify-center text-sm font-bold" style={{ backgroundColor: '#f87171', color: '#fff' }}>MISS</div>
               <h3 className="font-semibold mb-1">Miss</h3>
-              <p className="text-xs text-text-secondary">Wrong direction or barely moved. The analyst got it wrong.</p>
+              <p className="text-xs text-text-secondary">The stock went the wrong way or barely moved. Score: 0.0</p>
             </div>
+          </div>
+
+          <div className="card mb-4">
+            <div className="text-[10px] text-accent font-mono font-bold tracking-widest mb-2">ACCURACY FORMULA</div>
+            <p className="text-sm text-text-secondary leading-relaxed font-mono">
+              Accuracy = (HITs &times; 1.0 + NEARs &times; 0.5) / Total Evaluated &times; 100
+            </p>
           </div>
 
           <div className="card">
@@ -47,9 +102,9 @@ export default function HowItWorks() {
           </div>
         </section>
 
-        {/* ── 3. Tolerance by Timeframe ────────────────────────────── */}
+        {/* ── 4. Tolerance by Timeframe ────────────────────────────── */}
         <section className="mb-12">
-          <h2 className="font-bold text-xl sm:text-2xl mb-4">Tolerance by Timeframe</h2>
+          <h2 className="font-bold text-xl sm:text-2xl mb-4" style={{ color: '#D4A843' }}>Tolerance by Timeframe</h2>
           <p className="text-text-secondary text-sm mb-4">Longer predictions get more room. A 1-year call doesn't need to be as precise as a 1-day call.</p>
           <div className="card overflow-hidden p-0">
             <table className="w-full text-sm">
@@ -77,7 +132,24 @@ export default function HowItWorks() {
           </div>
         </section>
 
-        {/* ── 4. What is a Prediction? ─────────────────────────────── */}
+        {/* ── 5. Why You Can Trust This ────────────────────────────── */}
+        <section className="mb-12">
+          <h2 className="font-bold text-xl sm:text-2xl mb-4" style={{ color: '#D4A843' }}>Why You Can Trust This</h2>
+          <div className="space-y-3">
+            {[
+              { icon: Lock, text: 'No prediction can be changed after it\'s recorded.' },
+              { icon: Shield, text: 'Scoring is 100% automated — no human judgment, no appeals, no exceptions.' },
+              { icon: Trophy, text: 'A retail trader and Goldman Sachs stand on the same leaderboard. Both are judged by the same rules.' },
+            ].map(({ icon: Icon, text }) => (
+              <div key={text} className="flex items-center gap-3 card py-3">
+                <Icon className="w-4 h-4 text-accent shrink-0" />
+                <span className="text-sm text-text-secondary">{text}</span>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        {/* ── 6. What is a Prediction? ─────────────────────────────── */}
         <section className="mb-12">
           <h2 className="font-bold text-xl sm:text-2xl mb-4">What Counts as a Prediction?</h2>
           <div className="space-y-2">
@@ -95,7 +167,7 @@ export default function HowItWorks() {
           </div>
         </section>
 
-        {/* ── 5. Analysts vs Players ───────────────────────────────── */}
+        {/* ── 7. Analysts vs Players ───────────────────────────────── */}
         <section className="mb-12">
           <h2 className="font-bold text-xl sm:text-2xl mb-4">Analysts vs Players</h2>
           <div className="grid sm:grid-cols-2 gap-4">
@@ -110,7 +182,7 @@ export default function HowItWorks() {
           </div>
         </section>
 
-        {/* ── 6. Get Started ───────────────────────────────────────── */}
+        {/* ── 8. Get Started ───────────────────────────────────────── */}
         <section className="mb-8">
           <h2 className="font-bold text-xl sm:text-2xl mb-4">How to Get Started</h2>
           <div className="space-y-3">

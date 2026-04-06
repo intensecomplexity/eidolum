@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { ExternalLink, Archive } from 'lucide-react';
+import { ExternalLink, Archive, Lock } from 'lucide-react';
 import PredictionBadge from './PredictionBadge';
 import ConflictBadge from './ConflictBadge';
 import BookmarkButton from './BookmarkButton';
@@ -45,6 +45,47 @@ function getDomainLabel(url) {
 
 function isRealArchive(url) {
   return url && url.startsWith('https://web.archive.org');
+}
+
+function getSourceLabel(verifiedBy) {
+  if (!verifiedBy) return 'Community';
+  const map = {
+    massive_benzinga: 'Benzinga', benzinga_api: 'Benzinga', benzinga_web: 'Benzinga',
+    benzinga_rss: 'Benzinga', fmp_grades: 'FMP', fmp_ratings: 'FMP', fmp_pt: 'FMP',
+    fmp_daily_grades: 'FMP', finnhub_upgrade: 'Finnhub', finnhub_news: 'Finnhub',
+    finnhub_api: 'Finnhub', x_scraper: 'X', stocktwits_scraper: 'StockTwits',
+    alphavantage: 'Alpha Vantage', marketbeat_rss: 'MarketBeat',
+    yfinance: 'Yahoo Finance', newsapi: 'NewsAPI', ai_parsed: 'AI Parsed',
+    user: 'Community', manual: 'Community',
+  };
+  return map[verifiedBy] || 'Community';
+}
+
+function SourceBadge({ verifiedBy }) {
+  const label = getSourceLabel(verifiedBy);
+  return (
+    <span style={{
+      fontSize: 10, padding: '1px 7px', borderRadius: 12,
+      background: 'rgba(100,100,100,0.15)', color: 'var(--color-text-secondary)',
+      whiteSpace: 'nowrap',
+    }}>
+      {label}
+    </span>
+  );
+}
+
+function LockedDate({ dateStr }) {
+  if (!dateStr) return null;
+  const d = new Date(dateStr);
+  const formatted = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  return (
+    <span style={{
+      display: 'inline-flex', alignItems: 'center', gap: 3,
+      fontSize: 11, color: 'var(--color-text-tertiary)',
+    }}>
+      <Lock size={11} /> Locked {formatted}
+    </span>
+  );
 }
 
 function ProofLinks({ p }) {
@@ -213,7 +254,11 @@ export default function PredictionCard({ prediction: p, showForecaster = false, 
       {/* Scoring breakdown (expandable) */}
       <ScoringBreakdown prediction={p} />
 
-      {/* Line 6: Source + date */}
+      {/* Line 6: Source badge + locked timestamp + proof links */}
+      <div className="flex items-center gap-2 text-[10px] text-muted flex-wrap">
+        <SourceBadge verifiedBy={p.verified_by} />
+        <LockedDate dateStr={p.prediction_date} />
+      </div>
       <ProofLinks p={p} />
 
       {/* Conflict detail */}

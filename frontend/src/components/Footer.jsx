@@ -20,6 +20,8 @@ export default function Footer() {
             <span className="text-muted opacity-30">&middot;</span>
             <Link to="/consensus" className="hover:text-accent transition-colors whitespace-nowrap">Consensus</Link>
             <span className="text-muted opacity-30">&middot;</span>
+            <Link to="/how-it-works" className="hover:text-accent transition-colors whitespace-nowrap">How It Works</Link>
+            <span className="text-muted opacity-30">&middot;</span>
             {isAuthenticated ? (
               <>
                 <Link to="/submit" className="hover:text-accent transition-colors whitespace-nowrap">Submit</Link>
