@@ -433,7 +433,7 @@ def main():
         except Exception as e:
             log.error(f"[fmp_ultimate] {e}", exc_info=True)
     print("[Worker] Registering FMP Ultimate backfill (one-time)...", flush=True)
-    sched.add_job(_standalone("fmp_ultimate", _fmp_ultimate), "date", id="fmp_ultimate", run_date=datetime.utcnow() + timedelta(minutes=2))
+    sched.add_job(_standalone("fmp_ultimate", _fmp_ultimate), "interval", hours=24, id="fmp_ultimate", next_run_time=datetime.utcnow(), misfire_grace_time=600)
 
     # Cron jobs
     sched.add_job(_watchlist_queue, "interval", hours=4, id="watchlist_queue", next_run_time=t0 + timedelta(minutes=35))
