@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { ExternalLink, ArrowLeft, ChevronUp, ChevronDown, Lock } from 'lucide-react';
+import { ExternalLink, ArrowLeft, ChevronUp, ChevronDown, ChevronLeft, ChevronRight, Lock } from 'lucide-react';
 import LoadingSpinner from '../components/LoadingSpinner';
 import useSEO from '../hooks/useSEO';
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, ReferenceLine } from 'recharts';
@@ -23,6 +23,79 @@ import MiniPieChart from '../components/MiniPieChart';
 import PortfolioSimulator from '../components/PortfolioSimulator';
 import { getForecaster, getForecasterBySlug, getForecasterSectors, getPlatformDetail, getReportCards } from '../api';
 import { annotateContext, ExplainerLine, ratingChangeLabel } from '../utils/predictionExplainer';
+
+function SectorScroller({ sectors, activeSector, setActiveSector, totalPredictions }) {
+  const scrollRef = useRef(null);
+  const [canScrollLeft, setCanScrollLeft] = useState(false);
+  const [canScrollRight, setCanScrollRight] = useState(false);
+
+  const checkScroll = useCallback(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    setCanScrollLeft(el.scrollLeft > 4);
+    setCanScrollRight(el.scrollLeft + el.clientWidth < el.scrollWidth - 4);
+  }, []);
+
+  useEffect(() => {
+    checkScroll();
+    const el = scrollRef.current;
+    if (el) el.addEventListener('scroll', checkScroll, { passive: true });
+    window.addEventListener('resize', checkScroll);
+    return () => {
+      if (el) el.removeEventListener('scroll', checkScroll);
+      window.removeEventListener('resize', checkScroll);
+    };
+  }, [checkScroll, sectors]);
+
+  const scroll = (dir) => {
+    const el = scrollRef.current;
+    if (el) el.scrollBy({ left: dir * 200, behavior: 'smooth' });
+  };
+
+  const btnClass = (active) => `px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-colors ${
+    active
+      ? 'bg-accent/10 text-accent border border-accent/20'
+      : 'bg-surface border border-border text-text-secondary'
+  }`;
+
+  return (
+    <div className="relative mb-6 sm:mb-8 -mt-2">
+      {canScrollLeft && (
+        <button onClick={() => scroll(-1)}
+          className="absolute left-0 top-1/2 -translate-y-1/2 z-10 w-7 h-7 flex items-center justify-center rounded-full bg-surface border border-border shadow-md text-muted hover:text-text-primary transition-colors"
+          style={{ marginLeft: -2 }}>
+          <ChevronLeft className="w-4 h-4" />
+        </button>
+      )}
+      <div
+        ref={scrollRef}
+        className="flex gap-2 overflow-x-auto pb-1"
+        style={{
+          scrollbarWidth: 'none', msOverflowStyle: 'none',
+          WebkitMaskImage: `linear-gradient(to right, ${canScrollLeft ? 'transparent, black 32px' : 'black'}, ${canScrollRight ? 'black calc(100% - 32px), transparent' : 'black'})`,
+          maskImage: `linear-gradient(to right, ${canScrollLeft ? 'transparent, black 32px' : 'black'}, ${canScrollRight ? 'black calc(100% - 32px), transparent' : 'black'})`,
+        }}
+      >
+        <style>{`.sector-scroll::-webkit-scrollbar { display: none; }`}</style>
+        <button onClick={() => setActiveSector('All')} className={btnClass(activeSector === 'All')}>
+          All ({totalPredictions})
+        </button>
+        {sectors.map((s) => (
+          <button key={s.sector} onClick={() => setActiveSector(s.sector)} className={btnClass(activeSector === s.sector)}>
+            {s.sector} ({s.count})
+          </button>
+        ))}
+      </div>
+      {canScrollRight && (
+        <button onClick={() => scroll(1)}
+          className="absolute right-0 top-1/2 -translate-y-1/2 z-10 w-7 h-7 flex items-center justify-center rounded-full bg-surface border border-border shadow-md text-muted hover:text-text-primary transition-colors"
+          style={{ marginRight: -2 }}>
+          <ChevronRight className="w-4 h-4" />
+        </button>
+      )}
+    </div>
+  );
+}
 
 export default function ForecasterProfile() {
   const { id, slug } = useParams();
@@ -306,34 +379,13 @@ export default function ForecasterProfile() {
           <NotificationBanner text={`Get notified when ${data.name} makes a new prediction.`} forecasterName={data.name} />
         </div>
 
-        {/* Sector filter */}
-        {sectorCounts.length > 0 && (
-          <div className="flex gap-2 overflow-x-auto pills-scroll pb-1 mb-6 sm:mb-8 -mt-2">
-            <button
-              onClick={() => setActiveSector('All')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-colors ${
-                activeSector === 'All'
-                  ? 'bg-accent/10 text-accent border border-accent/20'
-                  : 'bg-surface border border-border text-text-secondary'
-              }`}
-            >
-              All ({data.total_predictions})
-            </button>
-            {sectorCounts.map((s) => (
-              <button
-                key={s.sector}
-                onClick={() => setActiveSector(s.sector)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-colors ${
-                  activeSector === s.sector
-                    ? 'bg-accent/10 text-accent border border-accent/20'
-                    : 'bg-surface border border-border text-text-secondary'
-                }`}
-              >
-                {s.sector} ({s.count})
-              </button>
-            ))}
-          </div>
-        )}
+        {/* Sector filter with scrollable arrows */}
+        {sectorCounts.length > 0 && <SectorScroller
+          sectors={sectorCounts}
+          activeSector={activeSector}
+          setActiveSector={setActiveSector}
+          totalPredictions={data.total_predictions}
+        />}
 
         {/* Chart + Sector — items-stretch so both panels match height */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6 mb-6 sm:mb-8 lg:items-stretch">
@@ -342,7 +394,7 @@ export default function ForecasterProfile() {
             {chartData.length > 0 ? (
               <>
                 <ResponsiveContainer width="100%" height={220}>
-                  <AreaChart data={chartData} margin={{ top: 5, right: 5, bottom: 5, left: -15 }}>
+                  <AreaChart key={activeSector} data={chartData} margin={{ top: 5, right: 5, bottom: 5, left: -15 }}>
                     <defs>
                       <linearGradient id="accGrad" x1="0" y1="0" x2="0" y2="1">
                         <stop offset="5%" stopColor="#D4A843" stopOpacity={0.2} />
@@ -400,11 +452,14 @@ export default function ForecasterProfile() {
                       fill="url(#accGrad)"
                       dot={false}
                       activeDot={{ r: 4, fill: '#D4A843', stroke: '#fff', strokeWidth: 2 }}
+                      isAnimationActive={true}
+                      animationDuration={600}
+                      animationEasing="ease-in-out"
                     />
                   </AreaChart>
                 </ResponsiveContainer>
                 <div className="text-center text-muted text-[10px] mt-1 font-mono">
-                  Based on {chartData[chartData.length - 1]?.total || 0} scored predictions
+                  Based on {chartData[chartData.length - 1]?.total || 0} scored predictions{activeSector !== 'All' ? ` in ${activeSector}` : ''}
                 </div>
               </>
             ) : (
