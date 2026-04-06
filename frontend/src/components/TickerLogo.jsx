@@ -1,15 +1,23 @@
 import { useState, useEffect } from 'react';
 
-// Logos that are WHITE on transparent — invert them on LIGHT mode
+// Logos that are WHITE on transparent — invert them on LIGHT mode only.
+// On dark mode (#0d0f13) they're naturally visible as white. Don't invert.
 const INVERT_ON_LIGHT = new Set([
+  // Existing white logos
   'UBER', 'RH', 'ALL', 'BLK', 'OSK', 'ABBV', 'STT', 'ROKU',
+  // White logos previously misplaced in INVERT_ON_DARK
+  'ADSK', 'REGN', 'EXPE', 'BA', 'DHI', 'SLB', 'RF', 'URBN', 'ALB',
+  'WYNN', 'INTU', 'ATVI', 'VFC', 'RCL', 'SPLK', 'ANET', 'KNX',
+  'NTAP', 'DIS', 'ULTA', 'V', 'VRTX',
+  // New additions
+  'UNH', 'ZION', 'PHM',
+  'X', // X = United States Steel Corporation (NYSE: X) — historical ticker, not Twitter
 ]);
 
-// Logos that are BLACK/DARK on transparent — invert them on DARK mode
+// Logos that are BLACK/DARK on transparent — invert them on DARK mode only.
+// On light mode they're naturally visible as black. Don't invert.
 const INVERT_ON_DARK = new Set([
-  'AAPL', 'EOG', 'ULTA', 'CSX', 'V', 'VRTX', 'ADSK', 'REGN', 'EXPE',
-  'BA', 'DHI', 'SLB', 'RF', 'URBN', 'ALB', 'WYNN', 'INTU', 'ATVI',
-  'VFC', 'RCL', 'SPLK', 'ANET', 'KNX', 'NTAP', 'DIS', 'SAVE',
+  'AAPL', 'EOG', 'CSX', 'SAVE',
 ]);
 
 // Logos that need to be scaled down to fit their container
