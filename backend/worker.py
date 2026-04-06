@@ -274,6 +274,19 @@ def main():
             log.error(f"[bulk_fill_logos] {e}", exc_info=True)
     sched.add_job(_standalone("bulk_fill_logos", _bulk_fill_logos), "interval", hours=24, id="bulk_fill_logos", next_run_time=datetime.utcnow(), misfire_grace_time=600)
 
+    # FMP Bulk Harvest — one-time download of all high-value datasets before downgrading plan
+    def _fmp_harvest():
+        try:
+            from jobs.fmp_bulk_harvest import run_fmp_bulk_harvest
+            db = BgSessionLocal()
+            try:
+                run_fmp_bulk_harvest(db)
+            finally:
+                db.close()
+        except Exception as e:
+            log.error(f"[fmp_harvest] {e}", exc_info=True)
+    sched.add_job(_standalone("fmp_harvest", _fmp_harvest), "interval", hours=24, id="fmp_harvest", next_run_time=datetime.utcnow() + timedelta(minutes=1), misfire_grace_time=600)
+
     # Polygon description backfill — fills gaps FMP missed (free, 5 calls/min)
     def _desc_backfill_polygon():
         try:

@@ -2123,6 +2123,8 @@ from routers.firms import router as firms_router
 app.include_router(firms_router, prefix="/api")
 from routers.logo_serve import router as logo_serve_router
 app.include_router(logo_serve_router, prefix="/api")
+from routers.company_data import router as company_data_router
+app.include_router(company_data_router, prefix="/api")
 
 
 @app.get("/health")
