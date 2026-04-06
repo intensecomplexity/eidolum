@@ -18,6 +18,7 @@ const INVERT_ON_LIGHT = new Set([
 // On light mode they're naturally visible as black. Don't invert.
 const INVERT_ON_DARK = new Set([
   'AAPL', 'EOG', 'SAVE',
+  'ESS', 'KBH', 'TRGP', 'DECK', 'AEO', 'CMI', 'ILMN', 'HCA', 'UA', 'SM',
 ]);
 
 // Logos that need to be scaled down to fit their container
