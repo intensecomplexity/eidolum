@@ -11,6 +11,7 @@ import PlatformBadge from '../components/PlatformBadge';
 import { getSourceBadgeKey } from '../utils/getSourceBadgeKey';
 import StreakBadge from '../components/StreakBadge';
 import PredictionCard from '../components/PredictionCard';
+import SourceBadge from '../components/SourceBadge';
 import EvidenceCard from '../components/EvidenceCard';
 import BookmarkButton from '../components/BookmarkButton';
 import NotificationBanner from '../components/NotificationBanner';
@@ -698,14 +699,7 @@ function PredictionRow({ p, forecaster: fc }) {
           {p.has_conflict && <ConflictBadge note={p.conflict_note} size="small" />}
         </td>
         <td className="px-6 py-3">
-          <div className="flex flex-col gap-0.5">
-            <PlatformBadge platform={getSourceBadgeKey(p)} size={12} showLabel />
-            {p.prediction_date && (
-              <span className="inline-flex items-center gap-1 text-[10px] text-muted">
-                <Lock size={10} /> {new Date(p.prediction_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-              </span>
-            )}
-          </div>
+          <SourceBadge verifiedBy={p.verified_by} date={p.prediction_date} />
         </td>
         <td className="px-6 py-3 text-right font-mono text-sm text-text-secondary">{p.entry_price ? `$${p.entry_price.toFixed(2)}` : '-'}</td>
         <td className="px-6 py-3 text-center"><PredictionBadge outcome={p.outcome} /></td>
