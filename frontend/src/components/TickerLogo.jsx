@@ -8,7 +8,7 @@ const INVERT_ON_LIGHT = new Set([
   // White logos previously misplaced in INVERT_ON_DARK
   'ADSK', 'REGN', 'EXPE', 'BA', 'DHI', 'SLB', 'RF', 'URBN', 'ALB',
   'WYNN', 'INTU', 'ATVI', 'VFC', 'RCL', 'SPLK', 'ANET', 'KNX',
-  'NTAP', 'DIS', 'ULTA', 'V', 'VRTX',
+  'NTAP', 'DIS', 'ULTA', 'V', 'VRTX', 'CSX', 'ADI',
   // New additions
   'UNH', 'ZION', 'PHM',
   'X', // X = United States Steel Corporation (NYSE: X) — historical ticker, not Twitter
@@ -17,7 +17,7 @@ const INVERT_ON_LIGHT = new Set([
 // Logos that are BLACK/DARK on transparent — invert them on DARK mode only.
 // On light mode they're naturally visible as black. Don't invert.
 const INVERT_ON_DARK = new Set([
-  'AAPL', 'EOG', 'CSX', 'SAVE',
+  'AAPL', 'EOG', 'SAVE',
 ]);
 
 // Logos that need to be scaled down to fit their container
