@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import LoadingSpinner from '../components/LoadingSpinner';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { Search, TrendingUp, TrendingDown, ArrowLeft } from 'lucide-react';
+import { Search, TrendingUp, TrendingDown, ArrowLeft, Lock } from 'lucide-react';
 import PredictionBadge from '../components/PredictionBadge';
 import ConflictBadge from '../components/ConflictBadge';
 import PredictionCard from '../components/PredictionCard';
@@ -12,6 +12,8 @@ import WatchButton from '../components/WatchButton';
 import RareSignalBanner from '../components/RareSignalBanner';
 import TickerLogo from '../components/TickerLogo';
 import StockPrice from '../components/StockPrice';
+import PlatformBadge from '../components/PlatformBadge';
+import { getSourceBadgeKey } from '../utils/getSourceBadgeKey';
 import Footer from '../components/Footer';
 import { getAssetConsensus } from '../api';
 
@@ -235,6 +237,7 @@ export default function AssetConsensus() {
                       <th className="px-6 py-3">Date</th>
                       <th className="px-6 py-3">Forecaster</th>
                       <th className="px-6 py-3">Call</th>
+                      <th className="px-6 py-3">Source</th>
                       <th className="px-6 py-3 text-right">Entry</th>
                       <th className="px-6 py-3 text-center">Outcome</th>
                       <th className="px-6 py-3 text-right">Return</th>
@@ -281,6 +284,16 @@ function AssetPredictionRow({ p }) {
           <PredictionBadge direction={p.direction} windowDays={p.window_days || p.evaluation_window_days} />
           {p.has_conflict && <ConflictBadge note={p.conflict_note} size="small" />}
         </td>
+        <td className="px-6 py-3">
+          <div className="flex flex-col gap-0.5">
+            <PlatformBadge platform={getSourceBadgeKey(p)} size={12} showLabel />
+            {p.prediction_date && (
+              <span className="inline-flex items-center gap-1 text-[10px] text-muted">
+                <Lock size={10} /> {new Date(p.prediction_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+              </span>
+            )}
+          </div>
+        </td>
         <td className="px-6 py-3 text-right font-mono text-sm text-text-secondary">{p.entry_price ? `$${p.entry_price.toFixed(2)}` : '-'}</td>
         <td className="px-6 py-3 text-center"><PredictionBadge outcome={p.outcome} /></td>
         <td className="px-6 py-3 text-right font-mono text-sm">
@@ -303,7 +316,7 @@ function AssetPredictionRow({ p }) {
       </tr>
       {expanded && (
         <tr className="bg-surface-2/30">
-          <td colSpan={9} className="px-6 py-2 pb-4">
+          <td colSpan={10} className="px-6 py-2 pb-4">
             <EvidenceCard prediction={p} forecaster={p.forecaster} expandable={false} />
             <p className="text-[10px] text-muted italic mt-2">
               {p.outcome === 'pending'

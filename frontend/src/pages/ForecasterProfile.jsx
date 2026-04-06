@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { ExternalLink, ArrowLeft, ChevronUp, ChevronDown } from 'lucide-react';
+import { ExternalLink, ArrowLeft, ChevronUp, ChevronDown, Lock } from 'lucide-react';
 import LoadingSpinner from '../components/LoadingSpinner';
 import useSEO from '../hooks/useSEO';
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, ReferenceLine } from 'recharts';
@@ -587,6 +587,7 @@ export default function ForecasterProfile() {
                   <th className="px-6 py-3">Date</th>
                   <th className="px-6 py-3">Ticker</th>
                   <th className="px-6 py-3">Call</th>
+                  <th className="px-6 py-3">Source</th>
                   <th className="px-6 py-3 text-right">Entry</th>
                   <th className="px-6 py-3 text-center">Outcome</th>
                   <th className="px-6 py-3 text-right">Return</th>
@@ -696,6 +697,16 @@ function PredictionRow({ p, forecaster: fc }) {
           <PredictionBadge direction={p.direction} windowDays={p.window_days || p.evaluation_window_days} />
           {p.has_conflict && <ConflictBadge note={p.conflict_note} size="small" />}
         </td>
+        <td className="px-6 py-3">
+          <div className="flex flex-col gap-0.5">
+            <PlatformBadge platform={getSourceBadgeKey(p)} size={12} showLabel />
+            {p.prediction_date && (
+              <span className="inline-flex items-center gap-1 text-[10px] text-muted">
+                <Lock size={10} /> {new Date(p.prediction_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+              </span>
+            )}
+          </div>
+        </td>
         <td className="px-6 py-3 text-right font-mono text-sm text-text-secondary">{p.entry_price ? `$${p.entry_price.toFixed(2)}` : '-'}</td>
         <td className="px-6 py-3 text-center"><PredictionBadge outcome={p.outcome} /></td>
         <td className="px-6 py-3 text-right font-mono text-sm">
@@ -721,7 +732,7 @@ function PredictionRow({ p, forecaster: fc }) {
       </tr>
       {expanded && (
         <tr className="bg-surface-2/30">
-          <td colSpan={9} className="px-6 py-4">
+          <td colSpan={10} className="px-6 py-4">
             {/* Full quote with glossary tooltips */}
             <blockquote style={{
               borderLeft: '3px solid #00c896',
