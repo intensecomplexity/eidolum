@@ -41,12 +41,18 @@ SPAM_PATTERNS = [re.compile(p, re.IGNORECASE) for p in [
 
 TICKER_MENTION_RE = re.compile(r'\$[A-Z]{1,5}\b|(?<!\w)[A-Z]{2,5}(?!\w)')
 
-# ── Haiku AI classification (reused from original) ──────────────────────────
+# ── Haiku AI classification ──────────────────────────────────────────────────
 
 HAIKU_SYSTEM = """You analyze financial tweets to extract stock/crypto predictions.
 Respond ONLY with JSON. No explanation.
 
 A prediction must be FORWARD-LOOKING -- the person believes a stock will go up or down.
+
+STRICT TICKER RULE: You MUST NOT return a ticker that does not appear LITERALLY in the tweet text. Acceptable forms: cashtag like $AAPL, or all-caps standalone symbol like AAPL or NVDA. If no such ticker appears in the tweet, you MUST return is_prediction=false.
+
+Macro/sector commentary about 'the market', 'stocks', 'equities', 'the Fed', 'rates', 'inflation', 'oil', 'gold' without a specific company ticker is NOT a prediction. Return is_prediction=false in those cases.
+
+Do NOT infer a ticker from context. Do NOT guess based on the author's known holdings. Do NOT extract a ticker from a hashtag unless it's a cashtag with $.
 
 VALID predictions:
 - "$AAPL going to 200" -> prediction
@@ -62,6 +68,8 @@ NOT predictions (reject these):
 - "TSLA earnings were great" -> commentary, no direction
 - "what do you think about MSFT?" -> question
 - "I bought AAPL last week" -> past action
+- "Equity markets are forward looking" -> macro, no ticker
+- "The Fed will cut rates" -> macro, no ticker
 - Retweets, news summaries, questions, watchlists
 
 Response format:
@@ -72,6 +80,43 @@ If not a prediction: {"is_prediction": false}"""
 
 TIMEFRAME_MAP = {"today": 1, "this week": 7, "next week": 14, "this month": 30,
                  "short-term": 30, "medium-term": 90, "long-term": 365, "by end of year": None}
+
+
+# ── Tweet ID → datetime (Twitter snowflake formula) ──────────────────────────
+
+TWITTER_EPOCH_MS = 1288834974657  # 2010-11-04T01:42:54.657Z
+
+def tweet_id_to_datetime(tweet_id) -> datetime | None:
+    """Decode Twitter snowflake ID to UTC datetime. Returns None on failure."""
+    try:
+        tid = int(tweet_id)
+        ms = (tid >> 22) + TWITTER_EPOCH_MS
+        return datetime.fromtimestamp(ms / 1000, tz=timezone.utc).replace(tzinfo=None)
+    except (ValueError, TypeError, OSError):
+        return None
+
+
+def _get_tweet_body(tweet: dict) -> str:
+    """Extract tweet text from Apify response, trying all known field names."""
+    for field in ("full_text", "text", "fullText", "rawContent", "body"):
+        val = tweet.get(field)
+        if val and isinstance(val, str) and val.strip():
+            return val.strip()
+    return ""
+
+
+def _ticker_in_text(ticker: str, text: str) -> bool:
+    """Check if a ticker appears literally in tweet text."""
+    if not ticker or not text:
+        return False
+    upper = text.upper()
+    t = ticker.upper()
+    # Check cashtag $AAPL
+    if f"${t}" in upper:
+        return True
+    # Check standalone word: space/start + TICKER + space/end/punctuation
+    pattern = rf'(?<![A-Z]){re.escape(t)}(?![A-Z])'
+    return bool(re.search(pattern, upper))
 
 
 def _classify_with_haiku(tweet_text: str) -> dict | None:
@@ -105,25 +150,6 @@ def _classify_with_haiku(tweet_text: str) -> dict | None:
         return json.loads(content)
     except Exception:
         return None
-
-
-def _parse_tweet_date(date_str: str) -> datetime:
-    if not date_str:
-        return datetime.utcnow()
-    s = date_str.strip()
-    for fmt in (
-        "%Y-%m-%dT%H:%M:%S",
-        "%Y-%m-%dT%H:%M:%S.%fZ",
-        "%Y-%m-%dT%H:%M:%SZ",
-        "%a %b %d %H:%M:%S +0000 %Y",
-        "%a %b %d %H:%M:%S %Y",
-        "%a %b %d %H:%M:%S",
-    ):
-        try:
-            return datetime.strptime(s, fmt)
-        except ValueError:
-            continue
-    return datetime.utcnow()
 
 
 def _parse_ai_timeframe(tf_str: str) -> int:
@@ -219,7 +245,7 @@ def _fetch_user_tweets(handle: str, max_items: int = TWEETS_PER_ACCOUNT) -> list
 # ── Insert prediction into database ──────────────────────────────────────────
 
 def _insert_prediction(db, ticker: str, direction: str, target_price, timeframe_days: int,
-                       author: str, text: str, tid: str, tweet_url: str, created: str) -> bool:
+                       author: str, body: str, tid: str, tweet_url: str, pred_date: datetime) -> bool:
     """Insert a single prediction. Returns True on success."""
     try:
         source_id = f"x_{tid}_{ticker}"
@@ -233,11 +259,10 @@ def _insert_prediction(db, ticker: str, direction: str, target_price, timeframe_
             return False
 
         from jobs.prediction_validator import prediction_exists_cross_scraper
-        pred_date = _parse_tweet_date(created)
         if prediction_exists_cross_scraper(ticker, forecaster.id, direction, pred_date, db):
             return False
 
-        context = f"@{author}: {text[:300]}"
+        context = f"@{author}: {body[:300]}"
         from models import Prediction
         db.add(Prediction(
             forecaster_id=forecaster.id, ticker=ticker, direction=direction,
@@ -247,7 +272,7 @@ def _insert_prediction(db, ticker: str, direction: str, target_price, timeframe_
             target_price=target_price,
             source_url=tweet_url, archive_url=None,
             source_type="x", source_platform_id=source_id,
-            context=context[:500], exact_quote=text[:500],
+            context=context[:500], exact_quote=body[:500],
             outcome="pending", verified_by="x_scraper",
         ))
         return True
@@ -313,7 +338,9 @@ def run_x_scraper(db=None):
         "accounts_scraped": 0, "tweets_fetched": 0, "prefilter_pass": 0,
         "ai_sent": 0, "ai_predictions": 0, "ai_high": 0, "ai_medium": 0,
         "inserted": 0, "dupes": 0, "errors": 0,
+        "rejected_no_ticker_in_text": 0, "rejected_empty_body": 0,
     }
+    first_tweet_logged = False
 
     for account_id, handle in accounts:
         try:
@@ -331,25 +358,35 @@ def run_x_scraper(db=None):
                 time.sleep(2)
                 continue
 
+            # Log first tweet structure for debugging
+            if not first_tweet_logged and tweets:
+                print(f"[X-SCRAPER-DEBUG] Raw tweet keys: {sorted(tweets[0].keys())}", flush=True)
+                first_tweet_logged = True
+
             # Pre-filter + classify
             seen = set()
             for tweet in tweets:
                 tid = str(tweet.get("id", ""))
-                text = tweet.get("text") or tweet.get("full_text") or ""
-                if not tid or not text or tid in seen:
+                body = _get_tweet_body(tweet)
+                if not tid or not body or tid in seen:
+                    if tid and not body:
+                        total_stats["rejected_empty_body"] += 1
                     continue
                 seen.add(tid)
 
-                author_obj = tweet.get("author") or {}
-                user_obj = tweet.get("user") or {}
-                is_rt = bool(tweet.get("isRetweet") or tweet.get("retweeted") or text.startswith("RT @"))
+                is_rt = bool(tweet.get("isRetweet") or tweet.get("retweeted") or body.startswith("RT @"))
                 tweet_url = tweet.get("url") or f"https://x.com/{handle}/status/{tid}"
-                created = (tweet.get("createdAt") or tweet.get("created_at") or "")[:19]
+
+                # Derive prediction_date from tweet ID (snowflake), not from Apify date field
+                pred_date = tweet_id_to_datetime(tid)
+                if not pred_date:
+                    print(f"[X-SCRAPER-WARN] Could not decode tweet ID {tid} to datetime, using NOW", flush=True)
+                    pred_date = datetime.utcnow()
 
                 # Passive discovery
-                _record_mentioned_handles(text, tracked_handles, db)
+                _record_mentioned_handles(body, tracked_handles, db)
 
-                reason = _prefilter_tweet(text, is_rt)
+                reason = _prefilter_tweet(body, is_rt)
                 if reason:
                     continue
 
@@ -357,7 +394,7 @@ def run_x_scraper(db=None):
                 total_stats["ai_sent"] += 1
 
                 # Classify with Haiku
-                result = _classify_with_haiku(text)
+                result = _classify_with_haiku(body)
                 time.sleep(0.02)  # rate limit Haiku calls
 
                 if not result or not result.get("is_prediction"):
@@ -378,10 +415,16 @@ def run_x_scraper(db=None):
                 if direction not in ("bullish", "bearish"):
                     continue
 
-                tickers = _extract_cashtags(text)
+                tickers = _extract_cashtags(body)
                 if not ticker and tickers:
                     ticker = tickers[0]
                 if not ticker or ticker in CURRENCY_IGNORE:
+                    continue
+
+                # BUG 3 FIX: Validate ticker appears literally in tweet text
+                if not _ticker_in_text(ticker, body):
+                    total_stats["rejected_no_ticker_in_text"] += 1
+                    print(f"[X-SCRAPER-REJECT] Ticker {ticker} not in tweet: {body[:120]}", flush=True)
                     continue
 
                 target_price = result.get("target_price")
@@ -398,7 +441,7 @@ def run_x_scraper(db=None):
                 if db:
                     ok = _insert_prediction(
                         db, ticker, direction, target_price, tf_days,
-                        handle, text, tid, tweet_url, created,
+                        handle, body, tid, tweet_url, pred_date,
                     )
                     if ok:
                         total_stats["inserted"] += 1
@@ -432,6 +475,7 @@ def run_x_scraper(db=None):
     print(f"  Tweets: {total_stats['tweets_fetched']} fetched, {total_stats['prefilter_pass']} passed pre-filter", flush=True)
     print(f"  Haiku: {total_stats['ai_sent']} sent, {total_stats['ai_predictions']} predictions ({total_stats['ai_high']} high, {total_stats['ai_medium']} medium)", flush=True)
     print(f"  INSERTED: {total_stats['inserted']} | Dupes: {total_stats['dupes']} | Errors: {total_stats['errors']}", flush=True)
+    print(f"  Rejected: {total_stats['rejected_no_ticker_in_text']} ticker-not-in-text, {total_stats['rejected_empty_body']} empty-body", flush=True)
     est_apify = total_stats['tweets_fetched'] * 0.40 / 1000
     est_haiku = total_stats['ai_sent'] * 220 * 0.80 / 1_000_000
     print(f"  Est cost: Apify ~${est_apify:.2f}, Haiku ~${est_haiku:.3f}", flush=True)
