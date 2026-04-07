@@ -15,6 +15,7 @@ from datetime import datetime, timedelta
 from http.server import HTTPServer, BaseHTTPRequestHandler
 
 from apscheduler.schedulers.blocking import BlockingScheduler
+from apscheduler.executors.pool import ThreadPoolExecutor as APThreadPool
 from sqlalchemy import text as sql_text
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s", datefmt="%H:%M:%S")
@@ -191,8 +192,12 @@ def main():
     except Exception as e:
         log.error(f"[Worker] Table error: {e}")
 
-    # Scheduler
-    sched = BlockingScheduler()
+    # Scheduler with separate executor for maintenance jobs
+    executors = {
+        'default': APThreadPool(max_workers=3),       # scrapers + evaluator
+        'maintenance': APThreadPool(max_workers=1),    # logos, backfills, bulk jobs
+    }
+    sched = BlockingScheduler(executors=executors)
     t0 = datetime.utcnow() + timedelta(seconds=30)
 
     # Locked jobs
@@ -262,7 +267,7 @@ def main():
             log.info(f"[process_logos] Done: {result}")
         except Exception as e:
             log.error(f"[process_logos] {e}", exc_info=True)
-    sched.add_job(_standalone("process_logos", _process_logos), "interval", hours=24, id="process_logos", next_run_time=t0 + timedelta(minutes=5))
+    sched.add_job(_standalone("process_logos", _process_logos), "interval", hours=24, id="process_logos", next_run_time=t0 + timedelta(minutes=5), executor='maintenance')
 
     # Bulk logo fill — one-time catch-up for all missing logos, ordered by popularity
     def _bulk_fill_logos():
@@ -272,7 +277,7 @@ def main():
             log.info(f"[bulk_fill_logos] Done: {result}")
         except Exception as e:
             log.error(f"[bulk_fill_logos] {e}", exc_info=True)
-    sched.add_job(_standalone("bulk_fill_logos", _bulk_fill_logos), "interval", hours=24, id="bulk_fill_logos", next_run_time=datetime.utcnow(), misfire_grace_time=600)
+    sched.add_job(_standalone("bulk_fill_logos", _bulk_fill_logos), "interval", hours=24, id="bulk_fill_logos", next_run_time=t0 + timedelta(minutes=10), misfire_grace_time=600, executor='maintenance')
 
     # FMP Bulk Harvest — one-time download of all high-value datasets before downgrading plan
     def _fmp_harvest():
@@ -285,7 +290,7 @@ def main():
                 db.close()
         except Exception as e:
             log.error(f"[fmp_harvest] {e}", exc_info=True)
-    sched.add_job(_standalone("fmp_harvest", _fmp_harvest), "interval", hours=24, id="fmp_harvest", next_run_time=datetime.utcnow() + timedelta(minutes=1), misfire_grace_time=600)
+    sched.add_job(_standalone("fmp_harvest", _fmp_harvest), "interval", hours=24, id="fmp_harvest", next_run_time=datetime.utcnow() + timedelta(minutes=1), misfire_grace_time=600, executor='maintenance')
 
     # Polygon description backfill — fills gaps FMP missed (free, 5 calls/min)
     def _desc_backfill_polygon():
@@ -417,7 +422,7 @@ def main():
                 db.close()
         except Exception as e:
             log.error(f"[fmp_backfill] {e}")
-    sched.add_job(_standalone("fmp_ratings_backfill", _fmp_ratings_backfill), "interval", hours=24, id="fmp_ratings_backfill", next_run_time=t0 + timedelta(minutes=8))
+    sched.add_job(_standalone("fmp_ratings_backfill", _fmp_ratings_backfill), "interval", hours=24, id="fmp_ratings_backfill", next_run_time=t0 + timedelta(minutes=8), executor='maintenance')
 
     # FMP grades full backfill — 5000 tickers with full history, runs once
     _fmp_grades_backfill_done = False
@@ -436,7 +441,7 @@ def main():
                 db.close()
         except Exception as e:
             log.error(f"[fmp_grades_backfill] {e}")
-    sched.add_job(_standalone("fmp_grades_backfill", _fmp_grades_backfill), "interval", hours=24, id="fmp_grades_backfill", next_run_time=t0 + timedelta(minutes=12))
+    sched.add_job(_standalone("fmp_grades_backfill", _fmp_grades_backfill), "interval", hours=24, id="fmp_grades_backfill", next_run_time=t0 + timedelta(minutes=12), executor='maintenance')
 
     # FMP Ultimate backfill — one-time massive pull of ALL global grades
     # Runs once on deploy, saves progress to config table, skips if already complete
@@ -451,7 +456,7 @@ def main():
         except Exception as e:
             log.error(f"[fmp_ultimate] {e}", exc_info=True)
     print("[Worker] Registering FMP Ultimate backfill (one-time)...", flush=True)
-    sched.add_job(_standalone("fmp_ultimate", _fmp_ultimate), "interval", hours=24, id="fmp_ultimate", next_run_time=datetime.utcnow(), misfire_grace_time=600)
+    sched.add_job(_standalone("fmp_ultimate", _fmp_ultimate), "interval", hours=24, id="fmp_ultimate", next_run_time=datetime.utcnow(), misfire_grace_time=600, executor='maintenance')
 
     # Cron jobs
     sched.add_job(_watchlist_queue, "interval", hours=4, id="watchlist_queue", next_run_time=t0 + timedelta(minutes=35))

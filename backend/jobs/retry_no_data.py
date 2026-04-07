@@ -28,6 +28,15 @@ TIINGO_KEY = os.getenv("TIINGO_API_KEY", "").strip()
 # Dynamic: Polygon has ~2 years of history from today
 POLYGON_EARLIEST = (datetime.utcnow() - timedelta(days=730)).date()
 
+# Foreign tickers — no free price source supports these
+FOREIGN_SUFFIXES = ('.L', '.TO', '.HK', '.PA', '.DE', '.SS', '.SZ', '.AX', '.SI',
+                    '.MI', '.MC', '.AS', '.BR', '.ST', '.HE', '.OL', '.CO', '.T', '.KS')
+
+def is_foreign_ticker(ticker: str) -> bool:
+    if not ticker:
+        return False
+    return ticker.upper().endswith(FOREIGN_SUFFIXES)
+
 _price_cache: dict[str, dict] = {}
 
 # Daily counters
@@ -58,7 +67,7 @@ def _reset_counters():
 def _fetch_polygon(ticker: str, start_date: str, end_date: str) -> dict:
     if ticker in _price_cache:
         return _price_cache[ticker]
-    if not POLYGON_KEY:
+    if not POLYGON_KEY or is_foreign_ticker(ticker):
         return {}
     import httpx
     try:
@@ -88,7 +97,7 @@ def _fetch_tiingo(ticker: str, start_date: str, end_date: str) -> dict:
     global _tiingo_calls_today, _tiingo_blocked_until, _tiingo_consecutive_429s
     if ticker in _price_cache:
         return _price_cache[ticker]
-    if not TIINGO_KEY or _tiingo_calls_today >= TIINGO_DAILY_LIMIT:
+    if not TIINGO_KEY or _tiingo_calls_today >= TIINGO_DAILY_LIMIT or is_foreign_ticker(ticker):
         return {}
     if _tiingo_blocked_until and datetime.utcnow() < _tiingo_blocked_until:
         return {}
@@ -142,7 +151,7 @@ def _fetch_fmp(ticker: str) -> dict:
     global _fmp_calls_today
     if ticker in _price_cache:
         return _price_cache[ticker]
-    if not FMP_KEY or _fmp_calls_today >= FMP_DAILY_LIMIT:
+    if not FMP_KEY or _fmp_calls_today >= FMP_DAILY_LIMIT or is_foreign_ticker(ticker):
         return {}
     import httpx
     try:
@@ -260,6 +269,13 @@ def retry_no_data_batch(db, max_tickers: int = 1000):
                p.evaluation_date, p.prediction_date, p.forecaster_id, p.window_days
         FROM predictions p
         WHERE p.outcome = 'no_data'
+          AND p.ticker NOT LIKE '%%.L' AND p.ticker NOT LIKE '%%.TO'
+          AND p.ticker NOT LIKE '%%.HK' AND p.ticker NOT LIKE '%%.PA'
+          AND p.ticker NOT LIKE '%%.DE' AND p.ticker NOT LIKE '%%.SS'
+          AND p.ticker NOT LIKE '%%.SZ' AND p.ticker NOT LIKE '%%.AX'
+          AND p.ticker NOT LIKE '%%.SI' AND p.ticker NOT LIKE '%%.MI'
+          AND p.ticker NOT LIKE '%%.MC' AND p.ticker NOT LIKE '%%.AS'
+          AND p.ticker NOT LIKE '%%.T' AND p.ticker NOT LIKE '%%.KS'
         ORDER BY p.ticker
         LIMIT 200000
     """)).fetchall()
@@ -281,6 +297,15 @@ def retry_no_data_batch(db, max_tickers: int = 1000):
             "evaluation_date": r[5], "prediction_date": r[6],
             "forecaster_id": r[7], "window_days": r[8],
         })
+
+    # Filter out any foreign tickers that slipped through
+    foreign_count = 0
+    for ticker in list(ticker_preds.keys()):
+        if is_foreign_ticker(ticker):
+            del ticker_preds[ticker]
+            foreign_count += 1
+    if foreign_count:
+        print(f"[RetryNoData] Skipped {foreign_count} foreign tickers", flush=True)
 
     # Split: Polygon for recent, Tiingo for old, FMP as last resort
     polygon_tickers = []
@@ -352,6 +377,8 @@ def retry_no_data_batch(db, max_tickers: int = 1000):
 
     db.commit()
     polygon_scored = total_scored
+    print(f"[RetryNoData-DEBUG] Polygon phase: {len(polygon_batch)} tickers, "
+          f"{polygon_calls} API calls, {polygon_scored} scored, {total_still_no_data} still no_data", flush=True)
 
     # ── Phase 2: Tiingo (old predictions, Power plan: 10K calls/hour) ──
     tiingo_failed_tickers = []

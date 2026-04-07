@@ -255,9 +255,11 @@ def process_new_logos(db=None) -> dict:
     return process_all_logos(db, batch_size=20, rate_limit=1.0)
 
 
+MAX_BULK_FILL_SECONDS = 1800  # 30 minute time budget per run
+
 def bulk_fill_missing_logos(db=None, rate_limit: float = 0.15) -> dict:
     """Fast bulk fill: process ALL tickers missing logos, ordered by prediction count (most popular first).
-    Does NOT reprocess existing logos. Designed for one-time catch-up."""
+    Does NOT reprocess existing logos. Hard 30-minute time budget — resumes next run."""
     from database import BgSessionLocal
     own_db = db is None
     if own_db:
@@ -284,7 +286,14 @@ def bulk_fill_missing_logos(db=None, rate_limit: float = 0.15) -> dict:
 
         print(f"[LogoBulkFill] {total} tickers missing logos (top: {', '.join(t for t in tickers[:10])})", flush=True)
 
+        start_time = time.time()
         for i, ticker in enumerate(tickers):
+            # Hard time budget
+            if time.time() - start_time > MAX_BULK_FILL_SECONDS:
+                print(f"[LogoBulkFill] Time budget reached ({MAX_BULK_FILL_SECONDS}s), will resume next run. "
+                      f"Processed {i}/{total}", flush=True)
+                break
+
             ok = process_ticker_logo(ticker, db)
             if ok:
                 success += 1
