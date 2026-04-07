@@ -4,7 +4,7 @@ from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from database import get_db
-from models import Forecaster, Prediction
+from models import Forecaster, Prediction, TrackedXAccount, SuggestedXAccount
 from middleware.auth import require_admin
 from rate_limit import limiter
 
@@ -346,3 +346,170 @@ def remove_profanity_word(request: Request, word: str, admin: bool = Depends(req
     from profanity_filter import remove_word
     remove_word(word)
     return {"status": "removed", "word": word}
+
+
+# ── X/Twitter Tracked Accounts ───────────────────────────────────────────────
+
+@router.get("/admin/x-accounts")
+@limiter.limit("30/minute")
+def get_x_accounts(request: Request, admin: bool = Depends(require_admin), db: Session = Depends(get_db)):
+    """List all tracked X accounts with 7-day stats."""
+    from sqlalchemy import text as sql_text
+    rows = db.execute(sql_text("""
+        SELECT t.*,
+            COALESCE((SELECT COUNT(*) FROM predictions p WHERE p.verified_by = 'x_scraper'
+                AND p.context LIKE '%@' || t.handle || ':%'
+                AND p.created_at > NOW() - INTERVAL '7 days'), 0) as predictions_7d
+        FROM tracked_x_accounts t
+        ORDER BY t.tier ASC, t.total_predictions_extracted DESC NULLS LAST
+    """)).fetchall()
+
+    accounts = []
+    for r in rows:
+        accounts.append({
+            "id": r[0], "handle": r[1], "display_name": r[2], "tier": r[3],
+            "follower_count": r[4], "notes": r[5], "active": r[6],
+            "added_date": r[7].isoformat() if r[7] else None,
+            "last_scraped_at": r[8].isoformat() if r[8] else None,
+            "last_scrape_tweets_found": r[9], "last_scrape_predictions_extracted": r[10],
+            "total_tweets_scraped": r[11], "total_predictions_extracted": r[12],
+            "predictions_7d": r[13],
+        })
+    return accounts
+
+
+@router.post("/admin/x-accounts")
+@limiter.limit("30/minute")
+async def add_x_account(request: Request, admin: bool = Depends(require_admin), db: Session = Depends(get_db)):
+    import json as _json
+    body = _json.loads(await request.body())
+
+    handle = (body.get("handle") or "").strip().lstrip("@")
+    display_name = (body.get("display_name") or "").strip()
+    tier = body.get("tier", 4)
+    notes = (body.get("notes") or "").strip()
+
+    if not handle:
+        raise HTTPException(status_code=400, detail="handle is required")
+    if tier not in (1, 2, 3, 4):
+        raise HTTPException(status_code=400, detail="tier must be 1-4")
+
+    existing = db.query(TrackedXAccount).filter(TrackedXAccount.handle == handle).first()
+    if existing:
+        raise HTTPException(status_code=409, detail=f"@{handle} already exists")
+
+    account = TrackedXAccount(handle=handle, display_name=display_name or None, tier=tier, notes=notes or None)
+    db.add(account)
+    db.commit()
+    db.refresh(account)
+    return {"status": "created", "id": account.id, "handle": handle}
+
+
+@router.patch("/admin/x-accounts/{account_id}")
+@limiter.limit("30/minute")
+async def update_x_account(request: Request, account_id: int, admin: bool = Depends(require_admin), db: Session = Depends(get_db)):
+    account = db.query(TrackedXAccount).filter(TrackedXAccount.id == account_id).first()
+    if not account:
+        raise HTTPException(status_code=404, detail="Account not found")
+
+    import json as _json
+    body = _json.loads(await request.body())
+
+    if "display_name" in body:
+        account.display_name = body["display_name"]
+    if "tier" in body:
+        if body["tier"] not in (1, 2, 3, 4):
+            raise HTTPException(status_code=400, detail="tier must be 1-4")
+        account.tier = body["tier"]
+    if "notes" in body:
+        account.notes = body["notes"]
+    if "active" in body:
+        account.active = bool(body["active"])
+
+    db.commit()
+    return {"status": "updated", "id": account_id}
+
+
+@router.delete("/admin/x-accounts/{account_id}")
+@limiter.limit("30/minute")
+def delete_x_account(request: Request, account_id: int, admin: bool = Depends(require_admin), db: Session = Depends(get_db)):
+    account = db.query(TrackedXAccount).filter(TrackedXAccount.id == account_id).first()
+    if not account:
+        raise HTTPException(status_code=404, detail="Account not found")
+    db.delete(account)
+    db.commit()
+    return {"status": "deleted", "id": account_id}
+
+
+@router.get("/admin/x-accounts/stats")
+@limiter.limit("30/minute")
+def get_x_accounts_stats(request: Request, admin: bool = Depends(require_admin), db: Session = Depends(get_db)):
+    from sqlalchemy import text as sql_text
+    active = db.query(TrackedXAccount).filter(TrackedXAccount.active == True).count()
+    inactive = db.query(TrackedXAccount).filter(TrackedXAccount.active == False).count()
+
+    today_stats = db.execute(sql_text("""
+        SELECT
+            COALESCE(SUM(CASE WHEN last_scraped_at > NOW() - INTERVAL '24 hours' THEN last_scrape_tweets_found ELSE 0 END), 0) as tweets_today,
+            COALESCE(SUM(CASE WHEN last_scraped_at > NOW() - INTERVAL '24 hours' THEN last_scrape_predictions_extracted ELSE 0 END), 0) as preds_today
+        FROM tracked_x_accounts
+    """)).first()
+
+    tweets_today = today_stats[0] if today_stats else 0
+    preds_today = today_stats[1] if today_stats else 0
+    conversion = round(preds_today / tweets_today * 100, 1) if tweets_today > 0 else 0
+
+    return {
+        "total_active": active,
+        "total_inactive": inactive,
+        "tweets_today": tweets_today,
+        "predictions_today": preds_today,
+        "conversion_rate": conversion,
+        "apify_usage_estimate": f"{round(tweets_today * 0.40 / 1000 / 29 * 100 * 30, 1)}% of monthly",
+    }
+
+
+@router.get("/admin/x-accounts/suggested")
+@limiter.limit("30/minute")
+def get_suggested_x_accounts(request: Request, admin: bool = Depends(require_admin), db: Session = Depends(get_db)):
+    rows = db.query(SuggestedXAccount).filter(
+        SuggestedXAccount.dismissed == False
+    ).order_by(SuggestedXAccount.mention_count.desc()).limit(50).all()
+
+    return [{
+        "id": r.id, "handle": r.handle, "mention_count": r.mention_count,
+        "first_seen_at": r.first_seen_at.isoformat() if r.first_seen_at else None,
+        "last_seen_at": r.last_seen_at.isoformat() if r.last_seen_at else None,
+    } for r in rows]
+
+
+@router.post("/admin/x-accounts/suggested/{suggested_id}/promote")
+@limiter.limit("30/minute")
+def promote_suggested_account(request: Request, suggested_id: int, admin: bool = Depends(require_admin), db: Session = Depends(get_db)):
+    suggested = db.query(SuggestedXAccount).filter(SuggestedXAccount.id == suggested_id).first()
+    if not suggested:
+        raise HTTPException(status_code=404, detail="Suggested account not found")
+
+    existing = db.query(TrackedXAccount).filter(TrackedXAccount.handle == suggested.handle).first()
+    if existing:
+        suggested.dismissed = True
+        db.commit()
+        return {"status": "already_tracked", "handle": suggested.handle}
+
+    account = TrackedXAccount(handle=suggested.handle, tier=4)
+    db.add(account)
+    suggested.dismissed = True
+    db.commit()
+    db.refresh(account)
+    return {"status": "promoted", "id": account.id, "handle": suggested.handle}
+
+
+@router.post("/admin/x-accounts/suggested/{suggested_id}/dismiss")
+@limiter.limit("30/minute")
+def dismiss_suggested_account(request: Request, suggested_id: int, admin: bool = Depends(require_admin), db: Session = Depends(get_db)):
+    suggested = db.query(SuggestedXAccount).filter(SuggestedXAccount.id == suggested_id).first()
+    if not suggested:
+        raise HTTPException(status_code=404, detail="Suggested account not found")
+    suggested.dismissed = True
+    db.commit()
+    return {"status": "dismissed", "handle": suggested.handle}

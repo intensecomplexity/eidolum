@@ -1,5 +1,5 @@
 import datetime
-from sqlalchemy import Column, Integer, String, Float, DateTime, ForeignKey, Text, Numeric, UniqueConstraint, CheckConstraint
+from sqlalchemy import Column, Integer, String, Float, DateTime, ForeignKey, Text, Numeric, Boolean, UniqueConstraint, CheckConstraint
 from sqlalchemy.orm import relationship
 from database import Base
 
@@ -603,6 +603,39 @@ class AnalystSubscription(Base):
     )
 
     user = relationship("User")
+
+
+class TrackedXAccount(Base):
+    __tablename__ = "tracked_x_accounts"
+
+    id = Column(Integer, primary_key=True, index=True)
+    handle = Column(String(50), unique=True, nullable=False)
+    display_name = Column(String(100))
+    tier = Column(Integer, nullable=False)
+    follower_count = Column(Integer, default=0)
+    notes = Column(Text)
+    active = Column(Boolean, default=True)
+    added_date = Column(DateTime, default=datetime.datetime.utcnow)
+    last_scraped_at = Column(DateTime)
+    last_scrape_tweets_found = Column(Integer, default=0)
+    last_scrape_predictions_extracted = Column(Integer, default=0)
+    total_tweets_scraped = Column(Integer, default=0)
+    total_predictions_extracted = Column(Integer, default=0)
+
+    __table_args__ = (
+        CheckConstraint("tier BETWEEN 1 AND 4", name="ck_tracked_x_tier"),
+    )
+
+
+class SuggestedXAccount(Base):
+    __tablename__ = "suggested_x_accounts"
+
+    id = Column(Integer, primary_key=True, index=True)
+    handle = Column(String(50), unique=True, nullable=False)
+    mention_count = Column(Integer, default=1)
+    first_seen_at = Column(DateTime, default=datetime.datetime.utcnow)
+    last_seen_at = Column(DateTime, default=datetime.datetime.utcnow)
+    dismissed = Column(Boolean, default=False)
 
 
 class Config(Base):

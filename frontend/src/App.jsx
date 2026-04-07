@@ -22,6 +22,7 @@ import RecentPredictions from './pages/RecentPredictions';
 import ForecastersList from './pages/ForecastersList';
 import AdminPanel from './pages/AdminPanel';
 import AdminDashboard from './pages/AdminDashboard';
+import AdminXAccounts from './pages/AdminXAccounts';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import ForgotPassword from './pages/ForgotPassword';
@@ -110,6 +111,7 @@ export default function App() {
         <Route path="/forecasters" element={<ForecastersList />} />
         <Route path="/admin" element={<AdminPanel />} />
         <Route path="/admin/dashboard" element={<AdminDashboard />} />
+        <Route path="/admin/x-accounts" element={<AdminXAccounts />} />
         {/* Phase 2 */}
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />

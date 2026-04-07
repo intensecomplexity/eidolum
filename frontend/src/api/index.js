@@ -936,5 +936,39 @@ export function getAdminForecasters(params = {}) {
   return api.get('/admin/forecasters', { params, headers: authHeaders() }).then(r => r.data);
 }
 
+// ——— X Accounts Admin API ———
+
+export function getXAccounts() {
+  return api.get('/admin/x-accounts', { headers: authHeaders() }).then(r => r.data);
+}
+
+export function addXAccount(data) {
+  return api.post('/admin/x-accounts', data, { headers: authHeaders() }).then(r => r.data);
+}
+
+export function updateXAccount(id, data) {
+  return api.patch(`/admin/x-accounts/${id}`, data, { headers: authHeaders() }).then(r => r.data);
+}
+
+export function deleteXAccount(id) {
+  return api.delete(`/admin/x-accounts/${id}`, { headers: authHeaders() }).then(r => r.data);
+}
+
+export function getXAccountsStats() {
+  return api.get('/admin/x-accounts/stats', { headers: authHeaders() }).then(r => r.data);
+}
+
+export function getSuggestedXAccounts() {
+  return api.get('/admin/x-accounts/suggested', { headers: authHeaders() }).then(r => r.data);
+}
+
+export function promoteSuggestedXAccount(id) {
+  return api.post(`/admin/x-accounts/suggested/${id}/promote`, {}, { headers: authHeaders() }).then(r => r.data);
+}
+
+export function dismissSuggestedXAccount(id) {
+  return api.post(`/admin/x-accounts/suggested/${id}/dismiss`, {}, { headers: authHeaders() }).then(r => r.data);
+}
+
 export default api;
 export { API_BASE };

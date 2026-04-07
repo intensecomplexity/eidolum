@@ -55,6 +55,10 @@ export default function AdminDashboard() {
               tab === t ? 'bg-accent/10 text-accent border border-accent/20' : 'text-text-secondary border border-border'
             }`}>{t}</button>
         ))}
+        <Link to="/admin/x-accounts"
+          className="px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap text-text-secondary border border-border hover:text-accent transition-colors">
+          X Accounts
+        </Link>
       </div>
 
       {tab === 'Overview' && <OverviewTab dashboard={dashboard} />}
