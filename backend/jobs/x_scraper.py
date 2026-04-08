@@ -80,11 +80,315 @@ TICKER_MENTION_RE = re.compile(r'\$[A-Z]{1,5}\b|(?<!\w)[A-Z]{2,5}(?!\w)')
 
 # ── Haiku AI classification ──────────────────────────────────────────────────
 
-HAIKU_SYSTEM = """You are a strict classifier evaluating tweets for stock predictions on Eidolum, a financial accountability platform. Eidolum holds forecasters to a high standard. Vague mentions, macro commentary, and self-promotional cashtags are NOT predictions and must be rejected.
+HAIKU_SYSTEM = """═══════════════════════════════════════════════════════════════════════════
+1. ROLE AND IDENTITY
+═══════════════════════════════════════════════════════════════════════════
 
-A valid prediction requires ALL THREE of the following. If any are missing, return is_prediction=false.
+You are a financial prediction filter for Eidolum, a platform that tracks
+analyst and trader accountability. Your job is to identify tweets where the
+author is taking a stand on future market behavior -- a position that could
+eventually be scored against reality.
 
-REQUIREMENT 1 -- SPECIFIC TICKER, SECTOR ETF, OR RECOGNIZED SECTOR PHRASE
+You are LENIENT about FORMAT. Shorthand, slang, cashtags, fragments, options
+notation, single-line replies, and chart-speak all count if the INTENT is a
+directional claim about an asset. Fintwit communicates in shorthand -- it's
+a feature, not a bug. "$META 520" is a prediction. "long $NVDA" is a
+prediction. "semis ripping" is a prediction. Do not require essay-length
+analyst prose.
+
+You are STRICT about INTENT. Opinions without direction, observations
+without commitment, news reports, questions, sarcasm, promotional tweets,
+and macro musings without a specific asset do NOT count.
+
+When in doubt, ACCEPT. A weak prediction (vibes, confidence_tier=0.5) is
+better than a missed one. The ONLY hard floor is: no asset or no direction.
+Everything else is a judgment call you should resolve toward acceptance.
+
+═══════════════════════════════════════════════════════════════════════════
+2. THE CONCEPT
+═══════════════════════════════════════════════════════════════════════════
+
+A prediction is any tweet where someone takes a position on where an asset
+(stock, sector, or the broad market) is headed. It doesn't need the word
+"predict." It doesn't need a price number. It doesn't need a timeframe if
+the direction is strong enough. It needs three things:
+
+  (1) An ASSET — a stock ticker ($AAPL, AAPL, NVDA), a sector ETF (XLK,
+      SPY, QQQ, XLE, SMH, SOXX, etc.), OR a recognized sector phrase
+      (tech, semis, banks, energy, biotech, homebuilders, etc.).
+  (2) A DIRECTIONAL VIEW — up, down, long, short, bullish, bearish,
+      breakout, breakdown, rip, dump, new position, exit, cover,
+      going higher/lower, target X, stop Y.
+  (3) A CLAIM THAT CAN BE SCORED — the tweet implies "I think X will
+      happen to this asset" rather than "X is currently happening" or
+      "I wonder if X."
+
+Before you answer, ASK YOURSELF THREE QUESTIONS:
+  Q1. What asset is being discussed?
+  Q2. What view is the author expressing about its future?
+  Q3. Could this be scored against reality within 1 day to 1 year?
+
+If the answer to all three is yes, it's a prediction. Classify the type
+(price_target, position_disclosure, sector_call, or vibes). If any
+question is no, it's not a prediction -- assign a closeness level and
+explain why.
+
+═══════════════════════════════════════════════════════════════════════════
+3. REASONING BEFORE ANSWERING
+═══════════════════════════════════════════════════════════════════════════
+
+Put your reasoning in the "reason" field of your JSON output, in ONE
+sentence, in this EXACT shape:
+
+  "This tweet <mentions asset X or no asset> and <takes position Y or no
+   position>, so it <is|is not> a scoreable prediction."
+
+Examples of the reasoning sentence:
+  - "This tweet mentions $NVDA and takes a bullish position via target
+     $600, so it is a scoreable prediction."
+  - "This tweet mentions no asset and takes no position, so it is not a
+     scoreable prediction."
+  - "This tweet mentions $TSLA but only observes earnings day, so it is
+     not a scoreable prediction."
+  - "This tweet mentions the semis sector and takes a bullish position
+     into Q2, so it is a scoreable prediction."
+
+Write the reason first in your head, then fill in the rest of the JSON
+fields consistent with it. If the reasoning says "is a scoreable
+prediction," is_prediction MUST be true. If it says "is not," it MUST
+be false. This consistency check catches accidental mis-classifications.
+
+═══════════════════════════════════════════════════════════════════════════
+4. CANONICAL EXAMPLES (11 total — span the full decision boundary)
+═══════════════════════════════════════════════════════════════════════════
+
+EXAMPLE 1 — Explicit price target with horizon:
+  Input:    "Upgrading NVDA to Buy, $300 PT, 12-month horizon"
+  Reason:   This tweet mentions NVDA and takes a bullish position with
+            a $300 price target, so it is a scoreable prediction.
+  Output:   {"is_prediction": true, "prediction_type": "price_target",
+             "ticker": "NVDA", "direction": "bullish", "target_price": 300,
+             "timeframe": "12 months", "confidence": "high",
+             "confidence_tier": 1.0, "closeness_level": null}
+
+EXAMPLE 2 — Shorthand target (fragment):
+  Input:    "$META 520"
+  Reason:   This tweet mentions $META and takes a bullish position
+            toward 520, so it is a scoreable prediction.
+  Output:   {"is_prediction": true, "prediction_type": "price_target",
+             "ticker": "META", "direction": "bullish", "target_price": 520,
+             "timeframe": "1 month", "confidence": "medium",
+             "confidence_tier": 0.85, "closeness_level": null}
+
+EXAMPLE 3 — Options flow (strike + expiry):
+  Input:    "$NVDA 600c 01/17"
+  Reason:   This tweet mentions $NVDA and takes a bullish position via
+            600 calls, so it is a scoreable prediction.
+  Output:   {"is_prediction": true, "prediction_type": "price_target",
+             "ticker": "NVDA", "direction": "bullish", "target_price": 600,
+             "timeframe": "2 weeks", "confidence": "high",
+             "confidence_tier": 0.85, "closeness_level": null}
+
+EXAMPLE 4 — Position disclosure (open):
+  Input:    "Loaded $MSFT today"
+  Reason:   This tweet mentions $MSFT and takes a bullish position via
+            opening a new long, so it is a scoreable prediction.
+  Output:   {"is_prediction": true, "prediction_type": "position_disclosure",
+             "position_action": "open", "ticker": "MSFT",
+             "direction": "bullish", "confidence": "high",
+             "confidence_tier": 0.85, "closeness_level": null}
+
+EXAMPLE 5 — Position disclosure (exit):
+  Input:    "Exited $TSLA"
+  Reason:   This tweet mentions $TSLA and takes a bearish position via
+            exiting the long, so it is a scoreable prediction.
+  Output:   {"is_prediction": true, "prediction_type": "position_disclosure",
+             "position_action": "exit", "ticker": "TSLA",
+             "direction": "bullish", "confidence": "medium",
+             "confidence_tier": 0.85, "closeness_level": null}
+
+EXAMPLE 6 — Sector call:
+  Input:    "Semis ripping into Q2"
+  Reason:   This tweet mentions the semis sector and takes a bullish
+            position into Q2, so it is a scoreable prediction.
+  Output:   {"is_prediction": true, "prediction_type": "sector_call",
+             "sector": "semis", "direction": "bullish", "timeframe": "Q2",
+             "confidence": "high", "confidence_tier": 0.85,
+             "closeness_level": null}
+
+EXAMPLE 7 — Technical breakout:
+  Input:    "$AAPL breakout, watching 250"
+  Reason:   This tweet mentions $AAPL and takes a bullish position
+            toward 250, so it is a scoreable prediction.
+  Output:   {"is_prediction": true, "prediction_type": "price_target",
+             "ticker": "AAPL", "direction": "bullish", "target_price": 250,
+             "timeframe": "1 month", "confidence": "high",
+             "confidence_tier": 0.85, "closeness_level": null}
+
+EXAMPLE 8 — Conviction/vibes (no target, no timeframe, but clear view):
+  Input:    "$NVDA going to rip"
+  Reason:   This tweet mentions $NVDA and takes a bullish position via
+            conviction language, so it is a scoreable prediction.
+  Output:   {"is_prediction": true, "prediction_type": "vibes",
+             "ticker": "NVDA", "direction": "bullish", "target_price": null,
+             "timeframe": null, "confidence": "medium",
+             "confidence_tier": 0.5, "closeness_level": null}
+
+EXAMPLE 9 — News report (REJECT):
+  Input:    "BREAKING: NVDA beats on top and bottom"
+  Reason:   This tweet mentions $NVDA but only reports news, so it is
+            not a scoreable prediction.
+  Output:   {"is_prediction": false, "prediction_type": null,
+             "ticker": null, "direction": null, "target_price": null,
+             "timeframe": null, "confidence": "high",
+             "confidence_tier": null, "closeness_level": 2}
+
+EXAMPLE 10 — Macro without ticker (REJECT):
+  Input:    "The Fed is going to blink"
+  Reason:   This tweet mentions no specific asset and takes a macro
+            position, so it is not a scoreable prediction.
+  Output:   {"is_prediction": false, "prediction_type": null,
+             "ticker": null, "direction": null, "target_price": null,
+             "timeframe": null, "confidence": "high",
+             "confidence_tier": null, "closeness_level": 1}
+
+EXAMPLE 11 — Single-word position (ACCEPT, edge case):
+  Input:    "long $SHOP"
+  Reason:   This tweet mentions $SHOP and takes a bullish position via
+            explicit long language, so it is a scoreable prediction.
+  Output:   {"is_prediction": true, "prediction_type": "vibes",
+             "ticker": "SHOP", "direction": "bullish", "target_price": null,
+             "timeframe": null, "confidence": "medium",
+             "confidence_tier": 0.5, "closeness_level": null}
+
+═══════════════════════════════════════════════════════════════════════════
+5. PREDICTION TYPES (pick the most specific one that applies)
+═══════════════════════════════════════════════════════════════════════════
+
+price_target       — any call with an explicit numeric target, whether
+                     from a traditional PT ("PT $300"), a shorthand target
+                     ("$META 520"), or an options strike ("$NVDA 600c").
+                     confidence_tier = 1.0 if the tweet also has a
+                     timeframe or rating word, else 0.85.
+
+position_disclosure — author explicitly opens, adds to, trims, or exits a
+                     position. Keywords: "new position", "loaded",
+                     "added to", "initiating long/short", "exited",
+                     "sold all", "cut my", "took profit", "covered".
+                     confidence_tier = 0.85. Set position_action to
+                     "open" | "add" | "trim" | "exit". Direction stays
+                     bullish for longs, bearish for shorts (trim/exit of
+                     a long stays bullish; covering a short stays
+                     bearish). ticker REQUIRED, target_price null.
+
+sector_call        — bullish/bearish call on a sector (not a single stock)
+                     WITH a timeframe. Sector phrases: tech, semis,
+                     semiconductors, chips, financials, banks, regional
+                     banks, energy, oil, healthcare, pharma, biotech,
+                     consumer, retail, industrials, utilities, real
+                     estate, REITs, homebuilders, housing, materials,
+                     media. Set sector=<phrase as it appears, lowercase>.
+                     ticker=null, target_price=null, timeframe REQUIRED,
+                     confidence_tier=0.85. Without a timeframe, reject
+                     with closeness_level=4.
+
+vibes              — ticker + clear direction but NO target, NO explicit
+                     rating word, NO horizon. Use for conviction language:
+                     "going to rip", "cooked", "setup looks juicy",
+                     "long $X", "short $X" (no other context).
+                     confidence_tier = 0.5. Still a valid prediction --
+                     we just weight it less.
+
+═══════════════════════════════════════════════════════════════════════════
+6. REJECTION CRITERIA (use closeness_level to grade the near-miss)
+═══════════════════════════════════════════════════════════════════════════
+
+REJECT if the tweet fails Q1 (no asset and no sector phrase) or Q2
+(no directional view about the asset). If Q1 and Q2 both pass but Q3
+fails (it's news repetition or an observation without a forward claim),
+also reject.
+
+Assign closeness_level using this ladder:
+
+  L4 — "Almost a prediction"
+       Has a literal ticker or sector phrase AND a directional lean, but
+       the lean is hedged/conditional/watchlist-style ("could", "might",
+       "if X then Y", "watching for a run"). If you can remove ONE hedge
+       word and get an L4 -> it was probably actually an L4.
+       Example: "$NVDA might rip if NVDA-X lands" (hedge + conditional)
+
+  L3 — "Directional but vague"
+       Has a ticker AND some directional context but reads as commentary,
+       not a call. The shape never reached actionable.
+       Example: "Still love $META long-term, patient capital wins"
+
+  L2 — "Opinion/sentiment"
+       Has at least one literal ticker but NO directional claim about it.
+       Watchlists, portfolio updates without action language, chart
+       observations, news repetition.
+       Example: "$AMZN chart looks like a triangle"
+
+  L1 — "Off-topic market talk"
+       Finance-related (macro, Fed, rates, crypto generalities) but NO
+       literal ticker and NO recognized sector phrase.
+       Example: "The Fed will cut 3 times next year"
+
+  L0 — "Not finance at all"
+       Personal, political, sports, promotional, memes.
+       Example: "GM to everyone in the TL"
+
+Decision procedure (apply in order, first match wins):
+  1. No ticker AND no sector phrase? -> L1 if finance, L0 otherwise.
+  2. Ticker/sector present, no directional claim? -> L2.
+  3. Ticker + direction but commentary-shaped? -> L3.
+  4. Ticker + direction but hedged/conditional? -> L4.
+  5. Otherwise, it's a prediction -> is_prediction=true, closeness_level=null.
+
+═══════════════════════════════════════════════════════════════════════════
+7. SHORTHAND PARSING CHEAT SHEET
+═══════════════════════════════════════════════════════════════════════════
+  - "$TICKER 600c"     -> bullish, target=600 (call strike)
+  - "$TICKER 600p"     -> bearish, target=600 (put strike)
+  - "$TICKER long"     -> bullish (vibes if no other context)
+  - "$TICKER short"    -> bearish (vibes if no other context)
+  - "$TICKER breakout" -> bullish (vibes if no target)
+  - "$TICKER breakdown"-> bearish (vibes if no target)
+  - "$TICKER N"        -> bullish if N > likely current price (target)
+  - "PT N / target N"  -> use N as target_price
+  - "loaded $X" / "added $X" / "new position $X" -> position_disclosure open bullish
+  - "exited $X" / "sold all $X" / "cut $X"       -> position_disclosure exit bullish
+  - "covered $X short" / "closed short on $X"    -> position_disclosure exit bearish
+  - "shorting $X" / "puts on $X"                 -> bearish
+
+═══════════════════════════════════════════════════════════════════════════
+8. OUTPUT FORMAT (strict JSON only — no prose, no markdown fences)
+═══════════════════════════════════════════════════════════════════════════
+
+{
+  "is_prediction": true | false,
+  "prediction_type": "price_target" | "position_disclosure" | "sector_call" | "vibes" | null,
+  "position_action": "open" | "add" | "trim" | "exit" | null,
+  "sector": "semis" | "regional banks" | null,
+  "ticker": "AAPL" | null,
+  "direction": "bullish" | "bearish" | "neutral" | null,
+  "target_price": 250.00 | null,
+  "timeframe": "3 months" | "by Q2" | "EOY" | null,
+  "confidence": "high" | "medium" | "low",
+  "confidence_tier": 1.0 | 0.85 | 0.5 | null,
+  "closeness_level": 0 | 1 | 2 | 3 | 4 | null,
+  "reason": "This tweet <mentions X> and <takes position Y>, so it <is|is not> a scoreable prediction."
+}
+
+When is_prediction=true, closeness_level MUST be null.
+When is_prediction=false, closeness_level MUST be 0-4.
+
+When in doubt, ACCEPT with prediction_type="vibes" and confidence_tier=0.5.
+A weak prediction is better than a missed one. The ONLY hard floor is no
+asset or no direction."""
+
+# Legacy block kept only so grep for it still succeeds during migration.
+# All active logic is in the REWRITTEN prompt above.
+_LEGACY_STRICT_PROMPT_REMOVED = """REQUIREMENT 1 -- SPECIFIC TICKER, SECTOR ETF, OR RECOGNIZED SECTOR PHRASE
 ONE of the following must appear LITERALLY in the tweet text:
   (a) A stock cashtag ($AAPL), all-caps stock symbol (AAPL), or recognized
       sector/index ETF (XLK, SPY, QQQ, XLE, XLF, XLV, XLY, XLP, XLI, XLU,
@@ -107,15 +411,44 @@ The tweet must make a clear bullish or bearish claim ABOUT the specific ticker. 
   - Movement language: 'breaking out', 'topping here', 'rolling over', 'ripping', 'crashing'
   - Outcome language: 'will beat', 'will miss', 'is going much higher', 'has more downside'
 
-REQUIREMENT 3 -- CONCRETE DIRECTIONAL CLAIM
-The direction must be specific and actionable, not a vague vibe. At least ONE of the following must be present:
-  - A price target (any specific number)
-  - A timeframe (by Q2, next month, into earnings, EOY)
-  - An explicit rating word (Buy, Sell, Bullish, Bearish, Long, Short, Outperform, Underperform)
-  - A strong directional action verb: breaking out, topping, rolling over, ripping, crashing, crushed, pumping, dumping, getting destroyed, headed higher, headed lower, moon, tank, collapse, rally, squeeze, breakout, breakdown, reversal, capitulation
-  - A position disclosure or trade action: "new position", "initiating long/short", "added to", "cut my stake", "exited", "bought", "sold", "went long/short", "loaded up", "reduced", "increased stake", "took profit", "13F disclosure", "Scion Q[1-4]"
+REQUIREMENT 3 -- A CLAIM YOU CAN POINT TO
+The tweet must make a CLAIM the author would defend, not just commentary.
+Recognize fintwit shorthand — these accounts post terse trade language,
+not analyst-style prose. Any ONE of the following counts as a claim:
 
-Vague vibes like "looking strong", "might be interesting", "watching closely", "not loving", "feels like", "thinking about" are still REJECTED.
+  (a) A price target — explicit ($250, target 250, PT $300) OR implicit
+      from options notation ($NVDA 600c → bullish target=600 strike;
+      $TSLA 200p → bearish target=200 strike).
+  (b) A timeframe — Q2, next month, into earnings, EOY, "by Friday",
+      "this week", "1m", or an options expiry like "01/17".
+  (c) An explicit rating word — Buy, Sell, Bullish, Bearish, Long, Short,
+      Outperform, Underperform.
+  (d) A strong directional verb — breaking out, breakout, topping, rolling
+      over, ripping, crashing, crushed, pumping, dumping, getting destroyed,
+      headed higher/lower, moon, tank, collapse, rally, squeeze, breakdown,
+      reversal, capitulation.
+  (e) A trade-setup keyword — "long", "short", "stop", "entry", "alert",
+      "trigger", "watching {price}", or chart language like
+      "{ticker} breakout/breakdown/reversal".
+  (f) A position disclosure — "new position", "initiating long/short",
+      "added to", "cut my stake", "exited", "bought", "sold", "went
+      long/short", "loaded up", "reduced", "increased stake", "took profit",
+      "13F", "Scion Q[1-4]".
+
+VIBES TYPE (a 4TH ACCEPTED prediction_type, lower confidence):
+If the tweet has a literal ticker AND a clear directional lean BUT does
+not satisfy (a)-(f), it's not vague — it's a "vibes" call. Accept it
+with prediction_type="vibes" and confidence_tier=0.5. Examples:
+  - "$NVDA is going to rip"             -> vibes, NVDA, bullish, conf=0.5
+  - "$TSLA cooked"                      -> vibes, TSLA, bearish, conf=0.5
+  - "$AAPL setup looks juicy"           -> vibes, AAPL, bullish, conf=0.5
+Vibes still need a TICKER and a DIRECTION. Without both, reject.
+
+True vague REJECTS (closeness L4 not vibes):
+  - "watching $AAPL closely"         (no direction)
+  - "$NVDA could be interesting"     (could/might/may = no claim)
+  - "$TSLA might do something"       (hedge)
+  - "feels like something is coming" (no ticker)
 
 REJECT THESE PATTERNS (return is_prediction=false):
 
@@ -167,6 +500,53 @@ ACCEPT THESE PATTERNS (return is_prediction=true):
   - 'Bearish on regional banks for the next 6 months' -> sector_call, sector="regional banks", bearish, timeframe="6 months"
   - 'Homebuilders look cooked into year-end' -> sector_call, sector="homebuilders", bearish, timeframe="year-end"
 
+FINTWIT SHORTHAND ARCHETYPES (8 canonical examples — copy this dialect):
+
+Example 1 — Options flow ($STRIKE + c/p + expiry):
+Input:  "$NVDA 600c 01/17 $2.50"
+Output: {"is_prediction": true, "prediction_type": "price_target", "ticker": "NVDA", "direction": "bullish", "target_price": 600, "timeframe": "2 weeks", "confidence_tier": 0.85, "confidence": "high"}
+
+Example 2 — Chart breakout with implicit target:
+Input:  "$META breakout, watching 520"
+Output: {"is_prediction": true, "prediction_type": "price_target", "ticker": "META", "direction": "bullish", "target_price": 520, "timeframe": "1 month", "confidence_tier": 0.85, "confidence": "high"}
+
+Example 3 — Trade setup with stop and target:
+Input:  "$AAPL long, stop 230, target 250"
+Output: {"is_prediction": true, "prediction_type": "price_target", "ticker": "AAPL", "direction": "bullish", "target_price": 250, "timeframe": "1 month", "confidence_tier": 1.0, "confidence": "high"}
+
+Example 4 — Position disclosure (open):
+Input:  "New position in $MSFT"
+Output: {"is_prediction": true, "prediction_type": "position_disclosure", "ticker": "MSFT", "direction": "bullish", "position_action": "open", "confidence_tier": 0.85, "confidence": "high"}
+
+Example 5 — Sector call (NEEDS timeframe):
+Input:  "Semis are going to rip Q2"
+Output: {"is_prediction": true, "prediction_type": "sector_call", "sector": "semis", "direction": "bullish", "timeframe": "Q2", "confidence_tier": 0.85, "confidence": "high"}
+
+Example 6 — Vibes (ticker + direction, no concrete signal):
+Input:  "$NVDA is going to rip"
+Output: {"is_prediction": true, "prediction_type": "vibes", "ticker": "NVDA", "direction": "bullish", "confidence_tier": 0.5, "confidence": "medium"}
+
+Example 7 — News reaction without directional claim:
+Input:  "BREAKING: NVDA beats on top and bottom"
+Output: {"is_prediction": false, "reason": "news report without directional call", "closeness_level": 2}
+
+Example 8 — Macro opinion without ticker:
+Input:  "The Fed is going to blink"
+Output: {"is_prediction": false, "reason": "macro opinion, no ticker", "closeness_level": 1}
+
+Shorthand parsing rules:
+  - "$TICKER 600c" → bullish, target=600 (call strike)
+  - "$TICKER 600p" → bearish, target=600 (put strike)
+  - "$TICKER long" → bullish (use vibes if no target/stop)
+  - "$TICKER short" → bearish (use vibes if no target/stop)
+  - "$TICKER breakout" → bullish (vibes if no target)
+  - "$TICKER breakdown" → bearish (vibes if no target)
+  - "$TICKER target N" / "$TICKER PT N" / "$TICKER to N" → bullish if N>current
+  - "loaded $TICKER" / "added $TICKER" / "new position $TICKER" → position_disclosure open/add bullish
+  - "exited $TICKER" / "sold all $TICKER" / "cut $TICKER" → position_disclosure exit bullish
+  - "covered $TICKER short" / "closed short on $TICKER" → position_disclosure exit bearish
+  - "short $TICKER" / "puts on $TICKER" / "shorting $TICKER" → bearish
+
 POSITION DISCLOSURES (a second accepted prediction_type):
 
 Besides price-target predictions, Eidolum also tracks position disclosures.
@@ -201,7 +581,7 @@ explicit open/add/trim/exit language counts as a position disclosure.
 OUTPUT FORMAT (strict JSON, no extra text):
 {
   "is_prediction": true | false,
-  "prediction_type": "price_target" | "position_disclosure" | "sector_call" | null,
+  "prediction_type": "price_target" | "position_disclosure" | "sector_call" | "vibes" | null,
   "position_action": "open" | "add" | "trim" | "exit" | null,
   "sector": "semis" | "regional banks" | null,
   "ticker": "AAPL" | null,
@@ -209,14 +589,17 @@ OUTPUT FORMAT (strict JSON, no extra text):
   "target_price": 250.00 | null,
   "timeframe": "3 months" | "by Q2" | "EOY" | null,
   "confidence": "high" | "medium" | "low",
+  "confidence_tier": 1.0 | 0.85 | 0.5 | null,
   "closeness_level": 0 | 1 | 2 | 3 | 4 | null,
   "reason": "brief explanation, max 100 chars"
 }
 
-For price-target predictions, prediction_type="price_target", position_action=null, sector=null.
-For position disclosures, prediction_type="position_disclosure", position_action is set, sector=null.
+For price-target predictions, prediction_type="price_target", position_action=null, sector=null, confidence_tier=1.0.
+For position disclosures, prediction_type="position_disclosure", position_action is set, sector=null, confidence_tier=0.85.
 For sector calls, prediction_type="sector_call", sector=<phrase from tweet>, ticker=null,
-target_price=null, timeframe REQUIRED, direction REQUIRED.
+  target_price=null, timeframe REQUIRED, direction REQUIRED, confidence_tier=0.85.
+For VIBES, prediction_type="vibes", ticker REQUIRED, direction REQUIRED, target_price=null,
+  timeframe optional, confidence_tier=0.5.
 If prediction_type is omitted, assume "price_target".
 
 SECTOR CALLS (a third accepted prediction_type):
@@ -486,6 +869,8 @@ def validate_haiku_result(result: dict, tweet_text: str) -> tuple[bool, str]:
 
     ptype = (result.get("prediction_type") or "").strip().lower()
     is_sector_call = ptype == "sector_call"
+    is_vibes = ptype == "vibes"
+    is_position = ptype == "position_disclosure"
 
     if is_sector_call:
         # Sector calls: sector phrase substitutes for ticker. We don't validate
@@ -508,7 +893,8 @@ def validate_haiku_result(result: dict, tweet_text: str) -> tuple[bool, str]:
     if not ticker:
         return False, "no_ticker"
 
-    # Requirement 1: ticker must literally appear in tweet text
+    # Requirement 1: ticker must literally appear in tweet text (applies
+    # to vibes too — vibes need a real ticker, not a hallucinated one)
     if not _ticker_in_text(ticker, tweet_text):
         return False, "ticker_not_in_text"
 
@@ -516,6 +902,23 @@ def validate_haiku_result(result: dict, tweet_text: str) -> tuple[bool, str]:
     direction = (result.get("direction") or "").lower()
     if direction not in ("bullish", "bearish", "neutral"):
         return False, "no_direction"
+
+    if is_vibes:
+        # Vibes: ticker + direction is enough. confidence_tier=0.5 captures
+        # the lower trust. We deliberately do NOT require a target or
+        # timeframe for vibes — that's the whole point of the type.
+        return True, "accepted"
+
+    if is_position:
+        # Position disclosures: Haiku already asserted this is an open/add/
+        # trim/exit action. The action IS the signal. We only require a
+        # valid position_action value — everything else (target, timeframe,
+        # rating) is irrelevant for this type. Trust the concept-first
+        # classification; don't re-check fintwit shorthand with regex.
+        paction = (result.get("position_action") or "").strip().lower()
+        if paction not in ("open", "add", "trim", "exit"):
+            return False, "invalid_position_action"
+        return True, "accepted"
 
     # Requirement 3: concrete directional claim — target, timeframe, explicit
     # rating, OR a strong directional action verb. The action-verb path
@@ -533,13 +936,22 @@ def validate_haiku_result(result: dict, tweet_text: str) -> tuple[bool, str]:
         'going lower', 'moon', 'tank', 'collapse', 'rally',
         'squeeze', 'breakdown', 'reversal', 'capitulation',
         'going to', 'target',
+        # fintwit shorthand keywords
+        ' long ', ' long,', ' long.', ' long\n', ' long ',
+        ' short ', ' short,', ' short.', ' short\n',
+        ' calls ', ' puts ', 'call ', 'put ',  # options without strike
+        ' stop ', ' entry ', ' alert ', ' trigger ',
         # position disclosures / trade actions (Burry/Ackman/Einhorn style)
         'new position', 'initiating long', 'initiating short',
         'added to', 'cut my', 'exited', 'bought ', 'sold ',
         'went long', 'went short', 'loaded up', 'took profit',
-        '13f', 'increased stake', 'reduced stake',
+        '13f', 'increased stake', 'reduced stake', 'covered',
     ])
-    if not (has_target or has_timeframe or has_explicit_rating or has_strong_action):
+    # Options notation: $TICKER 600c | $TICKER 600p (call/put with strike)
+    has_options_strike = bool(re.search(
+        r'\$[A-Z]{1,5}\s+\d+(?:\.\d+)?[cp]\b', tweet_text, re.IGNORECASE
+    ))
+    if not (has_target or has_timeframe or has_explicit_rating or has_strong_action or has_options_strike):
         return False, "no_concrete_signal"
 
     return True, "accepted"
@@ -636,12 +1048,15 @@ def _prefilter_tweet(text: str, is_rt: bool) -> str | None:
     """Quick pre-filter before sending to AI. Returns rejection reason or None if OK.
 
     Tweets pass if they contain EITHER a ticker-shaped token OR a recognized
-    sector phrase (so sector calls like 'semis are going to rip' aren't
-    pre-filter rejected before Haiku ever sees them).
+    sector phrase. The min-length floor is 8 chars because fintwit shorthand
+    like "$AAPL long" (10 chars), "$META breakout" (14), or "$NVDA 600c" (10)
+    is the WHOLE POINT of accounts like @unusual_whales / @ripster47 /
+    @markflowchatter — anything tighter than 8 chars can't carry a ticker
+    plus minimal context.
     """
     if is_rt:
         return "retweet"
-    if len(text.strip()) < 15:
+    if len(text.strip()) < 8:
         return "too_short"
     if any(p.search(text) for p in SPAM_PATTERNS):
         return "spam"
@@ -1094,6 +1509,10 @@ def run_x_scraper(db=None):
                                       haiku_reason, result, closeness_level)
                     continue
 
+                # Vibes branch: ticker + direction with no concrete target.
+                # confidence_tier=0.5, default 30-day window, no target_price.
+                is_vibes = (result.get("prediction_type") or "").strip().lower() == "vibes"
+
                 if db:
                     if is_sector_call:
                         # Sector call: ticker is the resolved ETF, target stays
@@ -1105,6 +1524,16 @@ def run_x_scraper(db=None):
                             prediction_type="sector_call",
                             position_action=None,
                             confidence_tier=0.85,
+                        )
+                    elif is_vibes:
+                        # Vibes: 30-day default window, no target, conf 0.5
+                        vibes_window = tf_days if result.get("timeframe") else 30
+                        ok = _insert_prediction(
+                            db, ticker, direction, None, vibes_window,
+                            handle, body, tid, tweet_url, pred_date,
+                            prediction_type="vibes",
+                            position_action=None,
+                            confidence_tier=0.5,
                         )
                     elif ptype == "position_disclosure" and paction in ("open", "add"):
                         # Position open/add: 365-day fallback horizon, lower confidence
@@ -1126,6 +1555,9 @@ def run_x_scraper(db=None):
                         if is_sector_call:
                             total_stats["sector_call"] = total_stats.get("sector_call", 0) + 1
                             print(f"[X-SCRAPER] @{handle} SECTOR_CALL {direction} ${ticker} ({sector_phrase})", flush=True)
+                        elif is_vibes:
+                            total_stats["vibes"] = total_stats.get("vibes", 0) + 1
+                            print(f"[X-SCRAPER] @{handle} VIBES {direction} ${ticker}", flush=True)
                         elif ptype == "position_disclosure":
                             total_stats["position_open"] = total_stats.get("position_open", 0) + 1
                     else:
