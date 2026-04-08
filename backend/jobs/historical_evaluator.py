@@ -86,6 +86,10 @@ def evaluate_batch(max_tickers: int = 500) -> dict:
     now = datetime.utcnow()
 
     # ── STEP 1: Read pending predictions (short DB connection) ──────────
+    # Foreign-listed tickers (.L .TO .HK .PA .DE .DU .F .SS .SZ .AX .SI .MI
+    # .MC .AS .BR .ST .HE .OL .CO .T .KS) are not supported by Polygon,
+    # Tiingo, or FMP free/standard tiers. We exclude them from the candidate
+    # query so the evaluator never wastes a run iterating through them.
     db = SessionLocal()
     try:
         rows = db.execute(sql_text("""
@@ -95,6 +99,17 @@ def evaluate_batch(max_tickers: int = 500) -> dict:
             WHERE (p.outcome = 'pending' OR p.outcome IS NULL OR p.outcome = '')
               AND p.evaluation_date IS NOT NULL
               AND p.evaluation_date < :now
+              AND p.ticker NOT LIKE '%.L'  AND p.ticker NOT LIKE '%.TO'
+              AND p.ticker NOT LIKE '%.HK' AND p.ticker NOT LIKE '%.PA'
+              AND p.ticker NOT LIKE '%.DE' AND p.ticker NOT LIKE '%.DU'
+              AND p.ticker NOT LIKE '%.F'  AND p.ticker NOT LIKE '%.SS'
+              AND p.ticker NOT LIKE '%.SZ' AND p.ticker NOT LIKE '%.AX'
+              AND p.ticker NOT LIKE '%.SI' AND p.ticker NOT LIKE '%.MI'
+              AND p.ticker NOT LIKE '%.MC' AND p.ticker NOT LIKE '%.AS'
+              AND p.ticker NOT LIKE '%.BR' AND p.ticker NOT LIKE '%.ST'
+              AND p.ticker NOT LIKE '%.HE' AND p.ticker NOT LIKE '%.OL'
+              AND p.ticker NOT LIKE '%.CO' AND p.ticker NOT LIKE '%.T'
+              AND p.ticker NOT LIKE '%.KS'
             ORDER BY p.ticker
             LIMIT 5000
         """), {"now": now}).fetchall()
@@ -103,6 +118,17 @@ def evaluate_batch(max_tickers: int = 500) -> dict:
             SELECT COUNT(*) FROM predictions
             WHERE (outcome = 'pending' OR outcome IS NULL OR outcome = '')
               AND evaluation_date IS NOT NULL AND evaluation_date < :now
+              AND ticker NOT LIKE '%.L'  AND ticker NOT LIKE '%.TO'
+              AND ticker NOT LIKE '%.HK' AND ticker NOT LIKE '%.PA'
+              AND ticker NOT LIKE '%.DE' AND ticker NOT LIKE '%.DU'
+              AND ticker NOT LIKE '%.F'  AND ticker NOT LIKE '%.SS'
+              AND ticker NOT LIKE '%.SZ' AND ticker NOT LIKE '%.AX'
+              AND ticker NOT LIKE '%.SI' AND ticker NOT LIKE '%.MI'
+              AND ticker NOT LIKE '%.MC' AND ticker NOT LIKE '%.AS'
+              AND ticker NOT LIKE '%.BR' AND ticker NOT LIKE '%.ST'
+              AND ticker NOT LIKE '%.HE' AND ticker NOT LIKE '%.OL'
+              AND ticker NOT LIKE '%.CO' AND ticker NOT LIKE '%.T'
+              AND ticker NOT LIKE '%.KS'
         """), {"now": now}).scalar() or 0
     finally:
         db.close()

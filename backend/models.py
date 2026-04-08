@@ -1,5 +1,5 @@
 import datetime
-from sqlalchemy import Column, Integer, BigInteger, String, Float, DateTime, ForeignKey, Text, Numeric, Boolean, JSON, UniqueConstraint, CheckConstraint
+from sqlalchemy import Column, Integer, BigInteger, String, Float, DateTime, ForeignKey, Text, Numeric, Boolean, JSON, UniqueConstraint, CheckConstraint, func
 from sqlalchemy.orm import relationship
 from database import Base
 
@@ -652,7 +652,10 @@ class XScraperRejection(Base):
     handle = Column(String(50), nullable=False, index=True)
     tweet_text = Column(Text, nullable=False)
     tweet_created_at = Column(DateTime, nullable=True)
-    rejected_at = Column(DateTime, default=datetime.datetime.utcnow, index=True)
+    # server_default ensures Postgres has a real DEFAULT clause; the Python
+    # default is kept for ORM-side inserts as a belt-and-braces fallback.
+    rejected_at = Column(DateTime, default=datetime.datetime.utcnow,
+                         server_default=func.now(), index=True)
     rejection_reason = Column(String(50), nullable=False, index=True)
     haiku_reason = Column(Text, nullable=True)
     # JSON maps to JSONB on Postgres automatically

@@ -468,16 +468,21 @@ def log_rejection(db, tweet: dict, handle: str, rejection_reason: str,
             except Exception:
                 raw_json = None
 
+        # Bug 1 fix: explicitly set rejected_at. The model uses an ORM-side
+        # default which does not generate a Postgres DEFAULT clause, so a raw
+        # INSERT would otherwise leave this column NULL — breaking the
+        # /rejections/summary endpoint which filters by rejected_at.
         db.execute(sql_text("""
             INSERT INTO x_scraper_rejections
                 (tweet_id, handle, tweet_text, tweet_created_at,
-                 rejection_reason, haiku_reason, haiku_raw_response)
-            VALUES (:tid, :h, :tt, :tc, :rr, :hr, CAST(:hraw AS JSONB))
+                 rejected_at, rejection_reason, haiku_reason, haiku_raw_response)
+            VALUES (:tid, :h, :tt, :tc, :ra, :rr, :hr, CAST(:hraw AS JSONB))
         """), {
             "tid": tweet_id,
             "h": handle,
             "tt": body[:2000],  # cap text at 2KB
             "tc": tweet_created,
+            "ra": datetime.utcnow(),
             "rr": rejection_reason,
             "hr": (haiku_reason or "")[:500] if haiku_reason else None,
             "hraw": raw_json,
@@ -532,7 +537,24 @@ def run_x_scraper(db=None):
     except Exception as e:
         print(f"[X-SCRAPER] Seed error: {e}", flush=True)
 
-    # Prune rejection log to last 7 days (best-effort, never block scrape)
+    # One-time backfill: patch any existing NULL rejected_at rows so the
+    # /rejections/summary endpoint can find them. Idempotent: future runs
+    # match nothing because the column is now always populated on insert.
+    try:
+        db.execute(sql_text(
+            "UPDATE x_scraper_rejections SET rejected_at = NOW() WHERE rejected_at IS NULL"
+        ))
+        db.commit()
+    except Exception as e:
+        log.warning(f"[X-SCRAPER] rejected_at backfill failed: {e}")
+        try:
+            db.rollback()
+        except Exception:
+            pass
+
+    # Prune rejection log to last 7 days (best-effort, never block scrape).
+    # NOTE: rows whose rejected_at is older than 7d are dropped — the backfill
+    # above runs first so legitimate recent rows are not lost.
     try:
         db.execute(sql_text(
             "DELETE FROM x_scraper_rejections WHERE rejected_at < NOW() - INTERVAL '7 days'"

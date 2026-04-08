@@ -208,6 +208,24 @@ def main():
     except Exception as e:
         log.error(f"[Worker] tweet_id migration error: {e}")
 
+    # Bug 1: ensure x_scraper_rejections.rejected_at has a Postgres DEFAULT NOW().
+    # The model previously used a Python-only default, so existing tables have
+    # no server-side default and raw INSERTs leave the column NULL. Adding the
+    # default here is idempotent — re-running it is safe.
+    try:
+        with engine.connect() as conn:
+            conn.execute(sql_text(
+                "ALTER TABLE x_scraper_rejections "
+                "ALTER COLUMN rejected_at SET DEFAULT NOW()"
+            ))
+            conn.commit()
+        log.info("[Worker] x_scraper_rejections.rejected_at default ensured")
+    except Exception as e:
+        # Table may not exist yet on a fresh DB — create_all above will have
+        # generated it with the correct server_default already, so this is
+        # safe to skip.
+        log.warning(f"[Worker] rejected_at default migration: {e}")
+
     # Scheduler with separate executor for maintenance jobs.
     # default: scrapers + evaluator (must never be blocked)
     # maintenance: logos, backfills, harvests (one at a time, isolated, time-budgeted)

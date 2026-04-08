@@ -29,8 +29,9 @@ TIINGO_KEY = os.getenv("TIINGO_API_KEY", "").strip()
 POLYGON_EARLIEST = (datetime.utcnow() - timedelta(days=730)).date()
 
 # Foreign tickers — no free price source supports these
-FOREIGN_SUFFIXES = ('.L', '.TO', '.HK', '.PA', '.DE', '.SS', '.SZ', '.AX', '.SI',
-                    '.MI', '.MC', '.AS', '.BR', '.ST', '.HE', '.OL', '.CO', '.T', '.KS')
+FOREIGN_SUFFIXES = ('.L', '.TO', '.HK', '.PA', '.DE', '.DU', '.F', '.SS', '.SZ',
+                    '.AX', '.SI', '.MI', '.MC', '.AS', '.BR', '.ST', '.HE',
+                    '.OL', '.CO', '.T', '.KS')
 
 def is_foreign_ticker(ticker: str) -> bool:
     if not ticker:
@@ -342,13 +343,17 @@ def retry_no_data_batch(db, max_tickers: int = 1000):
                p.evaluation_date, p.prediction_date, p.forecaster_id, p.window_days
         FROM predictions p
         WHERE p.outcome = 'no_data'
-          AND p.ticker NOT LIKE '%%.L' AND p.ticker NOT LIKE '%%.TO'
+          AND p.ticker NOT LIKE '%%.L'  AND p.ticker NOT LIKE '%%.TO'
           AND p.ticker NOT LIKE '%%.HK' AND p.ticker NOT LIKE '%%.PA'
-          AND p.ticker NOT LIKE '%%.DE' AND p.ticker NOT LIKE '%%.SS'
+          AND p.ticker NOT LIKE '%%.DE' AND p.ticker NOT LIKE '%%.DU'
+          AND p.ticker NOT LIKE '%%.F'  AND p.ticker NOT LIKE '%%.SS'
           AND p.ticker NOT LIKE '%%.SZ' AND p.ticker NOT LIKE '%%.AX'
           AND p.ticker NOT LIKE '%%.SI' AND p.ticker NOT LIKE '%%.MI'
           AND p.ticker NOT LIKE '%%.MC' AND p.ticker NOT LIKE '%%.AS'
-          AND p.ticker NOT LIKE '%%.T' AND p.ticker NOT LIKE '%%.KS'
+          AND p.ticker NOT LIKE '%%.BR' AND p.ticker NOT LIKE '%%.ST'
+          AND p.ticker NOT LIKE '%%.HE' AND p.ticker NOT LIKE '%%.OL'
+          AND p.ticker NOT LIKE '%%.CO' AND p.ticker NOT LIKE '%%.T'
+          AND p.ticker NOT LIKE '%%.KS'
         ORDER BY p.ticker
         LIMIT 200000
     """)).fetchall()
