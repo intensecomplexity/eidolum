@@ -345,67 +345,93 @@ def retry_no_data_batch(db, max_tickers: int = 1000):
     _reset_debug_counter()
     now = datetime.utcnow()
 
-    # Whitelist: only US tickers (1-5 letters, optional .X class share).
-    # Replaces a 27-suffix blacklist that kept missing new exchanges.
-    query_str = r"""
+    # Two disjoint queries partitioned by evaluation_date.
+    # Polygon covers ~2 years of history; Tiingo handles everything older.
+    # The eval_date partition guarantees Polygon never sees a prediction it
+    # cannot score, and the LIMITs keep memory bounded (was 200K rows).
+    polygon_query = r"""
         SELECT p.id, p.ticker, p.direction, p.target_price, p.entry_price,
                p.evaluation_date, p.prediction_date, p.forecaster_id, p.window_days
         FROM predictions p
         WHERE p.outcome = 'no_data'
+          AND p.evaluation_date IS NOT NULL
+          AND p.evaluation_date >= NOW() - INTERVAL '2 years'
+          AND p.evaluation_date <= NOW()
           AND (p.ticker ~ '^[A-Z]{1,5}$' OR p.ticker ~ '^[A-Z]{1,4}\.[A-Z]$')
         ORDER BY p.ticker
-        LIMIT 200000
+        LIMIT :lim
     """
-    log.info(f'[RetryNoData-CANDIDATES] Query preview: {query_str[:500]}')
-    rows = db.execute(sql_text(query_str)).fetchall()
-    log.info(f'[RetryNoData-CANDIDATES] Loaded {len(rows)} candidates. '
-             f'First 5 tickers: {[r[1] for r in rows[:5]]}')
+    tiingo_query = r"""
+        SELECT p.id, p.ticker, p.direction, p.target_price, p.entry_price,
+               p.evaluation_date, p.prediction_date, p.forecaster_id, p.window_days
+        FROM predictions p
+        WHERE p.outcome = 'no_data'
+          AND p.evaluation_date IS NOT NULL
+          AND p.evaluation_date < NOW() - INTERVAL '2 years'
+          AND (p.ticker ~ '^[A-Z]{1,5}$' OR p.ticker ~ '^[A-Z]{1,4}\.[A-Z]$')
+        ORDER BY p.ticker
+        LIMIT :lim
+    """
+    log.info(f'[RetryNoData-CANDIDATES] Polygon query preview: {polygon_query[:500]}')
+    log.info(f'[RetryNoData-CANDIDATES] Tiingo query preview:  {tiingo_query[:500]}')
 
-    remaining_total = db.execute(sql_text(
-        "SELECT COUNT(*) FROM predictions WHERE outcome = 'no_data'"
-    )).scalar() or 0
+    polygon_rows = db.execute(sql_text(polygon_query), {"lim": max_tickers}).fetchall()
+    tiingo_rows = db.execute(sql_text(tiingo_query), {"lim": max_tickers}).fetchall()
 
-    if not rows:
+    log.info(f'[RetryNoData-CANDIDATES] Loaded {len(polygon_rows)} Polygon + '
+             f'{len(tiingo_rows)} Tiingo candidates. '
+             f'Polygon first 5: {[r[1] for r in polygon_rows[:5]]} '
+             f'Tiingo first 5: {[r[1] for r in tiingo_rows[:5]]}')
+
+    # remaining_total: how many no_data US-ticker rows are left in total.
+    # Same regex filter so the stat reflects what this job will ever process.
+    remaining_total = db.execute(sql_text(r"""
+        SELECT COUNT(*) FROM predictions
+        WHERE outcome = 'no_data'
+          AND evaluation_date IS NOT NULL
+          AND (ticker ~ '^[A-Z]{1,5}$' OR ticker ~ '^[A-Z]{1,4}\.[A-Z]$')
+    """)).scalar() or 0
+
+    if not polygon_rows and not tiingo_rows:
         print("[RetryNoData] No no_data predictions to retry")
         return {"scored": 0, "remaining": 0}
 
-    ticker_preds = defaultdict(list)
-    for r in rows:
-        ticker_preds[r[1]].append({
+    def _row_to_pred(r):
+        return {
             "id": r[0], "ticker": r[1], "direction": r[2],
             "target_price": float(r[3]) if r[3] else None,
             "entry_price": float(r[4]) if r[4] else None,
             "evaluation_date": r[5], "prediction_date": r[6],
             "forecaster_id": r[7], "window_days": r[8],
-        })
+        }
 
-    # Filter out any non-US tickers that slipped through (whitelist).
-    # The candidate query already restricts via regex; this is belt-and-braces
-    # for any cached ticker_preds entries that may not have come from that query.
+    polygon_preds_by_ticker = defaultdict(list)
+    for r in polygon_rows:
+        polygon_preds_by_ticker[r[1]].append(_row_to_pred(r))
+
+    tiingo_preds_by_ticker = defaultdict(list)
+    for r in tiingo_rows:
+        tiingo_preds_by_ticker[r[1]].append(_row_to_pred(r))
+
+    # Belt-and-braces: drop any non-US tickers that slipped through (the SQL
+    # regex already enforces this, but a stale cache or schema change could
+    # leak something through). NOT a delete from the DB.
     foreign_count = 0
-    for ticker in list(ticker_preds.keys()):
-        if not is_us_ticker(ticker):
-            del ticker_preds[ticker]
-            foreign_count += 1
+    for d in (polygon_preds_by_ticker, tiingo_preds_by_ticker):
+        for ticker in list(d.keys()):
+            if not is_us_ticker(ticker):
+                del d[ticker]
+                foreign_count += 1
     if foreign_count:
         print(f"[RetryNoData] Skipped {foreign_count} foreign tickers", flush=True)
 
-    # Split: Polygon for recent, Tiingo for old, FMP as last resort
-    polygon_tickers = []
-    old_tickers = []
-    for ticker, preds in ticker_preds.items():
-        if _needs_polygon(preds):
-            polygon_tickers.append(ticker)
-        else:
-            old_tickers.append(ticker)
+    polygon_batch = list(polygon_preds_by_ticker.keys())
+    tiingo_batch = list(tiingo_preds_by_ticker.keys())
 
-    polygon_batch = polygon_tickers[:max_tickers]
-    tiingo_batch = old_tickers[:max_tickers]  # Tiingo handles the bulk now
-    fmp_batch = []  # FMP only for tickers Tiingo fails on (populated during run)
-
-    print(f"[RetryNoData] {remaining_total:,} no_data across {len(ticker_preds)} tickers "
-          f"({len(polygon_tickers)} recent, {len(old_tickers)} old). "
-          f"This run: {len(polygon_batch)} Polygon + {len(tiingo_batch)} Tiingo")
+    print(f"[RetryNoData] {remaining_total:,} US no_data total. "
+          f"This run: {len(polygon_batch)} Polygon tickers "
+          f"({len(polygon_rows)} recent preds) + "
+          f"{len(tiingo_batch)} Tiingo tickers ({len(tiingo_rows)} old preds)")
 
     total_scored = 0
     total_still_no_data = 0
@@ -435,9 +461,9 @@ def retry_no_data_batch(db, max_tickers: int = 1000):
         for u in updates:
             affected_forecasters.add(u["fid"])
 
-    # ── Phase 1: Polygon (recent, 5/min = 10s between) ──
+    # ── Phase 1: Polygon (recent preds only, 5/min = 10s between) ──
     for i, ticker in enumerate(polygon_batch):
-        preds = ticker_preds[ticker]
+        preds = polygon_preds_by_ticker[ticker]
         start_date, end_date = _date_range(preds)
 
         if ticker in _price_cache:
@@ -463,7 +489,7 @@ def retry_no_data_batch(db, max_tickers: int = 1000):
     print(f"[RetryNoData-DEBUG] Polygon phase: {len(polygon_batch)} tickers, "
           f"{polygon_calls} API calls, {polygon_scored} scored, {total_still_no_data} still no_data", flush=True)
 
-    # ── Phase 2: Tiingo (old predictions, Power plan: 10K calls/hour) ──
+    # ── Phase 2: Tiingo (old preds only, Power plan: 10K calls/hour) ──
     tiingo_failed_tickers = []
     for i, ticker in enumerate(tiingo_batch):
         if _tiingo_calls_today >= TIINGO_DAILY_LIMIT:
@@ -478,7 +504,7 @@ def retry_no_data_batch(db, max_tickers: int = 1000):
             elif wait_secs >= 400:
                 break
 
-        preds = ticker_preds[ticker]
+        preds = tiingo_preds_by_ticker[ticker]
         start_date, end_date = _date_range(preds)
 
         if ticker in _price_cache:
@@ -511,7 +537,7 @@ def retry_no_data_batch(db, max_tickers: int = 1000):
     for i, ticker in enumerate(tiingo_failed_tickers[:FMP_DAILY_LIMIT - _fmp_calls_today]):
         if _fmp_calls_today >= FMP_DAILY_LIMIT:
             break
-        preds = ticker_preds[ticker]
+        preds = tiingo_preds_by_ticker[ticker]
         prices = _fetch_fmp(ticker)
         fmp_calls += 1
 
