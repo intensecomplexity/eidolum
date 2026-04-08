@@ -95,7 +95,8 @@ def evaluate_batch(max_tickers: int = 500) -> dict:
     try:
         rows = db.execute(sql_text(r"""
             SELECT p.id, p.ticker, p.direction, p.target_price, p.entry_price,
-                   p.evaluation_date, p.prediction_date, p.forecaster_id, p.window_days
+                   p.evaluation_date, p.prediction_date, p.forecaster_id, p.window_days,
+                   p.prediction_type, p.position_closed_at
             FROM predictions p
             WHERE (p.outcome = 'pending' OR p.outcome IS NULL OR p.outcome = '')
               AND p.evaluation_date IS NOT NULL
@@ -140,6 +141,8 @@ def evaluate_batch(max_tickers: int = 500) -> dict:
             "entry_price": float(r[4]) if r[4] else None,
             "evaluation_date": r[5], "prediction_date": r[6],
             "forecaster_id": r[7], "window_days": r[8],
+            "prediction_type": r[9] or "price_target",
+            "position_closed_at": r[10],
         })
 
     tickers = list(ticker_preds.keys())[:max_tickers]
@@ -200,10 +203,39 @@ def evaluate_batch(max_tickers: int = 500) -> dict:
 
             ref = p["entry_price"]
             if not ref or ref <= 0:
+                # Look up the entry price on the day the position opened
+                ref = _closest_price(prices, p["prediction_date"])
+            if not ref or ref <= 0:
                 days_overdue = (now - p["evaluation_date"]).days if p["evaluation_date"] else 0
                 if days_overdue >= 7:
                     no_data_updates.append(p["id"])
                 skipped_no_ref += 1
+                continue
+
+            # Position disclosure branch: score by entry->close return, ignore target/tolerance.
+            if p.get("prediction_type") == "position_disclosure":
+                outcome, ret = score_position_disclosure(p["direction"], ref, eval_price)
+                if outcome == "no_data":
+                    days_overdue = (now - p["evaluation_date"]).days if p["evaluation_date"] else 0
+                    if days_overdue >= 7:
+                        no_data_updates.append(p["id"])
+                    continue
+                summary = _build_position_summary(
+                    p["ticker"], p["direction"], outcome, ref, eval_price, ret,
+                    p.get("position_closed_at") or p["evaluation_date"],
+                )
+                spy_return = _calc_spy_return(p.get("prediction_date"), p.get("evaluation_date"))
+                pred_alpha = round(ret - spy_return, 2) if spy_return is not None else None
+                updates.append({
+                    "id": p["id"], "outcome": outcome, "ret": ret, "ep": ref,
+                    "fid": p["forecaster_id"], "direction": p["direction"], "summary": summary,
+                    "spy_return": spy_return, "alpha": pred_alpha,
+                })
+                affected_forecasters.add(p["forecaster_id"])
+                if outcome in ("hit", "correct"):
+                    total_correct += 1
+                elif outcome in ("miss", "incorrect"):
+                    total_incorrect += 1
                 continue
 
             target = p["target_price"]
@@ -376,6 +408,46 @@ def _build_summary(ticker, direction, outcome, entry, eval_price, target, ret):
         return f"Target {target_str} on {ticker} — entry {entry_str}, ended at {eval_str} {ret_str} {mark}"
     else:
         return f"Called {dir_label} on {ticker} at {entry_str}, stock moved to {eval_str} ({ret_str}) {mark}"
+
+
+def score_position_disclosure(direction: str, entry_price: float | None, close_price: float | None):
+    """Score a position disclosure by the stock's return from open to close.
+
+    Returns (outcome, return_pct). Tolerance is wider than price-target
+    scoring because position disclosures are trade calls, not forecasts:
+      +5% or more → hit
+      0% to +5%   → near
+      negative    → miss (for bullish; flip for bearish)
+    """
+    if entry_price is None or close_price is None or entry_price <= 0:
+        return "no_data", 0.0
+    return_pct = round((close_price - entry_price) / entry_price * 100, 2)
+    if direction == "bullish":
+        if return_pct >= 5:
+            return "hit", return_pct
+        if return_pct >= 0:
+            return "near", return_pct
+        return "miss", return_pct
+    if direction == "bearish":
+        if return_pct <= -5:
+            return "hit", return_pct
+        if return_pct <= 0:
+            return "near", return_pct
+        return "miss", return_pct
+    return "no_data", return_pct
+
+
+def _build_position_summary(ticker, direction, outcome, entry, close_price, return_pct, close_date):
+    """Plain-English summary for a position disclosure evaluation."""
+    dir_label = "bullish" if direction == "bullish" else "bearish"
+    entry_str = f"${entry:,.2f}" if entry else "?"
+    close_str = f"${close_price:,.2f}" if close_price else "?"
+    ret_str = f"{'+' if return_pct >= 0 else ''}{return_pct:.1f}%"
+    date_str = close_date.strftime("%Y-%m-%d") if close_date else "?"
+    outcome_label = outcome.upper()
+    return (f"Position disclosure: {dir_label} on {ticker}. "
+            f"Entry {entry_str}, exit {close_str} on {date_str}. "
+            f"{ret_str} return. {outcome_label}.")
 
 
 FINNHUB_KEY = os.getenv("FINNHUB_KEY", "").strip()

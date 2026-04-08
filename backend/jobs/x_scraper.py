@@ -84,8 +84,20 @@ HAIKU_SYSTEM = """You are a strict classifier evaluating tweets for stock predic
 
 A valid prediction requires ALL THREE of the following. If any are missing, return is_prediction=false.
 
-REQUIREMENT 1 -- SPECIFIC TICKER OR SECTOR ETF
-A literal stock cashtag ($AAPL), all-caps stock symbol (AAPL), or recognized sector/index ETF (XLK, SPY, QQQ, XLE, XLF, XLV, XLY, XLP, XLI, XLU, XLB, XLRE, XLC, IWM, DIA, SMH, SOXX) must appear in the tweet text. Not in a hashtag. Not inferred from context. Not from the author's bio.
+REQUIREMENT 1 -- SPECIFIC TICKER, SECTOR ETF, OR RECOGNIZED SECTOR PHRASE
+ONE of the following must appear LITERALLY in the tweet text:
+  (a) A stock cashtag ($AAPL), all-caps stock symbol (AAPL), or recognized
+      sector/index ETF (XLK, SPY, QQQ, XLE, XLF, XLV, XLY, XLP, XLI, XLU,
+      XLB, XLRE, XLC, IWM, DIA, SMH, SOXX). Treat as prediction_type
+      "price_target".
+  (b) A recognized SECTOR PHRASE: "tech", "semis", "semiconductors", "chips",
+      "financials", "banks", "regional banks", "energy", "oil", "healthcare",
+      "pharma", "biotech", "consumer", "consumer discretionary", "retail",
+      "consumer staples", "staples", "industrials", "utilities", "real estate",
+      "reits", "homebuilders", "housing", "materials", "communication services",
+      "media". Treat as prediction_type "sector_call" and put the phrase
+      EXACTLY as it appears in the tweet (lowercase) in the "sector" field.
+Not in a hashtag. Not inferred from context. Not from the author's bio.
 
 REQUIREMENT 2 -- IDENTIFIABLE DIRECTION ABOUT THAT TICKER
 The tweet must make a clear bullish or bearish claim ABOUT the specific ticker. The direction must be the subject of the tweet. Acceptable direction signals include:
@@ -135,9 +147,11 @@ G) News repetition without claim
    Example: '$BMNR reports earnings tomorrow'
    Reason: Stating a fact is not a prediction.
 
-H) Macro/no-ticker tweets
-   Examples: 'Stocks are cheap here', 'Tech is rolling over' (no ticker or ETF)
-   Reason: No specific symbol.
+H) Macro/no-symbol tweets
+   Examples: 'Stocks are cheap here', 'The Fed will cut rates next month'
+   Reason: No specific symbol AND no recognized sector phrase.
+   NOTE: 'Tech is rolling over by Q2' is now a SECTOR CALL (not rejected),
+   because "tech" is a recognized sector phrase and "by Q2" is a timeframe.
 
 ACCEPT THESE PATTERNS (return is_prediction=true):
 
@@ -149,10 +163,46 @@ ACCEPT THESE PATTERNS (return is_prediction=true):
   - '$BTC breaking out, $100k by EOY'
   - 'Short $SHOP here, $50 target, valuation extreme'
   - 'New position $PARA, 900K shares' (Burry-style disclosure = bullish signal, even without a price target)
+  - 'Semis are going to rip in Q2 2026' -> sector_call, sector="semis", bullish, timeframe="Q2 2026"
+  - 'Bearish on regional banks for the next 6 months' -> sector_call, sector="regional banks", bearish, timeframe="6 months"
+  - 'Homebuilders look cooked into year-end' -> sector_call, sector="homebuilders", bearish, timeframe="year-end"
+
+POSITION DISCLOSURES (a second accepted prediction_type):
+
+Besides price-target predictions, Eidolum also tracks position disclosures.
+A position disclosure is a tweet where the author says they opened, added
+to, trimmed, or exited a stock position. Examples:
+
+  - 'New position in $NVDA'                 -> open,  bullish
+  - 'Loaded up on $META'                    -> add,   bullish
+  - 'Added to my $GOOGL stake'              -> add,   bullish
+  - 'Trimmed $TSLA'                         -> trim,  bullish
+  - 'Exited my $AAPL completely'            -> exit,  bullish
+  - 'Sold all my $AMD'                      -> exit,  bullish
+  - 'Initiating short $SHOP'                -> open,  bearish
+  - 'Covered my $NFLX short'                -> exit,  bearish
+  - '13F: new 900K share position in $PARA' -> open,  bullish
+
+Position disclosures do NOT need a price target, a timeframe, or an
+explicit rating word. The ACTION (open/add/trim/exit) is the signal.
+Target_price and timeframe stay null for these.
+
+For position disclosures, set:
+  prediction_type = "position_disclosure"
+  position_action = "open" | "add" | "trim" | "exit"
+  direction       = "bullish" for long positions, "bearish" for short positions
+                    (trim/exit keep the SAME direction as the underlying position)
+
+Everything else (L0-L4 scale, rejection rules) still applies. A tweet that
+merely MENTIONS a holding without stating an action ("long $NVDA for years")
+is still a price-target-style call if it has a directional claim; only the
+explicit open/add/trim/exit language counts as a position disclosure.
 
 OUTPUT FORMAT (strict JSON, no extra text):
 {
   "is_prediction": true | false,
+  "prediction_type": "price_target" | "position_disclosure" | null,
+  "position_action": "open" | "add" | "trim" | "exit" | null,
   "ticker": "AAPL" | null,
   "direction": "bullish" | "bearish" | "neutral" | null,
   "target_price": 250.00 | null,
@@ -161,6 +211,10 @@ OUTPUT FORMAT (strict JSON, no extra text):
   "closeness_level": 0 | 1 | 2 | 3 | 4 | null,
   "reason": "brief explanation, max 100 chars"
 }
+
+For price-target predictions, prediction_type="price_target" and position_action=null.
+For position disclosures, prediction_type="position_disclosure" and position_action is set.
+If prediction_type is omitted, assume "price_target".
 
 If is_prediction is false, set ticker/direction/target_price/timeframe/confidence to null, explain WHY in reason, AND set closeness_level to one of:
 
@@ -236,6 +290,26 @@ def _extract_closeness_level(result: dict | None) -> int | None:
     if cl < 0 or cl > 4:
         return None
     return cl
+
+
+VALID_POSITION_ACTIONS = {"open", "add", "trim", "exit"}
+
+def _extract_position_fields(result: dict | None) -> tuple[str, str | None]:
+    """Return (prediction_type, position_action) from a Haiku classification.
+
+    - If Haiku says prediction_type='position_disclosure' AND position_action
+      is in the allowed set, returns ('position_disclosure', action).
+    - Otherwise defaults to ('price_target', None).
+    """
+    if not result:
+        return "price_target", None
+    ptype = (result.get("prediction_type") or "").strip().lower()
+    if ptype != "position_disclosure":
+        return "price_target", None
+    action = (result.get("position_action") or "").strip().lower()
+    if action not in VALID_POSITION_ACTIONS:
+        return "price_target", None
+    return "position_disclosure", action
 
 
 def validate_haiku_result(result: dict, tweet_text: str) -> tuple[bool, str]:
@@ -416,8 +490,20 @@ def _fetch_user_tweets(handle: str, max_items: int = TWEETS_PER_ACCOUNT) -> list
 # ── Insert prediction into database ──────────────────────────────────────────
 
 def _insert_prediction(db, ticker: str, direction: str, target_price, timeframe_days: int,
-                       author: str, body: str, tid: str, tweet_url: str, pred_date: datetime) -> bool:
-    """Insert a single prediction. Returns True on success."""
+                       author: str, body: str, tid: str, tweet_url: str, pred_date: datetime,
+                       prediction_type: str = "price_target",
+                       position_action: str | None = None,
+                       confidence_tier: float = 1.0) -> bool:
+    """Insert a single prediction. Returns True on success.
+
+    For position disclosures (prediction_type='position_disclosure',
+    position_action in {open, add}): target_price stays None, evaluation_date
+    is set to prediction_date + 365d as a fallback horizon, and
+    confidence_tier defaults to 0.85 (caller should pass this).
+
+    Trim/exit actions should NOT reach this function — they should call
+    position_matcher.close_position() to close an existing open position.
+    """
     try:
         source_id = f"x_{tid}_{ticker}"
         if db.execute(sql_text("SELECT 1 FROM predictions WHERE source_platform_id = :sid LIMIT 1"),
@@ -454,6 +540,9 @@ def _insert_prediction(db, ticker: str, direction: str, target_price, timeframe_
             tweet_id=tweet_id_int,
             context=context[:500], exact_quote=body[:500],
             outcome="pending", verified_by="x_scraper",
+            prediction_type=prediction_type,
+            position_action=position_action,
+            confidence_tier=confidence_tier,
         ))
         return True
     except Exception:
@@ -745,14 +834,51 @@ def run_x_scraper(db=None):
 
                 tf_days = _parse_ai_timeframe(result.get("timeframe", "90d"))
 
+                # Position disclosure branch: if Haiku classified this as a
+                # position_disclosure with a valid action, route open/add to
+                # the insert path with a 365d fallback horizon, and trim/exit
+                # to position_matcher to close the existing open position.
+                ptype, paction = _extract_position_fields(result)
+                if ptype == "position_disclosure" and paction in ("trim", "exit") and db:
+                    from jobs.news_scraper import find_forecaster
+                    from services.position_matcher import find_open_position, close_position
+                    forecaster = find_forecaster(handle, db)
+                    if not forecaster:
+                        total_stats["dupes"] += 1
+                        continue
+                    open_pos = find_open_position(db, forecaster.id, ticker)
+                    if open_pos:
+                        close_position(db, open_pos["id"], pred_date)
+                        total_stats["position_closed"] = total_stats.get("position_closed", 0) + 1
+                        print(f"[X-SCRAPER] @{handle} {paction.upper()} ${ticker} → "
+                              f"closed position id={open_pos['id']}", flush=True)
+                    else:
+                        rejection_reasons["position_exit_no_match"] = \
+                            rejection_reasons.get("position_exit_no_match", 0) + 1
+                        log_rejection(db, tweet, handle, "position_exit_no_match",
+                                      haiku_reason, result, closeness_level)
+                    continue
+
                 if db:
-                    ok = _insert_prediction(
-                        db, ticker, direction, target_price, tf_days,
-                        handle, body, tid, tweet_url, pred_date,
-                    )
+                    if ptype == "position_disclosure" and paction in ("open", "add"):
+                        # Position open/add: 365-day fallback horizon, lower confidence
+                        ok = _insert_prediction(
+                            db, ticker, direction, None, 365,
+                            handle, body, tid, tweet_url, pred_date,
+                            prediction_type="position_disclosure",
+                            position_action=paction,
+                            confidence_tier=0.85,
+                        )
+                    else:
+                        ok = _insert_prediction(
+                            db, ticker, direction, target_price, tf_days,
+                            handle, body, tid, tweet_url, pred_date,
+                        )
                     if ok:
                         total_stats["inserted"] += 1
                         account_preds += 1
+                        if ptype == "position_disclosure":
+                            total_stats["position_open"] = total_stats.get("position_open", 0) + 1
                     else:
                         total_stats["dupes"] += 1
 

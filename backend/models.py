@@ -111,6 +111,15 @@ class Prediction(Base):
     evaluated_at = Column(DateTime, nullable=True)  # when the system actually scored this prediction
     call_type = Column(String, nullable=True)  # upgrade|downgrade|new_coverage|price_target|rating
 
+    # Prediction classification (added by migrations add_confidence_tier_and_voided.sql
+    # + add_position_fields.sql). Defaults match the DB defaults so new ORM-only
+    # inserts behave identically to existing rows.
+    prediction_type = Column(String(32), nullable=False, default="price_target")
+    confidence_tier = Column(Numeric(3, 2), nullable=False, default=1.0)
+    # Position disclosure fields: NULL for price_target predictions.
+    position_action = Column(String(16), nullable=True)   # open|add|trim|exit
+    position_closed_at = Column(DateTime, nullable=True)
+
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
 
     forecaster = relationship("Forecaster", back_populates="predictions")
