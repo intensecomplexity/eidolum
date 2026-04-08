@@ -300,6 +300,63 @@ def main():
     except Exception as e:
         log.warning(f"[Worker] drop phantom is_active migration: {e}")
 
+    # ── One-time jobs ────────────────────────────────────────────────
+    # Generic flag table for one-shot maintenance scripts. Each job
+    # writes its job_name into this table after a successful run, so
+    # subsequent worker restarts skip it. Add a new row here when you
+    # need to ship a one-time backfill / requeue / cleanup.
+    try:
+        with engine.connect() as conn:
+            conn.execute(sql_text("""
+                CREATE TABLE IF NOT EXISTS one_time_jobs (
+                    job_name TEXT PRIMARY KEY,
+                    ran_at TIMESTAMPTZ DEFAULT NOW()
+                )
+            """))
+            conn.commit()
+        log.info("[Worker] one_time_jobs table ensured")
+    except Exception as e:
+        log.warning(f"[Worker] one_time_jobs table migration: {e}")
+
+    def _run_once_requeue_billing_victims():
+        """Re-classify the 377 tweets killed by the 2026-04-08 Anthropic
+        billing outage. Idempotent via the one_time_jobs flag table."""
+        job_name = "requeue_haiku_billing_victims_april8"
+        try:
+            with engine.connect() as conn:
+                row = conn.execute(sql_text(
+                    "SELECT 1 FROM one_time_jobs WHERE job_name = :j"
+                ), {"j": job_name}).first()
+                if row:
+                    log.info(f"[Worker] {job_name} already ran, skipping")
+                    return
+        except Exception as e:
+            log.warning(f"[Worker] {job_name} flag check failed: {e}")
+            return
+
+        log.info(f"[Worker] Running one-time job: {job_name}")
+        try:
+            from scripts.requeue_haiku_billing_victims import main as requeue_main
+            summary = requeue_main()
+            log.info(f"[Worker] {job_name} summary: {summary}")
+        except Exception as e:
+            log.error(f"[Worker] {job_name} failed: {e}", exc_info=True)
+            # Do NOT mark as ran on failure — let the next deploy retry.
+            return
+
+        try:
+            with engine.connect() as conn:
+                conn.execute(sql_text(
+                    "INSERT INTO one_time_jobs (job_name) VALUES (:j) "
+                    "ON CONFLICT (job_name) DO NOTHING"
+                ), {"j": job_name})
+                conn.commit()
+            log.info(f"[Worker] {job_name} marked complete")
+        except Exception as e:
+            log.warning(f"[Worker] {job_name} flag insert failed: {e}")
+
+    _run_once_requeue_billing_victims()
+
     # Scheduler with separate executor for maintenance jobs.
     # default: scrapers + evaluator (must never be blocked)
     # maintenance: logos, backfills, harvests (one at a time, isolated, time-budgeted)
