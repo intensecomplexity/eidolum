@@ -1,5 +1,5 @@
 import datetime
-from sqlalchemy import Column, Integer, BigInteger, String, Float, DateTime, ForeignKey, Text, Numeric, Boolean, JSON, UniqueConstraint, CheckConstraint, func
+from sqlalchemy import Column, Integer, BigInteger, SmallInteger, String, Float, DateTime, ForeignKey, Text, Numeric, Boolean, JSON, UniqueConstraint, CheckConstraint, func
 from sqlalchemy.orm import relationship
 from database import Base
 
@@ -660,6 +660,9 @@ class XScraperRejection(Base):
     haiku_reason = Column(Text, nullable=True)
     # JSON maps to JSONB on Postgres automatically
     haiku_raw_response = Column(JSON, nullable=True)
+    # 0-4 closeness score from Haiku on rejected tweets (NULL for accepted
+    # predictions and for pre-classification rejections like no_tweet_id).
+    closeness_level = Column(SmallInteger, nullable=True, index=True)
 
 
 class Config(Base):

@@ -35,6 +35,16 @@ const REJECTION_BADGE_COLORS = {
   empty_body:            { bg: 'rgba(148,163,184,0.15)', fg: '#94a3b8' },  // gray
 };
 
+// Closeness level metadata — label, short label, and color
+const CLOSENESS_LEVELS = {
+  4: { label: 'L4 Almost',       short: 'L4', full: 'L4 Almost a prediction', bg: 'rgba(212,168,67,0.18)', fg: '#D4A843' },
+  3: { label: 'L3 Had the bones',short: 'L3', full: 'L3 Had the bones',       bg: 'rgba(251,191,36,0.15)', fg: '#fbbf24' },
+  2: { label: 'L2 Ticker only',  short: 'L2', full: 'L2 Ticker only',         bg: 'rgba(96,165,250,0.15)', fg: '#60a5fa' },
+  1: { label: 'L1 Finance',      short: 'L1', full: 'L1 Finance-related',     bg: 'rgba(107,114,128,0.20)', fg: '#9ca3af' },
+  0: { label: 'L0 Not finance',  short: 'L0', full: 'L0 Not finance',         bg: 'rgba(55,65,81,0.25)',    fg: '#6b7280' },
+};
+const UNCLASSIFIED_BADGE = { full: 'Unclassified', short: '—', bg: 'rgba(30,41,59,0.30)', fg: '#64748b' };
+
 function relativeTime(iso) {
   if (!iso) return '-';
   const diff = (Date.now() - new Date(iso).getTime()) / 1000;
@@ -73,6 +83,7 @@ export default function AdminXAccounts() {
   const [rejSummary, setRejSummary] = useState(null);
   const [rejFilterReason, setRejFilterReason] = useState('');
   const [rejFilterHandle, setRejFilterHandle] = useState('');
+  const [rejFilterLevel, setRejFilterLevel] = useState('');
   const [rejLoading, setRejLoading] = useState(false);
   const [expandedRejId, setExpandedRejId] = useState(null);
 
@@ -160,6 +171,7 @@ export default function AdminXAccounts() {
     const params = { limit: 100 };
     if (rejFilterReason) params.reason = rejFilterReason;
     if (rejFilterHandle) params.handle = rejFilterHandle;
+    if (rejFilterLevel) params.level = rejFilterLevel;
     Promise.all([
       getXRejections(params).catch(() => []),
       getXRejectionsSummary().catch(() => null),
@@ -179,7 +191,7 @@ export default function AdminXAccounts() {
   useEffect(() => {
     if (showRejections) fetchRejections();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [rejFilterReason, rejFilterHandle]);
+  }, [rejFilterReason, rejFilterHandle, rejFilterLevel]);
 
   function handleSort(col) {
     if (sortCol === col) { setSortAsc(!sortAsc); }
@@ -351,11 +363,21 @@ export default function AdminXAccounts() {
                   <div className="text-base font-bold font-mono">{(rejSummary.total_24h || 0).toLocaleString()}</div>
                 </div>
                 <div className="bg-surface-2 border border-border rounded-lg px-3 py-2">
-                  <div className="text-[10px] text-muted uppercase tracking-wider">Top Reason</div>
-                  <div className="text-xs font-mono truncate">
-                    {Object.keys(rejSummary.by_reason || {})[0] || '-'}
-                    {rejSummary.by_reason && Object.keys(rejSummary.by_reason)[0] && (
-                      <span className="text-muted ml-1">({Object.values(rejSummary.by_reason)[0]})</span>
+                  <div className="text-[10px] text-muted uppercase tracking-wider">Closeness</div>
+                  <div className="text-[10px] font-mono flex flex-wrap items-center gap-x-2 gap-y-0.5 mt-0.5">
+                    {[4, 3, 2, 1, 0].map(lv => {
+                      const meta = CLOSENESS_LEVELS[lv];
+                      const n = rejSummary.by_level?.[String(lv)] || 0;
+                      return (
+                        <span key={lv} style={{ color: meta.fg }}>
+                          {meta.short}:<span className="ml-0.5 text-text-primary">{n}</span>
+                        </span>
+                      );
+                    })}
+                    {(rejSummary.by_level?.unclassified || 0) > 0 && (
+                      <span style={{ color: UNCLASSIFIED_BADGE.fg }}>
+                        —:<span className="ml-0.5 text-text-primary">{rejSummary.by_level.unclassified}</span>
+                      </span>
                     )}
                   </div>
                 </div>
@@ -387,6 +409,16 @@ export default function AdminXAccounts() {
                 <option value="">All accounts</option>
                 {accounts.map(a => <option key={a.id} value={a.handle}>@{a.handle}</option>)}
               </select>
+              <select value={rejFilterLevel} onChange={e => setRejFilterLevel(e.target.value)}
+                className="bg-surface-2 border border-border rounded-lg px-2 py-1 text-xs">
+                <option value="">All closeness</option>
+                <option value="4">L4 Almost a prediction</option>
+                <option value="3">L3 Had the bones</option>
+                <option value="2">L2 Ticker only</option>
+                <option value="1">L1 Finance-related</option>
+                <option value="0">L0 Not finance</option>
+                <option value="unclassified">Unclassified</option>
+              </select>
               <button onClick={fetchRejections}
                 className="inline-flex items-center gap-1 text-xs text-muted hover:text-accent transition-colors">
                 <RefreshCw className={`w-3 h-3 ${rejLoading ? 'animate-spin' : ''}`} /> Refresh
@@ -403,10 +435,13 @@ export default function AdminXAccounts() {
                 {rejections.map(r => {
                   const colors = REJECTION_BADGE_COLORS[r.rejection_reason] || REJECTION_BADGE_COLORS.empty_body;
                   const isExpanded = expandedRejId === r.id;
+                  const levelMeta = r.closeness_level != null
+                    ? CLOSENESS_LEVELS[r.closeness_level]
+                    : UNCLASSIFIED_BADGE;
                   return (
                     <div key={r.id} className="bg-surface-2 border border-border rounded-lg p-3">
                       <div className="flex items-start justify-between gap-2 mb-1.5 flex-wrap">
-                        <div className="inline-flex items-center gap-2 min-w-0">
+                        <div className="inline-flex items-center gap-2 min-w-0 flex-wrap">
                           <a href={`https://x.com/${r.handle}`} target="_blank" rel="noopener noreferrer"
                             className="text-accent hover:underline text-xs font-semibold truncate">
                             @{r.handle}
@@ -416,6 +451,13 @@ export default function AdminXAccounts() {
                             style={{ backgroundColor: colors.bg, color: colors.fg }}>
                             {r.rejection_reason}
                           </span>
+                          {levelMeta && (
+                            <span className="text-[10px] font-mono px-1.5 py-0.5 rounded-full whitespace-nowrap"
+                              style={{ backgroundColor: levelMeta.bg, color: levelMeta.fg }}
+                              title={levelMeta.full}>
+                              {levelMeta.full}
+                            </span>
+                          )}
                         </div>
                         {r.tweet_url && (
                           <a href={r.tweet_url} target="_blank" rel="noopener noreferrer"

@@ -158,10 +158,21 @@ OUTPUT FORMAT (strict JSON, no extra text):
   "target_price": 250.00 | null,
   "timeframe": "3 months" | "by Q2" | "EOY" | null,
   "confidence": "high" | "medium" | "low",
+  "closeness_level": 0 | 1 | 2 | 3 | 4 | null,
   "reason": "brief explanation, max 100 chars"
 }
 
-If is_prediction is false, set all other fields to null and explain WHY in reason.
+If is_prediction is false, set ticker/direction/target_price/timeframe/confidence to null, explain WHY in reason, AND set closeness_level to one of:
+
+  4 = Tweet has a ticker AND directional lean but is missing one key element (no price target, unclear timeframe, hedged language like "could" or "might", or conditional "if X then Y")
+  3 = Tweet mentions a ticker with some directional context but is more commentary/observation than an actionable call
+  2 = Tweet mentions one or more tickers but has NO directional claim or analysis
+  1 = Tweet is finance-related (Fed, macro, rates, crypto generalities) but names NO specific ticker or sector ETF
+  0 = Tweet is not about finance at all (personal, political, promotional, sports, memes)
+
+Be honest and consistent. L4 is rare -- only use it when the tweet genuinely almost qualified. Don't inflate levels.
+
+When is_prediction is true, set closeness_level to null (accepted tweets are not "close to" anything, they ARE predictions).
 
 DEFAULT TO REJECT. When in doubt, return is_prediction=false. Eidolum prefers fewer high-quality predictions over many low-quality ones."""
 
@@ -209,6 +220,22 @@ def _ticker_in_text(ticker: str, text: str) -> bool:
 def _is_allowed_etf(ticker: str) -> bool:
     """Pillar 1: ticker is a recognized sector or broad-market ETF."""
     return bool(ticker) and ticker.upper().lstrip("$") in ALLOWED_SECTOR_ETFS
+
+
+def _extract_closeness_level(result: dict | None) -> int | None:
+    """Extract and validate closeness_level from Haiku response. 0-4 or None."""
+    if not result:
+        return None
+    cl = result.get("closeness_level")
+    if cl is None:
+        return None
+    try:
+        cl = int(cl)
+    except (ValueError, TypeError):
+        return None
+    if cl < 0 or cl > 4:
+        return None
+    return cl
 
 
 def validate_haiku_result(result: dict, tweet_text: str) -> tuple[bool, str]:
@@ -436,9 +463,13 @@ def _insert_prediction(db, ticker: str, direction: str, target_price, timeframe_
 # ── Persist rejected tweets for admin debug view ─────────────────────────────
 
 def log_rejection(db, tweet: dict, handle: str, rejection_reason: str,
-                  haiku_reason: str | None, haiku_raw: dict | None) -> None:
+                  haiku_reason: str | None, haiku_raw: dict | None,
+                  closeness_level: int | None = None) -> None:
     """Persist a rejected tweet to x_scraper_rejections.
     Best-effort: a persist failure must NEVER break the scrape loop.
+
+    closeness_level: 0-4 from Haiku (or None for pre-classification rejections
+    like no_tweet_id, and for any row where Haiku didn't return a level).
     """
     try:
         tid_raw = tweet.get("id") or tweet.get("id_str") or 0
@@ -471,12 +502,13 @@ def log_rejection(db, tweet: dict, handle: str, rejection_reason: str,
         # rejected_at intentionally omitted: Postgres DEFAULT NOW() fills it.
         # The DDL default is set on the live table by an ALTER TABLE migration
         # in worker.py startup, and the model has server_default=func.now() so
-        # fresh DBs get it via create_all. Seven columns, seven values.
+        # fresh DBs get it via create_all. Eight columns, eight values.
         db.execute(sql_text("""
             INSERT INTO x_scraper_rejections
                 (tweet_id, handle, tweet_text, tweet_created_at,
-                 rejection_reason, haiku_reason, haiku_raw_response)
-            VALUES (:tid, :h, :tt, :tc, :rr, :hr, CAST(:hraw AS JSONB))
+                 rejection_reason, haiku_reason, haiku_raw_response,
+                 closeness_level)
+            VALUES (:tid, :h, :tt, :tc, :rr, :hr, CAST(:hraw AS JSONB), :cl)
         """), {
             "tid": tweet_id,
             "h": handle,
@@ -485,6 +517,7 @@ def log_rejection(db, tweet: dict, handle: str, rejection_reason: str,
             "rr": rejection_reason,
             "hr": (haiku_reason or "")[:500] if haiku_reason else None,
             "hraw": raw_json,
+            "cl": closeness_level,
         })
         db.commit()
     except Exception as e:
@@ -653,6 +686,7 @@ def run_x_scraper(db=None):
                 # Phase 5: unified strict validation (matches the Haiku prompt's 3 requirements)
                 is_valid, reject_reason = validate_haiku_result(result or {}, body)
                 haiku_reason = (result or {}).get("reason", "") if isinstance(result, dict) else ""
+                closeness_level = _extract_closeness_level(result)
                 if not is_valid:
                     # Debug log for haiku_rejected rejections — capped at 50 per run
                     # so we can verify the soft prompt without flooding logs.
@@ -661,11 +695,11 @@ def run_x_scraper(db=None):
                             log.info(
                                 f"[X-SCRAPER-DEBUG] haiku_rejected: @{handle} "
                                 f"tweet_id={tid} reason={haiku_reason} "
-                                f"text={body[:150]!r}"
+                                f"level={closeness_level} text={body[:150]!r}"
                             )
                         haiku_rejected_logged += 1
                     rejection_reasons[reject_reason] = rejection_reasons.get(reject_reason, 0) + 1
-                    log_rejection(db, tweet, handle, reject_reason, haiku_reason, result)
+                    log_rejection(db, tweet, handle, reject_reason, haiku_reason, result, closeness_level)
                     continue
 
                 confidence = (result.get("confidence") or "low").lower()
@@ -680,13 +714,13 @@ def run_x_scraper(db=None):
                 # We only insert directional predictions; "neutral" is rejected here
                 if direction not in ("bullish", "bearish"):
                     rejection_reasons["neutral_or_no_direction"] = rejection_reasons.get("neutral_or_no_direction", 0) + 1
-                    log_rejection(db, tweet, handle, "neutral_or_no_direction", haiku_reason, result)
+                    log_rejection(db, tweet, handle, "neutral_or_no_direction", haiku_reason, result, closeness_level)
                     continue
 
                 # Currency tickers are never predictions
                 if ticker in CURRENCY_IGNORE:
                     rejection_reasons["currency_ticker"] = rejection_reasons.get("currency_ticker", 0) + 1
-                    log_rejection(db, tweet, handle, "currency_ticker", haiku_reason, result)
+                    log_rejection(db, tweet, handle, "currency_ticker", haiku_reason, result, closeness_level)
                     continue
 
                 # Phase 1: ticker must be a recognised stock symbol form OR an allowed sector ETF.
@@ -697,7 +731,7 @@ def run_x_scraper(db=None):
                 # downstream sector lookup would otherwise treat them as "Other".
                 if not (re.fullmatch(r"[A-Z]{1,5}", ticker) or _is_allowed_etf(ticker)):
                     rejection_reasons["invalid_ticker_format"] = rejection_reasons.get("invalid_ticker_format", 0) + 1
-                    log_rejection(db, tweet, handle, "invalid_ticker_format", haiku_reason, result)
+                    log_rejection(db, tweet, handle, "invalid_ticker_format", haiku_reason, result, closeness_level)
                     continue
 
                 target_price = result.get("target_price")

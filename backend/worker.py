@@ -226,6 +226,23 @@ def main():
         # safe to skip.
         log.warning(f"[Worker] rejected_at default migration: {e}")
 
+    # Add closeness_level column + index for the rejection viewer filter.
+    # Idempotent: safe to re-run.
+    try:
+        with engine.connect() as conn:
+            conn.execute(sql_text(
+                "ALTER TABLE x_scraper_rejections "
+                "ADD COLUMN IF NOT EXISTS closeness_level SMALLINT"
+            ))
+            conn.execute(sql_text(
+                "CREATE INDEX IF NOT EXISTS idx_x_rejections_closeness "
+                "ON x_scraper_rejections(closeness_level)"
+            ))
+            conn.commit()
+        log.info("[Worker] x_scraper_rejections.closeness_level ensured")
+    except Exception as e:
+        log.warning(f"[Worker] closeness_level migration: {e}")
+
     # Scheduler with separate executor for maintenance jobs.
     # default: scrapers + evaluator (must never be blocked)
     # maintenance: logos, backfills, harvests (one at a time, isolated, time-budgeted)
