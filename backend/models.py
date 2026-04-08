@@ -1,5 +1,5 @@
 import datetime
-from sqlalchemy import Column, Integer, BigInteger, String, Float, DateTime, ForeignKey, Text, Numeric, Boolean, UniqueConstraint, CheckConstraint
+from sqlalchemy import Column, Integer, BigInteger, String, Float, DateTime, ForeignKey, Text, Numeric, Boolean, JSON, UniqueConstraint, CheckConstraint
 from sqlalchemy.orm import relationship
 from database import Base
 
@@ -639,6 +639,24 @@ class SuggestedXAccount(Base):
     first_seen_at = Column(DateTime, default=datetime.datetime.utcnow)
     last_seen_at = Column(DateTime, default=datetime.datetime.utcnow)
     dismissed = Column(Boolean, default=False)
+
+
+class XScraperRejection(Base):
+    """Persisted record of every tweet rejected by the X scraper pipeline.
+    Used by the admin "Recent Rejections" view for filter tuning.
+    Pruned to last 7 days at the start of every scrape run."""
+    __tablename__ = "x_scraper_rejections"
+
+    id = Column(Integer, primary_key=True, index=True)
+    tweet_id = Column(BigInteger, nullable=False)
+    handle = Column(String(50), nullable=False, index=True)
+    tweet_text = Column(Text, nullable=False)
+    tweet_created_at = Column(DateTime, nullable=True)
+    rejected_at = Column(DateTime, default=datetime.datetime.utcnow, index=True)
+    rejection_reason = Column(String(50), nullable=False, index=True)
+    haiku_reason = Column(Text, nullable=True)
+    # JSON maps to JSONB on Postgres automatically
+    haiku_raw_response = Column(JSON, nullable=True)
 
 
 class Config(Base):

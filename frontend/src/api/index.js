@@ -970,5 +970,13 @@ export function dismissSuggestedXAccount(id) {
   return api.post(`/admin/x-accounts/suggested/${id}/dismiss`, {}, { headers: authHeaders() }).then(r => r.data);
 }
 
+export function getXRejections(params = {}) {
+  return api.get('/admin/x-accounts/rejections', { params, headers: authHeaders() }).then(r => r.data);
+}
+
+export function getXRejectionsSummary() {
+  return api.get('/admin/x-accounts/rejections/summary', { headers: authHeaders() }).then(r => r.data);
+}
+
 export default api;
 export { API_BASE };

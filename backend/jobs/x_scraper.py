@@ -433,6 +433,64 @@ def _insert_prediction(db, ticker: str, direction: str, target_price, timeframe_
         return False
 
 
+# ── Persist rejected tweets for admin debug view ─────────────────────────────
+
+def log_rejection(db, tweet: dict, handle: str, rejection_reason: str,
+                  haiku_reason: str | None, haiku_raw: dict | None) -> None:
+    """Persist a rejected tweet to x_scraper_rejections.
+    Best-effort: a persist failure must NEVER break the scrape loop.
+    """
+    try:
+        tid_raw = tweet.get("id") or tweet.get("id_str") or 0
+        try:
+            tweet_id = int(tid_raw) if tid_raw else 0
+        except (ValueError, TypeError):
+            tweet_id = 0
+
+        body = _get_tweet_body(tweet) or ""
+
+        tweet_created = None
+        if tweet_id:
+            try:
+                tweet_created = tweet_id_to_datetime(tweet_id)
+            except Exception:
+                tweet_created = None
+
+        # Cap haiku_raw at ~10KB to avoid bloating the table
+        raw_json = None
+        if haiku_raw:
+            try:
+                serialized = json.dumps(haiku_raw)
+                if len(serialized) <= 10240:
+                    raw_json = serialized
+                else:
+                    raw_json = json.dumps({"_truncated": True, "_size": len(serialized)})
+            except Exception:
+                raw_json = None
+
+        db.execute(sql_text("""
+            INSERT INTO x_scraper_rejections
+                (tweet_id, handle, tweet_text, tweet_created_at,
+                 rejection_reason, haiku_reason, haiku_raw_response)
+            VALUES (:tid, :h, :tt, :tc, :rr, :hr, CAST(:hraw AS JSONB))
+        """), {
+            "tid": tweet_id,
+            "h": handle,
+            "tt": body[:2000],  # cap text at 2KB
+            "tc": tweet_created,
+            "rr": rejection_reason,
+            "hr": (haiku_reason or "")[:500] if haiku_reason else None,
+            "hraw": raw_json,
+        })
+        db.commit()
+    except Exception as e:
+        log.warning(f"[X-SCRAPER] log_rejection failed: {e}")
+        try:
+            db.rollback()
+        except Exception:
+            pass
+
+
 # ── Passive discovery: record mentioned @handles ─────────────────────────────
 
 def _record_mentioned_handles(text: str, tracked_handles: set, db):
@@ -473,6 +531,19 @@ def run_x_scraper(db=None):
         seed_tracked_x_accounts(db)
     except Exception as e:
         print(f"[X-SCRAPER] Seed error: {e}", flush=True)
+
+    # Prune rejection log to last 7 days (best-effort, never block scrape)
+    try:
+        db.execute(sql_text(
+            "DELETE FROM x_scraper_rejections WHERE rejected_at < NOW() - INTERVAL '7 days'"
+        ))
+        db.commit()
+    except Exception as e:
+        log.warning(f"[X-SCRAPER] rejection cleanup failed: {e}")
+        try:
+            db.rollback()
+        except Exception:
+            pass
 
     # Load active accounts
     rows = db.execute(sql_text(
@@ -541,6 +612,7 @@ def run_x_scraper(db=None):
                 if not pred_date:
                     print(f"[X-SCRAPER-WARN] no tweet id, skipping (tid={tid!r})", flush=True)
                     rejection_reasons["no_tweet_id"] = rejection_reasons.get("no_tweet_id", 0) + 1
+                    log_rejection(db, tweet, handle, "no_tweet_id", None, None)
                     continue
 
                 # Passive discovery
@@ -559,12 +631,12 @@ def run_x_scraper(db=None):
 
                 # Phase 5: unified strict validation (matches the Haiku prompt's 3 requirements)
                 is_valid, reject_reason = validate_haiku_result(result or {}, body)
+                haiku_reason = (result or {}).get("reason", "") if isinstance(result, dict) else ""
                 if not is_valid:
                     # Debug log for haiku_rejected rejections — capped at 50 per run
                     # so we can verify the soft prompt without flooding logs.
                     if reject_reason == "haiku_rejected" and haiku_rejected_logged < 50:
                         if log.isEnabledFor(logging.INFO):
-                            haiku_reason = (result or {}).get("reason", "")
                             log.info(
                                 f"[X-SCRAPER-DEBUG] haiku_rejected: @{handle} "
                                 f"tweet_id={tid} reason={haiku_reason} "
@@ -572,6 +644,7 @@ def run_x_scraper(db=None):
                             )
                         haiku_rejected_logged += 1
                     rejection_reasons[reject_reason] = rejection_reasons.get(reject_reason, 0) + 1
+                    log_rejection(db, tweet, handle, reject_reason, haiku_reason, result)
                     continue
 
                 confidence = (result.get("confidence") or "low").lower()
@@ -586,11 +659,13 @@ def run_x_scraper(db=None):
                 # We only insert directional predictions; "neutral" is rejected here
                 if direction not in ("bullish", "bearish"):
                     rejection_reasons["neutral_or_no_direction"] = rejection_reasons.get("neutral_or_no_direction", 0) + 1
+                    log_rejection(db, tweet, handle, "neutral_or_no_direction", haiku_reason, result)
                     continue
 
                 # Currency tickers are never predictions
                 if ticker in CURRENCY_IGNORE:
                     rejection_reasons["currency_ticker"] = rejection_reasons.get("currency_ticker", 0) + 1
+                    log_rejection(db, tweet, handle, "currency_ticker", haiku_reason, result)
                     continue
 
                 # Phase 1: ticker must be a recognised stock symbol form OR an allowed sector ETF.
@@ -601,6 +676,7 @@ def run_x_scraper(db=None):
                 # downstream sector lookup would otherwise treat them as "Other".
                 if not (re.fullmatch(r"[A-Z]{1,5}", ticker) or _is_allowed_etf(ticker)):
                     rejection_reasons["invalid_ticker_format"] = rejection_reasons.get("invalid_ticker_format", 0) + 1
+                    log_rejection(db, tweet, handle, "invalid_ticker_format", haiku_reason, result)
                     continue
 
                 target_price = result.get("target_price")

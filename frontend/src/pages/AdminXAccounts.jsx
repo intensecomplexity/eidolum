@@ -6,11 +6,43 @@ import {
   getXAccounts, addXAccount, updateXAccount, deleteXAccount,
   getXAccountsStats, getSuggestedXAccounts,
   promoteSuggestedXAccount, dismissSuggestedXAccount,
+  getXRejections, getXRejectionsSummary,
 } from '../api';
 import {
   ExternalLink, Pencil, Trash2, ChevronDown, ChevronUp,
   Plus, Users, BarChart3, Zap, TrendingUp, Activity,
+  RefreshCw, AlertTriangle, Filter as FilterIcon,
 } from 'lucide-react';
+
+const REJECTION_REASONS = [
+  'haiku_rejected', 'no_concrete_signal', 'ticker_not_in_text',
+  'no_direction', 'low_confidence', 'no_ticker',
+  'neutral_or_no_direction', 'currency_ticker', 'invalid_ticker_format',
+  'no_tweet_id',
+];
+
+const REJECTION_BADGE_COLORS = {
+  haiku_rejected:        { bg: 'rgba(248,113,113,0.15)', fg: '#f87171' },  // red
+  no_concrete_signal:    { bg: 'rgba(251,191,36,0.15)',  fg: '#fbbf24' },  // yellow
+  low_confidence:        { bg: 'rgba(251,191,36,0.15)',  fg: '#fbbf24' },  // yellow
+  ticker_not_in_text:    { bg: 'rgba(251,146,60,0.15)',  fg: '#fb923c' },  // orange
+  no_direction:          { bg: 'rgba(251,146,60,0.15)',  fg: '#fb923c' },  // orange
+  no_ticker:             { bg: 'rgba(251,146,60,0.15)',  fg: '#fb923c' },  // orange
+  invalid_ticker_format: { bg: 'rgba(251,146,60,0.15)',  fg: '#fb923c' },  // orange
+  neutral_or_no_direction:{bg: 'rgba(251,146,60,0.15)',  fg: '#fb923c' },  // orange
+  currency_ticker:       { bg: 'rgba(148,163,184,0.15)', fg: '#94a3b8' },  // gray
+  no_tweet_id:           { bg: 'rgba(148,163,184,0.15)', fg: '#94a3b8' },  // gray
+  empty_body:            { bg: 'rgba(148,163,184,0.15)', fg: '#94a3b8' },  // gray
+};
+
+function relativeTime(iso) {
+  if (!iso) return '-';
+  const diff = (Date.now() - new Date(iso).getTime()) / 1000;
+  if (diff < 60) return 'just now';
+  if (diff < 3600) return `${Math.floor(diff / 60)} min ago`;
+  if (diff < 86400) return `${Math.floor(diff / 3600)} h ago`;
+  return `${Math.floor(diff / 86400)} d ago`;
+}
 
 const TIER_COLORS = {
   1: 'rgba(212,168,67,0.08)',
@@ -34,6 +66,15 @@ export default function AdminXAccounts() {
   const [form, setForm] = useState({ handle: '', display_name: '', tier: 4, notes: '' });
   const [sortCol, setSortCol] = useState('tier');
   const [sortAsc, setSortAsc] = useState(true);
+
+  // Recent Rejections state
+  const [showRejections, setShowRejections] = useState(false);
+  const [rejections, setRejections] = useState([]);
+  const [rejSummary, setRejSummary] = useState(null);
+  const [rejFilterReason, setRejFilterReason] = useState('');
+  const [rejFilterHandle, setRejFilterHandle] = useState('');
+  const [rejLoading, setRejLoading] = useState(false);
+  const [expandedRejId, setExpandedRejId] = useState(null);
 
   useEffect(() => {
     if (authLoading) return;
@@ -113,6 +154,32 @@ export default function AdminXAccounts() {
       getSuggestedXAccounts().then(setSuggested).catch(() => setSuggested([]));
     }
   }
+
+  function fetchRejections() {
+    setRejLoading(true);
+    const params = { limit: 100 };
+    if (rejFilterReason) params.reason = rejFilterReason;
+    if (rejFilterHandle) params.handle = rejFilterHandle;
+    Promise.all([
+      getXRejections(params).catch(() => []),
+      getXRejectionsSummary().catch(() => null),
+    ]).then(([rows, summary]) => {
+      setRejections(rows || []);
+      setRejSummary(summary);
+    }).finally(() => setRejLoading(false));
+  }
+
+  function toggleRejections() {
+    const next = !showRejections;
+    setShowRejections(next);
+    if (next) fetchRejections();
+  }
+
+  // Refetch when filters change while expanded
+  useEffect(() => {
+    if (showRejections) fetchRejections();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rejFilterReason, rejFilterHandle]);
 
   function handleSort(col) {
     if (sortCol === col) { setSortAsc(!sortAsc); }
@@ -254,6 +321,132 @@ export default function AdminXAccounts() {
               onChange={e => setForm({ ...form, notes: e.target.value })}
               className="sm:col-span-4 bg-surface-2 border border-border rounded-lg px-3 py-2 text-sm" />
           </form>
+        )}
+      </div>
+
+      {/* Recent Rejections */}
+      <div className="card mb-6">
+        <button onClick={toggleRejections}
+          className="w-full flex items-center justify-between text-sm font-semibold">
+          <span className="inline-flex items-center gap-2">
+            <AlertTriangle className="w-4 h-4" style={{ color: '#D4A843' }} />
+            <span style={{ color: '#D4A843' }}>Recent Rejections</span>
+            {rejSummary && rejSummary.total_24h > 0 && (
+              <span className="text-[10px] px-2 py-0.5 rounded-full"
+                style={{ background: 'rgba(212,168,67,0.15)', color: '#D4A843' }}>
+                {rejSummary.total_24h.toLocaleString()} in 24h
+              </span>
+            )}
+          </span>
+          {showRejections ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+        </button>
+
+        {showRejections && (
+          <div className="mt-4">
+            {/* Summary bar */}
+            {rejSummary && (
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-4">
+                <div className="bg-surface-2 border border-border rounded-lg px-3 py-2">
+                  <div className="text-[10px] text-muted uppercase tracking-wider">Last 24h</div>
+                  <div className="text-base font-bold font-mono">{(rejSummary.total_24h || 0).toLocaleString()}</div>
+                </div>
+                <div className="bg-surface-2 border border-border rounded-lg px-3 py-2">
+                  <div className="text-[10px] text-muted uppercase tracking-wider">Top Reason</div>
+                  <div className="text-xs font-mono truncate">
+                    {Object.keys(rejSummary.by_reason || {})[0] || '-'}
+                    {rejSummary.by_reason && Object.keys(rejSummary.by_reason)[0] && (
+                      <span className="text-muted ml-1">({Object.values(rejSummary.by_reason)[0]})</span>
+                    )}
+                  </div>
+                </div>
+                <div className="bg-surface-2 border border-border rounded-lg px-3 py-2">
+                  <div className="text-[10px] text-muted uppercase tracking-wider">Top Offender</div>
+                  <div className="text-xs font-mono truncate">
+                    {rejSummary.by_handle_top10?.[0]
+                      ? <>@{rejSummary.by_handle_top10[0].handle} <span className="text-muted">({rejSummary.by_handle_top10[0].count})</span></>
+                      : '-'}
+                  </div>
+                </div>
+                <div className="bg-surface-2 border border-border rounded-lg px-3 py-2">
+                  <div className="text-[10px] text-muted uppercase tracking-wider">Most Recent</div>
+                  <div className="text-xs font-mono truncate">{relativeTime(rejSummary.most_recent)}</div>
+                </div>
+              </div>
+            )}
+
+            {/* Filter row */}
+            <div className="flex flex-wrap items-center gap-2 mb-4">
+              <FilterIcon className="w-3.5 h-3.5 text-muted shrink-0" />
+              <select value={rejFilterReason} onChange={e => setRejFilterReason(e.target.value)}
+                className="bg-surface-2 border border-border rounded-lg px-2 py-1 text-xs">
+                <option value="">All reasons</option>
+                {REJECTION_REASONS.map(r => <option key={r} value={r}>{r}</option>)}
+              </select>
+              <select value={rejFilterHandle} onChange={e => setRejFilterHandle(e.target.value)}
+                className="bg-surface-2 border border-border rounded-lg px-2 py-1 text-xs">
+                <option value="">All accounts</option>
+                {accounts.map(a => <option key={a.id} value={a.handle}>@{a.handle}</option>)}
+              </select>
+              <button onClick={fetchRejections}
+                className="inline-flex items-center gap-1 text-xs text-muted hover:text-accent transition-colors">
+                <RefreshCw className={`w-3 h-3 ${rejLoading ? 'animate-spin' : ''}`} /> Refresh
+              </button>
+            </div>
+
+            {/* Rejection list */}
+            {rejLoading ? (
+              <div className="flex justify-center py-8"><LoadingSpinner /></div>
+            ) : rejections.length === 0 ? (
+              <p className="text-muted text-sm">No rejections recorded yet. Tweets get rejected here when they fail the strict filter.</p>
+            ) : (
+              <div className="space-y-2 max-h-[600px] overflow-y-auto pr-1">
+                {rejections.map(r => {
+                  const colors = REJECTION_BADGE_COLORS[r.rejection_reason] || REJECTION_BADGE_COLORS.empty_body;
+                  const isExpanded = expandedRejId === r.id;
+                  return (
+                    <div key={r.id} className="bg-surface-2 border border-border rounded-lg p-3">
+                      <div className="flex items-start justify-between gap-2 mb-1.5 flex-wrap">
+                        <div className="inline-flex items-center gap-2 min-w-0">
+                          <a href={`https://x.com/${r.handle}`} target="_blank" rel="noopener noreferrer"
+                            className="text-accent hover:underline text-xs font-semibold truncate">
+                            @{r.handle}
+                          </a>
+                          <span className="text-[10px] text-muted">{relativeTime(r.rejected_at)}</span>
+                          <span className="text-[10px] font-mono px-1.5 py-0.5 rounded-full whitespace-nowrap"
+                            style={{ backgroundColor: colors.bg, color: colors.fg }}>
+                            {r.rejection_reason}
+                          </span>
+                        </div>
+                        {r.tweet_url && (
+                          <a href={r.tweet_url} target="_blank" rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1 text-[10px] text-muted hover:text-accent transition-colors shrink-0">
+                            <ExternalLink className="w-3 h-3" /> View tweet
+                          </a>
+                        )}
+                      </div>
+                      <p
+                        className="font-mono text-xs text-text-secondary cursor-pointer break-words"
+                        style={{
+                          display: '-webkit-box',
+                          WebkitLineClamp: isExpanded ? 'unset' : 2,
+                          WebkitBoxOrient: 'vertical',
+                          overflow: isExpanded ? 'visible' : 'hidden',
+                        }}
+                        onClick={() => setExpandedRejId(isExpanded ? null : r.id)}
+                      >
+                        {r.tweet_text}
+                      </p>
+                      {r.haiku_reason && (
+                        <p className="italic text-[11px] text-muted mt-1 break-words">
+                          Haiku: {r.haiku_reason}
+                        </p>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
         )}
       </div>
 

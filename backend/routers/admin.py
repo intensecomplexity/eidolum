@@ -4,7 +4,7 @@ from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from database import get_db
-from models import Forecaster, Prediction, TrackedXAccount, SuggestedXAccount
+from models import Forecaster, Prediction, TrackedXAccount, SuggestedXAccount, XScraperRejection
 from middleware.auth import require_admin
 from rate_limit import limiter
 
@@ -513,3 +513,90 @@ def dismiss_suggested_account(request: Request, suggested_id: int, admin: bool =
     suggested.dismissed = True
     db.commit()
     return {"status": "dismissed", "handle": suggested.handle}
+
+
+# ── X scraper rejection log (read-only debug view) ───────────────────────────
+
+@router.get("/admin/x-accounts/rejections")
+@limiter.limit("60/minute")
+def list_x_rejections(
+    request: Request,
+    limit: int = 100,
+    handle: str | None = None,
+    reason: str | None = None,
+    admin: bool = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    """List recent rejected tweets for the admin debug view."""
+    if limit < 1:
+        limit = 1
+    if limit > 500:
+        limit = 500
+
+    q = db.query(XScraperRejection)
+    if handle:
+        q = q.filter(XScraperRejection.handle == handle.lstrip("@"))
+    if reason:
+        q = q.filter(XScraperRejection.rejection_reason == reason)
+    rows = q.order_by(XScraperRejection.rejected_at.desc()).limit(limit).all()
+
+    out = []
+    for r in rows:
+        out.append({
+            "id": r.id,
+            "tweet_id": r.tweet_id,
+            "handle": r.handle,
+            "tweet_text": r.tweet_text,
+            "tweet_created_at": r.tweet_created_at.isoformat() if r.tweet_created_at else None,
+            "rejected_at": r.rejected_at.isoformat() if r.rejected_at else None,
+            "rejection_reason": r.rejection_reason,
+            "haiku_reason": r.haiku_reason,
+            "tweet_url": f"https://x.com/{r.handle}/status/{r.tweet_id}" if r.tweet_id else None,
+        })
+    return out
+
+
+@router.get("/admin/x-accounts/rejections/summary")
+@limiter.limit("60/minute")
+def x_rejections_summary(
+    request: Request,
+    admin: bool = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    """Aggregate counts for the rejections dashboard tile."""
+    from sqlalchemy import text as sql_text
+
+    total_24h = db.execute(sql_text("""
+        SELECT COUNT(*) FROM x_scraper_rejections
+        WHERE rejected_at > NOW() - INTERVAL '24 hours'
+    """)).scalar() or 0
+
+    by_reason_rows = db.execute(sql_text("""
+        SELECT rejection_reason, COUNT(*) AS c
+        FROM x_scraper_rejections
+        WHERE rejected_at > NOW() - INTERVAL '24 hours'
+        GROUP BY rejection_reason
+        ORDER BY c DESC
+    """)).fetchall()
+    by_reason = {row[0]: row[1] for row in by_reason_rows}
+
+    by_handle_rows = db.execute(sql_text("""
+        SELECT handle, COUNT(*) AS c
+        FROM x_scraper_rejections
+        WHERE rejected_at > NOW() - INTERVAL '24 hours'
+        GROUP BY handle
+        ORDER BY c DESC
+        LIMIT 10
+    """)).fetchall()
+    by_handle_top10 = [{"handle": row[0], "count": row[1]} for row in by_handle_rows]
+
+    most_recent = db.execute(sql_text("""
+        SELECT MAX(rejected_at) FROM x_scraper_rejections
+    """)).scalar()
+
+    return {
+        "total_24h": total_24h,
+        "by_reason": by_reason,
+        "by_handle_top10": by_handle_top10,
+        "most_recent": most_recent.isoformat() if most_recent else None,
+    }
