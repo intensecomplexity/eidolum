@@ -965,6 +965,43 @@ def validate_haiku_result(result: dict, tweet_text: str) -> tuple[bool, str]:
     return True, "accepted"
 
 
+def _sanitize_tweet_for_haiku(text: str) -> str:
+    """Make a tweet safe to put inside a JSON request body to Anthropic.
+
+    Anthropic's API has been observed to return HTTP 400 on tweets that
+    contain certain unicode control characters or zero-width sequences.
+    The 🚨 emoji itself is fine (4-byte UTF-8) but it often appears
+    alongside zero-width joiners, BOM markers, U+FFFC object replacement,
+    bidi marks, and stray null/SOH/EOT control bytes that some scraper
+    pipelines leak through.
+
+    Steps:
+      1. Unicode NFKC normalization (folds compat sequences)
+      2. Strip control chars EXCEPT \\n and \\t (preserves line breaks)
+      3. Strip the BOM and zero-width joiners that confuse JSON parsers
+      4. Truncate to 500 chars (Haiku output budget is tight)
+      5. Strip leading/trailing whitespace
+    """
+    import unicodedata
+    if not text:
+        return ""
+    text = unicodedata.normalize("NFKC", text)
+    out_chars = []
+    for c in text:
+        if c == "\n" or c == "\t":
+            out_chars.append(c)
+            continue
+        # Drop all control category 'C' chars (Cc, Cf, Cs, Co, Cn).
+        # This includes the BOM (U+FEFF), zero-width joiners (U+200D),
+        # bidi marks (U+200E/U+200F), object replacement (U+FFFC), and
+        # the C0/C1 control sets.
+        if unicodedata.category(c)[0] == "C":
+            continue
+        out_chars.append(c)
+    cleaned = "".join(out_chars)[:500].strip()
+    return cleaned
+
+
 def _classify_with_haiku(tweet_text: str) -> dict:
     """Call Claude Haiku to classify a single tweet.
 
@@ -982,6 +1019,14 @@ def _classify_with_haiku(tweet_text: str) -> dict:
         print("[X-SCRAPER] Haiku NO_KEY — ANTHROPIC_API_KEY missing or placeholder", flush=True)
         return {"_success": False, "error": "no_api_key", "is_prediction": False}
 
+    # Sanitize FIRST: strip control chars / zero-width joiners / BOM / etc.
+    # The 🚨-emoji tweets from @ripster47 were 400'ing because of leaked
+    # control bytes adjacent to the emoji, not the emoji itself.
+    sanitized = _sanitize_tweet_for_haiku(tweet_text)
+    if not sanitized:
+        return {"_success": False, "error": "empty_after_sanitize",
+                "is_prediction": False}
+
     max_retries = 3
     base_delay = 2.0
     last_status = None
@@ -994,13 +1039,16 @@ def _classify_with_haiku(tweet_text: str) -> dict:
                 headers={
                     "x-api-key": ANTHROPIC_API_KEY,
                     "anthropic-version": "2023-06-01",
-                    "content-type": "application/json",
+                    # Explicit UTF-8 charset — httpx defaults to this for json=
+                    # but we make it explicit so the API never has to guess.
+                    "content-type": "application/json; charset=utf-8",
+                    "accept": "application/json",
                 },
                 json={
                     "model": "claude-haiku-4-5-20251001",
                     "max_tokens": 150,
                     "system": HAIKU_SYSTEM,
-                    "messages": [{"role": "user", "content": tweet_text[:500]}],
+                    "messages": [{"role": "user", "content": sanitized}],
                 },
                 timeout=10,
             )
@@ -1284,6 +1332,15 @@ def log_rejection(db, tweet: dict, handle: str, rejection_reason: str,
             except Exception:
                 raw_json = None
 
+        # Defense in depth: never write NULL or empty haiku_reason. Earlier
+        # versions had `(haiku_reason or "")[:500] if haiku_reason else None`
+        # which collapsed empty strings to NULL. We now floor at a constant
+        # so the column is always queryable and counts up by failure mode.
+        if haiku_reason is None or (isinstance(haiku_reason, str) and not haiku_reason.strip()):
+            hr_value = "no_reason_returned"
+        else:
+            hr_value = str(haiku_reason)[:500]
+
         # rejected_at intentionally omitted: Postgres DEFAULT NOW() fills it.
         # The DDL default is set on the live table by an ALTER TABLE migration
         # in worker.py startup, and the model has server_default=func.now() so
@@ -1300,7 +1357,7 @@ def log_rejection(db, tweet: dict, handle: str, rejection_reason: str,
             "tt": body[:2000],  # cap text at 2KB
             "tc": tweet_created,
             "rr": rejection_reason,
-            "hr": (haiku_reason or "")[:500] if haiku_reason else None,
+            "hr": hr_value,
             "hraw": raw_json,
             "cl": closeness_level,
         })
@@ -1494,7 +1551,10 @@ def run_x_scraper(db=None):
 
                 # Phase 5: unified strict validation (matches the Haiku prompt's 3 requirements)
                 is_valid, reject_reason = validate_haiku_result(result, body)
-                haiku_reason = result.get("reason") or ""
+                # Normalize haiku_reason once so EVERY downstream log_rejection
+                # call writes a non-null value. log_rejection has a defense-in-
+                # depth fallback too, but doing it here is cheaper and clearer.
+                haiku_reason = (result.get("reason") or "").strip() or "no_reason_returned"
                 closeness_level = _extract_closeness_level(result)
                 if not is_valid:
                     # Debug log for haiku_rejected rejections — capped at 50 per run
@@ -1508,12 +1568,10 @@ def run_x_scraper(db=None):
                             )
                         haiku_rejected_logged += 1
                     rejection_reasons[reject_reason] = rejection_reasons.get(reject_reason, 0) + 1
-                    # haiku_reason falls back to "no_reason_returned" if Haiku's
-                    # JSON didn't include one, so the DB row is never NULL for
-                    # a rejection that made it through to validation.
+                    # haiku_reason was normalized above to never be empty.
                     log_rejection(
                         db, tweet, handle, reject_reason,
-                        haiku_reason or "no_reason_returned",
+                        haiku_reason,
                         result, closeness_level,
                     )
                     continue
