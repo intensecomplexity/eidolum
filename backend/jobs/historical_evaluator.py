@@ -12,6 +12,15 @@ from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor, TimeoutError as FT
 from sqlalchemy import text as sql_text
 
+# FMP_PLAN gates whether FMP is the PRIMARY price source here, mirroring the
+# behavior already established in retry_no_data.py. Read at module load —
+# Railway auto-restarts on env var changes so this captures the current plan.
+#   "ultimate" — FMP is PRIMARY (3000/min, full history, global), no daily cap
+#   anything else (including unset/garbage) — FMP is FALLBACK, 60 calls/day
+FMP_PLAN = os.getenv("FMP_PLAN", "starter").strip().lower()
+FMP_IS_PRIMARY = FMP_PLAN == "ultimate"
+FMP_DAILY_CAP = 999_999 if FMP_IS_PRIMARY else 60
+
 # Global state for background task
 _eval_running = False
 _eval_stop = False
@@ -167,6 +176,18 @@ def evaluate_batch(max_tickers: int = 500) -> dict:
 
     print(f"[HistEval] Got prices for {len(all_prices)}/{len(tickers)} tickers (FMP calls used today: {_fmp_calls_today})")
 
+    # Sector calls need SPY prices to compute the ETF-vs-SPY spread.
+    # Fetch SPY once per batch and cache it. If SPY fetch fails, sector
+    # calls in this batch will fall through to no_data (same fail-safe as
+    # any other missing-price scenario).
+    spy_prices = {}
+    if any(p.get("prediction_type") == "sector_call" for preds in ticker_preds.values() for p in preds):
+        try:
+            spy_prices = _fetch_history("SPY", None, None) or {}
+            print(f"[HistEval] Fetched SPY benchmark: {len(spy_prices)} days")
+        except Exception as e:
+            print(f"[HistEval] SPY fetch failed: {e}")
+
     total_scored = 0
     total_correct = 0
     total_incorrect = 0
@@ -185,6 +206,51 @@ def evaluate_batch(max_tickers: int = 500) -> dict:
         skipped_no_eval_price = 0
         skipped_no_ref = 0
         for p in preds:
+            # ── Sector call branch: ETF vs SPY spread scoring ──────────────
+            if p.get("prediction_type") == "sector_call":
+                if not prices or not spy_prices:
+                    days_overdue = (now - p["evaluation_date"]).days if p["evaluation_date"] else 0
+                    if days_overdue >= 7:
+                        no_data_updates.append(p["id"])
+                    skipped_no_eval_price += 1
+                    continue
+                etf_start = _closest_price(prices, p["prediction_date"])
+                etf_end   = _closest_price(prices, p["evaluation_date"])
+                spy_start = _closest_price(spy_prices, p["prediction_date"])
+                spy_end   = _closest_price(spy_prices, p["evaluation_date"])
+                if etf_start is None or etf_end is None or spy_start is None or spy_end is None:
+                    days_overdue = (now - p["evaluation_date"]).days if p["evaluation_date"] else 0
+                    if days_overdue >= 7:
+                        no_data_updates.append(p["id"])
+                    skipped_no_eval_price += 1
+                    continue
+
+                window = p.get("window_days") or 90
+                tolerance = _get_tolerance(window, _TOLERANCE)
+                min_movement = _get_tolerance(window, _MIN_MOVEMENT)
+                outcome, etf_return, spy_return, spread = score_sector_call(
+                    p["direction"], etf_start, etf_end, spy_start, spy_end,
+                    tolerance, min_movement,
+                )
+                if outcome == "no_data":
+                    skipped_no_eval_price += 1
+                    continue
+                summary = build_sector_summary(
+                    p["direction"], ticker, None,
+                    etf_return, spy_return, spread, outcome,
+                )
+                updates.append({
+                    "id": p["id"], "outcome": outcome, "ret": spread, "ep": etf_start,
+                    "fid": p["forecaster_id"], "direction": p["direction"], "summary": summary,
+                    "spy_return": spy_return, "alpha": spread,
+                })
+                affected_forecasters.add(p["forecaster_id"])
+                if outcome in ("hit", "correct"):
+                    total_correct += 1
+                elif outcome in ("miss", "incorrect"):
+                    total_incorrect += 1
+                continue
+
             # If no price data at all, mark as no_data if overdue by 7+ days
             if not prices:
                 days_overdue = (now - p["evaluation_date"]).days if p["evaluation_date"] else 0
@@ -375,6 +441,73 @@ def _get_tolerance(window_days: int, table: dict) -> float:
     return table[max(table.keys())]
 
 
+# ── Sector call scoring (ETF spread vs SPY) ─────────────────────────────────
+
+def score_sector_call(direction: str,
+                      etf_price_start: float, etf_price_end: float,
+                      spy_price_start: float, spy_price_end: float,
+                      tolerance_pct: float, min_movement_pct: float
+                      ) -> tuple[str, float, float, float]:
+    """Score a sector call as ETF return vs SPY return spread.
+
+    Returns (outcome, etf_return_pct, spy_return_pct, spread_pct).
+
+    Outcome rules (mirror per-stock scoring):
+      - bullish HIT  if spread >=  tolerance
+      - bullish NEAR if spread >=  min_movement (but < tolerance)
+      - bullish MISS otherwise
+      - bearish HIT  if spread <= -tolerance
+      - bearish NEAR if spread <= -min_movement (but > -tolerance)
+      - bearish MISS otherwise
+
+    DEVIATION FROM SPEC: spec says NEAR threshold = tolerance / 2.5.
+    That ratio is only correct for 1m+ windows; for 1d (4x) and 1w (3x)
+    it would silently mis-score short-window calls. We use the existing
+    _MIN_MOVEMENT table directly so sector calls and per-stock calls
+    share the same NEAR thresholds.
+    """
+    if not etf_price_start or etf_price_start <= 0:
+        return "no_data", 0.0, 0.0, 0.0
+    if not spy_price_start or spy_price_start <= 0:
+        return "no_data", 0.0, 0.0, 0.0
+    etf_return = round((etf_price_end - etf_price_start) / etf_price_start * 100, 2)
+    spy_return = round((spy_price_end - spy_price_start) / spy_price_start * 100, 2)
+    spread = round(etf_return - spy_return, 2)
+
+    if direction == "bullish":
+        if spread >= tolerance_pct:
+            outcome = "hit"
+        elif spread >= min_movement_pct:
+            outcome = "near"
+        else:
+            outcome = "miss"
+    elif direction == "bearish":
+        if spread <= -tolerance_pct:
+            outcome = "hit"
+        elif spread <= -min_movement_pct:
+            outcome = "near"
+        else:
+            outcome = "miss"
+    else:
+        outcome = "no_data"
+    return outcome, etf_return, spy_return, spread
+
+
+def build_sector_summary(direction: str, etf_ticker: str, sector_phrase: str | None,
+                         etf_return: float, spy_return: float, spread: float,
+                         outcome: str) -> str:
+    """Build a human-readable evaluation_summary for a sector call."""
+    sector_label = f" ({sector_phrase})" if sector_phrase else ""
+    sign_etf = "+" if etf_return >= 0 else ""
+    sign_spy = "+" if spy_return >= 0 else ""
+    sign_spr = "+" if spread >= 0 else ""
+    return (
+        f"Sector call: {direction} on {etf_ticker}{sector_label}. "
+        f"{etf_ticker} {sign_etf}{etf_return}%, SPY {sign_spy}{spy_return}%, "
+        f"spread {sign_spr}{spread}%. {outcome.upper()}."
+    )
+
+
 def _calc_spy_return(pred_date, eval_date) -> float | None:
     """Estimate S&P 500 return over the prediction window.
     Uses SPY annualized avg of ~10%/year as benchmark since we can't
@@ -458,7 +591,9 @@ _quote_cache: dict[str, dict] = {}
 _history_cache: dict[str, dict] = {}
 _fmp_calls_today = 0
 _fmp_calls_date = ""
-_FMP_DAILY_LIMIT = 60  # RetryNoData gets ~240/day (batched), evaluator gets ~60/day
+# On Starter plan: 60/day budget, FMP is fallback only.
+# On Ultimate plan: 999_999 (effectively unlimited), FMP is primary.
+_FMP_DAILY_LIMIT = FMP_DAILY_CAP
 
 
 def _fetch_history(ticker: str, start, end) -> dict:
