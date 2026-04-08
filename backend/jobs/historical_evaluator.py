@@ -60,7 +60,8 @@ def run_evaluation_background():
 
     try:
         while not _eval_stop:
-            result = evaluate_batch(max_tickers=500)
+            # max_tickers=None → plan-aware default (5000 on Ultimate, 500 on Starter)
+            result = evaluate_batch()
             _eval_status["tickers_processed"] += result["tickers_processed"]
             _eval_status["predictions_scored"] += result["predictions_scored"]
             _eval_status["correct"] += result.get("correct", 0)
@@ -86,10 +87,25 @@ def run_evaluation_background():
         _eval_status["running"] = False
 
 
-def evaluate_batch(max_tickers: int = 500) -> dict:
+def evaluate_batch(max_tickers: int | None = None) -> dict:
     """Evaluate one batch of tickers. Connection-safe.
-    Groups predictions by ticker, fetches price history once per ticker from FMP."""
+    Groups predictions by ticker, fetches price history once per ticker.
+
+    max_tickers default is plan-aware:
+      - FMP Ultimate: 5000 per run (3000 calls/min burst, parallel-friendly)
+      - Starter:      500 per run  (Tiingo primary, 0.3s pacing)
+    """
     from database import BgSessionLocal as SessionLocal
+
+    if max_tickers is None:
+        max_tickers = 5000 if FMP_IS_PRIMARY else 500
+
+    print(
+        f"[HistEval] Mode: "
+        f"{'FMP Ultimate (primary)' if FMP_IS_PRIMARY else 'Starter (Tiingo primary)'} "
+        f"| max_tickers={max_tickers} | fmp_cap={FMP_DAILY_CAP}",
+        flush=True,
+    )
 
     _history_cache.clear()  # Clear between batches
     now = datetime.utcnow()
@@ -159,18 +175,23 @@ def evaluate_batch(max_tickers: int = 500) -> dict:
 
     # ── STEP 3: Batch-fetch ALL prices (NO DB connection held) ──────────
     print(f"[HistEval] Fetching prices for {len(tickers)} tickers (FMP budget: {_FMP_DAILY_LIMIT - _fmp_calls_today} remaining)...")
+    # On Ultimate: 0.02s between calls = ~50/sec, well under the 3000/min cap.
+    # On Starter:  0.3s preserves the old ~4/sec Tiingo-primary pacing.
+    fetch_sleep = 0.02 if FMP_IS_PRIMARY else 0.3
     all_prices = {}
     for i, ticker in enumerate(tickers):
         if _eval_stop:
             break
-        if _fmp_calls_today >= _FMP_DAILY_LIMIT and not FINNHUB_KEY:
-            print(f"[HistEval] FMP daily limit reached at ticker {i}/{len(tickers)}")
+        # Only abort on FMP cap if FMP is the primary source AND Finnhub can't cover the rest.
+        # On Starter the primary is Tiingo — don't stop when the 60/day fallback budget runs out.
+        if FMP_IS_PRIMARY and _fmp_calls_today >= _FMP_DAILY_LIMIT and not FINNHUB_KEY:
+            print(f"[HistEval] FMP daily cap reached at ticker {i}/{len(tickers)}")
             break
         prices = _fetch_history(ticker, None, None)
         if prices:
             all_prices[ticker] = prices
-        # Rate limit: ~4 req/sec for FMP
-        time.sleep(0.3)
+        # Rate limit: 50/sec on Ultimate (0.02s), ~3/sec on Starter (0.3s)
+        time.sleep(fetch_sleep)
         if (i + 1) % 50 == 0:
             print(f"[HistEval] Progress: {i + 1}/{len(tickers)} tickers fetched, {len(all_prices)} with data")
 
@@ -596,95 +617,123 @@ _fmp_calls_date = ""
 _FMP_DAILY_LIMIT = FMP_DAILY_CAP
 
 
-def _fetch_history(ticker: str, start, end) -> dict:
-    """Fetch historical daily prices for a ticker. Returns {date_str: close_price, ...}.
-    Priority: Tiingo (free) → FMP (paid, fallback) → Finnhub (current only)."""
+def _try_tiingo(ticker: str) -> dict:
+    """Fetch daily history from Tiingo. Returns {} on any failure.
+    Uses a process-wide 24h backoff on 429."""
     import httpx
-
-    if ticker in _history_cache:
-        return _history_cache[ticker]
-
-    prices = {}
-
-    # 1. Tiingo — skip if rate limited (429 cached for 24 hours)
     _tiingo_key = os.getenv("TIINGO_API_KEY", "").strip()
-    if _tiingo_key and not getattr(_fetch_history, '_tiingo_blocked_until', None) or \
-       (getattr(_fetch_history, '_tiingo_blocked_until', None) and datetime.utcnow() > _fetch_history._tiingo_blocked_until):
-        try:
-            r = httpx.get(
-                f"https://api.tiingo.com/tiingo/daily/{ticker}/prices",
-                params={
-                    "startDate": (datetime.utcnow() - timedelta(days=730)).strftime("%Y-%m-%d"),
-                    "endDate": datetime.utcnow().strftime("%Y-%m-%d"),
-                    "columns": "close,date",
-                    "token": _tiingo_key,
-                },
-                headers={"Content-Type": "application/json"},
-                timeout=15,
-            )
-            if r.status_code == 429:
-                _fetch_history._tiingo_blocked_until = datetime.utcnow() + timedelta(hours=24)
-                print("[HistEval] Tiingo 429 — blocked for 24h, using FMP/Finnhub")
-            elif r.status_code == 200:
-                data = r.json()
-                if isinstance(data, list):
-                    for day in data:
-                        ds = (day.get("date") or "")[:10]
-                        close = day.get("close") or day.get("adjClose")
-                        if ds and close and float(close) > 0:
-                            prices[ds] = float(close)
-                if prices:
-                    _history_cache[ticker] = prices
-                    return prices
-        except Exception:
-            pass
+    if not _tiingo_key:
+        return {}
+    blocked_until = getattr(_fetch_history, '_tiingo_blocked_until', None)
+    if blocked_until and datetime.utcnow() < blocked_until:
+        return {}
+    try:
+        r = httpx.get(
+            f"https://api.tiingo.com/tiingo/daily/{ticker}/prices",
+            params={
+                "startDate": (datetime.utcnow() - timedelta(days=730)).strftime("%Y-%m-%d"),
+                "endDate": datetime.utcnow().strftime("%Y-%m-%d"),
+                "columns": "close,date",
+                "token": _tiingo_key,
+            },
+            headers={"Content-Type": "application/json"},
+            timeout=15,
+        )
+        if r.status_code == 429:
+            _fetch_history._tiingo_blocked_until = datetime.utcnow() + timedelta(hours=24)
+            print("[HistEval] Tiingo 429 — blocked for 24h")
+            return {}
+        if r.status_code != 200:
+            return {}
+        data = r.json()
+        prices = {}
+        if isinstance(data, list):
+            for day in data:
+                ds = (day.get("date") or "")[:10]
+                close = day.get("close") or day.get("adjClose")
+                if ds and close and float(close) > 0:
+                    prices[ds] = float(close)
+        return prices
+    except Exception:
+        return {}
 
-    # 2. FMP fallback (paid — only if Tiingo failed and budget remains)
+
+def _try_fmp(ticker: str) -> dict:
+    """Fetch daily history from FMP. Respects _FMP_DAILY_LIMIT budget.
+    Returns {} on any failure or when the daily cap is exhausted."""
+    import httpx
     global _fmp_calls_today, _fmp_calls_date
     today_str = datetime.utcnow().strftime("%Y-%m-%d")
     if _fmp_calls_date != today_str:
         _fmp_calls_today = 0
         _fmp_calls_date = today_str
-    if FMP_KEY and _fmp_calls_today < _FMP_DAILY_LIMIT and not prices:
-        try:
-            r = httpx.get(
-                "https://financialmodelingprep.com/stable/historical-price-full",
-                params={"symbol": ticker, "apikey": FMP_KEY, "serietype": "line"},
-                timeout=15,
-            )
-            _fmp_calls_today += 1
-            if r.status_code == 200:
-                data = r.json()
-                historical = data.get("historical", data) if isinstance(data, dict) else data
-                if isinstance(historical, list):
-                    for day in historical:
-                        ds = (day.get("date") or "")[:10]
-                        close = day.get("close") or day.get("adjClose")
-                        if ds and close and float(close) > 0:
-                            prices[ds] = float(close)
-                if prices:
-                    _history_cache[ticker] = prices
-                    return prices
-        except Exception:
-            _fmp_calls_today += 1
+    if not FMP_KEY or _fmp_calls_today >= _FMP_DAILY_LIMIT:
+        return {}
+    try:
+        r = httpx.get(
+            "https://financialmodelingprep.com/stable/historical-price-full",
+            params={"symbol": ticker, "apikey": FMP_KEY, "serietype": "line"},
+            timeout=15,
+        )
+        _fmp_calls_today += 1
+        if r.status_code != 200:
+            return {}
+        data = r.json()
+        historical = data.get("historical", data) if isinstance(data, dict) else data
+        prices = {}
+        if isinstance(historical, list):
+            for day in historical:
+                ds = (day.get("date") or "")[:10]
+                close = day.get("close") or day.get("adjClose")
+                if ds and close and float(close) > 0:
+                    prices[ds] = float(close)
+        return prices
+    except Exception:
+        _fmp_calls_today += 1
+        return {}
 
-    # 3. Finnhub current quote — last resort, only useful for very recent predictions
-    if FINNHUB_KEY:
-        try:
-            r = httpx.get(
-                "https://finnhub.io/api/v1/quote",
-                params={"symbol": ticker, "token": FINNHUB_KEY},
-                timeout=8,
-            )
-            data = r.json()
-            current = float(data.get("c", 0) or 0)
-            if current > 0:
-                today = datetime.utcnow().strftime("%Y-%m-%d")
-                prices = {today: current, "_current": current}
-                _history_cache[ticker] = prices
-                return prices
-        except Exception:
-            pass
+
+def _try_finnhub(ticker: str) -> dict:
+    """Last-resort: Finnhub current quote (useful only for very recent predictions)."""
+    if not FINNHUB_KEY:
+        return {}
+    import httpx
+    try:
+        r = httpx.get(
+            "https://finnhub.io/api/v1/quote",
+            params={"symbol": ticker, "token": FINNHUB_KEY},
+            timeout=8,
+        )
+        data = r.json()
+        current = float(data.get("c", 0) or 0)
+        if current > 0:
+            today = datetime.utcnow().strftime("%Y-%m-%d")
+            return {today: current, "_current": current}
+    except Exception:
+        pass
+    return {}
+
+
+def _fetch_history(ticker: str, start, end) -> dict:
+    """Fetch historical daily prices for a ticker. Returns {date_str: close_price, ...}.
+
+    Priority is gated by FMP_PLAN:
+      - Ultimate: FMP (primary, fast, global) -> Tiingo -> Finnhub
+      - Starter:  Tiingo (free)                -> FMP (budget) -> Finnhub
+    """
+    if ticker in _history_cache:
+        return _history_cache[ticker]
+
+    if FMP_IS_PRIMARY:
+        sources = (_try_fmp, _try_tiingo, _try_finnhub)
+    else:
+        sources = (_try_tiingo, _try_fmp, _try_finnhub)
+
+    for fetch in sources:
+        prices = fetch(ticker)
+        if prices:
+            _history_cache[ticker] = prices
+            return prices
 
     return {}
 

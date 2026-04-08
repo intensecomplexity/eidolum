@@ -85,7 +85,8 @@ def _massive_benzinga(db):
 
 def _evaluator():
     from jobs.historical_evaluator import evaluate_batch, refresh_all_forecaster_stats
-    r = evaluate_batch(max_tickers=500)
+    # max_tickers=None → plan-aware default (5000 on Ultimate, 500 on Starter)
+    r = evaluate_batch()
     if r.get("predictions_scored", 0) > 0: refresh_all_forecaster_stats()
 
 def _refresh_stats():
