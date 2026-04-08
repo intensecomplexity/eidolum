@@ -208,9 +208,16 @@ def _fetch_fmp(ticker: str) -> dict:
         return {}
     import httpx
     try:
+        # /stable/historical-price-eod/full requires from/to to be present
+        # AND rejects the legacy v3 'serietype=line' param with 404. Match the
+        # user's verified working browser URL exactly: symbol, from, to, apikey.
+        # Use a 30-year window (FMP Ultimate has the depth) so we still get
+        # the full history we need to score predictions of any age.
+        from_date = (datetime.utcnow() - timedelta(days=365 * 30)).strftime("%Y-%m-%d")
+        to_date = datetime.utcnow().strftime("%Y-%m-%d")
         r = httpx.get(
             "https://financialmodelingprep.com/stable/historical-price-eod/full",
-            params={"symbol": ticker, "apikey": FMP_KEY, "serietype": "line"},
+            params={"symbol": ticker, "from": from_date, "to": to_date, "apikey": FMP_KEY},
             timeout=15,
         )
         _fmp_calls_today += 1

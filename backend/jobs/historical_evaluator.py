@@ -674,9 +674,14 @@ def _try_fmp(ticker: str) -> dict:
         # 2025-08-31, returns 403 Legacy Endpoint) AND from the interim
         # /stable/historical-price-full (also wrong path) to the correct
         # /stable/historical-price-eod/full?symbol={ticker} endpoint.
+        # /stable/ requires from/to to be present and rejects the legacy v3
+        # 'serietype=line' param with 404. Use a 30-year window so we still
+        # get the full history (FMP Ultimate has the depth).
+        from_date = (datetime.utcnow() - timedelta(days=365 * 30)).strftime("%Y-%m-%d")
+        to_date = datetime.utcnow().strftime("%Y-%m-%d")
         r = httpx.get(
             "https://financialmodelingprep.com/stable/historical-price-eod/full",
-            params={"symbol": ticker, "apikey": FMP_KEY, "serietype": "line"},
+            params={"symbol": ticker, "from": from_date, "to": to_date, "apikey": FMP_KEY},
             timeout=15,
         )
         _fmp_calls_today += 1

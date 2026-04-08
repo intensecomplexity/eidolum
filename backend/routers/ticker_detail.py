@@ -380,11 +380,14 @@ def get_ticker_chart(
     # 2. Fallback to FMP /stable/ (paid, full history).
     # Migrated from the deprecated /api/v3/historical-price-full/{ticker}
     # endpoint (returns 403 Legacy Endpoint after 2025-08-31).
+    # /stable/ requires from/to to be present and rejects the legacy v3
+    # 'serietype=line' param with 404. Use the chart's existing start/end
+    # window — it's already in scope above as start_date / end_date.
     if not prices and FMP_KEY:
         try:
             r = httpx.get(
                 "https://financialmodelingprep.com/stable/historical-price-eod/full",
-                params={"symbol": ticker, "apikey": FMP_KEY, "serietype": "line"},
+                params={"symbol": ticker, "from": start_date, "to": end_date, "apikey": FMP_KEY},
                 timeout=15,
             )
             if r.status_code == 200:
