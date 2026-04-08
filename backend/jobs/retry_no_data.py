@@ -41,21 +41,39 @@ FMP_DAILY_CAP = 999_999 if FMP_IS_PRIMARY else 300
 POLYGON_EARLIEST = (datetime.utcnow() - timedelta(days=730)).date()
 
 # US ticker whitelist — replaces the foreign-suffix blacklist.
+#
 # A US ticker is either:
-#   - 1-5 uppercase letters (AAPL, NVDA, F, TSLA, GOOGL)
-#   - 2-3 uppercase letters + dot + single uppercase letter (BRK.A, BRK.B,
-#     BF.A, BF.B, MOG.A). No real US class share has a 4-letter base.
-#     {1,4} would let in foreign tickers like ABEA.F (Frankfurt ADR for
-#     Alphabet) which broke the Polygon phase.
-# Anything else (including foreign exchange suffixes like .L .DE .HK .IL .SW
-# .F .DU and any new ones we have not enumerated) is rejected.
+#   (1) 1-5 uppercase letters (AAPL, NVDA, F, TSLA, GOOGL), OR
+#   (2) An explicitly allowed dotted share-class symbol (BRK.A, BRK.B, ...).
+#
+# The previous implementation used the regex ^[A-Z]{1,3}\.[A-Z]$ for the
+# dotted case, but that still lets in foreign-exchange tickers like
+# ABEA.F (Frankfurt ADR), BMW.F, BAS.F, and any other 1-3 letter base
+# followed by a 1-letter suffix. Since only a handful of legitimate US
+# share-class tickers contain a dot, we hard-code them here instead.
+#
+# If a new US class share lists later (rare), add it to this set.
 import re as _re
-US_TICKER_REGEX = _re.compile(r'^[A-Z]{1,5}$|^[A-Z]{1,3}\.[A-Z]$')
+US_TICKER_REGEX = _re.compile(r'^[A-Z]{1,5}$')
+
+US_DOTTED_ALLOWLIST = frozenset({
+    "BRK.A", "BRK.B",   # Berkshire Hathaway
+    "BF.A",  "BF.B",    # Brown-Forman
+    "GEF.B",            # Greif Inc
+    "HEI.A",            # HEICO
+    "LEN.B",            # Lennar
+    "MOG.A", "MOG.B",   # Moog Inc
+    "RUSHA", "RUSHB",   # Rush Enterprises (no dot, but pair with above)
+})
 
 
 def is_us_ticker(ticker: str) -> bool:
-    """True iff ticker is a recognised US-style symbol. Whitelist."""
-    return bool(ticker and US_TICKER_REGEX.match(ticker))
+    """True iff ticker is a recognised US-style symbol. Strict whitelist."""
+    if not ticker:
+        return False
+    if US_TICKER_REGEX.match(ticker):
+        return True
+    return ticker in US_DOTTED_ALLOWLIST
 
 _price_cache: dict[str, dict] = {}
 
@@ -392,7 +410,10 @@ def retry_no_data_batch(db, max_tickers: int | None = None):
           AND p.prediction_date IS NOT NULL
           AND p.prediction_date >= NOW() - INTERVAL '2 years'
           AND p.evaluation_date <= NOW()
-          AND (p.ticker ~ '^[A-Z]{1,5}$' OR p.ticker ~ '^[A-Z]{1,3}\.[A-Z]$')
+          AND (
+              p.ticker ~ '^[A-Z]{1,5}$'
+              OR p.ticker IN ('BRK.A','BRK.B','BF.A','BF.B','GEF.B','HEI.A','LEN.B','MOG.A','MOG.B')
+          )
         ORDER BY p.ticker
         LIMIT :lim
     """
@@ -404,7 +425,10 @@ def retry_no_data_batch(db, max_tickers: int | None = None):
           AND p.prediction_date IS NOT NULL
           AND p.prediction_date < NOW() - INTERVAL '2 years'
           AND p.evaluation_date <= NOW()
-          AND (p.ticker ~ '^[A-Z]{1,5}$' OR p.ticker ~ '^[A-Z]{1,3}\.[A-Z]$')
+          AND (
+              p.ticker ~ '^[A-Z]{1,5}$'
+              OR p.ticker IN ('BRK.A','BRK.B','BF.A','BF.B','GEF.B','HEI.A','LEN.B','MOG.A','MOG.B')
+          )
         ORDER BY p.ticker
         LIMIT :lim
     """
@@ -434,7 +458,10 @@ def retry_no_data_batch(db, max_tickers: int | None = None):
         SELECT COUNT(*) FROM predictions
         WHERE outcome = 'no_data'
           AND evaluation_date IS NOT NULL
-          AND (ticker ~ '^[A-Z]{1,5}$' OR ticker ~ '^[A-Z]{1,3}\.[A-Z]$')
+          AND (
+              ticker ~ '^[A-Z]{1,5}$'
+              OR ticker IN ('BRK.A','BRK.B','BF.A','BF.B','GEF.B','HEI.A','LEN.B','MOG.A','MOG.B')
+          )
     """)).scalar() or 0
 
     if not polygon_rows and not tiingo_rows:
