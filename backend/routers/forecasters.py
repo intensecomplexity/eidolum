@@ -173,6 +173,17 @@ def get_forecaster(
     else:
         live_accuracy = 0
 
+    # Dormancy fields. Use getattr for graceful degradation if the migration
+    # hasn't run yet on a fresh DB.
+    is_dormant = bool(getattr(f, "is_dormant", False))
+    last_pred_at = getattr(f, "last_prediction_at", None)
+    days_since_last = None
+    if last_pred_at:
+        try:
+            days_since_last = (datetime.datetime.utcnow() - last_pred_at).days
+        except Exception:
+            days_since_last = None
+
     result = {
         "id": f.id, "name": f.name, "handle": f.handle,
         "slug": getattr(f, 'slug', None) or slugify(f.name),
@@ -199,6 +210,10 @@ def get_forecaster(
         "predictions": _get_preds(forecaster_id, page, limit, filter, sector, db),
         "disclosed_positions": [],
         "conflict_stats": {"total": 0, "conflicts": 0, "rate": 0},
+        # Dormancy
+        "is_dormant": is_dormant,
+        "last_prediction_at": last_pred_at.isoformat() if last_pred_at else None,
+        "days_since_last_prediction": days_since_last,
     }
 
     # Cache the base stats (without predictions)

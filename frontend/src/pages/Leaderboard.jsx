@@ -26,6 +26,22 @@ const SHORT_SECTOR = {
   'Diversified Consumer Services': 'Consumer Svcs',
 };
 
+// Gray pill rendered next to a forecaster's name when is_dormant=true.
+// Visible only when "Show dormant" is on (otherwise the API filters
+// dormant rows out before they ever reach the frontend).
+function DormantBadge({ visible }) {
+  if (!visible) return null;
+  return (
+    <span
+      className="rounded-md px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider"
+      style={{ backgroundColor: '#4b5563', color: '#e5e7eb' }}
+      title="No new predictions in 30+ days"
+    >
+      DORMANT
+    </span>
+  );
+}
+
 function SectorBadge({ sector, accuracy, count, onClick }) {
   const color = accuracy >= 60 ? '#00c896' : accuracy >= 30 ? '#e5a100' : '#ef4444';
   const label = SHORT_SECTOR[sector] || sector;
@@ -82,6 +98,7 @@ export default function Leaderboard() {
   const [timeframe, setTimeframe] = useState('all');
   const [source, setSource] = useState('all');
   const [minPreds, setMinPreds] = useState(10);
+  const [showDormant, setShowDormant] = useState(false);
   const [availableTf, setAvailableTf] = useState({ all: true, short: true, medium: true, long: true });
 
   useEffect(() => {
@@ -108,7 +125,7 @@ export default function Leaderboard() {
   // Scroll to top on any filter change
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
-  }, [activeTab, sector, direction, metric, timeframe, source, minPreds]);
+  }, [activeTab, sector, direction, metric, timeframe, source, minPreds, showDormant]);
 
   function handleTabClick(key) {
     setActiveTab(key);
@@ -131,6 +148,7 @@ export default function Leaderboard() {
     if (timeframe !== 'all') params.timeframe = timeframe;
     if (source !== 'all') params.source = source;
     if (minPreds > 10) params.min_predictions = minPreds;
+    if (showDormant) params.include_dormant = 'true';
     return params;
   }
 
@@ -166,7 +184,7 @@ export default function Leaderboard() {
         setEmptyMessage('Could not load leaderboard. Retrying...');
       })
       .finally(() => setLoading(false));
-  }, [activeTab, sector, direction, metric, timeframe, source, minPreds]);
+  }, [activeTab, sector, direction, metric, timeframe, source, minPreds, showDormant]);
 
   // Auto-retry every 30 seconds when leaderboard is empty
   useEffect(() => {
@@ -311,6 +329,22 @@ export default function Leaderboard() {
                 </div>
               )}
 
+              {/* Show dormant toggle — off by default; survey said 75% of users
+                  want to hide forecasters who haven't made a new call in 30+ days. */}
+              {activeTab !== 'week' && (
+                <button
+                  onClick={() => setShowDormant(d => !d)}
+                  title="Forecasters with no new predictions in 30+ days"
+                  className={`px-2.5 py-1 rounded text-[11px] font-semibold transition-colors shrink-0 ${
+                    showDormant
+                      ? 'bg-surface-2 text-text-primary border border-border'
+                      : 'bg-surface-2 text-muted border border-border'
+                  }`}
+                >
+                  {showDormant ? '\u2713 Show dormant' : 'Show dormant'}
+                </button>
+              )}
+
               {activeTab === 'recent' && (
                 <span className="text-muted text-xs ml-1 shrink-0">Scored in the last 30 days</span>
               )}
@@ -392,11 +426,12 @@ export default function Leaderboard() {
                             style={{ animation: `leaderboardFadeIn 0.3s ease-out ${idx * 0.02}s both` }}>
                             <td className="px-3 py-4"><RankBadge rank={f.rank} movement={f.rank_movement} /></td>
                             <td className="px-3 py-3">
-                              <div className="flex items-center gap-1.5">
+                              <div className="flex items-center gap-1.5 flex-wrap">
                                 <Link to={f.slug ? `/analyst/${f.slug}` : `/forecaster/${f.id}`} className="font-medium text-[0.93rem] hover:text-accent transition-colors">
                                   {f.name}
                                 </Link>
                                 <PlatformBadge platform={getSourceBadgeKey(f)} />
+                                <DormantBadge visible={f.is_dormant} />
                               </div>
                               {f.firm ? (
                                 <div className="text-muted text-xs">{f.firm}</div>

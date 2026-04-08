@@ -868,6 +868,35 @@ def refresh_all_forecaster_stats():
                 ), {"t": total, "c": hits, "a": acc, "alp": alp, "ar": ar, "f": fid})
                 updated += 1
         db.commit()
+
+        # ── Dormancy recompute ───────────────────────────────────────────
+        # A forecaster is dormant if they have not made a NEW prediction
+        # (any outcome) in the last 30 days. Recompute last_prediction_at
+        # from predictions, then flip is_dormant accordingly.
+        try:
+            db.execute(sql_text("""
+                UPDATE forecasters f
+                SET last_prediction_at = (
+                    SELECT MAX(prediction_date) FROM predictions p
+                    WHERE p.forecaster_id = f.id
+                )
+            """))
+            db.execute(sql_text("""
+                UPDATE forecasters
+                SET is_dormant = (
+                    last_prediction_at IS NULL
+                    OR last_prediction_at < NOW() - INTERVAL '30 days'
+                )
+            """))
+            db.commit()
+            dormant_count = db.execute(sql_text(
+                "SELECT COUNT(*) FROM forecasters WHERE is_dormant = TRUE"
+            )).scalar() or 0
+            print(f"[StatsRefresh] {dormant_count} forecasters marked dormant (no new predictions in 30+ days)")
+        except Exception as e:
+            db.rollback()
+            print(f"[StatsRefresh] Dormancy recompute failed: {e}")
+
         print(f"[StatsRefresh] Updated {updated} forecasters, zeroed unscored")
         return {"updated": updated, "total_forecasters_with_scored": len(fids)}
     except Exception as e:

@@ -29,6 +29,11 @@ class Forecaster(Base):
     alpha = Column(Float, nullable=True)  # avg prediction return - avg SPY return
     avg_return = Column(Float, nullable=True)  # avg actual_return across evaluated predictions
 
+    # Dormancy: forecaster has not made a new prediction in 30+ days.
+    # Recomputed by refresh_all_forecaster_stats on every stats refresh.
+    last_prediction_at = Column(DateTime, nullable=True, index=True)
+    is_dormant = Column(Boolean, nullable=False, default=False, server_default="false")
+
     # Quota-safe sync fields
     uploads_playlist_id = Column(String, nullable=True)
     last_synced_at = Column(DateTime, nullable=True)

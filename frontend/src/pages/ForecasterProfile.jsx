@@ -219,6 +219,18 @@ export default function ForecasterProfile() {
           <ArrowLeft className="w-4 h-4" /> Back to leaderboard
         </Link>
 
+        {/* Dormancy banner — gray, only when forecaster has no new predictions in 30+ days */}
+        {data.is_dormant && (
+          <div
+            className="mb-4 sm:mb-6 rounded-lg px-4 py-3 text-sm border"
+            style={{ backgroundColor: 'rgba(75,85,99,0.18)', borderColor: '#4b5563', color: '#e5e7eb' }}
+          >
+            This forecaster has made no new predictions in the last{' '}
+            <strong>{data.days_since_last_prediction != null ? data.days_since_last_prediction : '30+'}</strong>{' '}
+            days. They are flagged as dormant and hidden from the default leaderboard view.
+          </div>
+        )}
+
         {/* Header */}
         <div className="card mb-6 sm:mb-8">
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 sm:gap-6">

@@ -20,6 +20,38 @@ INTEGRITY_CHECK_TTL = 600
 _last_forecaster_count: int = 0
 
 
+def _apply_dormancy(db: Session, results: list, include_dormant: bool) -> list:
+    """Annotate each result row with is_dormant + last_prediction_at, then
+    filter out dormant rows unless include_dormant=True.
+
+    Idempotent and cache-safe — works on any list of result dicts that
+    have an "id" field. Mutates the list members and returns a (possibly
+    filtered) copy.
+    """
+    if not results:
+        return results
+    fids = [r["id"] for r in results if r.get("id")]
+    if not fids:
+        return results
+    try:
+        rows = db.execute(sql_text("""
+            SELECT id, is_dormant, last_prediction_at
+            FROM forecasters
+            WHERE id = ANY(:fids)
+        """), {"fids": fids}).fetchall()
+        dormancy = {r[0]: (bool(r[1]), r[2]) for r in rows}
+    except Exception:
+        # Column may not exist yet on first deploy; gracefully degrade.
+        dormancy = {}
+    for r in results:
+        is_d, last_at = dormancy.get(r.get("id"), (False, None))
+        r["is_dormant"] = is_d
+        r["last_prediction_at"] = last_at.isoformat() if last_at else None
+    if include_dormant:
+        return results
+    return [r for r in results if not r.get("is_dormant")]
+
+
 def _enrich_primary_source(results: list, db: Session):
     """Batch-fetch the primary source_type for each forecaster based on their most common prediction source."""
     if not results:
@@ -598,6 +630,7 @@ def get_leaderboard(
     min_predictions: int = Query(None),
     timeframe: str = Query(None),
     source: str = Query(None),
+    include_dormant: bool = Query(False),
 ):
     global _leaderboard_cache, _cache_time
 
@@ -611,7 +644,7 @@ def get_leaderboard(
         cache_key = f"{sector}|{call_type}|{sort}|{limit}|{min_predictions}|{direction}|{timeframe}|{source}"
         cached = _filtered_cache.get(cache_key)
         if cached and (_time.time() - cached[1]) < FILTERED_CACHE_TTL:
-            return cached[0]
+            return _apply_dormancy(db, list(cached[0]), include_dormant)
 
         min_preds = min_predictions or (10 if sector or call_type or timeframe or source else 35)
         results = _build_filtered_leaderboard(
@@ -627,14 +660,14 @@ def get_leaderboard(
                 timeframe=timeframe, source=source,
             )
         _filtered_cache[cache_key] = (results, _time.time())
-        return results
+        return _apply_dormancy(db, list(results), include_dormant)
 
     # Periodic stats integrity check
     _check_stats_integrity(db)
 
     # Default all-time: use cache
     if _leaderboard_cache and (_time.time() - _cache_time) < CACHE_TTL:
-        return _leaderboard_cache
+        return _apply_dormancy(db, list(_leaderboard_cache), include_dormant)
 
     try:
         result = _refresh_leaderboard(db)
@@ -644,7 +677,7 @@ def get_leaderboard(
         _cache_time = _time.time()
     except Exception as e:
         print(f"[Leaderboard] Query error: {e}")
-    return _leaderboard_cache or []
+    return _apply_dormancy(db, list(_leaderboard_cache or []), include_dormant)
 
 
 @router.get("/sectors")

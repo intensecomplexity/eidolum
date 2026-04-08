@@ -54,6 +54,15 @@ export default function LeaderboardCard({ forecaster: f, metric = 'avg_return', 
                   {f.name}
                 </Link>
                 <PlatformBadge platform={getSourceBadgeKey(f)} />
+                {f.is_dormant && (
+                  <span
+                    className="rounded-md px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider"
+                    style={{ backgroundColor: '#4b5563', color: '#e5e7eb' }}
+                    title="No new predictions in 30+ days"
+                  >
+                    DORMANT
+                  </span>
+                )}
               </div>
               {f.firm ? (
                 <div className="text-muted text-xs">{f.firm}</div>

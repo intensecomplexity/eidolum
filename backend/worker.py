@@ -244,6 +244,49 @@ def main():
     except Exception as e:
         log.warning(f"[Worker] closeness_level migration: {e}")
 
+    # Dormancy: add forecasters.last_prediction_at + is_dormant columns,
+    # backfill on first run, then create the partial index.
+    # Idempotent: subsequent runs ALTER IF NOT EXISTS and the UPDATE only
+    # touches NULL rows on first run.
+    try:
+        with engine.connect() as conn:
+            conn.execute(sql_text(
+                "ALTER TABLE forecasters ADD COLUMN IF NOT EXISTS last_prediction_at TIMESTAMP"
+            ))
+            conn.execute(sql_text(
+                "ALTER TABLE forecasters ADD COLUMN IF NOT EXISTS is_dormant BOOLEAN NOT NULL DEFAULT FALSE"
+            ))
+            conn.execute(sql_text(
+                "CREATE INDEX IF NOT EXISTS idx_forecasters_dormant "
+                "ON forecasters(is_dormant) WHERE is_dormant = TRUE"
+            ))
+            conn.commit()
+
+            # Initial backfill: only runs on the first deploy after the
+            # columns are added. Once last_prediction_at is populated,
+            # subsequent calls to refresh_all_forecaster_stats keep it
+            # current. The WHERE clause guarantees idempotency — second
+            # run finds 0 NULL rows and is a no-op.
+            backfilled = conn.execute(sql_text("""
+                UPDATE forecasters f
+                SET last_prediction_at = (
+                    SELECT MAX(prediction_date) FROM predictions p
+                    WHERE p.forecaster_id = f.id
+                )
+                WHERE f.last_prediction_at IS NULL
+            """))
+            conn.execute(sql_text("""
+                UPDATE forecasters
+                SET is_dormant = (
+                    last_prediction_at IS NULL
+                    OR last_prediction_at < NOW() - INTERVAL '30 days'
+                )
+            """))
+            conn.commit()
+        log.info("[Worker] forecasters.last_prediction_at + is_dormant ensured (backfill done if first run)")
+    except Exception as e:
+        log.warning(f"[Worker] dormancy migration: {e}")
+
     # Scheduler with separate executor for maintenance jobs.
     # default: scrapers + evaluator (must never be blocked)
     # maintenance: logos, backfills, harvests (one at a time, isolated, time-budgeted)
