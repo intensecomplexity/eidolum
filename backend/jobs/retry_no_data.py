@@ -218,50 +218,123 @@ def _needs_polygon(preds: list) -> bool:
     return False
 
 
+# Debug counter — caps debug output at 20 predictions per RetryNoData run
+_debug_counter = {"n": 0, "max": 20}
+
+
+def _reset_debug_counter():
+    _debug_counter["n"] = 0
+
+
+def _dbg() -> bool:
+    """Return True if we should log this prediction, and increment the counter."""
+    if _debug_counter["n"] >= _debug_counter["max"]:
+        return False
+    _debug_counter["n"] += 1
+    return True
+
+
 def _score_predictions(preds, prices, now, ticker, verbose=False):
     updates = []
     no_data = 0
     for p in preds:
-        eval_price = _closest_price(prices, p["evaluation_date"])
-        if eval_price is None:
-            no_data += 1
-            continue
-        ref = p["entry_price"]
-        if not ref or ref <= 0:
-            ref = _closest_price(prices, p["prediction_date"])
+        should_log = _dbg()
+
+        try:
+            # CHECKPOINT A — Candidate loaded
+            if should_log:
+                print(f"[RetryNoData-DEBUG] A: pred_id={p['id']} ticker={ticker} "
+                      f"entry_date={p['prediction_date']} eval_date={p['evaluation_date']} "
+                      f"direction={p['direction']} target={p['target_price']}", flush=True)
+
+            # CHECKPOINT B — Prices fetched
+            if should_log:
+                price_count = len(prices) if prices else 0
+                sample_keys = list(prices.keys())[:3] if prices else None
+                print(f"[RetryNoData-DEBUG] B: pred_id={p['id']} "
+                      f"prices_fetched={price_count} "
+                      f"price_keys_sample={sample_keys}", flush=True)
+
+            # CHECKPOINT D — Eval price lookup (happens before entry in original flow)
+            eval_date_key = None
+            if p["evaluation_date"]:
+                ed = p["evaluation_date"]
+                eval_date_key = str(ed.date() if hasattr(ed, 'date') else ed)
+            eval_price = _closest_price(prices, p["evaluation_date"])
+            if should_log:
+                print(f"[RetryNoData-DEBUG] D: pred_id={p['id']} "
+                      f"eval_price={eval_price} "
+                      f"lookup_date={eval_date_key}", flush=True)
+            if eval_price is None:
+                no_data += 1
+                if should_log:
+                    print(f"[RetryNoData-DEBUG] E: pred_id={p['id']} "
+                          f"outcome=DROPPED reason=eval_price_none", flush=True)
+                continue
+
+            # CHECKPOINT C — Entry price lookup
+            entry_date_key = None
+            if p["prediction_date"]:
+                pd_ = p["prediction_date"]
+                entry_date_key = str(pd_.date() if hasattr(pd_, 'date') else pd_)
+            ref = p["entry_price"]
+            entry_source = "stored"
+            if not ref or ref <= 0:
+                ref = _closest_price(prices, p["prediction_date"])
+                entry_source = "lookup"
+            if should_log:
+                print(f"[RetryNoData-DEBUG] C: pred_id={p['id']} "
+                      f"entry_price={ref} source={entry_source} "
+                      f"lookup_date={entry_date_key}", flush=True)
             if not ref or ref <= 0:
                 no_data += 1
+                if should_log:
+                    print(f"[RetryNoData-DEBUG] E: pred_id={p['id']} "
+                          f"outcome=DROPPED reason=entry_price_none", flush=True)
                 continue
-        target = p["target_price"]
-        direction = p["direction"]
-        if target and target > 0 and ref > 0:
-            if target > ref: direction = "bullish"
-            elif target < ref: direction = "bearish"
-        raw_move = round(((eval_price - ref) / ref) * 100, 2)
-        ret = -raw_move if direction == "bearish" else raw_move
-        window = p.get("window_days") or 90
-        tolerance = _get_tolerance(window, _TOLERANCE)
-        min_movement = _get_tolerance(window, _MIN_MOVEMENT)
-        if direction == "neutral":
-            abs_ret = abs(raw_move)
-            outcome = "hit" if abs_ret <= 5.0 else "near" if abs_ret <= 10.0 else "miss"
-        elif target and target > 0:
-            target_dist_pct = abs(eval_price - target) / target * 100
-            if direction == "bullish":
-                outcome = "hit" if (eval_price >= target or target_dist_pct <= tolerance) else "near" if raw_move >= min_movement else "miss"
+
+            target = p["target_price"]
+            direction = p["direction"]
+            if target and target > 0 and ref > 0:
+                if target > ref: direction = "bullish"
+                elif target < ref: direction = "bearish"
+            raw_move = round(((eval_price - ref) / ref) * 100, 2)
+            ret = -raw_move if direction == "bearish" else raw_move
+            window = p.get("window_days") or 90
+            tolerance = _get_tolerance(window, _TOLERANCE)
+            min_movement = _get_tolerance(window, _MIN_MOVEMENT)
+            if direction == "neutral":
+                abs_ret = abs(raw_move)
+                outcome = "hit" if abs_ret <= 5.0 else "near" if abs_ret <= 10.0 else "miss"
+            elif target and target > 0:
+                target_dist_pct = abs(eval_price - target) / target * 100
+                if direction == "bullish":
+                    outcome = "hit" if (eval_price >= target or target_dist_pct <= tolerance) else "near" if raw_move >= min_movement else "miss"
+                else:
+                    outcome = "hit" if (eval_price <= target or target_dist_pct <= tolerance) else "near" if raw_move <= -min_movement else "miss"
             else:
-                outcome = "hit" if (eval_price <= target or target_dist_pct <= tolerance) else "near" if raw_move <= -min_movement else "miss"
-        else:
-            outcome = "hit" if (eval_price > ref if direction == "bullish" else eval_price < ref) else "miss"
-        summary = _build_summary(ticker, direction, outcome, ref, eval_price, target, ret)
-        updates.append({"id": p["id"], "outcome": outcome, "ret": ret, "ep": ref,
-                        "direction": direction, "summary": summary, "fid": p["forecaster_id"]})
+                outcome = "hit" if (eval_price > ref if direction == "bullish" else eval_price < ref) else "miss"
+            summary = _build_summary(ticker, direction, outcome, ref, eval_price, target, ret)
+
+            # CHECKPOINT E — Scoring decision
+            if should_log:
+                print(f"[RetryNoData-DEBUG] E: pred_id={p['id']} "
+                      f"outcome={outcome} return={ret} "
+                      f"reason=scored", flush=True)
+
+            updates.append({"id": p["id"], "outcome": outcome, "ret": ret, "ep": ref,
+                            "direction": direction, "summary": summary, "fid": p["forecaster_id"]})
+        except Exception as e:
+            no_data += 1
+            print(f"[RetryNoData-DEBUG] EXCEPTION on pred_id={p.get('id', '?')}: "
+                  f"{type(e).__name__}: {e}", flush=True)
     return updates, no_data
 
 
 def retry_no_data_batch(db, max_tickers: int = 1000):
     """Re-evaluate no_data predictions. Polygon → Tiingo → FMP."""
     _reset_counters()
+    _reset_debug_counter()
     now = datetime.utcnow()
 
     rows = db.execute(sql_text("""
