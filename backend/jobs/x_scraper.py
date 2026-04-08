@@ -101,6 +101,7 @@ The direction must be specific and actionable, not a vague vibe. At least ONE of
   - A timeframe (by Q2, next month, into earnings, EOY)
   - An explicit rating word (Buy, Sell, Bullish, Bearish, Long, Short, Outperform, Underperform)
   - A strong directional action verb: breaking out, topping, rolling over, ripping, crashing, crushed, pumping, dumping, getting destroyed, headed higher, headed lower, moon, tank, collapse, rally, squeeze, breakout, breakdown, reversal, capitulation
+  - A position disclosure or trade action: "new position", "initiating long/short", "added to", "cut my stake", "exited", "bought", "sold", "went long/short", "loaded up", "reduced", "increased stake", "took profit", "13F disclosure", "Scion Q[1-4]"
 
 Vague vibes like "looking strong", "might be interesting", "watching closely", "not loving", "feels like", "thinking about" are still REJECTED.
 
@@ -147,6 +148,7 @@ ACCEPT THESE PATTERNS (return is_prediction=true):
   - 'Bearish $META, ad spend deceleration, target $400 by Q2'
   - '$BTC breaking out, $100k by EOY'
   - 'Short $SHOP here, $50 target, valuation extreme'
+  - 'New position $PARA, 900K shares' (Burry-style disclosure = bullish signal, even without a price target)
 
 OUTPUT FORMAT (strict JSON, no extra text):
 {
@@ -242,12 +244,18 @@ def validate_haiku_result(result: dict, tweet_text: str) -> tuple[bool, str]:
     has_explicit_rating = bool(_EXPLICIT_RATING_RE.search(tweet_text))
     text_lower = tweet_text.lower()
     has_strong_action = any(v in text_lower for v in [
+        # directional verbs
         'breaking out', 'breakout', 'topping', 'rolling over',
         'ripping', 'crashing', 'crushed', 'pumping', 'dumping',
         'headed higher', 'headed lower', 'going higher',
         'going lower', 'moon', 'tank', 'collapse', 'rally',
         'squeeze', 'breakdown', 'reversal', 'capitulation',
         'going to', 'target',
+        # position disclosures / trade actions (Burry/Ackman/Einhorn style)
+        'new position', 'initiating long', 'initiating short',
+        'added to', 'cut my', 'exited', 'bought ', 'sold ',
+        'went long', 'went short', 'loaded up', 'took profit',
+        '13f', 'increased stake', 'reduced stake',
     ])
     if not (has_target or has_timeframe or has_explicit_rating or has_strong_action):
         return False, "no_concrete_signal"
