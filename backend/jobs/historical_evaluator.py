@@ -87,10 +87,10 @@ def evaluate_batch(max_tickers: int = 500) -> dict:
 
     # ── STEP 1: Read pending predictions (short DB connection) ──────────
     # Whitelist: only US tickers are supported by Polygon/Tiingo/FMP. A US
-    # ticker is 1-5 uppercase letters (AAPL, NVDA, F) or 2-4 letters + dot +
-    # single letter (BRK.A, BRK.B). Anything else (.L .DE .HK .IL .SW etc.)
-    # is rejected. Replaces an unbounded blacklist that kept missing new
-    # exchanges.
+    # ticker is 1-5 uppercase letters (AAPL, NVDA, F) or 2-3 letters + dot +
+    # single letter (BRK.A, BRK.B, BF.B). Tightened from {1,4} to {1,3}
+    # because no real US class share has a 4-letter base, but ABEA.F and
+    # similar Frankfurt ADRs were leaking through with the looser pattern.
     db = SessionLocal()
     try:
         rows = db.execute(sql_text(r"""
@@ -100,7 +100,7 @@ def evaluate_batch(max_tickers: int = 500) -> dict:
             WHERE (p.outcome = 'pending' OR p.outcome IS NULL OR p.outcome = '')
               AND p.evaluation_date IS NOT NULL
               AND p.evaluation_date < :now
-              AND (p.ticker ~ '^[A-Z]{1,5}$' OR p.ticker ~ '^[A-Z]{1,4}\.[A-Z]$')
+              AND (p.ticker ~ '^[A-Z]{1,5}$' OR p.ticker ~ '^[A-Z]{1,3}\.[A-Z]$')
             ORDER BY p.ticker
             LIMIT 5000
         """), {"now": now}).fetchall()
@@ -109,7 +109,7 @@ def evaluate_batch(max_tickers: int = 500) -> dict:
             SELECT COUNT(*) FROM predictions
             WHERE (outcome = 'pending' OR outcome IS NULL OR outcome = '')
               AND evaluation_date IS NOT NULL AND evaluation_date < :now
-              AND (ticker ~ '^[A-Z]{1,5}$' OR ticker ~ '^[A-Z]{1,4}\.[A-Z]$')
+              AND (ticker ~ '^[A-Z]{1,5}$' OR ticker ~ '^[A-Z]{1,3}\.[A-Z]$')
         """), {"now": now}).scalar() or 0
     finally:
         db.close()

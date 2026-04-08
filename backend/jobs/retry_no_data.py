@@ -34,11 +34,14 @@ POLYGON_EARLIEST = (datetime.utcnow() - timedelta(days=730)).date()
 # US ticker whitelist — replaces the foreign-suffix blacklist.
 # A US ticker is either:
 #   - 1-5 uppercase letters (AAPL, NVDA, F, TSLA, GOOGL)
-#   - 2-4 uppercase letters + dot + single uppercase letter (BRK.A, BRK.B, BF.B)
+#   - 2-3 uppercase letters + dot + single uppercase letter (BRK.A, BRK.B,
+#     BF.A, BF.B, MOG.A). No real US class share has a 4-letter base.
+#     {1,4} would let in foreign tickers like ABEA.F (Frankfurt ADR for
+#     Alphabet) which broke the Polygon phase.
 # Anything else (including foreign exchange suffixes like .L .DE .HK .IL .SW
 # .F .DU and any new ones we have not enumerated) is rejected.
 import re as _re
-US_TICKER_REGEX = _re.compile(r'^[A-Z]{1,5}$|^[A-Z]{1,4}\.[A-Z]$')
+US_TICKER_REGEX = _re.compile(r'^[A-Z]{1,5}$|^[A-Z]{1,3}\.[A-Z]$')
 
 
 def is_us_ticker(ticker: str) -> bool:
@@ -345,19 +348,24 @@ def retry_no_data_batch(db, max_tickers: int = 1000):
     _reset_debug_counter()
     now = datetime.utcnow()
 
-    # Two disjoint queries partitioned by evaluation_date.
-    # Polygon covers ~2 years of history; Tiingo handles everything older.
-    # The eval_date partition guarantees Polygon never sees a prediction it
-    # cannot score, and the LIMITs keep memory bounded (was 200K rows).
+    # Two disjoint queries partitioned by PREDICTION_DATE (not eval_date).
+    # Polygon covers exactly 2 years of history. If we partition by eval_date
+    # we end up routing predictions to Polygon that have an entry_date OLDER
+    # than Polygon's window — eval lookup succeeds but entry lookup fails,
+    # producing entry_price=None and a dropped prediction.
+    # Switching to prediction_date guarantees BOTH endpoints are inside the
+    # window (eval_date >= prediction_date always).
+    # Regex {1,3} not {1,4} — no real US class share has a 4-letter base,
+    # but ABEA.F (Frankfurt) etc. did slip through with the looser version.
     polygon_query = r"""
         SELECT p.id, p.ticker, p.direction, p.target_price, p.entry_price,
                p.evaluation_date, p.prediction_date, p.forecaster_id, p.window_days
         FROM predictions p
         WHERE p.outcome = 'no_data'
-          AND p.evaluation_date IS NOT NULL
-          AND p.evaluation_date >= NOW() - INTERVAL '2 years'
+          AND p.prediction_date IS NOT NULL
+          AND p.prediction_date >= NOW() - INTERVAL '2 years'
           AND p.evaluation_date <= NOW()
-          AND (p.ticker ~ '^[A-Z]{1,5}$' OR p.ticker ~ '^[A-Z]{1,4}\.[A-Z]$')
+          AND (p.ticker ~ '^[A-Z]{1,5}$' OR p.ticker ~ '^[A-Z]{1,3}\.[A-Z]$')
         ORDER BY p.ticker
         LIMIT :lim
     """
@@ -366,9 +374,10 @@ def retry_no_data_batch(db, max_tickers: int = 1000):
                p.evaluation_date, p.prediction_date, p.forecaster_id, p.window_days
         FROM predictions p
         WHERE p.outcome = 'no_data'
-          AND p.evaluation_date IS NOT NULL
-          AND p.evaluation_date < NOW() - INTERVAL '2 years'
-          AND (p.ticker ~ '^[A-Z]{1,5}$' OR p.ticker ~ '^[A-Z]{1,4}\.[A-Z]$')
+          AND p.prediction_date IS NOT NULL
+          AND p.prediction_date < NOW() - INTERVAL '2 years'
+          AND p.evaluation_date <= NOW()
+          AND (p.ticker ~ '^[A-Z]{1,5}$' OR p.ticker ~ '^[A-Z]{1,3}\.[A-Z]$')
         ORDER BY p.ticker
         LIMIT :lim
     """
@@ -389,7 +398,7 @@ def retry_no_data_batch(db, max_tickers: int = 1000):
         SELECT COUNT(*) FROM predictions
         WHERE outcome = 'no_data'
           AND evaluation_date IS NOT NULL
-          AND (ticker ~ '^[A-Z]{1,5}$' OR ticker ~ '^[A-Z]{1,4}\.[A-Z]$')
+          AND (ticker ~ '^[A-Z]{1,5}$' OR ticker ~ '^[A-Z]{1,3}\.[A-Z]$')
     """)).scalar() or 0
 
     if not polygon_rows and not tiingo_rows:
