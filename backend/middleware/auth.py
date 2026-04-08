@@ -9,12 +9,32 @@ ADMIN_SECRET = os.getenv("ADMIN_SECRET", "")
 
 
 def require_admin(credentials: HTTPAuthorizationCredentials = Security(security)):
-    """Legacy admin auth via shared secret (for backward compat)."""
-    if not ADMIN_SECRET:
-        raise HTTPException(status_code=500, detail="Admin secret not configured")
-    if credentials.credentials != ADMIN_SECRET:
-        raise HTTPException(status_code=403, detail="Forbidden")
-    return True
+    """Admin auth. Accepts either the legacy ADMIN_SECRET (shared secret)
+    OR a JWT token from an is_admin=1 user. Same pattern as AdminAuthMiddleware."""
+    token = credentials.credentials
+
+    # Try legacy ADMIN_SECRET first
+    if ADMIN_SECRET and token == ADMIN_SECRET:
+        return True
+
+    # Try JWT-based admin auth
+    try:
+        data = get_current_user(token)
+        uid = data.get("user_id")
+        if uid:
+            from database import SessionLocal
+            from models import User
+            db = SessionLocal()
+            try:
+                user = db.query(User).filter(User.id == uid).first()
+                if user and getattr(user, 'is_admin', 0):
+                    return True
+            finally:
+                db.close()
+    except Exception:
+        pass
+
+    raise HTTPException(status_code=403, detail="Forbidden")
 
 
 def require_user(credentials: HTTPAuthorizationCredentials = Security(security)):
