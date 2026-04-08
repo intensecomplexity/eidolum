@@ -17,9 +17,12 @@ import os
 import re
 import time
 import json
+import logging
 import httpx
 from datetime import datetime, timedelta, timezone
 from sqlalchemy import text as sql_text
+
+log = logging.getLogger(__name__)
 
 APIFY_API_TOKEN = os.getenv("APIFY_API_TOKEN", "").strip()
 ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "").strip()
@@ -92,11 +95,14 @@ The tweet must make a clear bullish or bearish claim ABOUT the specific ticker. 
   - Movement language: 'breaking out', 'topping here', 'rolling over', 'ripping', 'crashing'
   - Outcome language: 'will beat', 'will miss', 'is going much higher', 'has more downside'
 
-REQUIREMENT 3 -- AT LEAST ONE OF: PRICE TARGET, TIMEFRAME, OR EXPLICIT RATING
-To prevent vague vibes from counting, you must also identify at least one of:
+REQUIREMENT 3 -- CONCRETE DIRECTIONAL CLAIM
+The direction must be specific and actionable, not a vague vibe. At least ONE of the following must be present:
   - A price target (any specific number)
-  - A timeframe (by Q2, next month, this week, by year-end, into earnings, EOY)
-  - An explicit rating word (Buy, Sell, Bullish, Bearish, Long, Short)
+  - A timeframe (by Q2, next month, into earnings, EOY)
+  - An explicit rating word (Buy, Sell, Bullish, Bearish, Long, Short, Outperform, Underperform)
+  - A strong directional action verb: breaking out, topping, rolling over, ripping, crashing, crushed, pumping, dumping, getting destroyed, headed higher, headed lower, moon, tank, collapse, rally, squeeze, breakout, breakdown, reversal, capitulation
+
+Vague vibes like "looking strong", "might be interesting", "watching closely", "not loving", "feels like", "thinking about" are still REJECTED.
 
 REJECT THESE PATTERNS (return is_prediction=false):
 
@@ -227,12 +233,24 @@ def validate_haiku_result(result: dict, tweet_text: str) -> tuple[bool, str]:
     if direction not in ("bullish", "bearish", "neutral"):
         return False, "no_direction"
 
-    # Requirement 3: at least one of price target, timeframe, or explicit rating word
+    # Requirement 3: concrete directional claim — target, timeframe, explicit
+    # rating, OR a strong directional action verb. The action-verb path
+    # accepts real fintwit calls like "$NVDA breaking out" or "$TSLA crashing"
+    # that don't always carry a numeric target.
     has_target = result.get("target_price") is not None
     has_timeframe = bool(result.get("timeframe"))
     has_explicit_rating = bool(_EXPLICIT_RATING_RE.search(tweet_text))
-    if not (has_target or has_timeframe or has_explicit_rating):
-        return False, "no_target_timeframe_or_rating"
+    text_lower = tweet_text.lower()
+    has_strong_action = any(v in text_lower for v in [
+        'breaking out', 'breakout', 'topping', 'rolling over',
+        'ripping', 'crashing', 'crushed', 'pumping', 'dumping',
+        'headed higher', 'headed lower', 'going higher',
+        'going lower', 'moon', 'tank', 'collapse', 'rally',
+        'squeeze', 'breakdown', 'reversal', 'capitulation',
+        'going to', 'target',
+    ])
+    if not (has_target or has_timeframe or has_explicit_rating or has_strong_action):
+        return False, "no_concrete_signal"
 
     return True, "accepted"
 
@@ -470,6 +488,8 @@ def run_x_scraper(db=None):
     # Strict-mode rejection breakdown (Phase 5)
     rejection_reasons: dict[str, int] = {}
     first_tweet_logged = False
+    # Debug log cap: print up to 50 haiku_rejected tweets per run for prompt tuning
+    haiku_rejected_logged = 0
 
     for account_id, handle in accounts:
         try:
@@ -532,6 +552,17 @@ def run_x_scraper(db=None):
                 # Phase 5: unified strict validation (matches the Haiku prompt's 3 requirements)
                 is_valid, reject_reason = validate_haiku_result(result or {}, body)
                 if not is_valid:
+                    # Debug log for haiku_rejected rejections — capped at 50 per run
+                    # so we can verify the soft prompt without flooding logs.
+                    if reject_reason == "haiku_rejected" and haiku_rejected_logged < 50:
+                        if log.isEnabledFor(logging.INFO):
+                            haiku_reason = (result or {}).get("reason", "")
+                            log.info(
+                                f"[X-SCRAPER-DEBUG] haiku_rejected: @{handle} "
+                                f"tweet_id={tid} reason={haiku_reason} "
+                                f"text={body[:150]!r}"
+                            )
+                        haiku_rejected_logged += 1
                     rejection_reasons[reject_reason] = rejection_reasons.get(reject_reason, 0) + 1
                     continue
 
