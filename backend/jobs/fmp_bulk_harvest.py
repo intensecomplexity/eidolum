@@ -14,23 +14,52 @@ FMP_KEY = os.getenv("FMP_KEY", "")
 BASE = "https://financialmodelingprep.com"
 TAG = "[FMPHarvest]"
 
+# Debug counter so we only emit verbose URL/body logs for the FIRST call of each run
+_first_response_logged = {"done": False}
+
+
+def _redact_url(url: str) -> str:
+    """Strip API key from URL for safe logging."""
+    if not FMP_KEY:
+        return url
+    return url.replace(FMP_KEY, "XXX")
+
 
 def _get(path: str, params: dict = None, timeout: int = 60) -> list | dict | None:
-    """Call FMP API. Returns parsed JSON or None."""
+    """Call FMP API. Returns parsed JSON or None.
+
+    Phase 4 debug logging: logs full redacted URL on EVERY call, plus the
+    response status and body snippet for the FIRST call of each run.
+    """
     if not params:
         params = {}
     params["apikey"] = FMP_KEY
+    last_status = None
+    last_body = ""
     for prefix in ["/stable/", "/api/v3/"]:
         url = f"{BASE}{prefix}{path}"
+        # Build the full URL with query params for logging
+        from urllib.parse import urlencode
+        full_url = f"{url}?{urlencode({k: v for k, v in params.items() if k != 'apikey'})}&apikey=XXX"
+        print(f"{TAG}-DEBUG calling: {full_url}", flush=True)
         try:
             r = httpx.get(url, params=params, timeout=timeout)
+            last_status = r.status_code
+            last_body = r.text[:200] if r.text else ""
+            # First-response debug log (one per run)
+            if not _first_response_logged["done"]:
+                print(f"{TAG}-DEBUG first response status={r.status_code} body={last_body}", flush=True)
+                _first_response_logged["done"] = True
             if r.status_code == 200:
                 data = r.json()
                 if data and (isinstance(data, list) or isinstance(data, dict)):
                     return data
+                print(f"{TAG}-DEBUG {path} prefix {prefix} returned 200 but empty/invalid body", flush=True)
+            else:
+                print(f"{TAG}-DEBUG {path} prefix {prefix} returned status={r.status_code}", flush=True)
         except Exception as e:
-            print(f"{TAG} {url} error: {e}", flush=True)
-    print(f"{TAG} {path} — no data from any prefix", flush=True)
+            print(f"{TAG} {_redact_url(url)} error: {e}", flush=True)
+    print(f"{TAG} {path} — no data from any prefix (last_status={last_status} last_body={last_body[:80]})", flush=True)
     return None
 
 

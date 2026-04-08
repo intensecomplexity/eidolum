@@ -169,7 +169,7 @@ def process_ticker_logo(ticker: str, db, force: bool = False) -> bool:
     client.close()
 
     if not raw_bytes:
-        print(f"[LogoProcessor] {ticker}: no image found from any source")
+        # Quiet failure: caller (bulk_fill or process_all) tracks this via record_attempt
         return False
 
     # Process
@@ -198,11 +198,20 @@ def process_ticker_logo(ticker: str, db, force: bool = False) -> bool:
 
 # ── Batch process all tickers ────────────────────────────────────────────────
 def process_all_logos(db=None, batch_size: int = 50, rate_limit: float = 0.5, reprocess: bool = False) -> dict:
-    """Process logos for all tickers that don't have one yet (or all if reprocess=True)."""
+    """Process logos for tickers that don't have one yet. Hard 30-minute time budget.
+
+    Phase 2 + 3: filters delisted/foreign tickers and respects logo_attempts cooldown.
+    """
     from database import BgSessionLocal
+    from jobs._time_budget import TimeBudget, TimeBudgetExceeded
+
     own_db = db is None
     if own_db:
         db = BgSessionLocal()
+
+    success = 0
+    failed = 0
+    total = 0
 
     try:
         if reprocess:
@@ -210,39 +219,64 @@ def process_all_logos(db=None, batch_size: int = 50, rate_limit: float = 0.5, re
             db.commit()
             print("[LogoProcessor] Cleared processed_logos table for reprocessing")
 
-        # Get all tickers that need processing
+        _ensure_logo_attempts_table(db)
+
+        # Get tickers that need processing — same filters as bulk_fill_missing_logos
         rows = db.execute(sql_text("""
             SELECT DISTINCT p.ticker
             FROM predictions p
             WHERE p.ticker IS NOT NULL AND p.ticker != ''
               AND NOT EXISTS (SELECT 1 FROM processed_logos pl WHERE pl.ticker = p.ticker)
+              AND p.ticker NOT LIKE '%.%'
+              AND p.ticker IN (
+                  SELECT DISTINCT ticker FROM predictions
+                  WHERE created_at > NOW() - INTERVAL '2 years'
+              )
+              AND p.ticker NOT IN (
+                  SELECT ticker FROM logo_attempts
+                  WHERE last_result IN ('not_found', 'error')
+                    AND last_attempted_at > NOW() - INTERVAL '30 days'
+              )
             ORDER BY p.ticker
-        """)).fetchall()
+            LIMIT :lim
+        """), {"lim": MAX_TICKERS_PER_RUN}).fetchall()
 
         tickers = [r[0] for r in rows]
         total = len(tickers)
-        success = 0
-        failed = 0
 
-        print(f"[LogoProcessor] {total} tickers to process")
+        print(f"[LogoProcessor] Starting run with {total} tickers, 30min budget", flush=True)
 
-        for i, ticker in enumerate(tickers):
-            ok = process_ticker_logo(ticker, db)
-            if ok:
-                success += 1
-            else:
-                failed += 1
+        try:
+            with TimeBudget(seconds=MAX_BULK_FILL_SECONDS, job_name="LogoProcessor") as budget:
+                for i, ticker in enumerate(tickers):
+                    budget.check()
+                    ok = process_ticker_logo(ticker, db)
+                    if ok:
+                        success += 1
+                        record_attempt(db, ticker, "success")
+                    else:
+                        failed += 1
+                        record_attempt(db, ticker, "not_found")
 
-            if (i + 1) % 10 == 0:
-                print(f"[LogoProcessor] {i + 1}/{total} — {success} ok, {failed} failed")
+                    if (i + 1) % 10 == 0:
+                        print(
+                            f"[LogoProcessor] Progress: {i + 1}/{total} — "
+                            f"{success} ok, {failed} failed, remaining budget: {budget.remaining():.0f}s",
+                            flush=True,
+                        )
 
-            # Rate limit
-            if (i + 1) % batch_size == 0:
-                time.sleep(rate_limit * batch_size)
-            else:
-                time.sleep(rate_limit)
+                    if (i + 1) % batch_size == 0:
+                        time.sleep(rate_limit * batch_size)
+                    else:
+                        time.sleep(rate_limit)
+        except TimeBudgetExceeded:
+            print(
+                f"[LogoProcessor] Time budget reached, stopped cleanly. "
+                f"Processed {success + failed}/{total}, will resume next run.",
+                flush=True,
+            )
 
-        print(f"[LogoProcessor] Done: {success} processed, {failed} failed out of {total}")
+        print(f"[LogoProcessor] Done: {success} processed, {failed} failed out of {total}", flush=True)
         return {"total": total, "success": success, "failed": failed}
 
     finally:
@@ -256,56 +290,133 @@ def process_new_logos(db=None) -> dict:
 
 
 MAX_BULK_FILL_SECONDS = 1800  # 30 minute time budget per run
+MAX_TICKERS_PER_RUN = 500     # Phase 2: hard cap so the job can never run away
+
+
+def _ensure_logo_attempts_table(db) -> None:
+    """Create logo_attempts table if it doesn't exist. Idempotent."""
+    try:
+        db.execute(sql_text("""
+            CREATE TABLE IF NOT EXISTS logo_attempts (
+                ticker VARCHAR(20) PRIMARY KEY,
+                last_attempted_at TIMESTAMP DEFAULT NOW(),
+                attempt_count INTEGER DEFAULT 1,
+                last_result VARCHAR(20)
+            )
+        """))
+        db.commit()
+    except Exception as e:
+        print(f"[LogoBulkFill] Could not ensure logo_attempts table: {e}", flush=True)
+        db.rollback()
+
+
+def record_attempt(db, ticker: str, result: str) -> None:
+    """Record a logo fetch attempt. result is 'success', 'not_found', or 'error'."""
+    try:
+        db.execute(sql_text("""
+            INSERT INTO logo_attempts (ticker, last_attempted_at, attempt_count, last_result)
+            VALUES (:t, NOW(), 1, :r)
+            ON CONFLICT (ticker) DO UPDATE SET
+                last_attempted_at = NOW(),
+                attempt_count = logo_attempts.attempt_count + 1,
+                last_result = :r
+        """), {"t": ticker, "r": result})
+        db.commit()
+    except Exception:
+        db.rollback()
+
 
 def bulk_fill_missing_logos(db=None, rate_limit: float = 0.15) -> dict:
-    """Fast bulk fill: process ALL tickers missing logos, ordered by prediction count (most popular first).
-    Does NOT reprocess existing logos. Hard 30-minute time budget — resumes next run."""
+    """Fast bulk fill: process tickers missing logos, ordered by prediction count.
+
+    Phase 2: query filters delisted (no activity in 2 years) and foreign listings.
+    Phase 3: skips tickers attempted in last 30 days that previously failed.
+    Phase 5: hard 30-minute time budget via the TimeBudget helper.
+
+    Capped at MAX_TICKERS_PER_RUN per run; resumes on next interval.
+    """
     from database import BgSessionLocal
+    from jobs._time_budget import TimeBudget, TimeBudgetExceeded
+
     own_db = db is None
     if own_db:
         db = BgSessionLocal()
 
+    success = 0
+    failed = 0
+    total = 0
+
     try:
+        _ensure_logo_attempts_table(db)
+
+        # Phase 2 + Phase 3 query: active tickers, no foreign listings,
+        # not failed-and-cooling-down.
         rows = db.execute(sql_text("""
             SELECT p.ticker, COUNT(*) as cnt
             FROM predictions p
             WHERE p.ticker IS NOT NULL AND p.ticker != ''
               AND NOT EXISTS (SELECT 1 FROM processed_logos pl WHERE pl.ticker = p.ticker)
+              AND p.ticker NOT LIKE '%.%'
+              AND p.ticker IN (
+                  SELECT DISTINCT ticker FROM predictions
+                  WHERE created_at > NOW() - INTERVAL '2 years'
+              )
+              AND p.ticker NOT IN (
+                  SELECT ticker FROM logo_attempts
+                  WHERE last_result IN ('not_found', 'error')
+                    AND last_attempted_at > NOW() - INTERVAL '30 days'
+              )
             GROUP BY p.ticker
             ORDER BY cnt DESC
-        """)).fetchall()
+            LIMIT :lim
+        """), {"lim": MAX_TICKERS_PER_RUN}).fetchall()
 
         tickers = [r[0] for r in rows]
         total = len(tickers)
-        success = 0
-        failed = 0
 
         if total == 0:
-            print("[LogoBulkFill] All tickers already have logos", flush=True)
+            print("[LogoBulkFill] No active tickers need logos right now", flush=True)
             return {"total": 0, "success": 0, "failed": 0}
 
-        print(f"[LogoBulkFill] {total} tickers missing logos (top: {', '.join(t for t in tickers[:10])})", flush=True)
+        print(
+            f"[LogoBulkFill] Starting run with {total} tickers, 30min budget "
+            f"(top: {', '.join(t for t in tickers[:10])})",
+            flush=True,
+        )
 
-        start_time = time.time()
-        for i, ticker in enumerate(tickers):
-            # Hard time budget
-            if time.time() - start_time > MAX_BULK_FILL_SECONDS:
-                print(f"[LogoBulkFill] Time budget reached ({MAX_BULK_FILL_SECONDS}s), will resume next run. "
-                      f"Processed {i}/{total}", flush=True)
-                break
+        try:
+            with TimeBudget(seconds=MAX_BULK_FILL_SECONDS, job_name="LogoBulkFill") as budget:
+                for i, ticker in enumerate(tickers):
+                    budget.check()  # raises TimeBudgetExceeded when over budget
 
-            ok = process_ticker_logo(ticker, db)
-            if ok:
-                success += 1
-            else:
-                failed += 1
+                    ok = process_ticker_logo(ticker, db)
+                    if ok:
+                        success += 1
+                        record_attempt(db, ticker, "success")
+                    else:
+                        failed += 1
+                        record_attempt(db, ticker, "not_found")
 
-            if (i + 1) % 50 == 0:
-                print(f"[LogoBulkFill] {i + 1}/{total} — {success} ok, {failed} failed", flush=True)
+                    if (i + 1) % 50 == 0:
+                        print(
+                            f"[LogoBulkFill] Progress: {i + 1}/{total} — "
+                            f"{success} ok, {failed} failed, "
+                            f"remaining budget: {budget.remaining():.0f}s",
+                            flush=True,
+                        )
 
-            time.sleep(rate_limit)
+                    time.sleep(rate_limit)
+        except TimeBudgetExceeded:
+            print(
+                f"[LogoBulkFill] Time budget reached, stopped cleanly. "
+                f"Processed {success + failed}/{total}, will resume next run.",
+                flush=True,
+            )
 
-        print(f"[LogoBulkFill] DONE: {success} processed, {failed} failed out of {total}", flush=True)
+        print(
+            f"[LogoBulkFill] DONE: {success} processed, {failed} failed out of {total}",
+            flush=True,
+        )
         return {"total": total, "success": success, "failed": failed}
 
     finally:

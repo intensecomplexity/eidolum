@@ -192,28 +192,41 @@ def main():
     except Exception as e:
         log.error(f"[Worker] Table error: {e}")
 
-    # Scheduler with separate executor for maintenance jobs
+    # Scheduler with separate executor for maintenance jobs.
+    # default: scrapers + evaluator (must never be blocked)
+    # maintenance: logos, backfills, harvests (one at a time, isolated, time-budgeted)
     executors = {
-        'default': APThreadPool(max_workers=3),       # scrapers + evaluator
-        'maintenance': APThreadPool(max_workers=1),    # logos, backfills, bulk jobs
+        'default': APThreadPool(max_workers=3),
+        'maintenance': APThreadPool(max_workers=1),
     }
-    sched = BlockingScheduler(executors=executors)
+    job_defaults = {
+        'coalesce': True,        # if a job missed multiple runs, just run once
+        'max_instances': 1,      # never run the same job twice concurrently
+        'misfire_grace_time': 300,
+    }
+    sched = BlockingScheduler(
+        executors=executors,
+        job_defaults=job_defaults,
+        timezone='UTC',
+    )
     t0 = datetime.utcnow() + timedelta(seconds=30)
 
+    # ── DEFAULT executor (scrapers + evaluator + small periodic jobs) ──────
     # Locked jobs
-    sched.add_job(_guarded("massive_benzinga", _massive_benzinga), "interval", hours=2, id="massive_benzinga", next_run_time=t0)
-    sched.add_job(_guarded("sweep_stuck", _sweep), "interval", hours=24, id="sweep_stuck", next_run_time=t0 + timedelta(minutes=15))
-    sched.add_job(_guarded("analyst_notifications", _analyst_notif), "interval", hours=1, id="analyst_notifications", next_run_time=t0 + timedelta(minutes=25))
+    sched.add_job(_guarded("massive_benzinga", _massive_benzinga), "interval", hours=2, id="massive_benzinga", next_run_time=t0, executor='default')
+    sched.add_job(_guarded("sweep_stuck", _sweep), "interval", hours=24, id="sweep_stuck", next_run_time=t0 + timedelta(minutes=15), executor='default')
+    sched.add_job(_guarded("analyst_notifications", _analyst_notif), "interval", hours=1, id="analyst_notifications", next_run_time=t0 + timedelta(minutes=25), executor='default')
 
     # Independent jobs
-    sched.add_job(_standalone("auto_evaluate", _evaluator), "interval", minutes=30, id="auto_evaluate", next_run_time=t0 + timedelta(minutes=5))
-    sched.add_job(_standalone("refresh_stats", _refresh_stats), "interval", hours=2, id="refresh_stats", next_run_time=t0 + timedelta(minutes=10))
-    sched.add_job(_standalone("fmp_grades", _fmp_grades), "interval", hours=24, id="fmp_grades", next_run_time=t0 + timedelta(minutes=20))
-    sched.add_job(_standalone("retry_no_data", _retry_no_data), "interval", minutes=30, id="retry_no_data", next_run_time=t0 + timedelta(minutes=5))
-    sched.add_job(_standalone("url_backfill", _url_backfill), "interval", hours=24, id="url_backfill", next_run_time=t0 + timedelta(minutes=40))
-    sched.add_job(_standalone("tournament_scorer", _tournament), "interval", hours=6, id="tournament_scorer", next_run_time=t0 + timedelta(minutes=45))
-    sched.add_job(_standalone("youtube_scraper", _youtube), "interval", hours=8, id="youtube_scraper", next_run_time=t0 + timedelta(minutes=55))
-    sched.add_job(_standalone("enrich_urls", _enrich), "interval", hours=1, id="enrich_urls", next_run_time=t0 + timedelta(minutes=35))
+    sched.add_job(_standalone("auto_evaluate", _evaluator), "interval", minutes=30, id="auto_evaluate", next_run_time=t0 + timedelta(minutes=5), executor='default')
+    sched.add_job(_standalone("refresh_stats", _refresh_stats), "interval", hours=2, id="refresh_stats", next_run_time=t0 + timedelta(minutes=10), executor='default')
+    sched.add_job(_standalone("fmp_grades", _fmp_grades), "interval", hours=24, id="fmp_grades", next_run_time=t0 + timedelta(minutes=20), executor='default')
+    sched.add_job(_standalone("retry_no_data", _retry_no_data), "interval", minutes=30, id="retry_no_data", next_run_time=t0 + timedelta(minutes=5), executor='default')
+    # url_backfill is a maintenance job (calls Jina/external for up to 2000 URLs per run)
+    sched.add_job(_standalone("url_backfill", _url_backfill), "interval", hours=24, id="url_backfill", next_run_time=t0 + timedelta(minutes=40), executor='maintenance')
+    sched.add_job(_standalone("tournament_scorer", _tournament), "interval", hours=6, id="tournament_scorer", next_run_time=t0 + timedelta(minutes=45), executor='default')
+    sched.add_job(_standalone("youtube_scraper", _youtube), "interval", hours=8, id="youtube_scraper", next_run_time=t0 + timedelta(minutes=55), executor='default')
+    sched.add_job(_standalone("enrich_urls", _enrich), "interval", hours=1, id="enrich_urls", next_run_time=t0 + timedelta(minutes=35), executor='default')
 
     # YouTube Channel Monitor — Claude-powered extraction, every 12h
     def _channel_monitor():
@@ -226,7 +239,7 @@ def main():
                 db.close()
         except Exception as e:
             log.error(f"[channel_monitor] {e}")
-    sched.add_job(_standalone("channel_monitor", _channel_monitor), "interval", hours=12, id="channel_monitor", next_run_time=t0 + timedelta(minutes=90))
+    sched.add_job(_standalone("channel_monitor", _channel_monitor), "interval", hours=12, id="channel_monitor", next_run_time=t0 + timedelta(minutes=90), executor='default')
 
     # X/Twitter scraper — Apify-powered, every 8h, inserts predictions
     def _x_scraper():
@@ -242,7 +255,7 @@ def main():
         except Exception as e:
             log.error(f"[X-SCRAPER] Job failed: {e}", exc_info=True)
     print("[Worker] Registering X scraper job...", flush=True)
-    sched.add_job(_standalone("x_scraper", _x_scraper), "interval", hours=6, id="x_scraper", next_run_time=datetime.utcnow(), misfire_grace_time=300)
+    sched.add_job(_standalone("x_scraper", _x_scraper), "interval", hours=6, id="x_scraper", next_run_time=datetime.utcnow(), misfire_grace_time=300, executor='default')
 
     # StockTwits scraper — Apify-powered, every 6h, offset from X scraper
     def _stocktwits_scraper():
@@ -257,7 +270,7 @@ def main():
         except Exception as e:
             log.error(f"[STOCKTWITS] Job failed: {e}", exc_info=True)
     print("[Worker] Registering StockTwits scraper job...", flush=True)
-    sched.add_job(_standalone("stocktwits_scraper", _stocktwits_scraper), "interval", hours=6, id="stocktwits_scraper", next_run_time=datetime.utcnow(), misfire_grace_time=300)
+    sched.add_job(_standalone("stocktwits_scraper", _stocktwits_scraper), "interval", hours=6, id="stocktwits_scraper", next_run_time=datetime.utcnow(), misfire_grace_time=300, executor='default')
 
     # Logo processor — fill missing logos daily (never reprocess/delete existing)
     def _process_logos():
@@ -279,7 +292,10 @@ def main():
             log.error(f"[bulk_fill_logos] {e}", exc_info=True)
     sched.add_job(_standalone("bulk_fill_logos", _bulk_fill_logos), "interval", hours=24, id="bulk_fill_logos", next_run_time=t0 + timedelta(minutes=10), misfire_grace_time=600, executor='maintenance')
 
-    # FMP Bulk Harvest — one-time download of all high-value datasets before downgrading plan
+    # FMP Bulk Harvest — TEMPORARILY PAUSED (Apr 8 2026).
+    # The harvest was logging "[FMPHarvest] {ticker} — no data from any prefix" on
+    # 100% of attempts, blocking the maintenance executor. Will re-enable AFTER the
+    # URL debug logging in jobs/fmp_bulk_harvest.py reveals the root cause.
     def _fmp_harvest():
         try:
             from jobs.fmp_bulk_harvest import run_fmp_bulk_harvest
@@ -290,7 +306,8 @@ def main():
                 db.close()
         except Exception as e:
             log.error(f"[fmp_harvest] {e}", exc_info=True)
-    sched.add_job(_standalone("fmp_harvest", _fmp_harvest), "interval", hours=24, id="fmp_harvest", next_run_time=datetime.utcnow() + timedelta(minutes=1), misfire_grace_time=600, executor='maintenance')
+    log.info("[Worker] fmp_harvest is PAUSED — re-enable after URL bug is diagnosed")
+    # sched.add_job(_standalone("fmp_harvest", _fmp_harvest), "interval", hours=24, id="fmp_harvest", next_run_time=datetime.utcnow() + timedelta(minutes=1), misfire_grace_time=600, executor='maintenance')
 
     # Polygon description backfill — fills gaps FMP missed (free, 5 calls/min)
     def _desc_backfill_polygon():
@@ -299,7 +316,7 @@ def main():
             backfill_descriptions_polygon()
         except Exception as e:
             log.error(f"[desc_backfill_polygon] {e}", exc_info=True)
-    sched.add_job(_standalone("desc_backfill_polygon", _desc_backfill_polygon), "interval", hours=24, id="desc_backfill_polygon", next_run_time=t0 + timedelta(minutes=15))
+    sched.add_job(_standalone("desc_backfill_polygon", _desc_backfill_polygon), "interval", hours=24, id="desc_backfill_polygon", next_run_time=t0 + timedelta(minutes=15), executor='maintenance')
 
     # Benzinga RSS — free, no API key, every 4h
     def _benzinga_rss():
@@ -312,7 +329,7 @@ def main():
                 db.close()
         except Exception as e:
             log.error(f"[benzinga_rss] {e}")
-    sched.add_job(_standalone("benzinga_rss", _benzinga_rss), "interval", hours=4, id="benzinga_rss", next_run_time=t0 + timedelta(minutes=50))
+    sched.add_job(_standalone("benzinga_rss", _benzinga_rss), "interval", hours=4, id="benzinga_rss", next_run_time=t0 + timedelta(minutes=50), executor='default')
 
     # MarketBeat RSS — free, no API key, every 4h
     def _marketbeat_rss():
@@ -325,7 +342,7 @@ def main():
                 db.close()
         except Exception as e:
             log.error(f"[marketbeat_rss] {e}")
-    sched.add_job(_standalone("marketbeat_rss", _marketbeat_rss), "interval", hours=4, id="marketbeat_rss", next_run_time=t0 + timedelta(minutes=52))
+    sched.add_job(_standalone("marketbeat_rss", _marketbeat_rss), "interval", hours=4, id="marketbeat_rss", next_run_time=t0 + timedelta(minutes=52), executor='default')
 
     # yfinance recommendations — free, every 6h
     def _yfinance():
@@ -338,7 +355,7 @@ def main():
                 db.close()
         except Exception as e:
             log.error(f"[yfinance] {e}")
-    sched.add_job(_standalone("yfinance", _yfinance), "interval", hours=6, id="yfinance", next_run_time=t0 + timedelta(minutes=60))
+    sched.add_job(_standalone("yfinance", _yfinance), "interval", hours=6, id="yfinance", next_run_time=t0 + timedelta(minutes=60), executor='default')
 
     # AlphaVantage news sentiment — free tier (25 calls/day), every 8h
     def _alphavantage():
@@ -351,7 +368,7 @@ def main():
                 db.close()
         except Exception as e:
             log.error(f"[alphavantage] {e}")
-    sched.add_job(_standalone("alphavantage", _alphavantage), "interval", hours=8, id="alphavantage", next_run_time=t0 + timedelta(minutes=65))
+    sched.add_job(_standalone("alphavantage", _alphavantage), "interval", hours=8, id="alphavantage", next_run_time=t0 + timedelta(minutes=65), executor='default')
 
     # Finnhub upgrades/downgrades — requires FINNHUB_KEY, every 8h
     def _finnhub_upgrades():
@@ -364,7 +381,7 @@ def main():
                 db.close()
         except Exception as e:
             log.error(f"[finnhub_upgrades] {e}")
-    sched.add_job(_standalone("finnhub_upgrades", _finnhub_upgrades), "interval", hours=8, id="finnhub_upgrades", next_run_time=t0 + timedelta(minutes=70))
+    sched.add_job(_standalone("finnhub_upgrades", _finnhub_upgrades), "interval", hours=8, id="finnhub_upgrades", next_run_time=t0 + timedelta(minutes=70), executor='default')
 
     # FMP latest grades (upgrades RSS) — requires FMP_KEY, every 4h
     def _fmp_upgrades():
@@ -377,7 +394,7 @@ def main():
                 db.close()
         except Exception as e:
             log.error(f"[fmp_upgrades] {e}")
-    sched.add_job(_standalone("fmp_upgrades", _fmp_upgrades), "interval", hours=4, id="fmp_upgrades", next_run_time=t0 + timedelta(minutes=54))
+    sched.add_job(_standalone("fmp_upgrades", _fmp_upgrades), "interval", hours=4, id="fmp_upgrades", next_run_time=t0 + timedelta(minutes=54), executor='default')
 
     # FMP price target changes — requires FMP_KEY, every 4h
     def _fmp_price_targets():
@@ -390,7 +407,7 @@ def main():
                 db.close()
         except Exception as e:
             log.error(f"[fmp_price_targets] {e}")
-    sched.add_job(_standalone("fmp_price_targets", _fmp_price_targets), "interval", hours=4, id="fmp_price_targets", next_run_time=t0 + timedelta(minutes=56))
+    sched.add_job(_standalone("fmp_price_targets", _fmp_price_targets), "interval", hours=4, id="fmp_price_targets", next_run_time=t0 + timedelta(minutes=56), executor='default')
 
     # FMP daily grades (all upgrades/downgrades for today+yesterday) — requires FMP_KEY, every 6h
     def _fmp_daily_grades():
@@ -403,7 +420,7 @@ def main():
                 db.close()
         except Exception as e:
             log.error(f"[fmp_daily_grades] {e}")
-    sched.add_job(_standalone("fmp_daily_grades", _fmp_daily_grades), "interval", hours=6, id="fmp_daily_grades", next_run_time=t0 + timedelta(minutes=62))
+    sched.add_job(_standalone("fmp_daily_grades", _fmp_daily_grades), "interval", hours=6, id="fmp_daily_grades", next_run_time=t0 + timedelta(minutes=62), executor='default')
 
     # FMP ratings backfill — month-by-month from 2018, runs once then done
     _fmp_backfill_done = False
@@ -459,10 +476,10 @@ def main():
     sched.add_job(_standalone("fmp_ultimate", _fmp_ultimate), "interval", hours=24, id="fmp_ultimate", next_run_time=datetime.utcnow(), misfire_grace_time=600, executor='maintenance')
 
     # Cron jobs
-    sched.add_job(_watchlist_queue, "interval", hours=4, id="watchlist_queue", next_run_time=t0 + timedelta(minutes=35))
-    sched.add_job(_watchlist_digest, "cron", day_of_week="mon-fri", hour=13, minute=0, id="watchlist_digest")
-    sched.add_job(_weekly_digest, "cron", day_of_week="mon", hour=13, minute=0, id="site_weekly_digest")
-    sched.add_job(_watchdog, "interval", minutes=5, id="watchdog")
+    sched.add_job(_watchlist_queue, "interval", hours=4, id="watchlist_queue", next_run_time=t0 + timedelta(minutes=35), executor='default')
+    sched.add_job(_watchlist_digest, "cron", day_of_week="mon-fri", hour=13, minute=0, id="watchlist_digest", executor='default')
+    sched.add_job(_weekly_digest, "cron", day_of_week="mon", hour=13, minute=0, id="site_weekly_digest", executor='default')
+    sched.add_job(_watchdog, "interval", minutes=5, id="watchdog", executor='default')
 
     # Benzinga historical backfill — runs as daemon thread (forward + reverse)
     # This is the biggest volume lever: 2020→today (forward) then 2019→2011 (reverse)

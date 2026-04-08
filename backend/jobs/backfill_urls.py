@@ -16,12 +16,18 @@ API_URL = "https://api.massive.com/benzinga/v1/ratings"
 
 
 def backfill_real_urls(db=None, max_per_run: int = 20000):
-    """Re-fetch real article URLs for predictions with generic source URLs."""
+    """Re-fetch real article URLs for predictions with generic source URLs.
+
+    Phase 5: hard 30-minute time budget. The job re-runs daily and resumes
+    from where it stopped (because completed rows have url_backfill_attempted=1).
+    """
     if not MASSIVE_KEY:
         print("[URLBackfill] MASSIVE_API_KEY not set, skipping")
         return {"updated": 0, "remaining": 0}
 
     from database import BgSessionLocal
+    from jobs._time_budget import TimeBudget, TimeBudgetExceeded
+
     own_db = db is None
     if own_db:
         db = BgSessionLocal()
@@ -73,40 +79,46 @@ def backfill_real_urls(db=None, max_per_run: int = 20000):
         failed = 0
         api_calls = 0
 
-        for ticker, preds in ticker_preds.items():
-            needed_ids = {p["bz_id"] for p in preds if p["bz_id"]}
-            if not needed_ids:
-                continue
+        try:
+            with TimeBudget(seconds=1800, job_name="URLBackfill") as budget:
+                for ticker, preds in ticker_preds.items():
+                    budget.check()
 
-            dates = [p["date"] for p in preds if p["date"]]
-            if not dates:
-                continue
-            date_from = min(dates)
-            date_to = max(dates)
+                    needed_ids = {p["bz_id"] for p in preds if p["bz_id"]}
+                    if not needed_ids:
+                        continue
 
-            url_map = _fetch_urls_for_ticker(ticker, date_from, date_to, needed_ids)
-            api_calls += 1
+                    dates = [p["date"] for p in preds if p["date"]]
+                    if not dates:
+                        continue
+                    date_from = min(dates)
+                    date_to = max(dates)
 
-            for p in preds:
-                real_url = url_map.get(p["bz_id"])
-                if real_url:
-                    db.execute(sql_text(
-                        "UPDATE predictions SET source_url = :url, url_quality = 'real_article', url_backfill_attempted = 1 WHERE id = :id"
-                    ), {"url": real_url, "id": p["id"]})
-                    updated += 1
-                else:
-                    db.execute(sql_text(
-                        "UPDATE predictions SET url_backfill_attempted = 1 WHERE id = :id"
-                    ), {"id": p["id"]})
-                    failed += 1
+                    url_map = _fetch_urls_for_ticker(ticker, date_from, date_to, needed_ids)
+                    api_calls += 1
 
-            if api_calls % 5 == 0:
-                db.commit()
+                    for p in preds:
+                        real_url = url_map.get(p["bz_id"])
+                        if real_url:
+                            db.execute(sql_text(
+                                "UPDATE predictions SET source_url = :url, url_quality = 'real_article', url_backfill_attempted = 1 WHERE id = :id"
+                            ), {"url": real_url, "id": p["id"]})
+                            updated += 1
+                        else:
+                            db.execute(sql_text(
+                                "UPDATE predictions SET url_backfill_attempted = 1 WHERE id = :id"
+                            ), {"id": p["id"]})
+                            failed += 1
 
-            if api_calls % 100 == 0:
-                print(f"[URLBackfill] {api_calls} API calls, {updated} updated, {failed} not found")
+                    if api_calls % 5 == 0:
+                        db.commit()
 
-            time.sleep(0.3)
+                    if api_calls % 100 == 0:
+                        print(f"[URLBackfill] {api_calls} API calls, {updated} updated, {failed} not found, remaining budget: {budget.remaining():.0f}s")
+
+                    time.sleep(0.3)
+        except TimeBudgetExceeded:
+            print(f"[URLBackfill] Time budget reached, stopped cleanly. {updated} updated, {failed} not found, will resume next run.")
 
         db.commit()
         print(f"[URLBackfill] Done: {updated} updated, {failed} no URL found, "
