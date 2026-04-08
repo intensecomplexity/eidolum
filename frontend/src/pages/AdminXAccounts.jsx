@@ -411,12 +411,12 @@ export default function AdminXAccounts() {
               </select>
               <select value={rejFilterLevel} onChange={e => setRejFilterLevel(e.target.value)}
                 className="bg-surface-2 border border-border rounded-lg px-2 py-1 text-xs">
-                <option value="">All closeness</option>
-                <option value="4">L4 Almost a prediction</option>
-                <option value="3">L3 Had the bones</option>
-                <option value="2">L2 Ticker only</option>
-                <option value="1">L1 Finance-related</option>
-                <option value="0">L0 Not finance</option>
+                <option value="">All levels</option>
+                <option value="4">L4 — Almost a prediction</option>
+                <option value="3">L3 — Had the bones</option>
+                <option value="2">L2 — Ticker only</option>
+                <option value="1">L1 — Finance-related</option>
+                <option value="0">L0 — Not finance</option>
                 <option value="unclassified">Unclassified</option>
               </select>
               <button onClick={fetchRejections}
@@ -424,6 +424,11 @@ export default function AdminXAccounts() {
                 <RefreshCw className={`w-3 h-3 ${rejLoading ? 'animate-spin' : ''}`} /> Refresh
               </button>
             </div>
+
+            {/* Helper tip — point users at the highest-value filter */}
+            <p className="text-[11px] mb-3" style={{ color: '#D4A843' }}>
+              Tip: Filter to L4 to see tweets that almost qualified as predictions — these are your edge cases.
+            </p>
 
             {/* Rejection list */}
             {rejLoading ? (
