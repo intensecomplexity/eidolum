@@ -32,6 +32,14 @@ APIFY_ACTOR = "apidojo~tweet-scraper"
 TWEETS_PER_ACCOUNT = 20
 CURRENCY_IGNORE = {"USD", "EUR", "GBP", "JPY", "CAD", "AUD", "NZD", "CHF", "CNY", "HKD", "SGD"}
 
+# Skip tweets older than this. Apify's tweet-scraper actor occasionally
+# returns tweets from as far back as 2010-2011 for high-signal handles
+# (it returns "recent" tweets but has no strict date filter), which wastes
+# Haiku quota classifying 15-year-old content. 30 days is tight enough to
+# keep predictions actionable but loose enough to survive a 2-4 day scraper
+# outage without missing anything.
+MAX_TWEET_AGE_DAYS = 30
+
 # Pillar 1: sector and broad-market ETFs accepted alongside individual stock tickers
 ALLOWED_SECTOR_ETFS = {
     # SPDR sector ETFs
@@ -957,20 +965,27 @@ def validate_haiku_result(result: dict, tweet_text: str) -> tuple[bool, str]:
     return True, "accepted"
 
 
-def _classify_with_haiku(tweet_text: str) -> dict | None:
-    """Call Claude Haiku to classify a single tweet. Returns parsed dict or None.
+def _classify_with_haiku(tweet_text: str) -> dict:
+    """Call Claude Haiku to classify a single tweet.
 
-    Retries on HTTP 429 (rate limit) with exponential backoff:
-      attempt 1: immediate
-      attempt 2: wait 2s
-      attempt 3: wait 4s
-    Returns None on any other error or after retries are exhausted.
+    ALWAYS returns a dict. On success, the dict is Haiku's parsed JSON
+    response with _success=True added. On any failure (missing key, HTTP
+    error, parse error, timeout, retries exhausted) the dict contains:
+        {"_success": False, "error": "<short_error_tag>",
+         "is_prediction": False}
+    so the caller never has to deal with None and can distinguish
+    classifier FAILURES from classifier REJECTIONS.
+
+    Retries on HTTP 429 with exponential backoff (2s, 4s).
     """
     if not ANTHROPIC_API_KEY or ANTHROPIC_API_KEY in ("placeholder", "sk-ant-placeholder"):
-        return None
+        print("[X-SCRAPER] Haiku NO_KEY — ANTHROPIC_API_KEY missing or placeholder", flush=True)
+        return {"_success": False, "error": "no_api_key", "is_prediction": False}
 
     max_retries = 3
     base_delay = 2.0
+    last_status = None
+    last_body_snippet = ""
 
     for attempt in range(max_retries):
         try:
@@ -989,6 +1004,9 @@ def _classify_with_haiku(tweet_text: str) -> dict | None:
                 },
                 timeout=10,
             )
+            last_status = r.status_code
+            last_body_snippet = (r.text or "")[:300]
+
             if r.status_code == 429:
                 if attempt < max_retries - 1:
                     delay = base_delay * (2 ** attempt)
@@ -996,17 +1014,56 @@ def _classify_with_haiku(tweet_text: str) -> dict | None:
                           f"(attempt {attempt + 1}/{max_retries})", flush=True)
                     time.sleep(delay)
                     continue
-                print(f"[X-SCRAPER] Haiku 429 — retries exhausted, dropping tweet", flush=True)
-                return None
+                print(f"[X-SCRAPER] Haiku RATE_LIMIT exhausted on tweet: "
+                      f"{tweet_text[:80]!r}", flush=True)
+                return {"_success": False, "error": "rate_limit", "is_prediction": False}
+
+            if r.status_code == 401 or r.status_code == 403:
+                print(f"[X-SCRAPER] Haiku AUTH_ERROR {r.status_code}: "
+                      f"{last_body_snippet}", flush=True)
+                return {"_success": False, "error": f"auth_{r.status_code}",
+                        "is_prediction": False}
+
             if r.status_code != 200:
-                return None
+                print(f"[X-SCRAPER] Haiku HTTP_{r.status_code}: "
+                      f"{last_body_snippet}", flush=True)
+                return {"_success": False, "error": f"http_{r.status_code}",
+                        "is_prediction": False}
+
             content = r.json().get("content", [{}])[0].get("text", "")
             content = content.strip()
             if content.startswith("```"):
                 content = content.split("```")[1]
                 if content.startswith("json"):
                     content = content[4:]
-            return json.loads(content)
+
+            try:
+                parsed = json.loads(content)
+            except json.JSONDecodeError as pe:
+                print(f"[X-SCRAPER] Haiku PARSE_ERROR: {pe} | "
+                      f"raw={content[:200]!r}", flush=True)
+                return {"_success": False, "error": "parse_error",
+                        "is_prediction": False}
+
+            if not isinstance(parsed, dict):
+                print(f"[X-SCRAPER] Haiku NON_DICT response: {type(parsed).__name__}",
+                      flush=True)
+                return {"_success": False, "error": "non_dict_response",
+                        "is_prediction": False}
+
+            parsed["_success"] = True
+            return parsed
+
+        except httpx.TimeoutException as te:
+            if attempt < max_retries - 1:
+                delay = base_delay * (2 ** attempt)
+                print(f"[X-SCRAPER] Haiku TIMEOUT, backing off {delay}s "
+                      f"(attempt {attempt + 1}/{max_retries})", flush=True)
+                time.sleep(delay)
+                continue
+            print(f"[X-SCRAPER] Haiku TIMEOUT exhausted: {te}", flush=True)
+            return {"_success": False, "error": "timeout", "is_prediction": False}
+
         except Exception as e:
             msg = str(e).lower()
             if ("429" in msg or "rate_limit" in msg) and attempt < max_retries - 1:
@@ -1015,12 +1072,14 @@ def _classify_with_haiku(tweet_text: str) -> dict | None:
                       f"(attempt {attempt + 1}/{max_retries}): {e}", flush=True)
                 time.sleep(delay)
                 continue
-            # Non-429 error or out of retries
             if attempt == 0:
-                # Only log the first attempt's error to avoid spam
-                print(f"[X-SCRAPER] Haiku error: {e}", flush=True)
-            return None
-    return None
+                print(f"[X-SCRAPER] Haiku UNKNOWN {type(e).__name__}: {e}", flush=True)
+            return {"_success": False, "error": f"unknown_{type(e).__name__}",
+                    "is_prediction": False}
+
+    # Should never reach here, but return a safe default just in case
+    return {"_success": False, "error": "retry_loop_fallthrough",
+            "is_prediction": False}
 
 
 def _parse_ai_timeframe(tf_str: str) -> int:
@@ -1395,6 +1454,18 @@ def run_x_scraper(db=None):
                     log_rejection(db, tweet, handle, "no_tweet_id", None, None)
                     continue
 
+                # Age filter: drop tweets older than MAX_TWEET_AGE_DAYS. Apify
+                # occasionally returns 10+ year old tweets for accounts with
+                # deep history, which wastes Haiku quota on unactionable
+                # content. Count these so we can see the volume in the
+                # per-run summary.
+                age_days = (datetime.utcnow() - pred_date).days
+                if age_days > MAX_TWEET_AGE_DAYS:
+                    rejection_reasons["too_old"] = rejection_reasons.get("too_old", 0) + 1
+                    log_rejection(db, tweet, handle, "too_old",
+                                  f"tweet_age_days={age_days}", None, None)
+                    continue
+
                 # Passive discovery
                 _record_mentioned_handles(body, tracked_handles, db)
 
@@ -1405,13 +1476,25 @@ def run_x_scraper(db=None):
                 total_stats["prefilter_pass"] += 1
                 total_stats["ai_sent"] += 1
 
-                # Classify with Haiku
+                # Classify with Haiku (always returns a dict — see _classify_with_haiku)
                 result = _classify_with_haiku(body)
                 time.sleep(0.1)  # rate limit Haiku calls (was 0.02s — 0.1s avoids 429 bursts)
 
+                # Classifier FAILURE (distinct from classifier REJECTION):
+                # if _success is False, Haiku didn't give us a real verdict.
+                # Log with a specific rejection_reason so the distribution in
+                # x_scraper_rejections tells us exactly what went wrong.
+                classifier_failed = result.get("_success") is False
+                if classifier_failed:
+                    err_tag = result.get("error", "unknown_failure")
+                    rej_key = f"haiku_{err_tag}"
+                    rejection_reasons[rej_key] = rejection_reasons.get(rej_key, 0) + 1
+                    log_rejection(db, tweet, handle, "haiku_error", err_tag, result, None)
+                    continue
+
                 # Phase 5: unified strict validation (matches the Haiku prompt's 3 requirements)
-                is_valid, reject_reason = validate_haiku_result(result or {}, body)
-                haiku_reason = (result or {}).get("reason", "") if isinstance(result, dict) else ""
+                is_valid, reject_reason = validate_haiku_result(result, body)
+                haiku_reason = result.get("reason") or ""
                 closeness_level = _extract_closeness_level(result)
                 if not is_valid:
                     # Debug log for haiku_rejected rejections — capped at 50 per run
@@ -1425,7 +1508,14 @@ def run_x_scraper(db=None):
                             )
                         haiku_rejected_logged += 1
                     rejection_reasons[reject_reason] = rejection_reasons.get(reject_reason, 0) + 1
-                    log_rejection(db, tweet, handle, reject_reason, haiku_reason, result, closeness_level)
+                    # haiku_reason falls back to "no_reason_returned" if Haiku's
+                    # JSON didn't include one, so the DB row is never NULL for
+                    # a rejection that made it through to validation.
+                    log_rejection(
+                        db, tweet, handle, reject_reason,
+                        haiku_reason or "no_reason_returned",
+                        result, closeness_level,
+                    )
                     continue
 
                 confidence = (result.get("confidence") or "low").lower()

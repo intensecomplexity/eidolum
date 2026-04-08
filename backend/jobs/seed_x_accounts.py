@@ -32,7 +32,11 @@ SEED_ACCOUNTS = [
     ("bethkindig",      "Beth Kindig",         2, "semis AI infrastructure"),
     ("DanNiles",        "Dan Niles",           2, "tech semis shorts"),
     ("GeneMunster",     "Gene Munster",        2, "Loup Apple megacap"),
-    ("mahaney",         "Mark Mahaney",        2, "Evercore internet"),
+    # Removed @mahaney — the real Mark Mahaney of Evercore does not tweet
+    # under that handle; the account producing our rejections is unrelated.
+    # seed_tracked_x_accounts() deactivates all rows and re-activates only
+    # SEED_ACCOUNTS entries, so dropping this line here deactivates the
+    # existing row in production on the next scraper cycle.
     ("canuck2usa",      "Canuck2USA",          2, "swing trade setups"),
     ("DayTradeWarrior", "Day Trade Warrior",   2, "day trade setups"),
     ("Ksidiii",         "Ksidiii",             2, "earnings plays"),
