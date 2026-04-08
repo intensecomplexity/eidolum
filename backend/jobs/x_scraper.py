@@ -201,8 +201,9 @@ explicit open/add/trim/exit language counts as a position disclosure.
 OUTPUT FORMAT (strict JSON, no extra text):
 {
   "is_prediction": true | false,
-  "prediction_type": "price_target" | "position_disclosure" | null,
+  "prediction_type": "price_target" | "position_disclosure" | "sector_call" | null,
   "position_action": "open" | "add" | "trim" | "exit" | null,
+  "sector": "semis" | "regional banks" | null,
   "ticker": "AAPL" | null,
   "direction": "bullish" | "bearish" | "neutral" | null,
   "target_price": 250.00 | null,
@@ -212,19 +213,137 @@ OUTPUT FORMAT (strict JSON, no extra text):
   "reason": "brief explanation, max 100 chars"
 }
 
-For price-target predictions, prediction_type="price_target" and position_action=null.
-For position disclosures, prediction_type="position_disclosure" and position_action is set.
+For price-target predictions, prediction_type="price_target", position_action=null, sector=null.
+For position disclosures, prediction_type="position_disclosure", position_action is set, sector=null.
+For sector calls, prediction_type="sector_call", sector=<phrase from tweet>, ticker=null,
+target_price=null, timeframe REQUIRED, direction REQUIRED.
 If prediction_type is omitted, assume "price_target".
 
-If is_prediction is false, set ticker/direction/target_price/timeframe/confidence to null, explain WHY in reason, AND set closeness_level to one of:
+SECTOR CALLS (a third accepted prediction_type):
 
-  4 = Tweet has a ticker AND directional lean but is missing one key element (no price target, unclear timeframe, hedged language like "could" or "might", or conditional "if X then Y")
-  3 = Tweet mentions a ticker with some directional context but is more commentary/observation than an actionable call
-  2 = Tweet mentions one or more tickers but has NO directional claim or analysis
-  1 = Tweet is finance-related (Fed, macro, rates, crypto generalities) but names NO specific ticker or sector ETF
-  0 = Tweet is not about finance at all (personal, political, promotional, sports, memes)
+A sector call is a tweet that makes a bullish or bearish call on a SECTOR
+(not a single stock). The author names a sector phrase from Requirement 1(b)
+and asserts a direction with a timeframe. We map the phrase to a sector
+ETF server-side (e.g., "semis" -> SOXX, "regional banks" -> KRE, "tech" -> XLK)
+and score the call as the ETF's return vs SPY's return over the window.
 
-Be honest and consistent. L4 is rare -- only use it when the tweet genuinely almost qualified. Don't inflate levels.
+Sector calls do NOT need a price target. They DO need a timeframe — without
+one they are vague vibes and must be REJECTED.
+
+Examples:
+  - 'Semis are going to rip in Q2 2026'         -> sector="semis",          bullish, "Q2 2026"
+  - 'Bearish on regional banks for 6 months'     -> sector="regional banks", bearish, "6 months"
+  - 'Homebuilders look cooked into year-end'     -> sector="homebuilders",   bearish, "year-end"
+  - 'Energy is a buy here for the next 12 months'-> sector="energy",         bullish, "12 months"
+  - 'Pharma topping into Q3'                     -> sector="pharma",         bearish, "Q3"
+
+For sector calls, set:
+  prediction_type = "sector_call"
+  sector          = the lowercase phrase exactly as it appears in the tweet
+  direction       = "bullish" or "bearish"
+  timeframe       = REQUIRED (e.g., "Q2", "6 months", "EOY", "year-end")
+  ticker          = null  (we resolve sector -> ETF server-side)
+  target_price    = null
+
+A tweet that names a sector phrase but has NO timeframe is still a vague vibe
+and must be rejected (closeness_level=4 if it had directional lean).
+
+If is_prediction is false, set ticker/direction/target_price/timeframe/confidence to null, explain WHY in reason, AND set closeness_level using the criteria below.
+
+═══════════════════════════════════════════════════════════════════════════
+CLOSENESS LEVEL CRITERIA (apply in order; use the FIRST level that matches)
+═══════════════════════════════════════════════════════════════════════════
+
+L4 -- "Almost a prediction"
+  REQUIRES ALL OF:
+    - Has a literal ticker or sector ETF in the text ($AAPL, NVDA, XLE, SPY)
+    - Has a clear directional lean about that ticker (up/down/long/short)
+    - Missing EXACTLY ONE of: price target, timeframe, explicit rating word
+  AND AT LEAST ONE OF:
+    - Uses hedged language: "could", "might", "looks like", "seems"
+    - Is conditional: "if X holds/breaks, then Y"
+    - Is a watchlist with a lean but no commit: "watching $NVDA for a long"
+  Examples:
+    - "$NVDA looking strong into earnings, could run"  (hedged, no target/timeframe)
+    - "Watching $TSLA, I think the bottom is in"       (lean + hedge, no commit)
+    - "If $AAPL holds $170, big move coming"           (conditional)
+  TIEBREAKER: If the tweet has ALL THREE (ticker + direction + target/timeframe/rating),
+              it should have been ACCEPTED, not L4. L4 is strictly "almost".
+
+L3 -- "Directional but vague"
+  REQUIRES:
+    - Has a literal ticker
+    - Has SOME directional context (bullish/bearish lean)
+    - But reads as commentary/observation, not a call
+  DIFFERS FROM L4 by:
+    - L3 has no "missing one element" -- it never had the shape of an actionable
+      call in the first place. L4 is a near-miss; L3 is a take.
+  Examples:
+    - "Still love $META long-term, patient capital wins"    (opinion, no action)
+    - "$COIN earnings tomorrow, positioning is interesting" (observation)
+    - "$SPY grinding higher, nothing to do"                 (commentary + non-call)
+
+L2 -- "Opinion/sentiment" (ticker mentioned, no directional claim)
+  REQUIRES:
+    - Has at least one literal ticker
+    - NO directional claim about that ticker
+  COMMON PATTERNS:
+    - Watchlists: "Tickers on my radar: $AAPL $MSFT $GOOGL"
+    - Portfolio updates: "Added $NVDA to the pile"
+    - Chart observations: "$AMZN chart looks like a triangle"
+    - News repetition: "$BMNR reports earnings tomorrow"
+  Examples:
+    - "Stocks on my radar today: $AAPL $MSFT $GOOGL"
+    - "Portfolio update: added $NVDA"
+    - "$AMZN chart looks like a triangle"
+
+L1 -- "Off-topic market talk" (finance, but no specific ticker or ETF)
+  REQUIRES:
+    - Tweet is finance-related (macro, Fed, rates, crypto generalities, sectors)
+    - NO literal ticker or sector ETF anywhere in the text
+  Examples:
+    - "Fed will cut 3 times next year"
+    - "Bond market is broken"
+    - "Crypto about to have a moment"
+    - "Markets are forward looking, Iran war 90% priced in"
+
+L0 -- "Not finance at all" (off-topic)
+  REQUIRES:
+    - Tweet is about personal life, politics, sports, memes, promotion
+    - NO meaningful finance content
+  Examples:
+    - "Great dinner at Carbone last night"
+    - "Elon is right about everything"
+    - "GM to everyone in the TL"
+
+═══════════════════════════════════════════════════════════════════════════
+HOW TO ASSIGN (decision procedure -- follow in order)
+═══════════════════════════════════════════════════════════════════════════
+
+  1. Does the tweet mention any stock/ETF ticker in the text? If NO -> L1 or L0.
+     - If it talks about markets/Fed/macro/crypto -> L1
+     - Otherwise                                  -> L0
+
+  2. Ticker IS present. Does the tweet make a directional claim about it?
+     If NO -> L2 (opinion/sentiment/watchlist/news repetition).
+
+  3. Direction IS present. Does it ALSO have a price target, timeframe,
+     OR an explicit rating word (buy/sell/bullish/bearish/long/short/
+     outperform/underperform/overweight/underweight)?
+     If YES -> is_prediction=true (ACCEPT, closeness_level=null).
+     If NO but directional shape is almost right (hedged/conditional/
+        "looking for", "watching for a run") -> L4 (almost a prediction).
+     If NO and it reads as commentary/opinion -> L3 (directional but vague).
+
+═══════════════════════════════════════════════════════════════════════════
+CONSISTENCY RULES
+═══════════════════════════════════════════════════════════════════════════
+  - L4 is rare. Don't inflate. An L4 tweet is one a human reviewer would
+    look at and say "that was close."
+  - Never assign L4 to a tweet without a literal ticker -- those are L1 or L0.
+  - Never assign L3 to a watchlist or portfolio update -- those are L2.
+  - Never assign L2 to a macro take -- those are L1.
+  - When in doubt between two levels, pick the LOWER one. L0 floor for safety.
 
 When is_prediction is true, set closeness_level to null (accepted tweets are not "close to" anything, they ARE predictions).
 
@@ -312,16 +431,78 @@ def _extract_position_fields(result: dict | None) -> tuple[str, str | None]:
     return "position_disclosure", action
 
 
+def _extract_sector_fields(result: dict | None, tweet_text: str) -> tuple[str | None, str | None, str | None]:
+    """Return (etf_ticker, sector_phrase, error) for a sector_call result.
+
+    Returns ('SOXX', 'semis', None) if Haiku said sector_call AND the sector
+    phrase appears literally in the tweet AND it resolves to an ETF.
+    Returns (None, sector_phrase, 'sector_etf_unknown') if the phrase doesn't
+    resolve. Returns (None, None, 'sector_phrase_not_in_text') if Haiku
+    hallucinated a sector that isn't in the tweet. Returns (None, None, None)
+    if this is not a sector call at all.
+    """
+    if not result:
+        return None, None, None
+    ptype = (result.get("prediction_type") or "").strip().lower()
+    if ptype != "sector_call":
+        return None, None, None
+
+    from services.sector_etf_map import resolve_sector_to_etf, find_sector_phrase_in_text
+
+    sector_phrase = (result.get("sector") or "").strip().lower()
+    if not sector_phrase:
+        return None, None, "sector_phrase_not_in_text"
+
+    # Defense in depth: phrase must appear literally in tweet (Haiku may hallucinate)
+    if sector_phrase not in tweet_text.lower():
+        # Maybe the phrase Haiku returned is a synonym; try matching ANY known
+        # sector phrase that appears in the tweet
+        found = find_sector_phrase_in_text(tweet_text)
+        if not found:
+            return None, sector_phrase, "sector_phrase_not_in_text"
+        sector_phrase = found
+
+    etf = resolve_sector_to_etf(sector_phrase)
+    if not etf:
+        return None, sector_phrase, "sector_etf_unknown"
+
+    return etf, sector_phrase, None
+
+
 def validate_haiku_result(result: dict, tweet_text: str) -> tuple[bool, str]:
     """Python-side safety net for the new strict Haiku prompt.
 
     Returns (is_valid, reason). Even if Haiku says is_prediction=true, this
     enforces the three requirements from the prompt independently.
+
+    Sector calls (prediction_type='sector_call') get a slightly different
+    validation: ticker is server-resolved so the ticker_in_text check is
+    skipped, but a timeframe is REQUIRED (otherwise it's a vague vibe).
     """
     if not result or not result.get("is_prediction"):
         return False, "haiku_rejected"
     if result.get("confidence") == "low":
         return False, "low_confidence"
+
+    ptype = (result.get("prediction_type") or "").strip().lower()
+    is_sector_call = ptype == "sector_call"
+
+    if is_sector_call:
+        # Sector calls: sector phrase substitutes for ticker. We don't validate
+        # the literal sector phrase here — _extract_sector_fields will do that
+        # in the run loop and reject with sector_phrase_not_in_text /
+        # sector_etf_unknown if it fails.
+        sector_phrase = (result.get("sector") or "").strip()
+        if not sector_phrase:
+            return False, "no_sector_phrase"
+        # Direction
+        direction = (result.get("direction") or "").lower()
+        if direction not in ("bullish", "bearish"):
+            return False, "no_direction"
+        # Sector calls REQUIRE a timeframe (no ambiguity allowed)
+        if not result.get("timeframe"):
+            return False, "no_timeframe_for_sector_call"
+        return True, "accepted"
 
     ticker = result.get("ticker")
     if not ticker:
@@ -419,7 +600,12 @@ def _extract_cashtags(text: str) -> list[str]:
 
 
 def _prefilter_tweet(text: str, is_rt: bool) -> str | None:
-    """Quick pre-filter before sending to AI. Returns rejection reason or None if OK."""
+    """Quick pre-filter before sending to AI. Returns rejection reason or None if OK.
+
+    Tweets pass if they contain EITHER a ticker-shaped token OR a recognized
+    sector phrase (so sector calls like 'semis are going to rip' aren't
+    pre-filter rejected before Haiku ever sees them).
+    """
     if is_rt:
         return "retweet"
     if len(text.strip()) < 15:
@@ -427,7 +613,10 @@ def _prefilter_tweet(text: str, is_rt: bool) -> str | None:
     if any(p.search(text) for p in SPAM_PATTERNS):
         return "spam"
     if not TICKER_MENTION_RE.search(text):
-        return "no_ticker_ref"
+        # Allow sector-call candidates through to Haiku.
+        from services.sector_etf_map import find_sector_phrase_in_text
+        if not find_sector_phrase_in_text(text):
+            return "no_ticker_ref"
     cashtags = _extract_cashtags(text)
     if len(cashtags) > 5:
         return "too_many_tickers"
@@ -798,7 +987,20 @@ def run_x_scraper(db=None):
                 else:
                     total_stats["ai_medium"] += 1
 
-                ticker = (result.get("ticker") or "").upper().lstrip("$")
+                # Sector call resolution: if Haiku said sector_call, resolve the
+                # sector phrase to an ETF ticker and substitute it for the
+                # missing literal ticker. Reject if the phrase is unknown or
+                # not actually present in the tweet text.
+                sector_etf, sector_phrase, sector_err = _extract_sector_fields(result, body)
+                if sector_err:
+                    rejection_reasons[sector_err] = rejection_reasons.get(sector_err, 0) + 1
+                    log_rejection(db, tweet, handle, sector_err, haiku_reason, result, closeness_level)
+                    continue
+                is_sector_call = sector_etf is not None
+                if is_sector_call:
+                    ticker = sector_etf
+                else:
+                    ticker = (result.get("ticker") or "").upper().lstrip("$")
                 direction = (result.get("direction") or "").lower()
                 # We only insert directional predictions; "neutral" is rejected here
                 if direction not in ("bullish", "bearish"):
@@ -806,8 +1008,8 @@ def run_x_scraper(db=None):
                     log_rejection(db, tweet, handle, "neutral_or_no_direction", haiku_reason, result, closeness_level)
                     continue
 
-                # Currency tickers are never predictions
-                if ticker in CURRENCY_IGNORE:
+                # Currency tickers are never predictions (n/a for sector calls)
+                if not is_sector_call and ticker in CURRENCY_IGNORE:
                     rejection_reasons["currency_ticker"] = rejection_reasons.get("currency_ticker", 0) + 1
                     log_rejection(db, tweet, handle, "currency_ticker", haiku_reason, result, closeness_level)
                     continue
@@ -860,7 +1062,18 @@ def run_x_scraper(db=None):
                     continue
 
                 if db:
-                    if ptype == "position_disclosure" and paction in ("open", "add"):
+                    if is_sector_call:
+                        # Sector call: ticker is the resolved ETF, target stays
+                        # null, confidence slightly downweighted vs explicit
+                        # price-target predictions.
+                        ok = _insert_prediction(
+                            db, ticker, direction, None, tf_days,
+                            handle, body, tid, tweet_url, pred_date,
+                            prediction_type="sector_call",
+                            position_action=None,
+                            confidence_tier=0.85,
+                        )
+                    elif ptype == "position_disclosure" and paction in ("open", "add"):
                         # Position open/add: 365-day fallback horizon, lower confidence
                         ok = _insert_prediction(
                             db, ticker, direction, None, 365,
@@ -877,7 +1090,10 @@ def run_x_scraper(db=None):
                     if ok:
                         total_stats["inserted"] += 1
                         account_preds += 1
-                        if ptype == "position_disclosure":
+                        if is_sector_call:
+                            total_stats["sector_call"] = total_stats.get("sector_call", 0) + 1
+                            print(f"[X-SCRAPER] @{handle} SECTOR_CALL {direction} ${ticker} ({sector_phrase})", flush=True)
+                        elif ptype == "position_disclosure":
                             total_stats["position_open"] = total_stats.get("position_open", 0) + 1
                     else:
                         total_stats["dupes"] += 1
