@@ -114,12 +114,12 @@ def _fetch_all_tickers(db) -> list[str]:
         except Exception:
             pass
 
-    # Secondary: try FMP stock list endpoints (may or may not work depending on plan)
+    # Secondary: try FMP stock list endpoints (may or may not work depending on plan).
+    # /api/v3/ was deprecated 2025-08-31 and now returns 403 "Legacy Endpoint",
+    # so only the /stable/ variants are tried.
     for endpoint in [
         "https://financialmodelingprep.com/stable/stock-list",
-        "https://financialmodelingprep.com/api/v3/stock/list",
         "https://financialmodelingprep.com/stable/available-traded-list",
-        "https://financialmodelingprep.com/api/v3/available-traded/list",
     ]:
         try:
             r = httpx.get(endpoint, params={"apikey": FMP_KEY}, timeout=30)

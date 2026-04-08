@@ -377,21 +377,36 @@ def get_ticker_chart(
         except Exception as e:
             print(f"[Chart] Polygon error for {ticker}: {e}")
 
-    # 2. Fallback to FMP /api/v3/ (paid, full history)
+    # 2. Fallback to FMP /stable/ (paid, full history).
+    # Migrated from the deprecated /api/v3/historical-price-full/{ticker}
+    # endpoint (returns 403 Legacy Endpoint after 2025-08-31).
     if not prices and FMP_KEY:
         try:
             r = httpx.get(
-                f"https://financialmodelingprep.com/api/v3/historical-price-full/{ticker}",
-                params={"apikey": FMP_KEY, "serietype": "line"},
+                "https://financialmodelingprep.com/stable/historical-price-eod/full",
+                params={"symbol": ticker, "apikey": FMP_KEY, "serietype": "line"},
                 timeout=15,
             )
             if r.status_code == 200:
                 data = r.json()
-                historical = data.get("historical", []) if isinstance(data, dict) else []
+                # Accept both shapes: new flat list and legacy {historical: [...]}
+                if isinstance(data, dict):
+                    historical = data.get("historical", []) or []
+                elif isinstance(data, list):
+                    historical = data
+                else:
+                    historical = []
                 for item in historical:
+                    if not isinstance(item, dict):
+                        continue
                     d = item.get("date", "")
                     if d >= start_date:
-                        prices.append({"date": d, "close": round(float(item.get("close", 0)), 2), "volume": 0})
+                        try:
+                            close_val = float(item.get("close", 0))
+                            if close_val > 0:
+                                prices.append({"date": d, "close": round(close_val, 2), "volume": 0})
+                        except (ValueError, TypeError):
+                            pass
                 prices.sort(key=lambda x: x["date"])
         except Exception as e:
             print(f"[Chart] FMP error for {ticker}: {e}")

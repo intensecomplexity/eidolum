@@ -36,7 +36,9 @@ def _get(path: str, params: dict = None, timeout: int = 60) -> list | dict | Non
     params["apikey"] = FMP_KEY
     last_status = None
     last_body = ""
-    for prefix in ["/stable/", "/api/v3/"]:
+    # /api/v3/ was deprecated 2025-08-31 and now returns 403 "Legacy Endpoint".
+    # Only the /stable/ namespace is supported on FMP Ultimate.
+    for prefix in ["/stable/"]:
         url = f"{BASE}{prefix}{path}"
         # Build the full URL with query params for logging
         from urllib.parse import urlencode

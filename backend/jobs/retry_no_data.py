@@ -189,6 +189,18 @@ def _fetch_tiingo(ticker: str, start_date: str, end_date: str) -> dict:
 
 
 def _fetch_fmp(ticker: str) -> dict:
+    """Fetch full historical daily prices from FMP.
+
+    Migrated from the dead /api/v3/historical-price-full/{ticker} endpoint
+    (deprecated 2025-08-31, returns 403 "Legacy Endpoint") to the new
+    /stable/historical-price-eod/full?symbol={ticker} endpoint.
+
+    Response shape changed too: old v3 returned
+        {"symbol": "AAPL", "historical": [{"date": ..., "close": ...}]}
+    new /stable/ returns either a flat array
+        [{"symbol": "AAPL", "date": ..., "close": ...}]
+    or sometimes a wrapped dict — we handle both for safety.
+    """
     global _fmp_calls_today
     if ticker in _price_cache:
         return _price_cache[ticker]
@@ -197,19 +209,36 @@ def _fetch_fmp(ticker: str) -> dict:
     import httpx
     try:
         r = httpx.get(
-            f"https://financialmodelingprep.com/api/v3/historical-price-full/{ticker}",
-            params={"apikey": FMP_KEY, "serietype": "line"}, timeout=15,
+            "https://financialmodelingprep.com/stable/historical-price-eod/full",
+            params={"symbol": ticker, "apikey": FMP_KEY, "serietype": "line"},
+            timeout=15,
         )
         _fmp_calls_today += 1
         if r.status_code != 200:
             _price_cache[ticker] = {}
             return {}
+        data = r.json()
+        # /stable/ usually returns a flat list; old wrappers returned
+        # {"symbol": ..., "historical": [...]}. Accept both shapes.
+        if isinstance(data, dict):
+            historical = data.get("historical") or []
+        elif isinstance(data, list):
+            historical = data
+        else:
+            historical = []
         prices = {}
-        for day in (r.json().get("historical", []) if isinstance(r.json(), dict) else []):
+        for day in historical:
+            if not isinstance(day, dict):
+                continue
             ds = (day.get("date") or "")[:10]
-            close = day.get("close")
-            if ds and close and float(close) > 0:
-                prices[ds] = round(float(close), 2)
+            close = day.get("close") or day.get("adjClose")
+            if ds and close:
+                try:
+                    val = float(close)
+                    if val > 0:
+                        prices[ds] = round(val, 2)
+                except (ValueError, TypeError):
+                    pass
         _price_cache[ticker] = prices
         return prices
     except Exception:

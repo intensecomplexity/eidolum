@@ -670,8 +670,12 @@ def _try_fmp(ticker: str) -> dict:
     if not FMP_KEY or _fmp_calls_today >= _FMP_DAILY_LIMIT:
         return {}
     try:
+        # Migrated from /api/v3/historical-price-full/{ticker} (deprecated
+        # 2025-08-31, returns 403 Legacy Endpoint) AND from the interim
+        # /stable/historical-price-full (also wrong path) to the correct
+        # /stable/historical-price-eod/full?symbol={ticker} endpoint.
         r = httpx.get(
-            "https://financialmodelingprep.com/stable/historical-price-full",
+            "https://financialmodelingprep.com/stable/historical-price-eod/full",
             params={"symbol": ticker, "apikey": FMP_KEY, "serietype": "line"},
             timeout=15,
         )
@@ -679,14 +683,23 @@ def _try_fmp(ticker: str) -> dict:
         if r.status_code != 200:
             return {}
         data = r.json()
+        # Accept both shapes: flat list (new /stable/) and dict-with-historical
+        # (legacy v3). The .get('historical', data) idiom handles both.
         historical = data.get("historical", data) if isinstance(data, dict) else data
         prices = {}
         if isinstance(historical, list):
             for day in historical:
+                if not isinstance(day, dict):
+                    continue
                 ds = (day.get("date") or "")[:10]
                 close = day.get("close") or day.get("adjClose")
-                if ds and close and float(close) > 0:
-                    prices[ds] = float(close)
+                if ds and close:
+                    try:
+                        val = float(close)
+                        if val > 0:
+                            prices[ds] = val
+                    except (ValueError, TypeError):
+                        pass
         return prices
     except Exception:
         _fmp_calls_today += 1
