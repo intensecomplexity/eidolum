@@ -35,13 +35,15 @@ const REJECTION_BADGE_COLORS = {
   empty_body:            { bg: 'rgba(148,163,184,0.15)', fg: '#94a3b8' },  // gray
 };
 
-// Closeness level metadata — label, short label, and color
+// Closeness level metadata — label, short label, and color.
+// Color palette: L4 gold, L3 amber, L2-L0 grayscale by darkness.
+// Labels match the survey-validated taxonomy.
 const CLOSENESS_LEVELS = {
-  4: { label: 'L4 Almost',       short: 'L4', full: 'L4 Almost a prediction', bg: 'rgba(212,168,67,0.18)', fg: '#D4A843' },
-  3: { label: 'L3 Had the bones',short: 'L3', full: 'L3 Had the bones',       bg: 'rgba(251,191,36,0.15)', fg: '#fbbf24' },
-  2: { label: 'L2 Ticker only',  short: 'L2', full: 'L2 Ticker only',         bg: 'rgba(96,165,250,0.15)', fg: '#60a5fa' },
-  1: { label: 'L1 Finance',      short: 'L1', full: 'L1 Finance-related',     bg: 'rgba(107,114,128,0.20)', fg: '#9ca3af' },
-  0: { label: 'L0 Not finance',  short: 'L0', full: 'L0 Not finance',         bg: 'rgba(55,65,81,0.25)',    fg: '#6b7280' },
+  4: { short: 'L4', full: 'L4 — Almost a prediction',  bg: 'rgba(212,168,67,0.18)', fg: '#D4A843' },
+  3: { short: 'L3', full: 'L3 — Directional but vague', bg: 'rgba(251,191,36,0.15)', fg: '#fbbf24' },
+  2: { short: 'L2', full: 'L2 — Opinion/sentiment',     bg: 'rgba(156,163,175,0.18)', fg: '#9ca3af' },
+  1: { short: 'L1', full: 'L1 — Off-topic market talk', bg: 'rgba(107,114,128,0.20)', fg: '#6b7280' },
+  0: { short: 'L0', full: 'L0 — Not finance at all',    bg: 'rgba(75,85,99,0.25)',    fg: '#4b5563' },
 };
 const UNCLASSIFIED_BADGE = { full: 'Unclassified', short: '—', bg: 'rgba(30,41,59,0.30)', fg: '#64748b' };
 
@@ -363,23 +365,41 @@ export default function AdminXAccounts() {
                   <div className="text-base font-bold font-mono">{(rejSummary.total_24h || 0).toLocaleString()}</div>
                 </div>
                 <div className="bg-surface-2 border border-border rounded-lg px-3 py-2">
-                  <div className="text-[10px] text-muted uppercase tracking-wider">Closeness</div>
-                  <div className="text-[10px] font-mono flex flex-wrap items-center gap-x-2 gap-y-0.5 mt-0.5">
-                    {[4, 3, 2, 1, 0].map(lv => {
-                      const meta = CLOSENESS_LEVELS[lv];
-                      const n = rejSummary.by_level?.[String(lv)] || 0;
-                      return (
-                        <span key={lv} style={{ color: meta.fg }}>
-                          {meta.short}:<span className="ml-0.5 text-text-primary">{n}</span>
-                        </span>
-                      );
-                    })}
-                    {(rejSummary.by_level?.unclassified || 0) > 0 && (
-                      <span style={{ color: UNCLASSIFIED_BADGE.fg }}>
-                        —:<span className="ml-0.5 text-text-primary">{rejSummary.by_level.unclassified}</span>
-                      </span>
-                    )}
-                  </div>
+                  <div className="text-[10px] text-muted uppercase tracking-wider">Closeness distribution</div>
+                  {(() => {
+                    // 5 small horizontal bars, one per level 4 -> 0.
+                    // Bar width is proportional to that level's share of the
+                    // 24h total, so the eye picks up where the noise lives.
+                    const counts = [4, 3, 2, 1, 0].map(lv => ({
+                      lv, meta: CLOSENESS_LEVELS[lv],
+                      n: rejSummary.by_level?.[String(lv)] || 0,
+                    }));
+                    const maxN = Math.max(1, ...counts.map(c => c.n));
+                    return (
+                      <div className="mt-1 space-y-0.5">
+                        {counts.map(({ lv, meta, n }) => {
+                          const pct = Math.round((n / maxN) * 100);
+                          return (
+                            <div key={lv} className="flex items-center gap-1.5 text-[10px] font-mono">
+                              <span className="w-5 shrink-0" style={{ color: meta.fg }}>{meta.short}</span>
+                              <div className="flex-1 h-1.5 rounded-sm bg-surface relative overflow-hidden">
+                                <div className="h-full rounded-sm transition-all"
+                                  style={{ width: `${pct}%`, backgroundColor: meta.fg }} />
+                              </div>
+                              <span className="w-8 shrink-0 text-right text-text-primary">{n}</span>
+                            </div>
+                          );
+                        })}
+                        {(rejSummary.by_level?.unclassified || 0) > 0 && (
+                          <div className="flex items-center gap-1.5 text-[10px] font-mono">
+                            <span className="w-5 shrink-0" style={{ color: UNCLASSIFIED_BADGE.fg }}>—</span>
+                            <div className="flex-1 h-1.5 rounded-sm bg-surface" />
+                            <span className="w-8 shrink-0 text-right text-text-primary">{rejSummary.by_level.unclassified}</span>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
                 </div>
                 <div className="bg-surface-2 border border-border rounded-lg px-3 py-2">
                   <div className="text-[10px] text-muted uppercase tracking-wider">Top Offender</div>
@@ -413,10 +433,10 @@ export default function AdminXAccounts() {
                 className="bg-surface-2 border border-border rounded-lg px-2 py-1 text-xs">
                 <option value="">All levels</option>
                 <option value="4">L4 — Almost a prediction</option>
-                <option value="3">L3 — Had the bones</option>
-                <option value="2">L2 — Ticker only</option>
-                <option value="1">L1 — Finance-related</option>
-                <option value="0">L0 — Not finance</option>
+                <option value="3">L3 — Directional but vague</option>
+                <option value="2">L2 — Opinion/sentiment</option>
+                <option value="1">L1 — Off-topic market talk</option>
+                <option value="0">L0 — Not finance at all</option>
                 <option value="unclassified">Unclassified</option>
               </select>
               <button onClick={fetchRejections}
@@ -437,7 +457,15 @@ export default function AdminXAccounts() {
               <p className="text-muted text-sm">No rejections recorded yet. Tweets get rejected here when they fail the strict filter.</p>
             ) : (
               <div className="space-y-2 max-h-[600px] overflow-y-auto pr-1">
-                {rejections.map(r => {
+                {/* Default sort: closeness_level DESC so L4 / L3 surface at the
+                    top — these are the highest-value tweets to inspect for
+                    filter tuning. Nulls (unclassified) sink to the bottom.
+                    Stable within a level: API already returns rejected_at DESC. */}
+                {[...rejections].sort((a, b) => {
+                  const av = a.closeness_level == null ? -1 : a.closeness_level;
+                  const bv = b.closeness_level == null ? -1 : b.closeness_level;
+                  return bv - av;
+                }).map(r => {
                   const colors = REJECTION_BADGE_COLORS[r.rejection_reason] || REJECTION_BADGE_COLORS.empty_body;
                   const isExpanded = expandedRejId === r.id;
                   const levelMeta = r.closeness_level != null
@@ -452,17 +480,17 @@ export default function AdminXAccounts() {
                             @{r.handle}
                           </a>
                           <span className="text-[10px] text-muted">{relativeTime(r.rejected_at)}</span>
+                          {levelMeta && (
+                            <span className="rounded-md px-2 py-0.5 text-xs font-medium whitespace-nowrap"
+                              style={{ backgroundColor: levelMeta.bg, color: levelMeta.fg }}
+                              title={levelMeta.full}>
+                              {levelMeta.short}
+                            </span>
+                          )}
                           <span className="text-[10px] font-mono px-1.5 py-0.5 rounded-full whitespace-nowrap"
                             style={{ backgroundColor: colors.bg, color: colors.fg }}>
                             {r.rejection_reason}
                           </span>
-                          {levelMeta && (
-                            <span className="text-[10px] font-mono px-1.5 py-0.5 rounded-full whitespace-nowrap"
-                              style={{ backgroundColor: levelMeta.bg, color: levelMeta.fg }}
-                              title={levelMeta.full}>
-                              {levelMeta.full}
-                            </span>
-                          )}
                         </div>
                         {r.tweet_url && (
                           <a href={r.tweet_url} target="_blank" rel="noopener noreferrer"
