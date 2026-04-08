@@ -29,6 +29,40 @@ APIFY_ACTOR = "apidojo~tweet-scraper"
 TWEETS_PER_ACCOUNT = 20
 CURRENCY_IGNORE = {"USD", "EUR", "GBP", "JPY", "CAD", "AUD", "NZD", "CHF", "CNY", "HKD", "SGD"}
 
+# Pillar 1: sector and broad-market ETFs accepted alongside individual stock tickers
+ALLOWED_SECTOR_ETFS = {
+    # SPDR sector ETFs
+    "XLK", "XLE", "XLF", "XLV", "XLY", "XLP", "XLI", "XLU", "XLB", "XLRE", "XLC",
+    # Broad market
+    "SPY", "QQQ", "IWM", "DIA",
+    # Semis
+    "SMH", "SOXX",
+    # Biotech
+    "XBI", "IBB",
+    # Banks
+    "KRE", "KBE",
+    # Homebuilders
+    "XHB", "ITB",
+    # Oil/energy
+    "XOP", "OIH",
+    # Metals
+    "GLD", "SLV",
+    # Bonds
+    "TLT", "IEF", "SHY",
+}
+
+# Words that count as "explicit rating" for the Pillar 2 / Requirement 3 check.
+# Whole-word match, case-insensitive.
+EXPLICIT_RATING_WORDS = {
+    "buy", "sell", "bullish", "bearish", "long", "short",
+    "outperform", "underperform", "strong buy", "strong sell",
+    "overweight", "underweight",
+}
+_EXPLICIT_RATING_RE = re.compile(
+    r'\b(' + '|'.join(re.escape(w) for w in EXPLICIT_RATING_WORDS) + r')\b',
+    re.IGNORECASE,
+)
+
 # ── Spam pre-filter (cheap, applied before AI) ──────────────────────────────
 SPAM_PATTERNS = [re.compile(p, re.IGNORECASE) for p in [
     r'join\s+(my|our)\s+(discord|telegram|group|channel)',
@@ -43,40 +77,85 @@ TICKER_MENTION_RE = re.compile(r'\$[A-Z]{1,5}\b|(?<!\w)[A-Z]{2,5}(?!\w)')
 
 # ── Haiku AI classification ──────────────────────────────────────────────────
 
-HAIKU_SYSTEM = """You analyze financial tweets to extract stock/crypto predictions.
-Respond ONLY with JSON. No explanation.
+HAIKU_SYSTEM = """You are a strict classifier evaluating tweets for stock predictions on Eidolum, a financial accountability platform. Eidolum holds forecasters to a high standard. Vague mentions, macro commentary, and self-promotional cashtags are NOT predictions and must be rejected.
 
-A prediction must be FORWARD-LOOKING -- the person believes a stock will go up or down.
+A valid prediction requires ALL THREE of the following. If any are missing, return is_prediction=false.
 
-STRICT TICKER RULE: You MUST NOT return a ticker that does not appear LITERALLY in the tweet text. Acceptable forms: cashtag like $AAPL, or all-caps standalone symbol like AAPL or NVDA. If no such ticker appears in the tweet, you MUST return is_prediction=false.
+REQUIREMENT 1 -- SPECIFIC TICKER OR SECTOR ETF
+A literal stock cashtag ($AAPL), all-caps stock symbol (AAPL), or recognized sector/index ETF (XLK, SPY, QQQ, etc.) must appear in the tweet text. Not in a hashtag. Not inferred from context. Not from the author's bio.
 
-Macro/sector commentary about 'the market', 'stocks', 'equities', 'the Fed', 'rates', 'inflation', 'oil', 'gold' without a specific company ticker is NOT a prediction. Return is_prediction=false in those cases.
+REQUIREMENT 2 -- IDENTIFIABLE DIRECTION ABOUT THAT TICKER
+The tweet must make a clear bullish or bearish claim ABOUT the specific ticker. The direction must be the subject of the tweet. Acceptable direction signals include:
+  - Explicit ratings: Buy, Sell, Strong Buy, Outperform, Bullish, Bearish
+  - Price targets: 'going to $250', 'PT $300', 'target $50'
+  - Action language: 'going long', 'shorting', 'loading up', 'getting out', 'cutting'
+  - Movement language: 'breaking out', 'topping here', 'rolling over', 'ripping', 'crashing'
+  - Outcome language: 'will beat', 'will miss', 'is going much higher', 'has more downside'
 
-Do NOT infer a ticker from context. Do NOT guess based on the author's known holdings. Do NOT extract a ticker from a hashtag unless it's a cashtag with $.
+REQUIREMENT 3 -- AT LEAST ONE OF: PRICE TARGET, TIMEFRAME, OR EXPLICIT RATING
+To prevent vague vibes from counting, you must also identify at least one of:
+  - A price target (any specific number)
+  - A timeframe (by Q2, next month, this week, by year-end, into earnings, EOY)
+  - An explicit rating word (Buy, Sell, Bullish, Bearish, Long, Short)
 
-VALID predictions:
-- "$AAPL going to 200" -> prediction
-- "NVDA is a buy here" -> prediction
-- "shorting TSLA, overvalued" -> prediction (bearish)
-- "loading calls on META" -> prediction (bullish)
-- "puts on AMZN, this dumps to 150" -> prediction (bearish, target 150)
-- "accumulating GOOGL under 170" -> prediction (bullish)
+REJECT THESE PATTERNS (return is_prediction=false):
 
-NOT predictions (reject these):
-- "I sold AAPL at 190" -> past tense, not a prediction
-- "took profit on NVDA" -> past action
-- "TSLA earnings were great" -> commentary, no direction
-- "what do you think about MSFT?" -> question
-- "I bought AAPL last week" -> past action
-- "Equity markets are forward looking" -> macro, no ticker
-- "The Fed will cut rates" -> macro, no ticker
-- Retweets, news summaries, questions, watchlists
+A) Macro/sector commentary with a tagged cashtag as a sign-off
+   Example: 'Markets are forward looking, Iran war 90% priced in, Fed has tough job. $BMNR'
+   Reason: BMNR is a sign-off, not the subject. Macro commentary about markets is not a prediction.
 
-Response format:
-{"is_prediction": true, "ticker": "AAPL", "direction": "bullish", "target_price": null, "confidence": "high", "timeframe": "90d", "reasoning": "5 words max"}
+B) Vague vibes without target or timeframe
+   Examples: '$NVDA looking strong here', 'Not loving the chart on $TSLA', '$AMD might be interesting'
+   Reason: No target, no timeframe, no explicit rating. Pure vibes.
 
-If multiple tickers with different directions, pick the PRIMARY one.
-If not a prediction: {"is_prediction": false}"""
+C) Self-promotional ticker tags
+   Example: 'Just published our Q4 outlook! $FUNDX'
+   Reason: Self-promotion, not a forecast.
+
+D) Questions and hedges
+   Examples: 'Anyone else loading up on $PLTR?', 'Will $TSLA rally? We will see'
+   Reason: Questions and 'we will see' are not predictions.
+
+E) Hypotheticals
+   Example: '$XOM is where I would be if I had cash'
+   Reason: Hypothetical, not a position or call.
+
+F) Pure observations without direction
+   Example: 'Watching $AAPL closely into earnings'
+   Reason: Watching is not predicting.
+
+G) News repetition without claim
+   Example: '$BMNR reports earnings tomorrow'
+   Reason: Stating a fact is not a prediction.
+
+H) Macro/no-ticker tweets
+   Examples: 'Stocks are cheap here', 'Tech is rolling over' (no ticker or ETF)
+   Reason: No specific symbol.
+
+ACCEPT THESE PATTERNS (return is_prediction=true):
+
+  - 'Initiating long $AAPL, $250 PT, services growth thesis, 12 month horizon'
+  - '$NVDA going to rip this earnings, target $200'
+  - 'Selling all my $TSLA before Q1 deliveries, will disappoint'
+  - 'Going long $XLE into year-end, energy is the trade for 2026'
+  - 'Bearish $META, ad spend deceleration, target $400 by Q2'
+  - '$BTC breaking out, $100k by EOY'
+  - 'Short $SHOP here, $50 target, valuation extreme'
+
+OUTPUT FORMAT (strict JSON, no extra text):
+{
+  "is_prediction": true | false,
+  "ticker": "AAPL" | null,
+  "direction": "bullish" | "bearish" | "neutral" | null,
+  "target_price": 250.00 | null,
+  "timeframe": "3 months" | "by Q2" | "EOY" | null,
+  "confidence": "high" | "medium" | "low",
+  "reason": "brief explanation, max 100 chars"
+}
+
+If is_prediction is false, set all other fields to null and explain WHY in reason.
+
+DEFAULT TO REJECT. When in doubt, return is_prediction=false. Eidolum prefers fewer high-quality predictions over many low-quality ones."""
 
 TIMEFRAME_MAP = {"today": 1, "this week": 7, "next week": 14, "this month": 30,
                  "short-term": 30, "medium-term": 90, "long-term": 365, "by end of year": None}
@@ -117,6 +196,45 @@ def _ticker_in_text(ticker: str, text: str) -> bool:
     # Check standalone word: space/start + TICKER + space/end/punctuation
     pattern = rf'(?<![A-Z]){re.escape(t)}(?![A-Z])'
     return bool(re.search(pattern, upper))
+
+
+def _is_allowed_etf(ticker: str) -> bool:
+    """Pillar 1: ticker is a recognized sector or broad-market ETF."""
+    return bool(ticker) and ticker.upper().lstrip("$") in ALLOWED_SECTOR_ETFS
+
+
+def validate_haiku_result(result: dict, tweet_text: str) -> tuple[bool, str]:
+    """Python-side safety net for the new strict Haiku prompt.
+
+    Returns (is_valid, reason). Even if Haiku says is_prediction=true, this
+    enforces the three requirements from the prompt independently.
+    """
+    if not result or not result.get("is_prediction"):
+        return False, "haiku_rejected"
+    if result.get("confidence") == "low":
+        return False, "low_confidence"
+
+    ticker = result.get("ticker")
+    if not ticker:
+        return False, "no_ticker"
+
+    # Requirement 1: ticker must literally appear in tweet text
+    if not _ticker_in_text(ticker, tweet_text):
+        return False, "ticker_not_in_text"
+
+    # Requirement 2: must have a direction
+    direction = (result.get("direction") or "").lower()
+    if direction not in ("bullish", "bearish", "neutral"):
+        return False, "no_direction"
+
+    # Requirement 3: at least one of price target, timeframe, or explicit rating word
+    has_target = result.get("target_price") is not None
+    has_timeframe = bool(result.get("timeframe"))
+    has_explicit_rating = bool(_EXPLICIT_RATING_RE.search(tweet_text))
+    if not (has_target or has_timeframe or has_explicit_rating):
+        return False, "no_target_timeframe_or_rating"
+
+    return True, "accepted"
 
 
 def _classify_with_haiku(tweet_text: str) -> dict | None:
@@ -338,8 +456,10 @@ def run_x_scraper(db=None):
         "accounts_scraped": 0, "tweets_fetched": 0, "prefilter_pass": 0,
         "ai_sent": 0, "ai_predictions": 0, "ai_high": 0, "ai_medium": 0,
         "inserted": 0, "dupes": 0, "errors": 0,
-        "rejected_no_ticker_in_text": 0, "rejected_empty_body": 0,
+        "rejected_empty_body": 0,
     }
+    # Strict-mode rejection breakdown (Phase 5)
+    rejection_reasons: dict[str, int] = {}
     first_tweet_logged = False
 
     for account_id, handle in accounts:
@@ -397,34 +517,39 @@ def run_x_scraper(db=None):
                 result = _classify_with_haiku(body)
                 time.sleep(0.02)  # rate limit Haiku calls
 
-                if not result or not result.get("is_prediction"):
+                # Phase 5: unified strict validation (matches the Haiku prompt's 3 requirements)
+                is_valid, reject_reason = validate_haiku_result(result or {}, body)
+                if not is_valid:
+                    rejection_reasons[reject_reason] = rejection_reasons.get(reject_reason, 0) + 1
                     continue
 
-                confidence = result.get("confidence", "low")
-                if confidence not in ("high", "medium"):
-                    continue
-
+                confidence = (result.get("confidence") or "low").lower()
                 total_stats["ai_predictions"] += 1
                 if confidence == "high":
                     total_stats["ai_high"] += 1
                 else:
                     total_stats["ai_medium"] += 1
 
-                ticker = (result.get("ticker") or "").upper()
-                direction = result.get("direction", "").lower()
+                ticker = (result.get("ticker") or "").upper().lstrip("$")
+                direction = (result.get("direction") or "").lower()
+                # We only insert directional predictions; "neutral" is rejected here
                 if direction not in ("bullish", "bearish"):
+                    rejection_reasons["neutral_or_no_direction"] = rejection_reasons.get("neutral_or_no_direction", 0) + 1
                     continue
 
-                tickers = _extract_cashtags(body)
-                if not ticker and tickers:
-                    ticker = tickers[0]
-                if not ticker or ticker in CURRENCY_IGNORE:
+                # Currency tickers are never predictions
+                if ticker in CURRENCY_IGNORE:
+                    rejection_reasons["currency_ticker"] = rejection_reasons.get("currency_ticker", 0) + 1
                     continue
 
-                # BUG 3 FIX: Validate ticker appears literally in tweet text
-                if not _ticker_in_text(ticker, body):
-                    total_stats["rejected_no_ticker_in_text"] += 1
-                    print(f"[X-SCRAPER-REJECT] Ticker {ticker} not in tweet: {body[:120]}", flush=True)
+                # Phase 1: ticker must be a recognised stock symbol form OR an allowed sector ETF.
+                # find_forecaster + the rest of the pipeline accept any uppercase ticker, so the
+                # gate here is just: if it's not in the explicit ETF allowlist, it must look like
+                # a normal cashtag-style symbol (1-5 uppercase letters). Crypto and stocks both
+                # satisfy that. The ETF allowlist gives sector ETFs an explicit pass even if
+                # downstream sector lookup would otherwise treat them as "Other".
+                if not (re.fullmatch(r"[A-Z]{1,5}", ticker) or _is_allowed_etf(ticker)):
+                    rejection_reasons["invalid_ticker_format"] = rejection_reasons.get("invalid_ticker_format", 0) + 1
                     continue
 
                 target_price = result.get("target_price")
@@ -470,12 +595,14 @@ def run_x_scraper(db=None):
             db.rollback()
 
     # Summary
+    rejected_total = sum(rejection_reasons.values())
+    reasons_str = ", ".join(f"{k}={v}" for k, v in sorted(rejection_reasons.items(), key=lambda x: -x[1]))
+    print(f"[X-SCRAPER] Done: {total_stats['inserted']} inserted, {rejected_total} rejected (rejection reasons: {reasons_str or 'none'})", flush=True)
     print(f"[X-SCRAPER] RUN COMPLETE:", flush=True)
     print(f"  Accounts: {total_stats['accounts_scraped']}/{len(accounts)}", flush=True)
-    print(f"  Tweets: {total_stats['tweets_fetched']} fetched, {total_stats['prefilter_pass']} passed pre-filter", flush=True)
-    print(f"  Haiku: {total_stats['ai_sent']} sent, {total_stats['ai_predictions']} predictions ({total_stats['ai_high']} high, {total_stats['ai_medium']} medium)", flush=True)
+    print(f"  Tweets: {total_stats['tweets_fetched']} fetched, {total_stats['prefilter_pass']} passed pre-filter, {total_stats['rejected_empty_body']} empty-body", flush=True)
+    print(f"  Haiku: {total_stats['ai_sent']} sent, {total_stats['ai_predictions']} accepted ({total_stats['ai_high']} high, {total_stats['ai_medium']} medium)", flush=True)
     print(f"  INSERTED: {total_stats['inserted']} | Dupes: {total_stats['dupes']} | Errors: {total_stats['errors']}", flush=True)
-    print(f"  Rejected: {total_stats['rejected_no_ticker_in_text']} ticker-not-in-text, {total_stats['rejected_empty_body']} empty-body", flush=True)
     est_apify = total_stats['tweets_fetched'] * 0.40 / 1000
     est_haiku = total_stats['ai_sent'] * 220 * 0.80 / 1_000_000
     print(f"  Est cost: Apify ~${est_apify:.2f}, Haiku ~${est_haiku:.3f}", flush=True)

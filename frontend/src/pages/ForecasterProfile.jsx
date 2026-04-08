@@ -358,6 +358,9 @@ export default function ForecasterProfile() {
                     </div>
                   </div>
                   <div className="text-muted text-[11px] sm:text-xs">Accuracy</div>
+                  <div className="text-muted/70 text-[9px] sm:text-[10px] mt-0.5 italic max-w-[180px] mx-auto leading-tight">
+                    Calculated from specific predictions only. Vague mentions are not counted.
+                  </div>
                 </div>
                 <div className="text-center p-3 sm:p-0">
                   <div className={`font-mono text-xl sm:text-2xl font-bold ${(data.avg_return ?? 0) >= 0 ? 'text-positive' : 'text-negative'}`}>

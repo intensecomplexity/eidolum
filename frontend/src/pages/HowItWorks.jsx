@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { Check, Crosshair, BarChart3, Trophy, Users, Clock, TrendingUp, Shield, Database, Lock } from 'lucide-react';
+import { Check, Crosshair, BarChart3, Trophy, Users, Clock, TrendingUp, Shield, Database, Lock, FileText, Calendar, AlertTriangle, Tag } from 'lucide-react';
 import Footer from '../components/Footer';
 import useSEO from '../hooks/useSEO';
 
@@ -146,6 +146,83 @@ export default function HowItWorks() {
                 <span className="text-sm text-text-secondary">{text}</span>
               </div>
             ))}
+          </div>
+        </section>
+
+        {/* ── Seven Pillars of a Real Prediction ───────────────────── */}
+        <section className="mb-12">
+          <h2 className="font-bold text-xl sm:text-2xl mb-4" style={{ color: '#D4A843' }}>
+            The Seven Pillars of a Real Prediction
+          </h2>
+          <p className="text-text-secondary text-sm mb-4">
+            Every prediction on Eidolum must satisfy seven criteria. Vague mentions, macro
+            commentary, and questions are rejected at ingestion. Accuracy is calculated
+            from specific predictions only.
+          </p>
+          <div className="space-y-3">
+            {[
+              {
+                num: '1',
+                icon: Tag,
+                title: 'Specific Ticker or Sector ETF',
+                body: 'A real stock ticker (AAPL, NVDA), a crypto ticker (BTC, ETH), or a sector ETF (XLK, XLE, SPY, QQQ). Generic "tech stocks" or "energy sector" commentary without a specific symbol is rejected.',
+              },
+              {
+                num: '2',
+                icon: Crosshair,
+                title: 'Identifiable Direction',
+                body: 'For analyst notes, an explicit rating (Buy, Sell, Hold, Outperform) or price target. For social media, clear directional language (going to $X, breaking out, topping here, getting crushed). Pure sentiment without a directional claim is rejected.',
+              },
+              {
+                num: '3',
+                icon: BarChart3,
+                title: 'Specific Asset',
+                body: 'A single, identifiable instrument that can be priced by Polygon, Tiingo, or FMP. Baskets, watchlists, and "the market" do not qualify.',
+              },
+              {
+                num: '4',
+                icon: Shield,
+                title: 'Verifiable Source Identity',
+                body: 'For news articles, a Wayback Machine archive of the source URL. For tweets, the immutable tweet ID serves as the archive (snowflake-decoded for date verification, reconstructible into a URL). SEC and EDGAR links are exempt.',
+              },
+              {
+                num: '5',
+                icon: Clock,
+                title: 'Bounded Timeframe',
+                body: 'Every prediction has an evaluation window: 1 day, 1 week, 1 month, 3 months, 6 months, or 1 year. When the window expires, the prediction is scored automatically.',
+              },
+              {
+                num: '6',
+                icon: Calendar,
+                title: 'Authoritative Date',
+                body: 'Derived from the most trustworthy machine-readable source available. For tweets: snowflake-decoded from the tweet ID. For articles: extracted from published metadata (meta tags, JSON-LD). For analyst notes: from the document timestamp. Never parsed from human-readable date strings, never user-supplied.',
+              },
+              {
+                num: '7',
+                icon: Lock,
+                title: 'Immutable Record',
+                body: 'Once recorded, a prediction cannot be edited, backdated, or deleted. The forecaster owns the call forever — hit or miss.',
+              },
+            ].map(({ num, icon: Icon, title, body }) => (
+              <div key={num} className="card py-4">
+                <div className="flex items-start gap-3">
+                  <div className="flex items-center gap-2 shrink-0">
+                    <span className="font-mono text-accent text-xs font-bold">{num}</span>
+                    <Icon className="w-4 h-4 text-accent" />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-sm mb-1">{title}</h3>
+                    <p className="text-xs text-text-secondary leading-relaxed">{body}</p>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+          <div className="mt-4 flex items-start gap-2 text-xs text-text-tertiary">
+            <AlertTriangle className="w-3.5 h-3.5 text-accent shrink-0 mt-0.5" />
+            <span>
+              Accuracy is calculated from specific predictions only. Vague mentions are not counted.
+            </span>
           </div>
         </section>
 
