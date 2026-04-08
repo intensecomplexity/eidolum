@@ -192,6 +192,22 @@ def main():
     except Exception as e:
         log.error(f"[Worker] Table error: {e}")
 
+    # Pillar 4: ensure predictions.tweet_id column exists on existing DBs.
+    # Base.metadata.create_all does not ALTER existing tables, so we add it explicitly.
+    try:
+        with engine.connect() as conn:
+            conn.execute(sql_text(
+                "ALTER TABLE predictions ADD COLUMN IF NOT EXISTS tweet_id BIGINT"
+            ))
+            conn.execute(sql_text(
+                "CREATE INDEX IF NOT EXISTS idx_predictions_tweet_id "
+                "ON predictions(tweet_id) WHERE tweet_id IS NOT NULL"
+            ))
+            conn.commit()
+        log.info("[Worker] predictions.tweet_id column ensured")
+    except Exception as e:
+        log.error(f"[Worker] tweet_id migration error: {e}")
+
     # Scheduler with separate executor for maintenance jobs.
     # default: scrapers + evaluator (must never be blocked)
     # maintenance: logos, backfills, harvests (one at a time, isolated, time-budgeted)

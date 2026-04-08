@@ -1,5 +1,5 @@
 import datetime
-from sqlalchemy import Column, Integer, String, Float, DateTime, ForeignKey, Text, Numeric, Boolean, UniqueConstraint, CheckConstraint
+from sqlalchemy import Column, Integer, BigInteger, String, Float, DateTime, ForeignKey, Text, Numeric, Boolean, UniqueConstraint, CheckConstraint
 from sqlalchemy.orm import relationship
 from database import Base
 
@@ -100,6 +100,9 @@ class Prediction(Base):
     source_title = Column(Text, nullable=True)
     source_platform_id = Column(String, nullable=True)
     external_id = Column(String, nullable=True, unique=True, index=True)  # benzinga_id for dedup
+    # Pillar 4: tweet IDs serve as the immutable archive for X predictions.
+    # Snowflake-decoded for date verification, reconstructible into a URL.
+    tweet_id = Column(BigInteger, nullable=True, index=True)
     video_timestamp_sec = Column(Integer, nullable=True)
     verified_by = Column(String, nullable=True)  # 'ai_parsed'|'manual'|'auto_title'
     evaluation_summary = Column(Text, nullable=True)

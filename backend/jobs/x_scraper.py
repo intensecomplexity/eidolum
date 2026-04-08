@@ -82,7 +82,7 @@ HAIKU_SYSTEM = """You are a strict classifier evaluating tweets for stock predic
 A valid prediction requires ALL THREE of the following. If any are missing, return is_prediction=false.
 
 REQUIREMENT 1 -- SPECIFIC TICKER OR SECTOR ETF
-A literal stock cashtag ($AAPL), all-caps stock symbol (AAPL), or recognized sector/index ETF (XLK, SPY, QQQ, etc.) must appear in the tweet text. Not in a hashtag. Not inferred from context. Not from the author's bio.
+A literal stock cashtag ($AAPL), all-caps stock symbol (AAPL), or recognized sector/index ETF (XLK, SPY, QQQ, XLE, XLF, XLV, XLY, XLP, XLI, XLU, XLB, XLRE, XLC, IWM, DIA, SMH, SOXX) must appear in the tweet text. Not in a hashtag. Not inferred from context. Not from the author's bio.
 
 REQUIREMENT 2 -- IDENTIFIABLE DIRECTION ABOUT THAT TICKER
 The tweet must make a clear bullish or bearish claim ABOUT the specific ticker. The direction must be the subject of the tweet. Acceptable direction signals include:
@@ -380,6 +380,14 @@ def _insert_prediction(db, ticker: str, direction: str, target_price, timeframe_
         if prediction_exists_cross_scraper(ticker, forecaster.id, direction, pred_date, db):
             return False
 
+        # Pillar 4: store the immutable tweet ID. Tweets need no Wayback archive
+        # because the tweet ID itself is the archive (snowflake-decoded for date,
+        # reconstructible into a URL).
+        try:
+            tweet_id_int = int(tid) if tid else None
+        except (ValueError, TypeError):
+            tweet_id_int = None
+
         context = f"@{author}: {body[:300]}"
         from models import Prediction
         db.add(Prediction(
@@ -390,6 +398,7 @@ def _insert_prediction(db, ticker: str, direction: str, target_price, timeframe_
             target_price=target_price,
             source_url=tweet_url, archive_url=None,
             source_type="x", source_platform_id=source_id,
+            tweet_id=tweet_id_int,
             context=context[:500], exact_quote=body[:500],
             outcome="pending", verified_by="x_scraper",
         ))
@@ -497,11 +506,14 @@ def run_x_scraper(db=None):
                 is_rt = bool(tweet.get("isRetweet") or tweet.get("retweeted") or body.startswith("RT @"))
                 tweet_url = tweet.get("url") or f"https://x.com/{handle}/status/{tid}"
 
-                # Derive prediction_date from tweet ID (snowflake), not from Apify date field
+                # Pillar 6: derive prediction_date from tweet ID (snowflake) only.
+                # If decoding fails, SKIP the tweet — empty results are better than wrong
+                # results. This prevents the year-1900 bug from ever recurring.
                 pred_date = tweet_id_to_datetime(tid)
                 if not pred_date:
-                    print(f"[X-SCRAPER-WARN] Could not decode tweet ID {tid} to datetime, using NOW", flush=True)
-                    pred_date = datetime.utcnow()
+                    print(f"[X-SCRAPER-WARN] no tweet id, skipping (tid={tid!r})", flush=True)
+                    rejection_reasons["no_tweet_id"] = rejection_reasons.get("no_tweet_id", 0) + 1
+                    continue
 
                 # Passive discovery
                 _record_mentioned_handles(body, tracked_handles, db)
@@ -594,10 +606,10 @@ def run_x_scraper(db=None):
             print(f"[X-SCRAPER] Commit error: {e}", flush=True)
             db.rollback()
 
-    # Summary
+    # Summary (Phase 5D — exact format spec)
     rejected_total = sum(rejection_reasons.values())
     reasons_str = ", ".join(f"{k}={v}" for k, v in sorted(rejection_reasons.items(), key=lambda x: -x[1]))
-    print(f"[X-SCRAPER] Done: {total_stats['inserted']} inserted, {rejected_total} rejected (rejection reasons: {reasons_str or 'none'})", flush=True)
+    print(f"[X-SCRAPER] Done: {total_stats['inserted']} inserted, {rejected_total} rejected ({reasons_str or 'none'})", flush=True)
     print(f"[X-SCRAPER] RUN COMPLETE:", flush=True)
     print(f"  Accounts: {total_stats['accounts_scraped']}/{len(accounts)}", flush=True)
     print(f"  Tweets: {total_stats['tweets_fetched']} fetched, {total_stats['prefilter_pass']} passed pre-filter, {total_stats['rejected_empty_body']} empty-body", flush=True)
