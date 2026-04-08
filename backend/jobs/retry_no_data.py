@@ -28,21 +28,19 @@ TIINGO_KEY = os.getenv("TIINGO_API_KEY", "").strip()
 # Dynamic: Polygon has ~2 years of history from today
 POLYGON_EARLIEST = (datetime.utcnow() - timedelta(days=730)).date()
 
-# Foreign tickers — no free price source supports these.
-# Full list of 27 covering LSE, TSX/TSX-V, Hong Kong, Paris, German exchanges
-# (.DE Xetra, .DU Düsseldorf, .F Frankfurt), Shanghai, Shenzhen, ASX,
-# Singapore, Milan, Madrid, Amsterdam, Brussels, Stockholm, Helsinki, Oslo,
-# Copenhagen, Tokyo, Johannesburg, Korea (KOSPI/KOSDAQ), Taiwan, Sao Paulo,
-# Mexico.
-FOREIGN_SUFFIXES = ('.L', '.TO', '.V', '.HK', '.PA', '.DE', '.DU', '.F',
-                    '.SS', '.SZ', '.AX', '.SI', '.MI', '.MC', '.AS', '.BR',
-                    '.ST', '.HE', '.OL', '.CO', '.T', '.JO', '.KS', '.KQ',
-                    '.TW', '.SA', '.MX')
+# US ticker whitelist — replaces the foreign-suffix blacklist.
+# A US ticker is either:
+#   - 1-5 uppercase letters (AAPL, NVDA, F, TSLA, GOOGL)
+#   - 2-4 uppercase letters + dot + single uppercase letter (BRK.A, BRK.B, BF.B)
+# Anything else (including foreign exchange suffixes like .L .DE .HK .IL .SW
+# .F .DU and any new ones we have not enumerated) is rejected.
+import re as _re
+US_TICKER_REGEX = _re.compile(r'^[A-Z]{1,5}$|^[A-Z]{1,4}\.[A-Z]$')
 
-def is_foreign_ticker(ticker: str) -> bool:
-    if not ticker:
-        return False
-    return ticker.upper().endswith(FOREIGN_SUFFIXES)
+
+def is_us_ticker(ticker: str) -> bool:
+    """True iff ticker is a recognised US-style symbol. Whitelist."""
+    return bool(ticker and US_TICKER_REGEX.match(ticker))
 
 _price_cache: dict[str, dict] = {}
 
@@ -74,7 +72,7 @@ def _reset_counters():
 def _fetch_polygon(ticker: str, start_date: str, end_date: str) -> dict:
     if ticker in _price_cache:
         return _price_cache[ticker]
-    if not POLYGON_KEY or is_foreign_ticker(ticker):
+    if not POLYGON_KEY or not is_us_ticker(ticker):
         return {}
     import httpx
     try:
@@ -104,7 +102,7 @@ def _fetch_tiingo(ticker: str, start_date: str, end_date: str) -> dict:
     global _tiingo_calls_today, _tiingo_blocked_until, _tiingo_consecutive_429s
     if ticker in _price_cache:
         return _price_cache[ticker]
-    if not TIINGO_KEY or _tiingo_calls_today >= TIINGO_DAILY_LIMIT or is_foreign_ticker(ticker):
+    if not TIINGO_KEY or _tiingo_calls_today >= TIINGO_DAILY_LIMIT or not is_us_ticker(ticker):
         return {}
     if _tiingo_blocked_until and datetime.utcnow() < _tiingo_blocked_until:
         return {}
@@ -158,7 +156,7 @@ def _fetch_fmp(ticker: str) -> dict:
     global _fmp_calls_today
     if ticker in _price_cache:
         return _price_cache[ticker]
-    if not FMP_KEY or _fmp_calls_today >= FMP_DAILY_LIMIT or is_foreign_ticker(ticker):
+    if not FMP_KEY or _fmp_calls_today >= FMP_DAILY_LIMIT or not is_us_ticker(ticker):
         return {}
     import httpx
     try:
@@ -344,25 +342,14 @@ def retry_no_data_batch(db, max_tickers: int = 1000):
     _reset_debug_counter()
     now = datetime.utcnow()
 
-    rows = db.execute(sql_text("""
+    # Whitelist: only US tickers (1-5 letters, optional .X class share).
+    # Replaces a 27-suffix blacklist that kept missing new exchanges.
+    rows = db.execute(sql_text(r"""
         SELECT p.id, p.ticker, p.direction, p.target_price, p.entry_price,
                p.evaluation_date, p.prediction_date, p.forecaster_id, p.window_days
         FROM predictions p
         WHERE p.outcome = 'no_data'
-          AND p.ticker NOT LIKE '%%.L'  AND p.ticker NOT LIKE '%%.TO'
-          AND p.ticker NOT LIKE '%%.V'  AND p.ticker NOT LIKE '%%.HK'
-          AND p.ticker NOT LIKE '%%.PA' AND p.ticker NOT LIKE '%%.DE'
-          AND p.ticker NOT LIKE '%%.DU' AND p.ticker NOT LIKE '%%.F'
-          AND p.ticker NOT LIKE '%%.SS' AND p.ticker NOT LIKE '%%.SZ'
-          AND p.ticker NOT LIKE '%%.AX' AND p.ticker NOT LIKE '%%.SI'
-          AND p.ticker NOT LIKE '%%.MI' AND p.ticker NOT LIKE '%%.MC'
-          AND p.ticker NOT LIKE '%%.AS' AND p.ticker NOT LIKE '%%.BR'
-          AND p.ticker NOT LIKE '%%.ST' AND p.ticker NOT LIKE '%%.HE'
-          AND p.ticker NOT LIKE '%%.OL' AND p.ticker NOT LIKE '%%.CO'
-          AND p.ticker NOT LIKE '%%.T'  AND p.ticker NOT LIKE '%%.JO'
-          AND p.ticker NOT LIKE '%%.KS' AND p.ticker NOT LIKE '%%.KQ'
-          AND p.ticker NOT LIKE '%%.TW' AND p.ticker NOT LIKE '%%.SA'
-          AND p.ticker NOT LIKE '%%.MX'
+          AND (p.ticker ~ '^[A-Z]{1,5}$' OR p.ticker ~ '^[A-Z]{1,4}\.[A-Z]$')
         ORDER BY p.ticker
         LIMIT 200000
     """)).fetchall()
@@ -385,10 +372,12 @@ def retry_no_data_batch(db, max_tickers: int = 1000):
             "forecaster_id": r[7], "window_days": r[8],
         })
 
-    # Filter out any foreign tickers that slipped through
+    # Filter out any non-US tickers that slipped through (whitelist).
+    # The candidate query already restricts via regex; this is belt-and-braces
+    # for any cached ticker_preds entries that may not have come from that query.
     foreign_count = 0
     for ticker in list(ticker_preds.keys()):
-        if is_foreign_ticker(ticker):
+        if not is_us_ticker(ticker):
             del ticker_preds[ticker]
             foreign_count += 1
     if foreign_count:
