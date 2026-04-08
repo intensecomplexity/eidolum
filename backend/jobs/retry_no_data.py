@@ -15,9 +15,12 @@ Strategy: Polygon for 2024+ → Tiingo for everything else → FMP last resort.
 """
 import os
 import time
+import logging
 from datetime import datetime, timedelta, date as _date
 from collections import defaultdict
 from sqlalchemy import text as sql_text
+
+log = logging.getLogger(__name__)
 
 from jobs.historical_evaluator import _get_tolerance, _TOLERANCE, _MIN_MOVEMENT, _build_summary
 
@@ -344,7 +347,7 @@ def retry_no_data_batch(db, max_tickers: int = 1000):
 
     # Whitelist: only US tickers (1-5 letters, optional .X class share).
     # Replaces a 27-suffix blacklist that kept missing new exchanges.
-    rows = db.execute(sql_text(r"""
+    query_str = r"""
         SELECT p.id, p.ticker, p.direction, p.target_price, p.entry_price,
                p.evaluation_date, p.prediction_date, p.forecaster_id, p.window_days
         FROM predictions p
@@ -352,7 +355,11 @@ def retry_no_data_batch(db, max_tickers: int = 1000):
           AND (p.ticker ~ '^[A-Z]{1,5}$' OR p.ticker ~ '^[A-Z]{1,4}\.[A-Z]$')
         ORDER BY p.ticker
         LIMIT 200000
-    """)).fetchall()
+    """
+    log.info(f'[RetryNoData-CANDIDATES] Query preview: {query_str[:500]}')
+    rows = db.execute(sql_text(query_str)).fetchall()
+    log.info(f'[RetryNoData-CANDIDATES] Loaded {len(rows)} candidates. '
+             f'First 5 tickers: {[r[1] for r in rows[:5]]}')
 
     remaining_total = db.execute(sql_text(
         "SELECT COUNT(*) FROM predictions WHERE outcome = 'no_data'"
