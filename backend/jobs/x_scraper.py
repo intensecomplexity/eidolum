@@ -1032,6 +1032,16 @@ def _classify_with_haiku(tweet_text: str) -> dict:
     last_status = None
     last_body_snippet = ""
 
+    request_body = {
+        "model": "claude-haiku-4-5-20251001",
+        "max_tokens": 150,
+        "system": HAIKU_SYSTEM,
+        "messages": [{"role": "user", "content": sanitized}],
+    }
+    # Diagnostic: payload size for HTTP-error logs (computed once per call,
+    # not on every retry — the body is identical across retries)
+    payload_bytes = len(json.dumps(request_body, ensure_ascii=False).encode("utf-8"))
+
     for attempt in range(max_retries):
         try:
             r = httpx.post(
@@ -1044,16 +1054,11 @@ def _classify_with_haiku(tweet_text: str) -> dict:
                     "content-type": "application/json; charset=utf-8",
                     "accept": "application/json",
                 },
-                json={
-                    "model": "claude-haiku-4-5-20251001",
-                    "max_tokens": 150,
-                    "system": HAIKU_SYSTEM,
-                    "messages": [{"role": "user", "content": sanitized}],
-                },
+                json=request_body,
                 timeout=10,
             )
             last_status = r.status_code
-            last_body_snippet = (r.text or "")[:300]
+            last_body_snippet = (r.text or "")[:500]
 
             if r.status_code == 429:
                 if attempt < max_retries - 1:
@@ -1067,16 +1072,37 @@ def _classify_with_haiku(tweet_text: str) -> dict:
                 return {"_success": False, "error": "rate_limit", "is_prediction": False}
 
             if r.status_code == 401 or r.status_code == 403:
-                print(f"[X-SCRAPER] Haiku AUTH_ERROR {r.status_code}: "
-                      f"{last_body_snippet}", flush=True)
-                return {"_success": False, "error": f"auth_{r.status_code}",
+                print(f"[X-SCRAPER] Haiku AUTH_{r.status_code} body={last_body_snippet}", flush=True)
+                return {"_success": False,
+                        "error": f"auth_{r.status_code}: {last_body_snippet[:200]}",
                         "is_prediction": False}
 
             if r.status_code != 200:
-                print(f"[X-SCRAPER] Haiku HTTP_{r.status_code}: "
-                      f"{last_body_snippet}", flush=True)
-                return {"_success": False, "error": f"http_{r.status_code}",
-                        "is_prediction": False}
+                # Surface the FULL Anthropic error body so we can diagnose
+                # exactly what's wrong. Both stdout AND the error tag get
+                # the body snippet so it lands in x_scraper_rejections.
+                # Also dump payload size + model + system size to rule out
+                # the obvious size/type/auth issues without another round trip.
+                print(
+                    f"[X-SCRAPER] Haiku HTTP_{r.status_code} "
+                    f"payload={payload_bytes}b model='{request_body['model']}' "
+                    f"sys_chars={len(request_body['system'])} "
+                    f"tweet={sanitized[:120]!r}",
+                    flush=True,
+                )
+                print(
+                    f"[X-SCRAPER] Haiku HTTP_{r.status_code} body={last_body_snippet}",
+                    flush=True,
+                )
+                # Compress the error body into the tag so it ends up in the
+                # haiku_reason DB column. Cap at ~350 chars to leave room
+                # for the "http_NNN: " prefix inside the 500-char column.
+                err_detail = last_body_snippet.replace("\n", " ")[:350]
+                return {
+                    "_success": False,
+                    "error": f"http_{r.status_code}: {err_detail}",
+                    "is_prediction": False,
+                }
 
             content = r.json().get("content", [{}])[0].get("text", "")
             content = content.strip()
