@@ -28,10 +28,16 @@ TIINGO_KEY = os.getenv("TIINGO_API_KEY", "").strip()
 # Dynamic: Polygon has ~2 years of history from today
 POLYGON_EARLIEST = (datetime.utcnow() - timedelta(days=730)).date()
 
-# Foreign tickers — no free price source supports these
-FOREIGN_SUFFIXES = ('.L', '.TO', '.HK', '.PA', '.DE', '.DU', '.F', '.SS', '.SZ',
-                    '.AX', '.SI', '.MI', '.MC', '.AS', '.BR', '.ST', '.HE',
-                    '.OL', '.CO', '.T', '.KS')
+# Foreign tickers — no free price source supports these.
+# Full list of 27 covering LSE, TSX/TSX-V, Hong Kong, Paris, German exchanges
+# (.DE Xetra, .DU Düsseldorf, .F Frankfurt), Shanghai, Shenzhen, ASX,
+# Singapore, Milan, Madrid, Amsterdam, Brussels, Stockholm, Helsinki, Oslo,
+# Copenhagen, Tokyo, Johannesburg, Korea (KOSPI/KOSDAQ), Taiwan, Sao Paulo,
+# Mexico.
+FOREIGN_SUFFIXES = ('.L', '.TO', '.V', '.HK', '.PA', '.DE', '.DU', '.F',
+                    '.SS', '.SZ', '.AX', '.SI', '.MI', '.MC', '.AS', '.BR',
+                    '.ST', '.HE', '.OL', '.CO', '.T', '.JO', '.KS', '.KQ',
+                    '.TW', '.SA', '.MX')
 
 def is_foreign_ticker(ticker: str) -> bool:
     if not ticker:
@@ -344,16 +350,19 @@ def retry_no_data_batch(db, max_tickers: int = 1000):
         FROM predictions p
         WHERE p.outcome = 'no_data'
           AND p.ticker NOT LIKE '%%.L'  AND p.ticker NOT LIKE '%%.TO'
-          AND p.ticker NOT LIKE '%%.HK' AND p.ticker NOT LIKE '%%.PA'
-          AND p.ticker NOT LIKE '%%.DE' AND p.ticker NOT LIKE '%%.DU'
-          AND p.ticker NOT LIKE '%%.F'  AND p.ticker NOT LIKE '%%.SS'
-          AND p.ticker NOT LIKE '%%.SZ' AND p.ticker NOT LIKE '%%.AX'
-          AND p.ticker NOT LIKE '%%.SI' AND p.ticker NOT LIKE '%%.MI'
-          AND p.ticker NOT LIKE '%%.MC' AND p.ticker NOT LIKE '%%.AS'
-          AND p.ticker NOT LIKE '%%.BR' AND p.ticker NOT LIKE '%%.ST'
-          AND p.ticker NOT LIKE '%%.HE' AND p.ticker NOT LIKE '%%.OL'
-          AND p.ticker NOT LIKE '%%.CO' AND p.ticker NOT LIKE '%%.T'
-          AND p.ticker NOT LIKE '%%.KS'
+          AND p.ticker NOT LIKE '%%.V'  AND p.ticker NOT LIKE '%%.HK'
+          AND p.ticker NOT LIKE '%%.PA' AND p.ticker NOT LIKE '%%.DE'
+          AND p.ticker NOT LIKE '%%.DU' AND p.ticker NOT LIKE '%%.F'
+          AND p.ticker NOT LIKE '%%.SS' AND p.ticker NOT LIKE '%%.SZ'
+          AND p.ticker NOT LIKE '%%.AX' AND p.ticker NOT LIKE '%%.SI'
+          AND p.ticker NOT LIKE '%%.MI' AND p.ticker NOT LIKE '%%.MC'
+          AND p.ticker NOT LIKE '%%.AS' AND p.ticker NOT LIKE '%%.BR'
+          AND p.ticker NOT LIKE '%%.ST' AND p.ticker NOT LIKE '%%.HE'
+          AND p.ticker NOT LIKE '%%.OL' AND p.ticker NOT LIKE '%%.CO'
+          AND p.ticker NOT LIKE '%%.T'  AND p.ticker NOT LIKE '%%.JO'
+          AND p.ticker NOT LIKE '%%.KS' AND p.ticker NOT LIKE '%%.KQ'
+          AND p.ticker NOT LIKE '%%.TW' AND p.ticker NOT LIKE '%%.SA'
+          AND p.ticker NOT LIKE '%%.MX'
         ORDER BY p.ticker
         LIMIT 200000
     """)).fetchall()

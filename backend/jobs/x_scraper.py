@@ -468,21 +468,20 @@ def log_rejection(db, tweet: dict, handle: str, rejection_reason: str,
             except Exception:
                 raw_json = None
 
-        # Bug 1 fix: explicitly set rejected_at. The model uses an ORM-side
-        # default which does not generate a Postgres DEFAULT clause, so a raw
-        # INSERT would otherwise leave this column NULL — breaking the
-        # /rejections/summary endpoint which filters by rejected_at.
+        # rejected_at intentionally omitted: Postgres DEFAULT NOW() fills it.
+        # The DDL default is set on the live table by an ALTER TABLE migration
+        # in worker.py startup, and the model has server_default=func.now() so
+        # fresh DBs get it via create_all. Seven columns, seven values.
         db.execute(sql_text("""
             INSERT INTO x_scraper_rejections
                 (tweet_id, handle, tweet_text, tweet_created_at,
-                 rejected_at, rejection_reason, haiku_reason, haiku_raw_response)
-            VALUES (:tid, :h, :tt, :tc, :ra, :rr, :hr, CAST(:hraw AS JSONB))
+                 rejection_reason, haiku_reason, haiku_raw_response)
+            VALUES (:tid, :h, :tt, :tc, :rr, :hr, CAST(:hraw AS JSONB))
         """), {
             "tid": tweet_id,
             "h": handle,
             "tt": body[:2000],  # cap text at 2KB
             "tc": tweet_created,
-            "ra": datetime.utcnow(),
             "rr": rejection_reason,
             "hr": (haiku_reason or "")[:500] if haiku_reason else None,
             "hraw": raw_json,

@@ -100,16 +100,19 @@ def evaluate_batch(max_tickers: int = 500) -> dict:
               AND p.evaluation_date IS NOT NULL
               AND p.evaluation_date < :now
               AND p.ticker NOT LIKE '%.L'  AND p.ticker NOT LIKE '%.TO'
-              AND p.ticker NOT LIKE '%.HK' AND p.ticker NOT LIKE '%.PA'
-              AND p.ticker NOT LIKE '%.DE' AND p.ticker NOT LIKE '%.DU'
-              AND p.ticker NOT LIKE '%.F'  AND p.ticker NOT LIKE '%.SS'
-              AND p.ticker NOT LIKE '%.SZ' AND p.ticker NOT LIKE '%.AX'
-              AND p.ticker NOT LIKE '%.SI' AND p.ticker NOT LIKE '%.MI'
-              AND p.ticker NOT LIKE '%.MC' AND p.ticker NOT LIKE '%.AS'
-              AND p.ticker NOT LIKE '%.BR' AND p.ticker NOT LIKE '%.ST'
-              AND p.ticker NOT LIKE '%.HE' AND p.ticker NOT LIKE '%.OL'
-              AND p.ticker NOT LIKE '%.CO' AND p.ticker NOT LIKE '%.T'
-              AND p.ticker NOT LIKE '%.KS'
+              AND p.ticker NOT LIKE '%.V'  AND p.ticker NOT LIKE '%.HK'
+              AND p.ticker NOT LIKE '%.PA' AND p.ticker NOT LIKE '%.DE'
+              AND p.ticker NOT LIKE '%.DU' AND p.ticker NOT LIKE '%.F'
+              AND p.ticker NOT LIKE '%.SS' AND p.ticker NOT LIKE '%.SZ'
+              AND p.ticker NOT LIKE '%.AX' AND p.ticker NOT LIKE '%.SI'
+              AND p.ticker NOT LIKE '%.MI' AND p.ticker NOT LIKE '%.MC'
+              AND p.ticker NOT LIKE '%.AS' AND p.ticker NOT LIKE '%.BR'
+              AND p.ticker NOT LIKE '%.ST' AND p.ticker NOT LIKE '%.HE'
+              AND p.ticker NOT LIKE '%.OL' AND p.ticker NOT LIKE '%.CO'
+              AND p.ticker NOT LIKE '%.T'  AND p.ticker NOT LIKE '%.JO'
+              AND p.ticker NOT LIKE '%.KS' AND p.ticker NOT LIKE '%.KQ'
+              AND p.ticker NOT LIKE '%.TW' AND p.ticker NOT LIKE '%.SA'
+              AND p.ticker NOT LIKE '%.MX'
             ORDER BY p.ticker
             LIMIT 5000
         """), {"now": now}).fetchall()
@@ -119,16 +122,19 @@ def evaluate_batch(max_tickers: int = 500) -> dict:
             WHERE (outcome = 'pending' OR outcome IS NULL OR outcome = '')
               AND evaluation_date IS NOT NULL AND evaluation_date < :now
               AND ticker NOT LIKE '%.L'  AND ticker NOT LIKE '%.TO'
-              AND ticker NOT LIKE '%.HK' AND ticker NOT LIKE '%.PA'
-              AND ticker NOT LIKE '%.DE' AND ticker NOT LIKE '%.DU'
-              AND ticker NOT LIKE '%.F'  AND ticker NOT LIKE '%.SS'
-              AND ticker NOT LIKE '%.SZ' AND ticker NOT LIKE '%.AX'
-              AND ticker NOT LIKE '%.SI' AND ticker NOT LIKE '%.MI'
-              AND ticker NOT LIKE '%.MC' AND ticker NOT LIKE '%.AS'
-              AND ticker NOT LIKE '%.BR' AND ticker NOT LIKE '%.ST'
-              AND ticker NOT LIKE '%.HE' AND ticker NOT LIKE '%.OL'
-              AND ticker NOT LIKE '%.CO' AND ticker NOT LIKE '%.T'
-              AND ticker NOT LIKE '%.KS'
+              AND ticker NOT LIKE '%.V'  AND ticker NOT LIKE '%.HK'
+              AND ticker NOT LIKE '%.PA' AND ticker NOT LIKE '%.DE'
+              AND ticker NOT LIKE '%.DU' AND ticker NOT LIKE '%.F'
+              AND ticker NOT LIKE '%.SS' AND ticker NOT LIKE '%.SZ'
+              AND ticker NOT LIKE '%.AX' AND ticker NOT LIKE '%.SI'
+              AND ticker NOT LIKE '%.MI' AND ticker NOT LIKE '%.MC'
+              AND ticker NOT LIKE '%.AS' AND ticker NOT LIKE '%.BR'
+              AND ticker NOT LIKE '%.ST' AND ticker NOT LIKE '%.HE'
+              AND ticker NOT LIKE '%.OL' AND ticker NOT LIKE '%.CO'
+              AND ticker NOT LIKE '%.T'  AND ticker NOT LIKE '%.JO'
+              AND ticker NOT LIKE '%.KS' AND ticker NOT LIKE '%.KQ'
+              AND ticker NOT LIKE '%.TW' AND ticker NOT LIKE '%.SA'
+              AND ticker NOT LIKE '%.MX'
         """), {"now": now}).scalar() or 0
     finally:
         db.close()
