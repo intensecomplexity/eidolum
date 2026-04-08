@@ -546,36 +546,69 @@ def validate_haiku_result(result: dict, tweet_text: str) -> tuple[bool, str]:
 
 
 def _classify_with_haiku(tweet_text: str) -> dict | None:
-    """Call Claude Haiku to classify a single tweet. Returns parsed dict or None."""
+    """Call Claude Haiku to classify a single tweet. Returns parsed dict or None.
+
+    Retries on HTTP 429 (rate limit) with exponential backoff:
+      attempt 1: immediate
+      attempt 2: wait 2s
+      attempt 3: wait 4s
+    Returns None on any other error or after retries are exhausted.
+    """
     if not ANTHROPIC_API_KEY or ANTHROPIC_API_KEY in ("placeholder", "sk-ant-placeholder"):
         return None
-    try:
-        r = httpx.post(
-            "https://api.anthropic.com/v1/messages",
-            headers={
-                "x-api-key": ANTHROPIC_API_KEY,
-                "anthropic-version": "2023-06-01",
-                "content-type": "application/json",
-            },
-            json={
-                "model": "claude-haiku-4-5-20251001",
-                "max_tokens": 150,
-                "system": HAIKU_SYSTEM,
-                "messages": [{"role": "user", "content": tweet_text[:500]}],
-            },
-            timeout=10,
-        )
-        if r.status_code != 200:
+
+    max_retries = 3
+    base_delay = 2.0
+
+    for attempt in range(max_retries):
+        try:
+            r = httpx.post(
+                "https://api.anthropic.com/v1/messages",
+                headers={
+                    "x-api-key": ANTHROPIC_API_KEY,
+                    "anthropic-version": "2023-06-01",
+                    "content-type": "application/json",
+                },
+                json={
+                    "model": "claude-haiku-4-5-20251001",
+                    "max_tokens": 150,
+                    "system": HAIKU_SYSTEM,
+                    "messages": [{"role": "user", "content": tweet_text[:500]}],
+                },
+                timeout=10,
+            )
+            if r.status_code == 429:
+                if attempt < max_retries - 1:
+                    delay = base_delay * (2 ** attempt)
+                    print(f"[X-SCRAPER] Haiku 429, backing off {delay}s "
+                          f"(attempt {attempt + 1}/{max_retries})", flush=True)
+                    time.sleep(delay)
+                    continue
+                print(f"[X-SCRAPER] Haiku 429 — retries exhausted, dropping tweet", flush=True)
+                return None
+            if r.status_code != 200:
+                return None
+            content = r.json().get("content", [{}])[0].get("text", "")
+            content = content.strip()
+            if content.startswith("```"):
+                content = content.split("```")[1]
+                if content.startswith("json"):
+                    content = content[4:]
+            return json.loads(content)
+        except Exception as e:
+            msg = str(e).lower()
+            if ("429" in msg or "rate_limit" in msg) and attempt < max_retries - 1:
+                delay = base_delay * (2 ** attempt)
+                print(f"[X-SCRAPER] Haiku exception 429, backing off {delay}s "
+                      f"(attempt {attempt + 1}/{max_retries}): {e}", flush=True)
+                time.sleep(delay)
+                continue
+            # Non-429 error or out of retries
+            if attempt == 0:
+                # Only log the first attempt's error to avoid spam
+                print(f"[X-SCRAPER] Haiku error: {e}", flush=True)
             return None
-        content = r.json().get("content", [{}])[0].get("text", "")
-        content = content.strip()
-        if content.startswith("```"):
-            content = content.split("```")[1]
-            if content.startswith("json"):
-                content = content[4:]
-        return json.loads(content)
-    except Exception:
-        return None
+    return None
 
 
 def _parse_ai_timeframe(tf_str: str) -> int:
@@ -959,7 +992,7 @@ def run_x_scraper(db=None):
 
                 # Classify with Haiku
                 result = _classify_with_haiku(body)
-                time.sleep(0.02)  # rate limit Haiku calls
+                time.sleep(0.1)  # rate limit Haiku calls (was 0.02s — 0.1s avoids 429 bursts)
 
                 # Phase 5: unified strict validation (matches the Haiku prompt's 3 requirements)
                 is_valid, reject_reason = validate_haiku_result(result or {}, body)

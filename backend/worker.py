@@ -287,6 +287,19 @@ def main():
     except Exception as e:
         log.warning(f"[Worker] dormancy migration: {e}")
 
+    # Drop the phantom `is_active` column on tracked_x_accounts if it ever
+    # got added by an out-of-band SQL run. The canonical column is `active`.
+    # Idempotent: DROP COLUMN IF EXISTS is a no-op when the column is absent.
+    try:
+        with engine.connect() as conn:
+            conn.execute(sql_text(
+                "ALTER TABLE tracked_x_accounts DROP COLUMN IF EXISTS is_active"
+            ))
+            conn.commit()
+        log.info("[Worker] tracked_x_accounts.is_active phantom column dropped (no-op if absent)")
+    except Exception as e:
+        log.warning(f"[Worker] drop phantom is_active migration: {e}")
+
     # Scheduler with separate executor for maintenance jobs.
     # default: scrapers + evaluator (must never be blocked)
     # maintenance: logos, backfills, harvests (one at a time, isolated, time-budgeted)

@@ -1,56 +1,87 @@
-"""
-Seed tracked X/Twitter accounts for the curated-accounts scraper.
-Idempotent: uses ON CONFLICT DO NOTHING.
+"""Seed tracked X/Twitter accounts for the curated-accounts scraper.
+
+This module is the SOURCE OF TRUTH for which accounts the X scraper
+follows. It is called from run_x_scraper() on every cycle (every 6h).
+
+On every call:
+  1. ALL existing rows in tracked_x_accounts are set active=FALSE
+  2. The handles in SEED_ACCOUNTS are upserted with active=TRUE
+
+Side effect: any account added via the admin UI will be deactivated
+within ≤6 hours unless it's also added to SEED_ACCOUNTS. This is
+intentional — SEED_ACCOUNTS is the canonical list, the admin UI is
+for inspection only. To permanently add an account, edit this file.
 """
 from sqlalchemy import text as sql_text
 
 
 SEED_ACCOUNTS = [
-    # Tier 1 - High-volume fintwit
-    ("garyblack00", "Gary Black", 1, "TSLA, megacap targets"),
-    ("bethkindig", "Beth Kindig", 1, "semis, AI infrastructure"),
-    ("fundstrat", "Tom Lee", 1, "macro + sector calls"),
-    ("DanNiles", "Dan Niles", 1, "tech, semis, shorts"),
-    ("gavinsbaker", "Gavin Baker", 1, "growth tech"),
-    ("chamath", "Chamath Palihapitiya", 1, "variable but specific"),
-    ("GerberKawasaki", "Ross Gerber", 1, "TSLA, megacaps"),
-    ("CathieDWood", "Cathie Wood", 1, "ARK names, long-term targets"),
-    ("LizAnnSonders", "Liz Ann Sonders", 1, "Schwab macro/equities"),
-    ("ReformedBroker", "Josh Brown", 1, "frequent specific calls"),
-    # Tier 2 - Sell-side analysts on X
-    ("DivItoy", "Dan Ives", 2, "Wedbush, top Eidolum forecaster"),
-    ("GeneMunster", "Gene Munster", 2, "Loup, Apple/megacap tech"),
-    ("mahaney", "Mark Mahaney", 2, "Evercore, internet/tech"),
-    ("RichBTIG", "Rich Greenfield", 2, "LightShed, media/tech"),
-    ("BradGerstner", "Brad Gerstner", 2, "Altimeter, growth tech"),
-    ("hmeisler", "Helene Meisler", 2, "technicals + names"),
-    ("JC_Parets", "JC Parets", 2, "All Star Charts"),
-    ("semianalysis_", "Dylan Patel", 2, "semis deep dives"),
-    # Tier 3 - Hedge fund / well-known traders
-    ("BillAckman", "Bill Ackman", 3, "Pershing Square, concentrated bets"),
-    ("michaeljburry", "Michael Burry", 3, "rare but high impact"),
-    ("KeithMcCullough", "Keith McCullough", 3, "Hedgeye, sector calls"),
-    ("markminervini", "Mark Minervini", 3, "momentum trader"),
-    # Tier 4 - Underrated specialists
-    ("CharlieBilello", "Charlie Bilello", 4, "data-driven calls"),
-    ("RihardJarc", "Rihard Jarc", 4, "growth analysis"),
-    ("PaulMeeks1", "Paul Meeks", 4, "semis, tech"),
+    # Tier 1 — Core high-volume scoreable accounts
+    ("unusual_whales",  "Unusual Whales",      1, "options flow alerts"),
+    ("DeItaone",        "Walter Bloomberg",    1, "breaking news directional takes"),
+    ("markflowchatter", "Mark Flow Chatter",   1, "dark pool + options flow"),
+    ("ripster47",       "Ripster",             1, "chart setups entry/target/stop"),
+    ("traderstewie",    "Stewie",              1, "daily picks with targets"),
+    ("hkuppy",          "HKuppy",              1, "long-form thesis with targets"),
+    ("stocksinplay",    "Stocks In Play",      1, "pre-market gap plays"),
+    ("WallStJesus",     "WallStJesus",         1, "options strike plays"),
+    ("OphirGottlieb",   "Ophir Gottlieb",      1, "pre-earnings vol plays"),
+    ("BrianFeroldi",    "Brian Feroldi",       1, "fundamental long-term"),
+
+    # Tier 2 — Specialists
+    ("bethkindig",      "Beth Kindig",         2, "semis AI infrastructure"),
+    ("DanNiles",        "Dan Niles",           2, "tech semis shorts"),
+    ("GeneMunster",     "Gene Munster",        2, "Loup Apple megacap"),
+    ("mahaney",         "Mark Mahaney",        2, "Evercore internet"),
+    ("canuck2usa",      "Canuck2USA",          2, "swing trade setups"),
+    ("DayTradeWarrior", "Day Trade Warrior",   2, "day trade setups"),
+    ("Ksidiii",         "Ksidiii",             2, "earnings plays"),
+    ("MrTopStep",       "Mr Top Step",         2, "ES futures levels"),
+    ("steverrauch",     "Steve Rauch",         2, "energy sector"),
+    ("PeterLBrandt",    "Peter Brandt",        2, "long-term technical"),
+
+    # Tier 3 — Broad macro + stats
+    ("bespokeinvest",   "Bespoke",             3, "data-driven directional"),
+    ("RyanDetrick",     "Ryan Detrick",        3, "stats-driven index calls"),
+    ("pierce_crosby",   "Pierce Crosby",       3, "macro to equity"),
+    ("zerohedge",       "ZeroHedge",           3, "fast directional takes"),
+    ("BradGerstner",    "Brad Gerstner",       3, "Altimeter growth tech"),
 ]
 
 
 def seed_tracked_x_accounts(db):
-    """Insert seed accounts if table is empty. Idempotent."""
-    count = db.execute(sql_text("SELECT COUNT(*) FROM tracked_x_accounts")).scalar()
-    if count > 0:
-        print(f"[X-SCRAPER] tracked_x_accounts already has {count} rows, skipping seed", flush=True)
-        return
+    """Sync the tracked_x_accounts table to match SEED_ACCOUNTS exactly.
 
+    Steps:
+      1. Deactivate all rows (active=FALSE)
+      2. Upsert each SEED_ACCOUNTS handle with active=TRUE
+      3. Commit
+
+    Idempotent. Safe to run on every X scraper cycle.
+    """
+    # Step 1: deactivate all
+    db.execute(sql_text("UPDATE tracked_x_accounts SET active = FALSE"))
+
+    # Step 2: upsert the canonical list as active
     for handle, display_name, tier, notes in SEED_ACCOUNTS:
         db.execute(sql_text("""
             INSERT INTO tracked_x_accounts (handle, display_name, tier, notes, active)
             VALUES (:handle, :display_name, :tier, :notes, TRUE)
-            ON CONFLICT (handle) DO NOTHING
-        """), {"handle": handle, "display_name": display_name, "tier": tier, "notes": notes})
+            ON CONFLICT (handle) DO UPDATE SET
+                active = TRUE,
+                display_name = EXCLUDED.display_name,
+                tier = EXCLUDED.tier,
+                notes = EXCLUDED.notes
+        """), {
+            "handle": handle,
+            "display_name": display_name,
+            "tier": tier,
+            "notes": notes,
+        })
 
     db.commit()
-    print(f"[X-SCRAPER] Seeded {len(SEED_ACCOUNTS)} tracked accounts", flush=True)
+    print(
+        f"[X-SCRAPER] Seeded {len(SEED_ACCOUNTS)} tracked accounts "
+        f"(all others deactivated)",
+        flush=True,
+    )
