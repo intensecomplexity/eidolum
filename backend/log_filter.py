@@ -38,6 +38,28 @@ def _scrub(text: str) -> str:
     return _KEY_SCRUB_RE.sub(lambda m: f"{m.group(1)}=<REDACTED>", text)
 
 
+def _scrub_arg(arg):
+    """Scrub a single log arg.
+
+    httpx logs the URL as a `httpx.URL` object, not a string — the URL
+    only becomes a string when the handler does `msg % args`. So we
+    can't filter by `isinstance(arg, str)`; we have to stringify first
+    and replace the arg with the scrubbed string when it actually
+    contains a key. Replacing the arg is safe because `%s` formatting
+    already calls `str()` on the value.
+    """
+    if isinstance(arg, str):
+        return _scrub(arg) if "=" in arg else arg
+    try:
+        s = str(arg)
+    except Exception:
+        return arg
+    if "=" not in s:
+        return arg
+    scrubbed = _scrub(s)
+    return scrubbed if scrubbed != s else arg
+
+
 class KeyScrubFilter(logging.Filter):
     """Strip API keys from log records before they're emitted."""
 
@@ -47,15 +69,9 @@ class KeyScrubFilter(logging.Filter):
                 record.msg = _scrub(record.msg)
             if record.args:
                 if isinstance(record.args, dict):
-                    record.args = {
-                        k: _scrub(v) if isinstance(v, str) else v
-                        for k, v in record.args.items()
-                    }
+                    record.args = {k: _scrub_arg(v) for k, v in record.args.items()}
                 else:
-                    record.args = tuple(
-                        _scrub(a) if isinstance(a, str) else a
-                        for a in record.args
-                    )
+                    record.args = tuple(_scrub_arg(a) for a in record.args)
         except Exception:
             # Never let scrubbing kill a log line — the record is more
             # valuable than perfect scrubbing.
