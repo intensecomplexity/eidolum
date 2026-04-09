@@ -23,6 +23,15 @@ from jobs.upgrade_scrapers import _is_self_analysis
 
 MASSIVE_KEY = os.getenv("MASSIVE_API_KEY", "").strip()
 API_URL = "https://api.massive.com/benzinga/v1/ratings"
+# Header-based auth keeps the key out of URL query strings (which httpx and
+# urllib3 log at INFO level). Bearer is the only header form Massive accepts.
+_AUTH_HEADERS = {"Authorization": f"Bearer {MASSIVE_KEY}", "Accept": "application/json"} if MASSIVE_KEY else {}
+
+
+def _strip_apikey(url: str) -> str:
+    """Remove any apikey/apiKey query param from a URL returned by the API."""
+    import re
+    return re.sub(r'(?i)([?&])api_?key=[^&]*(&|$)', lambda m: m.group(1) if m.group(2) == '&' else '', url).rstrip('?&')
 
 SKIP_ACTIONS = {
     "terminates_coverage_on", "removes", "suspends", "firm_dissolved",
@@ -360,7 +369,6 @@ def _fetch_and_insert_day(day_str: str, db) -> tuple:
         else:
             url = API_URL
             params = {
-                "apiKey": MASSIVE_KEY,
                 "date.gte": day_str,
                 "date.lte": day_str,
                 "limit": 500,
@@ -368,7 +376,7 @@ def _fetch_and_insert_day(day_str: str, db) -> tuple:
             }
 
         try:
-            r = httpx.get(url, params=params, timeout=20)
+            r = httpx.get(url, params=params, headers=_AUTH_HEADERS, timeout=20)
             if r.status_code != 200:
                 break
             data = r.json()
@@ -382,11 +390,9 @@ def _fetch_and_insert_day(day_str: str, db) -> tuple:
         elif isinstance(data, dict):
             ratings = data.get("ratings", data.get("results", data.get("data", [])))
             raw_next = data.get("next_url") or data.get("next")
-            if raw_next:
-                sep = "&" if "?" in raw_next else "?"
-                next_url = f"{raw_next}{sep}apiKey={MASSIVE_KEY}" if "apiKey" not in raw_next else raw_next
-            else:
-                next_url = None
+            # Header auth: strip any apikey echoed back in next_url; the
+            # Authorization header carries the credential on every call.
+            next_url = _strip_apikey(raw_next) if raw_next else None
         else:
             break
 

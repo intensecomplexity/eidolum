@@ -13,6 +13,9 @@ from sqlalchemy import text as sql_text
 
 MASSIVE_KEY = os.getenv("MASSIVE_API_KEY", "").strip()
 API_URL = "https://api.massive.com/benzinga/v1/ratings"
+# Header-based auth keeps the key out of URL query strings (which httpx and
+# urllib3 log at INFO level). Bearer is the only header form Massive accepts.
+_AUTH_HEADERS = {"Authorization": f"Bearer {MASSIVE_KEY}", "Accept": "application/json"} if MASSIVE_KEY else {}
 
 
 def backfill_real_urls(db=None, max_per_run: int = 20000):
@@ -143,14 +146,13 @@ def _fetch_urls_for_ticker(ticker: str, date_from: str, date_to: str, needed_ids
         r = httpx.get(
             API_URL,
             params={
-                "apiKey": MASSIVE_KEY,
                 "tickers": ticker,
                 "date.gte": date_from,
                 "date.lte": date_to,
                 "sort": "date.desc",
                 "limit": 50000,
             },
-            headers={"Accept": "application/json"},
+            headers=_AUTH_HEADERS,
             timeout=20,
         )
         if r.status_code != 200:
@@ -165,7 +167,7 @@ def _fetch_urls_for_ticker(ticker: str, date_from: str, date_to: str, needed_ids
             if not next_url:
                 break
             try:
-                r = httpx.get(next_url, headers={"Accept": "application/json"}, timeout=20)
+                r = httpx.get(next_url, headers=_AUTH_HEADERS, timeout=20)
                 if r.status_code != 200:
                     break
                 data = r.json()

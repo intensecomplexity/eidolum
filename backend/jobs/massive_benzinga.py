@@ -22,7 +22,18 @@ from jobs.upgrade_scrapers import _is_self_analysis
 
 MASSIVE_KEY = os.getenv("MASSIVE_API_KEY", "").strip()
 API_URL = "https://api.massive.com/benzinga/v1/ratings"
+# Header-based auth keeps the key out of URL query strings (which httpx and
+# urllib3 log at INFO level). Bearer is the only header form Massive accepts.
+_AUTH_HEADERS = {"Authorization": f"Bearer {MASSIVE_KEY}", "Accept": "application/json"} if MASSIVE_KEY else {}
 _LAST_UPDATED = None
+
+
+def _strip_apikey(url: str) -> str:
+    """Remove any apikey/apiKey query param from a URL returned by the API.
+    Defensive: the upstream may or may not echo the key into next_url; either
+    way we want it gone before httpx logs the URL on the next request."""
+    import re
+    return re.sub(r'(?i)([?&])api_?key=[^&]*(&|$)', lambda m: m.group(1) if m.group(2) == '&' else '', url).rstrip('?&')
 
 # Actions to skip entirely — not predictions
 SKIP_ACTIONS = {
@@ -66,7 +77,6 @@ def _massive_inner(db: Session):
         else:
             url = API_URL
             params = {
-                "apiKey": MASSIVE_KEY,
                 "sort": "last_updated.desc",
                 "limit": 500,
             }
@@ -74,7 +84,7 @@ def _massive_inner(db: Session):
                 params["last_updated.gte"] = _LAST_UPDATED
 
         try:
-            r = httpx.get(url, params=params, headers={"Accept": "application/json"}, timeout=30)
+            r = httpx.get(url, params=params, headers=_AUTH_HEADERS, timeout=30)
             if r.status_code != 200:
                 print(f"[MassiveBZ] HTTP {r.status_code}: {r.text[:300]}")
                 break
@@ -91,12 +101,9 @@ def _massive_inner(db: Session):
         elif isinstance(data, dict):
             ratings = data.get("ratings", data.get("results", data.get("data", [])))
             next_url_raw = data.get("next_url") or data.get("next")
-            # Append API key to next_url if needed
-            if next_url_raw:
-                sep = "&" if "?" in next_url_raw else "?"
-                next_url = f"{next_url_raw}{sep}apiKey={MASSIVE_KEY}" if "apiKey" not in next_url_raw else next_url_raw
-            else:
-                next_url = None
+            # Header auth: strip any apikey echoed back in next_url; the
+            # Authorization header carries the credential on every call.
+            next_url = _strip_apikey(next_url_raw) if next_url_raw else None
         else:
             ratings = []
             next_url = None
