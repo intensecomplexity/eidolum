@@ -17,6 +17,10 @@ from datetime import datetime, timedelta
 APIFY_API_TOKEN = os.getenv("APIFY_API_TOKEN", "").strip()
 APIFY_API = "https://api.apify.com/v2"
 APIFY_ACTOR = "shahidirfan~stocktwits-sentiment-scraper"
+# Header-based auth keeps the token out of URL query strings, which httpx
+# and urllib3 log at INFO level. Apify documents Bearer as a first-class
+# auth method for the v2 API.
+_APIFY_HEADERS = {"Authorization": f"Bearer {APIFY_API_TOKEN}"} if APIFY_API_TOKEN else {}
 
 MIN_LIKES = 5
 MIN_BODY_LEN = 20
@@ -128,7 +132,7 @@ def _call_apify() -> list:
 
         r = httpx.post(
             f"{APIFY_API}/acts/{APIFY_ACTOR}/runs",
-            params={"token": APIFY_API_TOKEN},
+            headers=_APIFY_HEADERS,
             json=payload,
             timeout=30,
         )
@@ -144,7 +148,7 @@ def _call_apify() -> list:
         dataset_id = None
         for _ in range(30):
             time.sleep(10)
-            sr = httpx.get(f"{APIFY_API}/actor-runs/{run_id}", params={"token": APIFY_API_TOKEN}, timeout=15)
+            sr = httpx.get(f"{APIFY_API}/actor-runs/{run_id}", headers=_APIFY_HEADERS, timeout=15)
             data = sr.json().get("data", {})
             status = data.get("status", "")
             if status == "SUCCEEDED":
@@ -159,7 +163,7 @@ def _call_apify() -> list:
             return []
 
         dr = httpx.get(f"{APIFY_API}/datasets/{dataset_id}/items",
-                       params={"token": APIFY_API_TOKEN, "format": "json"}, timeout=60)
+                       params={"format": "json"}, headers=_APIFY_HEADERS, timeout=60)
         items = dr.json() if dr.status_code == 200 else []
         return items if isinstance(items, list) else []
 
