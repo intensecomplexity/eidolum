@@ -429,6 +429,66 @@ def retry_no_data_batch(db, max_tickers: int | None = None):
         f'Max tickers: {max_tickers}. FMP daily cap: {FMP_DAILY_CAP}.'
     )
 
+    # ── Zombie purge ────────────────────────────────────────────────────
+    # Three categories get marked outcome='delisted' so they exit the
+    # candidate pool permanently. delisted is a new terminal outcome —
+    # not 'pending', not in ('hit','near','miss'), and the candidate
+    # query filters outcome='no_data' so delisted rows are auto-excluded.
+    #
+    # Idempotent: after the first run drains the legacy foreign rows,
+    # subsequent runs hit zero foreign matches because the candidate
+    # query already enforces the strict US allowlist for new ingests.
+    # The retry-count purge keeps running because new US zombies age in.
+
+    # 3a — Foreign tickers (allowlist-based: any dotted ticker NOT in the
+    # US dotted allowlist is foreign). This catches .HK .L .DE .F .MX .SW
+    # .NE .AS .BA .TA .ME and every other exchange suffix without needing
+    # an enumerated blacklist.
+    res_a = db.execute(sql_text("""
+        UPDATE predictions
+        SET outcome='delisted',
+            evaluation_summary='Foreign ticker — not supported by US price data pipeline'
+        WHERE outcome='no_data'
+          AND ticker LIKE '%.%'
+          AND ticker NOT IN ('BRK.A','BRK.B','BF.A','BF.B','GEF.B','HEI.A','LEN.B','MOG.A','MOG.B')
+    """))
+    foreign_dotted = res_a.rowcount or 0
+
+    # 3b — Digit-prefix tickers (e.g. 0005.HK, 4335.HK, 02M.DE).
+    # These are HK/LSE numeric codes. Caught by 3a if dotted, but
+    # belt-and-braces in case any non-dotted digit-prefix tickers exist.
+    res_b = db.execute(sql_text(r"""
+        UPDATE predictions
+        SET outcome='delisted',
+            evaluation_summary='Digit-prefix foreign ticker — not supported'
+        WHERE outcome='no_data'
+          AND ticker ~ '^[0-9]'
+    """))
+    digit_prefix = res_b.rowcount or 0
+
+    # 3c — US tickers that have failed every retry attempt at least 5
+    # times across providers. Includes ATVI (delisted 2023), AMD rows
+    # with the legacy 1900 prediction_date bug, and other unreachable
+    # symbols. retry_count is incremented per provider phase, not per
+    # run, so 5 attempts ≈ 1-2 runs of a true zombie.
+    res_c = db.execute(sql_text("""
+        UPDATE predictions
+        SET outcome='delisted',
+            evaluation_summary='Ticker unreachable via FMP/Tiingo/Polygon after 5 retry attempts'
+        WHERE outcome='no_data' AND retry_count >= 5
+    """))
+    retry_zombies = res_c.rowcount or 0
+
+    db.commit()
+
+    purged_total = foreign_dotted + digit_prefix + retry_zombies
+    if purged_total:
+        print(f'[RetryNoData] Zombie purge: {foreign_dotted} foreign suffix + '
+              f'{digit_prefix} digit prefix + {retry_zombies} retry-exhausted = '
+              f'{purged_total} total marked delisted', flush=True)
+    else:
+        print('[RetryNoData] Zombie purge: 0 (no zombies to purge this run)', flush=True)
+
     # Two disjoint queries partitioned by PREDICTION_DATE (not eval_date).
     # Polygon covers exactly 2 years of history. If we partition by eval_date
     # we end up routing predictions to Polygon that have an entry_date OLDER
