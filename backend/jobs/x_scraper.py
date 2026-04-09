@@ -2,8 +2,16 @@
 X/Twitter Stock Prediction Scraper for Eidolum -- Tracked Accounts Model
 
 Scrapes tweets from a curated list of ~25 high-signal financial accounts
-stored in the tracked_x_accounts table. Uses Claude Haiku to classify
-each tweet as a prediction (or not).
+stored in the tracked_x_accounts table. Classifies each tweet via Groq
+(llama-3.3-70b-versatile by default).
+
+Why Groq, not Haiku:
+  Apr 8 2026 outage: the Anthropic billing account ran out of credit and
+  every Haiku call returned HTTP 400 for 18 minutes, killing 377 tweets
+  before detection. The X scraper is now off Anthropic billing for
+  resilience and cost reasons. Haiku remains in use for OTHER pipelines
+  (e.g. anywhere ANTHROPIC_API_KEY is consumed) — only the X scraper has
+  migrated.
 
 Apify actor: apidojo~tweet-scraper (Twitter User Scraper mode)
   Cost: ~$0.40 per 1000 tweets fetched
@@ -11,13 +19,16 @@ Apify actor: apidojo~tweet-scraper (Twitter User Scraper mode)
   4 runs/day = ~$0.80/day = ~$24/month (within $29 Starter plan)
 
 Schedule: every 6 hours (4 runs/day).
-Requires: APIFY_API_TOKEN, ANTHROPIC_API_KEY env vars.
+Requires: APIFY_API_TOKEN, GROQ_API_KEY env vars.
+ANTHROPIC_API_KEY is NO LONGER read by this scraper.
 """
 import os
 import re
 import time
 import json
 import logging
+import threading
+from collections import deque
 import httpx
 from datetime import datetime, timedelta, timezone
 from sqlalchemy import text as sql_text
@@ -25,13 +36,70 @@ from sqlalchemy import text as sql_text
 log = logging.getLogger(__name__)
 
 APIFY_API_TOKEN = os.getenv("APIFY_API_TOKEN", "").strip()
-ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "").strip()
 APIFY_API = "https://api.apify.com/v2"
 APIFY_ACTOR = "apidojo~tweet-scraper"
 # Header-based auth keeps the token out of URL query strings, which httpx
 # and urllib3 log at INFO level. Apify documents Bearer as a first-class
 # auth method for the v2 API.
 _APIFY_HEADERS = {"Authorization": f"Bearer {APIFY_API_TOKEN}"} if APIFY_API_TOKEN else {}
+
+# ── Groq classifier config ──────────────────────────────────────────────────
+# llama-3.3-70b-versatile is the eval-script winner from commit 2865f06.
+# Free-tier limits (as of 2026-04): 30 RPM AND 12,000 TPM. Our HAIKU_SYSTEM
+# prompt is ~3,600 tokens, so the binding constraint is TPM, not RPM:
+#     12,000 TPM / (~3,600 in + ~200 out) ≈ 3.16 RPM ceiling
+# We default GROQ_MAX_RPM to 3 to stay safely under TPM with headroom for
+# the variable response size. Override with GROQ_MAX_RPM env var if you
+# upgrade to Groq paid tier (which lifts the TPM cap dramatically).
+GROQ_API_KEY = os.getenv("GROQ_API_KEY", "").strip()
+GROQ_MODEL = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile").strip() or "llama-3.3-70b-versatile"
+try:
+    GROQ_MAX_RPM = max(1, int(os.getenv("GROQ_MAX_RPM", "3").strip() or "3"))
+except ValueError:
+    GROQ_MAX_RPM = 3
+GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
+
+
+class _GroqRateLimiter:
+    """Sliding-window RPM limiter shared across the x_scraper process.
+
+    The Groq free tier enforces both an RPM and a TPM ceiling. With a
+    ~3,600-token system prompt, TPM (12,000) is the binding constraint —
+    capping requests at ~3.2 RPM regardless of the documented 30 RPM RPM
+    cap. Pacing the scraper at GROQ_MAX_RPM=3 keeps us under both.
+
+    Implementation: a deque of monotonic timestamps. acquire() drops
+    expired entries (>60s old), and if the window is already full it
+    sleeps until the oldest entry rolls out.
+    """
+
+    def __init__(self, max_rpm: int):
+        self.max_rpm = max_rpm
+        self._times: "deque[float]" = deque()
+        self._lock = threading.Lock()
+
+    def acquire(self) -> None:
+        with self._lock:
+            now = time.monotonic()
+            while self._times and now - self._times[0] >= 60.0:
+                self._times.popleft()
+            if len(self._times) >= self.max_rpm:
+                wait = 60.0 - (now - self._times[0]) + 0.05
+                if wait > 0:
+                    # Release the lock while sleeping so other callers can
+                    # at least observe the queue length. Re-acquire after.
+                    self._lock.release()
+                    try:
+                        time.sleep(wait)
+                    finally:
+                        self._lock.acquire()
+                    now = time.monotonic()
+                    while self._times and now - self._times[0] >= 60.0:
+                        self._times.popleft()
+            self._times.append(now)
+
+
+_groq_limiter = _GroqRateLimiter(GROQ_MAX_RPM)
 
 TWEETS_PER_ACCOUNT = 20
 CURRENCY_IGNORE = {"USD", "EUR", "GBP", "JPY", "CAD", "AUD", "NZD", "CHF", "CNY", "HKD", "SGD"}
@@ -662,26 +730,38 @@ def _sanitize_tweet_for_haiku(text: str) -> str:
     return cleaned
 
 
-def _classify_with_haiku(tweet_text: str) -> dict:
-    """Call Claude Haiku to classify a single tweet.
+def _classify_with_groq(tweet_text: str) -> dict:
+    """Call Groq llama-3.3-70b-versatile to classify a single tweet.
 
-    ALWAYS returns a dict. On success, the dict is Haiku's parsed JSON
+    ALWAYS returns a dict. On success, the dict is Groq's parsed JSON
     response with _success=True added. On any failure (missing key, HTTP
-    error, parse error, timeout, retries exhausted) the dict contains:
+    error, parse error, timeout, retries exhausted, rate limit) the dict
+    contains:
         {"_success": False, "error": "<short_error_tag>",
          "is_prediction": False}
     so the caller never has to deal with None and can distinguish
     classifier FAILURES from classifier REJECTIONS.
 
-    Retries on HTTP 429 with exponential backoff (2s, 4s).
+    Pacing: every call goes through the process-wide _GroqRateLimiter
+    BEFORE issuing the HTTP request. The limiter sleeps until the call
+    fits inside the per-minute budget, so the request count never
+    exceeds GROQ_MAX_RPM by construction. The HTTP-level 429 retry
+    loop below is a SECOND line of defense in case the server-side
+    counter and our window drift apart.
+
+    Retries on HTTP 429 with exponential backoff (2s, 4s). After 3
+    exhausted retries, returns error="groq_rate_limited". NEVER falls
+    back to Haiku — the X scraper has been deliberately decoupled from
+    Anthropic billing per the Apr 8 outage post-mortem.
     """
-    if not ANTHROPIC_API_KEY or ANTHROPIC_API_KEY in ("placeholder", "sk-ant-placeholder"):
-        print("[X-SCRAPER] Haiku NO_KEY — ANTHROPIC_API_KEY missing or placeholder", flush=True)
+    if not GROQ_API_KEY:
+        print("[X-SCRAPER] Groq NO_KEY — GROQ_API_KEY missing", flush=True)
         return {"_success": False, "error": "no_api_key", "is_prediction": False}
 
-    # Sanitize FIRST: strip control chars / zero-width joiners / BOM / etc.
-    # The 🚨-emoji tweets from @ripster47 were 400'ing because of leaked
-    # control bytes adjacent to the emoji, not the emoji itself.
+    # Reuse the Haiku-era sanitizer: it strips unicode control bytes and
+    # zero-width joiners, which trip up any LLM JSON-mode parser, not
+    # just Anthropic's. Name retained for diff minimalism — rename in a
+    # follow-up cleanup pass.
     sanitized = _sanitize_tweet_for_haiku(tweet_text)
     if not sanitized:
         return {"_success": False, "error": "empty_after_sanitize",
@@ -692,83 +772,70 @@ def _classify_with_haiku(tweet_text: str) -> dict:
     last_status = None
     last_body_snippet = ""
 
-    # System prompt is sent as a single content block with cache_control so
-    # Anthropic caches it for ~5 minutes. Subsequent calls within the cache
-    # window pay ~10% of the normal input rate for the cached portion (~3,630
-    # tokens), cutting per-call input cost from ~$0.0046 to ~$0.0006. The
-    # ephemeral cache type is GA on anthropic-version 2023-06-01 — no beta
-    # header required.
+    # Same prompt as Haiku — verified end-to-end against Groq llama-3.3-70b
+    # before merge. Groq's response_format=json_object guarantees parseable
+    # output, eliminating the markdown-fence stripping path.
     request_body = {
-        "model": "claude-haiku-4-5-20251001",
-        "max_tokens": 150,
-        "system": [
-            {
-                "type": "text",
-                "text": HAIKU_SYSTEM,
-                "cache_control": {"type": "ephemeral"},
-            }
+        "model": GROQ_MODEL,
+        "messages": [
+            {"role": "system", "content": HAIKU_SYSTEM},
+            {"role": "user", "content": sanitized},
         ],
-        "messages": [{"role": "user", "content": sanitized}],
+        "temperature": 0.1,
+        "max_tokens": 250,
+        "response_format": {"type": "json_object"},
     }
-    # Diagnostic: payload size for HTTP-error logs (computed once per call,
-    # not on every retry — the body is identical across retries)
-    payload_bytes = len(json.dumps(request_body, ensure_ascii=False).encode("utf-8"))
+    headers = {
+        "Authorization": f"Bearer {GROQ_API_KEY}",
+        "Content-Type": "application/json",
+    }
 
     for attempt in range(max_retries):
+        # Pace BEFORE the HTTP call so we never burst over the per-minute
+        # budget on the first attempt of a tight loop.
+        _groq_limiter.acquire()
         try:
-            r = httpx.post(
-                "https://api.anthropic.com/v1/messages",
-                headers={
-                    "x-api-key": ANTHROPIC_API_KEY,
-                    "anthropic-version": "2023-06-01",
-                    # Explicit UTF-8 charset — httpx defaults to this for json=
-                    # but we make it explicit so the API never has to guess.
-                    "content-type": "application/json; charset=utf-8",
-                    "accept": "application/json",
-                },
-                json=request_body,
-                timeout=10,
-            )
+            r = httpx.post(GROQ_URL, headers=headers, json=request_body, timeout=30)
             last_status = r.status_code
             last_body_snippet = (r.text or "")[:500]
 
             if r.status_code == 429:
                 if attempt < max_retries - 1:
                     delay = base_delay * (2 ** attempt)
-                    print(f"[X-SCRAPER] Haiku 429, backing off {delay}s "
-                          f"(attempt {attempt + 1}/{max_retries})", flush=True)
+                    print(
+                        f"[X-SCRAPER] Groq 429, backing off {delay}s "
+                        f"(attempt {attempt + 1}/{max_retries}) body={last_body_snippet[:200]}",
+                        flush=True,
+                    )
                     time.sleep(delay)
                     continue
-                print(f"[X-SCRAPER] Haiku RATE_LIMIT exhausted on tweet: "
-                      f"{tweet_text[:80]!r}", flush=True)
-                return {"_success": False, "error": "rate_limit", "is_prediction": False}
+                print(
+                    f"[X-SCRAPER] Groq RATE_LIMIT exhausted on tweet: "
+                    f"{tweet_text[:80]!r} body={last_body_snippet[:200]}",
+                    flush=True,
+                )
+                return {"_success": False, "error": "groq_rate_limited",
+                        "is_prediction": False}
 
-            if r.status_code == 401 or r.status_code == 403:
-                print(f"[X-SCRAPER] Haiku AUTH_{r.status_code} body={last_body_snippet}", flush=True)
+            if r.status_code in (401, 403):
+                print(f"[X-SCRAPER] Groq AUTH_{r.status_code} body={last_body_snippet}", flush=True)
                 return {"_success": False,
                         "error": f"auth_{r.status_code}: {last_body_snippet[:200]}",
                         "is_prediction": False}
 
             if r.status_code != 200:
-                # Surface the FULL Anthropic error body so we can diagnose
-                # exactly what's wrong. Both stdout AND the error tag get
-                # the body snippet so it lands in x_scraper_rejections.
-                # Also dump payload size + model + system size to rule out
-                # the obvious size/type/auth issues without another round trip.
+                # Surface the full body so we can diagnose without a round
+                # trip. Tag includes "http_NNN: <body>" so it lands in the
+                # x_scraper_rejections.haiku_reason column for grep.
                 print(
-                    f"[X-SCRAPER] Haiku HTTP_{r.status_code} "
-                    f"payload={payload_bytes}b model='{request_body['model']}' "
-                    f"sys_chars={len(request_body['system'][0]['text'])} "
+                    f"[X-SCRAPER] Groq HTTP_{r.status_code} model='{GROQ_MODEL}' "
                     f"tweet={sanitized[:120]!r}",
                     flush=True,
                 )
                 print(
-                    f"[X-SCRAPER] Haiku HTTP_{r.status_code} body={last_body_snippet}",
+                    f"[X-SCRAPER] Groq HTTP_{r.status_code} body={last_body_snippet}",
                     flush=True,
                 )
-                # Compress the error body into the tag so it ends up in the
-                # haiku_reason DB column. Cap at ~350 chars to leave room
-                # for the "http_NNN: " prefix inside the 500-char column.
                 err_detail = last_body_snippet.replace("\n", " ")[:350]
                 return {
                     "_success": False,
@@ -777,27 +844,13 @@ def _classify_with_haiku(tweet_text: str) -> dict:
                 }
 
             resp_json = r.json()
-
-            # Surface prompt-cache stats from the usage field. Silent unless
-            # caching is actually active (both fields default to 0). The
-            # first call in a cache window logs cache_creation; subsequent
-            # calls log cache_read. If neither is non-zero, the cache is
-            # not engaging — investigate (eligibility threshold, ephemeral
-            # window expiry, payload mismatch, etc.).
-            usage = resp_json.get("usage", {}) or {}
-            cache_creation = usage.get("cache_creation_input_tokens", 0) or 0
-            cache_read = usage.get("cache_read_input_tokens", 0) or 0
-            if cache_creation or cache_read:
-                print(
-                    f"[X-SCRAPER] Haiku cache: created={cache_creation} "
-                    f"read={cache_read} input={usage.get('input_tokens', 0)} "
-                    f"output={usage.get('output_tokens', 0)}",
-                    flush=True,
-                )
-
-            content = (resp_json.get("content") or [{}])[0].get("text", "")
-            content = content.strip()
+            content = (
+                ((resp_json.get("choices") or [{}])[0].get("message") or {}).get("content", "")
+            )
+            content = (content or "").strip()
             if content.startswith("```"):
+                # Defensive: response_format=json_object should never wrap
+                # in fences, but strip them just in case the model regresses.
                 content = content.split("```")[1]
                 if content.startswith("json"):
                     content = content[4:]
@@ -805,14 +858,22 @@ def _classify_with_haiku(tweet_text: str) -> dict:
             try:
                 parsed = json.loads(content)
             except json.JSONDecodeError as pe:
-                print(f"[X-SCRAPER] Haiku PARSE_ERROR: {pe} | "
-                      f"raw={content[:200]!r}", flush=True)
-                return {"_success": False, "error": "parse_error",
-                        "is_prediction": False}
+                raw_snippet = (content or "no content")[:200]
+                print(
+                    f"[X-SCRAPER] Groq PARSE_ERROR: {pe} | raw={raw_snippet!r}",
+                    flush=True,
+                )
+                return {
+                    "_success": False,
+                    "error": f"parse_error: {raw_snippet}",
+                    "is_prediction": False,
+                }
 
             if not isinstance(parsed, dict):
-                print(f"[X-SCRAPER] Haiku NON_DICT response: {type(parsed).__name__}",
-                      flush=True)
+                print(
+                    f"[X-SCRAPER] Groq NON_DICT response: {type(parsed).__name__}",
+                    flush=True,
+                )
                 return {"_success": False, "error": "non_dict_response",
                         "is_prediction": False}
 
@@ -822,23 +883,29 @@ def _classify_with_haiku(tweet_text: str) -> dict:
         except httpx.TimeoutException as te:
             if attempt < max_retries - 1:
                 delay = base_delay * (2 ** attempt)
-                print(f"[X-SCRAPER] Haiku TIMEOUT, backing off {delay}s "
-                      f"(attempt {attempt + 1}/{max_retries})", flush=True)
+                print(
+                    f"[X-SCRAPER] Groq TIMEOUT, backing off {delay}s "
+                    f"(attempt {attempt + 1}/{max_retries})",
+                    flush=True,
+                )
                 time.sleep(delay)
                 continue
-            print(f"[X-SCRAPER] Haiku TIMEOUT exhausted: {te}", flush=True)
+            print(f"[X-SCRAPER] Groq TIMEOUT exhausted: {te}", flush=True)
             return {"_success": False, "error": "timeout", "is_prediction": False}
 
         except Exception as e:
             msg = str(e).lower()
             if ("429" in msg or "rate_limit" in msg) and attempt < max_retries - 1:
                 delay = base_delay * (2 ** attempt)
-                print(f"[X-SCRAPER] Haiku exception 429, backing off {delay}s "
-                      f"(attempt {attempt + 1}/{max_retries}): {e}", flush=True)
+                print(
+                    f"[X-SCRAPER] Groq exception 429, backing off {delay}s "
+                    f"(attempt {attempt + 1}/{max_retries}): {e}",
+                    flush=True,
+                )
                 time.sleep(delay)
                 continue
             if attempt == 0:
-                print(f"[X-SCRAPER] Haiku UNKNOWN {type(e).__name__}: {e}", flush=True)
+                print(f"[X-SCRAPER] Groq UNKNOWN {type(e).__name__}: {e}", flush=True)
             return {"_success": False, "error": f"unknown_{type(e).__name__}",
                     "is_prediction": False}
 
@@ -1111,14 +1178,18 @@ def _record_mentioned_handles(text: str, tracked_handles: set, db):
 # ── Main entry point ─────────────────────────────────────────────────────────
 
 def run_x_scraper(db=None):
-    """Main entry point. Scrapes tracked X accounts and classifies tweets with Haiku."""
+    """Main entry point. Scrapes tracked X accounts and classifies tweets with Groq."""
     print("[X-SCRAPER] run_x_scraper() called", flush=True)
+    print(
+        f"[X-SCRAPER] classifier=groq model={GROQ_MODEL} max_rpm={GROQ_MAX_RPM}",
+        flush=True,
+    )
 
     if not APIFY_API_TOKEN:
         print("[X-SCRAPER] APIFY_API_TOKEN not set, skipping", flush=True)
         return
-    if not ANTHROPIC_API_KEY or ANTHROPIC_API_KEY in ("placeholder", "sk-ant-placeholder"):
-        print("[X-SCRAPER] FATAL: ANTHROPIC_API_KEY not set. Cannot run without AI classifier.", flush=True)
+    if not GROQ_API_KEY:
+        print("[X-SCRAPER] FATAL: GROQ_API_KEY not set. Cannot run without classifier.", flush=True)
         return
 
     # Seed accounts if table is empty
@@ -1259,18 +1330,23 @@ def run_x_scraper(db=None):
                 total_stats["prefilter_pass"] += 1
                 total_stats["ai_sent"] += 1
 
-                # Classify with Haiku (always returns a dict — see _classify_with_haiku)
-                result = _classify_with_haiku(body)
-                time.sleep(0.1)  # rate limit Haiku calls (was 0.02s — 0.1s avoids 429 bursts)
+                # Classify with Groq (always returns a dict — see _classify_with_groq).
+                # The rate limiter inside _classify_with_groq paces calls to
+                # GROQ_MAX_RPM, so we no longer need a manual sleep here.
+                result = _classify_with_groq(body)
 
                 # Classifier FAILURE (distinct from classifier REJECTION):
-                # if _success is False, Haiku didn't give us a real verdict.
+                # if _success is False, Groq didn't give us a real verdict.
                 # Log with a specific rejection_reason so the distribution in
                 # x_scraper_rejections tells us exactly what went wrong.
+                # NOTE: rejection_reason stays "haiku_error" / "haiku_rejected"
+                # for now to keep the rejection-viewer filters working. The
+                # haiku_reason column gets the new groq error tag. Column
+                # rename is a separate follow-up migration.
                 classifier_failed = result.get("_success") is False
                 if classifier_failed:
                     err_tag = result.get("error", "unknown_failure")
-                    rej_key = f"haiku_{err_tag}"
+                    rej_key = f"groq_{err_tag.split(':')[0]}"
                     rejection_reasons[rej_key] = rejection_reasons.get(rej_key, 0) + 1
                     log_rejection(db, tweet, handle, "haiku_error", err_tag, result, None)
                     continue
@@ -1464,11 +1540,18 @@ def run_x_scraper(db=None):
     print(f"[X-SCRAPER] RUN COMPLETE:", flush=True)
     print(f"  Accounts: {total_stats['accounts_scraped']}/{len(accounts)} scraped, {total_stats['blocked_handles']} blocked (news firehose)", flush=True)
     print(f"  Tweets: {total_stats['tweets_fetched']} fetched, {total_stats['prefilter_pass']} passed pre-filter, {total_stats['rejected_empty_body']} empty-body", flush=True)
-    print(f"  Haiku: {total_stats['ai_sent']} sent, {total_stats['ai_predictions']} accepted ({total_stats['ai_high']} high, {total_stats['ai_medium']} medium)", flush=True)
+    print(f"  Groq ({GROQ_MODEL}): {total_stats['ai_sent']} sent, {total_stats['ai_predictions']} accepted ({total_stats['ai_high']} high, {total_stats['ai_medium']} medium)", flush=True)
     print(f"  INSERTED: {total_stats['inserted']} | Dupes: {total_stats['dupes']} | Errors: {total_stats['errors']}", flush=True)
     est_apify = total_stats['tweets_fetched'] * 0.40 / 1000
-    est_haiku = total_stats['ai_sent'] * 220 * 0.80 / 1_000_000
-    print(f"  Est cost: Apify ~${est_apify:.2f}, Haiku ~${est_haiku:.3f}", flush=True)
+    # Groq llama-3.3-70b paid-tier pricing (as of 2026-04): $0.59/M input,
+    # $0.79/M output. ~3,750 in + ~150 out per call. Free tier = $0.
+    est_groq_in = total_stats['ai_sent'] * 3750 * 0.59 / 1_000_000
+    est_groq_out = total_stats['ai_sent'] * 150 * 0.79 / 1_000_000
+    print(
+        f"  Est cost: Apify ~${est_apify:.2f}, Groq ~${est_groq_in + est_groq_out:.4f} "
+        f"(FREE on free tier)",
+        flush=True,
+    )
 
 
 def _update_account_stats(db, account_id: int, tweets_found: int, preds_extracted: int):

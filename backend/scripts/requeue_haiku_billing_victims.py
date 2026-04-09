@@ -5,21 +5,29 @@ One-time job: requeue tweets killed by the Anthropic billing outage on
 During that window, the ANTHROPIC_API_KEY account had insufficient credit
 balance and Haiku classification returned HTTP 400 with body
 {type:invalid_request_error, message:"Your credit balance is too low..."}.
-The _classify_with_haiku error handler wrote those tweets to
-x_scraper_rejections with rejection_reason='haiku_error' and
-haiku_reason starting with "http_400". They never got a real Haiku
-verdict.
+The (then-active) _classify_with_haiku error handler wrote those tweets to
+x_scraper_rejections with rejection_reason='haiku_error' and haiku_reason
+starting with "http_400". They never got a real classifier verdict.
+
+The X scraper has since migrated to Groq llama-3.3-70b-versatile (Apr 9
+2026), so this requeue runs through Groq, NOT Haiku. The job_name in
+worker.py is bumped to '_v2' to make the new pipeline fire even on
+restarts where the v1 entry exists in one_time_jobs.
 
 This script:
   1. Selects every billing-victim row from x_scraper_rejections
-  2. Re-runs _classify_with_haiku on the original tweet text
-  3. If Haiku now accepts → inserts into predictions, deletes the
+  2. Re-runs _classify_with_groq on the original tweet text
+  3. If Groq now accepts → inserts into predictions, deletes the
      rejection row (verified_by='x_scraper_requeue' so we can audit)
-  4. If Haiku now rejects with a real reason → updates the rejection row
+  4. If Groq now rejects with a real reason → updates the rejection row
      in place (rejection_reason='haiku_rejected', haiku_reason=<real>,
      closeness_level=<from result>)
-  5. If Haiku still fails → updates haiku_reason with the new error tag
+  5. If Groq still fails → updates haiku_reason with the new error tag
      and leaves the row alone
+
+The rejection_reason / haiku_reason column names are kept for now to
+preserve compatibility with the rejection viewer; the column rename to
+'classifier_reason' is a separate follow-up migration.
 
 Safe to re-run. The query window is exact and idempotent — successfully
 requeued rows are deleted, so a second run finds 0 victims unless new
@@ -27,7 +35,7 @@ billing failures appear in that exact window.
 
 Usage (CLI, from outside Railway):
     DATABASE_PUBLIC_URL="postgresql://..." \\
-    ANTHROPIC_API_KEY=sk-ant-... \\
+    GROQ_API_KEY=gsk_... \\
     python backend/scripts/requeue_haiku_billing_victims.py
 
 Or invoked from worker.py startup once and guarded by the one_time_jobs
@@ -49,9 +57,10 @@ from sqlalchemy import text as sql_text  # noqa: E402
 OUTAGE_WINDOW_START = datetime(2026, 4, 8, 17, 0, 0)
 OUTAGE_WINDOW_END = datetime(2026, 4, 8, 18, 0, 0)
 
-# Sleep between Haiku calls. Production rate is 0.1s; we use 0.3s here
-# to be safe during a one-shot 377-tweet catchup. ~$0.0001 per call.
-SLEEP_BETWEEN_CALLS = 0.3
+# Per-call sleep is now 0 — the Groq classifier paces itself via the
+# in-process rate limiter (GROQ_MAX_RPM, default 3 RPM under the free-tier
+# 12k TPM ceiling), so any extra sleep here would compound the wait.
+SLEEP_BETWEEN_CALLS = 0.0
 
 
 def _get_session():
@@ -233,12 +242,12 @@ def _insert_requeued_prediction(db, victim: dict, result: dict) -> bool:
 
 def main() -> dict:
     """Run the one-time requeue. Returns a summary dict for logging."""
-    print("[REQUEUE] Starting Anthropic billing-outage requeue job", flush=True)
+    print("[REQUEUE] Starting Apr-8 billing-outage requeue job (Groq pipeline)", flush=True)
 
     # Lazy imports so this script can be imported without triggering side
     # effects in the worker startup path
     from jobs.x_scraper import (
-        _classify_with_haiku, validate_haiku_result, _extract_closeness_level,
+        _classify_with_groq, validate_haiku_result, _extract_closeness_level,
     )
 
     db = _get_session()
@@ -262,13 +271,14 @@ def main() -> dict:
                 skipped_invalid += 1
                 continue
 
-            result = _classify_with_haiku(tweet_text)
-            time.sleep(SLEEP_BETWEEN_CALLS)
+            result = _classify_with_groq(tweet_text)
+            if SLEEP_BETWEEN_CALLS > 0:
+                time.sleep(SLEEP_BETWEEN_CALLS)
 
             if result.get("_success") is False:
-                # Haiku still failing — update haiku_reason with the new tag
-                # so we can see if it's the SAME billing error or something
-                # else. Don't delete the row.
+                # Classifier still failing — update haiku_reason with the new
+                # tag so we can see what went wrong (groq_rate_limited,
+                # http_NNN, parse_error, etc.). Don't delete the row.
                 err_tag = result.get("error", "unknown_failure")[:480]
                 new_error_tags[err_tag.split(":")[0]] += 1
                 still_failing += 1
@@ -289,7 +299,7 @@ def main() -> dict:
                           f"still_failing={still_failing})", flush=True)
                 continue
 
-            # Haiku returned a real verdict. Validate it.
+            # Classifier returned a real verdict. Validate it.
             is_valid, _reject_reason = validate_haiku_result(result, tweet_text)
             closeness_level = _extract_closeness_level(result)
 
@@ -338,7 +348,7 @@ def main() -> dict:
                         print(f"[REQUEUE] Failed to update row {v['id']}: {e}", flush=True)
                         db.rollback()
             else:
-                # Haiku says it's not a prediction — write the real reason
+                # Classifier says it's not a prediction — write the real reason
                 real_reason = (result.get("reason") or "").strip() or "no_reason_returned"
                 try:
                     db.execute(sql_text("""

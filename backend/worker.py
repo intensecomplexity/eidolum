@@ -327,10 +327,24 @@ def main():
 
     def _run_once_requeue_billing_victims():
         """Re-classify the 377 tweets killed by the 2026-04-08 Anthropic
-        billing outage. Idempotent via the one_time_jobs flag table."""
-        job_name = "requeue_haiku_billing_victims_april8"
+        billing outage. Idempotent via the one_time_jobs flag table.
+
+        v2: now runs through Groq llama-3.3-70b-versatile (Apr 9 2026
+        migration). Bumped job_name so the new pipeline fires once even
+        on workers where the v1 entry already sits in one_time_jobs.
+        The v1 row is also dropped here so future migrations of the same
+        cohort don't accidentally short-circuit on it.
+        """
+        job_name = "requeue_billing_victims_april8_v2"
         try:
             with engine.connect() as conn:
+                # Clear the v1 marker — the requeue is being re-run through
+                # the new Groq pipeline. Keeping v1 around would not block
+                # the v2 run (different job_name) but it's misleading state.
+                conn.execute(sql_text(
+                    "DELETE FROM one_time_jobs WHERE job_name = :old"
+                ), {"old": "requeue_haiku_billing_victims_april8"})
+                conn.commit()
                 row = conn.execute(sql_text(
                     "SELECT 1 FROM one_time_jobs WHERE job_name = :j"
                 ), {"j": job_name}).first()
