@@ -18,3 +18,7 @@ dist/
 .DS_Store
 *.log
 .vercel
+
+# Groq Layer 3 eval — local artifacts only, not source
+backend/scripts/groq_layer3_testset.json
+backend/scripts/groq_layer3_eval_results.json
