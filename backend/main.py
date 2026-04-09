@@ -9,8 +9,17 @@ import os
 import sys
 import subprocess
 import time
+import logging
 from datetime import datetime, timedelta, date
 from contextlib import asynccontextmanager
+
+# Install API-key scrubber on httpx/urllib3/root loggers BEFORE any router or
+# scraper imports so the very first outbound HTTP request line is already
+# protected. FMP /stable/ only accepts ?apikey= query auth, so this is the
+# only thing keeping the FMP key out of plaintext logs on the API process.
+from log_filter import install_key_scrubber
+install_key_scrubber()
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware

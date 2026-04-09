@@ -21,6 +21,13 @@ from sqlalchemy import text as sql_text
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s", datefmt="%H:%M:%S")
 log = logging.getLogger("worker")
 
+# Install API-key scrubber on httpx/urllib3/root loggers BEFORE any scraper
+# imports so the very first request line is already protected. FMP /stable/
+# only supports ?apikey= query auth, so this filter is the only thing
+# keeping the FMP key out of plaintext logs.
+from log_filter import install_key_scrubber
+install_key_scrubber()
+
 # Database
 from database import BgSessionLocal, engine, Base
 
