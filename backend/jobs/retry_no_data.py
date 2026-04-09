@@ -895,4 +895,14 @@ def retry_no_data_batch(db, max_tickers: int | None = None):
     print(f"  Cache hits: {cache_hits}")
     print(f"  Remaining no_data: {remaining:,} (was {remaining_total:,})")
     print(f"  Est. days to clear: {est_days}")
+
+    # Cache eviction. The process-local _price_cache also stores NEGATIVE
+    # results ({} for failed fetches), so without an end-of-run clear the
+    # next run hits the negative cache for every previously-failed ticker
+    # and skips the API call entirely. With FMP Ultimate's 999K/day cap
+    # there is zero reason to hoard prices across runs.
+    cache_size = len(_price_cache)
+    _price_cache.clear()
+    print(f"[RetryNoData] Price cache cleared: {cache_size} entries purged", flush=True)
+
     return {"scored": total_scored, "remaining": max(remaining, 0)}

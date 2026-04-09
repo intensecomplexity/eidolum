@@ -438,6 +438,14 @@ def evaluate_batch(max_tickers: int | None = None) -> dict:
           f"Backlog: ~{max(backlog, 0):,} predictions remaining. "
           f"FMP calls today: {_fmp_calls_today}/{_FMP_DAILY_LIMIT}")
 
+    # Symmetric end-of-batch cache clear. _history_cache is also cleared
+    # at the start of every evaluate_batch (see top of function), but
+    # explicit end-clear ensures the worker process doesn't hold the
+    # batch's prices in memory between scheduled runs.
+    cache_size = len(_history_cache)
+    _history_cache.clear()
+    print(f"[HistEval] Price cache cleared: {cache_size} entries purged", flush=True)
+
     return {
         "tickers_processed": len(tickers),
         "predictions_scored": total_scored,
