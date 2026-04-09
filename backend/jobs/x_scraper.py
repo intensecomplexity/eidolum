@@ -692,10 +692,22 @@ def _classify_with_haiku(tweet_text: str) -> dict:
     last_status = None
     last_body_snippet = ""
 
+    # System prompt is sent as a single content block with cache_control so
+    # Anthropic caches it for ~5 minutes. Subsequent calls within the cache
+    # window pay ~10% of the normal input rate for the cached portion (~3,630
+    # tokens), cutting per-call input cost from ~$0.0046 to ~$0.0006. The
+    # ephemeral cache type is GA on anthropic-version 2023-06-01 — no beta
+    # header required.
     request_body = {
         "model": "claude-haiku-4-5-20251001",
         "max_tokens": 150,
-        "system": HAIKU_SYSTEM,
+        "system": [
+            {
+                "type": "text",
+                "text": HAIKU_SYSTEM,
+                "cache_control": {"type": "ephemeral"},
+            }
+        ],
         "messages": [{"role": "user", "content": sanitized}],
     }
     # Diagnostic: payload size for HTTP-error logs (computed once per call,
@@ -746,7 +758,7 @@ def _classify_with_haiku(tweet_text: str) -> dict:
                 print(
                     f"[X-SCRAPER] Haiku HTTP_{r.status_code} "
                     f"payload={payload_bytes}b model='{request_body['model']}' "
-                    f"sys_chars={len(request_body['system'])} "
+                    f"sys_chars={len(request_body['system'][0]['text'])} "
                     f"tweet={sanitized[:120]!r}",
                     flush=True,
                 )
@@ -764,7 +776,26 @@ def _classify_with_haiku(tweet_text: str) -> dict:
                     "is_prediction": False,
                 }
 
-            content = r.json().get("content", [{}])[0].get("text", "")
+            resp_json = r.json()
+
+            # Surface prompt-cache stats from the usage field. Silent unless
+            # caching is actually active (both fields default to 0). The
+            # first call in a cache window logs cache_creation; subsequent
+            # calls log cache_read. If neither is non-zero, the cache is
+            # not engaging — investigate (eligibility threshold, ephemeral
+            # window expiry, payload mismatch, etc.).
+            usage = resp_json.get("usage", {}) or {}
+            cache_creation = usage.get("cache_creation_input_tokens", 0) or 0
+            cache_read = usage.get("cache_read_input_tokens", 0) or 0
+            if cache_creation or cache_read:
+                print(
+                    f"[X-SCRAPER] Haiku cache: created={cache_creation} "
+                    f"read={cache_read} input={usage.get('input_tokens', 0)} "
+                    f"output={usage.get('output_tokens', 0)}",
+                    flush=True,
+                )
+
+            content = (resp_json.get("content") or [{}])[0].get("text", "")
             content = content.strip()
             if content.startswith("```"):
                 content = content.split("```")[1]
