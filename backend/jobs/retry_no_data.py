@@ -438,6 +438,12 @@ def retry_no_data_batch(db, max_tickers: int | None = None):
     # window (eval_date >= prediction_date always).
     # Regex {1,3} not {1,4} — no real US class share has a 4-letter base,
     # but ABEA.F (Frankfurt) etc. did slip through with the looser version.
+    # ORDER BY p.last_retry_at NULLS FIRST, p.ticker — rotates the candidate
+    # window. Without this, the same alphabetically-earliest cohort gets
+    # picked up every run, the negative cache short-circuits the fetch,
+    # and net throughput collapses to ~0. The partial index
+    # idx_predictions_no_data_retry covers (last_retry_at NULLS FIRST, ticker)
+    # WHERE outcome='no_data' so this is an index-only sort.
     polygon_query = r"""
         SELECT p.id, p.ticker, p.direction, p.target_price, p.entry_price,
                p.evaluation_date, p.prediction_date, p.forecaster_id, p.window_days
@@ -450,7 +456,7 @@ def retry_no_data_batch(db, max_tickers: int | None = None):
               p.ticker ~ '^[A-Z]{1,5}$'
               OR p.ticker IN ('BRK.A','BRK.B','BF.A','BF.B','GEF.B','HEI.A','LEN.B','MOG.A','MOG.B')
           )
-        ORDER BY p.ticker
+        ORDER BY p.last_retry_at NULLS FIRST, p.ticker
         LIMIT :lim
     """
     tiingo_query = r"""
@@ -465,7 +471,7 @@ def retry_no_data_batch(db, max_tickers: int | None = None):
               p.ticker ~ '^[A-Z]{1,5}$'
               OR p.ticker IN ('BRK.A','BRK.B','BF.A','BF.B','GEF.B','HEI.A','LEN.B','MOG.A','MOG.B')
           )
-        ORDER BY p.ticker
+        ORDER BY p.last_retry_at NULLS FIRST, p.ticker
         LIMIT :lim
     """
     log.info(f'[RetryNoData-CANDIDATES] Polygon query preview: {polygon_query[:500]}')
@@ -619,6 +625,19 @@ def retry_no_data_batch(db, max_tickers: int | None = None):
               f"{fmp_calls} API calls, {fmp_scored} scored, "
               f"{len(fmp_failed_tickers)} failed, {total_still_no_data} still no_data", flush=True)
 
+        # Mark every ticker FMP attempted (success OR failure) as retried so
+        # the next run rotates to a different cohort. Without this batch
+        # UPDATE the ORDER BY p.last_retry_at NULLS FIRST clause has nothing
+        # to sort on and the rotation degenerates back to alphabetical.
+        if all_tickers:
+            db.execute(sql_text("""
+                UPDATE predictions
+                SET last_retry_at = NOW(), retry_count = retry_count + 1
+                WHERE outcome='no_data' AND ticker = ANY(:tickers)
+            """), {"tickers": list(all_tickers)})
+            db.commit()
+            print(f"[RetryNoData] Marked {len(all_tickers)} tickers as retried (FMP phase)", flush=True)
+
         # ── Polygon fallback for FMP-failed RECENT tickers ──
         polygon_fallback = [t for t in fmp_failed_tickers if t in polygon_preds_by_ticker]
         for i, ticker in enumerate(polygon_fallback):
@@ -637,6 +656,14 @@ def retry_no_data_batch(db, max_tickers: int | None = None):
             time.sleep(10)  # Polygon: 5 calls/min — kept slow for fallback safety
         db.commit()
         polygon_scored = total_scored - fmp_scored
+        if polygon_fallback:
+            db.execute(sql_text("""
+                UPDATE predictions
+                SET last_retry_at = NOW(), retry_count = retry_count + 1
+                WHERE outcome='no_data' AND ticker = ANY(:tickers)
+            """), {"tickers": list(polygon_fallback)})
+            db.commit()
+            print(f"[RetryNoData] Marked {len(polygon_fallback)} tickers as retried (Polygon fallback)", flush=True)
 
         # ── Tiingo fallback for FMP-failed OLD tickers ──
         tiingo_fallback = [t for t in fmp_failed_tickers if t in tiingo_preds_by_ticker]
@@ -660,6 +687,14 @@ def retry_no_data_batch(db, max_tickers: int | None = None):
             time.sleep(0.05)
         db.commit()
         tiingo_scored = total_scored - fmp_scored - polygon_scored
+        if tiingo_fallback:
+            db.execute(sql_text("""
+                UPDATE predictions
+                SET last_retry_at = NOW(), retry_count = retry_count + 1
+                WHERE outcome='no_data' AND ticker = ANY(:tickers)
+            """), {"tickers": list(tiingo_fallback)})
+            db.commit()
+            print(f"[RetryNoData] Marked {len(tiingo_fallback)} tickers as retried (Tiingo fallback)", flush=True)
 
     else:
         # ═══════════════════════════════════════════════════════════════
@@ -693,6 +728,14 @@ def retry_no_data_batch(db, max_tickers: int | None = None):
         polygon_scored = total_scored
         print(f"[RetryNoData-DEBUG] Polygon phase: {len(polygon_batch)} tickers, "
               f"{polygon_calls} API calls, {polygon_scored} scored, {total_still_no_data} still no_data", flush=True)
+        if polygon_batch:
+            db.execute(sql_text("""
+                UPDATE predictions
+                SET last_retry_at = NOW(), retry_count = retry_count + 1
+                WHERE outcome='no_data' AND ticker = ANY(:tickers)
+            """), {"tickers": list(polygon_batch)})
+            db.commit()
+            print(f"[RetryNoData] Marked {len(polygon_batch)} tickers as retried (Polygon phase)", flush=True)
 
         # ── Phase 2: Tiingo (old preds only, Power plan: 10K calls/hour) ──
         tiingo_failed_tickers = []
@@ -736,6 +779,14 @@ def retry_no_data_batch(db, max_tickers: int | None = None):
 
         db.commit()
         tiingo_scored = total_scored - polygon_scored
+        if tiingo_batch:
+            db.execute(sql_text("""
+                UPDATE predictions
+                SET last_retry_at = NOW(), retry_count = retry_count + 1
+                WHERE outcome='no_data' AND ticker = ANY(:tickers)
+            """), {"tickers": list(tiingo_batch)})
+            db.commit()
+            print(f"[RetryNoData] Marked {len(tiingo_batch)} tickers as retried (Tiingo phase)", flush=True)
 
         # ── Phase 3: FMP (tickers Tiingo failed on, 300/day) ──
         for i, ticker in enumerate(tiingo_failed_tickers[:FMP_DAILY_LIMIT - _fmp_calls_today]):
@@ -754,6 +805,14 @@ def retry_no_data_batch(db, max_tickers: int | None = None):
             time.sleep(0.3)
         db.commit()
         fmp_scored = total_scored - polygon_scored - tiingo_scored
+        if tiingo_failed_tickers:
+            db.execute(sql_text("""
+                UPDATE predictions
+                SET last_retry_at = NOW(), retry_count = retry_count + 1
+                WHERE outcome='no_data' AND ticker = ANY(:tickers)
+            """), {"tickers": list(tiingo_failed_tickers)})
+            db.commit()
+            print(f"[RetryNoData] Marked {len(tiingo_failed_tickers)} tickers as retried (FMP Starter fallback)", flush=True)
 
     # Update forecaster stats
     if affected_forecasters:
