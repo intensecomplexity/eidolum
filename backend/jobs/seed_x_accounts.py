@@ -18,7 +18,12 @@ from sqlalchemy import text as sql_text
 SEED_ACCOUNTS = [
     # Tier 1 — Core high-volume scoreable accounts
     ("unusual_whales",  "Unusual Whales",      1, "options flow alerts"),
-    ("DeItaone",        "Walter Bloomberg",    1, "breaking news directional takes"),
+    # Removed @DeItaone — verified Apr 9 forensics: posted ~2,400 geopolitical
+    # headlines in 30h, all correctly rejected by Haiku as non-predictions, but
+    # each rejection cost ~$0.0046. Single-handed driver of ~80% of April
+    # Anthropic spend. seed_tracked_x_accounts() deactivates all rows and
+    # re-activates only SEED_ACCOUNTS, so dropping this line here deactivates
+    # the existing row in production on the next scraper cycle.
     ("markflowchatter", "Mark Flow Chatter",   1, "dark pool + options flow"),
     ("ripster47",       "Ripster",             1, "chart setups entry/target/stop"),
     ("traderstewie",    "Stewie",              1, "daily picks with targets"),
@@ -48,7 +53,9 @@ SEED_ACCOUNTS = [
     ("bespokeinvest",   "Bespoke",             3, "data-driven directional"),
     ("RyanDetrick",     "Ryan Detrick",        3, "stats-driven index calls"),
     ("pierce_crosby",   "Pierce Crosby",       3, "macro to equity"),
-    ("zerohedge",       "ZeroHedge",           3, "fast directional takes"),
+    # Removed @zerohedge — same news-firehose pattern as @DeItaone. Posts
+    # headline-shaped tweets that match the all-caps ticker regex (TRUMP,
+    # NATO, IRAN) and reach Haiku as false positives. No real predictions.
     ("BradGerstner",    "Brad Gerstner",       3, "Altimeter growth tech"),
 ]
 

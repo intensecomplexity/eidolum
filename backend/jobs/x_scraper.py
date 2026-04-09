@@ -90,6 +90,45 @@ SPAM_PATTERNS = [re.compile(p, re.IGNORECASE) for p in [
 
 TICKER_MENTION_RE = re.compile(r'\$[A-Z]{1,5}\b|(?<!\w)[A-Z]{2,5}(?!\w)')
 
+# ── News-firehose blocklist ──────────────────────────────────────────────────
+#
+# Handles that post breaking-news headlines, not predictions. These accounts
+# trigger TICKER_MENTION_RE via all-caps country/org names (TRUMP, IRAN,
+# NATO, NYSE) and reach Haiku as false positives. Apr 9 forensics showed
+# @DeItaone alone drove ~80% of the scraper's Anthropic spend by posting
+# ~2,400 geopolitical headlines in 30 hours, every one correctly rejected
+# by Haiku as "no asset" but each rejection still costing ~$0.0046.
+#
+# Blocked at the per-handle pre-fetch layer in run_x_scraper(), so blocked
+# accounts never hit Apify or Haiku. SEED_ACCOUNTS in seed_x_accounts.py is
+# the canonical list — DeItaone and zerohedge have been removed there too,
+# so the seeder won't re-activate them. This Python set is belt-and-braces
+# defense in case anyone re-adds them via the admin UI or a future seed.
+BLOCKED_HANDLES = frozenset({
+    'deitaone',         # Bloomberg-style breaking news firehose (#1 cost driver)
+    'zerohedge',        # Same news-firehose pattern as deitaone
+    'firstsquawk',      # Real-time market news aggregator
+    'livesquawk',       # Real-time market news aggregator
+    'breaking911',      # Breaking news
+    'disclosetv',       # General news
+    'spectatorindex',   # World news aggregator
+    'insiderpaper',     # News aggregator
+    'reutersbiz',       # Reuters business news feed
+    'reuters',          # Reuters main
+    'bloomberg',        # Bloomberg main
+    'cnbcnow',          # CNBC breaking news
+    'financialjuice',   # Market news feed
+    'walterbloomberg',  # Headline mirror (alias of DeItaone)
+})
+
+
+def _is_blocked_handle(handle: str) -> bool:
+    """Return True if the handle should be skipped entirely (news firehose)."""
+    if not handle:
+        return False
+    return handle.lstrip('@').strip().lower() in BLOCKED_HANDLES
+
+
 # ── Haiku AI classification ──────────────────────────────────────────────────
 
 HAIKU_SYSTEM = """You are a strict classifier evaluating tweets for stock predictions on Eidolum, a financial accountability platform. Eidolum holds forecasters to a high standard. Vague mentions, macro commentary, and self-promotional cashtags are NOT predictions and must be rejected.
@@ -1106,6 +1145,7 @@ def run_x_scraper(db=None):
         "ai_sent": 0, "ai_predictions": 0, "ai_high": 0, "ai_medium": 0,
         "inserted": 0, "dupes": 0, "errors": 0,
         "rejected_empty_body": 0,
+        "blocked_handles": 0,
     }
     # Strict-mode rejection breakdown (Phase 5)
     rejection_reasons: dict[str, int] = {}
@@ -1114,6 +1154,14 @@ def run_x_scraper(db=None):
     haiku_rejected_logged = 0
 
     for account_id, handle in accounts:
+        # Hard-block news-firehose handles before Apify is even called.
+        # Saves both Apify cost AND Haiku cost. See BLOCKED_HANDLES at the
+        # top of this file for the rationale.
+        if _is_blocked_handle(handle):
+            total_stats["blocked_handles"] += 1
+            print(f"[X-SCRAPER] @{handle}: BLOCKED (news firehose, skipping)", flush=True)
+            continue
+
         try:
             account_tweets = 0
             account_preds = 0
@@ -1383,7 +1431,7 @@ def run_x_scraper(db=None):
     reasons_str = ", ".join(f"{k}={v}" for k, v in sorted(rejection_reasons.items(), key=lambda x: -x[1]))
     print(f"[X-SCRAPER] Done: {total_stats['inserted']} inserted, {rejected_total} rejected ({reasons_str or 'none'})", flush=True)
     print(f"[X-SCRAPER] RUN COMPLETE:", flush=True)
-    print(f"  Accounts: {total_stats['accounts_scraped']}/{len(accounts)}", flush=True)
+    print(f"  Accounts: {total_stats['accounts_scraped']}/{len(accounts)} scraped, {total_stats['blocked_handles']} blocked (news firehose)", flush=True)
     print(f"  Tweets: {total_stats['tweets_fetched']} fetched, {total_stats['prefilter_pass']} passed pre-filter, {total_stats['rejected_empty_body']} empty-body", flush=True)
     print(f"  Haiku: {total_stats['ai_sent']} sent, {total_stats['ai_predictions']} accepted ({total_stats['ai_high']} high, {total_stats['ai_medium']} medium)", flush=True)
     print(f"  INSERTED: {total_stats['inserted']} | Dupes: {total_stats['dupes']} | Errors: {total_stats['errors']}", flush=True)
