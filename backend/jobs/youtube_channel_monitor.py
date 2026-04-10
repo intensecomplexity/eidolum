@@ -669,17 +669,23 @@ def _parse_publish_date(s: str):
     return None
 
 
-# ── Per-channel yield tracking ──────────────────────────────────────────────
+# ── Per-channel yield tracking + auto-prune ─────────────────────────────────
 
 # A channel is reached-Haiku if classify_video returned a verdict, i.e.
 # transcript_status is one of these. classifier_error is intentionally
 # excluded — a Haiku outage should not push channels toward auto-prune.
 _REACHED_HAIKU_STATUSES = {"ok_inserted", "ok_no_predictions"}
 
+# Auto-prune threshold: a channel that's processed this many videos
+# without producing a single inserted prediction gets soft-deactivated.
+# Pruned channels can be manually re-enabled from the admin panel.
+AUTO_PRUNE_VIDEO_THRESHOLD = 5
+
 
 def _update_channel_yield_counters(db, youtube_channel_id, channel_name,
                                     transcript_status, inserted_for_video):
-    """Increment per-channel yield counters after a video is processed.
+    """Increment per-channel yield counters after a video is processed,
+    and auto-deactivate the channel if it crosses the zero-yield threshold.
 
     videos_processed_count: +1 if the video reached Haiku and got a
                             verdict (regardless of how many predictions
@@ -688,6 +694,10 @@ def _update_channel_yield_counters(db, youtube_channel_id, channel_name,
                             video was inserted into the predictions
                             table — the only signal that the channel is
                             actually producing usable content.
+
+    Auto-prune trigger: after the increment, if videos_processed_count
+    >= AUTO_PRUNE_VIDEO_THRESHOLD AND predictions_extracted_count == 0,
+    the channel is soft-deactivated via _deactivate_channel().
 
     Best-effort: a write failure must NEVER break the scrape loop. The
     counters resync from youtube_videos on the next worker boot via the
@@ -705,17 +715,78 @@ def _update_channel_yield_counters(db, youtube_channel_id, channel_name,
 
     inc_predictions = 1 if (inserted_for_video or 0) > 0 else 0
     try:
-        db.execute(sql_text(f"""
+        # RETURNING the post-update counts so we can decide to prune
+        # in the same round-trip without a follow-up SELECT.
+        row = db.execute(sql_text(f"""
             UPDATE youtube_channels
             SET videos_processed_count = videos_processed_count + 1,
                 predictions_extracted_count = predictions_extracted_count + :inc_p
             WHERE {where_clause}
               AND is_active = TRUE
+            RETURNING videos_processed_count, predictions_extracted_count,
+                      youtube_channel_id, channel_name
         """), {"cid": youtube_channel_id, "name": channel_name,
-               "inc_p": inc_predictions})
+               "inc_p": inc_predictions}).first()
         db.commit()
     except Exception as e:
         print(f"[ChannelMonitor] yield counter update failed for "
+              f"{channel_name}: {e}")
+        try:
+            db.rollback()
+        except Exception:
+            pass
+        return
+
+    if not row:
+        # Channel was already inactive (or row missing) — nothing to prune.
+        return
+
+    new_videos = int(row[0] or 0)
+    new_preds = int(row[1] or 0)
+    cid = row[2]
+    cname = row[3] or channel_name
+
+    if new_videos >= AUTO_PRUNE_VIDEO_THRESHOLD and new_preds == 0:
+        _deactivate_channel(
+            db, youtube_channel_id=cid, channel_name=cname,
+            videos_processed=new_videos, predictions_extracted=new_preds,
+            reason="auto_pruned_zero_yield",
+        )
+
+
+def _deactivate_channel(db, *, youtube_channel_id, channel_name,
+                         videos_processed, predictions_extracted,
+                         reason="auto_pruned_zero_yield"):
+    """Soft-deactivate a YouTube channel. Sets is_active=FALSE and stamps
+    deactivated_at + deactivation_reason. The row stays in the table
+    forever; predictions, video metadata, and rejection logs are
+    untouched. Pruned channels can be manually reactivated from the
+    admin panel (clearing the counters for a fresh chance).
+
+    The WHERE clause includes is_active = TRUE so a re-deactivation race
+    is a no-op. The audit_log table requires admin_user_id NOT NULL and
+    is therefore left to the manual reactivate endpoint, where a real
+    admin user is in scope; auto-prunes are observable via the [YOUTUBE-
+    MONITOR] stdout line and the deactivated_at column.
+    """
+    try:
+        db.execute(sql_text("""
+            UPDATE youtube_channels
+            SET is_active = FALSE,
+                deactivated_at = NOW(),
+                deactivation_reason = :reason
+            WHERE youtube_channel_id = :cid
+              AND is_active = TRUE
+        """), {"cid": youtube_channel_id, "reason": reason})
+        db.commit()
+        print(
+            f"[YOUTUBE-MONITOR] Auto-deactivated channel {channel_name} "
+            f"({youtube_channel_id}): {videos_processed} videos processed, "
+            f"{predictions_extracted} predictions extracted",
+            flush=True,
+        )
+    except Exception as e:
+        print(f"[ChannelMonitor] deactivate_channel failed for "
               f"{channel_name}: {e}")
         try:
             db.rollback()
