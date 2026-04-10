@@ -139,6 +139,30 @@ TRANSCRIPT_CHUNK_OVERLAP = 2_000
 # Default evaluation window when the classifier returns no timeframe.
 DEFAULT_EVAL_WINDOW_DAYS = 90
 
+# Haiku 4.5 pricing (USD per 1M tokens). Keep in sync with Anthropic's
+# public pricing page — if these drift out of date the [YOUTUBE-HAIKU]
+# cost line and the scraper_runs.estimated_cost_usd aggregate will
+# understate or overstate spend. Last verified: 2026-04-10.
+HAIKU_PRICE_INPUT_PER_M = 1.00        # base input tokens
+HAIKU_PRICE_OUTPUT_PER_M = 5.00       # output tokens
+HAIKU_PRICE_CACHE_WRITE_PER_M = 1.25  # ephemeral cache creation (5-min TTL)
+HAIKU_PRICE_CACHE_READ_PER_M = 0.10   # ephemeral cache read
+
+
+def _estimate_haiku_cost(
+    *, input_tokens: int, output_tokens: int,
+    cache_create_tokens: int = 0, cache_read_tokens: int = 0,
+) -> float:
+    """Compute USD cost for a single Haiku call using the public pricing
+    constants above. Returns a float dollar amount (call sites format
+    to 4 decimals). If pricing changes, update the HAIKU_PRICE_* block."""
+    return (
+        (input_tokens * HAIKU_PRICE_INPUT_PER_M / 1_000_000)
+        + (output_tokens * HAIKU_PRICE_OUTPUT_PER_M / 1_000_000)
+        + (cache_create_tokens * HAIKU_PRICE_CACHE_WRITE_PER_M / 1_000_000)
+        + (cache_read_tokens * HAIKU_PRICE_CACHE_READ_PER_M / 1_000_000)
+    )
+
 # verified_by tag for grep / cohort analysis. Bump _v1 → _v2 if the
 # prompt or model materially change.
 VERIFIED_BY = "youtube_haiku_v1"
@@ -460,15 +484,37 @@ def classify_video(channel_name: str, title: str, publish_date: str,
 
         usage = getattr(resp, "usage", None)
         if usage:
-            telemetry["input_tokens"] += getattr(usage, "input_tokens", 0) or 0
-            telemetry["output_tokens"] += getattr(usage, "output_tokens", 0) or 0
-            cache_read = getattr(usage, "cache_read_input_tokens", 0) or 0
-            cache_create = getattr(usage, "cache_creation_input_tokens", 0) or 0
-            if cache_read or cache_create:
-                telemetry.setdefault("cache_read", 0)
-                telemetry.setdefault("cache_create", 0)
-                telemetry["cache_read"] += cache_read
-                telemetry["cache_create"] += cache_create
+            call_input = int(getattr(usage, "input_tokens", 0) or 0)
+            call_output = int(getattr(usage, "output_tokens", 0) or 0)
+            call_cache_read = int(getattr(usage, "cache_read_input_tokens", 0) or 0)
+            call_cache_create = int(getattr(usage, "cache_creation_input_tokens", 0) or 0)
+            telemetry["input_tokens"] += call_input
+            telemetry["output_tokens"] += call_output
+            telemetry.setdefault("cache_read", 0)
+            telemetry.setdefault("cache_create", 0)
+            telemetry["cache_read"] += call_cache_read
+            telemetry["cache_create"] += call_cache_create
+
+            call_cost = _estimate_haiku_cost(
+                input_tokens=call_input,
+                output_tokens=call_output,
+                cache_create_tokens=call_cache_create,
+                cache_read_tokens=call_cache_read,
+            )
+            telemetry.setdefault("estimated_cost_usd", 0.0)
+            telemetry["estimated_cost_usd"] += call_cost
+
+            # Per-call stdout telemetry line. Mirrors the format we can
+            # grep from worker logs, and makes the cache-hit ratio
+            # visible per chunk (so a cold chunk vs a warm chunk is
+            # obvious without opening the scraper_runs row).
+            print(
+                f"[YOUTUBE-HAIKU] cache_create={call_cache_create} "
+                f"cache_read={call_cache_read} input={call_input} "
+                f"output={call_output} "
+                f"total_cost_estimate=${call_cost:.4f}",
+                flush=True,
+            )
 
         try:
             content = resp.content[0].text.strip()
