@@ -1660,6 +1660,22 @@ async def lifespan(app):
         except Exception as _sre:
             print(f"[Startup] scraper_runs sector_calls migration error: {_sre}")
 
+        # ── ENABLE_YOUTUBE_SECTOR_CALLS flag seed ─────────────────────────
+        # Seed at 0 (feature OFF) on first boot. Idempotent: only inserts
+        # if the row doesn't already exist. Admin flips via
+        # POST /api/admin/sector-calls/traffic.
+        try:
+            with engine.connect() as _fl_c:
+                _fl_c.execute(sql_text("""
+                    INSERT INTO config (key, value)
+                    VALUES ('ENABLE_YOUTUBE_SECTOR_CALLS', '0')
+                    ON CONFLICT (key) DO NOTHING
+                """))
+                _fl_c.commit()
+                print("[Startup] ENABLE_YOUTUBE_SECTOR_CALLS flag seeded")
+        except Exception as _fle:
+            print(f"[Startup] ENABLE_YOUTUBE_SECTOR_CALLS seed error: {_fle}")
+
         # ── youtube_channel_meta totals backfill ────────────────────────
         # Historical backfill for the admin card counters. Three columns:
         #   - total_predictions_extracted (display)
@@ -2609,14 +2625,24 @@ def get_features(db: _Session = _Depends(_get_db)):
         "tournaments": False, "daily_challenge": False,
         "duels": False, "compete": False, "compare_analysts": False,
         "evaluate_x_predictions": False,
+        # Integer 0-100. 0 = YouTube sector-call extraction OFF. The
+        # frontend admin overview tab reads this to render the current
+        # slider value.
+        "youtube_sector_traffic_pct": 0,
     }
     try:
         rows = db.execute(_ft(
-            "SELECT key, value FROM config WHERE key IN ('tournaments_enabled','daily_challenge_enabled','duels_enabled','compete_enabled','compare_analysts_enabled','EVALUATE_X_PREDICTIONS')"
+            "SELECT key, value FROM config WHERE key IN ('tournaments_enabled','daily_challenge_enabled','duels_enabled','compete_enabled','compare_analysts_enabled','EVALUATE_X_PREDICTIONS','ENABLE_YOUTUBE_SECTOR_CALLS')"
         )).fetchall()
         for r in rows:
             if r[0] == "EVALUATE_X_PREDICTIONS":
                 flags["evaluate_x_predictions"] = str(r[1]).strip().lower() == "true"
+            elif r[0] == "ENABLE_YOUTUBE_SECTOR_CALLS":
+                try:
+                    pct = int(str(r[1]).strip())
+                except (ValueError, TypeError):
+                    pct = 0
+                flags["youtube_sector_traffic_pct"] = max(0, min(100, pct))
             else:
                 flags[r[0].replace("_enabled", "")] = r[1] == "true"
     except Exception:
