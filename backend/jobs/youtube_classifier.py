@@ -888,6 +888,24 @@ def _validate_and_dedupe_predictions(raw: list) -> list[dict]:
                 # fall through as unranked picks (per spec).
                 list_id = None
                 list_rank = None
+        # Revision metadata: is_revision=true flags this prediction as
+        # a target revision. previous_target / revision_direction are
+        # free-form hints from Haiku used only for logging — the actual
+        # revision_of FK is resolved at insert time by looking up the
+        # forecaster's most recent prior prediction on this ticker.
+        is_revision = bool(p.get("is_revision"))
+        raw_prev = p.get("previous_target")
+        prev_target_hint = None
+        if raw_prev is not None:
+            try:
+                prev_target_hint = float(raw_prev)
+                if not (0.0 < prev_target_hint < 1_000_000):
+                    prev_target_hint = None
+            except (TypeError, ValueError):
+                prev_target_hint = None
+        rev_dir = (p.get("revision_direction") or "").strip().lower() or None
+        if rev_dir not in (None, "up", "down", "direction_change"):
+            rev_dir = None
         key = (ticker, direction)
         if key in seen_tickers:
             continue
@@ -899,6 +917,9 @@ def _validate_and_dedupe_predictions(raw: list) -> list[dict]:
         p["_list_rank"] = list_rank
         if list_error:
             p["_list_error"] = list_error
+        p["_is_revision"] = is_revision
+        p["_previous_target_hint"] = prev_target_hint
+        p["_revision_direction_hint"] = rev_dir
         out.append(p)
     return out
 
@@ -1013,6 +1034,43 @@ def _parse_evaluation_date(timeframe_str, prediction_date: datetime) -> tuple[da
     return default_eval, DEFAULT_EVAL_WINDOW_DAYS
 
 
+def _find_prior_prediction_for_revision(
+    db, *, forecaster_id: int, ticker: str,
+) -> tuple[int | None, float | None]:
+    """Look up the most recent YouTube prediction by this forecaster on
+    this ticker to link a revision to. Returns (prior_id, prior_target)
+    or (None, None) if no prior exists.
+
+    Flat-chain semantics per spec: we return the IMMEDIATE predecessor
+    even if that predecessor is itself a revision. We do NOT walk up the
+    chain to find the 'original' — each revision points at the single
+    most recent prior, and the full history is a linked list of hops.
+
+    Best-effort: any query failure returns (None, None) and the caller
+    inserts the prediction as a standalone call.
+    """
+    if not forecaster_id or not ticker:
+        return None, None
+    try:
+        row = db.execute(sql_text("""
+            SELECT id, target_price
+            FROM predictions
+            WHERE forecaster_id = :fid
+              AND ticker = :ticker
+              AND source_type = 'youtube'
+            ORDER BY created_at DESC NULLS LAST, id DESC
+            LIMIT 1
+        """), {"fid": int(forecaster_id), "ticker": ticker.upper()}).first()
+    except Exception as _e:
+        log.warning("[YT-CLF] revision prior lookup failed: %s", _e)
+        return None, None
+    if not row:
+        return None, None
+    prior_id = int(row[0])
+    prior_target = float(row[1]) if row[1] is not None else None
+    return prior_id, prior_target
+
+
 def insert_youtube_prediction(
     pred: dict,
     *,
@@ -1084,6 +1142,16 @@ def insert_youtube_prediction(
     list_id_val = pred.get("_list_id")
     list_rank_val = pred.get("_list_rank")
 
+    # Revision linkage: if Haiku flagged this as a target revision, look
+    # up the forecaster's most recent prior prediction on this ticker
+    # and set revision_of. We DON'T drop the prediction if no prior is
+    # found — first-time calls wrongly tagged as revisions still get
+    # inserted as standalone calls, per spec ("better than dropping it").
+    # Note: the find_or_create_youtube_forecaster call below is the
+    # source of the forecaster_id we need, so the prior lookup happens
+    # AFTER we resolve the forecaster.
+    revision_of_val: int | None = None
+
     # Per-video-per-ticker dedup. Same video may produce multiple tickers,
     # but the same (video, ticker) pair should only insert once even if
     # the classifier returns it twice across chunks.
@@ -1104,6 +1172,34 @@ def insert_youtube_prediction(
     forecaster = find_or_create_youtube_forecaster(channel_name, channel_id, db)
     if not forecaster:
         return _reject("forecaster_creation_failed")
+
+    # Resolve the revision_of link if Haiku flagged this as a revision.
+    # Flat chain: we link to the IMMEDIATE prior prediction even if it's
+    # itself a revision. Missing-prior case (first-time call wrongly
+    # tagged as a revision) → insert as standalone, log a note, do NOT
+    # drop the prediction.
+    if pred.get("_is_revision"):
+        prior_id, prior_target = _find_prior_prediction_for_revision(
+            db, forecaster_id=forecaster.id, ticker=ticker,
+        )
+        if prior_id is not None:
+            revision_of_val = prior_id
+            _rev_dir = pred.get("_revision_direction_hint") or "?"
+            _prior_hint = pred.get("_previous_target_hint")
+            _new_hint = pred.get("target_price")
+            print(
+                f"[YOUTUBE-HAIKU] Revision linked: {channel_name} {ticker} "
+                f"→ prior_id={prior_id} dir={_rev_dir} "
+                f"({_prior_hint} → {_new_hint})",
+                flush=True,
+            )
+        else:
+            print(
+                f"[YOUTUBE-HAIKU] Revision claimed on {ticker} by "
+                f"{channel_name} but no prior prediction found — "
+                f"inserting as standalone call",
+                flush=True,
+            )
 
     # Cross-scraper dedup (within 24h of the prediction_date)
     if prediction_exists_cross_scraper(ticker, forecaster.id, direction, publish_date, db):
@@ -1170,6 +1266,7 @@ def insert_youtube_prediction(
             prediction_category="ticker_call",
             list_id=list_id_val,
             list_rank=list_rank_val,
+            revision_of=revision_of_val,
         )
     )
     db.flush()
