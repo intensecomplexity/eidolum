@@ -173,6 +173,90 @@ def get_forecaster(
     else:
         live_accuracy = 0
 
+    # Ranked lists — every distinct list_id this forecaster has published,
+    # with the individual items. Powers the "Ranked Lists" section on the
+    # profile page. Gracefully degrades if list_id column is missing.
+    ranked_lists: list = []
+    ranking_stats = {
+        "lists_published": 0,
+        "evaluated_lists": 0,
+        "ranking_accuracy": None,
+    }
+    try:
+        list_rows = db.execute(sql_text("""
+            SELECT list_id, list_rank, ticker, direction, actual_return,
+                   outcome, prediction_date
+            FROM predictions
+            WHERE forecaster_id = :fid
+              AND list_id IS NOT NULL
+              AND list_rank IS NOT NULL
+            ORDER BY prediction_date DESC, list_id, list_rank
+        """), {"fid": forecaster_id}).fetchall()
+        by_list_id: dict = {}
+        for lr in list_rows:
+            lid = lr[0]
+            if lid not in by_list_id:
+                by_list_id[lid] = {
+                    "list_id": lid,
+                    "prediction_date": lr[6].isoformat() if lr[6] else None,
+                    "items": [],
+                }
+            by_list_id[lid]["items"].append({
+                "rank": int(lr[1]) if lr[1] is not None else None,
+                "ticker": lr[2],
+                "direction": lr[3],
+                "actual_return": float(lr[4]) if lr[4] is not None else None,
+                "outcome": lr[5],
+            })
+        total_pairs = 0
+        correct_pairs = 0
+        evaluated_lists = 0
+        for lid, entry in by_list_id.items():
+            items = entry["items"]
+            scored = [
+                it for it in items
+                if it["actual_return"] is not None
+                and it["outcome"] in ("hit", "near", "miss", "correct", "incorrect")
+            ]
+            entry["items_scored"] = len(scored)
+            if len(scored) >= 2:
+                evaluated_lists += 1
+                scored.sort(key=lambda x: x["rank"] or 0)
+                list_pairs = 0
+                list_correct = 0
+                for i in range(len(scored)):
+                    for j in range(i + 1, len(scored)):
+                        list_pairs += 1
+                        if scored[i]["actual_return"] > scored[j]["actual_return"]:
+                            list_correct += 1
+                entry["pairs_total"] = list_pairs
+                entry["pairs_correct"] = list_correct
+                entry["ranking_accuracy"] = (
+                    round(list_correct / list_pairs * 100, 1) if list_pairs > 0 else None
+                )
+                total_pairs += list_pairs
+                correct_pairs += list_correct
+            else:
+                entry["pairs_total"] = 0
+                entry["pairs_correct"] = 0
+                entry["ranking_accuracy"] = None
+            # Also build a "by actual return" ordering for the diff view
+            by_return = sorted(
+                [it for it in items if it["actual_return"] is not None],
+                key=lambda x: x["actual_return"],
+                reverse=True,
+            )
+            entry["by_return_order"] = by_return
+        ranked_lists = list(by_list_id.values())
+        ranking_stats["lists_published"] = len(ranked_lists)
+        ranking_stats["evaluated_lists"] = evaluated_lists
+        if evaluated_lists >= 2 and total_pairs > 0:
+            ranking_stats["ranking_accuracy"] = round(
+                correct_pairs / total_pairs * 100, 1
+            )
+    except Exception:
+        pass
+
     # Per-category stats (ticker_call vs sector_call). Exposes the split
     # so the profile page can render a dedicated "Sector Calls" section
     # without inflating the main accuracy number. Gracefully degrades
@@ -240,6 +324,8 @@ def get_forecaster(
         "accuracy_over_time": _build_accuracy_trend(forecaster_id, db, sector),
         "prediction_counts": pred_counts,
         "category_stats": category_stats,
+        "ranked_lists": ranked_lists,
+        "ranking_stats": ranking_stats,
         "predictions": _get_preds(forecaster_id, page, limit, filter, sector, db),
         "disclosed_positions": [],
         "conflict_stats": {"total": 0, "conflicts": 0, "rate": 0},

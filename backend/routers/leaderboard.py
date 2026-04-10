@@ -115,6 +115,110 @@ def _enrich_category_stats(results: list, db: Session):
         r.update(stats)
 
 
+def _enrich_ranking_stats(results: list, db: Session):
+    """Batch-compute ranking_accuracy and lists_published per forecaster.
+
+    ranking_accuracy is defined as (correct pairwise orderings) / (total
+    pairs) across every fully-evaluated ranked list the forecaster has
+    published. A pair (i, j) with list_rank i < j is 'correct' if
+    items[i].actual_return > items[j].actual_return — the forecaster's
+    higher-ranked pick outperformed their lower-ranked pick.
+
+    A list is only counted if it has at least 2 items with a real
+    actual_return (outcome in hit/near/miss/correct/incorrect). A
+    forecaster must have at least 2 evaluated lists to get a
+    surfaced ranking_accuracy — single-list accuracy is too noisy to
+    rank against.
+
+    Adds three fields to each result dict:
+      - lists_published: total distinct list_ids authored (all lists,
+        not just evaluated ones)
+      - evaluated_lists: lists with 2+ scored items
+      - ranking_accuracy: % or None when below the 2-list floor
+
+    Gracefully degrades: if list_id column doesn't exist yet, silently
+    leaves fields unset.
+    """
+    if not results:
+        return
+    fids = [r["id"] for r in results if r.get("id")]
+    if not fids:
+        return
+    try:
+        rows = db.execute(sql_text("""
+            SELECT forecaster_id, list_id, list_rank, actual_return, outcome
+            FROM predictions
+            WHERE forecaster_id = ANY(:fids)
+              AND list_id IS NOT NULL
+              AND list_rank IS NOT NULL
+        """), {"fids": fids}).fetchall()
+    except Exception:
+        return
+
+    by_list: dict = {}
+    lists_seen_by_fid: dict = {}
+    for row in rows:
+        fid = int(row[0])
+        lid = row[1]
+        try:
+            rank = int(row[2])
+        except (TypeError, ValueError):
+            continue
+        ret = float(row[3]) if row[3] is not None else None
+        outcome = row[4]
+        lists_seen_by_fid.setdefault(fid, set()).add(lid)
+        key = (fid, lid)
+        by_list.setdefault(key, []).append({
+            "rank": rank,
+            "return": ret,
+            "outcome": outcome,
+        })
+
+    stats_by_fid: dict = {}
+    for fid, lids in lists_seen_by_fid.items():
+        total_pairs = 0
+        correct_pairs = 0
+        evaluated_lists = 0
+        for lid in lids:
+            items = by_list.get((fid, lid), [])
+            scored = [
+                it for it in items
+                if it["return"] is not None
+                and it["outcome"] in ("hit", "near", "miss", "correct", "incorrect")
+            ]
+            if len(scored) < 2:
+                continue
+            evaluated_lists += 1
+            scored.sort(key=lambda x: x["rank"])
+            for i in range(len(scored)):
+                for j in range(i + 1, len(scored)):
+                    total_pairs += 1
+                    if scored[i]["return"] > scored[j]["return"]:
+                        correct_pairs += 1
+        stats_by_fid[fid] = {
+            "lists_published": len(lids),
+            "evaluated_lists": evaluated_lists,
+            "ranking_accuracy": (
+                round(correct_pairs / total_pairs * 100, 1)
+                if total_pairs > 0 else None
+            ),
+        }
+
+    for r in results:
+        fid = int(r["id"])
+        stats = stats_by_fid.get(fid, {
+            "lists_published": 0, "evaluated_lists": 0, "ranking_accuracy": None,
+        })
+        r["lists_published"] = stats["lists_published"]
+        r["evaluated_lists"] = stats["evaluated_lists"]
+        # Spec: require at least 2 evaluated lists before surfacing the
+        # ranking accuracy. Below the floor, ranking_accuracy stays None
+        # so the frontend can render '—' instead of a noisy number.
+        r["ranking_accuracy"] = (
+            stats["ranking_accuracy"] if stats["evaluated_lists"] >= 2 else None
+        )
+
+
 def _enrich_primary_source(results: list, db: Session):
     """Batch-fetch the primary source_type for each forecaster based on their most common prediction source."""
     if not results:
@@ -275,6 +379,9 @@ def _refresh_leaderboard(db: Session) -> list | dict:
 
     # Batch-fetch per-category accuracy (ticker_call vs sector_call)
     _enrich_category_stats(results, db)
+
+    # Batch-compute ranking accuracy from published ranked lists
+    _enrich_ranking_stats(results, db)
 
     # Batch-fetch outcome + direction counts for pie charts
     if results:
@@ -679,6 +786,9 @@ def _build_filtered_leaderboard(db: Session, sector=None, call_type=None, sort="
 
     # Batch-fetch per-category accuracy (ticker_call vs sector_call)
     _enrich_category_stats(results, db)
+
+    # Batch-compute ranking accuracy from published ranked lists
+    _enrich_ranking_stats(results, db)
 
     return results
 
