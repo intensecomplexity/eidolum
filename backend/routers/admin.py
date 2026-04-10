@@ -8,7 +8,7 @@ from sqlalchemy import func, text as sql_text
 from database import get_db
 from models import (
     Forecaster, Prediction, TrackedXAccount, SuggestedXAccount,
-    XScraperRejection, YouTubeChannelMeta,
+    XScraperRejection, YouTubeChannelMeta, SectorEtfAlias, Config,
 )
 from middleware.auth import require_admin, require_admin_user
 from rate_limit import limiter
@@ -1146,4 +1146,173 @@ def fetch_youtube_channel_now(
         "channel_id": channel_id,
         "channel_name": channel_name,
         "message": "Queued for next worker cycle — refresh in ~2 minutes",
+    }
+
+
+# ── Sector ETF aliases + sector traffic percentage ─────────────────────────
+#
+# Backs the AdminSectorAliases frontend page and the sector-calls card in
+# the admin Overview tab. All endpoints require_admin / require_admin_user
+# and audit-log via _log_yt_action (the same helper used by the YouTube
+# channels admin, kept DRY).
+
+
+@router.get("/admin/sector-aliases")
+@limiter.limit("30/minute")
+def list_sector_aliases(
+    request: Request,
+    admin: bool = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    """List every row in sector_etf_aliases ordered by canonical_sector
+    then alias, so related aliases group together in the admin UI."""
+    rows = db.query(SectorEtfAlias).order_by(
+        SectorEtfAlias.canonical_sector.asc(),
+        SectorEtfAlias.alias.asc(),
+    ).all()
+    return [
+        {
+            "id": r.id,
+            "alias": r.alias,
+            "canonical_sector": r.canonical_sector,
+            "etf_ticker": r.etf_ticker,
+            "notes": r.notes,
+        }
+        for r in rows
+    ]
+
+
+@router.post("/admin/sector-aliases")
+@limiter.limit("30/minute")
+async def add_sector_alias(
+    request: Request,
+    admin_id: int = Depends(require_admin_user),
+    db: Session = Depends(get_db),
+):
+    """Create a new sector → ETF mapping. Body: {alias, canonical_sector,
+    etf_ticker, notes?}. Alias must be unique (409 on collision)."""
+    body = _json.loads(await request.body())
+    alias = (body.get("alias") or "").strip().lower()
+    canonical = (body.get("canonical_sector") or "").strip().lower()
+    etf = (body.get("etf_ticker") or "").strip().upper()
+    notes = (body.get("notes") or "").strip() or None
+
+    if not alias:
+        raise HTTPException(status_code=400, detail="alias is required")
+    if not canonical:
+        raise HTTPException(status_code=400, detail="canonical_sector is required")
+    if not etf:
+        raise HTTPException(status_code=400, detail="etf_ticker is required")
+    if len(etf) > 10:
+        raise HTTPException(status_code=400, detail="etf_ticker max length 10")
+
+    existing = db.query(SectorEtfAlias).filter(
+        SectorEtfAlias.alias == alias
+    ).first()
+    if existing:
+        raise HTTPException(status_code=409, detail=f"alias '{alias}' already exists")
+
+    row = SectorEtfAlias(
+        alias=alias,
+        canonical_sector=canonical,
+        etf_ticker=etf,
+        notes=notes,
+    )
+    db.add(row)
+    db.commit()
+    db.refresh(row)
+
+    _log_yt_action(
+        db, admin_id, "sector_alias_add", target_id=row.id,
+        details={"alias": alias, "canonical_sector": canonical, "etf_ticker": etf},
+        request=request,
+    )
+
+    return {
+        "status": "created",
+        "id": row.id,
+        "alias": alias,
+        "canonical_sector": canonical,
+        "etf_ticker": etf,
+        "notes": notes,
+    }
+
+
+@router.delete("/admin/sector-aliases/{alias_id}")
+@limiter.limit("30/minute")
+def delete_sector_alias(
+    request: Request,
+    alias_id: int,
+    admin_id: int = Depends(require_admin_user),
+    db: Session = Depends(get_db),
+):
+    """Remove a single alias row. Does NOT touch predictions that already
+    used this alias — historical prediction rows carry their own ticker."""
+    row = db.query(SectorEtfAlias).filter(SectorEtfAlias.id == alias_id).first()
+    if not row:
+        raise HTTPException(status_code=404, detail="alias not found")
+    alias_snapshot = {
+        "alias": row.alias,
+        "canonical_sector": row.canonical_sector,
+        "etf_ticker": row.etf_ticker,
+    }
+    db.delete(row)
+    db.commit()
+
+    _log_yt_action(
+        db, admin_id, "sector_alias_delete", target_id=alias_id,
+        details=alias_snapshot,
+        request=request,
+    )
+
+    return {"deleted": True, "id": alias_id}
+
+
+@router.post("/admin/sector-calls/traffic")
+@limiter.limit("10/minute")
+async def set_sector_traffic(
+    request: Request,
+    admin_id: int = Depends(require_admin_user),
+    db: Session = Depends(get_db),
+):
+    """Set ENABLE_YOUTUBE_SECTOR_CALLS traffic percentage (0-100).
+    Body: {pct: int}. 0 = feature off, 100 = every video uses the sector
+    prompt. The YouTube classifier reads this flag via the 60s-cached
+    helper in feature_flags.py; we invalidate that cache here so the
+    new value takes effect on the next classify_video call instead of
+    waiting up to 60 seconds."""
+    body = _json.loads(await request.body())
+    try:
+        pct = int(body.get("pct"))
+    except (TypeError, ValueError):
+        raise HTTPException(status_code=400, detail="pct must be an integer 0-100")
+    if pct < 0 or pct > 100:
+        raise HTTPException(status_code=400, detail="pct must be between 0 and 100")
+
+    row = db.query(Config).filter(Config.key == "ENABLE_YOUTUBE_SECTOR_CALLS").first()
+    if row:
+        old_value = row.value
+        row.value = str(pct)
+    else:
+        old_value = None
+        db.add(Config(key="ENABLE_YOUTUBE_SECTOR_CALLS", value=str(pct)))
+    db.commit()
+
+    # Reset the feature_flags cache so get_youtube_sector_traffic_pct
+    # picks up the new value immediately on the next call.
+    try:
+        from feature_flags import invalidate_sector_traffic_cache
+        invalidate_sector_traffic_cache()
+    except Exception:
+        pass
+
+    _log_yt_action(
+        db, admin_id, "sector_traffic_pct_set", target_id=None,
+        details={"old_pct": old_value, "new_pct": pct},
+        request=request,
+    )
+
+    return {
+        "status": "updated",
+        "youtube_sector_traffic_pct": pct,
     }
