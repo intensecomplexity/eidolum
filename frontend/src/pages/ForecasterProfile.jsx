@@ -397,6 +397,116 @@ export default function ForecasterProfile() {
           <NotificationBanner text={`Get notified when ${data.name} makes a new prediction.`} forecasterName={data.name} />
         </div>
 
+        {/* Ranked Lists section — rendered only when this forecaster has
+            published at least one ranked list ("my top 5 stocks…"). Shows
+            each list with the original speaker order alongside the
+            actual-return order, plus the pairwise accuracy diff.
+            Kept separate from the main accuracy number. */}
+        {data.ranked_lists && data.ranked_lists.length > 0 && (
+          <div className="card mb-4 sm:mb-6">
+            <div className="flex items-start justify-between flex-wrap gap-2 mb-4">
+              <div>
+                <h2 className="text-xs text-muted uppercase tracking-wider font-semibold mb-1">
+                  Ranked Lists
+                </h2>
+                <p className="text-[11px] text-muted/80 max-w-md">
+                  Speaker-declared ranked lists ("my top 5 stocks"). Scored by pairwise
+                  ordering: did the #1 pick outperform #2? #2 beat #3? etc. Separate from
+                  the main accuracy number — a forecaster can pick good stocks without
+                  being good at ranking them.
+                </p>
+              </div>
+              {data.ranking_stats?.ranking_accuracy != null && (
+                <div className="flex gap-4 shrink-0">
+                  <div className="text-center">
+                    <div className={`font-mono text-xl font-bold ${
+                      data.ranking_stats.ranking_accuracy >= 60 ? 'text-positive' : 'text-negative'
+                    }`}>
+                      {data.ranking_stats.ranking_accuracy.toFixed(1)}%
+                    </div>
+                    <div className="text-muted text-[10px] uppercase tracking-wider">Ranking Accuracy</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="font-mono text-xl font-bold text-accent">
+                      {data.ranking_stats.lists_published}
+                    </div>
+                    <div className="text-muted text-[10px] uppercase tracking-wider">
+                      Lists {data.ranking_stats.evaluated_lists > 0
+                        ? `(${data.ranking_stats.evaluated_lists} scored)` : ''}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="space-y-4">
+              {data.ranked_lists.map(l => (
+                <div key={l.list_id} className="bg-surface-2 border border-border rounded-lg p-3">
+                  <div className="flex items-center justify-between flex-wrap gap-2 mb-2">
+                    <div className="text-sm font-semibold text-accent font-mono">{l.list_id}</div>
+                    <div className="text-[11px] text-muted font-mono">
+                      {l.prediction_date ? new Date(l.prediction_date).toLocaleDateString() : ''}
+                    </div>
+                    <div className="text-[11px] font-mono">
+                      {l.pairs_total > 0 ? (
+                        <span className={l.ranking_accuracy >= 60 ? 'text-positive' : 'text-negative'}>
+                          {l.pairs_correct}/{l.pairs_total} pairs correct
+                        </span>
+                      ) : (
+                        <span className="text-muted">
+                          {l.items_scored < 2 ? 'awaiting evaluation' : '—'}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <div className="text-[10px] text-muted uppercase tracking-wider mb-1">Speaker order</div>
+                      <div className="space-y-0.5">
+                        {[...(l.items || [])].sort((a, b) => (a.rank || 0) - (b.rank || 0)).map(it => (
+                          <div key={`sp-${it.rank}-${it.ticker}`} className="flex items-center gap-2 text-xs font-mono">
+                            <span className="text-muted w-4 text-right">#{it.rank}</span>
+                            <span className="text-text-primary flex-1 truncate">{it.ticker}</span>
+                            <span className={`text-[11px] ${
+                              it.actual_return == null ? 'text-muted' :
+                              it.actual_return > 0 ? 'text-positive' : 'text-negative'
+                            }`}>
+                              {it.actual_return == null ? '—' :
+                                `${it.actual_return > 0 ? '+' : ''}${it.actual_return.toFixed(2)}%`}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                    <div>
+                      <div className="text-[10px] text-muted uppercase tracking-wider mb-1">Actual return order</div>
+                      {l.by_return_order && l.by_return_order.length > 0 ? (
+                        <div className="space-y-0.5">
+                          {l.by_return_order.map((it, idx) => (
+                            <div key={`ret-${idx}-${it.ticker}`} className="flex items-center gap-2 text-xs font-mono">
+                              <span className="text-muted w-4 text-right">#{idx + 1}</span>
+                              <span className="text-text-primary flex-1 truncate">{it.ticker}</span>
+                              <span className="text-[11px] text-muted">(spoke #{it.rank})</span>
+                              <span className={`text-[11px] ${
+                                it.actual_return > 0 ? 'text-positive' : 'text-negative'
+                              }`}>
+                                {it.actual_return > 0 ? '+' : ''}{it.actual_return.toFixed(2)}%
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="text-[11px] text-muted italic">No items scored yet</div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Sector Calls section — rendered only when this forecaster has
             at least one sector_call prediction. Stays separate from the
             main accuracy number so sector skill is its own dimension. */}
