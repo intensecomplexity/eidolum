@@ -101,6 +101,10 @@ export function toggleEvaluateXAdmin() {
   return api.post('/admin/toggle-evaluate-x', {}, { headers: authHeaders() }).then(r => r.data);
 }
 
+export function toggleRankedListExtractionAdmin() {
+  return api.post('/admin/toggle-ranked-list-extraction', {}, { headers: authHeaders() }).then(r => r.data);
+}
+
 export function getTrendingTickers() {
   return api.get('/trending-tickers').then(r => r.data);
 }

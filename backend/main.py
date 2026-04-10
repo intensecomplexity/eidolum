@@ -2752,6 +2752,34 @@ def toggle_evaluate_x(admin_id: int = _Depends(_require_admin), db: _Session = _
     }
 
 
+@app.post("/api/admin/toggle-ranked-list-extraction")
+def toggle_ranked_list_extraction(
+    admin_id: int = _Depends(_require_admin),
+    db: _Session = _Depends(_get_db),
+):
+    """Flip ENABLE_RANKED_LIST_EXTRACTION between 'true' and 'false'.
+    Invalidates the feature_flags cache so the new value takes effect
+    on the next classify_video call instead of waiting 60s for the TTL."""
+    from models import Config
+    row = db.query(Config).filter(Config.key == "ENABLE_RANKED_LIST_EXTRACTION").first()
+    if row:
+        row.value = "false" if str(row.value).strip().lower() == "true" else "true"
+    else:
+        db.add(Config(key="ENABLE_RANKED_LIST_EXTRACTION", value="true"))
+    db.commit()
+    try:
+        from feature_flags import invalidate_ranked_list_flag_cache
+        invalidate_ranked_list_flag_cache()
+    except Exception:
+        pass
+    new_val = db.query(Config).filter(Config.key == "ENABLE_RANKED_LIST_EXTRACTION").first()
+    return {
+        "ranked_list_extraction": (
+            str(new_val.value).strip().lower() == "true" if new_val else False
+        )
+    }
+
+
 # ── SEO: sitemap.xml + robots.txt ──────────────────────────────────────────
 import time as _seo_time
 from fastapi.responses import Response as _RawResponse
