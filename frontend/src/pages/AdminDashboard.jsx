@@ -1,14 +1,14 @@
 import { useEffect, useState, useCallback } from 'react';
 import LoadingSpinner from '../components/LoadingSpinner';
 import { useNavigate, Link } from 'react-router-dom';
-import { Trash2, Shield, ShieldOff, UserX, ChevronLeft, ChevronRight, Search, RefreshCw } from 'lucide-react';
+import { Trash2, Shield, ShieldOff, UserX, ChevronLeft, ChevronRight, Search, RefreshCw, Youtube } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import {
   getAdminDashboard, getAdminUsers, getAdminForecasters, getAdminAuditLog,
   banUser, unbanUser, deleteUserAccount, promoteAdmin, demoteAdmin,
   deleteForecasterAdmin, deletePredictionAdmin, listPredictionsAdmin,
   getFeatureFlags, toggleDuelsAdmin, toggleCompeteAdmin, toggleCompareAnalystsAdmin,
-  getAdminUrlQuality,
+  getAdminUrlQuality, getSocialStats,
 } from '../api';
 
 const TABS = ['Overview', 'Users', 'Forecasters', 'Predictions', 'Audit Log'];
@@ -176,6 +176,180 @@ function UrlQualitySection() {
 }
 
 
+function socialTimeAgo(iso) {
+  if (!iso) return 'never';
+  const normalized = /[zZ]|[+-]\d\d:?\d\d$/.test(iso) ? iso : iso + 'Z';
+  const diff = Date.now() - new Date(normalized).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return 'just now';
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ${mins % 60}m ago`;
+  const days = Math.floor(hrs / 24);
+  return `${days}d ago`;
+}
+
+
+function XIcon({ className }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} fill="currentColor" aria-hidden="true">
+      <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
+    </svg>
+  );
+}
+
+
+function SocialScraperCard({ source, data }) {
+  const [expanded, setExpanded] = useState(false);
+  const isYoutube = source === 'youtube';
+  const label = isYoutube ? 'YouTube' : 'X';
+
+  if (!data) {
+    return (
+      <div className="flex-1 min-w-0 bg-surface-2 border border-border/50 rounded-lg p-3">
+        <div className="text-muted text-sm">Loading {label}…</div>
+      </div>
+    );
+  }
+
+  const forecasters = data.top_forecasters || [];
+  const visible = expanded ? forecasters.slice(0, 10) : forecasters.slice(0, 5);
+
+  return (
+    <div className="flex-1 min-w-0 bg-surface-2 border border-border/50 rounded-lg p-3">
+      {/* Header */}
+      <div className="flex items-center gap-2 mb-3">
+        <div className={`w-8 h-8 rounded-lg flex items-center justify-center border ${
+          isYoutube ? 'bg-red-500/10 border-red-500/20' : 'bg-text-primary/5 border-border'
+        }`}>
+          {isYoutube
+            ? <Youtube className="w-5 h-5 text-red-500" />
+            : <XIcon className="w-4 h-4 text-text-primary" />}
+        </div>
+        <span className="font-semibold text-sm">{label}</span>
+        <span className="ml-auto text-[10px] font-mono bg-surface border border-border rounded px-2 py-0.5 text-text-secondary">
+          {(data.total_predictions ?? 0).toLocaleString()} total
+        </span>
+      </div>
+
+      {/* Stats tiles */}
+      <div className="grid grid-cols-3 gap-2 mb-3">
+        <div className="bg-surface border border-border/50 rounded-lg px-2 py-1.5">
+          <div className="text-[10px] text-muted uppercase tracking-wider">24h</div>
+          <div className="text-sm font-mono font-semibold text-accent">{data.predictions_24h ?? 0}</div>
+        </div>
+        <div className="bg-surface border border-border/50 rounded-lg px-2 py-1.5">
+          <div className="text-[10px] text-muted uppercase tracking-wider">7d</div>
+          <div className="text-sm font-mono font-semibold text-accent">{data.predictions_7d ?? 0}</div>
+        </div>
+        <div className="bg-surface border border-border/50 rounded-lg px-2 py-1.5">
+          <div className="text-[10px] text-muted uppercase tracking-wider">Total</div>
+          <div className="text-sm font-mono font-semibold text-text-primary">
+            {(data.total_predictions ?? 0).toLocaleString()}
+          </div>
+        </div>
+      </div>
+
+      {/* Last run */}
+      <div className="flex items-center justify-between text-xs mb-2 px-1">
+        <span className="text-muted">
+          Last run: <span className="text-text-secondary">{socialTimeAgo(data.last_run_at)}</span>
+        </span>
+        <span className="text-muted font-mono">
+          <span className="text-positive">+{data.last_run_inserted ?? 0}</span> inserted
+        </span>
+      </div>
+
+      {/* YouTube-only: channels */}
+      {isYoutube && (
+        <div className="flex items-center justify-between text-xs mb-2 px-1">
+          <span className="text-muted">Channels</span>
+          <span className="font-mono text-text-secondary">
+            <span className="text-positive">{data.channels_active ?? 0}</span>
+            <span className="text-muted"> active / {data.channels_total ?? 0} total</span>
+          </span>
+        </div>
+      )}
+
+      {/* YouTube-only: pipeline breakdown */}
+      {isYoutube && data.by_pipeline?.length > 0 && (
+        <div className="mb-3">
+          <div className="text-[10px] text-muted uppercase tracking-wider mb-1 px-1">Pipeline</div>
+          <div className="flex flex-wrap gap-1">
+            {data.by_pipeline.map(p => (
+              <span key={p.verified_by} className="text-[10px] font-mono bg-surface border border-border/50 rounded px-1.5 py-0.5 text-text-secondary">
+                {p.verified_by}: <span className="text-accent">{p.count}</span>
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Top forecasters */}
+      <div>
+        <div className="text-[10px] text-muted uppercase tracking-wider mb-1 px-1">Top Forecasters</div>
+        {visible.length === 0 ? (
+          <div className="text-muted text-xs px-1 py-2">No predictions yet</div>
+        ) : (
+          <div className="bg-surface border border-border/50 rounded-lg overflow-hidden">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="text-left text-muted text-[10px] uppercase tracking-wider border-b border-border/50">
+                  <th className="px-2 py-1.5">Name</th>
+                  <th className="px-2 py-1.5 text-right">Predictions</th>
+                  <th className="px-2 py-1.5 text-right">Last Active</th>
+                </tr>
+              </thead>
+              <tbody>
+                {visible.map((f, i) => (
+                  <tr key={`${f.name}-${i}`} className="border-b border-border/30 last:border-0">
+                    <td className="px-2 py-1.5 text-text-secondary truncate max-w-[140px]" title={f.name}>{f.name}</td>
+                    <td className="px-2 py-1.5 text-right font-mono text-accent">{f.count}</td>
+                    <td className="px-2 py-1.5 text-right font-mono text-muted">{socialTimeAgo(f.last_prediction)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+        {forecasters.length > 5 && (
+          <button
+            onClick={() => setExpanded(e => !e)}
+            className="mt-1.5 text-[11px] text-accent hover:text-accent/80"
+          >
+            {expanded ? 'Show less' : `Show all ${Math.min(forecasters.length, 10)}`}
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+
+function SocialScrapersSection() {
+  const [social, setSocial] = useState(null);
+  const [loaded, setLoaded] = useState(false);
+  useEffect(() => {
+    getSocialStats()
+      .then(setSocial)
+      .catch(() => {})
+      .finally(() => setLoaded(true));
+  }, []);
+
+  if (loaded && !social) return null;
+
+  return (
+    <div className="card">
+      <h3 className="text-sm font-semibold text-muted uppercase tracking-wider mb-3">Social Scrapers</h3>
+      <div className="flex flex-col md:flex-row gap-3">
+        <SocialScraperCard source="youtube" data={social?.youtube} />
+        <SocialScraperCard source="x" data={social?.x} />
+      </div>
+    </div>
+  );
+}
+
+
 function OverviewTab({ dashboard }) {
   const d = dashboard || {};
   return (
@@ -234,7 +408,7 @@ function OverviewTab({ dashboard }) {
 
       {/* Recent audit */}
       {d.recent_actions?.length > 0 && (
-        <div className="card">
+        <div className="card mb-6">
           <h3 className="text-sm font-semibold text-muted uppercase tracking-wider mb-3">Recent Actions</h3>
           <div className="space-y-2">
             {d.recent_actions.map(a => (
@@ -248,6 +422,9 @@ function OverviewTab({ dashboard }) {
           </div>
         </div>
       )}
+
+      {/* Social Scrapers */}
+      <SocialScrapersSection />
     </div>
   );
 }
