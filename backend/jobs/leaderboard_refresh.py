@@ -11,14 +11,21 @@ def run_leaderboard_refresh(db: Session):
     """Recalculate accuracy scores and update rank_last_week snapshots."""
     print(f"[Leaderboard] Recalculating scores at {datetime.utcnow().isoformat()}")
 
+    from feature_flags import is_x_evaluation_enabled
+    from sqlalchemy import or_
+    skip_x = not is_x_evaluation_enabled(db)
+
     forecasters = db.query(Forecaster).all()
     rank_data = []
 
     for f in forecasters:
-        preds = db.query(Prediction).filter(
+        pred_q = db.query(Prediction).filter(
             Prediction.forecaster_id == f.id,
             Prediction.outcome.in_(["hit","near","miss","correct","incorrect"]),
-        ).all()
+        )
+        if skip_x:
+            pred_q = pred_q.filter(or_(Prediction.source_type.is_(None), Prediction.source_type != "x"))
+        preds = pred_q.all()
 
         if not preds:
             continue

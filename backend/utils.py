@@ -109,16 +109,16 @@ def recalculate_forecaster_stats(forecaster_id: int, db: Session):
     if not forecaster:
         return
 
-    evaluated = (
-        db.query(Prediction)
-        .filter(
-            Prediction.forecaster_id == forecaster_id,
-            Prediction.outcome.in_(["hit", "near", "miss", "correct", "incorrect"]),
-            Prediction.actual_return.isnot(None),
-        )
-        .order_by(Prediction.prediction_date.desc())
-        .all()
+    from feature_flags import is_x_evaluation_enabled
+    from sqlalchemy import or_
+    eval_q = db.query(Prediction).filter(
+        Prediction.forecaster_id == forecaster_id,
+        Prediction.outcome.in_(["hit", "near", "miss", "correct", "incorrect"]),
+        Prediction.actual_return.isnot(None),
     )
+    if not is_x_evaluation_enabled(db):
+        eval_q = eval_q.filter(or_(Prediction.source_type.is_(None), Prediction.source_type != "x"))
+    evaluated = eval_q.order_by(Prediction.prediction_date.desc()).all()
 
     total = len(evaluated)
     hits = sum(1 for p in evaluated if p.outcome in ("hit", "correct"))
