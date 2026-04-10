@@ -191,7 +191,9 @@ Respond with a JSON array of predictions. Each prediction object:
 
 If NO valid predictions found, respond with: []
 
-Do NOT hallucinate predictions. If you're unsure whether something is a prediction, leave it out. False negatives are better than false positives."""
+Do NOT hallucinate predictions. If you're unsure whether something is a prediction, leave it out. False negatives are better than false positives.
+
+Output JSON only. Be concise. Do not include prose explanations outside the JSON."""
 
 
 # ── Transcript fetching ─────────────────────────────────────────────────────
@@ -417,7 +419,13 @@ def classify_video(channel_name: str, title: str, publish_date: str,
         try:
             resp = client.messages.create(
                 model=HAIKU_MODEL,
-                max_tokens=2000,
+                # 800-token cap balances cost (~5x smaller output budget
+                # than the old 2000) against head-room for high-yield
+                # videos that legitimately return 10+ predictions. Even
+                # at 15 predictions per video (MAX_PREDICTIONS_PER_VIDEO),
+                # each prediction object serializes to ~50 output tokens,
+                # so 800 leaves buffer for long "reasoning" strings.
+                max_tokens=800,
                 temperature=0,
                 system=[
                     {
