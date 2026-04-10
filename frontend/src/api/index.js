@@ -1028,5 +1028,23 @@ export function fetchYouTubeChannelNow(id) {
   return api.post(`/admin/youtube-channels/${id}/fetch-now`, {}, { headers: authHeaders() }).then(r => r.data);
 }
 
+// ——— Sector Aliases + YouTube Sector Call Traffic ———
+
+export function getSectorAliases() {
+  return api.get('/admin/sector-aliases', { headers: authHeaders() }).then(r => r.data);
+}
+
+export function addSectorAlias(data) {
+  return api.post('/admin/sector-aliases', data, { headers: authHeaders() }).then(r => r.data);
+}
+
+export function deleteSectorAlias(id) {
+  return api.delete(`/admin/sector-aliases/${id}`, { headers: authHeaders() }).then(r => r.data);
+}
+
+export function setYouTubeSectorTraffic(pct) {
+  return api.post('/admin/sector-calls/traffic', { pct }, { headers: authHeaders() }).then(r => r.data);
+}
+
 export default api;
 export { API_BASE };

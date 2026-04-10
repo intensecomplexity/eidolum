@@ -11,6 +11,7 @@ import {
   toggleEvaluateXAdmin,
   getAdminUrlQuality, getSocialStats,
   getPrunedYouTubeChannels, reactivateYouTubeChannel,
+  setYouTubeSectorTraffic,
 } from '../api';
 
 const TABS = ['Overview', 'Users', 'Forecasters', 'Predictions', 'Audit Log'];
@@ -64,6 +65,10 @@ export default function AdminDashboard() {
         <Link to="/admin/youtube-channels"
           className="px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap text-text-secondary border border-border hover:text-accent transition-colors">
           YouTube Channels
+        </Link>
+        <Link to="/admin/sector-aliases"
+          className="px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap text-text-secondary border border-border hover:text-accent transition-colors">
+          Sector Aliases
         </Link>
       </div>
 
@@ -642,11 +647,99 @@ function SocialScrapersSection() {
 }
 
 
+function SectorCallsCard() {
+  // Reads the current youtube_sector_traffic_pct from /api/features
+  // (already loaded by the app's feature context) and lets the admin
+  // set a new value. Starts at 0 — the feature is OFF by default. The
+  // backend /admin/sector-calls/traffic endpoint validates 0-100 and
+  // invalidates the 60s cache so the new value takes effect immediately.
+  const [current, setCurrent] = useState(null);
+  const [draft, setDraft] = useState(0);
+  const [saving, setSaving] = useState(false);
+  const [toast, setToast] = useState(null);
+
+  useEffect(() => {
+    getFeatureFlags().then(f => {
+      const pct = Number(f.youtube_sector_traffic_pct || 0);
+      setCurrent(pct);
+      setDraft(pct);
+    }).catch(() => {});
+  }, []);
+
+  async function handleApply() {
+    setSaving(true);
+    try {
+      const r = await setYouTubeSectorTraffic(Math.max(0, Math.min(100, Number(draft))));
+      setCurrent(r.youtube_sector_traffic_pct);
+      setDraft(r.youtube_sector_traffic_pct);
+      setToast(`Traffic set to ${r.youtube_sector_traffic_pct}%`);
+    } catch (err) {
+      setToast(err.response?.data?.detail || 'Error updating');
+    } finally {
+      setSaving(false);
+      setTimeout(() => setToast(null), 3000);
+    }
+  }
+
+  if (current === null) return null;
+  return (
+    <div className="card mb-6">
+      <div className="flex items-center justify-between mb-2">
+        <h3 className="text-sm font-semibold text-muted uppercase tracking-wider">
+          YouTube Sector Calls (Experimental)
+        </h3>
+        <Link to="/admin/sector-aliases" className="text-xs text-accent hover:underline">
+          Manage aliases →
+        </Link>
+      </div>
+      <p className="text-xs text-muted mb-3">
+        Traffic percentage (0–100) of YouTube videos routed to the sector-aware Haiku prompt.
+        0 means the feature is off entirely. Same video always routes to the same prompt
+        (stable hash by video_id), so retries stay deterministic.
+      </p>
+      <div className="flex items-center gap-3 flex-wrap">
+        <input
+          type="range"
+          min="0"
+          max="100"
+          step="1"
+          value={draft}
+          onChange={e => setDraft(Number(e.target.value))}
+          className="flex-1 min-w-[180px]"
+        />
+        <input
+          type="number"
+          min="0"
+          max="100"
+          value={draft}
+          onChange={e => setDraft(Number(e.target.value))}
+          className="w-16 bg-surface-2 border border-border rounded-lg px-2 py-1 text-sm font-mono text-right"
+        />
+        <span className="text-xs text-muted font-mono shrink-0">
+          current: <span className="text-accent">{current}%</span>
+        </span>
+        <button
+          onClick={handleApply}
+          disabled={saving || draft === current}
+          className="btn-primary text-xs disabled:opacity-50"
+        >
+          {saving ? 'Saving…' : 'Apply'}
+        </button>
+      </div>
+      {toast && (
+        <p className="text-[11px] mt-2" style={{ color: '#D4A843' }}>{toast}</p>
+      )}
+    </div>
+  );
+}
+
+
 function OverviewTab({ dashboard }) {
   const d = dashboard || {};
   return (
     <div>
       <FeatureToggles />
+      <SectorCallsCard />
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
         <StatCard label="Predictions" value={d.total_predictions?.toLocaleString()} />
         <StatCard label="Forecasters" value={d.total_forecasters?.toLocaleString()} />
