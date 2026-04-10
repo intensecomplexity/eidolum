@@ -156,7 +156,13 @@ def get_social_stats(
     admin=Depends(require_admin),
     db: Session = Depends(get_db),
 ):
-    """Live stats for the YouTube and X scraper pipelines."""
+    """Live stats for the YouTube and X scraper pipelines.
+
+    Returns per-source totals + top forecasters + a "funnel" sub-object
+    with last-run counts and 7-day rejection breakdowns. The funnel data
+    is sourced from scraper_runs (last-run row) and the per-source
+    rejection log (x_scraper_rejections / youtube_scraper_rejections).
+    """
     now = datetime.utcnow()
     day_ago = now - timedelta(hours=24)
     week_ago = now - timedelta(days=7)
@@ -205,19 +211,25 @@ def get_social_stats(
         last_run_at = last_run_at_dt.isoformat() if last_run_at_dt else None
         last_run_inserted = 0
 
-        # Prefer scheduler_logs if that table exists
+        # Prefer scraper_runs (the new run-boundary table). If empty for
+        # this source, last_run_inserted falls back to 0 — visible as
+        # "+0 inserted" until the first post-deploy run lands a row.
+        last_run_row = None
         try:
-            row = db.execute(
+            last_run_row = db.execute(
                 sql_text(
-                    "SELECT started_at, inserted FROM scheduler_logs "
-                    "WHERE job_name = :job ORDER BY started_at DESC LIMIT 1"
+                    "SELECT started_at, finished_at, status, "
+                    "items_fetched, items_processed, items_llm_sent, "
+                    "items_inserted, items_rejected, items_deduped "
+                    "FROM scraper_runs "
+                    "WHERE source = :s ORDER BY started_at DESC LIMIT 1"
                 ),
-                {"job": source},
+                {"s": source},
             ).first()
-            if row:
-                if row[0]:
-                    last_run_at = row[0].isoformat()
-                last_run_inserted = int(row[1] or 0)
+            if last_run_row:
+                if last_run_row[0]:
+                    last_run_at = last_run_row[0].isoformat()
+                last_run_inserted = int(last_run_row[6] or 0)
         except Exception:
             db.rollback()
 
@@ -228,6 +240,157 @@ def get_social_stats(
             "top_forecasters": top_forecasters,
             "last_run_at": last_run_at,
             "last_run_inserted": last_run_inserted,
+            "funnel": _funnel_for(source, last_run_row),
+        }
+
+    def _funnel_for(source: str, last_run_row):
+        """Build the per-source funnel sub-object.
+
+        last_run_row is the most-recent scraper_runs tuple (or None if
+        no runs yet for this source). Schema:
+          (started_at, finished_at, status,
+           items_fetched, items_processed, items_llm_sent,
+           items_inserted, items_rejected, items_deduped)
+        """
+        # Last-run + 7d aggregate counts from scraper_runs
+        last = {
+            "started_at": None,
+            "finished_at": None,
+            "status": None,
+            "items_fetched": 0,
+            "items_processed": 0,
+            "items_llm_sent": 0,
+            "items_inserted": 0,
+            "items_rejected": 0,
+            "items_deduped": 0,
+        }
+        if last_run_row:
+            last = {
+                "started_at": last_run_row[0].isoformat() if last_run_row[0] else None,
+                "finished_at": last_run_row[1].isoformat() if last_run_row[1] else None,
+                "status": last_run_row[2],
+                "items_fetched": int(last_run_row[3] or 0),
+                "items_processed": int(last_run_row[4] or 0),
+                "items_llm_sent": int(last_run_row[5] or 0),
+                "items_inserted": int(last_run_row[6] or 0),
+                "items_rejected": int(last_run_row[7] or 0),
+                "items_deduped": int(last_run_row[8] or 0),
+            }
+
+        items_fetched_7d = 0
+        try:
+            items_fetched_7d = int(db.execute(sql_text(
+                "SELECT COALESCE(SUM(items_fetched), 0) FROM scraper_runs "
+                "WHERE source = :s AND started_at >= NOW() - INTERVAL '7 days'"
+            ), {"s": source}).scalar() or 0)
+        except Exception:
+            db.rollback()
+
+        # Per-source rejection table + closeness column (X only)
+        if source == "x":
+            rej_table = "x_scraper_rejections"
+            has_closeness = True
+        elif source == "youtube":
+            rej_table = "youtube_scraper_rejections"
+            has_closeness = False
+        else:
+            return {
+                "last_run": last,
+                "items_fetched_7d": items_fetched_7d,
+                "rejection_breakdown_7d": [],
+                "closeness_distribution_7d": None,
+                "near_misses_sample": [],
+                "recent_rejections_sample": [],
+            }
+
+        # Rejection breakdown (top 10 by count, last 7d)
+        rejection_breakdown_7d = []
+        try:
+            rows = db.execute(sql_text(
+                f"SELECT rejection_reason, COUNT(*) AS c "
+                f"FROM {rej_table} "
+                f"WHERE rejected_at >= NOW() - INTERVAL '7 days' "
+                f"GROUP BY rejection_reason ORDER BY c DESC LIMIT 10"
+            )).fetchall()
+            rejection_breakdown_7d = [
+                {"reason": r[0], "count": int(r[1])} for r in rows
+            ]
+        except Exception:
+            db.rollback()
+
+        # Closeness distribution (X only — YouTube has no closeness scale)
+        closeness_distribution_7d = None
+        if has_closeness:
+            closeness_distribution_7d = {
+                "L0": 0, "L1": 0, "L2": 0, "L3": 0, "L4": 0,
+            }
+            try:
+                rows = db.execute(sql_text(
+                    "SELECT closeness_level, COUNT(*) AS c "
+                    "FROM x_scraper_rejections "
+                    "WHERE rejected_at >= NOW() - INTERVAL '7 days' "
+                    "  AND closeness_level IS NOT NULL "
+                    "GROUP BY closeness_level"
+                )).fetchall()
+                for r in rows:
+                    lvl = int(r[0])
+                    if 0 <= lvl <= 4:
+                        closeness_distribution_7d[f"L{lvl}"] = int(r[1])
+            except Exception:
+                db.rollback()
+
+        # Near-misses sample: 5 most recent L4 rejections (X only)
+        near_misses_sample = []
+        if has_closeness:
+            try:
+                rows = db.execute(sql_text(
+                    "SELECT handle, tweet_text, haiku_reason, rejected_at "
+                    "FROM x_scraper_rejections "
+                    "WHERE closeness_level = 4 "
+                    "ORDER BY rejected_at DESC LIMIT 5"
+                )).fetchall()
+                near_misses_sample = [
+                    {
+                        "handle": r[0],
+                        "tweet_text": (r[1] or "")[:280],
+                        "haiku_reason": r[2],
+                        "rejected_at": r[3].isoformat() if r[3] else None,
+                    }
+                    for r in rows
+                ]
+            except Exception:
+                db.rollback()
+
+        # Recent rejections sample: 5 most recent of any reason (YouTube)
+        recent_rejections_sample = []
+        if source == "youtube":
+            try:
+                rows = db.execute(sql_text(
+                    "SELECT channel_name, video_title, rejection_reason, "
+                    "       haiku_reason, rejected_at "
+                    "FROM youtube_scraper_rejections "
+                    "ORDER BY rejected_at DESC LIMIT 5"
+                )).fetchall()
+                recent_rejections_sample = [
+                    {
+                        "channel_name": r[0],
+                        "video_title": (r[1] or "")[:200],
+                        "reason": r[2],
+                        "haiku_reason": r[3],
+                        "rejected_at": r[4].isoformat() if r[4] else None,
+                    }
+                    for r in rows
+                ]
+            except Exception:
+                db.rollback()
+
+        return {
+            "last_run": last,
+            "items_fetched_7d": items_fetched_7d,
+            "rejection_breakdown_7d": rejection_breakdown_7d,
+            "closeness_distribution_7d": closeness_distribution_7d,
+            "near_misses_sample": near_misses_sample,
+            "recent_rejections_sample": recent_rejections_sample,
         }
 
     youtube_stats = _stats_for("youtube")
