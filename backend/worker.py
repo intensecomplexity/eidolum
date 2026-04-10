@@ -251,6 +251,61 @@ def main():
     except Exception as e:
         log.warning(f"[Worker] closeness_level migration: {e}")
 
+    # youtube_channels — auto-pruning columns. Channels with 5 reached-Haiku
+    # videos and 0 inserted predictions get soft-deactivated by the channel
+    # monitor. Idempotent: ALTER ... IF NOT EXISTS, safe on every boot.
+    # Backfill happens in main.py / channel_monitor on startup so the
+    # counters reflect historical reality on first deploy.
+    try:
+        with engine.connect() as conn:
+            for ddl in (
+                "ALTER TABLE youtube_channels ADD COLUMN IF NOT EXISTS "
+                "videos_processed_count INTEGER NOT NULL DEFAULT 0",
+                "ALTER TABLE youtube_channels ADD COLUMN IF NOT EXISTS "
+                "predictions_extracted_count INTEGER NOT NULL DEFAULT 0",
+                "ALTER TABLE youtube_channels ADD COLUMN IF NOT EXISTS "
+                "deactivated_at TIMESTAMP",
+                "ALTER TABLE youtube_channels ADD COLUMN IF NOT EXISTS "
+                "deactivation_reason VARCHAR(50)",
+            ):
+                conn.execute(sql_text(ddl))
+            conn.commit()
+        log.info("[Worker] youtube_channels pruning columns ensured")
+    except Exception as e:
+        log.warning(f"[Worker] youtube_channels pruning migration: {e}")
+
+    # One-time backfill of the new counters from youtube_videos. Only
+    # touches rows whose counters are still 0 (i.e. never written by
+    # the live counter increment). Safe to re-run: a row that already
+    # has positive counters is left alone. transcript_status values
+    # 'ok_inserted' / 'ok_no_predictions' are the "reached Haiku and
+    # got a verdict" set; classifier_error is excluded so a Haiku outage
+    # cannot retroactively poison the pruning threshold.
+    try:
+        with engine.connect() as conn:
+            conn.execute(sql_text("""
+                UPDATE youtube_channels c
+                SET videos_processed_count = COALESCE((
+                    SELECT COUNT(*) FROM youtube_videos v
+                    WHERE v.channel_name = c.channel_name
+                      AND v.transcript_status IN ('ok_inserted', 'ok_no_predictions')
+                ), 0)
+                WHERE videos_processed_count = 0
+            """))
+            conn.execute(sql_text("""
+                UPDATE youtube_channels c
+                SET predictions_extracted_count = COALESCE((
+                    SELECT COUNT(*) FROM youtube_videos v
+                    WHERE v.channel_name = c.channel_name
+                      AND v.predictions_extracted > 0
+                ), 0)
+                WHERE predictions_extracted_count = 0
+            """))
+            conn.commit()
+        log.info("[Worker] youtube_channels counter backfill complete")
+    except Exception as e:
+        log.warning(f"[Worker] youtube_channels counter backfill: {e}")
+
     # scraper_runs + youtube_scraper_rejections — belt-and-braces migration.
     # Base.metadata.create_all above is the primary creator (the SQLAlchemy
     # models live in models.py), but on existing DBs the indexes / column

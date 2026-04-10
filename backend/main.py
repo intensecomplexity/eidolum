@@ -1437,6 +1437,47 @@ async def lifespan(app):
         except Exception as e:
             print(f"[Startup] processed_logos table error: {e}")
 
+        # ── youtube_channels pruning columns + counter backfill ────────
+        # Mirrors the migration in worker.py so the API service can boot
+        # the new admin endpoints (list pruned + reactivate) even if the
+        # API container starts before the worker. Idempotent.
+        try:
+            with engine.connect() as _yc_c:
+                for _yc_ddl in (
+                    "ALTER TABLE youtube_channels ADD COLUMN IF NOT EXISTS "
+                    "videos_processed_count INTEGER NOT NULL DEFAULT 0",
+                    "ALTER TABLE youtube_channels ADD COLUMN IF NOT EXISTS "
+                    "predictions_extracted_count INTEGER NOT NULL DEFAULT 0",
+                    "ALTER TABLE youtube_channels ADD COLUMN IF NOT EXISTS "
+                    "deactivated_at TIMESTAMP",
+                    "ALTER TABLE youtube_channels ADD COLUMN IF NOT EXISTS "
+                    "deactivation_reason VARCHAR(50)",
+                ):
+                    _yc_c.execute(sql_text(_yc_ddl))
+                # Counter backfill (only seeds rows still at 0)
+                _yc_c.execute(sql_text("""
+                    UPDATE youtube_channels c
+                    SET videos_processed_count = COALESCE((
+                        SELECT COUNT(*) FROM youtube_videos v
+                        WHERE v.channel_name = c.channel_name
+                          AND v.transcript_status IN ('ok_inserted', 'ok_no_predictions')
+                    ), 0)
+                    WHERE videos_processed_count = 0
+                """))
+                _yc_c.execute(sql_text("""
+                    UPDATE youtube_channels c
+                    SET predictions_extracted_count = COALESCE((
+                        SELECT COUNT(*) FROM youtube_videos v
+                        WHERE v.channel_name = c.channel_name
+                          AND v.predictions_extracted > 0
+                    ), 0)
+                    WHERE predictions_extracted_count = 0
+                """))
+                _yc_c.commit()
+                print("[Startup] youtube_channels pruning columns + backfill ready")
+        except Exception as _yce:
+            print(f"[Startup] youtube_channels pruning migration error: {_yce}")
+
         # ── scraper_runs + youtube_scraper_rejections (mirrors worker.py) ──
         # Both API and worker run this. SQLAlchemy create_all above already
         # creates the tables when the model is fresh, but the IF NOT EXISTS
