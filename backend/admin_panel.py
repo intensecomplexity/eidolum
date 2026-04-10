@@ -458,6 +458,66 @@ def get_social_stats(
     }
 
 
+# ── YouTube channel pruning admin endpoints ─────────────────────────────────
+
+@router.get("/api/admin/youtube-channels/pruned")
+def list_pruned_youtube_channels(
+    admin=Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    """List YouTube channels that have been auto-deactivated by the
+    monitor's zero-yield pruner. Sorted newest-pruned first."""
+    rows = db.execute(sql_text("""
+        SELECT youtube_channel_id, channel_name, deactivated_at,
+               deactivation_reason, videos_processed_count,
+               predictions_extracted_count
+        FROM youtube_channels
+        WHERE is_active = FALSE AND deactivated_at IS NOT NULL
+        ORDER BY deactivated_at DESC
+    """)).fetchall()
+    return [
+        {
+            "channel_id": r[0],
+            "channel_name": r[1],
+            "deactivated_at": r[2].isoformat() if r[2] else None,
+            "deactivation_reason": r[3],
+            "videos_processed_count": int(r[4] or 0),
+            "predictions_extracted_count": int(r[5] or 0),
+        }
+        for r in rows
+    ]
+
+
+@router.post("/api/admin/youtube-channels/{channel_id}/reactivate")
+def reactivate_youtube_channel(
+    channel_id: str,
+    admin=Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    """Manually re-enable a soft-deactivated YouTube channel. Resets
+    the auto-prune counters to 0 so the channel gets a fresh 5-video
+    chance after reactivation. The path parameter is named channel_id
+    for the URL but matches the youtube_channel_id column."""
+    row = db.execute(sql_text("""
+        UPDATE youtube_channels
+        SET is_active = TRUE,
+            deactivated_at = NULL,
+            deactivation_reason = NULL,
+            videos_processed_count = 0,
+            predictions_extracted_count = 0
+        WHERE youtube_channel_id = :cid
+        RETURNING channel_name
+    """), {"cid": channel_id}).first()
+    db.commit()
+    if not row:
+        raise HTTPException(status_code=404, detail="Channel not found")
+    print(
+        f"[YOUTUBE-MONITOR] Reactivated channel {row[0]} ({channel_id}) via admin",
+        flush=True,
+    )
+    return {"success": True, "channel_id": channel_id, "channel_name": row[0]}
+
+
 class PredictionCreate(BaseModel):
     forecaster_id: Optional[int] = None
     forecaster_name: Optional[str] = None
