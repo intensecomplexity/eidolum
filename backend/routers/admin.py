@@ -1,11 +1,16 @@
 import datetime
+import json as _json
+import threading
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
-from sqlalchemy import func
+from sqlalchemy import func, text as sql_text
 from database import get_db
-from models import Forecaster, Prediction, TrackedXAccount, SuggestedXAccount, XScraperRejection
-from middleware.auth import require_admin
+from models import (
+    Forecaster, Prediction, TrackedXAccount, SuggestedXAccount,
+    XScraperRejection, YouTubeChannelMeta,
+)
+from middleware.auth import require_admin, require_admin_user
 from rate_limit import limiter
 
 router = APIRouter()
@@ -634,4 +639,476 @@ def x_rejections_summary(
         "by_handle_top10": by_handle_top10,
         "by_level": by_level,
         "most_recent": most_recent.isoformat() if most_recent else None,
+    }
+
+
+# ── YouTube Channels Admin ───────────────────────────────────────────────────
+#
+# Mirrors the X Accounts admin endpoints above, adapted to YouTube's data
+# model. Backed by the youtube_channel_meta table (FK'd to forecasters)
+# plus the existing youtube_scraper_rejections for the rejection viewer.
+# All endpoints require_admin / require_admin_user; write endpoints log
+# via the _log_action helper from routers.admin_panel.
+
+
+def _log_yt_action(db: Session, admin_id: int, action: str,
+                   target_id: int | None, details: dict | None):
+    """Thin wrapper around admin_panel._log_action that pulls the admin
+    email from the users table and JSON-encodes details."""
+    try:
+        from routers.admin_panel import _log_action, _get_admin_email
+        _log_action(
+            db, admin_id, _get_admin_email(admin_id, db),
+            action=action,
+            target_type="youtube_channel_meta",
+            target_id=target_id,
+            details=_json.dumps(details) if details else None,
+        )
+    except Exception as e:
+        print(f"[admin.youtube] audit log write failed: {e}")
+
+
+@router.get("/admin/youtube-channels")
+@limiter.limit("30/minute")
+def list_youtube_channels(
+    request: Request,
+    admin: bool = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    """List all YouTube channel meta rows joined to forecasters for name /
+    accuracy_score lookup. Sorted by tier ASC then total_predictions DESC."""
+    rows = db.execute(sql_text("""
+        SELECT m.id, m.forecaster_id, m.channel_id, f.name AS channel_name,
+               m.tier, m.notes, m.active, m.added_date, m.last_scraped_at,
+               m.last_scrape_videos_found, m.last_scrape_predictions_extracted,
+               m.total_videos_scraped, m.total_predictions_extracted,
+               m.videos_processed_count, m.predictions_extracted_count,
+               m.deactivated_at, m.deactivation_reason,
+               f.accuracy_score,
+               COALESCE((
+                   SELECT COUNT(*) FROM predictions p
+                   WHERE p.forecaster_id = f.id
+                     AND p.source_type = 'youtube'
+                     AND p.created_at > NOW() - INTERVAL '7 days'
+               ), 0) AS predictions_7d
+        FROM youtube_channel_meta m
+        JOIN forecasters f ON f.id = m.forecaster_id
+        ORDER BY m.tier ASC, m.total_predictions_extracted DESC NULLS LAST
+    """)).fetchall()
+
+    out = []
+    for r in rows:
+        out.append({
+            "id": r[0],
+            "forecaster_id": r[1],
+            "channel_id": r[2],
+            "channel_name": r[3],
+            "tier": r[4],
+            "notes": r[5],
+            "active": bool(r[6]),
+            "added_date": r[7].isoformat() if r[7] else None,
+            "last_scraped_at": r[8].isoformat() if r[8] else None,
+            "last_scrape_videos_found": int(r[9] or 0),
+            "last_scrape_predictions_extracted": int(r[10] or 0),
+            "total_videos_scraped": int(r[11] or 0),
+            "total_predictions_extracted": int(r[12] or 0),
+            "videos_processed_count": int(r[13] or 0),
+            "predictions_extracted_count": int(r[14] or 0),
+            "deactivated_at": r[15].isoformat() if r[15] else None,
+            "deactivation_reason": r[16],
+            "accuracy_score": float(r[17]) if r[17] is not None else None,
+            "predictions_7d": int(r[18] or 0),
+        })
+    return out
+
+
+@router.post("/admin/youtube-channels")
+@limiter.limit("30/minute")
+async def add_youtube_channel(
+    request: Request,
+    admin_id: int = Depends(require_admin_user),
+    db: Session = Depends(get_db),
+):
+    """Create a new YouTube channel meta row. If the forecaster with this
+    channel_id doesn't exist yet, it gets created with platform='youtube'."""
+    body = _json.loads(await request.body())
+
+    channel_id = (body.get("channel_id") or "").strip()
+    name = (body.get("name") or "").strip()
+    tier = body.get("tier", 4)
+    notes = (body.get("notes") or "").strip() or None
+
+    if not channel_id:
+        raise HTTPException(status_code=400, detail="channel_id is required")
+    if not name:
+        raise HTTPException(status_code=400, detail="name is required")
+    # Basic YouTube channel ID format check: UC + 22 chars, total 24
+    if not (len(channel_id) == 24 and channel_id.startswith("UC")):
+        raise HTTPException(
+            status_code=400,
+            detail="channel_id must be a 24-character YouTube ID starting with UC",
+        )
+    if tier not in (1, 2, 3, 4):
+        raise HTTPException(status_code=400, detail="tier must be 1-4")
+
+    existing = db.query(YouTubeChannelMeta).filter(
+        YouTubeChannelMeta.channel_id == channel_id
+    ).first()
+    if existing:
+        raise HTTPException(
+            status_code=409,
+            detail=f"channel_id {channel_id} already exists",
+        )
+
+    # Find or create the forecaster row for this channel
+    f = db.query(Forecaster).filter(Forecaster.channel_id == channel_id).first()
+    if not f:
+        # Slug has to be unique; generate a safe one from the channel_id
+        slug = f"yt-{channel_id.lower()}"[:60]
+        # Handle must also be unique; use channel_id as a stable fallback
+        handle = channel_id
+        f = Forecaster(
+            name=name,
+            handle=handle,
+            channel_id=channel_id,
+            platform="youtube",
+            channel_url=f"https://www.youtube.com/channel/{channel_id}",
+            slug=slug,
+        )
+        db.add(f)
+        db.flush()
+
+    meta = YouTubeChannelMeta(
+        forecaster_id=f.id,
+        channel_id=channel_id,
+        tier=tier,
+        notes=notes,
+        active=True,
+    )
+    db.add(meta)
+    db.commit()
+    db.refresh(meta)
+
+    _log_yt_action(
+        db, admin_id, "youtube_channel_add", target_id=meta.id,
+        details={"channel_id": channel_id, "name": name, "tier": tier},
+    )
+
+    return {
+        "status": "created",
+        "id": meta.id,
+        "forecaster_id": f.id,
+        "channel_id": channel_id,
+        "name": name,
+        "tier": tier,
+    }
+
+
+@router.patch("/admin/youtube-channels/{meta_id}")
+@limiter.limit("30/minute")
+async def update_youtube_channel(
+    request: Request,
+    meta_id: int,
+    admin_id: int = Depends(require_admin_user),
+    db: Session = Depends(get_db),
+):
+    """Update tier / notes / active on a youtube_channel_meta row.
+    If active is flipped from FALSE → TRUE, also clear deactivated_at /
+    deactivation_reason and reset the auto-prune counters so the channel
+    gets a fresh chance."""
+    meta = db.query(YouTubeChannelMeta).filter(
+        YouTubeChannelMeta.id == meta_id
+    ).first()
+    if not meta:
+        raise HTTPException(status_code=404, detail="Channel meta not found")
+
+    body = _json.loads(await request.body())
+    changes: dict = {}
+
+    if "tier" in body:
+        if body["tier"] not in (1, 2, 3, 4):
+            raise HTTPException(status_code=400, detail="tier must be 1-4")
+        if meta.tier != body["tier"]:
+            changes["tier"] = body["tier"]
+            meta.tier = body["tier"]
+    if "notes" in body:
+        new_notes = body["notes"] or None
+        if meta.notes != new_notes:
+            changes["notes"] = new_notes
+            meta.notes = new_notes
+    if "active" in body:
+        new_active = bool(body["active"])
+        if meta.active != new_active:
+            changes["active"] = new_active
+            meta.active = new_active
+            if new_active and meta.deactivated_at:
+                # Reactivation: clear the pruning state and reset counters
+                meta.deactivated_at = None
+                meta.deactivation_reason = None
+                meta.videos_processed_count = 0
+                meta.predictions_extracted_count = 0
+                changes["reset_counters"] = True
+
+    db.commit()
+
+    if changes:
+        _log_yt_action(
+            db, admin_id, "youtube_channel_edit", target_id=meta.id,
+            details={"channel_id": meta.channel_id, "changes": changes},
+        )
+
+    return {"status": "updated", "id": meta.id, "changes": changes}
+
+
+@router.delete("/admin/youtube-channels/{meta_id}")
+@limiter.limit("30/minute")
+def delete_youtube_channel(
+    request: Request,
+    meta_id: int,
+    admin_id: int = Depends(require_admin_user),
+    db: Session = Depends(get_db),
+):
+    """Delete a youtube_channel_meta row. Does NOT delete the forecaster
+    or any predictions — those stay for historical accuracy."""
+    meta = db.query(YouTubeChannelMeta).filter(
+        YouTubeChannelMeta.id == meta_id
+    ).first()
+    if not meta:
+        raise HTTPException(status_code=404, detail="Channel meta not found")
+
+    channel_id = meta.channel_id
+    # Pull name from forecaster for the audit log
+    f = db.query(Forecaster).filter(Forecaster.id == meta.forecaster_id).first()
+    name = f.name if f else None
+
+    db.delete(meta)
+    db.commit()
+
+    _log_yt_action(
+        db, admin_id, "youtube_channel_delete", target_id=meta_id,
+        details={"channel_id": channel_id, "name": name},
+    )
+
+    return {"deleted": True, "id": meta_id, "channel_id": channel_id}
+
+
+@router.get("/admin/youtube-channels/stats")
+@limiter.limit("30/minute")
+def youtube_channels_stats(
+    request: Request,
+    admin: bool = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    """Dashboard stats for the YouTube admin page."""
+    total_active = db.query(YouTubeChannelMeta).filter(
+        YouTubeChannelMeta.active == True  # noqa: E712
+    ).count()
+    total_inactive = db.query(YouTubeChannelMeta).filter(
+        YouTubeChannelMeta.active == False  # noqa: E712
+    ).count()
+
+    videos_today = db.execute(sql_text("""
+        SELECT COALESCE(SUM(last_scrape_videos_found), 0)
+        FROM youtube_channel_meta
+        WHERE active = TRUE
+          AND last_scraped_at > NOW() - INTERVAL '24 hours'
+    """)).scalar() or 0
+
+    predictions_today = db.execute(sql_text("""
+        SELECT COUNT(*) FROM predictions
+        WHERE source_type = 'youtube'
+          AND created_at >= date_trunc('day', NOW())
+    """)).scalar() or 0
+
+    try:
+        videos_today_i = int(videos_today)
+        preds_today_i = int(predictions_today)
+    except Exception:
+        videos_today_i, preds_today_i = 0, 0
+
+    if videos_today_i > 0:
+        conversion = round(preds_today_i / videos_today_i * 100, 1)
+        conversion = min(100.0, conversion)
+    else:
+        conversion = 0.0
+
+    # Rough YouTube Data API quota estimate: ~100 quota units per
+    # channel per fetch (search.list), excluding one-time channel ID
+    # resolution.
+    quota_estimate = total_active * 100
+
+    return {
+        "total_active": int(total_active),
+        "total_inactive": int(total_inactive),
+        "videos_today": videos_today_i,
+        "predictions_today": preds_today_i,
+        "conversion_rate": conversion,
+        "youtube_api_quota_estimate": f"{quota_estimate} units / run",
+    }
+
+
+@router.get("/admin/youtube-channels/rejections")
+@limiter.limit("60/minute")
+def list_youtube_rejections(
+    request: Request,
+    limit: int = 100,
+    channel_id: str | None = None,
+    reason: str | None = None,
+    admin: bool = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    """Recent rejected videos for the admin debug view. No closeness
+    level for YouTube — that column doesn't exist on
+    youtube_scraper_rejections (design decision)."""
+    if limit < 1:
+        limit = 1
+    if limit > 500:
+        limit = 500
+
+    where = ["1=1"]
+    params: dict = {"lim": limit}
+    if channel_id:
+        where.append("channel_id = :cid")
+        params["cid"] = channel_id
+    if reason:
+        where.append("rejection_reason = :reason")
+        params["reason"] = reason
+
+    sql = f"""
+        SELECT id, video_id, channel_id, channel_name, video_title,
+               video_published_at, rejected_at, rejection_reason,
+               haiku_reason, transcript_snippet
+        FROM youtube_scraper_rejections
+        WHERE {' AND '.join(where)}
+        ORDER BY rejected_at DESC
+        LIMIT :lim
+    """
+    rows = db.execute(sql_text(sql), params).fetchall()
+
+    out = []
+    for r in rows:
+        vid = r[1]
+        out.append({
+            "id": r[0],
+            "video_id": vid,
+            "channel_id": r[2],
+            "channel_name": r[3],
+            "video_title": r[4],
+            "video_published_at": r[5].isoformat() if r[5] else None,
+            "rejected_at": r[6].isoformat() if r[6] else None,
+            "rejection_reason": r[7],
+            "haiku_reason": r[8],
+            "transcript_snippet": r[9],
+            "video_url": f"https://www.youtube.com/watch?v={vid}" if vid else None,
+        })
+    return out
+
+
+@router.get("/admin/youtube-channels/rejections/summary")
+@limiter.limit("60/minute")
+def youtube_rejections_summary(
+    request: Request,
+    admin: bool = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    """Aggregate stats for the YouTube rejections dashboard tile."""
+    total_24h = db.execute(sql_text("""
+        SELECT COUNT(*) FROM youtube_scraper_rejections
+        WHERE rejected_at > NOW() - INTERVAL '24 hours'
+    """)).scalar() or 0
+
+    by_reason_rows = db.execute(sql_text("""
+        SELECT rejection_reason, COUNT(*) AS c
+        FROM youtube_scraper_rejections
+        WHERE rejected_at > NOW() - INTERVAL '24 hours'
+        GROUP BY rejection_reason
+        ORDER BY c DESC
+    """)).fetchall()
+    by_reason = [{"reason": row[0], "count": int(row[1])} for row in by_reason_rows]
+
+    by_channel_rows = db.execute(sql_text("""
+        SELECT channel_id, channel_name, COUNT(*) AS c
+        FROM youtube_scraper_rejections
+        WHERE rejected_at > NOW() - INTERVAL '24 hours'
+          AND channel_id IS NOT NULL
+        GROUP BY channel_id, channel_name
+        ORDER BY c DESC
+        LIMIT 10
+    """)).fetchall()
+    by_channel_top10 = [
+        {"channel_id": row[0], "channel_name": row[1], "count": int(row[2])}
+        for row in by_channel_rows
+    ]
+
+    recent_rows = db.execute(sql_text("""
+        SELECT id, video_id, channel_name, video_title, rejected_at,
+               rejection_reason
+        FROM youtube_scraper_rejections
+        ORDER BY rejected_at DESC
+        LIMIT 10
+    """)).fetchall()
+    most_recent = [
+        {
+            "id": r[0],
+            "video_id": r[1],
+            "channel_name": r[2],
+            "video_title": r[3],
+            "rejected_at": r[4].isoformat() if r[4] else None,
+            "rejection_reason": r[5],
+        }
+        for r in recent_rows
+    ]
+
+    return {
+        "total_24h": int(total_24h),
+        "by_reason": by_reason,
+        "by_channel_top10": by_channel_top10,
+        "most_recent": most_recent,
+    }
+
+
+@router.post("/admin/youtube-channels/{meta_id}/fetch-now")
+@limiter.limit("10/minute")
+def fetch_youtube_channel_now(
+    request: Request,
+    meta_id: int,
+    admin_id: int = Depends(require_admin_user),
+    db: Session = Depends(get_db),
+):
+    """Fire-and-forget one-shot fetch of a single YouTube channel.
+
+    Bypasses the normal 12h monitor schedule. Spawns a daemon thread
+    and returns immediately so the HTTP request doesn't block on
+    transcript download + Haiku classification."""
+    meta = db.query(YouTubeChannelMeta).filter(
+        YouTubeChannelMeta.id == meta_id
+    ).first()
+    if not meta:
+        raise HTTPException(status_code=404, detail="Channel meta not found")
+
+    channel_id = meta.channel_id
+    f = db.query(Forecaster).filter(Forecaster.id == meta.forecaster_id).first()
+    channel_name = f.name if f else channel_id
+
+    def _worker(cid: str):
+        try:
+            from jobs.youtube_channel_monitor import fetch_channel_now
+            fetch_channel_now(cid)
+        except Exception as e:
+            print(f"[admin.youtube] fetch_channel_now worker error: {e}")
+
+    threading.Thread(
+        target=_worker, args=(channel_id,), daemon=True
+    ).start()
+
+    _log_yt_action(
+        db, admin_id, "youtube_channel_fetch_now", target_id=meta.id,
+        details={"channel_id": channel_id, "name": channel_name},
+    )
+
+    return {
+        "triggered": True,
+        "channel_id": channel_id,
+        "channel_name": channel_name,
+        "message": "Fetch running in background — check worker logs",
     }
