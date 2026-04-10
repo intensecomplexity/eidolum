@@ -1537,6 +1537,87 @@ async def lifespan(app):
         except Exception as _yme:
             print(f"[Startup] youtube_channel_meta migration error: {_yme}")
 
+        # ── youtube_channel_meta totals backfill ────────────────────────
+        # Historical backfill for the admin card counters. Three columns:
+        #   - total_predictions_extracted (display)
+        #   - predictions_extracted_count (auto-prune yield counter)
+        #   - videos_processed_count      (auto-prune throughput counter)
+        # Each UPDATE has an idempotency guard (= 0) so it only touches
+        # rows the monitor hasn't already started writing to. Runs every
+        # boot; no-ops once populated.
+        try:
+            with engine.connect() as _yb_c:
+                # total_predictions_extracted — counts 'youtube_haiku_v1'
+                # inserts only (the display metric on the admin card).
+                _yb_c.execute(sql_text("""
+                    UPDATE youtube_channel_meta m
+                    SET total_predictions_extracted = sub.cnt
+                    FROM (
+                        SELECT f.id AS forecaster_id, COUNT(*) AS cnt
+                        FROM predictions p
+                        JOIN forecasters f ON f.id = p.forecaster_id
+                        WHERE p.source_type = 'youtube'
+                          AND p.verified_by = 'youtube_haiku_v1'
+                        GROUP BY f.id
+                    ) sub
+                    WHERE m.forecaster_id = sub.forecaster_id
+                      AND m.total_predictions_extracted = 0
+                """))
+                # predictions_extracted_count — auto-prune yield counter.
+                # Counts ANY source_type='youtube' prediction so V1 rows
+                # (predating youtube_haiku_v1) still credit the channel.
+                _yb_c.execute(sql_text("""
+                    UPDATE youtube_channel_meta m
+                    SET predictions_extracted_count = sub.cnt
+                    FROM (
+                        SELECT f.id AS forecaster_id, COUNT(*) AS cnt
+                        FROM predictions p
+                        JOIN forecasters f ON f.id = p.forecaster_id
+                        WHERE p.source_type = 'youtube'
+                        GROUP BY f.id
+                    ) sub
+                    WHERE m.forecaster_id = sub.forecaster_id
+                      AND m.predictions_extracted_count = 0
+                """))
+                # videos_processed_count — reached-Haiku throughput.
+                # UNION of post-Haiku rejections with inserted predictions,
+                # keyed by channel_id on both sides, distinct on video_id.
+                # source_platform_id format is 'yt_<video_id>_<ticker>';
+                # SPLIT_PART pulls the video_id cleanly without the
+                # nested-replace hack the task spec suggests.
+                _yb_c.execute(sql_text("""
+                    UPDATE youtube_channel_meta m
+                    SET videos_processed_count = sub.cnt
+                    FROM (
+                        SELECT channel_id, COUNT(DISTINCT video_id) AS cnt
+                        FROM (
+                            SELECT channel_id, video_id
+                            FROM youtube_scraper_rejections
+                            WHERE rejection_reason IN (
+                                'haiku_no_predictions',
+                                'invalid_ticker',
+                                'neutral_or_no_direction'
+                            )
+                            UNION
+                            SELECT f.channel_id AS channel_id,
+                                   SPLIT_PART(p.source_platform_id, '_', 2) AS video_id
+                            FROM predictions p
+                            JOIN forecasters f ON f.id = p.forecaster_id
+                            WHERE p.source_type = 'youtube'
+                              AND p.source_platform_id LIKE 'yt\\_%' ESCAPE '\\'
+                              AND f.channel_id IS NOT NULL
+                        ) combined
+                        WHERE channel_id IS NOT NULL
+                        GROUP BY channel_id
+                    ) sub
+                    WHERE m.channel_id = sub.channel_id
+                      AND m.videos_processed_count = 0
+                """))
+                _yb_c.commit()
+                print("[Startup] youtube_channel_meta totals backfilled")
+        except Exception as _ybe:
+            print(f"[Startup] youtube_channel_meta totals backfill error: {_ybe}")
+
         # ── scraper_runs + youtube_scraper_rejections (mirrors worker.py) ──
         # Both API and worker run this. SQLAlchemy create_all above already
         # creates the tables when the model is fresh, but the IF NOT EXISTS
