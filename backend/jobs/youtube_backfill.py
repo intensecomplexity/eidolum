@@ -378,7 +378,11 @@ def _process_one_video(db, channel_name, channel_id, video_id, title, publish_st
 
     publish_dt = _parse_publish_date(publish_str) or datetime.utcnow()
 
-    preds, telem = classify_video(channel_name, title, publish_str[:10] if publish_str else "", text)
+    preds, telem = classify_video(
+        channel_name, title,
+        publish_str[:10] if publish_str else "",
+        text, video_id=video_id,
+    )
     if telem.get("error"):
         print(f"[YT-Backfill] {channel_name}: classifier error on {video_id} — {telem.get('error')[:200]}")
         return 0, transcript_chars, "classifier_error"

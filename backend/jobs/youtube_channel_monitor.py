@@ -708,18 +708,25 @@ def _process_one_video(db, channel_name, channel_id, video_id, title, publish_da
     if not publish_dt:
         publish_dt = datetime.utcnow()
 
-    preds, telem = classify_video(channel_name, title, publish_date_str[:10] if publish_date_str else "", text)
+    preds, telem = classify_video(
+        channel_name, title,
+        publish_date_str[:10] if publish_date_str else "",
+        text, video_id=video_id,
+    )
     stats["videos_classified"] += 1
     stats["predictions_extracted"] += telem.get("predictions_validated", 0)
 
     # Aggregate per-call token + cost telemetry into the run-level
     # stats dict. Finalize writes these to scraper_runs so the admin
-    # card can render cost-per-run and cache-hit ratio.
+    # card can render cost-per-run and cache-hit ratio. haiku_retries
+    # is incremented once per chunk that triggered the 800→4000 retry
+    # path inside call_youtube_haiku_with_retry.
     stats["total_input_tokens"] = int(stats.get("total_input_tokens", 0)) + int(telem.get("input_tokens", 0) or 0)
     stats["total_output_tokens"] = int(stats.get("total_output_tokens", 0)) + int(telem.get("output_tokens", 0) or 0)
     stats["total_cache_create_tokens"] = int(stats.get("total_cache_create_tokens", 0)) + int(telem.get("cache_create", 0) or 0)
     stats["total_cache_read_tokens"] = int(stats.get("total_cache_read_tokens", 0)) + int(telem.get("cache_read", 0) or 0)
     stats["estimated_cost_usd"] = float(stats.get("estimated_cost_usd", 0.0)) + float(telem.get("estimated_cost_usd", 0.0) or 0.0)
+    stats["haiku_retries_count"] = int(stats.get("haiku_retries_count", 0)) + int(telem.get("haiku_retries", 0) or 0)
 
     if telem.get("error"):
         stats["classifier_errors"] += 1

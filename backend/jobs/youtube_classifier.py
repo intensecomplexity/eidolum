@@ -163,6 +163,109 @@ def _estimate_haiku_cost(
         + (cache_read_tokens * HAIKU_PRICE_CACHE_READ_PER_M / 1_000_000)
     )
 
+
+# First-attempt and retry caps for YouTube Haiku calls. The first
+# attempt is tight so the common case (few predictions) is cheap; the
+# retry is loose so high-yield videos still survive truncation. Exactly
+# one retry per chunk — we never loop on max_tokens.
+YOUTUBE_HAIKU_MAX_TOKENS_FIRST = 800
+YOUTUBE_HAIKU_MAX_TOKENS_RETRY = 4000
+
+
+def _record_haiku_usage(resp, telemetry: dict) -> None:
+    """Read response.usage and fold tokens + cost into the telemetry
+    dict. Emits a single [YOUTUBE-HAIKU] stdout line so cache-hit ratio
+    and per-call cost are visible in worker logs. Safe if usage is None
+    (treated as zero)."""
+    usage = getattr(resp, "usage", None)
+    if not usage:
+        return
+    ci = int(getattr(usage, "input_tokens", 0) or 0)
+    co = int(getattr(usage, "output_tokens", 0) or 0)
+    cr = int(getattr(usage, "cache_read_input_tokens", 0) or 0)
+    cc = int(getattr(usage, "cache_creation_input_tokens", 0) or 0)
+    telemetry["input_tokens"] = int(telemetry.get("input_tokens", 0)) + ci
+    telemetry["output_tokens"] = int(telemetry.get("output_tokens", 0)) + co
+    telemetry["cache_read"] = int(telemetry.get("cache_read", 0)) + cr
+    telemetry["cache_create"] = int(telemetry.get("cache_create", 0)) + cc
+    cost = _estimate_haiku_cost(
+        input_tokens=ci, output_tokens=co,
+        cache_create_tokens=cc, cache_read_tokens=cr,
+    )
+    telemetry["estimated_cost_usd"] = float(telemetry.get("estimated_cost_usd", 0.0)) + cost
+    print(
+        f"[YOUTUBE-HAIKU] cache_create={cc} cache_read={cr} "
+        f"input={ci} output={co} total_cost_estimate=${cost:.4f}",
+        flush=True,
+    )
+
+
+def call_youtube_haiku_with_retry(
+    client,
+    *,
+    system,
+    messages,
+    video_id: str | None,
+    channel_name: str,
+    telemetry: dict,
+):
+    """Call Haiku with max_tokens=800; retry ONCE at 4000 if
+    stop_reason=='max_tokens'. The system parameter is passed through
+    untouched — callers build it as a list-of-dicts with cache_control
+    ephemeral, and the retry reuses the exact same object so prompt
+    caching hits the 5-minute TTL on the second call. Both attempts
+    contribute tokens + cost to telemetry; the retry also increments
+    telemetry['haiku_retries'] so the channel monitor can aggregate
+    it into scraper_runs.haiku_retries_count.
+
+    Exactly one retry — if the 4000-token call also truncates, we
+    log [YOUTUBE-HAIKU-HARD-FAIL] and return the truncated response so
+    the outer JSON parser produces a classifier_error naturally.
+
+    Returns: (response, was_retried: bool)
+    """
+    resp = client.messages.create(
+        model=HAIKU_MODEL,
+        max_tokens=YOUTUBE_HAIKU_MAX_TOKENS_FIRST,
+        temperature=0,
+        system=system,
+        messages=messages,
+    )
+    _record_haiku_usage(resp, telemetry)
+
+    if getattr(resp, "stop_reason", None) != "max_tokens":
+        return resp, False
+
+    identifier = video_id or channel_name
+    print(
+        f"[YOUTUBE-HAIKU-RETRY] {identifier} ({channel_name}) truncated "
+        f"at {YOUTUBE_HAIKU_MAX_TOKENS_FIRST} tokens, retrying at "
+        f"{YOUTUBE_HAIKU_MAX_TOKENS_RETRY}",
+        flush=True,
+    )
+    telemetry["haiku_retries"] = int(telemetry.get("haiku_retries", 0)) + 1
+
+    resp = client.messages.create(
+        model=HAIKU_MODEL,
+        max_tokens=YOUTUBE_HAIKU_MAX_TOKENS_RETRY,
+        temperature=0,
+        system=system,
+        messages=messages,
+    )
+    _record_haiku_usage(resp, telemetry)
+
+    if getattr(resp, "stop_reason", None) == "max_tokens":
+        # Hard fail: even 4000 wasn't enough. Return the truncated
+        # response anyway so the outer JSON parser throws and the
+        # video gets a classifier_error rejection naturally. No
+        # infinite loops.
+        print(
+            f"[YOUTUBE-HAIKU-HARD-FAIL] {identifier} ({channel_name}) "
+            f"truncated even at {YOUTUBE_HAIKU_MAX_TOKENS_RETRY} tokens",
+            flush=True,
+        )
+    return resp, True
+
 # verified_by tag for grep / cohort analysis. Bump _v1 → _v2 if the
 # prompt or model materially change.
 VERIFIED_BY = "youtube_haiku_v1"
@@ -406,7 +509,8 @@ def _build_user_prompt(channel_name: str, title: str, publish_date: str, transcr
 
 
 def classify_video(channel_name: str, title: str, publish_date: str,
-                   transcript: str) -> tuple[list[dict], dict]:
+                   transcript: str,
+                   video_id: str | None = None) -> tuple[list[dict], dict]:
     """Send a (possibly chunked) transcript to Haiku and return parsed predictions.
 
     Returns (predictions, telemetry):
@@ -440,33 +544,31 @@ def classify_video(channel_name: str, title: str, publish_date: str,
     all_preds: list[dict] = []
     for i, chunk in enumerate(chunks):
         telemetry["chunks"] += 1
+        # System + messages built per-chunk; the cache_control ephemeral
+        # wrapper means the retry path reuses the same cached system
+        # prompt. The wrapper records tokens + cost from both the first
+        # attempt and (if triggered) the retry into telemetry.
+        system_block = [
+            {
+                "type": "text",
+                "text": HAIKU_SYSTEM,
+                "cache_control": {"type": "ephemeral"},
+            }
+        ]
+        messages_block = [
+            {
+                "role": "user",
+                "content": _build_user_prompt(channel_name, title, publish_date, chunk),
+            }
+        ]
         try:
-            resp = client.messages.create(
-                model=HAIKU_MODEL,
-                # 800-token cap balances cost (~5x smaller output budget
-                # than the old 2000) against head-room for high-yield
-                # videos that legitimately return 10+ predictions. Even
-                # at 15 predictions per video (MAX_PREDICTIONS_PER_VIDEO),
-                # each prediction object serializes to ~50 output tokens,
-                # so 800 leaves buffer for long "reasoning" strings.
-                max_tokens=800,
-                temperature=0,
-                system=[
-                    {
-                        "type": "text",
-                        "text": HAIKU_SYSTEM,
-                        # Ephemeral cache: subsequent chunks within the
-                        # same run hit the cache, dropping per-call input
-                        # cost on the ~3,300-token system prompt.
-                        "cache_control": {"type": "ephemeral"},
-                    }
-                ],
-                messages=[
-                    {
-                        "role": "user",
-                        "content": _build_user_prompt(channel_name, title, publish_date, chunk),
-                    }
-                ],
+            resp, _was_retried = call_youtube_haiku_with_retry(
+                client,
+                system=system_block,
+                messages=messages_block,
+                video_id=video_id,
+                channel_name=channel_name,
+                telemetry=telemetry,
             )
         except Exception as e:
             # Anthropic SDK raises typed exceptions for 4xx/5xx — we don't
@@ -481,40 +583,6 @@ def classify_video(channel_name: str, title: str, publish_date: str,
             telemetry["error"] = tag[:300]
             telemetry["last_status"] = "exception"
             return [], telemetry
-
-        usage = getattr(resp, "usage", None)
-        if usage:
-            call_input = int(getattr(usage, "input_tokens", 0) or 0)
-            call_output = int(getattr(usage, "output_tokens", 0) or 0)
-            call_cache_read = int(getattr(usage, "cache_read_input_tokens", 0) or 0)
-            call_cache_create = int(getattr(usage, "cache_creation_input_tokens", 0) or 0)
-            telemetry["input_tokens"] += call_input
-            telemetry["output_tokens"] += call_output
-            telemetry.setdefault("cache_read", 0)
-            telemetry.setdefault("cache_create", 0)
-            telemetry["cache_read"] += call_cache_read
-            telemetry["cache_create"] += call_cache_create
-
-            call_cost = _estimate_haiku_cost(
-                input_tokens=call_input,
-                output_tokens=call_output,
-                cache_create_tokens=call_cache_create,
-                cache_read_tokens=call_cache_read,
-            )
-            telemetry.setdefault("estimated_cost_usd", 0.0)
-            telemetry["estimated_cost_usd"] += call_cost
-
-            # Per-call stdout telemetry line. Mirrors the format we can
-            # grep from worker logs, and makes the cache-hit ratio
-            # visible per chunk (so a cold chunk vs a warm chunk is
-            # obvious without opening the scraper_runs row).
-            print(
-                f"[YOUTUBE-HAIKU] cache_create={call_cache_create} "
-                f"cache_read={call_cache_read} input={call_input} "
-                f"output={call_output} "
-                f"total_cost_estimate=${call_cost:.4f}",
-                flush=True,
-            )
 
         try:
             content = resp.content[0].text.strip()
