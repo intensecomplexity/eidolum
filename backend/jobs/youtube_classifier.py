@@ -323,6 +323,49 @@ Do NOT hallucinate predictions. If you're unsure whether something is a predicti
 Output JSON only. Be concise. Do not include prose explanations outside the JSON."""
 
 
+# Sector-aware variant of HAIKU_SYSTEM. Gated behind
+# ENABLE_YOUTUBE_SECTOR_CALLS (feature flag, default 0% traffic). Starts
+# with the exact same content as HAIKU_SYSTEM and adds a SECTOR CALLS
+# appendix so the classifier can emit both ticker_call predictions
+# (existing behavior) and sector_call predictions (new behavior) from a
+# single Haiku call.
+#
+# IMPORTANT: HAIKU_SYSTEM must remain untouched. This constant is the
+# ONLY place the sector-call prompt text lives. should_use_sector_prompt
+# in feature_flags.py decides which system prompt each video gets, based
+# on a stable hash(video_id) vs the current traffic percentage.
+YOUTUBE_HAIKU_SECTOR_SYSTEM = HAIKU_SYSTEM + """
+
+SECTOR CALLS:
+If the speaker mentions an entire market sector with a clear direction but no specific ticker,
+extract it as a sector_call. Examples:
+- "Semiconductors are going to the moon" → sector_call, sector: "semiconductors", direction: "bullish"
+- "I'm bearish on energy stocks" → sector_call, sector: "energy", direction: "bearish"
+- "Tech is done, I'm out" → sector_call, sector: "tech", direction: "bearish"
+
+Rules for sector_call extraction:
+- MUST have a specific named sector (not just "the market" or "stocks in general")
+- MUST have a clear direction (bullish/bearish)
+- target_price is OPTIONAL and usually not present in sector commentary
+- Use the sector name exactly as spoken — do NOT try to pick an ETF ticker yourself
+- If the speaker also mentions specific tickers in the same sentence, prefer the ticker_call extraction
+- Do NOT extract vague statements like "the economy is weak" or "inflation is bad" — those are macro, not sectors
+
+Output format for sector calls (add these objects to the same JSON array alongside any ticker_call objects):
+{
+  "type": "sector_call",
+  "sector": "<sector name as spoken>",
+  "direction": "bullish",
+  "target_return_pct": null,
+  "timeframe": "<absolute date if mentioned, else omit>",
+  "context_quote": "<the exact phrase from the transcript>"
+}
+
+For ticker calls, continue using the existing object shape (with "ticker", "direction", etc.) — you may optionally include "type": "ticker_call" to be explicit, but omitting the type field is equivalent to ticker_call.
+
+Output JSON only. Be concise. Do not include prose explanations outside the JSON."""
+
+
 # ── Transcript fetching ─────────────────────────────────────────────────────
 
 def _build_transcript_api():
@@ -510,7 +553,8 @@ def _build_user_prompt(channel_name: str, title: str, publish_date: str, transcr
 
 def classify_video(channel_name: str, title: str, publish_date: str,
                    transcript: str,
-                   video_id: str | None = None) -> tuple[list[dict], dict]:
+                   video_id: str | None = None,
+                   db=None) -> tuple[list[dict], dict]:
     """Send a (possibly chunked) transcript to Haiku and return parsed predictions.
 
     Returns (predictions, telemetry):
@@ -521,9 +565,17 @@ def classify_video(channel_name: str, title: str, publish_date: str,
     NEVER raises. On any classifier failure (no key, HTTP error, parse
     error) returns ([], {"error": "<tag>"}). The caller should treat
     empty predictions + an error tag as a transient skip.
+
+    Prompt selection: when a DB session is passed AND the stable hash
+    routing for this video_id falls under the current traffic percent
+    for ENABLE_YOUTUBE_SECTOR_CALLS, use YOUTUBE_HAIKU_SECTOR_SYSTEM
+    (extracts both ticker_call and sector_call objects). Otherwise use
+    the unchanged HAIKU_SYSTEM (ticker_call only). telemetry gets a
+    prompt_variant key so the caller can aggregate.
     """
     telemetry: dict = {"chunks": 0, "input_tokens": 0, "output_tokens": 0,
-                       "last_status": None, "predictions_raw": 0}
+                       "last_status": None, "predictions_raw": 0,
+                       "prompt_variant": "standard"}
     if not ANTHROPIC_API_KEY:
         telemetry["error"] = "no_api_key"
         return [], telemetry
@@ -541,6 +593,25 @@ def classify_video(channel_name: str, title: str, publish_date: str,
 
     client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
 
+    # Decide which system prompt this video gets. Stable hash routing
+    # guarantees retries see the same prompt, and the cached flag read
+    # (60s TTL) keeps this cheap in tight batch loops.
+    use_sector_prompt = False
+    if db is not None and video_id:
+        try:
+            from feature_flags import should_use_sector_prompt
+            use_sector_prompt = should_use_sector_prompt(db, video_id)
+        except Exception as _e:
+            log.warning("[YT-CLF] sector prompt flag check failed: %s", _e)
+            use_sector_prompt = False
+    active_system = YOUTUBE_HAIKU_SECTOR_SYSTEM if use_sector_prompt else HAIKU_SYSTEM
+    telemetry["prompt_variant"] = "sector" if use_sector_prompt else "standard"
+    print(
+        f"[YOUTUBE-HAIKU] video={video_id or '?'} channel={channel_name} "
+        f"prompt_variant={telemetry['prompt_variant']}",
+        flush=True,
+    )
+
     all_preds: list[dict] = []
     for i, chunk in enumerate(chunks):
         telemetry["chunks"] += 1
@@ -551,7 +622,7 @@ def classify_video(channel_name: str, title: str, publish_date: str,
         system_block = [
             {
                 "type": "text",
-                "text": HAIKU_SYSTEM,
+                "text": active_system,
                 "cache_control": {"type": "ephemeral"},
             }
         ]

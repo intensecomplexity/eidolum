@@ -730,7 +730,7 @@ def _process_one_video(db, channel_name, channel_id, video_id, title, publish_da
     preds, telem = classify_video(
         channel_name, title,
         publish_date_str[:10] if publish_date_str else "",
-        text, video_id=video_id,
+        text, video_id=video_id, db=db,
     )
     stats["videos_classified"] += 1
     stats["predictions_extracted"] += telem.get("predictions_validated", 0)

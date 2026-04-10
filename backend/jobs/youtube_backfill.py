@@ -381,7 +381,7 @@ def _process_one_video(db, channel_name, channel_id, video_id, title, publish_st
     preds, telem = classify_video(
         channel_name, title,
         publish_str[:10] if publish_str else "",
-        text, video_id=video_id,
+        text, video_id=video_id, db=db,
     )
     if telem.get("error"):
         print(f"[YT-Backfill] {channel_name}: classifier error on {video_id} — {telem.get('error')[:200]}")
