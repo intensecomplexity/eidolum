@@ -1242,6 +1242,24 @@ def run_x_scraper(db=None):
     tracked_handles = {h.lower() for _, h in accounts}
     print(f"[X-SCRAPER] Loaded {len(accounts)} active accounts", flush=True)
 
+    # Open a scraper_runs row so the admin Social Scrapers card can show
+    # last-run funnel counts. Best-effort: failure to insert must NOT
+    # break the scrape. The row is finalized in the summary block at the
+    # bottom of this function. See models.ScraperRun.
+    run_id: int | None = None
+    try:
+        run_id = db.execute(sql_text(
+            "INSERT INTO scraper_runs (source, started_at, status) "
+            "VALUES ('x', NOW(), 'running') RETURNING id"
+        )).scalar()
+        db.commit()
+    except Exception as e:
+        log.warning(f"[X-SCRAPER] scraper_runs insert failed: {e}")
+        try:
+            db.rollback()
+        except Exception:
+            pass
+
     total_stats = {
         "accounts_scraped": 0, "tweets_fetched": 0, "prefilter_pass": 0,
         "ai_sent": 0, "ai_predictions": 0, "ai_high": 0, "ai_medium": 0,
@@ -1536,6 +1554,40 @@ def run_x_scraper(db=None):
     # Summary (Phase 5D — exact format spec)
     rejected_total = sum(rejection_reasons.values())
     reasons_str = ", ".join(f"{k}={v}" for k, v in sorted(rejection_reasons.items(), key=lambda x: -x[1]))
+
+    # Finalize scraper_runs row. Best-effort: any failure here is logged
+    # and ignored — the run already happened, the in-memory summary
+    # below is still authoritative for stdout debugging.
+    if run_id is not None:
+        try:
+            db.execute(sql_text("""
+                UPDATE scraper_runs
+                SET finished_at = NOW(),
+                    status = 'ok',
+                    items_fetched = :fetched,
+                    items_processed = :processed,
+                    items_llm_sent = :llm_sent,
+                    items_inserted = :inserted,
+                    items_rejected = :rejected,
+                    items_deduped = :deduped
+                WHERE id = :id
+            """), {
+                "id": run_id,
+                "fetched": int(total_stats.get("tweets_fetched", 0)),
+                "processed": int(total_stats.get("prefilter_pass", 0)),
+                "llm_sent": int(total_stats.get("ai_sent", 0)),
+                "inserted": int(total_stats.get("inserted", 0)),
+                "rejected": int(rejected_total),
+                "deduped": int(total_stats.get("dupes", 0)),
+            })
+            db.commit()
+        except Exception as e:
+            log.warning(f"[X-SCRAPER] scraper_runs finalize failed: {e}")
+            try:
+                db.rollback()
+            except Exception:
+                pass
+
     print(f"[X-SCRAPER] Done: {total_stats['inserted']} inserted, {rejected_total} rejected ({reasons_str or 'none'})", flush=True)
     print(f"[X-SCRAPER] RUN COMPLETE:", flush=True)
     print(f"  Accounts: {total_stats['accounts_scraped']}/{len(accounts)} scraped, {total_stats['blocked_handles']} blocked (news firehose)", flush=True)
