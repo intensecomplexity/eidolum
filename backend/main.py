@@ -2255,13 +2255,17 @@ def get_features(db: _Session = _Depends(_get_db)):
     flags = {
         "tournaments": False, "daily_challenge": False,
         "duels": False, "compete": False, "compare_analysts": False,
+        "evaluate_x_predictions": False,
     }
     try:
         rows = db.execute(_ft(
-            "SELECT key, value FROM config WHERE key IN ('tournaments_enabled','daily_challenge_enabled','duels_enabled','compete_enabled','compare_analysts_enabled')"
+            "SELECT key, value FROM config WHERE key IN ('tournaments_enabled','daily_challenge_enabled','duels_enabled','compete_enabled','compare_analysts_enabled','EVALUATE_X_PREDICTIONS')"
         )).fetchall()
         for r in rows:
-            flags[r[0].replace("_enabled", "")] = r[1] == "true"
+            if r[0] == "EVALUATE_X_PREDICTIONS":
+                flags["evaluate_x_predictions"] = str(r[1]).strip().lower() == "true"
+            else:
+                flags[r[0].replace("_enabled", "")] = r[1] == "true"
     except Exception:
         pass
     return flags
@@ -2304,6 +2308,23 @@ def toggle_compare_analysts(admin_id: int = _Depends(_require_admin), db: _Sessi
     db.commit()
     new_val = db.query(Config).filter(Config.key == "compare_analysts_enabled").first()
     return {"compare_analysts_enabled": new_val.value == "true" if new_val else False}
+
+
+@app.post("/api/admin/toggle-evaluate-x")
+def toggle_evaluate_x(admin_id: int = _Depends(_require_admin), db: _Session = _Depends(_get_db)):
+    from models import Config
+    row = db.query(Config).filter(Config.key == "EVALUATE_X_PREDICTIONS").first()
+    if row:
+        row.value = "false" if str(row.value).strip().lower() == "true" else "true"
+    else:
+        db.add(Config(key="EVALUATE_X_PREDICTIONS", value="true"))
+    db.commit()
+    new_val = db.query(Config).filter(Config.key == "EVALUATE_X_PREDICTIONS").first()
+    return {
+        "evaluate_x_predictions": (
+            str(new_val.value).strip().lower() == "true" if new_val else False
+        )
+    }
 
 
 # ── SEO: sitemap.xml + robots.txt ──────────────────────────────────────────
