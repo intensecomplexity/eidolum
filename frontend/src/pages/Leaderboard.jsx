@@ -414,6 +414,7 @@ export default function Leaderboard() {
                             </div>
                           </th>
                           <th className="px-3 py-3 text-right">Predictions</th>
+                          <th className="px-3 py-3 text-right hidden xl:table-cell w-20" title="Sector call accuracy (separate from ticker call accuracy)">Sector Calls</th>
                           <th className="px-3 py-3 text-center hidden xl:table-cell w-16">Streak</th>
                           <th className="px-3 py-3 hidden xl:table-cell max-w-[180px]">Top Sector</th>
                           <th className="px-2 py-3 text-center hidden lg:table-cell w-14">Watch</th>
@@ -479,6 +480,18 @@ export default function Leaderboard() {
                             <td className="px-3 py-3 text-right">
                               <div className="font-mono text-text-secondary text-sm">{f.evaluated_predictions}</div>
                               <div className="text-muted text-[10px] font-mono">{f.total_predictions} total</div>
+                            </td>
+                            <td className="px-3 py-3 text-right hidden xl:table-cell">
+                              {f.sector_call_total > 0 && f.sector_call_accuracy != null ? (
+                                <div className="flex flex-col items-end">
+                                  <span className={`font-mono text-sm ${f.sector_call_accuracy >= 60 ? 'text-positive' : 'text-negative'}`}>
+                                    {f.sector_call_accuracy.toFixed(1)}%
+                                  </span>
+                                  <span className="text-muted text-[10px] font-mono">{f.sector_call_total} calls</span>
+                                </div>
+                              ) : (
+                                <span className="font-mono text-muted">—</span>
+                              )}
                             </td>
                             <td className="px-3 py-3 text-center hidden xl:table-cell"><StreakBadge streak={f.streak} /></td>
                             <td className="px-3 py-3 hidden xl:table-cell max-w-[180px]">

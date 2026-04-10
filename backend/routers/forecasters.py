@@ -173,6 +173,38 @@ def get_forecaster(
     else:
         live_accuracy = 0
 
+    # Per-category stats (ticker_call vs sector_call). Exposes the split
+    # so the profile page can render a dedicated "Sector Calls" section
+    # without inflating the main accuracy number. Gracefully degrades
+    # if the prediction_category column doesn't exist on very old deploys.
+    category_stats = {
+        "ticker_call_total": 0, "ticker_call_accuracy": None,
+        "sector_call_total": 0, "sector_call_accuracy": None,
+    }
+    try:
+        cat_rows = db.execute(sql_text("""
+            SELECT COALESCE(prediction_category, 'ticker_call') as cat,
+                   COUNT(*) FILTER (WHERE outcome IN ('hit','near','miss','correct','incorrect')) as evaluated,
+                   SUM(CASE WHEN outcome IN ('hit','correct') THEN 1.0
+                            WHEN outcome = 'near' THEN 0.5 ELSE 0 END) as score
+            FROM predictions WHERE forecaster_id = :fid
+            GROUP BY COALESCE(prediction_category, 'ticker_call')
+        """), {"fid": forecaster_id}).fetchall()
+        for row in cat_rows:
+            cat = str(row[0] or "ticker_call")
+            evaluated = int(row[1] or 0)
+            score = float(row[2] or 0.0)
+            if cat == "sector_call":
+                category_stats["sector_call_total"] = evaluated
+                if evaluated > 0:
+                    category_stats["sector_call_accuracy"] = round(score / evaluated * 100, 1)
+            else:
+                category_stats["ticker_call_total"] = evaluated
+                if evaluated > 0:
+                    category_stats["ticker_call_accuracy"] = round(score / evaluated * 100, 1)
+    except Exception:
+        pass
+
     # Dormancy fields. Use getattr for graceful degradation if the migration
     # hasn't run yet on a fresh DB.
     is_dormant = bool(getattr(f, "is_dormant", False))
@@ -207,6 +239,7 @@ def get_forecaster(
         "sector_strengths": [],
         "accuracy_over_time": _build_accuracy_trend(forecaster_id, db, sector),
         "prediction_counts": pred_counts,
+        "category_stats": category_stats,
         "predictions": _get_preds(forecaster_id, page, limit, filter, sector, db),
         "disclosed_positions": [],
         "conflict_stats": {"total": 0, "conflicts": 0, "rate": 0},

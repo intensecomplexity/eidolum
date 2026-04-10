@@ -52,6 +52,69 @@ def _apply_dormancy(db: Session, results: list, include_dormant: bool) -> list:
     return [r for r in results if not r.get("is_dormant")]
 
 
+def _enrich_category_stats(results: list, db: Session):
+    """Batch-fetch per-forecaster prediction counts split by
+    prediction_category (ticker_call vs sector_call). Adds four fields
+    to each result dict:
+
+      - ticker_call_total / ticker_call_accuracy
+      - sector_call_total / sector_call_accuracy
+
+    Accuracy uses the same weighting as the main leaderboard: hit/correct
+    count as 1.0, near counts as 0.5, miss/incorrect count as 0. Any
+    evaluated outcome (in the SCORED set) contributes to the denominator.
+    Forecasters with zero predictions in a category get accuracy=None
+    so the frontend can render '—' instead of a misleading 0%.
+
+    Gracefully degrades: if the prediction_category column doesn't exist
+    yet (fresh deploy), silently leaves the fields absent.
+    """
+    if not results:
+        return
+    fids = [r["id"] for r in results if r.get("id")]
+    if not fids:
+        return
+    try:
+        rows = db.execute(sql_text("""
+            SELECT p.forecaster_id,
+                   COALESCE(p.prediction_category, 'ticker_call') as cat,
+                   COUNT(*) FILTER (WHERE p.outcome IN ('hit','near','miss','correct','incorrect')) as evaluated,
+                   SUM(CASE WHEN p.outcome IN ('hit','correct') THEN 1.0
+                            WHEN p.outcome = 'near' THEN 0.5 ELSE 0 END) as score
+            FROM predictions p
+            WHERE p.forecaster_id = ANY(:fids)
+            GROUP BY p.forecaster_id, COALESCE(p.prediction_category, 'ticker_call')
+        """), {"fids": fids}).fetchall()
+    except Exception as _e:
+        # Column missing on very old deploys — skip enrichment entirely.
+        return
+    by_fid = {}
+    for row in rows:
+        fid = int(row[0])
+        cat = str(row[1] or "ticker_call")
+        evaluated = int(row[2] or 0)
+        score = float(row[3] or 0.0)
+        if fid not in by_fid:
+            by_fid[fid] = {
+                "ticker_call_total": 0, "ticker_call_accuracy": None,
+                "sector_call_total": 0, "sector_call_accuracy": None,
+            }
+        if cat == "sector_call":
+            by_fid[fid]["sector_call_total"] = evaluated
+            if evaluated > 0:
+                by_fid[fid]["sector_call_accuracy"] = round(score / evaluated * 100, 1)
+        else:
+            by_fid[fid]["ticker_call_total"] = evaluated
+            if evaluated > 0:
+                by_fid[fid]["ticker_call_accuracy"] = round(score / evaluated * 100, 1)
+    for r in results:
+        stats = by_fid.get(int(r["id"]), {
+            "ticker_call_total": 0, "ticker_call_accuracy": None,
+            "sector_call_total": 0, "sector_call_accuracy": None,
+        })
+        r.update(stats)
+
+
 def _enrich_primary_source(results: list, db: Session):
     """Batch-fetch the primary source_type for each forecaster based on their most common prediction source."""
     if not results:
@@ -209,6 +272,9 @@ def _refresh_leaderboard(db: Session) -> list | dict:
 
     # Batch-fetch sector strengths
     _enrich_sector_strengths(results, db)
+
+    # Batch-fetch per-category accuracy (ticker_call vs sector_call)
+    _enrich_category_stats(results, db)
 
     # Batch-fetch outcome + direction counts for pie charts
     if results:
@@ -610,6 +676,9 @@ def _build_filtered_leaderboard(db: Session, sector=None, call_type=None, sort="
 
     # Batch-fetch sector strengths (same as default leaderboard)
     _enrich_sector_strengths(results, db)
+
+    # Batch-fetch per-category accuracy (ticker_call vs sector_call)
+    _enrich_category_stats(results, db)
 
     return results
 

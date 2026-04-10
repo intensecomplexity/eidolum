@@ -397,6 +397,45 @@ export default function ForecasterProfile() {
           <NotificationBanner text={`Get notified when ${data.name} makes a new prediction.`} forecasterName={data.name} />
         </div>
 
+        {/* Sector Calls section — rendered only when this forecaster has
+            at least one sector_call prediction. Stays separate from the
+            main accuracy number so sector skill is its own dimension. */}
+        {data.category_stats?.sector_call_total > 0 && (
+          <div className="card mb-4 sm:mb-6">
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <div>
+                <h2 className="text-xs text-muted uppercase tracking-wider font-semibold mb-1">
+                  Sector Calls
+                </h2>
+                <p className="text-[11px] text-muted/80 max-w-md">
+                  Broad sector bets mapped to ETFs. Scored as spread vs SPY with a wider
+                  HIT/NEAR tolerance than specific ticker calls. Kept separate from the
+                  main accuracy number so sector skill is visible as its own dimension.
+                </p>
+              </div>
+              <div className="flex gap-4 shrink-0">
+                <div className="text-center">
+                  <div className={`font-mono text-xl font-bold ${
+                    data.category_stats.sector_call_accuracy != null && data.category_stats.sector_call_accuracy >= 60
+                      ? 'text-positive' : 'text-negative'
+                  }`}>
+                    {data.category_stats.sector_call_accuracy != null
+                      ? `${data.category_stats.sector_call_accuracy.toFixed(1)}%`
+                      : '—'}
+                  </div>
+                  <div className="text-muted text-[10px] uppercase tracking-wider">Sector Accuracy</div>
+                </div>
+                <div className="text-center">
+                  <div className="font-mono text-xl font-bold text-accent">
+                    {data.category_stats.sector_call_total}
+                  </div>
+                  <div className="text-muted text-[10px] uppercase tracking-wider">Sector Calls</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Sector filter with scrollable arrows */}
         {sectorCounts.length > 0 && <SectorScroller
           sectors={sectorCounts}
