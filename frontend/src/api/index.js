@@ -880,6 +880,14 @@ export function getSocialStats() {
   return api.get('/admin/social-stats', { headers: authHeaders() }).then(r => r.data);
 }
 
+export function getPrunedYouTubeChannels() {
+  return api.get('/admin/youtube-channels/pruned', { headers: authHeaders() }).then(r => r.data);
+}
+
+export function reactivateYouTubeChannel(channelId) {
+  return api.post(`/admin/youtube-channels/${encodeURIComponent(channelId)}/reactivate`, {}, { headers: authHeaders() }).then(r => r.data);
+}
+
 // ——— Smart Money ———
 
 export function getSmartMoney(params = {}) {

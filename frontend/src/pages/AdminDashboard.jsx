@@ -9,6 +9,7 @@ import {
   deleteForecasterAdmin, deletePredictionAdmin, listPredictionsAdmin,
   getFeatureFlags, toggleDuelsAdmin, toggleCompeteAdmin, toggleCompareAnalystsAdmin,
   getAdminUrlQuality, getSocialStats,
+  getPrunedYouTubeChannels, reactivateYouTubeChannel,
 } from '../api';
 
 const TABS = ['Overview', 'Users', 'Forecasters', 'Predictions', 'Audit Log'];
@@ -324,6 +325,9 @@ function SocialScraperCard({ source, data }) {
           </button>
         )}
       </div>
+
+      {/* YouTube-only: pruned channels (auto-deactivated by zero-yield) */}
+      {isYoutube && <PrunedChannelsSection />}
     </div>
   );
 }
@@ -514,6 +518,95 @@ function ClosenessChart({ dist }) {
           </div>
         );
       })}
+    </div>
+  );
+}
+
+
+function PrunedChannelsSection() {
+  const [open, setOpen] = useState(false);
+  const [rows, setRows] = useState(null);
+  const [busy, setBusy] = useState(null);
+
+  function load() {
+    setRows(null);
+    getPrunedYouTubeChannels()
+      .then(setRows)
+      .catch(() => setRows([]));
+  }
+
+  useEffect(() => {
+    load();
+  }, []);
+
+  async function reactivate(channelId) {
+    setBusy(channelId);
+    try {
+      await reactivateYouTubeChannel(channelId);
+      load();
+    } catch (_e) {
+      // Best-effort: surface failure via the busy clear; the next load
+      // will refresh the list. No toast here to keep the section quiet.
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  const count = Array.isArray(rows) ? rows.length : 0;
+
+  return (
+    <div className="mt-3 bg-surface-2 border border-border/50 rounded-lg">
+      <button
+        onClick={() => setOpen(o => !o)}
+        className="w-full flex items-center justify-between px-2.5 py-1.5 text-[10px] uppercase tracking-wider"
+        style={{ color: '#D4A843' }}
+      >
+        <span>Pruned channels {count > 0 && <span className="text-muted">({count})</span>}</span>
+        <span className="font-mono text-muted">{open ? '−' : '+'}</span>
+      </button>
+      {open && (
+        <div className="px-2.5 pb-2.5">
+          {rows === null ? (
+            <div className="text-muted text-xs px-1 py-1">Loading…</div>
+          ) : rows.length === 0 ? (
+            <div className="text-muted text-xs px-1 py-1">No channels auto-pruned yet.</div>
+          ) : (
+            <div className="bg-surface border border-border/50 rounded-lg overflow-hidden">
+              <table className="w-full text-[11px]">
+                <thead>
+                  <tr className="text-left text-muted text-[10px] uppercase tracking-wider border-b border-border/50">
+                    <th className="px-2 py-1.5">Name</th>
+                    <th className="px-2 py-1.5 text-right">Deactivated</th>
+                    <th className="px-2 py-1.5 text-right">Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.map(r => (
+                    <tr key={r.channel_id} className="border-b border-border/30 last:border-0">
+                      <td className="px-2 py-1.5 text-text-secondary truncate max-w-[160px]" title={r.channel_name}>
+                        {r.channel_name || r.channel_id}
+                        <span className="ml-2 text-muted font-mono text-[10px]">
+                          {r.videos_processed_count}v / {r.predictions_extracted_count}p
+                        </span>
+                      </td>
+                      <td className="px-2 py-1.5 text-right font-mono text-muted">{socialTimeAgo(r.deactivated_at)}</td>
+                      <td className="px-2 py-1.5 text-right">
+                        <button
+                          onClick={() => reactivate(r.channel_id)}
+                          disabled={busy === r.channel_id}
+                          className="px-2 py-0.5 rounded border border-accent/40 text-accent text-[10px] font-medium hover:bg-accent/10 disabled:opacity-50"
+                        >
+                          {busy === r.channel_id ? '…' : 'Reactivate'}
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
