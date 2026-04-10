@@ -41,6 +41,7 @@ from jobs.youtube_classifier import (
     fetch_transcript,
     classify_video,
     insert_youtube_prediction,
+    insert_youtube_sector_prediction,
     log_youtube_rejection,
     transcript_proxy_status,
     PIPELINE_VERSION,
@@ -393,6 +394,11 @@ def _run_inner(db):
         # on the first 800-token attempt and fell through to the 4000-
         # token retry. Populated from telem["haiku_retries"].
         "haiku_retries_count": 0,
+        # Per-run sector_call counter — incremented inside
+        # insert_youtube_sector_prediction. Written to
+        # scraper_runs.sector_calls_extracted at finalize. Stays at 0
+        # when ENABLE_YOUTUBE_SECTOR_CALLS flag is off (default).
+        "sector_calls_extracted": 0,
     }
 
     for row in batch_rows:
@@ -612,7 +618,8 @@ def _run_inner(db):
                     total_cache_create_tokens = :cc_tok,
                     total_cache_read_tokens = :cr_tok,
                     estimated_cost_usd = :cost,
-                    haiku_retries_count = :retries
+                    haiku_retries_count = :retries,
+                    sector_calls_extracted = :sector_calls
                 WHERE id = :id
             """), {
                 "id": run_id,
@@ -628,6 +635,7 @@ def _run_inner(db):
                 "cr_tok": int(stats.get("total_cache_read_tokens", 0)),
                 "cost": round(float(stats.get("estimated_cost_usd", 0.0)), 4),
                 "retries": int(stats.get("haiku_retries_count", 0)),
+                "sector_calls": int(stats.get("sector_calls_extracted", 0)),
             })
             db.commit()
         except Exception as e:
@@ -787,21 +795,38 @@ def _process_one_video(db, channel_name, channel_id, video_id, title, publish_da
     inserted = 0
     for pred in preds:
         try:
-            ok = insert_youtube_prediction(
-                pred,
-                channel_name=channel_name,
-                channel_id=channel_id,
-                video_id=video_id,
-                video_title=title,
-                publish_date=publish_dt,
-                db=db,
-                transcript_snippet=transcript_snippet,
-                stats=stats,
-            )
+            # Route sector_call objects to the sector-aware insert path.
+            # Ticker calls (the vast majority, and 100% of rows when the
+            # feature flag is at 0) take the existing path unchanged.
+            if pred.get("_kind") == "sector_call":
+                ok = insert_youtube_sector_prediction(
+                    pred,
+                    channel_name=channel_name,
+                    channel_id=channel_id,
+                    video_id=video_id,
+                    video_title=title,
+                    publish_date=publish_dt,
+                    db=db,
+                    transcript_snippet=transcript_snippet,
+                    stats=stats,
+                )
+            else:
+                ok = insert_youtube_prediction(
+                    pred,
+                    channel_name=channel_name,
+                    channel_id=channel_id,
+                    video_id=video_id,
+                    video_title=title,
+                    publish_date=publish_dt,
+                    db=db,
+                    transcript_snippet=transcript_snippet,
+                    stats=stats,
+                )
             if ok:
                 inserted += 1
         except Exception as e:
-            print(f"[ChannelMonitor] insert error for {video_id} {pred.get('ticker')}: {e}")
+            _key = pred.get("ticker") or pred.get("sector") or "?"
+            print(f"[ChannelMonitor] insert error for {video_id} {_key}: {e}")
             db.rollback()
 
     stats["predictions_inserted"] += inserted

@@ -703,19 +703,46 @@ def classify_video(channel_name: str, title: str, publish_date: str,
 # ── Validation ──────────────────────────────────────────────────────────────
 
 _VALID_DIRECTIONS = {"bullish", "bearish", "neutral"}
+# Sector calls only support bullish/bearish — neutral doesn't make sense
+# at the sector level (a "hold the sector" call is not a prediction).
+_SECTOR_VALID_DIRECTIONS = {"bullish", "bearish"}
 
 
 def _validate_and_dedupe_predictions(raw: list) -> list[dict]:
-    """Filter to predictions that look structurally sound and dedupe by
-    (ticker, direction). The classifier occasionally returns the same
-    prediction twice when a transcript repeats a take, and chunked
-    transcripts will overlap by 2k chars so the same sentence may be
-    classified twice."""
-    seen: set[tuple[str, str]] = set()
+    """Filter to predictions that look structurally sound and dedupe
+    across chunks. Handles both ticker_call and sector_call objects.
+
+    Ticker calls dedupe on (ticker, direction). Sector calls dedupe on
+    (sector_lower, direction) and are marked with _kind='sector_call'
+    so the caller can route them to the sector insertion path. Ticker
+    calls get _kind='ticker_call' for symmetry.
+
+    The classifier occasionally returns the same prediction twice when
+    a transcript repeats a take, and chunked transcripts overlap by 2k
+    chars so the same sentence may be classified twice.
+    """
+    seen_tickers: set[tuple[str, str]] = set()
+    seen_sectors: set[tuple[str, str]] = set()
     out: list[dict] = []
     for p in raw:
         if not isinstance(p, dict):
             continue
+        # Sector call branch: type='sector_call' with sector + direction
+        if str(p.get("type") or "").strip().lower() == "sector_call":
+            sector_name = (p.get("sector") or "").strip()
+            direction = (p.get("direction") or "").strip().lower()
+            if not sector_name or direction not in _SECTOR_VALID_DIRECTIONS:
+                continue
+            key = (sector_name.lower(), direction)
+            if key in seen_sectors:
+                continue
+            seen_sectors.add(key)
+            p["sector"] = sector_name
+            p["direction"] = direction
+            p["_kind"] = "sector_call"
+            out.append(p)
+            continue
+
         ticker = (p.get("ticker") or "").upper().strip().lstrip("$")
         direction = (p.get("direction") or "").strip().lower()
         if not ticker or not direction:
@@ -727,11 +754,12 @@ def _validate_and_dedupe_predictions(raw: list) -> list[dict]:
         if not ticker or len(ticker) > 5:
             continue
         key = (ticker, direction)
-        if key in seen:
+        if key in seen_tickers:
             continue
-        seen.add(key)
+        seen_tickers.add(key)
         p["ticker"] = ticker
         p["direction"] = direction
+        p["_kind"] = "ticker_call"
         out.append(p)
     return out
 
@@ -992,7 +1020,136 @@ def insert_youtube_prediction(
             outcome="pending",
             verified_by=VERIFIED_BY,
             call_type="video_prediction",
+            prediction_category="ticker_call",
         )
     )
     db.flush()
+    return True
+
+
+def insert_youtube_sector_prediction(
+    pred: dict,
+    *,
+    channel_name: str,
+    channel_id: str | None,
+    video_id: str,
+    video_title: str,
+    publish_date: datetime,
+    db,
+    transcript_snippet: str | None = None,
+    stats: dict | None = None,
+) -> bool:
+    """Insert a sector_call prediction.
+
+    Mirrors insert_youtube_prediction but:
+      - Resolves the free-form sector name to an ETF ticker via
+        feature_flags.map_sector_to_etf
+      - Sets prediction_type='sector_call' AND prediction_category='sector_call'
+        so the evaluator's existing ETF-vs-SPY spread scorer picks it up
+        and the leaderboard can surface sector skill as a separate column
+      - target_price is always NULL (sector calls don't use price targets)
+      - call_type='sector_call'
+      - source_platform_id='yt_<vid>_sector_<canonical>' for dedup
+
+    Returns True on successful insert, False on any rejection. All
+    rejection paths log to youtube_scraper_rejections with a specific
+    reason tag and increment stats['items_rejected'] via
+    log_youtube_rejection.
+    """
+    from models import Prediction
+    from jobs.prediction_validator import prediction_exists_cross_scraper
+    from feature_flags import map_sector_to_etf
+
+    def _reject(reason: str, hr: str | None = None) -> bool:
+        log_youtube_rejection(
+            db,
+            video_id=video_id,
+            channel_id=channel_id,
+            channel_name=channel_name,
+            video_title=video_title,
+            video_published_at=publish_date,
+            reason=reason,
+            haiku_reason=hr,
+            haiku_raw=pred,
+            transcript_snippet=transcript_snippet,
+            stats=stats,
+        )
+        return False
+
+    sector_name = (pred.get("sector") or "").strip()
+    direction = (pred.get("direction") or "").strip().lower()
+    if not sector_name:
+        return _reject("sector_missing")
+    if direction not in ("bullish", "bearish"):
+        return _reject("sector_invalid_direction", hr=direction or None)
+
+    etf_ticker = map_sector_to_etf(db, sector_name)
+    if not etf_ticker:
+        return _reject("sector_etf_unknown", hr=sector_name[:200])
+
+    # Per-video-per-sector dedup. Two separate sectors in the same
+    # video insert as separate rows; the same sector mentioned twice
+    # collapses to one row.
+    canonical = re.sub(r"[^a-z0-9]+", "_", sector_name.lower()).strip("_")[:30]
+    source_id = f"yt_{video_id}_sector_{canonical}"
+    if db.execute(
+        sql_text("SELECT 1 FROM predictions WHERE source_platform_id = :sid LIMIT 1"),
+        {"sid": source_id},
+    ).first():
+        if stats is not None:
+            stats["items_deduped"] = int(stats.get("items_deduped", 0)) + 1
+        return _reject("dedup_collision", hr=canonical)
+
+    # Forecaster (same find/create as ticker calls)
+    forecaster = find_or_create_youtube_forecaster(channel_name, channel_id, db)
+    if not forecaster:
+        return _reject("forecaster_creation_failed")
+
+    # Cross-scraper dedup on the mapped ETF
+    if prediction_exists_cross_scraper(etf_ticker, forecaster.id, direction, publish_date, db):
+        if stats is not None:
+            stats["items_deduped"] = int(stats.get("items_deduped", 0)) + 1
+        return _reject("cross_scraper_dupe", hr=etf_ticker)
+
+    eval_date, window_days = _parse_evaluation_date(pred.get("timeframe"), publish_date)
+
+    quote = (pred.get("context_quote") or pred.get("quote") or "").strip()
+    parts = [f"{channel_name}: {direction.capitalize()} on {sector_name} → {etf_ticker}"]
+    if quote:
+        parts.append(f"\"{quote[:120]}\"")
+    context_str = ". ".join(parts)[:500]
+
+    source_url = f"https://www.youtube.com/watch?v={video_id}"
+
+    db.add(
+        Prediction(
+            forecaster_id=forecaster.id,
+            ticker=etf_ticker,
+            direction=direction,
+            prediction_date=publish_date,
+            evaluation_date=eval_date,
+            window_days=window_days,
+            target_price=None,  # sector calls don't use price targets
+            entry_price=None,
+            source_url=source_url,
+            archive_url=source_url,
+            source_type="youtube",
+            source_title=(video_title or "")[:500],
+            source_platform_id=source_id,
+            sector=sector_name,
+            context=context_str,
+            exact_quote=(quote or context_str)[:500],
+            outcome="pending",
+            verified_by=VERIFIED_BY,
+            call_type="sector_call",
+            # Dual-column tagging: prediction_type drives the evaluator's
+            # ETF-vs-SPY spread scorer; prediction_category drives the
+            # leaderboard's separate-accuracy column.
+            prediction_type="sector_call",
+            prediction_category="sector_call",
+        )
+    )
+    db.flush()
+    if stats is not None:
+        stats["sector_calls_extracted"] = int(stats.get("sector_calls_extracted", 0)) + 1
     return True
