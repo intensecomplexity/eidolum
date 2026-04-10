@@ -211,9 +211,12 @@ def get_social_stats(
         last_run_at = last_run_at_dt.isoformat() if last_run_at_dt else None
         last_run_inserted = 0
 
-        # Prefer scraper_runs (the new run-boundary table). If empty for
-        # this source, last_run_inserted falls back to 0 — visible as
-        # "+0 inserted" until the first post-deploy run lands a row.
+        # Prefer scraper_runs (the new run-boundary table). Replaces the
+        # old scheduler_logs query that was wrapped in try/except and
+        # silently fell back to 0 because the table was never created.
+        # If scraper_runs has no row for this source yet, last_run_inserted
+        # falls back to 0 — visible as "+0 inserted" until the first
+        # post-deploy run lands a row.
         last_run_row = None
         try:
             last_run_row = db.execute(
@@ -230,6 +233,21 @@ def get_social_stats(
                 if last_run_row[0]:
                     last_run_at = last_run_row[0].isoformat()
                 last_run_inserted = int(last_run_row[6] or 0)
+                # In-flight refinement: if the most recent run is still
+                # 'running' (worker hasn't finalized yet), the row's
+                # items_inserted is 0 even when predictions are landing.
+                # Compute a live count from the predictions table since
+                # the run started so the admin card stays accurate.
+                if last_run_row[2] == "running" and last_run_row[0]:
+                    try:
+                        live = db.query(Prediction).filter(
+                            Prediction.source_type == source,
+                            Prediction.created_at >= last_run_row[0],
+                        ).count()
+                        if live > last_run_inserted:
+                            last_run_inserted = int(live)
+                    except Exception:
+                        db.rollback()
         except Exception:
             db.rollback()
 
