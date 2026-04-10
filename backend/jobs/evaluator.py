@@ -145,21 +145,32 @@ def run_evaluator(db: Session):
     _price_cache.clear()
     _failed_tickers.clear()
 
+    from feature_flags import is_x_evaluation_enabled
+    from sqlalchemy import or_
+    skip_x = not is_x_evaluation_enabled(db)
+    _not_x = or_(Prediction.source_type.is_(None), Prediction.source_type != "x")
+
     now = datetime.utcnow()
 
     # Find predictions past their evaluation window
-    overdue = db.query(Prediction).filter(
+    base_q = db.query(Prediction).filter(
         Prediction.outcome == "pending",
         Prediction.evaluation_date.isnot(None),
         Prediction.evaluation_date <= now,
-    ).all()
+    )
+    if skip_x:
+        base_q = base_q.filter(_not_x)
+    overdue = base_q.all()
 
     if not overdue:
         # Also check predictions without evaluation_date but past their window
-        all_pending = db.query(Prediction).filter(
+        pending_q = db.query(Prediction).filter(
             Prediction.outcome == "pending",
             Prediction.evaluation_date.is_(None),
-        ).all()
+        )
+        if skip_x:
+            pending_q = pending_q.filter(_not_x)
+        all_pending = pending_q.all()
         overdue = [
             p for p in all_pending
             if p.prediction_date and
@@ -230,15 +241,22 @@ def sweep_stuck_predictions(db: Session):
     _price_cache.clear()
     _failed_tickers.clear()
 
+    from feature_flags import is_x_evaluation_enabled
+    from sqlalchemy import or_
+    skip_x = not is_x_evaluation_enabled(db)
+
     now = datetime.utcnow()
     cutoff = now - timedelta(days=7)
 
     # Predictions overdue by more than 7 days
-    stuck = db.query(Prediction).filter(
+    stuck_q = db.query(Prediction).filter(
         Prediction.outcome == "pending",
         Prediction.evaluation_date.isnot(None),
         Prediction.evaluation_date <= cutoff,
-    ).all()
+    )
+    if skip_x:
+        stuck_q = stuck_q.filter(or_(Prediction.source_type.is_(None), Prediction.source_type != "x"))
+    stuck = stuck_q.all()
 
     if not stuck:
         print("[Sweep] No stuck predictions found")
@@ -284,12 +302,17 @@ def retry_no_data_predictions(db: Session):
 
     now = datetime.utcnow()
 
-    no_data = db.query(Prediction).filter(
+    from feature_flags import is_x_evaluation_enabled
+    from sqlalchemy import or_
+    no_data_q = db.query(Prediction).filter(
         Prediction.outcome == "no_data",
         Prediction.entry_price.isnot(None),
         Prediction.entry_price > 0,
         Prediction.ticker.isnot(None),
-    ).order_by(Prediction.prediction_date.desc()).limit(100).all()
+    )
+    if not is_x_evaluation_enabled(db):
+        no_data_q = no_data_q.filter(or_(Prediction.source_type.is_(None), Prediction.source_type != "x"))
+    no_data = no_data_q.order_by(Prediction.prediction_date.desc()).limit(100).all()
 
     if not no_data:
         print("[NoDataRetry] No no_data predictions to retry")

@@ -61,16 +61,27 @@ def evaluate_all_pending(db):
 
     from sqlalchemy import text as sql_text
 
+    from feature_flags import is_x_evaluation_enabled
+    from sqlalchemy import or_
+    skip_x = not is_x_evaluation_enabled(db)
+    _not_x = or_(Prediction.source_type.is_(None), Prediction.source_type != "x")
+
     # Count totals
-    total_pending = db.query(Prediction).filter(Prediction.outcome == "pending").count()
+    pending_q = db.query(Prediction).filter(Prediction.outcome == "pending")
+    if skip_x:
+        pending_q = pending_q.filter(_not_x)
+    total_pending = pending_q.count()
 
     # SQL-level filter: only predictions past their evaluation window
     # prediction_date + window_days < now
-    due = db.query(Prediction).filter(
+    due_q = db.query(Prediction).filter(
         Prediction.outcome == "pending",
         Prediction.ticker.isnot(None),
         Prediction.prediction_date.isnot(None),
-    ).all()
+    )
+    if skip_x:
+        due_q = due_q.filter(_not_x)
+    due = due_q.all()
 
     # Filter in Python since interval math varies by DB engine
     due = [p for p in due if p.prediction_date + timedelta(days=p.window_days or 90) <= now]

@@ -118,6 +118,9 @@ def evaluate_batch(max_tickers: int | None = None) -> dict:
     # similar Frankfurt ADRs were leaking through with the looser pattern.
     db = SessionLocal()
     try:
+        from feature_flags import x_filter_sql
+        x_filter_p = x_filter_sql(db, table_alias="p")
+        x_filter_bare = x_filter_sql(db)
         rows = db.execute(sql_text(r"""
             SELECT p.id, p.ticker, p.direction, p.target_price, p.entry_price,
                    p.evaluation_date, p.prediction_date, p.forecaster_id, p.window_days,
@@ -127,6 +130,7 @@ def evaluate_batch(max_tickers: int | None = None) -> dict:
               AND p.evaluation_date IS NOT NULL
               AND p.evaluation_date < :now
               AND (p.ticker ~ '^[A-Z]{1,5}$' OR p.ticker ~ '^[A-Z]{1,3}\.[A-Z]$')
+              """ + x_filter_p + r"""
             ORDER BY p.ticker
             LIMIT 5000
         """), {"now": now}).fetchall()
@@ -136,6 +140,7 @@ def evaluate_batch(max_tickers: int | None = None) -> dict:
             WHERE (outcome = 'pending' OR outcome IS NULL OR outcome = '')
               AND evaluation_date IS NOT NULL AND evaluation_date < :now
               AND (ticker ~ '^[A-Z]{1,5}$' OR ticker ~ '^[A-Z]{1,3}\.[A-Z]$')
+              """ + x_filter_bare + r"""
         """), {"now": now}).scalar() or 0
     finally:
         db.close()

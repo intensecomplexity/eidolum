@@ -504,6 +504,8 @@ def retry_no_data_batch(db, max_tickers: int | None = None):
     # and net throughput collapses to ~0. The partial index
     # idx_predictions_no_data_retry covers (last_retry_at NULLS FIRST, ticker)
     # WHERE outcome='no_data' so this is an index-only sort.
+    from feature_flags import x_filter_sql
+    _x_filter_p = x_filter_sql(db, table_alias="p")
     polygon_query = r"""
         SELECT p.id, p.ticker, p.direction, p.target_price, p.entry_price,
                p.evaluation_date, p.prediction_date, p.forecaster_id, p.window_days
@@ -516,6 +518,7 @@ def retry_no_data_batch(db, max_tickers: int | None = None):
               p.ticker ~ '^[A-Z]{1,5}$'
               OR p.ticker IN ('BRK.A','BRK.B','BF.A','BF.B','GEF.B','HEI.A','LEN.B','MOG.A','MOG.B')
           )
+          """ + _x_filter_p + r"""
         ORDER BY p.last_retry_at NULLS FIRST, p.ticker
         LIMIT :lim
     """
@@ -531,6 +534,7 @@ def retry_no_data_batch(db, max_tickers: int | None = None):
               p.ticker ~ '^[A-Z]{1,5}$'
               OR p.ticker IN ('BRK.A','BRK.B','BF.A','BF.B','GEF.B','HEI.A','LEN.B','MOG.A','MOG.B')
           )
+          """ + _x_filter_p + r"""
         ORDER BY p.last_retry_at NULLS FIRST, p.ticker
         LIMIT :lim
     """
