@@ -738,6 +738,13 @@ class ScraperRun(Base):
     # youtube_channel_monitor._run_inner finalize block.
     haiku_retries_count = Column(Integer, nullable=False, default=0,
                                   server_default="0")
+    # Count of sector_call predictions extracted in this run. Incremented
+    # only when the ENABLE_YOUTUBE_SECTOR_CALLS flag routes a video to
+    # the sector-aware Haiku prompt AND the prediction survives
+    # map_sector_to_etf + insertion. Useful for tracking the rollout
+    # from the admin panel.
+    sector_calls_extracted = Column(Integer, nullable=False, default=0,
+                                     server_default="0")
 
 
 class YouTubeScraperRejection(Base):

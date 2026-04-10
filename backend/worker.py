@@ -540,6 +540,20 @@ def main():
     except Exception as e:
         log.warning(f"[Worker] prediction_category migration: {e}")
 
+    # scraper_runs.sector_calls_extracted — per-run counter for the
+    # admin sector-calls dashboard. Stays at 0 until the feature flag
+    # is flipped on.
+    try:
+        with engine.connect() as conn:
+            conn.execute(sql_text(
+                "ALTER TABLE scraper_runs ADD COLUMN IF NOT EXISTS "
+                "sector_calls_extracted INTEGER NOT NULL DEFAULT 0"
+            ))
+            conn.commit()
+        log.info("[Worker] scraper_runs.sector_calls_extracted ready")
+    except Exception as e:
+        log.warning(f"[Worker] scraper_runs sector_calls migration: {e}")
+
     # scraper_runs + youtube_scraper_rejections — belt-and-braces migration.
     # Base.metadata.create_all above is the primary creator (the SQLAlchemy
     # models live in models.py), but on existing DBs the indexes / column

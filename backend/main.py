@@ -1644,6 +1644,22 @@ async def lifespan(app):
         except Exception as _pce:
             print(f"[Startup] prediction_category migration error: {_pce}")
 
+        # ── scraper_runs.sector_calls_extracted ─────────────────────────
+        # Per-run counter for the admin sector-calls dashboard. Incremented
+        # by the YouTube monitor when the sector-aware prompt extracts a
+        # sector_call that survives ETF mapping + insertion. Always runs,
+        # but stays at 0 until the feature flag is flipped on.
+        try:
+            with engine.connect() as _sr2_c:
+                _sr2_c.execute(sql_text(
+                    "ALTER TABLE scraper_runs ADD COLUMN IF NOT EXISTS "
+                    "sector_calls_extracted INTEGER NOT NULL DEFAULT 0"
+                ))
+                _sr2_c.commit()
+                print("[Startup] scraper_runs.sector_calls_extracted ready")
+        except Exception as _sre:
+            print(f"[Startup] scraper_runs sector_calls migration error: {_sre}")
+
         # ── youtube_channel_meta totals backfill ────────────────────────
         # Historical backfill for the admin card counters. Three columns:
         #   - total_predictions_extracted (display)
