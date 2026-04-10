@@ -805,6 +805,37 @@ def _validate_and_dedupe_predictions(raw: list) -> list[dict]:
         ticker = re.sub(r"[^A-Z0-9]", "", ticker)
         if not ticker or len(ticker) > 5:
             continue
+        # Ranked-list metadata: both fields must be present or both absent.
+        # Predictions with only one half get _list_error set so the caller
+        # can skip them and log a classifier_error. Otherwise the two
+        # fields are normalized (list_id → string ≤40 chars, list_rank →
+        # int 1-10 capped) and attached to the pred dict for the insert
+        # path to pick up. Unrelated to dedup: two rows on the same
+        # ticker with different list_rank would dedupe away on (ticker,
+        # direction) anyway, which is the intended behavior.
+        raw_list_id = p.get("list_id")
+        raw_list_rank = p.get("list_rank")
+        list_id = None
+        list_rank = None
+        list_error = None
+        has_id = raw_list_id is not None and str(raw_list_id).strip() != ""
+        has_rank = raw_list_rank is not None and str(raw_list_rank).strip() != ""
+        if has_id != has_rank:
+            list_error = "list_fields_mismatched"
+        elif has_id and has_rank:
+            list_id = re.sub(r"\s+", "_", str(raw_list_id).strip().lower())[:40]
+            try:
+                list_rank = int(raw_list_rank)
+            except (TypeError, ValueError):
+                list_rank = None
+            if list_rank is None or list_rank < 1:
+                list_error = "list_rank_invalid"
+            elif list_rank > 10:
+                # Hard cap: trim anything beyond top 10. Drop the list
+                # metadata entirely for rows past position 10 so they
+                # fall through as unranked picks (per spec).
+                list_id = None
+                list_rank = None
         key = (ticker, direction)
         if key in seen_tickers:
             continue
@@ -812,6 +843,10 @@ def _validate_and_dedupe_predictions(raw: list) -> list[dict]:
         p["ticker"] = ticker
         p["direction"] = direction
         p["_kind"] = "ticker_call"
+        p["_list_id"] = list_id
+        p["_list_rank"] = list_rank
+        if list_error:
+            p["_list_error"] = list_error
         out.append(p)
     return out
 
@@ -989,6 +1024,14 @@ def insert_youtube_prediction(
     if direction not in _VALID_DIRECTIONS:
         return _reject("neutral_or_no_direction", hr=direction or None)
 
+    # Ranked-list metadata (pre-validated by _validate_and_dedupe_predictions).
+    # Both-or-neither invariant enforced there: if the validator flagged a
+    # mismatch, log the classifier_error and skip the row.
+    if pred.get("_list_error"):
+        return _reject("classifier_error", hr=pred.get("_list_error"))
+    list_id_val = pred.get("_list_id")
+    list_rank_val = pred.get("_list_rank")
+
     # Per-video-per-ticker dedup. Same video may produce multiple tickers,
     # but the same (video, ticker) pair should only insert once even if
     # the classifier returns it twice across chunks.
@@ -1073,6 +1116,8 @@ def insert_youtube_prediction(
             verified_by=VERIFIED_BY,
             call_type="video_prediction",
             prediction_category="ticker_call",
+            list_id=list_id_val,
+            list_rank=list_rank_val,
         )
     )
     db.flush()
