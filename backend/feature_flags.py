@@ -174,3 +174,34 @@ def invalidate_ranked_list_flag_cache() -> None:
     """Reset the 60-second cache — called from the admin toggle endpoint
     so the new value takes effect immediately."""
     _RANKED_LIST_FLAG_CACHE["fetched_at"] = 0.0
+
+
+# ── Target revisions flag ───────────────────────────────────────────────────
+#
+# Boolean all-or-nothing flag. When true, the YouTube classifier appends
+# the revision-detection instructions to the Haiku system prompt so
+# statements like "moving my AAPL target from $200 to $220" extract as
+# is_revision=true predictions and the insertion path links them to
+# their immediate predecessor via the revision_of FK.
+
+_TARGET_REVISIONS_FLAG_CACHE: dict = {"enabled": False, "fetched_at": 0.0}
+_TARGET_REVISIONS_FLAG_TTL = 60  # seconds
+
+
+def is_target_revisions_enabled(db) -> bool:
+    """Return True if ENABLE_TARGET_REVISIONS is 'true' in config.
+    Default False. Cached 60s to avoid hammering the config table in
+    tight loops (classifier runs per-video-per-chunk)."""
+    now = time.time()
+    if (now - _TARGET_REVISIONS_FLAG_CACHE["fetched_at"]) < _TARGET_REVISIONS_FLAG_TTL:
+        return bool(_TARGET_REVISIONS_FLAG_CACHE["enabled"])
+    enabled = _read_bool(db, "ENABLE_TARGET_REVISIONS", default=False)
+    _TARGET_REVISIONS_FLAG_CACHE["enabled"] = enabled
+    _TARGET_REVISIONS_FLAG_CACHE["fetched_at"] = now
+    return enabled
+
+
+def invalidate_target_revisions_flag_cache() -> None:
+    """Reset the 60-second cache — called from the admin toggle endpoint
+    so changes take effect immediately instead of waiting for the TTL."""
+    _TARGET_REVISIONS_FLAG_CACHE["fetched_at"] = 0.0

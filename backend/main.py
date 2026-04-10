@@ -1755,6 +1755,21 @@ async def lifespan(app):
         except Exception as _rle:
             print(f"[Startup] ENABLE_RANKED_LIST_EXTRACTION seed error: {_rle}")
 
+        # ── ENABLE_TARGET_REVISIONS flag seed ───────────────────────────
+        # Default 'false'. Admin flips via POST /api/admin/toggle-target-
+        # revisions once they've eval'd the prompt change on a corpus.
+        try:
+            with engine.connect() as _tr_c:
+                _tr_c.execute(sql_text("""
+                    INSERT INTO config (key, value)
+                    VALUES ('ENABLE_TARGET_REVISIONS', 'false')
+                    ON CONFLICT (key) DO NOTHING
+                """))
+                _tr_c.commit()
+                print("[Startup] ENABLE_TARGET_REVISIONS flag seeded")
+        except Exception as _tre:
+            print(f"[Startup] ENABLE_TARGET_REVISIONS seed error: {_tre}")
+
         # ── youtube_channel_meta totals backfill ────────────────────────
         # Historical backfill for the admin card counters. Three columns:
         #   - total_predictions_extracted (display)
@@ -2711,10 +2726,14 @@ def get_features(db: _Session = _Depends(_get_db)):
         # Boolean: ranked list extraction appends the ranked-list
         # instructions to the Haiku system prompt. Default false.
         "ranked_list_extraction": False,
+        # Boolean: target revision detection appends the revisions
+        # instructions and links revised predictions via revision_of.
+        # Default false.
+        "target_revisions": False,
     }
     try:
         rows = db.execute(_ft(
-            "SELECT key, value FROM config WHERE key IN ('tournaments_enabled','daily_challenge_enabled','duels_enabled','compete_enabled','compare_analysts_enabled','EVALUATE_X_PREDICTIONS','ENABLE_YOUTUBE_SECTOR_CALLS','ENABLE_RANKED_LIST_EXTRACTION')"
+            "SELECT key, value FROM config WHERE key IN ('tournaments_enabled','daily_challenge_enabled','duels_enabled','compete_enabled','compare_analysts_enabled','EVALUATE_X_PREDICTIONS','ENABLE_YOUTUBE_SECTOR_CALLS','ENABLE_RANKED_LIST_EXTRACTION','ENABLE_TARGET_REVISIONS')"
         )).fetchall()
         for r in rows:
             if r[0] == "EVALUATE_X_PREDICTIONS":
@@ -2727,6 +2746,8 @@ def get_features(db: _Session = _Depends(_get_db)):
                 flags["youtube_sector_traffic_pct"] = max(0, min(100, pct))
             elif r[0] == "ENABLE_RANKED_LIST_EXTRACTION":
                 flags["ranked_list_extraction"] = str(r[1]).strip().lower() == "true"
+            elif r[0] == "ENABLE_TARGET_REVISIONS":
+                flags["target_revisions"] = str(r[1]).strip().lower() == "true"
             else:
                 flags[r[0].replace("_enabled", "")] = r[1] == "true"
     except Exception:
