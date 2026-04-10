@@ -1618,6 +1618,33 @@ async def lifespan(app):
         except Exception as _ybe:
             print(f"[Startup] youtube_channel_meta totals backfill error: {_ybe}")
 
+        # ── scraper_job_queue (cross-service work queue) ───────────────
+        # Mirrors the migration in worker.py so the API service can INSERT
+        # queued jobs even if the worker container boots later. Idempotent.
+        try:
+            with engine.connect() as _sjq_c:
+                _sjq_c.execute(sql_text("""
+                    CREATE TABLE IF NOT EXISTS scraper_job_queue (
+                        id SERIAL PRIMARY KEY,
+                        job_type VARCHAR(50) NOT NULL,
+                        payload JSONB,
+                        status VARCHAR(20) NOT NULL DEFAULT 'pending',
+                        created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+                        started_at TIMESTAMP,
+                        finished_at TIMESTAMP,
+                        error TEXT
+                    )
+                """))
+                _sjq_c.execute(sql_text(
+                    "CREATE INDEX IF NOT EXISTS idx_sjq_pending "
+                    "ON scraper_job_queue(status, created_at) "
+                    "WHERE status = 'pending'"
+                ))
+                _sjq_c.commit()
+                print("[Startup] scraper_job_queue ready")
+        except Exception as _sjqe:
+            print(f"[Startup] scraper_job_queue migration error: {_sjqe}")
+
         # ── youtube_channel_meta.last_scraped_at backfill ──────────────
         # Two-pass strategy mirroring the spec. Pass 1 copies from
         # forecasters.last_synced_at, which holds historical per-channel

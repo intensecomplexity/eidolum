@@ -137,7 +137,10 @@ export default function AdminYouTubeChannels() {
   async function handleFetchNow(ch) {
     try {
       const r = await fetchYouTubeChannelNow(ch.id);
-      show(`Fetching ${r.channel_name || ch.channel_name}… check worker logs`);
+      show(
+        `Queued ${r.channel_name || ch.channel_name} for next worker ` +
+        `cycle — refresh in ~2 minutes`
+      );
     } catch (err) {
       show(err.response?.data?.detail || 'Error triggering fetch');
     }

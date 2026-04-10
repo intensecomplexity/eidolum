@@ -145,6 +145,87 @@ def _youtube():
         finally: db.close()
     except Exception as e: log.error(f"[youtube] {e}")
 
+
+def _drain_scraper_job_queue():
+    """Drain pending rows from scraper_job_queue. Called on a 60s
+    interval by APScheduler. Cross-service work queue: the eidolum
+    API service INSERTs jobs here from admin endpoints; the worker
+    (this service, hopeful-expression) actually runs them because
+    scraping env vars (YOUTUBE_API_KEY, WEBSHARE_PROXY_*, etc.) live
+    on this container.
+
+    Currently handles exactly one job_type: 'youtube_fetch_channel'.
+    Extend the if-ladder below when more job types are added. Per-job
+    exceptions are caught and written to the `error` column so a
+    single poison-pill row can't stall the whole queue.
+    """
+    db = BgSessionLocal()
+    try:
+        rows = db.execute(sql_text("""
+            SELECT id, job_type, payload
+            FROM scraper_job_queue
+            WHERE status = 'pending'
+            ORDER BY created_at ASC
+            LIMIT 10
+        """)).fetchall()
+        if not rows:
+            return
+        for row in rows:
+            job_id, job_type, payload = row[0], row[1], row[2]
+            # Mark running BEFORE starting work so a restart mid-job
+            # doesn't redo it in an infinite loop (the drain only
+            # picks up status='pending'). A job stuck in 'running'
+            # is visible in the queue and can be manually reset.
+            try:
+                db.execute(sql_text("""
+                    UPDATE scraper_job_queue
+                    SET status = 'running', started_at = NOW()
+                    WHERE id = :id AND status = 'pending'
+                """), {"id": job_id})
+                db.commit()
+            except Exception as e:
+                log.warning(f"[drain] mark-running failed for {job_id}: {e}")
+                db.rollback()
+                continue
+
+            err = None
+            try:
+                if isinstance(payload, str):
+                    import json as _json
+                    payload_dict = _json.loads(payload)
+                else:
+                    payload_dict = payload or {}
+
+                if job_type == "youtube_fetch_channel":
+                    cid = payload_dict.get("channel_id")
+                    cname = payload_dict.get("channel_name", cid)
+                    log.info(f"[drain] youtube_fetch_channel {cid} ({cname})")
+                    from jobs.youtube_channel_monitor import fetch_channel_now
+                    fetch_channel_now(cid)
+                else:
+                    err = f"unknown job_type: {job_type}"
+                    log.warning(f"[drain] {err}")
+            except Exception as e:
+                err = f"{type(e).__name__}: {str(e)[:500]}"
+                log.error(f"[drain] job {job_id} failed: {err}")
+
+            try:
+                db.execute(sql_text("""
+                    UPDATE scraper_job_queue
+                    SET status = :status, finished_at = NOW(), error = :err
+                    WHERE id = :id
+                """), {
+                    "id": job_id,
+                    "status": "error" if err else "done",
+                    "err": err,
+                })
+                db.commit()
+            except Exception as e:
+                log.warning(f"[drain] finalize failed for {job_id}: {e}")
+                db.rollback()
+    finally:
+        db.close()
+
 def _enrich():
     try:
         from jobs.enrich_source_urls import enrich_batch
@@ -520,6 +601,36 @@ def main():
     except Exception as e:
         log.warning(f"[Worker] one_time_jobs table migration: {e}")
 
+    # scraper_job_queue — cross-service work queue used by admin endpoints
+    # (running on the eidolum API service) to hand off scraping work to
+    # the hopeful-expression worker service. The API service lacks the
+    # YouTube/Webshare env vars and should not run scraping directly.
+    # Distinct from one_time_jobs (which is a flag table with job_name PK);
+    # this one is a proper queue with per-row IDs + payload + status.
+    try:
+        with engine.connect() as conn:
+            conn.execute(sql_text("""
+                CREATE TABLE IF NOT EXISTS scraper_job_queue (
+                    id SERIAL PRIMARY KEY,
+                    job_type VARCHAR(50) NOT NULL,
+                    payload JSONB,
+                    status VARCHAR(20) NOT NULL DEFAULT 'pending',
+                    created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+                    started_at TIMESTAMP,
+                    finished_at TIMESTAMP,
+                    error TEXT
+                )
+            """))
+            conn.execute(sql_text(
+                "CREATE INDEX IF NOT EXISTS idx_sjq_pending "
+                "ON scraper_job_queue(status, created_at) "
+                "WHERE status = 'pending'"
+            ))
+            conn.commit()
+        log.info("[Worker] scraper_job_queue table ensured")
+    except Exception as e:
+        log.warning(f"[Worker] scraper_job_queue migration: {e}")
+
     def _run_once_requeue_billing_victims():
         """Re-classify the 377 tweets killed by the 2026-04-08 Anthropic
         billing outage. Idempotent via the one_time_jobs flag table.
@@ -622,6 +733,21 @@ def main():
         except Exception as e:
             log.error(f"[channel_monitor] {e}")
     sched.add_job(_standalone("channel_monitor", _channel_monitor), "interval", hours=12, id="channel_monitor", next_run_time=t0 + timedelta(minutes=90), executor='default')
+
+    # Cross-service work queue drain. Polls scraper_job_queue every
+    # 60s and runs any pending rows on the worker container (where
+    # scraping env vars live). Uses _standalone so it doesn't acquire
+    # the global SCRAPER_LOCK — queue jobs are short per-channel
+    # fetches that shouldn't be gated by the hourly Benzinga pass.
+    sched.add_job(
+        _standalone("scraper_job_queue", _drain_scraper_job_queue),
+        "interval", seconds=60,
+        id="scraper_job_queue",
+        next_run_time=t0 + timedelta(seconds=30),
+        max_instances=1,
+        coalesce=True,
+        executor='default',
+    )
 
     # YouTube Historical Backfill — every 4h, walks each channel's full
     # upload history oldest-first via cursor in youtube_channels.backfill_cursor.

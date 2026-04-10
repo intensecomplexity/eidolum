@@ -1097,11 +1097,17 @@ def fetch_youtube_channel_now(
     admin_id: int = Depends(require_admin_user),
     db: Session = Depends(get_db),
 ):
-    """Fire-and-forget one-shot fetch of a single YouTube channel.
+    """Queue a one-shot fetch of a single YouTube channel.
 
-    Bypasses the normal 12h monitor schedule. Spawns a daemon thread
-    and returns immediately so the HTTP request doesn't block on
-    transcript download + Haiku classification."""
+    Bypasses the normal 12h monitor schedule by inserting a
+    scraper_job_queue row that the worker service picks up on its
+    next drain tick (every 60s). Cannot run the fetch in-process on
+    the API service because scraping infrastructure (YOUTUBE_API_KEY,
+    WEBSHARE_PROXY_*, classify_video) lives on the worker container
+    — the previous threading.Thread version silently no-op'd on the
+    API container because the env vars were missing, producing a
+    200 + toast with zero actual work.
+    """
     meta = db.query(YouTubeChannelMeta).filter(
         YouTubeChannelMeta.id == meta_id
     ).first()
@@ -1112,26 +1118,32 @@ def fetch_youtube_channel_now(
     f = db.query(Forecaster).filter(Forecaster.id == meta.forecaster_id).first()
     channel_name = f.name if f else channel_id
 
-    def _worker(cid: str):
-        try:
-            from jobs.youtube_channel_monitor import fetch_channel_now
-            fetch_channel_now(cid)
-        except Exception as e:
-            print(f"[admin.youtube] fetch_channel_now worker error: {e}")
-
-    threading.Thread(
-        target=_worker, args=(channel_id,), daemon=True
-    ).start()
+    payload = _json.dumps({
+        "channel_id": channel_id,
+        "channel_name": channel_name,
+        "meta_id": meta.id,
+    })
+    queued_id = db.execute(sql_text("""
+        INSERT INTO scraper_job_queue (job_type, payload, status)
+        VALUES ('youtube_fetch_channel', CAST(:p AS JSONB), 'pending')
+        RETURNING id
+    """), {"p": payload}).scalar()
+    db.commit()
 
     _log_yt_action(
         db, admin_id, "youtube_channel_fetch_now", target_id=meta.id,
-        details={"channel_id": channel_id, "name": channel_name},
+        details={
+            "channel_id": channel_id,
+            "name": channel_name,
+            "queue_id": queued_id,
+        },
         request=request,
     )
 
     return {
-        "triggered": True,
+        "queued": True,
+        "queue_id": queued_id,
         "channel_id": channel_id,
         "channel_name": channel_name,
-        "message": "Fetch running in background — check worker logs",
+        "message": "Queued for next worker cycle — refresh in ~2 minutes",
     }
