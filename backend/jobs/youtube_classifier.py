@@ -120,6 +120,74 @@ Do NOT hallucinate predictions. If you're unsure whether something is a predicti
 
 # ── Transcript fetching ─────────────────────────────────────────────────────
 
+def _build_transcript_api():
+    """Construct a YouTubeTranscriptApi instance with optional proxy.
+
+    YouTube aggressively blocks transcript scraping from datacenter IPs
+    (Railway, AWS, GCP). Without a residential proxy, every fetch
+    returns IpBlocked within a few requests. We support two opt-in
+    configurations via env vars:
+
+      WEBSHARE_PROXY_USERNAME / WEBSHARE_PROXY_PASSWORD
+        → uses youtube_transcript_api.proxies.WebshareProxyConfig.
+          Webshare offers $3-5/mo residential proxy plans designed
+          specifically for YouTube transcript scraping. The library
+          author recommends Webshare in the README. retries_when_blocked
+          stays at the default 10.
+
+      YT_PROXY_HTTP / YT_PROXY_HTTPS
+        → generic proxy URLs for any other provider. The values are
+          full URLs including credentials, e.g.
+          http://user:pass@proxy.example.com:8080
+
+    If neither pair is set, returns a plain YouTubeTranscriptApi() —
+    which works fine when running locally on a residential connection
+    but will hit IpBlocked from any datacenter.
+    """
+    from youtube_transcript_api import YouTubeTranscriptApi
+
+    webshare_user = os.getenv("WEBSHARE_PROXY_USERNAME", "").strip()
+    webshare_pass = os.getenv("WEBSHARE_PROXY_PASSWORD", "").strip()
+    proxy_http = os.getenv("YT_PROXY_HTTP", "").strip()
+    proxy_https = os.getenv("YT_PROXY_HTTPS", "").strip()
+
+    if webshare_user and webshare_pass:
+        try:
+            from youtube_transcript_api.proxies import WebshareProxyConfig
+            return YouTubeTranscriptApi(
+                proxy_config=WebshareProxyConfig(
+                    proxy_username=webshare_user,
+                    proxy_password=webshare_pass,
+                )
+            )
+        except ImportError:
+            log.warning("[YT-CLF] WebshareProxyConfig import failed — version too old")
+    elif proxy_http or proxy_https:
+        try:
+            from youtube_transcript_api.proxies import GenericProxyConfig
+            return YouTubeTranscriptApi(
+                proxy_config=GenericProxyConfig(
+                    http_url=proxy_http or None,
+                    https_url=proxy_https or proxy_http or None,
+                )
+            )
+        except ImportError:
+            log.warning("[YT-CLF] GenericProxyConfig import failed — version too old")
+
+    return YouTubeTranscriptApi()
+
+
+def transcript_proxy_status() -> str:
+    """Return a short string describing what proxy mode is configured.
+    Used by the channel monitor / backfill startup logging so the
+    proxy state is visible without grepping env vars."""
+    if os.getenv("WEBSHARE_PROXY_USERNAME") and os.getenv("WEBSHARE_PROXY_PASSWORD"):
+        return "webshare"
+    if os.getenv("YT_PROXY_HTTP") or os.getenv("YT_PROXY_HTTPS"):
+        return "generic"
+    return "none (datacenter IPs are typically blocked by YouTube)"
+
+
 def fetch_transcript(video_id: str) -> tuple[str | None, str | None]:
     """Fetch a YouTube video's auto-captions via youtube-transcript-api.
 
@@ -130,7 +198,10 @@ def fetch_transcript(video_id: str) -> tuple[str | None, str | None]:
                                   works regardless)
       - (None, "no_transcript") — disabled / live stream / age-gated / shorts
                                   with no captions / region-blocked
-      - (None, "error: ...")    — unexpected library error
+      - (None, "error: IpBlocked: ...") — datacenter IP block. See
+                                  _build_transcript_api() for the proxy
+                                  env vars to set.
+      - (None, "error: ...")    — other library error
 
     Does NOT consume YouTube Data API quota — the library scrapes the
     transcript endpoints directly.
@@ -146,7 +217,6 @@ def fetch_transcript(video_id: str) -> tuple[str | None, str | None]:
         return None, "no_video_id"
     try:
         from youtube_transcript_api import (
-            YouTubeTranscriptApi,
             TranscriptsDisabled,
             NoTranscriptFound,
             VideoUnavailable,
@@ -155,7 +225,7 @@ def fetch_transcript(video_id: str) -> tuple[str | None, str | None]:
         return None, "library_missing"
 
     try:
-        api = YouTubeTranscriptApi()
+        api = _build_transcript_api()
         # Prefer English; fall back to any available language. The 1.x
         # API picks the best match given a language priority list.
         try:

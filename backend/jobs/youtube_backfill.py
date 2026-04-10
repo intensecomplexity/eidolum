@@ -48,6 +48,7 @@ from jobs.youtube_classifier import (
     fetch_transcript,
     classify_video,
     insert_youtube_prediction,
+    transcript_proxy_status,
     PIPELINE_VERSION,
     HAIKU_MODEL,
 )
@@ -73,7 +74,11 @@ def run_youtube_backfill(db=None):
         print("[YT-Backfill] ANTHROPIC_API_KEY not set — skipping")
         return
 
-    print(f"[YT-Backfill] Starting | classifier={HAIKU_MODEL} pipeline={PIPELINE_VERSION}", flush=True)
+    print(
+        f"[YT-Backfill] Starting | classifier={HAIKU_MODEL} pipeline={PIPELINE_VERSION} "
+        f"proxy={transcript_proxy_status()}",
+        flush=True,
+    )
 
     from database import BgSessionLocal
     own_db = db is None

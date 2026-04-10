@@ -41,6 +41,7 @@ from jobs.youtube_classifier import (
     fetch_transcript,
     classify_video,
     insert_youtube_prediction,
+    transcript_proxy_status,
     PIPELINE_VERSION,
     HAIKU_MODEL,
 )
@@ -191,7 +192,11 @@ def run_channel_monitor(db=None):
         print("[ChannelMonitor] ANTHROPIC_API_KEY not set — skipping")
         return
 
-    print(f"[ChannelMonitor] V2 (transcript-based) starting | classifier={HAIKU_MODEL} pipeline={PIPELINE_VERSION}", flush=True)
+    print(
+        f"[ChannelMonitor] V2 (transcript-based) starting | classifier={HAIKU_MODEL} "
+        f"pipeline={PIPELINE_VERSION} proxy={transcript_proxy_status()}",
+        flush=True,
+    )
 
     from database import BgSessionLocal
     own_db = db is None
