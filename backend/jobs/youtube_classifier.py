@@ -401,6 +401,45 @@ Rules for ranked list detection:
 Output JSON only. Be concise."""
 
 
+# Revisions instruction block, appended to the active prompt when
+# ENABLE_TARGET_REVISIONS is flipped on in the config table. Same
+# pattern as YOUTUBE_HAIKU_RANKED_LIST_INSTRUCTIONS — kept separate
+# so the base prompts' ephemeral cache entries stay intact for the
+# OFF path (the default).
+YOUTUBE_HAIKU_REVISIONS_INSTRUCTIONS = """PRICE TARGET REVISIONS:
+If the speaker explicitly states they are REVISING a previous target on a specific ticker (not initiating a new position, not reiterating an existing view), mark the prediction as a revision.
+
+Signals that indicate a revision:
+- "I'm raising my target from $X to $Y"
+- "Moving my NVDA target up to $250" (from a previously stated lower target)
+- "Downgrading my AAPL target to $180" (implying a previous higher target)
+- "Adjusting my Tesla price target from $300 to $350"
+- "Cut my Amazon target"
+- "Bumped my Microsoft target"
+
+Output format for a revision (add these fields to an otherwise-normal prediction):
+{
+  "ticker": "AAPL",
+  "direction": "bullish",
+  "target_price": 220,
+  "timeframe": "6m",
+  "is_revision": true,
+  "previous_target": 200,
+  "revision_direction": "up",
+  "context_quote": "I'm moving my Apple target from $200 to $220"
+}
+
+Rules for revision detection:
+- MUST be explicit — words like "moving", "raising", "cutting", "adjusting", "revising", "updating" applied to a target
+- Implicit revisions don't count — if they say "new target: $220" without mentioning an old one, extract as a normal call, NOT a revision
+- Target reiterations don't count — "still at $220" is not a revision, it's a reaffirmation
+- If previous_target is not explicitly stated in the transcript, set it to null and leave revision_direction as best-guess from context ("raised" = up, "cut" = down)
+- A revision to a neutral/hold rating counts as a downgrade revision
+- A revision that KEEPS the same target but CHANGES the direction is still a revision — flag it with revision_direction: "direction_change"
+
+Output JSON only. Be concise."""
+
+
 # ── Transcript fetching ─────────────────────────────────────────────────────
 
 def _build_transcript_api():
@@ -633,6 +672,7 @@ def classify_video(channel_name: str, title: str, publish_date: str,
     # (60s TTL) keeps this cheap in tight batch loops.
     use_sector_prompt = False
     use_ranked_list = False
+    use_revisions = False
     if db is not None and video_id:
         try:
             from feature_flags import should_use_sector_prompt
@@ -647,20 +687,32 @@ def classify_video(channel_name: str, title: str, publish_date: str,
         except Exception as _e:
             log.warning("[YT-CLF] ranked-list flag check failed: %s", _e)
             use_ranked_list = False
+        try:
+            from feature_flags import is_target_revisions_enabled
+            use_revisions = is_target_revisions_enabled(db)
+        except Exception as _e:
+            log.warning("[YT-CLF] revisions flag check failed: %s", _e)
+            use_revisions = False
     base_system = YOUTUBE_HAIKU_SECTOR_SYSTEM if use_sector_prompt else HAIKU_SYSTEM
-    # Append ranked list instructions ONLY when the flag is on. When off,
-    # base_system is sent byte-for-byte unchanged so Anthropic's prompt
-    # cache hit rate on the base prompt stays at 100%.
+    # Append optional instruction blocks ONLY when each flag is on. When
+    # every flag is off (the default), base_system is sent byte-for-byte
+    # unchanged so Anthropic's prompt cache hit rate on the base prompt
+    # stays at 100%. Order matters for cache hits: ranked list then
+    # revisions, so the extended-prompt cache entry is consistent
+    # across calls with both flags on.
+    active_system = base_system
     if use_ranked_list:
-        active_system = base_system + "\n\n" + YOUTUBE_HAIKU_RANKED_LIST_INSTRUCTIONS
-    else:
-        active_system = base_system
+        active_system = active_system + "\n\n" + YOUTUBE_HAIKU_RANKED_LIST_INSTRUCTIONS
+    if use_revisions:
+        active_system = active_system + "\n\n" + YOUTUBE_HAIKU_REVISIONS_INSTRUCTIONS
     telemetry["prompt_variant"] = "sector" if use_sector_prompt else "standard"
     telemetry["ranked_list_enabled"] = bool(use_ranked_list)
+    telemetry["revisions_enabled"] = bool(use_revisions)
     print(
         f"[YOUTUBE-HAIKU] video={video_id or '?'} channel={channel_name} "
         f"prompt_variant={telemetry['prompt_variant']} "
-        f"ranked_list={'on' if use_ranked_list else 'off'}",
+        f"ranked_list={'on' if use_ranked_list else 'off'} "
+        f"revisions={'on' if use_revisions else 'off'}",
         flush=True,
     )
 
