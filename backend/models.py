@@ -713,6 +713,20 @@ class ScraperRun(Base):
                            server_default="0")
     error_message = Column(Text, nullable=True)
 
+    # LLM cost / usage aggregates. Populated by scrapers that call an
+    # LLM (currently the YouTube monitor). Source-agnostic — any
+    # scraper that runs classify_* can push totals here.
+    total_input_tokens = Column(BigInteger, nullable=False, default=0,
+                                server_default="0")
+    total_output_tokens = Column(BigInteger, nullable=False, default=0,
+                                 server_default="0")
+    total_cache_create_tokens = Column(BigInteger, nullable=False,
+                                        default=0, server_default="0")
+    total_cache_read_tokens = Column(BigInteger, nullable=False,
+                                      default=0, server_default="0")
+    estimated_cost_usd = Column(Numeric(10, 4), nullable=False, default=0,
+                                server_default="0")
+
 
 class YouTubeScraperRejection(Base):
     """Persisted record of every video rejected by the YouTube scraper

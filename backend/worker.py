@@ -420,6 +420,30 @@ def main():
     except Exception as e:
         log.warning(f"[Worker] scraper_runs/yt_rejections migration: {e}")
 
+    # scraper_runs LLM cost/usage columns. Source-agnostic — any scraper
+    # that calls an LLM can populate these. The YouTube monitor is the
+    # first writer. Existing rows are left at 0; historical cost cannot
+    # be reconstructed from the log.
+    try:
+        with engine.connect() as conn:
+            for ddl in (
+                "ALTER TABLE scraper_runs ADD COLUMN IF NOT EXISTS "
+                "total_input_tokens BIGINT NOT NULL DEFAULT 0",
+                "ALTER TABLE scraper_runs ADD COLUMN IF NOT EXISTS "
+                "total_output_tokens BIGINT NOT NULL DEFAULT 0",
+                "ALTER TABLE scraper_runs ADD COLUMN IF NOT EXISTS "
+                "total_cache_create_tokens BIGINT NOT NULL DEFAULT 0",
+                "ALTER TABLE scraper_runs ADD COLUMN IF NOT EXISTS "
+                "total_cache_read_tokens BIGINT NOT NULL DEFAULT 0",
+                "ALTER TABLE scraper_runs ADD COLUMN IF NOT EXISTS "
+                "estimated_cost_usd NUMERIC(10,4) NOT NULL DEFAULT 0",
+            ):
+                conn.execute(sql_text(ddl))
+            conn.commit()
+        log.info("[Worker] scraper_runs cost columns ensured")
+    except Exception as e:
+        log.warning(f"[Worker] scraper_runs cost columns migration: {e}")
+
     # Dormancy: add forecasters.last_prediction_at + is_dormant columns,
     # backfill on first run, then create the partial index.
     # Idempotent: subsequent runs ALTER IF NOT EXISTS and the UPDATE only

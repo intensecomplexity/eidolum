@@ -1596,6 +1596,27 @@ async def lifespan(app):
         except Exception as _sre:
             print(f"[Startup] scraper_runs/yt_rejections error: {_sre}")
 
+        # ── scraper_runs LLM cost/usage columns (mirrors worker.py) ────
+        try:
+            with engine.connect() as _sc_c:
+                for _sc_ddl in (
+                    "ALTER TABLE scraper_runs ADD COLUMN IF NOT EXISTS "
+                    "total_input_tokens BIGINT NOT NULL DEFAULT 0",
+                    "ALTER TABLE scraper_runs ADD COLUMN IF NOT EXISTS "
+                    "total_output_tokens BIGINT NOT NULL DEFAULT 0",
+                    "ALTER TABLE scraper_runs ADD COLUMN IF NOT EXISTS "
+                    "total_cache_create_tokens BIGINT NOT NULL DEFAULT 0",
+                    "ALTER TABLE scraper_runs ADD COLUMN IF NOT EXISTS "
+                    "total_cache_read_tokens BIGINT NOT NULL DEFAULT 0",
+                    "ALTER TABLE scraper_runs ADD COLUMN IF NOT EXISTS "
+                    "estimated_cost_usd NUMERIC(10,4) NOT NULL DEFAULT 0",
+                ):
+                    _sc_c.execute(sql_text(_sc_ddl))
+                _sc_c.commit()
+                print("[Startup] scraper_runs cost columns ready")
+        except Exception as _sce:
+            print(f"[Startup] scraper_runs cost columns error: {_sce}")
+
         # ── Clean up company descriptions — first sentence only, no "..." ──
         try:
             with engine.connect() as _desc_c:
