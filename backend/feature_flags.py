@@ -145,3 +145,32 @@ def invalidate_sector_traffic_cache() -> None:
     changes the traffic percentage so the new value takes effect
     immediately without waiting for the TTL to expire."""
     _YT_SECTOR_TRAFFIC_CACHE["fetched_at"] = 0.0
+
+
+# ── Ranked list extraction flag ─────────────────────────────────────────────
+#
+# Boolean all-or-nothing flag (not a traffic percentage). When false, the
+# YouTube classifier does NOT append the ranked-list instructions to the
+# Haiku system prompt, so list_id / list_rank stay NULL on every new row.
+# Cached for 60 seconds to avoid hammering the config table in tight loops.
+
+_RANKED_LIST_FLAG_CACHE: dict = {"enabled": False, "fetched_at": 0.0}
+_RANKED_LIST_FLAG_TTL = 60  # seconds
+
+
+def is_ranked_list_extraction_enabled(db) -> bool:
+    """Return True if ENABLE_RANKED_LIST_EXTRACTION is set to 'true' in
+    the config table. Default False. Cached 60s."""
+    now = time.time()
+    if (now - _RANKED_LIST_FLAG_CACHE["fetched_at"]) < _RANKED_LIST_FLAG_TTL:
+        return bool(_RANKED_LIST_FLAG_CACHE["enabled"])
+    enabled = _read_bool(db, "ENABLE_RANKED_LIST_EXTRACTION", default=False)
+    _RANKED_LIST_FLAG_CACHE["enabled"] = enabled
+    _RANKED_LIST_FLAG_CACHE["fetched_at"] = now
+    return enabled
+
+
+def invalidate_ranked_list_flag_cache() -> None:
+    """Reset the 60-second cache — called from the admin toggle endpoint
+    so the new value takes effect immediately."""
+    _RANKED_LIST_FLAG_CACHE["fetched_at"] = 0.0
