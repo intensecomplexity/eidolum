@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { ExternalLink, ArrowLeft, ChevronUp, ChevronDown, ChevronLeft, ChevronRight, Lock } from 'lucide-react';
+import { ExternalLink, ArrowLeft, ChevronUp, ChevronDown, ChevronLeft, ChevronRight, Lock, TrendingUp, TrendingDown, ArrowRight } from 'lucide-react';
 import LoadingSpinner from '../components/LoadingSpinner';
 import useSEO from '../hooks/useSEO';
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, ReferenceLine } from 'recharts';
@@ -268,6 +268,14 @@ export default function ForecasterProfile() {
                   <>
                     <span className="text-border">·</span>
                     <span>{data.sector_count} {data.sector_count === 1 ? 'sector' : 'sectors'}</span>
+                  </>
+                )}
+                {(data.revisions_made || 0) > 0 && (
+                  <>
+                    <span className="text-border">·</span>
+                    <span title="Price target revisions this forecaster has published — updates to their own prior calls.">
+                      {data.revisions_made} {data.revisions_made === 1 ? 'revision' : 'revisions'}
+                    </span>
                   </>
                 )}
               </div>
@@ -890,6 +898,64 @@ function ProofBlock({ p }) {
   );
 }
 
+// Revision badge — renders when a prediction is a revision of an earlier
+// call. Shows direction (up/down/direction_change) with the old target
+// so users can see at a glance that the analyst updated their view.
+// Lucide icons only, no emojis (project rule).
+function RevisionBadge({ p }) {
+  if (!p || !p.revision_of) return null;
+  const prev = p.previous_target;
+  const curr = p.target_price;
+  let dir = '=';
+  if (prev != null && curr != null) {
+    if (curr > prev) dir = 'up';
+    else if (curr < prev) dir = 'down';
+    else dir = '=';
+  } else if (prev == null) {
+    // No prior target known; fall back to direction signal
+    dir = 'up';
+  }
+  const Icon = dir === 'up' ? TrendingUp : dir === 'down' ? TrendingDown : ArrowRight;
+  const color = dir === 'up' ? '#34d399' : dir === 'down' ? '#f87171' : '#fbbf24';
+  const bg = dir === 'up' ? 'rgba(52,211,153,0.12)' : dir === 'down' ? 'rgba(248,113,113,0.12)' : 'rgba(251,191,36,0.12)';
+  const title = prev != null
+    ? `Revised from $${prev.toFixed(2)}. The analyst explicitly updated this target.`
+    : 'Revised — the analyst updated a prior target on this ticker.';
+  return (
+    <span
+      className="inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[9px] font-semibold whitespace-nowrap ml-1"
+      style={{ backgroundColor: bg, color }}
+      title={title}
+    >
+      <Icon className="w-2.5 h-2.5" />
+      REVISED
+      {prev != null && <span className="font-mono ml-0.5">from ${prev.toFixed(0)}</span>}
+    </span>
+  );
+}
+
+
+// "Superseded" inline marker — renders on original predictions that
+// have been replaced by a later revision. Spec: don't hide the original,
+// show the whole history for accountability. Strikethrough hover tooltip.
+function SupersededMarker({ p }) {
+  if (!p || !p.was_superseded) return null;
+  return (
+    <span
+      className="inline-flex items-center rounded-full px-1.5 py-0.5 text-[9px] font-semibold whitespace-nowrap ml-1"
+      style={{
+        backgroundColor: 'rgba(148,163,184,0.15)',
+        color: '#94a3b8',
+        textDecoration: 'line-through',
+      }}
+      title="This target was later revised by the forecaster — see their newer call"
+    >
+      superseded
+    </span>
+  );
+}
+
+
 function PredictionRow({ p, forecaster: fc }) {
   const [expanded, setExpanded] = useState(false);
   const evalDate = p.evaluation_date || p.resolution_date;
@@ -917,8 +983,12 @@ function PredictionRow({ p, forecaster: fc }) {
           )}
         </td>
         <td className="px-6 py-3">
-          <PredictionBadge direction={p.direction} windowDays={p.window_days || p.evaluation_window_days} />
-          {p.has_conflict && <ConflictBadge note={p.conflict_note} size="small" />}
+          <div className="inline-flex items-center gap-1 flex-wrap">
+            <PredictionBadge direction={p.direction} windowDays={p.window_days || p.evaluation_window_days} />
+            {p.has_conflict && <ConflictBadge note={p.conflict_note} size="small" />}
+            <RevisionBadge p={p} />
+            <SupersededMarker p={p} />
+          </div>
         </td>
         <td className="px-6 py-3">
           <SourceBadge verifiedBy={p.verified_by} date={p.prediction_date} />
