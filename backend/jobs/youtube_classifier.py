@@ -366,6 +366,41 @@ For ticker calls, continue using the existing object shape (with "ticker", "dire
 Output JSON only. Be concise. Do not include prose explanations outside the JSON."""
 
 
+# Ranked-list instructions, appended to either HAIKU_SYSTEM or
+# YOUTUBE_HAIKU_SECTOR_SYSTEM when ENABLE_RANKED_LIST_EXTRACTION is
+# flipped on in the config table. KEPT SEPARATE so the base prompts'
+# cached 5-minute ephemeral cache entries on Anthropic's side stay
+# intact for the OFF path. When the flag is off, the base prompts are
+# sent byte-for-byte unchanged, so cache hit rate is unaffected.
+YOUTUBE_HAIKU_RANKED_LIST_INSTRUCTIONS = """RANKED LISTS:
+If the speaker explicitly presents a ranked list of stocks (e.g. "my top 5 picks", "my 3 favorite stocks", "the 10 stocks I'm buying this year"), extract each item as a separate prediction AND mark its rank position.
+
+For a ranked list, add these fields to each extracted prediction:
+- list_id: a short identifier you invent for this list (e.g. "top5_2026")
+- list_rank: integer starting at 1 for the top pick
+
+Example input: "My top 5 stocks for 2026, in order: NVIDIA at number one, then AMD, then Taiwan Semi, then Apple, and Microsoft at number five"
+
+Example extraction (each item becomes a separate prediction object):
+[
+  {"ticker": "NVDA", "direction": "bullish", "list_id": "top5_2026", "list_rank": 1, ...},
+  {"ticker": "AMD", "direction": "bullish", "list_id": "top5_2026", "list_rank": 2, ...},
+  {"ticker": "TSM", "direction": "bullish", "list_id": "top5_2026", "list_rank": 3, ...},
+  {"ticker": "AAPL", "direction": "bullish", "list_id": "top5_2026", "list_rank": 4, ...},
+  {"ticker": "MSFT", "direction": "bullish", "list_id": "top5_2026", "list_rank": 5, ...}
+]
+
+Rules for ranked list detection:
+- The speaker MUST explicitly indicate ranking ("number one", "my top pick", "best stock is", "then in second place", "third favorite")
+- Unordered lists like "I like AAPL, NVDA, and TSLA" do NOT get ranked — no list_id, no list_rank. Extract as 3 separate normal predictions.
+- "Stocks to avoid" lists are ranked by WORST direction — item 1 is the most bearish pick. Direction is bearish.
+- Maximum list size: 10 items. If the speaker lists more, only rank the top 10 and treat the rest as unranked picks.
+- list_id must be unique per list but should be human-readable (e.g. "top_tech_2026", "avoid_list_q1", "div_picks")
+- If the same YouTuber publishes multiple lists in one video, each list gets its own list_id
+
+Output JSON only. Be concise."""
+
+
 # ── Transcript fetching ─────────────────────────────────────────────────────
 
 def _build_transcript_api():
@@ -597,6 +632,7 @@ def classify_video(channel_name: str, title: str, publish_date: str,
     # guarantees retries see the same prompt, and the cached flag read
     # (60s TTL) keeps this cheap in tight batch loops.
     use_sector_prompt = False
+    use_ranked_list = False
     if db is not None and video_id:
         try:
             from feature_flags import should_use_sector_prompt
@@ -604,11 +640,27 @@ def classify_video(channel_name: str, title: str, publish_date: str,
         except Exception as _e:
             log.warning("[YT-CLF] sector prompt flag check failed: %s", _e)
             use_sector_prompt = False
-    active_system = YOUTUBE_HAIKU_SECTOR_SYSTEM if use_sector_prompt else HAIKU_SYSTEM
+    if db is not None:
+        try:
+            from feature_flags import is_ranked_list_extraction_enabled
+            use_ranked_list = is_ranked_list_extraction_enabled(db)
+        except Exception as _e:
+            log.warning("[YT-CLF] ranked-list flag check failed: %s", _e)
+            use_ranked_list = False
+    base_system = YOUTUBE_HAIKU_SECTOR_SYSTEM if use_sector_prompt else HAIKU_SYSTEM
+    # Append ranked list instructions ONLY when the flag is on. When off,
+    # base_system is sent byte-for-byte unchanged so Anthropic's prompt
+    # cache hit rate on the base prompt stays at 100%.
+    if use_ranked_list:
+        active_system = base_system + "\n\n" + YOUTUBE_HAIKU_RANKED_LIST_INSTRUCTIONS
+    else:
+        active_system = base_system
     telemetry["prompt_variant"] = "sector" if use_sector_prompt else "standard"
+    telemetry["ranked_list_enabled"] = bool(use_ranked_list)
     print(
         f"[YOUTUBE-HAIKU] video={video_id or '?'} channel={channel_name} "
-        f"prompt_variant={telemetry['prompt_variant']}",
+        f"prompt_variant={telemetry['prompt_variant']} "
+        f"ranked_list={'on' if use_ranked_list else 'off'}",
         flush=True,
     )
 
