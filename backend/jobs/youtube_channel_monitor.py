@@ -192,6 +192,27 @@ def run_channel_monitor(db=None):
         print("[ChannelMonitor] ANTHROPIC_API_KEY not set — skipping")
         return
 
+    # Surface every transcript-proxy-related env var the classifier checks,
+    # presence-only and length-only (never the value). If the proxy banner
+    # below says proxy=none even though Webshare is "set" in Railway, the
+    # log lines here will tell you whether the env var name is misspelled
+    # vs. genuinely missing — that exact diagnosis is what shipped this
+    # debug block in the first place (the deployed worker turned out to
+    # have EBSHARE_PROXY_USERNAME, missing the leading W, and my code's
+    # os.getenv('WEBSHARE_PROXY_USERNAME') quietly returned empty).
+    _proxy_env_keys = [
+        "WEBSHARE_PROXY_USERNAME",
+        "WEBSHARE_PROXY_PASSWORD",
+        "YT_PROXY_HTTP",
+        "YT_PROXY_HTTPS",
+    ]
+    for k in _proxy_env_keys:
+        v = os.getenv(k, "")
+        print(
+            f"[ChannelMonitor] env {k}: present={bool(v)} length={len(v)}",
+            flush=True,
+        )
+
     print(
         f"[ChannelMonitor] V2 (transcript-based) starting | classifier={HAIKU_MODEL} "
         f"pipeline={PIPELINE_VERSION} proxy={transcript_proxy_status()}",
