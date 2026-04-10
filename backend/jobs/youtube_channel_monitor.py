@@ -41,6 +41,7 @@ from jobs.youtube_classifier import (
     fetch_transcript,
     classify_video,
     insert_youtube_prediction,
+    log_youtube_rejection,
     transcript_proxy_status,
     PIPELINE_VERSION,
     HAIKU_MODEL,
@@ -263,6 +264,38 @@ def _seed_target_channels(db):
 def _run_inner(db):
     _seed_target_channels(db)
 
+    # Prune the YouTube rejection log to last 7 days, mirroring the
+    # x_scraper_rejections cleanup at the top of run_x_scraper. Best-effort:
+    # never block the scrape on this.
+    try:
+        db.execute(sql_text(
+            "DELETE FROM youtube_scraper_rejections "
+            "WHERE rejected_at < NOW() - INTERVAL '7 days'"
+        ))
+        db.commit()
+    except Exception as e:
+        print(f"[ChannelMonitor] rejection cleanup failed: {e}")
+        try:
+            db.rollback()
+        except Exception:
+            pass
+
+    # Open a scraper_runs row so the admin Social Scrapers card can show
+    # last-run funnel counts. Best-effort, mirrors the X scraper pattern.
+    run_id: int | None = None
+    try:
+        run_id = db.execute(sql_text(
+            "INSERT INTO scraper_runs (source, started_at, status) "
+            "VALUES ('youtube', NOW(), 'running') RETURNING id"
+        )).scalar()
+        db.commit()
+    except Exception as e:
+        print(f"[ChannelMonitor] scraper_runs insert failed: {e}")
+        try:
+            db.rollback()
+        except Exception:
+            pass
+
     # Pick the 10 least recently crawled active channels
     batch_rows = db.execute(sql_text("""
         SELECT channel_name, youtube_channel_id, last_crawled
@@ -274,7 +307,11 @@ def _run_inner(db):
 
     print(f"[ChannelMonitor] Processing {len(batch_rows)} channels")
 
-    # Run-level stats
+    # Run-level stats. The first block is the legacy free-form keys used
+    # in stdout logging since V1; the second block is the symmetric
+    # schema used by scraper_runs (matches the X scraper). Both stay in
+    # sync because the new keys are derived from the legacy ones at the
+    # finalize step.
     stats = {
         "channels_checked": 0,
         "videos_seen": 0,
@@ -286,6 +323,10 @@ def _run_inner(db):
         "predictions_inserted": 0,
         "classifier_errors": 0,
         "yt_api_units": 0,
+        # Cross-scraper symmetric counters — incremented inside
+        # log_youtube_rejection / insert_youtube_prediction.
+        "items_rejected": 0,
+        "items_deduped": 0,
     }
 
     for row in batch_rows:
@@ -338,6 +379,19 @@ def _run_inner(db):
             description = snippet.get("description", "")
             publish_date_str = snippet.get("publishedAt", "")
             if not video_id or not title:
+                # No usable identifier — log so we can spot a YouTube API
+                # response shape change without grepping the worker logs.
+                log_youtube_rejection(
+                    db,
+                    video_id=video_id,
+                    channel_id=channel_id,
+                    channel_name=channel_name,
+                    video_title=title,
+                    video_published_at=_parse_publish_date(publish_date_str),
+                    reason="no_video_id",
+                    haiku_raw=video,
+                    stats=stats,
+                )
                 continue
             stats["videos_seen"] += 1
 
@@ -348,6 +402,7 @@ def _run_inner(db):
             ), {"vid": video_id, "pv": PIPELINE_VERSION}).first()
             if already:
                 stats["videos_skipped_already_processed"] += 1
+                stats["items_deduped"] += 1
                 continue
 
             # Skip Shorts (best-effort title-based heuristic — duration
@@ -355,6 +410,16 @@ def _run_inner(db):
             if _is_likely_short(title, video_id):
                 stats["videos_skipped_short"] += 1
                 _record_processed_video(db, video_id, channel_name, title, description, publish_date_str, "shorts_skipped", 0, 0)
+                log_youtube_rejection(
+                    db,
+                    video_id=video_id,
+                    channel_id=channel_id,
+                    channel_name=channel_name,
+                    video_title=title,
+                    video_published_at=_parse_publish_date(publish_date_str),
+                    reason="shorts_skipped",
+                    stats=stats,
+                )
                 continue
 
             channel_videos += 1
@@ -392,7 +457,54 @@ def _run_inner(db):
 
         time.sleep(1)
 
-    # Run summary — exact format the success criteria checks for
+    # Finalize scraper_runs row. Best-effort: any failure here is logged
+    # and ignored — the run already happened. Keys map to the symmetric
+    # X scraper schema:
+    #   items_fetched   = videos_seen
+    #   items_processed = videos that yielded a usable transcript
+    #                     (videos_seen − no_transcript − shorts)
+    #   items_llm_sent  = videos_classified
+    #   items_inserted  = predictions_inserted
+    #   items_rejected  = rows written to youtube_scraper_rejections
+    #   items_deduped   = videos_skipped_already_processed + insert-time dedup
+    items_processed = max(
+        0,
+        stats["videos_seen"]
+        - stats["videos_skipped_no_transcript"]
+        - stats["videos_skipped_short"],
+    )
+    if run_id is not None:
+        try:
+            db.execute(sql_text("""
+                UPDATE scraper_runs
+                SET finished_at = NOW(),
+                    status = 'ok',
+                    items_fetched = :fetched,
+                    items_processed = :processed,
+                    items_llm_sent = :llm_sent,
+                    items_inserted = :inserted,
+                    items_rejected = :rejected,
+                    items_deduped = :deduped
+                WHERE id = :id
+            """), {
+                "id": run_id,
+                "fetched": int(stats["videos_seen"]),
+                "processed": int(items_processed),
+                "llm_sent": int(stats["videos_classified"]),
+                "inserted": int(stats["predictions_inserted"]),
+                "rejected": int(stats["items_rejected"]),
+                "deduped": int(stats["items_deduped"]),
+            })
+            db.commit()
+        except Exception as e:
+            print(f"[ChannelMonitor] scraper_runs finalize failed: {e}")
+            try:
+                db.rollback()
+            except Exception:
+                pass
+
+    # Legacy DONE summary (kept for backwards compat with anything grepping
+    # the worker logs).
     print(
         f"[ChannelMonitor] DONE: {stats['channels_checked']} channels checked, "
         f"{stats['videos_seen']} videos seen "
@@ -406,19 +518,59 @@ def _run_inner(db):
         flush=True,
     )
 
+    # Symmetric 4-line summary matching the [X-SCRAPER] format so both
+    # scrapers are equally debuggable from worker stdout.
+    print(f"[YOUTUBE-SCRAPER] RUN COMPLETE:", flush=True)
+    print(
+        f"  Channels: {stats['channels_checked']} checked",
+        flush=True,
+    )
+    print(
+        f"  Videos: {stats['videos_seen']} fetched, "
+        f"{items_processed} with transcript, "
+        f"{stats['videos_skipped_no_transcript']} no-transcript, "
+        f"{stats['videos_skipped_short']} shorts",
+        flush=True,
+    )
+    print(
+        f"  Haiku ({HAIKU_MODEL}): {stats['videos_classified']} sent, "
+        f"{stats['predictions_extracted']} predictions extracted",
+        flush=True,
+    )
+    print(
+        f"  INSERTED: {stats['predictions_inserted']} | "
+        f"Deduped: {stats['items_deduped']} | "
+        f"Rejected: {stats['items_rejected']} | "
+        f"Errors: {stats['classifier_errors']}",
+        flush=True,
+    )
+
 
 def _process_one_video(db, channel_name, channel_id, video_id, title, publish_date_str, stats):
     """Fetch transcript → classify → insert. Returns (inserted, transcript_chars, status)."""
+    publish_dt = _parse_publish_date(publish_date_str)
+
     text, transcript_status = fetch_transcript(video_id)
     if not text:
         stats["videos_skipped_no_transcript"] += 1
         print(f"[ChannelMonitor] {channel_name}: no transcript for {video_id} ({transcript_status})")
+        log_youtube_rejection(
+            db,
+            video_id=video_id,
+            channel_id=channel_id,
+            channel_name=channel_name,
+            video_title=title,
+            video_published_at=publish_dt,
+            reason="no_transcript",
+            haiku_reason=transcript_status,
+            stats=stats,
+        )
         return 0, 0, transcript_status or "no_transcript"
 
     transcript_chars = len(text)
+    transcript_snippet = text[:500]
 
-    # Parse publish date — YouTube returns ISO 8601 with Z suffix
-    publish_dt = _parse_publish_date(publish_date_str)
+    # Default publish date if YouTube didn't return one
     if not publish_dt:
         publish_dt = datetime.utcnow()
 
@@ -428,13 +580,39 @@ def _process_one_video(db, channel_name, channel_id, video_id, title, publish_da
 
     if telem.get("error"):
         stats["classifier_errors"] += 1
+        err_tag = telem.get("error") or "unknown"
         print(
             f"[ChannelMonitor] {channel_name}: classifier error on {video_id} — "
-            f"{telem.get('error')[:200]}"
+            f"{err_tag[:200]}"
+        )
+        log_youtube_rejection(
+            db,
+            video_id=video_id,
+            channel_id=channel_id,
+            channel_name=channel_name,
+            video_title=title,
+            video_published_at=publish_dt,
+            reason="classifier_error",
+            haiku_reason=err_tag[:200],
+            haiku_raw=telem,
+            transcript_snippet=transcript_snippet,
+            stats=stats,
         )
         return 0, transcript_chars, f"classifier_error"
 
     if not preds:
+        log_youtube_rejection(
+            db,
+            video_id=video_id,
+            channel_id=channel_id,
+            channel_name=channel_name,
+            video_title=title,
+            video_published_at=publish_dt,
+            reason="haiku_no_predictions",
+            haiku_raw=telem,
+            transcript_snippet=transcript_snippet,
+            stats=stats,
+        )
         return 0, transcript_chars, "ok_no_predictions"
 
     inserted = 0
@@ -448,6 +626,8 @@ def _process_one_video(db, channel_name, channel_id, video_id, title, publish_da
                 video_title=title,
                 publish_date=publish_dt,
                 db=db,
+                transcript_snippet=transcript_snippet,
+                stats=stats,
             )
             if ok:
                 inserted += 1

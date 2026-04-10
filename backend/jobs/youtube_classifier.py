@@ -39,6 +39,82 @@ from sqlalchemy import text as sql_text
 
 log = logging.getLogger(__name__)
 
+
+# ── Rejection logging (mirror of x_scraper.log_rejection) ───────────────────
+
+def log_youtube_rejection(
+    db,
+    *,
+    video_id: str | None,
+    channel_id: str | None,
+    channel_name: str | None,
+    video_title: str | None,
+    video_published_at: datetime | None,
+    reason: str,
+    haiku_reason: str | None = None,
+    haiku_raw: dict | list | None = None,
+    transcript_snippet: str | None = None,
+    stats: dict | None = None,
+) -> bool:
+    """Persist a rejected YouTube video / prediction to youtube_scraper_rejections.
+
+    Mirror of jobs.x_scraper.log_rejection — same best-effort semantics:
+    a write failure must NEVER break the scrape loop. Returns True if the
+    write succeeded so the caller can increment its in-memory counter
+    only on success.
+
+    If `stats` is provided, increments stats['items_rejected'] on success
+    so the caller's run-level totals stay in sync without an extra
+    bookkeeping step at every call site.
+    """
+    try:
+        raw_json = None
+        if haiku_raw is not None:
+            try:
+                serialized = json.dumps(haiku_raw)
+                if len(serialized) <= 10240:
+                    raw_json = serialized
+                else:
+                    raw_json = json.dumps({"_truncated": True, "_size": len(serialized)})
+            except Exception:
+                raw_json = None
+
+        hr_value = None
+        if haiku_reason is not None:
+            hr_value = str(haiku_reason)[:500] or None
+
+        snippet = (transcript_snippet or "")[:500] or None
+
+        db.execute(sql_text("""
+            INSERT INTO youtube_scraper_rejections
+                (video_id, channel_id, channel_name, video_title,
+                 video_published_at, rejection_reason, haiku_reason,
+                 haiku_raw_response, transcript_snippet)
+            VALUES (:vid, :cid, :cname, :ctitle, :cpub, :rr, :hr,
+                    CAST(:hraw AS JSONB), :snip)
+        """), {
+            "vid": (video_id or "")[:20] or None,
+            "cid": (channel_id or "")[:30] or None,
+            "cname": (channel_name or "")[:200] or None,
+            "ctitle": (video_title or "")[:2000] or None,
+            "cpub": video_published_at,
+            "rr": reason[:50],
+            "hr": hr_value,
+            "hraw": raw_json,
+            "snip": snippet,
+        })
+        db.commit()
+        if stats is not None:
+            stats["items_rejected"] = int(stats.get("items_rejected", 0)) + 1
+        return True
+    except Exception as e:
+        log.warning(f"[YT-CLF] log_youtube_rejection failed: {e}")
+        try:
+            db.rollback()
+        except Exception:
+            pass
+        return False
+
 ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "").strip()
 
 # Current Haiku model. The spec called for claude-haiku-4-5-20250514 but
@@ -586,6 +662,8 @@ def insert_youtube_prediction(
     video_title: str,
     publish_date: datetime,
     db,
+    transcript_snippet: str | None = None,
+    stats: dict | None = None,
 ) -> bool:
     """Insert one classifier-extracted prediction following the
     massive_benzinga.py pattern.
@@ -605,15 +683,38 @@ def insert_youtube_prediction(
       - evaluation_date = classifier-supplied absolute date or +90 days
       - context = "Channel: <quote> [reasoning]" capped at 500 chars
       - Cross-scraper dedup via prediction_exists_cross_scraper(...)
+
+    Rejection logging: every False return path now writes a row to
+    youtube_scraper_rejections so the admin Social Scrapers card can
+    surface the funnel breakdown. transcript_snippet/stats are optional
+    so existing callers (e.g. youtube_backfill) keep working unchanged.
     """
     from models import Prediction
     from jobs.prediction_validator import prediction_exists_cross_scraper
 
+    def _reject(reason: str, hr: str | None = None) -> bool:
+        log_youtube_rejection(
+            db,
+            video_id=video_id,
+            channel_id=channel_id,
+            channel_name=channel_name,
+            video_title=video_title,
+            video_published_at=publish_date,
+            reason=reason,
+            haiku_reason=hr,
+            haiku_raw=pred,
+            transcript_snippet=transcript_snippet,
+            stats=stats,
+        )
+        return False
+
     ticker = (pred.get("ticker") or "").upper().strip().lstrip("$")
     direction = (pred.get("direction") or "").strip().lower()
 
-    if not ticker or direction not in _VALID_DIRECTIONS:
-        return False
+    if not ticker:
+        return _reject("invalid_ticker")
+    if direction not in _VALID_DIRECTIONS:
+        return _reject("neutral_or_no_direction", hr=direction or None)
 
     # Per-video-per-ticker dedup. Same video may produce multiple tickers,
     # but the same (video, ticker) pair should only insert once even if
@@ -623,20 +724,24 @@ def insert_youtube_prediction(
         sql_text("SELECT 1 FROM predictions WHERE source_platform_id = :sid LIMIT 1"),
         {"sid": source_id},
     ).first():
-        return False
+        if stats is not None:
+            stats["items_deduped"] = int(stats.get("items_deduped", 0)) + 1
+        return _reject("dedup_collision", hr=ticker)
 
     # Ticker validation against ticker_sectors
     if not validate_ticker_in_db(ticker, db):
-        return False
+        return _reject("invalid_ticker", hr=ticker)
 
     # Forecaster
     forecaster = find_or_create_youtube_forecaster(channel_name, channel_id, db)
     if not forecaster:
-        return False
+        return _reject("forecaster_creation_failed")
 
     # Cross-scraper dedup (within 24h of the prediction_date)
     if prediction_exists_cross_scraper(ticker, forecaster.id, direction, publish_date, db):
-        return False
+        if stats is not None:
+            stats["items_deduped"] = int(stats.get("items_deduped", 0)) + 1
+        return _reject("cross_scraper_dupe", hr=ticker)
 
     # Evaluation date / window
     eval_date, window_days = _parse_evaluation_date(pred.get("timeframe"), publish_date)
