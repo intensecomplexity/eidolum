@@ -8,6 +8,7 @@ import {
   banUser, unbanUser, deleteUserAccount, promoteAdmin, demoteAdmin,
   deleteForecasterAdmin, deletePredictionAdmin, listPredictionsAdmin,
   getFeatureFlags, toggleDuelsAdmin, toggleCompeteAdmin, toggleCompareAnalystsAdmin,
+  toggleEvaluateXAdmin,
   getAdminUrlQuality, getSocialStats,
   getPrunedYouTubeChannels, reactivateYouTubeChannel,
 } from '../api';
@@ -111,6 +112,7 @@ function FeatureToggles() {
         { key: 'duels', label: 'Duels', fn: toggleDuelsAdmin },
         { key: 'compete', label: 'Compete / Seasons', fn: toggleCompeteAdmin },
         { key: 'compare_analysts', label: 'Compare Analysts', fn: toggleCompareAnalystsAdmin },
+        { key: 'evaluate_x_predictions', label: 'Evaluate X Predictions', fn: toggleEvaluateXAdmin },
       ].map(f => (
         <div key={f.key} className="flex items-center justify-between py-1.5">
           <span className="text-sm text-text-secondary">{f.label}</span>
