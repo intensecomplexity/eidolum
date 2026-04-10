@@ -285,6 +285,9 @@ function SocialScraperCard({ source, data }) {
         </div>
       )}
 
+      {/* Funnel breakdown — symmetric across X and YouTube */}
+      <FunnelSection source={source} funnel={data.funnel} />
+
       {/* Top forecasters */}
       <div>
         <div className="text-[10px] text-muted uppercase tracking-wider mb-1 px-1">Top Forecasters</div>
@@ -321,6 +324,196 @@ function SocialScraperCard({ source, data }) {
           </button>
         )}
       </div>
+    </div>
+  );
+}
+
+
+function FunnelSection({ source, funnel }) {
+  const [sampleOpen, setSampleOpen] = useState(false);
+
+  if (!funnel) return null;
+  const isYoutube = source === 'youtube';
+  const last = funnel.last_run || {};
+  const fetched = last.items_fetched || 0;
+  const processed = last.items_processed || 0;
+  const llmSent = last.items_llm_sent || 0;
+  const inserted = last.items_inserted || 0;
+  const rejected = last.items_rejected || 0;
+  const deduped = last.items_deduped || 0;
+  const breakdown = funnel.rejection_breakdown_7d || [];
+  const closeness = funnel.closeness_distribution_7d;
+  const sample = isYoutube
+    ? (funnel.recent_rejections_sample || [])
+    : (funnel.near_misses_sample || []);
+
+  const pct = (n) => fetched > 0 ? `${((n / fetched) * 100).toFixed(1)}%` : '—';
+  const stages = isYoutube
+    ? [
+        { label: 'Videos fetched', value: fetched, pctVal: '100%' },
+        { label: 'Transcripts OK', value: processed, pctVal: pct(processed) },
+        { label: 'Sent to LLM', value: llmSent, pctVal: pct(llmSent) },
+        { label: 'Inserted', value: inserted, pctVal: pct(inserted) },
+      ]
+    : [
+        { label: 'Tweets fetched', value: fetched, pctVal: '100%' },
+        { label: 'Passed prefilter', value: processed, pctVal: pct(processed) },
+        { label: 'Sent to LLM', value: llmSent, pctVal: pct(llmSent) },
+        { label: 'Inserted', value: inserted, pctVal: pct(inserted) },
+      ];
+
+  // Nothing to show if the new tables haven't been written to yet
+  // (e.g. fresh deploy before the first scraper run). Bail clean.
+  const hasAnyData = fetched > 0 || rejected > 0 || deduped > 0
+    || breakdown.length > 0 || sample.length > 0;
+  if (!hasAnyData) {
+    return (
+      <div className="mb-3 bg-surface-2 border border-border/50 rounded-lg p-2.5">
+        <div className="text-[10px] uppercase tracking-wider mb-1 px-1" style={{ color: '#D4A843' }}>
+          Funnel
+        </div>
+        <div className="text-xs text-muted px-1 py-1">
+          No runs recorded yet — waiting for next {isYoutube ? 'channel monitor' : 'X scraper'} cycle.
+        </div>
+      </div>
+    );
+  }
+
+  const maxBreakdown = breakdown.reduce((m, r) => Math.max(m, r.count || 0), 0) || 1;
+
+  return (
+    <div className="mb-3 space-y-2">
+      {/* Last-run funnel */}
+      <div className="bg-surface-2 border border-border/50 rounded-lg p-2.5">
+        <div className="flex items-center justify-between mb-1.5">
+          <div className="text-[10px] uppercase tracking-wider" style={{ color: '#D4A843' }}>
+            Funnel (last run)
+          </div>
+          <div className="text-[10px] font-mono text-muted">
+            {last.status || '—'} · deduped {deduped}
+          </div>
+        </div>
+        <div className="space-y-0.5">
+          {stages.map(s => (
+            <div key={s.label} className="flex items-center justify-between text-xs px-1">
+              <span className="text-text-secondary">{s.label}</span>
+              <span className="font-mono">
+                <span className="text-text-primary">{s.value.toLocaleString()}</span>
+                <span className="text-muted ml-2 w-12 inline-block text-right">{s.pctVal}</span>
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Rejection breakdown */}
+      {breakdown.length > 0 && (
+        <div className="bg-surface-2 border border-border/50 rounded-lg p-2.5">
+          <div className="text-[10px] uppercase tracking-wider mb-1.5" style={{ color: '#D4A843' }}>
+            Rejection reasons (7d)
+          </div>
+          <div className="space-y-1">
+            {breakdown.map(r => {
+              const w = Math.max(2, Math.round((r.count / maxBreakdown) * 100));
+              return (
+                <div key={r.reason} className="flex items-center gap-2 text-[11px]">
+                  <span className="text-text-secondary truncate w-36" title={r.reason}>{r.reason}</span>
+                  <div className="flex-1 h-1.5 bg-surface rounded overflow-hidden">
+                    <div className="h-full bg-accent/60" style={{ width: `${w}%` }} />
+                  </div>
+                  <span className="font-mono text-muted w-12 text-right">{r.count.toLocaleString()}</span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Closeness distribution (X only) */}
+      {closeness && (
+        <div className="bg-surface-2 border border-border/50 rounded-lg p-2.5">
+          <div className="text-[10px] uppercase tracking-wider mb-1.5" style={{ color: '#D4A843' }}>
+            Closeness distribution (7d rejected)
+          </div>
+          <ClosenessChart dist={closeness} />
+        </div>
+      )}
+
+      {/* Sample (collapsible) */}
+      {sample.length > 0 && (
+        <div className="bg-surface-2 border border-border/50 rounded-lg">
+          <button
+            onClick={() => setSampleOpen(o => !o)}
+            className="w-full flex items-center justify-between px-2.5 py-1.5 text-[10px] uppercase tracking-wider"
+            style={{ color: '#D4A843' }}
+          >
+            <span>{isYoutube ? 'Recent rejections' : 'Near misses (L4)'}</span>
+            <span className="font-mono text-muted">{sampleOpen ? '−' : '+'}</span>
+          </button>
+          {sampleOpen && (
+            <div className="px-2.5 pb-2.5 space-y-1.5">
+              {sample.map((s, i) => (
+                <div key={i} className="text-[11px] border-l border-border/50 pl-2 py-0.5">
+                  {isYoutube ? (
+                    <>
+                      <div className="text-text-secondary truncate" title={s.video_title}>
+                        <span className="text-accent font-mono">{s.channel_name || '—'}</span>
+                        {' · '}
+                        <span>{s.video_title || '—'}</span>
+                      </div>
+                      <div className="text-muted truncate">
+                        <span className="font-mono">{s.reason}</span>
+                        {s.haiku_reason ? <span> — {s.haiku_reason}</span> : null}
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div className="text-text-secondary truncate" title={s.tweet_text}>
+                        <span className="text-accent font-mono">@{s.handle}</span>
+                        {' · '}
+                        <span>{s.tweet_text || '—'}</span>
+                      </div>
+                      {s.haiku_reason && (
+                        <div className="text-muted truncate">Haiku: {s.haiku_reason}</div>
+                      )}
+                    </>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+
+function ClosenessChart({ dist }) {
+  // L0 → L4: red (off-topic) → gold (almost a prediction)
+  const meta = [
+    { key: 'L0', label: 'L0 not finance',         color: '#ef4444' },
+    { key: 'L1', label: 'L1 off-topic finance',   color: '#f97316' },
+    { key: 'L2', label: 'L2 ticker no direction', color: '#eab308' },
+    { key: 'L3', label: 'L3 vague directional',   color: '#ca8a04' },
+    { key: 'L4', label: 'L4 near miss',           color: '#D4A843' },
+  ];
+  const max = Math.max(1, ...meta.map(m => dist[m.key] || 0));
+  return (
+    <div className="space-y-1">
+      {meta.map(m => {
+        const v = dist[m.key] || 0;
+        const w = Math.max(2, Math.round((v / max) * 100));
+        return (
+          <div key={m.key} className="flex items-center gap-2 text-[11px]">
+            <span className="text-text-secondary w-36 truncate" title={m.label}>{m.label}</span>
+            <div className="flex-1 h-1.5 bg-surface rounded overflow-hidden">
+              <div className="h-full" style={{ width: `${w}%`, background: m.color }} />
+            </div>
+            <span className="font-mono text-muted w-12 text-right">{v.toLocaleString()}</span>
+          </div>
+        );
+      })}
     </div>
   );
 }
