@@ -994,5 +994,39 @@ export function getXRejectionsSummary() {
   return api.get('/admin/x-accounts/rejections/summary', { headers: authHeaders() }).then(r => r.data);
 }
 
+// ——— YouTube Channels Admin API ———
+
+export function getYouTubeChannels() {
+  return api.get('/admin/youtube-channels', { headers: authHeaders() }).then(r => r.data);
+}
+
+export function addYouTubeChannel(data) {
+  return api.post('/admin/youtube-channels', data, { headers: authHeaders() }).then(r => r.data);
+}
+
+export function updateYouTubeChannel(id, data) {
+  return api.patch(`/admin/youtube-channels/${id}`, data, { headers: authHeaders() }).then(r => r.data);
+}
+
+export function deleteYouTubeChannel(id) {
+  return api.delete(`/admin/youtube-channels/${id}`, { headers: authHeaders() }).then(r => r.data);
+}
+
+export function getYouTubeChannelsStats() {
+  return api.get('/admin/youtube-channels/stats', { headers: authHeaders() }).then(r => r.data);
+}
+
+export function getYouTubeRejections(params = {}) {
+  return api.get('/admin/youtube-channels/rejections', { params, headers: authHeaders() }).then(r => r.data);
+}
+
+export function getYouTubeRejectionsSummary() {
+  return api.get('/admin/youtube-channels/rejections/summary', { headers: authHeaders() }).then(r => r.data);
+}
+
+export function fetchYouTubeChannelNow(id) {
+  return api.post(`/admin/youtube-channels/${id}/fetch-now`, {}, { headers: authHeaders() }).then(r => r.data);
+}
+
 export default api;
 export { API_BASE };

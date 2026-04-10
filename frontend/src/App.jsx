@@ -23,6 +23,7 @@ import ForecastersList from './pages/ForecastersList';
 import AdminPanel from './pages/AdminPanel';
 import AdminDashboard from './pages/AdminDashboard';
 import AdminXAccounts from './pages/AdminXAccounts';
+import AdminYouTubeChannels from './pages/AdminYouTubeChannels';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import ForgotPassword from './pages/ForgotPassword';
@@ -112,6 +113,7 @@ export default function App() {
         <Route path="/admin" element={<AdminPanel />} />
         <Route path="/admin/dashboard" element={<AdminDashboard />} />
         <Route path="/admin/x-accounts" element={<AdminXAccounts />} />
+        <Route path="/admin/youtube-channels" element={<AdminYouTubeChannels />} />
         {/* Phase 2 */}
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
