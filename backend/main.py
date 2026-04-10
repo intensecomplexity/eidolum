@@ -1618,6 +1618,46 @@ async def lifespan(app):
         except Exception as _ybe:
             print(f"[Startup] youtube_channel_meta totals backfill error: {_ybe}")
 
+        # ── youtube_channel_meta.last_scraped_at backfill ──────────────
+        # Two-pass strategy mirroring the spec. Pass 1 copies from
+        # forecasters.last_synced_at, which holds historical per-channel
+        # fetch timestamps from the pre-meta era. Pass 2 backs it up
+        # with MAX(predictions.created_at) for channels whose forecaster
+        # row still has last_synced_at=NULL (older V1 rows). Both passes
+        # have an IS NULL idempotency guard so they only touch rows the
+        # monitor hasn't already written.
+        try:
+            with engine.connect() as _ls_c:
+                # Pass 1: forecasters.last_synced_at
+                _ls_c.execute(sql_text("""
+                    UPDATE youtube_channel_meta m
+                    SET last_scraped_at = f.last_synced_at
+                    FROM forecasters f
+                    WHERE m.forecaster_id = f.id
+                      AND f.platform = 'youtube'
+                      AND f.last_synced_at IS NOT NULL
+                      AND m.last_scraped_at IS NULL
+                """))
+                # Pass 2: fallback from prediction created_at
+                _ls_c.execute(sql_text("""
+                    UPDATE youtube_channel_meta m
+                    SET last_scraped_at = sub.latest
+                    FROM (
+                        SELECT f.id AS forecaster_id,
+                               MAX(p.created_at) AS latest
+                        FROM predictions p
+                        JOIN forecasters f ON f.id = p.forecaster_id
+                        WHERE p.source_type = 'youtube'
+                        GROUP BY f.id
+                    ) sub
+                    WHERE m.forecaster_id = sub.forecaster_id
+                      AND m.last_scraped_at IS NULL
+                """))
+                _ls_c.commit()
+                print("[Startup] youtube_channel_meta.last_scraped_at backfilled")
+        except Exception as _lse:
+            print(f"[Startup] youtube_channel_meta.last_scraped_at backfill error: {_lse}")
+
         # ── scraper_runs + youtube_scraper_rejections (mirrors worker.py) ──
         # Both API and worker run this. SQLAlchemy create_all above already
         # creates the tables when the model is fresh, but the IF NOT EXISTS
