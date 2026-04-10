@@ -173,6 +173,18 @@ def get_forecaster(
     else:
         live_accuracy = 0
 
+    # Revisions count — how many of this forecaster's predictions are
+    # revisions of earlier ones (revision_of IS NOT NULL). Small stat
+    # shown on the profile page; doesn't affect accuracy calculations.
+    revisions_made = 0
+    try:
+        revisions_made = int(db.execute(sql_text("""
+            SELECT COUNT(*) FROM predictions
+            WHERE forecaster_id = :fid AND revision_of IS NOT NULL
+        """), {"fid": forecaster_id}).scalar() or 0)
+    except Exception:
+        revisions_made = 0
+
     # Ranked lists — every distinct list_id this forecaster has published,
     # with the individual items. Powers the "Ranked Lists" section on the
     # profile page. Gracefully degrades if list_id column is missing.
@@ -326,6 +338,7 @@ def get_forecaster(
         "category_stats": category_stats,
         "ranked_lists": ranked_lists,
         "ranking_stats": ranking_stats,
+        "revisions_made": revisions_made,
         "predictions": _get_preds(forecaster_id, page, limit, filter, sector, db),
         "disclosed_positions": [],
         "conflict_stats": {"total": 0, "conflicts": 0, "rate": 0},
@@ -481,16 +494,44 @@ def _get_preds(fid, page, limit, filter_type, sector, db):
                    p.source_type, p.source_platform_id, p.video_timestamp_sec,
                    p.verified_by, p.has_conflict, p.conflict_note,
                    ts.logo_domain, ts.logo_url, ts.company_name,
-                   p.url_quality
+                   p.url_quality,
+                   p.revision_of, prior.target_price AS previous_target,
+                   prior.direction AS previous_direction,
+                   EXISTS (
+                       SELECT 1 FROM predictions later
+                       WHERE later.revision_of = p.id
+                   ) AS was_superseded
             FROM predictions p
             LEFT JOIN ticker_sectors ts ON ts.ticker = p.ticker
+            LEFT JOIN predictions prior ON prior.id = p.revision_of
             WHERE p.forecaster_id = :fid {where}
             ORDER BY CASE WHEN p.outcome IN ('hit','near','miss','correct','incorrect') THEN 0 ELSE 1 END,
                      p.prediction_date DESC
             LIMIT :lim OFFSET :off
         """), params).fetchall()
     except Exception:
-        return []
+        # Fallback to the pre-revision query shape for environments where
+        # revision_of or the EXISTS subquery isn't supported yet.
+        try:
+            rows = db.execute(sql_text(f"""
+                SELECT p.id, p.ticker, p.direction, p.target_price, p.entry_price,
+                       p.prediction_date, p.evaluation_date, p.window_days,
+                       p.outcome, p.actual_return, p.evaluation_summary,
+                       p.sector, p.context, p.exact_quote, p.source_url, p.archive_url,
+                       p.source_type, p.source_platform_id, p.video_timestamp_sec,
+                       p.verified_by, p.has_conflict, p.conflict_note,
+                       ts.logo_domain, ts.logo_url, ts.company_name,
+                       p.url_quality,
+                       NULL, NULL, NULL, FALSE
+                FROM predictions p
+                LEFT JOIN ticker_sectors ts ON ts.ticker = p.ticker
+                WHERE p.forecaster_id = :fid {where}
+                ORDER BY CASE WHEN p.outcome IN ('hit','near','miss','correct','incorrect') THEN 0 ELSE 1 END,
+                         p.prediction_date DESC
+                LIMIT :lim OFFSET :off
+            """), params).fetchall()
+        except Exception:
+            return []
 
     results = []
     for p in rows:
@@ -517,6 +558,12 @@ def _get_preds(fid, page, limit, filter_type, sector, db):
             "timestamp_url": get_youtube_timestamp_url(p[17], p[18]),
             "logo_domain": p[22], "logo_url": p[23], "company_name": p[24],
             "url_quality": p[25],
+            # Revision metadata (commit: target revisions ship). Both
+            # fields are null/false for the vast majority of rows.
+            "revision_of": p[26],
+            "previous_target": float(p[27]) if p[27] is not None else None,
+            "previous_direction": p[28],
+            "was_superseded": bool(p[29]) if p[29] is not None else False,
         })
     return results
 
