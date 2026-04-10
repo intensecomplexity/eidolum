@@ -1478,6 +1478,65 @@ async def lifespan(app):
         except Exception as _yce:
             print(f"[Startup] youtube_channels pruning migration error: {_yce}")
 
+        # ── youtube_channel_meta (admin-facing metadata, FK'd to forecasters) ──
+        # Backs the /admin/youtube-channels admin page. Mirrors the shape of
+        # tracked_x_accounts so the YouTube admin page is symmetric with the
+        # X one. Idempotent: CREATE TABLE IF NOT EXISTS + INSERT ... ON
+        # CONFLICT DO NOTHING so it's safe to re-run on every boot.
+        try:
+            with engine.connect() as _ym_c:
+                _ym_c.execute(sql_text("""
+                    CREATE TABLE IF NOT EXISTS youtube_channel_meta (
+                        id SERIAL PRIMARY KEY,
+                        forecaster_id INTEGER NOT NULL REFERENCES forecasters(id) ON DELETE CASCADE,
+                        channel_id VARCHAR(30) NOT NULL,
+                        tier INTEGER NOT NULL DEFAULT 4,
+                        notes TEXT,
+                        active BOOLEAN NOT NULL DEFAULT TRUE,
+                        added_date TIMESTAMP NOT NULL DEFAULT NOW(),
+                        last_scraped_at TIMESTAMP,
+                        last_scrape_videos_found INTEGER DEFAULT 0,
+                        last_scrape_predictions_extracted INTEGER DEFAULT 0,
+                        total_videos_scraped INTEGER DEFAULT 0,
+                        total_predictions_extracted INTEGER DEFAULT 0,
+                        videos_processed_count INTEGER DEFAULT 0,
+                        predictions_extracted_count INTEGER DEFAULT 0,
+                        deactivated_at TIMESTAMP,
+                        deactivation_reason VARCHAR(50),
+                        CONSTRAINT uq_yt_meta_forecaster UNIQUE (forecaster_id),
+                        CONSTRAINT uq_yt_meta_channel_id UNIQUE (channel_id),
+                        CONSTRAINT ck_yt_meta_tier CHECK (tier BETWEEN 1 AND 4)
+                    )
+                """))
+                _ym_c.execute(sql_text(
+                    "CREATE INDEX IF NOT EXISTS idx_yt_meta_active "
+                    "ON youtube_channel_meta(active)"
+                ))
+                _ym_c.execute(sql_text(
+                    "CREATE INDEX IF NOT EXISTS idx_yt_meta_tier "
+                    "ON youtube_channel_meta(tier)"
+                ))
+                # Backfill: every forecaster with platform='youtube' and a
+                # resolved channel_id gets a default meta row. Forecasters
+                # without a channel_id are skipped — they'll be added when
+                # the scraper resolves their channel_id on the next run.
+                _ym_c.execute(sql_text("""
+                    INSERT INTO youtube_channel_meta
+                        (forecaster_id, channel_id, tier, active, added_date)
+                    SELECT f.id, f.channel_id, 4, TRUE, NOW()
+                    FROM forecasters f
+                    WHERE f.platform = 'youtube'
+                      AND f.channel_id IS NOT NULL
+                      AND NOT EXISTS (
+                          SELECT 1 FROM youtube_channel_meta m
+                          WHERE m.forecaster_id = f.id
+                      )
+                """))
+                _ym_c.commit()
+                print("[Startup] youtube_channel_meta table + backfill ready")
+        except Exception as _yme:
+            print(f"[Startup] youtube_channel_meta migration error: {_yme}")
+
         # ── scraper_runs + youtube_scraper_rejections (mirrors worker.py) ──
         # Both API and worker run this. SQLAlchemy create_all above already
         # creates the tables when the model is fresh, but the IF NOT EXISTS

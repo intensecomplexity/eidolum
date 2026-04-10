@@ -306,6 +306,59 @@ def main():
     except Exception as e:
         log.warning(f"[Worker] youtube_channels counter backfill: {e}")
 
+    # youtube_channel_meta — admin-facing metadata for YouTube channels,
+    # FK'd to forecasters. Mirrors the shape of tracked_x_accounts. Backs
+    # the /admin/youtube-channels admin page. Idempotent.
+    try:
+        with engine.connect() as conn:
+            conn.execute(sql_text("""
+                CREATE TABLE IF NOT EXISTS youtube_channel_meta (
+                    id SERIAL PRIMARY KEY,
+                    forecaster_id INTEGER NOT NULL REFERENCES forecasters(id) ON DELETE CASCADE,
+                    channel_id VARCHAR(30) NOT NULL,
+                    tier INTEGER NOT NULL DEFAULT 4,
+                    notes TEXT,
+                    active BOOLEAN NOT NULL DEFAULT TRUE,
+                    added_date TIMESTAMP NOT NULL DEFAULT NOW(),
+                    last_scraped_at TIMESTAMP,
+                    last_scrape_videos_found INTEGER DEFAULT 0,
+                    last_scrape_predictions_extracted INTEGER DEFAULT 0,
+                    total_videos_scraped INTEGER DEFAULT 0,
+                    total_predictions_extracted INTEGER DEFAULT 0,
+                    videos_processed_count INTEGER DEFAULT 0,
+                    predictions_extracted_count INTEGER DEFAULT 0,
+                    deactivated_at TIMESTAMP,
+                    deactivation_reason VARCHAR(50),
+                    CONSTRAINT uq_yt_meta_forecaster UNIQUE (forecaster_id),
+                    CONSTRAINT uq_yt_meta_channel_id UNIQUE (channel_id),
+                    CONSTRAINT ck_yt_meta_tier CHECK (tier BETWEEN 1 AND 4)
+                )
+            """))
+            conn.execute(sql_text(
+                "CREATE INDEX IF NOT EXISTS idx_yt_meta_active "
+                "ON youtube_channel_meta(active)"
+            ))
+            conn.execute(sql_text(
+                "CREATE INDEX IF NOT EXISTS idx_yt_meta_tier "
+                "ON youtube_channel_meta(tier)"
+            ))
+            conn.execute(sql_text("""
+                INSERT INTO youtube_channel_meta
+                    (forecaster_id, channel_id, tier, active, added_date)
+                SELECT f.id, f.channel_id, 4, TRUE, NOW()
+                FROM forecasters f
+                WHERE f.platform = 'youtube'
+                  AND f.channel_id IS NOT NULL
+                  AND NOT EXISTS (
+                      SELECT 1 FROM youtube_channel_meta m
+                      WHERE m.forecaster_id = f.id
+                  )
+            """))
+            conn.commit()
+        log.info("[Worker] youtube_channel_meta table + backfill ready")
+    except Exception as e:
+        log.warning(f"[Worker] youtube_channel_meta migration: {e}")
+
     # scraper_runs + youtube_scraper_rejections — belt-and-braces migration.
     # Base.metadata.create_all above is the primary creator (the SQLAlchemy
     # models live in models.py), but on existing DBs the indexes / column

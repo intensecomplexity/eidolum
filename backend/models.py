@@ -737,6 +737,43 @@ class YouTubeScraperRejection(Base):
     transcript_snippet = Column(Text, nullable=True)
 
 
+class YouTubeChannelMeta(Base):
+    """Admin-facing metadata for YouTube channels. FK'd to forecasters so
+    the admin page can tier/toggle/annotate the YouTube leaderboard without
+    polluting the shared forecasters table with YouTube-only columns.
+
+    Mirrors the shape of tracked_x_accounts for symmetry with the X admin
+    page, but stays decoupled from the scraper's own youtube_channels
+    tracking table (which drives the actual batch iteration).
+    """
+    __tablename__ = "youtube_channel_meta"
+
+    id = Column(Integer, primary_key=True, index=True)
+    forecaster_id = Column(Integer, ForeignKey("forecasters.id", ondelete="CASCADE"),
+                           nullable=False)
+    channel_id = Column(String(30), nullable=False)
+    tier = Column(Integer, nullable=False, default=4, server_default="4")
+    notes = Column(Text, nullable=True)
+    active = Column(Boolean, nullable=False, default=True, server_default="true")
+    added_date = Column(DateTime, nullable=False, default=datetime.datetime.utcnow,
+                        server_default=func.now())
+    last_scraped_at = Column(DateTime, nullable=True)
+    last_scrape_videos_found = Column(Integer, default=0, server_default="0")
+    last_scrape_predictions_extracted = Column(Integer, default=0, server_default="0")
+    total_videos_scraped = Column(Integer, default=0, server_default="0")
+    total_predictions_extracted = Column(Integer, default=0, server_default="0")
+    videos_processed_count = Column(Integer, default=0, server_default="0")
+    predictions_extracted_count = Column(Integer, default=0, server_default="0")
+    deactivated_at = Column(DateTime, nullable=True)
+    deactivation_reason = Column(String(50), nullable=True)
+
+    __table_args__ = (
+        UniqueConstraint("forecaster_id", name="uq_yt_meta_forecaster"),
+        UniqueConstraint("channel_id", name="uq_yt_meta_channel_id"),
+        CheckConstraint("tier BETWEEN 1 AND 4", name="ck_yt_meta_tier"),
+    )
+
+
 class Config(Base):
     __tablename__ = "config"
     key = Column(String, primary_key=True)
