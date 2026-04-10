@@ -61,6 +61,10 @@ export default function AdminDashboard() {
           className="px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap text-text-secondary border border-border hover:text-accent transition-colors">
           X Accounts
         </Link>
+        <Link to="/admin/youtube-channels"
+          className="px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap text-text-secondary border border-border hover:text-accent transition-colors">
+          YouTube Channels
+        </Link>
       </div>
 
       {tab === 'Overview' && <OverviewTab dashboard={dashboard} />}
