@@ -2839,6 +2839,34 @@ def toggle_ranked_list_extraction(
     }
 
 
+@app.post("/api/admin/toggle-target-revisions")
+def toggle_target_revisions(
+    admin_id: int = _Depends(_require_admin),
+    db: _Session = _Depends(_get_db),
+):
+    """Flip ENABLE_TARGET_REVISIONS between 'true' and 'false'.
+    Invalidates the feature_flags cache so changes take effect on the
+    next classify_video call instead of waiting 60s for the TTL."""
+    from models import Config
+    row = db.query(Config).filter(Config.key == "ENABLE_TARGET_REVISIONS").first()
+    if row:
+        row.value = "false" if str(row.value).strip().lower() == "true" else "true"
+    else:
+        db.add(Config(key="ENABLE_TARGET_REVISIONS", value="true"))
+    db.commit()
+    try:
+        from feature_flags import invalidate_target_revisions_flag_cache
+        invalidate_target_revisions_flag_cache()
+    except Exception:
+        pass
+    new_val = db.query(Config).filter(Config.key == "ENABLE_TARGET_REVISIONS").first()
+    return {
+        "target_revisions": (
+            str(new_val.value).strip().lower() == "true" if new_val else False
+        )
+    }
+
+
 # ── SEO: sitemap.xml + robots.txt ──────────────────────────────────────────
 import time as _seo_time
 from fastapi.responses import Response as _RawResponse
