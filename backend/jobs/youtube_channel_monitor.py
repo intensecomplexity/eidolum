@@ -296,12 +296,19 @@ def _run_inner(db):
         except Exception:
             pass
 
-    # Pick the 10 least recently crawled active channels
+    # Pick the 10 least recently crawled active channels.
+    # LEFT JOIN youtube_channel_meta so that channels the admin has manually
+    # deactivated via /admin/youtube-channels are skipped, and so that the
+    # iteration order respects tier (1=highest priority first). Channels
+    # without a meta row yet (e.g. newly seeded via TARGET_CHANNELS that
+    # haven't produced predictions yet) get tier=4 by default via COALESCE.
     batch_rows = db.execute(sql_text("""
-        SELECT channel_name, youtube_channel_id, last_crawled
-        FROM youtube_channels
-        WHERE is_active = TRUE
-        ORDER BY last_crawled ASC NULLS FIRST
+        SELECT yc.channel_name, yc.youtube_channel_id, yc.last_crawled
+        FROM youtube_channels yc
+        LEFT JOIN youtube_channel_meta m ON m.channel_id = yc.youtube_channel_id
+        WHERE yc.is_active = TRUE
+          AND (m.active IS NULL OR m.active = TRUE)
+        ORDER BY COALESCE(m.tier, 4) ASC, yc.last_crawled ASC NULLS FIRST
         LIMIT :lim
     """), {"lim": CHANNELS_PER_RUN}).fetchall()
 
@@ -464,6 +471,17 @@ def _run_inner(db):
         except Exception as e:
             print(f"[ChannelMonitor] channel state update error: {e}")
             db.rollback()
+
+        # Mirror per-channel scrape stats into youtube_channel_meta so the
+        # /admin/youtube-channels page shows the same last-run counts as
+        # the scraper's canonical youtube_channels table.
+        _upsert_meta_stats(
+            db,
+            channel_id=channel_id,
+            channel_name=channel_name,
+            videos_found=channel_videos,
+            predictions_extracted=channel_inserted,
+        )
 
         time.sleep(1)
 
@@ -793,6 +811,16 @@ def _deactivate_channel(db, *, youtube_channel_id, channel_name,
         except Exception:
             pass
 
+    # Mirror the deactivation into youtube_channel_meta (so the admin
+    # page shows the same state) AND write an audit_log row so the
+    # action is visible in the Audit Log tab.
+    _deactivate_meta_and_log(
+        db, youtube_channel_id=youtube_channel_id, channel_name=channel_name,
+        videos_processed=videos_processed,
+        predictions_extracted=predictions_extracted,
+        reason=reason,
+    )
+
 
 def _record_processed_video(db, video_id, channel_name, title, description, publish_str,
                             transcript_status, transcript_chars, prediction_count):
@@ -827,3 +855,274 @@ def _record_processed_video(db, video_id, channel_name, title, description, publ
     except Exception as e:
         print(f"[ChannelMonitor] _record_processed_video error: {e}")
         db.rollback()
+
+
+# ── youtube_channel_meta bridge helpers ─────────────────────────────────────
+
+def _upsert_meta_stats(db, *, channel_id, channel_name, videos_found,
+                       predictions_extracted):
+    """UPSERT per-channel scrape stats into youtube_channel_meta.
+
+    Keyed by forecaster_id (the admin layer's source of truth). The
+    forecaster is looked up by channel_id first, then falling back to
+    name match, matching the find_or_create_youtube_forecaster logic in
+    jobs/youtube_classifier.py.
+
+    Best-effort: never breaks the scrape loop. If no forecaster exists
+    yet (channel has never produced a prediction), the meta row is
+    skipped — it will be backfilled on the next run after
+    insert_youtube_prediction creates the forecaster.
+    """
+    if not channel_id:
+        return
+    try:
+        row = db.execute(sql_text("""
+            SELECT id FROM forecasters
+            WHERE platform = 'youtube'
+              AND (channel_id = :cid OR name = :name)
+            ORDER BY (channel_id = :cid) DESC
+            LIMIT 1
+        """), {"cid": channel_id, "name": channel_name}).first()
+        if not row:
+            return
+        fid = row[0]
+        db.execute(sql_text("""
+            INSERT INTO youtube_channel_meta
+                (forecaster_id, channel_id, tier, active, added_date,
+                 last_scraped_at, last_scrape_videos_found,
+                 last_scrape_predictions_extracted,
+                 total_videos_scraped, total_predictions_extracted)
+            VALUES (:fid, :cid, 4, TRUE, NOW(), NOW(), :v, :p, :v, :p)
+            ON CONFLICT (forecaster_id) DO UPDATE SET
+                channel_id = EXCLUDED.channel_id,
+                last_scraped_at = NOW(),
+                last_scrape_videos_found = EXCLUDED.last_scrape_videos_found,
+                last_scrape_predictions_extracted = EXCLUDED.last_scrape_predictions_extracted,
+                total_videos_scraped = youtube_channel_meta.total_videos_scraped
+                                       + EXCLUDED.last_scrape_videos_found,
+                total_predictions_extracted = youtube_channel_meta.total_predictions_extracted
+                                              + EXCLUDED.last_scrape_predictions_extracted
+        """), {"fid": fid, "cid": channel_id,
+               "v": int(videos_found or 0),
+               "p": int(predictions_extracted or 0)})
+        db.commit()
+    except Exception as e:
+        print(f"[ChannelMonitor] meta stats upsert failed for "
+              f"{channel_name}: {e}")
+        try:
+            db.rollback()
+        except Exception:
+            pass
+
+
+def _deactivate_meta_and_log(db, *, youtube_channel_id, channel_name,
+                              videos_processed, predictions_extracted,
+                              reason="auto_pruned_zero_yield"):
+    """Mirror the youtube_channels auto-prune into youtube_channel_meta
+    and write an audit_log row. The audit_log write uses the super admin
+    as admin_user_id because audit_log.admin_user_id is NOT NULL — the
+    auto-prune is a system action but has to borrow an existing admin
+    row to satisfy the FK. Best-effort: never breaks the scrape loop.
+    """
+    if not youtube_channel_id:
+        return
+    forecaster_id = None
+    try:
+        row = db.execute(sql_text("""
+            UPDATE youtube_channel_meta
+            SET active = FALSE,
+                deactivated_at = NOW(),
+                deactivation_reason = :reason
+            WHERE channel_id = :cid AND active = TRUE
+            RETURNING forecaster_id
+        """), {"cid": youtube_channel_id, "reason": reason}).first()
+        db.commit()
+        if row:
+            forecaster_id = int(row[0])
+    except Exception as e:
+        print(f"[ChannelMonitor] meta deactivate failed for "
+              f"{channel_name}: {e}")
+        try:
+            db.rollback()
+        except Exception:
+            pass
+
+    # Audit log — best-effort. Skip if we can't find a super admin row.
+    try:
+        super_email = os.getenv("SUPER_ADMIN_EMAIL", "nimrodryder@gmail.com")
+        admin_row = db.execute(sql_text(
+            "SELECT id, email FROM users WHERE email = :e LIMIT 1"
+        ), {"e": super_email}).first()
+        if not admin_row:
+            return
+        details = json.dumps({
+            "channel_id": youtube_channel_id,
+            "name": channel_name,
+            "videos_processed": int(videos_processed or 0),
+            "predictions": int(predictions_extracted or 0),
+            "reason": reason,
+        })
+        db.execute(sql_text("""
+            INSERT INTO audit_log
+                (admin_user_id, admin_email, action, target_type, target_id,
+                 details, created_at)
+            VALUES (:uid, :email, 'youtube_channel_auto_pruned',
+                    'youtube_channel_meta', :tid, :details, NOW())
+        """), {
+            "uid": int(admin_row[0]),
+            "email": admin_row[1] or super_email,
+            "tid": forecaster_id,
+            "details": details,
+        })
+        db.commit()
+    except Exception as e:
+        print(f"[ChannelMonitor] meta audit log write failed: {e}")
+        try:
+            db.rollback()
+        except Exception:
+            pass
+
+
+def fetch_channel_now(channel_id: str):
+    """One-shot fetch of a single YouTube channel. Used by the
+    /admin/youtube-channels/{id}/fetch-now endpoint to bypass the normal
+    12h monitor schedule.
+
+    Runs in-process (the endpoint invokes this from a daemon thread for
+    fire-and-forget semantics). Creates its own DB session from
+    BgSessionLocal so it's safe to call outside a request scope.
+
+    Resolves the channel_id against the scraper's canonical
+    youtube_channels table, then runs the same transcript → classify →
+    insert flow as the regular batch loop but only for that one channel.
+    """
+    if not channel_id:
+        return
+    if not YOUTUBE_API_KEY or not ANTHROPIC_API_KEY:
+        print(f"[ChannelMonitor] fetch_channel_now skipped for "
+              f"{channel_id}: missing API keys")
+        return
+
+    from database import BgSessionLocal
+    db = BgSessionLocal()
+    try:
+        _ensure_tables(db)
+        row = db.execute(sql_text("""
+            SELECT channel_name, youtube_channel_id, last_crawled
+            FROM youtube_channels
+            WHERE youtube_channel_id = :cid
+            LIMIT 1
+        """), {"cid": channel_id}).first()
+        if not row:
+            # Fall back to forecaster lookup so admins can fetch a channel
+            # that exists as a forecaster but isn't in youtube_channels yet.
+            f_row = db.execute(sql_text("""
+                SELECT name FROM forecasters
+                WHERE channel_id = :cid AND platform = 'youtube'
+                LIMIT 1
+            """), {"cid": channel_id}).first()
+            if not f_row:
+                print(f"[ChannelMonitor] fetch_channel_now: no channel "
+                      f"found for {channel_id}")
+                return
+            channel_name = f_row[0]
+            # Seed a youtube_channels row so regular monitor runs pick it up
+            db.execute(sql_text("""
+                INSERT INTO youtube_channels (channel_name, youtube_channel_id)
+                VALUES (:name, :cid)
+                ON CONFLICT DO NOTHING
+            """), {"name": channel_name, "cid": channel_id})
+            db.commit()
+            last_crawled = None
+        else:
+            channel_name, _cid, last_crawled = row[0], row[1], row[2]
+
+        stats = {
+            "channels_checked": 1, "videos_seen": 0,
+            "videos_skipped_already_processed": 0,
+            "videos_skipped_short": 0, "videos_skipped_no_transcript": 0,
+            "videos_classified": 0, "predictions_extracted": 0,
+            "predictions_inserted": 0, "classifier_errors": 0,
+            "yt_api_units": 0, "items_rejected": 0, "items_deduped": 0,
+        }
+
+        if last_crawled:
+            since = last_crawled.strftime("%Y-%m-%dT%H:%M:%SZ")
+        else:
+            since = (datetime.utcnow() - timedelta(days=7)).strftime(
+                "%Y-%m-%dT%H:%M:%SZ")
+
+        videos = _get_recent_videos(channel_id, since)
+        if not videos:
+            print(f"[ChannelMonitor] fetch_channel_now: no new videos "
+                  f"for {channel_name}")
+            return
+
+        channel_inserted = 0
+        channel_videos = 0
+        for video in videos:
+            video_id = video.get("id", {}).get("videoId")
+            snippet = video.get("snippet", {})
+            title = snippet.get("title", "")
+            description = snippet.get("description", "")
+            publish_date_str = snippet.get("publishedAt", "")
+            if not video_id or not title:
+                continue
+            stats["videos_seen"] += 1
+
+            already = db.execute(sql_text(
+                "SELECT 1 FROM youtube_videos "
+                "WHERE youtube_video_id = :vid AND pipeline_version = :pv"
+            ), {"vid": video_id, "pv": PIPELINE_VERSION}).first()
+            if already:
+                continue
+
+            if _is_likely_short(title, video_id):
+                continue
+
+            channel_videos += 1
+            inserted, tchars, tstatus = _process_one_video(
+                db, channel_name, channel_id, video_id, title,
+                publish_date_str, stats,
+            )
+            if inserted > 0:
+                channel_inserted += inserted
+            _update_channel_yield_counters(
+                db, channel_id, channel_name, tstatus, inserted,
+            )
+            _record_processed_video(
+                db, video_id, channel_name, title, description,
+                publish_date_str, tstatus, tchars, inserted,
+            )
+            try:
+                db.commit()
+            except Exception:
+                db.rollback()
+            time.sleep(0.5)
+
+        try:
+            db.execute(sql_text("""
+                UPDATE youtube_channels
+                SET last_crawled = :now,
+                    total_videos_processed = total_videos_processed + :v,
+                    total_predictions_extracted = total_predictions_extracted + :p
+                WHERE youtube_channel_id = :cid
+            """), {"now": datetime.utcnow(), "v": channel_videos,
+                   "p": channel_inserted, "cid": channel_id})
+            db.commit()
+        except Exception:
+            db.rollback()
+
+        _upsert_meta_stats(
+            db, channel_id=channel_id, channel_name=channel_name,
+            videos_found=channel_videos, predictions_extracted=channel_inserted,
+        )
+
+        print(f"[ChannelMonitor] fetch_channel_now DONE for {channel_name}: "
+              f"{channel_videos} videos, {channel_inserted} predictions",
+              flush=True)
+    except Exception as e:
+        print(f"[ChannelMonitor] fetch_channel_now error: {e}")
+        import traceback; traceback.print_exc()
+    finally:
+        db.close()
