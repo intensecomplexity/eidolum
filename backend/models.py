@@ -726,6 +726,12 @@ class ScraperRun(Base):
                                       default=0, server_default="0")
     estimated_cost_usd = Column(Numeric(10, 4), nullable=False, default=0,
                                 server_default="0")
+    # Count of Haiku retries triggered by stop_reason=='max_tokens' on
+    # the 800-token first-attempt cap. If the retry rate climbs above
+    # 5% of items_llm_sent, the monitor emits a warning — see
+    # youtube_channel_monitor._run_inner finalize block.
+    haiku_retries_count = Column(Integer, nullable=False, default=0,
+                                  server_default="0")
 
 
 class YouTubeScraperRejection(Base):

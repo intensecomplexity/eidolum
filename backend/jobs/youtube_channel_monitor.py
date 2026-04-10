@@ -389,6 +389,10 @@ def _run_inner(db):
         "total_cache_create_tokens": 0,
         "total_cache_read_tokens": 0,
         "estimated_cost_usd": 0.0,
+        # Count of classify_video calls that hit stop_reason=='max_tokens'
+        # on the first 800-token attempt and fell through to the 4000-
+        # token retry. Populated from telem["haiku_retries"].
+        "haiku_retries_count": 0,
     }
 
     for row in batch_rows:
@@ -607,7 +611,8 @@ def _run_inner(db):
                     total_output_tokens = :out_tok,
                     total_cache_create_tokens = :cc_tok,
                     total_cache_read_tokens = :cr_tok,
-                    estimated_cost_usd = :cost
+                    estimated_cost_usd = :cost,
+                    haiku_retries_count = :retries
                 WHERE id = :id
             """), {
                 "id": run_id,
@@ -622,6 +627,7 @@ def _run_inner(db):
                 "cc_tok": int(stats.get("total_cache_create_tokens", 0)),
                 "cr_tok": int(stats.get("total_cache_read_tokens", 0)),
                 "cost": round(float(stats.get("estimated_cost_usd", 0.0)), 4),
+                "retries": int(stats.get("haiku_retries_count", 0)),
             })
             db.commit()
         except Exception as e:

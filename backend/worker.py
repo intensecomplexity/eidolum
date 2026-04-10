@@ -437,6 +437,8 @@ def main():
                 "total_cache_read_tokens BIGINT NOT NULL DEFAULT 0",
                 "ALTER TABLE scraper_runs ADD COLUMN IF NOT EXISTS "
                 "estimated_cost_usd NUMERIC(10,4) NOT NULL DEFAULT 0",
+                "ALTER TABLE scraper_runs ADD COLUMN IF NOT EXISTS "
+                "haiku_retries_count INTEGER NOT NULL DEFAULT 0",
             ):
                 conn.execute(sql_text(ddl))
             conn.commit()
