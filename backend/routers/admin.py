@@ -651,10 +651,28 @@ def x_rejections_summary(
 # via the _log_action helper from routers.admin_panel.
 
 
+def _client_ip(request: Request | None) -> str | None:
+    """Pull the remote address from the request for audit_log.ip_address.
+    Falls back to request.client.host if slowapi isn't importable."""
+    if request is None:
+        return None
+    try:
+        from slowapi.util import get_remote_address
+        return get_remote_address(request)
+    except Exception:
+        try:
+            return request.client.host if request.client else None
+        except Exception:
+            return None
+
+
 def _log_yt_action(db: Session, admin_id: int, action: str,
-                   target_id: int | None, details: dict | None):
+                   target_id: int | None, details: dict | None,
+                   request: Request | None = None):
     """Thin wrapper around admin_panel._log_action that pulls the admin
-    email from the users table and JSON-encodes details."""
+    email from the users table, JSON-encodes details, and captures the
+    client IP from the FastAPI request so every YouTube channel admin
+    action has a full audit trail."""
     try:
         from routers.admin_panel import _log_action, _get_admin_email
         _log_action(
@@ -663,6 +681,7 @@ def _log_yt_action(db: Session, admin_id: int, action: str,
             target_type="youtube_channel_meta",
             target_id=target_id,
             details=_json.dumps(details) if details else None,
+            ip=_client_ip(request),
         )
     except Exception as e:
         print(f"[admin.youtube] audit log write failed: {e}")
@@ -792,6 +811,7 @@ async def add_youtube_channel(
     _log_yt_action(
         db, admin_id, "youtube_channel_add", target_id=meta.id,
         details={"channel_id": channel_id, "name": name, "tier": tier},
+        request=request,
     )
 
     return {
@@ -855,6 +875,7 @@ async def update_youtube_channel(
         _log_yt_action(
             db, admin_id, "youtube_channel_edit", target_id=meta.id,
             details={"channel_id": meta.channel_id, "changes": changes},
+            request=request,
         )
 
     return {"status": "updated", "id": meta.id, "changes": changes}
@@ -887,6 +908,7 @@ def delete_youtube_channel(
     _log_yt_action(
         db, admin_id, "youtube_channel_delete", target_id=meta_id,
         details={"channel_id": channel_id, "name": name},
+        request=request,
     )
 
     return {"deleted": True, "id": meta_id, "channel_id": channel_id}
@@ -1104,6 +1126,7 @@ def fetch_youtube_channel_now(
     _log_yt_action(
         db, admin_id, "youtube_channel_fetch_now", target_id=meta.id,
         details={"channel_id": channel_id, "name": channel_name},
+        request=request,
     )
 
     return {
