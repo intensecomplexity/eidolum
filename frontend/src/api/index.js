@@ -876,6 +876,10 @@ export function getSchedulerStatus() {
   return api.get('/admin/scheduler-status', { headers: adminHeaders() }).then(r => r.data);
 }
 
+export function getSocialStats() {
+  return api.get('/admin/social-stats', { headers: adminHeaders() }).then(r => r.data);
+}
+
 // ——— Smart Money ———
 
 export function getSmartMoney(params = {}) {

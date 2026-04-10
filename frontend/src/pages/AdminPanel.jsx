@@ -1,9 +1,9 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { Link } from 'react-router-dom';
-import { Trash2, Plus, RefreshCw, ExternalLink, Archive, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Trash2, Plus, RefreshCw, ExternalLink, Archive, ChevronLeft, ChevronRight, Youtube } from 'lucide-react';
 import {
   getAdminPredictions, deleteAdminPrediction, bulkDeletePredictions,
-  createAdminPrediction, getSchedulerStatus,
+  createAdminPrediction, getSchedulerStatus, getSocialStats,
 } from '../api';
 
 function formatCountdown(secondsLeft) {
@@ -57,6 +57,139 @@ function SchedulerCard({ job, now }) {
         {job.next_run ? formatCountdown(secondsLeft) : '--:--'}
       </div>
       <div className="text-muted text-[10px] mt-0.5">every {job.interval_minutes}m</div>
+    </div>
+  );
+}
+
+// ── Social Scraper Card ──
+function XIcon({ className }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} fill="currentColor" aria-hidden="true">
+      <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
+    </svg>
+  );
+}
+
+function SocialScraperCard({ source, data }) {
+  const [expanded, setExpanded] = useState(false);
+  const isYoutube = source === 'youtube';
+  const label = isYoutube ? 'YouTube' : 'X';
+  const accentColor = isYoutube ? 'text-red-500' : 'text-text-primary';
+  const accentBg = isYoutube ? 'bg-red-500/10 border-red-500/20' : 'bg-text-primary/5 border-border';
+
+  if (!data) {
+    return (
+      <div className="bg-surface border border-border rounded-xl p-4">
+        <div className="text-muted text-sm">Loading {label}…</div>
+      </div>
+    );
+  }
+
+  const forecasters = data.top_forecasters || [];
+  const visible = expanded ? forecasters.slice(0, 10) : forecasters.slice(0, 5);
+
+  return (
+    <div className="bg-surface border border-border rounded-xl p-4 flex-1 min-w-0">
+      {/* Header */}
+      <div className="flex items-center gap-2 mb-3">
+        <div className={`w-8 h-8 rounded-lg flex items-center justify-center border ${accentBg}`}>
+          {isYoutube
+            ? <Youtube className={`w-5 h-5 ${accentColor}`} />
+            : <XIcon className={`w-4 h-4 ${accentColor}`} />}
+        </div>
+        <span className="font-semibold text-sm">{label}</span>
+        <span className="ml-auto text-[10px] font-mono bg-surface-2 border border-border rounded px-2 py-0.5 text-text-secondary">
+          {data.total_predictions?.toLocaleString() ?? 0} total
+        </span>
+      </div>
+
+      {/* Stats row */}
+      <div className="grid grid-cols-3 gap-2 mb-3">
+        <div className="bg-surface-2/50 border border-border/50 rounded-lg px-2 py-1.5">
+          <div className="text-[10px] text-muted uppercase tracking-wider">24h</div>
+          <div className="text-sm font-mono font-semibold text-accent">{data.predictions_24h ?? 0}</div>
+        </div>
+        <div className="bg-surface-2/50 border border-border/50 rounded-lg px-2 py-1.5">
+          <div className="text-[10px] text-muted uppercase tracking-wider">7d</div>
+          <div className="text-sm font-mono font-semibold text-accent">{data.predictions_7d ?? 0}</div>
+        </div>
+        <div className="bg-surface-2/50 border border-border/50 rounded-lg px-2 py-1.5">
+          <div className="text-[10px] text-muted uppercase tracking-wider">Total</div>
+          <div className="text-sm font-mono font-semibold text-text-primary">{data.total_predictions ?? 0}</div>
+        </div>
+      </div>
+
+      {/* Last run */}
+      <div className="flex items-center justify-between text-xs mb-3 px-1">
+        <span className="text-muted">
+          Last run: <span className="text-text-secondary">{timeAgo(data.last_run_at)}</span>
+        </span>
+        <span className="text-muted font-mono">
+          <span className="text-positive">+{data.last_run_inserted ?? 0}</span> inserted
+        </span>
+      </div>
+
+      {/* YouTube-only: channels */}
+      {isYoutube && (
+        <div className="flex items-center justify-between text-xs mb-3 px-1">
+          <span className="text-muted">Channels</span>
+          <span className="font-mono text-text-secondary">
+            <span className="text-positive">{data.channels_active ?? 0}</span>
+            <span className="text-muted"> active / {data.channels_total ?? 0} total</span>
+          </span>
+        </div>
+      )}
+
+      {/* YouTube-only: pipeline breakdown */}
+      {isYoutube && data.by_pipeline?.length > 0 && (
+        <div className="mb-3">
+          <div className="text-[10px] text-muted uppercase tracking-wider mb-1 px-1">Pipeline</div>
+          <div className="flex flex-wrap gap-1">
+            {data.by_pipeline.map(p => (
+              <span key={p.verified_by} className="text-[10px] font-mono bg-surface-2 border border-border/50 rounded px-1.5 py-0.5 text-text-secondary">
+                {p.verified_by}: <span className="text-accent">{p.count}</span>
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Top forecasters table */}
+      <div>
+        <div className="text-[10px] text-muted uppercase tracking-wider mb-1 px-1">Top Forecasters</div>
+        {visible.length === 0 ? (
+          <div className="text-muted text-xs px-1 py-2">No predictions yet</div>
+        ) : (
+          <div className="bg-surface-2/30 border border-border/50 rounded-lg overflow-hidden">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="text-left text-muted text-[10px] uppercase tracking-wider border-b border-border/50">
+                  <th className="px-2 py-1.5">Name</th>
+                  <th className="px-2 py-1.5 text-right">Predictions</th>
+                  <th className="px-2 py-1.5 text-right">Last Active</th>
+                </tr>
+              </thead>
+              <tbody>
+                {visible.map((f, i) => (
+                  <tr key={`${f.name}-${i}`} className="border-b border-border/20 last:border-0">
+                    <td className="px-2 py-1.5 text-text-secondary truncate max-w-[140px]" title={f.name}>{f.name}</td>
+                    <td className="px-2 py-1.5 text-right font-mono text-accent">{f.count}</td>
+                    <td className="px-2 py-1.5 text-right font-mono text-muted">{timeAgo(f.last_prediction)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+        {forecasters.length > 5 && (
+          <button
+            onClick={() => setExpanded(e => !e)}
+            className="mt-1.5 text-[11px] text-accent active:text-accent/80"
+          >
+            {expanded ? 'Show less' : `Show all ${Math.min(forecasters.length, 10)}`}
+          </button>
+        )}
+      </div>
     </div>
   );
 }
@@ -133,6 +266,7 @@ export default function AdminPanel() {
   const [authed, setAuthed] = useState(!!sessionStorage.getItem('admin_token'));
   const [data, setData] = useState(null);
   const [jobs, setJobs] = useState([]);
+  const [social, setSocial] = useState(null);
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
   const [selected, setSelected] = useState(new Set());
@@ -156,11 +290,16 @@ export default function AdminPanel() {
     getSchedulerStatus().then(setJobs).catch(() => {});
   }, []);
 
+  const loadSocial = useCallback(() => {
+    getSocialStats().then(setSocial).catch(() => {});
+  }, []);
+
   useEffect(() => {
     if (!authed) return;
     loadPredictions();
     loadJobs();
-  }, [authed, loadPredictions, loadJobs]);
+    loadSocial();
+  }, [authed, loadPredictions, loadJobs, loadSocial]);
 
   // Live countdown ticker
   useEffect(() => {
@@ -174,6 +313,13 @@ export default function AdminPanel() {
     const t = setInterval(loadJobs, 60000);
     return () => clearInterval(t);
   }, [authed, loadJobs]);
+
+  // Refresh social scraper stats every 60s
+  useEffect(() => {
+    if (!authed) return;
+    const t = setInterval(loadSocial, 60000);
+    return () => clearInterval(t);
+  }, [authed, loadSocial]);
 
   function onSearch(val) {
     setSearch(val);
@@ -222,6 +368,18 @@ export default function AdminPanel() {
         <div className="flex gap-3 overflow-x-auto pb-2">
           {jobs.map(j => <SchedulerCard key={j.id} job={j} now={now} />)}
           {!jobs.length && <span className="text-muted text-sm">Loading...</span>}
+        </div>
+      </div>
+
+      {/* Social Scrapers */}
+      <div className="mb-6">
+        <div className="flex items-center gap-2 mb-3">
+          <h2 className="text-sm font-semibold text-text-secondary">Social Scrapers</h2>
+          <button onClick={loadSocial} className="text-muted active:text-accent"><RefreshCw className="w-3 h-3" /></button>
+        </div>
+        <div className="flex flex-col md:flex-row gap-3">
+          <SocialScraperCard source="youtube" data={social?.youtube} />
+          <SocialScraperCard source="x" data={social?.x} />
         </div>
       </div>
 

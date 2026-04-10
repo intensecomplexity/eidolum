@@ -3,14 +3,14 @@ Server-side admin panel — pure HTML served by FastAPI at /admin.
 Also provides API endpoints for the React admin page at /admin on frontend.
 """
 import os
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Optional, List
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
-from sqlalchemy import or_
+from sqlalchemy import or_, func, text as sql_text
 
 from database import get_db
 from middleware.auth import require_admin
@@ -149,6 +149,132 @@ def get_scheduler_status(admin=Depends(require_admin)):
             "status": "ok" if last_run and (now - last_run).total_seconds() < job["interval_minutes"] * 120 else "unknown",
         })
     return result
+
+
+@router.get("/api/admin/social-stats")
+def get_social_stats(
+    admin=Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    """Live stats for the YouTube and X scraper pipelines."""
+    now = datetime.utcnow()
+    day_ago = now - timedelta(hours=24)
+    week_ago = now - timedelta(days=7)
+    month_ago = now - timedelta(days=30)
+
+    def _stats_for(source: str):
+        total = db.query(Prediction).filter(Prediction.source_type == source).count()
+        count_24h = (
+            db.query(Prediction)
+            .filter(Prediction.source_type == source, Prediction.created_at >= day_ago)
+            .count()
+        )
+        count_7d = (
+            db.query(Prediction)
+            .filter(Prediction.source_type == source, Prediction.created_at >= week_ago)
+            .count()
+        )
+
+        top_rows = (
+            db.query(
+                Forecaster.name,
+                func.count(Prediction.id).label("cnt"),
+                func.max(Prediction.created_at).label("last_at"),
+            )
+            .join(Prediction, Prediction.forecaster_id == Forecaster.id)
+            .filter(Prediction.source_type == source)
+            .group_by(Forecaster.name)
+            .order_by(func.count(Prediction.id).desc())
+            .limit(10)
+            .all()
+        )
+        top_forecasters = [
+            {
+                "name": r.name,
+                "count": int(r.cnt),
+                "last_prediction": r.last_at.isoformat() if r.last_at else None,
+            }
+            for r in top_rows
+        ]
+
+        last_run_at_dt = (
+            db.query(func.max(Prediction.created_at))
+            .filter(Prediction.source_type == source)
+            .scalar()
+        )
+        last_run_at = last_run_at_dt.isoformat() if last_run_at_dt else None
+        last_run_inserted = 0
+
+        # Prefer scheduler_logs if that table exists
+        try:
+            row = db.execute(
+                sql_text(
+                    "SELECT started_at, inserted FROM scheduler_logs "
+                    "WHERE job_name = :job ORDER BY started_at DESC LIMIT 1"
+                ),
+                {"job": source},
+            ).first()
+            if row:
+                if row[0]:
+                    last_run_at = row[0].isoformat()
+                last_run_inserted = int(row[1] or 0)
+        except Exception:
+            db.rollback()
+
+        return {
+            "total_predictions": total,
+            "predictions_24h": count_24h,
+            "predictions_7d": count_7d,
+            "top_forecasters": top_forecasters,
+            "last_run_at": last_run_at,
+            "last_run_inserted": last_run_inserted,
+        }
+
+    youtube_stats = _stats_for("youtube")
+    x_stats = _stats_for("x")
+
+    pipeline_rows = (
+        db.query(Prediction.verified_by, func.count(Prediction.id))
+        .filter(Prediction.source_type == "youtube")
+        .group_by(Prediction.verified_by)
+        .order_by(func.count(Prediction.id).desc())
+        .all()
+    )
+    by_pipeline = [
+        {"verified_by": (vb or "unknown"), "count": int(cnt)}
+        for vb, cnt in pipeline_rows
+    ]
+
+    channels_total = 0
+    channels_active = 0
+    try:
+        channels_total = int(
+            db.execute(sql_text("SELECT COUNT(*) FROM youtube_channels")).scalar() or 0
+        )
+        channels_active = int(
+            db.execute(
+                sql_text(
+                    "SELECT COUNT(DISTINCT yc.id) FROM youtube_channels yc "
+                    "JOIN forecasters f ON f.name = yc.channel_name "
+                    "JOIN predictions p ON p.forecaster_id = f.id "
+                    "WHERE p.source_type = 'youtube' AND p.created_at >= :cutoff"
+                ),
+                {"cutoff": month_ago},
+            ).scalar()
+            or 0
+        )
+    except Exception:
+        db.rollback()
+
+    return {
+        "youtube": {
+            **youtube_stats,
+            "by_pipeline": by_pipeline,
+            "channels_total": channels_total,
+            "channels_active": channels_active,
+        },
+        "x": x_stats,
+    }
 
 
 class PredictionCreate(BaseModel):
