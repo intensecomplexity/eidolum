@@ -124,7 +124,8 @@ def evaluate_batch(max_tickers: int | None = None) -> dict:
         rows = db.execute(sql_text(r"""
             SELECT p.id, p.ticker, p.direction, p.target_price, p.entry_price,
                    p.evaluation_date, p.prediction_date, p.forecaster_id, p.window_days,
-                   p.prediction_type, p.position_closed_at
+                   p.prediction_type, p.position_closed_at,
+                   COALESCE(p.prediction_category, 'ticker_call') as prediction_category
             FROM predictions p
             WHERE (p.outcome = 'pending' OR p.outcome IS NULL OR p.outcome = '')
               AND p.evaluation_date IS NOT NULL
@@ -173,6 +174,7 @@ def evaluate_batch(max_tickers: int | None = None) -> dict:
             "forecaster_id": r[7], "window_days": r[8],
             "prediction_type": r[9] or "price_target",
             "position_closed_at": r[10],
+            "prediction_category": r[11] or "ticker_call",
         })
 
     tickers = list(ticker_preds.keys())[:max_tickers]
@@ -254,6 +256,16 @@ def evaluate_batch(max_tickers: int | None = None) -> dict:
                 window = p.get("window_days") or 90
                 tolerance = _get_tolerance(window, _TOLERANCE)
                 min_movement = _get_tolerance(window, _MIN_MOVEMENT)
+                # Sector calls are inherently vaguer than specific ticker
+                # calls, so HIT/NEAR thresholds get a 1.5x widening.
+                # Example: a 1-month ticker-call HIT tolerance is 5% →
+                # the same-window sector-call HIT tolerance is 7.5%.
+                # Keyed on prediction_category so this applies to every
+                # sector_call row regardless of how it got labeled (X
+                # scraper, YouTube sector prompt, or manual).
+                if p.get("prediction_category") == "sector_call":
+                    tolerance *= SECTOR_CALL_TOLERANCE_MULTIPLIER
+                    min_movement *= SECTOR_CALL_TOLERANCE_MULTIPLIER
                 outcome, etf_return, spy_return, spread = score_sector_call(
                     p["direction"], etf_start, etf_end, spy_start, spy_end,
                     tolerance, min_movement,
@@ -464,6 +476,14 @@ def evaluate_batch(max_tickers: int | None = None) -> dict:
 # ── Three-tier scoring thresholds ──────────────────────────────────────────
 _TOLERANCE = {1: 2, 7: 3, 14: 4, 30: 5, 90: 5, 180: 7, 365: 10}
 _MIN_MOVEMENT = {1: 0.5, 7: 1, 14: 1.5, 30: 2, 90: 2, 180: 3, 365: 4}
+
+# Sector calls (prediction_category='sector_call') use the same three-tier
+# HIT/NEAR/MISS model as ticker calls but with a wider tolerance window.
+# Rationale: a sector call like "semiconductors are going to the moon"
+# is inherently less precise than "NVDA to $200" and the scorer should
+# reflect that without inventing a whole new outcome system. 1.5x widens
+# every threshold by the same ratio.
+SECTOR_CALL_TOLERANCE_MULTIPLIER = 1.5
 
 
 def _get_tolerance(window_days: int, table: dict) -> float:
