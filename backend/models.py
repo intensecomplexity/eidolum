@@ -757,6 +757,22 @@ class YouTubeScraperRejection(Base):
     transcript_snippet = Column(Text, nullable=True)
 
 
+class SectorEtfAlias(Base):
+    """Canonical sector → ETF ticker mapping used by the YouTube classifier's
+    sector-call extraction. Multiple aliases (e.g. "semis", "chip stocks",
+    "semiconductors") can map to the same canonical_sector + etf_ticker so
+    the Haiku prompt can output natural sector names without the classifier
+    having to pick an ETF itself. Admin-editable via /admin/sector-aliases.
+    """
+    __tablename__ = "sector_etf_aliases"
+
+    id = Column(Integer, primary_key=True, index=True)
+    alias = Column(String(100), nullable=False, unique=True)
+    canonical_sector = Column(String(50), nullable=False, index=True)
+    etf_ticker = Column(String(10), nullable=False)
+    notes = Column(Text, nullable=True)
+
+
 class YouTubeChannelMeta(Base):
     """Admin-facing metadata for YouTube channels. FK'd to forecasters so
     the admin page can tier/toggle/annotate the YouTube leaderboard without

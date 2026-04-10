@@ -440,6 +440,85 @@ def main():
     except Exception as e:
         log.warning(f"[Worker] youtube_channel_meta migration: {e}")
 
+    # sector_etf_aliases — sector → ETF mapping for YouTube sector call
+    # extraction. Seeded once on first run with the canonical mappings
+    # below; admin can add more via /admin/sector-aliases without a deploy.
+    try:
+        with engine.connect() as conn:
+            conn.execute(sql_text("""
+                CREATE TABLE IF NOT EXISTS sector_etf_aliases (
+                    id SERIAL PRIMARY KEY,
+                    alias VARCHAR(100) NOT NULL UNIQUE,
+                    canonical_sector VARCHAR(50) NOT NULL,
+                    etf_ticker VARCHAR(10) NOT NULL,
+                    notes TEXT
+                )
+            """))
+            conn.execute(sql_text(
+                "CREATE INDEX IF NOT EXISTS idx_sector_aliases_canonical "
+                "ON sector_etf_aliases(canonical_sector)"
+            ))
+            _seed_aliases = [
+                ('technology', 'technology', 'XLK', 'Tech sector ETF'),
+                ('tech', 'technology', 'XLK', 'Tech sector alias'),
+                ('big tech', 'technology', 'QQQ', 'Big tech via Nasdaq-100'),
+                ('semiconductors', 'semiconductors', 'SOXX', 'Semi sector ETF'),
+                ('semis', 'semiconductors', 'SOXX', 'Semi alias'),
+                ('chip stocks', 'semiconductors', 'SOXX', 'Semi alias'),
+                ('chips', 'semiconductors', 'SOXX', 'Semi alias'),
+                ('energy', 'energy', 'XLE', 'Energy sector ETF'),
+                ('oil', 'energy', 'XLE', 'Oil alias for energy'),
+                ('oil stocks', 'energy', 'XLE', 'Energy alias'),
+                ('financials', 'financials', 'XLF', 'Financial sector ETF'),
+                ('banks', 'financials', 'KBE', 'Bank sector ETF'),
+                ('big banks', 'financials', 'KBE', 'Bank alias'),
+                ('healthcare', 'healthcare', 'XLV', 'Healthcare sector ETF'),
+                ('health care', 'healthcare', 'XLV', 'Healthcare alias'),
+                ('biotech', 'biotech', 'XBI', 'Biotech ETF'),
+                ('biotechnology', 'biotech', 'XBI', 'Biotech alias'),
+                ('pharma', 'pharma', 'IHE', 'Pharma ETF'),
+                ('pharmaceuticals', 'pharma', 'IHE', 'Pharma alias'),
+                ('industrials', 'industrials', 'XLI', 'Industrial sector ETF'),
+                ('consumer discretionary', 'consumer_discretionary', 'XLY', 'Consumer disc ETF'),
+                ('retail', 'consumer_discretionary', 'XRT', 'Retail ETF'),
+                ('consumer staples', 'consumer_staples', 'XLP', 'Consumer staples ETF'),
+                ('utilities', 'utilities', 'XLU', 'Utility sector ETF'),
+                ('real estate', 'real_estate', 'XLRE', 'REIT sector ETF'),
+                ('reits', 'real_estate', 'XLRE', 'REIT alias'),
+                ('communication services', 'communications', 'XLC', 'Comm services ETF'),
+                ('telecom', 'communications', 'XLC', 'Telecom alias'),
+                ('materials', 'materials', 'XLB', 'Materials sector ETF'),
+                ('gold', 'gold', 'GLD', 'Gold ETF'),
+                ('gold miners', 'gold_miners', 'GDX', 'Gold miners ETF'),
+                ('silver', 'silver', 'SLV', 'Silver ETF'),
+                ('crypto', 'crypto', 'BITO', 'Crypto futures ETF, maps to BTC via BITO'),
+                ('bitcoin', 'bitcoin', 'BITO', 'BTC via BITO ETF'),
+                ('bonds', 'bonds', 'TLT', '20+ year treasury bonds'),
+                ('long bonds', 'bonds', 'TLT', 'Bonds alias'),
+                ('short bonds', 'short_bonds', 'SHY', '1-3 year treasuries'),
+                ('emerging markets', 'emerging_markets', 'EEM', 'EM ETF'),
+                ('china', 'china', 'FXI', 'China large cap ETF'),
+                ('chinese stocks', 'china', 'FXI', 'China alias'),
+                ('europe', 'europe', 'VGK', 'European stocks ETF'),
+                ('small caps', 'small_caps', 'IWM', 'Russell 2000'),
+                ('russell 2000', 'small_caps', 'IWM', 'Small caps index'),
+                ('large caps', 'large_caps', 'SPY', 'S&P 500 proxy'),
+                ('s&p 500', 'sp500', 'SPY', 'S&P 500 index'),
+                ('sp500', 'sp500', 'SPY', 'S&P 500 alias'),
+                ('nasdaq', 'nasdaq', 'QQQ', 'Nasdaq-100 proxy'),
+            ]
+            for _alias, _canonical, _etf, _notes in _seed_aliases:
+                conn.execute(sql_text("""
+                    INSERT INTO sector_etf_aliases
+                        (alias, canonical_sector, etf_ticker, notes)
+                    VALUES (:a, :c, :e, :n)
+                    ON CONFLICT (alias) DO NOTHING
+                """), {"a": _alias, "c": _canonical, "e": _etf, "n": _notes})
+            conn.commit()
+        log.info("[Worker] sector_etf_aliases table + seed ready")
+    except Exception as e:
+        log.warning(f"[Worker] sector_etf_aliases migration: {e}")
+
     # scraper_runs + youtube_scraper_rejections — belt-and-braces migration.
     # Base.metadata.create_all above is the primary creator (the SQLAlchemy
     # models live in models.py), but on existing DBs the indexes / column
