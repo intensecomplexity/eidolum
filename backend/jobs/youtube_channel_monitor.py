@@ -679,6 +679,25 @@ def _run_inner(db):
         flush=True,
     )
 
+    # 5% retry-rate warning. If Haiku is truncating often enough that
+    # >5% of classified videos need the 800→4000 retry path, the
+    # 800-token first-attempt cap from the cheapening commit is no
+    # longer the right trade-off and should be raised. The wrapper
+    # already writes [YOUTUBE-HAIKU-RETRY] lines per occurrence; this
+    # is the aggregate signal.
+    _retries = int(stats.get("haiku_retries_count", 0))
+    _llm_sent = int(stats.get("videos_classified", 0))
+    if _retries > 0 and _llm_sent > 0:
+        _retry_rate = _retries / _llm_sent
+        if _retry_rate > 0.05:
+            print(
+                f"[YOUTUBE-MONITOR] WARNING: Haiku retry rate "
+                f"{_retry_rate:.1%} ({_retries}/{_llm_sent}) exceeds "
+                f"5% threshold. Consider raising max_tokens first-"
+                f"attempt cap from 800.",
+                flush=True,
+            )
+
 
 def _process_one_video(db, channel_name, channel_id, video_id, title, publish_date_str, stats):
     """Fetch transcript → classify → insert. Returns (inserted, transcript_chars, status)."""
