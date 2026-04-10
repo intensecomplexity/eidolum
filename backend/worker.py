@@ -414,7 +414,8 @@ def main():
     sched.add_job(_standalone("youtube_scraper", _youtube), "interval", hours=8, id="youtube_scraper", next_run_time=t0 + timedelta(minutes=55), executor='default')
     sched.add_job(_standalone("enrich_urls", _enrich), "interval", hours=1, id="enrich_urls", next_run_time=t0 + timedelta(minutes=35), executor='default')
 
-    # YouTube Channel Monitor — Claude-powered extraction, every 12h
+    # YouTube Channel Monitor — V2 transcript-based, Haiku-powered, every 12h.
+    # Inserts predictions into the predictions table via insert_youtube_prediction.
     def _channel_monitor():
         try:
             from jobs.youtube_channel_monitor import run_channel_monitor
@@ -426,6 +427,22 @@ def main():
         except Exception as e:
             log.error(f"[channel_monitor] {e}")
     sched.add_job(_standalone("channel_monitor", _channel_monitor), "interval", hours=12, id="channel_monitor", next_run_time=t0 + timedelta(minutes=90), executor='default')
+
+    # YouTube Historical Backfill — every 4h, walks each channel's full
+    # upload history oldest-first via cursor in youtube_channels.backfill_cursor.
+    # Independent of the regular monitor; both share the youtube_videos
+    # dedup table so neither one re-processes a video the other has done.
+    def _youtube_backfill():
+        try:
+            from jobs.youtube_backfill import run_youtube_backfill
+            db = BgSessionLocal()
+            try:
+                run_youtube_backfill(db)
+            finally:
+                db.close()
+        except Exception as e:
+            log.error(f"[youtube_backfill] {e}")
+    sched.add_job(_standalone("youtube_backfill", _youtube_backfill), "interval", hours=4, id="youtube_backfill", next_run_time=t0 + timedelta(minutes=110), executor='default')
 
     # X/Twitter scraper — Apify-powered, every 8h, inserts predictions
     def _x_scraper():
