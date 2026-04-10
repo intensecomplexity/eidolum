@@ -53,6 +53,13 @@ YOUTUBE_API = "https://www.googleapis.com/youtube/v3"
 
 CHANNELS_PER_RUN = 10
 
+# Videos shorter than this are skipped before the transcript fetch.
+# YouTube Shorts are definitionally ≤60s; the 180s floor also catches
+# short news clips / teasers that almost never contain real predictions
+# and burn Webshare bandwidth + Haiku tokens for no yield. Duration is
+# pulled from a single videos.list batch call per channel (~1 quota unit).
+YOUTUBE_MIN_DURATION_SECONDS = 180  # 3 minutes
+
 TARGET_CHANNELS = [
     # TIER 1: Value/Fundamental Analysis
     "Joseph Carlson", "The Plain Bagel", "Aswath Damodaran", "Sven Carlin",
@@ -182,6 +189,48 @@ def _is_likely_short(title: str, video_id: str) -> bool:
         return False
     t = title.lower()
     return "#shorts" in t or "shorts" in t and len(title) < 30
+
+
+def _parse_iso_duration(s: str) -> int:
+    """Parse an ISO 8601 duration like PT2M30S / PT1H5M / PT45S into
+    seconds. Returns 0 on any parse failure. YouTube videos.list
+    contentDetails.duration is always in this format."""
+    if not s or not isinstance(s, str) or not s.startswith("PT"):
+        return 0
+    import re as _re
+    m = _re.match(r"PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?", s)
+    if not m:
+        return 0
+    h, mn, sc = (int(g) if g else 0 for g in m.groups())
+    return h * 3600 + mn * 60 + sc
+
+
+def _fetch_video_durations(video_ids: list[str]) -> dict[str, int]:
+    """Batch videos.list call to pull duration_seconds per video. Returns
+    an empty dict on any failure (callers treat 0/missing as "unknown"
+    and fall through to the title heuristic). Costs 1 YouTube Data API
+    quota unit per batch of up to 50 IDs — a ~1% increase over the
+    existing per-channel search.list spend.
+    """
+    if not video_ids or not YOUTUBE_API_KEY:
+        return {}
+    out: dict[str, int] = {}
+    try:
+        r = httpx.get(f"{YOUTUBE_API}/videos", params={
+            "part": "contentDetails",
+            "id": ",".join(video_ids[:50]),
+            "key": YOUTUBE_API_KEY,
+        }, timeout=10)
+        if r.status_code != 200:
+            print(f"[ChannelMonitor] videos.list HTTP {r.status_code}: {r.text[:200]}")
+            return {}
+        for it in r.json().get("items", []):
+            vid = it.get("id")
+            dur = (it.get("contentDetails") or {}).get("duration") or ""
+            out[vid] = _parse_iso_duration(dur)
+    except Exception as e:
+        print(f"[ChannelMonitor] videos.list error: {e}")
+    return out
 
 
 def run_channel_monitor(db=None):
@@ -383,6 +432,18 @@ def _run_inner(db):
             db.commit()
             continue
 
+        # Batch-fetch durations for the page so the loop can skip
+        # Shorts before the transcript fetch. Missing video IDs stay
+        # at 0 and fall through to the title heuristic below.
+        _batch_vids = [
+            (v.get("id") or {}).get("videoId")
+            for v in videos
+            if (v.get("id") or {}).get("videoId")
+        ]
+        video_durations = _fetch_video_durations(_batch_vids)
+        if _batch_vids:
+            stats["yt_api_units"] += 1
+
         channel_inserted = 0
         channel_videos = 0
         for video in videos:
@@ -418,8 +479,31 @@ def _run_inner(db):
                 stats["items_deduped"] += 1
                 continue
 
-            # Skip Shorts (best-effort title-based heuristic — duration
-            # would require an extra videos.list call)
+            # Skip videos under YOUTUBE_MIN_DURATION_SECONDS. Duration is
+            # already batched via _fetch_video_durations above; 0 means
+            # "unknown" and falls through to the title heuristic.
+            dur_seconds = video_durations.get(video_id, 0)
+            if 0 < dur_seconds < YOUTUBE_MIN_DURATION_SECONDS:
+                stats["videos_skipped_short"] += 1
+                _record_processed_video(
+                    db, video_id, channel_name, title, description,
+                    publish_date_str, "shorts_skipped", 0, 0,
+                )
+                log_youtube_rejection(
+                    db,
+                    video_id=video_id,
+                    channel_id=channel_id,
+                    channel_name=channel_name,
+                    video_title=title,
+                    video_published_at=_parse_publish_date(publish_date_str),
+                    reason="shorts_skipped",
+                    haiku_reason=f"duration_seconds={dur_seconds}",
+                    stats=stats,
+                )
+                continue
+
+            # Skip Shorts (best-effort title-based heuristic — fallback
+            # when videos.list didn't return a duration)
             if _is_likely_short(title, video_id):
                 stats["videos_skipped_short"] += 1
                 _record_processed_video(db, video_id, channel_name, title, description, publish_date_str, "shorts_skipped", 0, 0)
@@ -1083,6 +1167,17 @@ def fetch_channel_now(channel_id: str):
                   f"for {channel_name}")
             return
 
+        # Batch-fetch durations so fetch_channel_now respects the same
+        # YOUTUBE_MIN_DURATION_SECONDS floor as the main monitor loop.
+        _fcn_vids = [
+            (v.get("id") or {}).get("videoId")
+            for v in videos
+            if (v.get("id") or {}).get("videoId")
+        ]
+        video_durations = _fetch_video_durations(_fcn_vids)
+        if _fcn_vids:
+            stats["yt_api_units"] += 1
+
         channel_inserted = 0
         channel_videos = 0
         for video in videos:
@@ -1100,6 +1195,26 @@ def fetch_channel_now(channel_id: str):
                 "WHERE youtube_video_id = :vid AND pipeline_version = :pv"
             ), {"vid": video_id, "pv": PIPELINE_VERSION}).first()
             if already:
+                continue
+
+            dur_seconds = video_durations.get(video_id, 0)
+            if 0 < dur_seconds < YOUTUBE_MIN_DURATION_SECONDS:
+                stats["videos_skipped_short"] += 1
+                _record_processed_video(
+                    db, video_id, channel_name, title, description,
+                    publish_date_str, "shorts_skipped", 0, 0,
+                )
+                log_youtube_rejection(
+                    db,
+                    video_id=video_id,
+                    channel_id=channel_id,
+                    channel_name=channel_name,
+                    video_title=title,
+                    video_published_at=_parse_publish_date(publish_date_str),
+                    reason="shorts_skipped",
+                    haiku_reason=f"duration_seconds={dur_seconds}",
+                    stats=stats,
+                )
                 continue
 
             if _is_likely_short(title, video_id):
