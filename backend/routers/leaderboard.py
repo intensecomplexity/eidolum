@@ -67,8 +67,18 @@ def _enrich_category_stats(results: list, db: Session):
     so the frontend can render '—' instead of a misleading 0%.
 
     Gracefully degrades: if the prediction_category column doesn't exist
-    yet (fresh deploy), silently leaves the fields absent.
+    yet (fresh deploy), defaults are still stamped onto every row so
+    the leaderboard cache doesn't poison with missing keys.
     """
+    # Stamp defaults first so a SELECT failure doesn't leave the cache
+    # serving rows without these keys. Same defense as
+    # _enrich_ranking_stats — see the bugfix commit for context.
+    for r in results:
+        r.setdefault("ticker_call_total", 0)
+        r.setdefault("ticker_call_accuracy", None)
+        r.setdefault("sector_call_total", 0)
+        r.setdefault("sector_call_accuracy", None)
+
     if not results:
         return
     fids = [r["id"] for r in results if r.get("id")]
@@ -136,9 +146,20 @@ def _enrich_ranking_stats(results: list, db: Session):
       - evaluated_lists: lists with 2+ scored items
       - ranking_accuracy: % or None when below the 2-list floor
 
-    Gracefully degrades: if list_id column doesn't exist yet, silently
-    leaves fields unset.
+    Gracefully degrades: if list_id column doesn't exist yet, defaults
+    are still stamped onto every row so the leaderboard cache never
+    poisons with missing fields.
     """
+    # Stamp defaults FIRST so that even on SELECT failure (e.g. fresh
+    # deploy where the list_id column migration hasn't landed yet) the
+    # result rows have the expected shape. A previous bug here caused
+    # the cache to serve results without these keys for 10 minutes
+    # after deploy, until the TTL expired and the refresh re-ran.
+    for r in results:
+        r.setdefault("lists_published", 0)
+        r.setdefault("evaluated_lists", 0)
+        r.setdefault("ranking_accuracy", None)
+
     if not results:
         return
     fids = [r["id"] for r in results if r.get("id")]
