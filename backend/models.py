@@ -135,6 +135,14 @@ class Prediction(Base):
     #   list_rank: 1-based position within the list (1=top pick), capped at 10
     list_id = Column(String(40), nullable=True)
     list_rank = Column(Integer, nullable=True)
+    # Target revision link. When a forecaster publicly revises an existing
+    # price target ("moving my AAPL target from $200 to $220"), the new
+    # prediction gets revision_of pointing at the previous prediction's
+    # id. Flat chain — each revision links only to its immediate
+    # predecessor, never walks up. ON DELETE SET NULL so deleting an
+    # early prediction just severs the link, never cascades.
+    revision_of = Column(Integer, ForeignKey("predictions.id", ondelete="SET NULL"),
+                         nullable=True)
     confidence_tier = Column(Numeric(3, 2), nullable=False, default=1.0)
     # Position disclosure fields: NULL for price_target predictions.
     position_action = Column(String(16), nullable=True)   # open|add|trim|exit

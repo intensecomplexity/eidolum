@@ -1686,6 +1686,44 @@ async def lifespan(app):
         except Exception as _lle:
             print(f"[Startup] list_id/list_rank migration error: {_lle}")
 
+        # ── predictions.revision_of (target revision tracking) ──────────
+        # Self-referencing FK linking a revised prediction to its
+        # immediate predecessor by the same forecaster on the same
+        # ticker. Flat chain — the insertion logic always points at the
+        # most recent prior (even if that prior is itself a revision)
+        # without walking up. ON DELETE SET NULL so removing an early
+        # prediction just severs the link, never cascades. Partial
+        # index keeps the index small: only revised rows get indexed.
+        # No backfill: historical predictions have no revision metadata.
+        try:
+            with engine.connect() as _rv_c:
+                _rv_c.execute(sql_text(
+                    "ALTER TABLE predictions ADD COLUMN IF NOT EXISTS "
+                    "revision_of INTEGER"
+                ))
+                # Attempt to add the FK constraint separately so failure
+                # on an old Postgres (or SQLite dev) doesn't block the
+                # column add. Idempotent: catch and ignore if the
+                # constraint is already present.
+                try:
+                    _rv_c.execute(sql_text("""
+                        ALTER TABLE predictions
+                        ADD CONSTRAINT fk_predictions_revision_of
+                        FOREIGN KEY (revision_of)
+                        REFERENCES predictions(id)
+                        ON DELETE SET NULL
+                    """))
+                except Exception:
+                    pass
+                _rv_c.execute(sql_text(
+                    "CREATE INDEX IF NOT EXISTS idx_predictions_revision_of "
+                    "ON predictions(revision_of) WHERE revision_of IS NOT NULL"
+                ))
+                _rv_c.commit()
+                print("[Startup] predictions.revision_of ready")
+        except Exception as _rve:
+            print(f"[Startup] revision_of migration error: {_rve}")
+
         # ── ENABLE_YOUTUBE_SECTOR_CALLS flag seed ─────────────────────────
         # Seed at 0 (feature OFF) on first boot. Idempotent: only inserts
         # if the row doesn't already exist. Admin flips via

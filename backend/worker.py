@@ -576,6 +576,35 @@ def main():
     except Exception as e:
         log.warning(f"[Worker] list_id/list_rank migration: {e}")
 
+    # predictions.revision_of — self-referencing FK for target revision
+    # tracking. Column add is independent from the FK constraint so an
+    # old Postgres (or SQLite dev) still gets the column. Partial index
+    # keeps it small.
+    try:
+        with engine.connect() as conn:
+            conn.execute(sql_text(
+                "ALTER TABLE predictions ADD COLUMN IF NOT EXISTS "
+                "revision_of INTEGER"
+            ))
+            try:
+                conn.execute(sql_text("""
+                    ALTER TABLE predictions
+                    ADD CONSTRAINT fk_predictions_revision_of
+                    FOREIGN KEY (revision_of)
+                    REFERENCES predictions(id)
+                    ON DELETE SET NULL
+                """))
+            except Exception:
+                pass
+            conn.execute(sql_text(
+                "CREATE INDEX IF NOT EXISTS idx_predictions_revision_of "
+                "ON predictions(revision_of) WHERE revision_of IS NOT NULL"
+            ))
+            conn.commit()
+        log.info("[Worker] predictions.revision_of ready")
+    except Exception as e:
+        log.warning(f"[Worker] revision_of migration: {e}")
+
     # scraper_runs + youtube_scraper_rejections — belt-and-braces migration.
     # Base.metadata.create_all above is the primary creator (the SQLAlchemy
     # models live in models.py), but on existing DBs the indexes / column
