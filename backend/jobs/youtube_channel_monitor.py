@@ -334,6 +334,12 @@ def _run_inner(db):
         # log_youtube_rejection / insert_youtube_prediction.
         "items_rejected": 0,
         "items_deduped": 0,
+        # LLM cost/usage aggregates written to scraper_runs at finalize.
+        "total_input_tokens": 0,
+        "total_output_tokens": 0,
+        "total_cache_create_tokens": 0,
+        "total_cache_read_tokens": 0,
+        "estimated_cost_usd": 0.0,
     }
 
     for row in batch_rows:
@@ -512,7 +518,12 @@ def _run_inner(db):
                     items_llm_sent = :llm_sent,
                     items_inserted = :inserted,
                     items_rejected = :rejected,
-                    items_deduped = :deduped
+                    items_deduped = :deduped,
+                    total_input_tokens = :in_tok,
+                    total_output_tokens = :out_tok,
+                    total_cache_create_tokens = :cc_tok,
+                    total_cache_read_tokens = :cr_tok,
+                    estimated_cost_usd = :cost
                 WHERE id = :id
             """), {
                 "id": run_id,
@@ -522,6 +533,11 @@ def _run_inner(db):
                 "inserted": int(stats["predictions_inserted"]),
                 "rejected": int(stats["items_rejected"]),
                 "deduped": int(stats["items_deduped"]),
+                "in_tok": int(stats.get("total_input_tokens", 0)),
+                "out_tok": int(stats.get("total_output_tokens", 0)),
+                "cc_tok": int(stats.get("total_cache_create_tokens", 0)),
+                "cr_tok": int(stats.get("total_cache_read_tokens", 0)),
+                "cost": round(float(stats.get("estimated_cost_usd", 0.0)), 4),
             })
             db.commit()
         except Exception as e:
@@ -605,6 +621,15 @@ def _process_one_video(db, channel_name, channel_id, video_id, title, publish_da
     preds, telem = classify_video(channel_name, title, publish_date_str[:10] if publish_date_str else "", text)
     stats["videos_classified"] += 1
     stats["predictions_extracted"] += telem.get("predictions_validated", 0)
+
+    # Aggregate per-call token + cost telemetry into the run-level
+    # stats dict. Finalize writes these to scraper_runs so the admin
+    # card can render cost-per-run and cache-hit ratio.
+    stats["total_input_tokens"] = int(stats.get("total_input_tokens", 0)) + int(telem.get("input_tokens", 0) or 0)
+    stats["total_output_tokens"] = int(stats.get("total_output_tokens", 0)) + int(telem.get("output_tokens", 0) or 0)
+    stats["total_cache_create_tokens"] = int(stats.get("total_cache_create_tokens", 0)) + int(telem.get("cache_create", 0) or 0)
+    stats["total_cache_read_tokens"] = int(stats.get("total_cache_read_tokens", 0)) + int(telem.get("cache_read", 0) or 0)
+    stats["estimated_cost_usd"] = float(stats.get("estimated_cost_usd", 0.0)) + float(telem.get("estimated_cost_usd", 0.0) or 0.0)
 
     if telem.get("error"):
         stats["classifier_errors"] += 1
