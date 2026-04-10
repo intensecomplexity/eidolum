@@ -126,6 +126,15 @@ class Prediction(Base):
     # separate column without conflating it with individual ticker accuracy.
     prediction_category = Column(String(20), nullable=False, default="ticker_call",
                                  server_default="ticker_call")
+    # Ranked list metadata. Populated only when the YouTube classifier
+    # (with ENABLE_RANKED_LIST_EXTRACTION enabled) extracts a prediction
+    # from a speaker-declared ranked list ("my top 5 stocks"). Both
+    # columns move together — either both set or both NULL.
+    #   list_id: human-readable ID invented by Haiku, shared by all items in
+    #            the same list ("top5_2026", "avoid_list_q1", etc.)
+    #   list_rank: 1-based position within the list (1=top pick), capped at 10
+    list_id = Column(String(40), nullable=True)
+    list_rank = Column(Integer, nullable=True)
     confidence_tier = Column(Numeric(3, 2), nullable=False, default=1.0)
     # Position disclosure fields: NULL for price_target predictions.
     position_action = Column(String(16), nullable=True)   # open|add|trim|exit

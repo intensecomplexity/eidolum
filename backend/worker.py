@@ -554,6 +554,28 @@ def main():
     except Exception as e:
         log.warning(f"[Worker] scraper_runs sector_calls migration: {e}")
 
+    # predictions.list_id + list_rank — ranked list extraction metadata.
+    # Partial index keeps the index small because most rows won't be in
+    # lists. No backfill: historical predictions have no ranking data.
+    try:
+        with engine.connect() as conn:
+            conn.execute(sql_text(
+                "ALTER TABLE predictions ADD COLUMN IF NOT EXISTS "
+                "list_id VARCHAR(40)"
+            ))
+            conn.execute(sql_text(
+                "ALTER TABLE predictions ADD COLUMN IF NOT EXISTS "
+                "list_rank INTEGER"
+            ))
+            conn.execute(sql_text(
+                "CREATE INDEX IF NOT EXISTS idx_predictions_list_id "
+                "ON predictions(list_id) WHERE list_id IS NOT NULL"
+            ))
+            conn.commit()
+        log.info("[Worker] predictions.list_id + list_rank ready")
+    except Exception as e:
+        log.warning(f"[Worker] list_id/list_rank migration: {e}")
+
     # scraper_runs + youtube_scraper_rejections — belt-and-braces migration.
     # Base.metadata.create_all above is the primary creator (the SQLAlchemy
     # models live in models.py), but on existing DBs the indexes / column

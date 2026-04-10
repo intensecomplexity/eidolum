@@ -1660,6 +1660,32 @@ async def lifespan(app):
         except Exception as _sre:
             print(f"[Startup] scraper_runs sector_calls migration error: {_sre}")
 
+        # ── predictions.list_id + list_rank (ranked list extraction) ────
+        # Stores speaker-declared rank position within a ranked list
+        # ("my top 5 stocks: NVDA, AMD, TSM, AAPL, MSFT"). Both columns
+        # move together — either both set or both NULL. Partial index on
+        # list_id is intentional: most rows will never be in a list, so
+        # WHERE list_id IS NOT NULL keeps the index small. No backfill:
+        # historical predictions have no ranking metadata.
+        try:
+            with engine.connect() as _ll_c:
+                _ll_c.execute(sql_text(
+                    "ALTER TABLE predictions ADD COLUMN IF NOT EXISTS "
+                    "list_id VARCHAR(40)"
+                ))
+                _ll_c.execute(sql_text(
+                    "ALTER TABLE predictions ADD COLUMN IF NOT EXISTS "
+                    "list_rank INTEGER"
+                ))
+                _ll_c.execute(sql_text(
+                    "CREATE INDEX IF NOT EXISTS idx_predictions_list_id "
+                    "ON predictions(list_id) WHERE list_id IS NOT NULL"
+                ))
+                _ll_c.commit()
+                print("[Startup] predictions.list_id + list_rank ready")
+        except Exception as _lle:
+            print(f"[Startup] list_id/list_rank migration error: {_lle}")
+
         # ── ENABLE_YOUTUBE_SECTOR_CALLS flag seed ─────────────────────────
         # Seed at 0 (feature OFF) on first boot. Idempotent: only inserts
         # if the row doesn't already exist. Admin flips via
