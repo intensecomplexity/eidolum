@@ -1437,6 +1437,65 @@ async def lifespan(app):
         except Exception as e:
             print(f"[Startup] processed_logos table error: {e}")
 
+        # ── scraper_runs + youtube_scraper_rejections (mirrors worker.py) ──
+        # Both API and worker run this. SQLAlchemy create_all above already
+        # creates the tables when the model is fresh, but the IF NOT EXISTS
+        # block here is the belt-and-braces guarantee for indexes on
+        # existing DBs. Idempotent: safe to re-run on every boot.
+        try:
+            with engine.connect() as _sr_c:
+                _sr_c.execute(sql_text("""
+                    CREATE TABLE IF NOT EXISTS scraper_runs (
+                        id SERIAL PRIMARY KEY,
+                        source VARCHAR(20) NOT NULL,
+                        started_at TIMESTAMP NOT NULL DEFAULT NOW(),
+                        finished_at TIMESTAMP,
+                        status VARCHAR(20) NOT NULL DEFAULT 'running',
+                        items_fetched INTEGER NOT NULL DEFAULT 0,
+                        items_processed INTEGER NOT NULL DEFAULT 0,
+                        items_llm_sent INTEGER NOT NULL DEFAULT 0,
+                        items_inserted INTEGER NOT NULL DEFAULT 0,
+                        items_rejected INTEGER NOT NULL DEFAULT 0,
+                        items_deduped INTEGER NOT NULL DEFAULT 0,
+                        error_message TEXT
+                    )
+                """))
+                _sr_c.execute(sql_text(
+                    "CREATE INDEX IF NOT EXISTS idx_scraper_runs_source_started "
+                    "ON scraper_runs(source, started_at DESC)"
+                ))
+                _sr_c.execute(sql_text("""
+                    CREATE TABLE IF NOT EXISTS youtube_scraper_rejections (
+                        id SERIAL PRIMARY KEY,
+                        video_id VARCHAR(20),
+                        channel_id VARCHAR(30),
+                        channel_name VARCHAR(200),
+                        video_title TEXT,
+                        video_published_at TIMESTAMP,
+                        rejected_at TIMESTAMP NOT NULL DEFAULT NOW(),
+                        rejection_reason VARCHAR(50) NOT NULL,
+                        haiku_reason TEXT,
+                        haiku_raw_response JSONB,
+                        transcript_snippet TEXT
+                    )
+                """))
+                _sr_c.execute(sql_text(
+                    "CREATE INDEX IF NOT EXISTS idx_yt_rejections_rejected_at "
+                    "ON youtube_scraper_rejections(rejected_at)"
+                ))
+                _sr_c.execute(sql_text(
+                    "CREATE INDEX IF NOT EXISTS idx_yt_rejections_reason "
+                    "ON youtube_scraper_rejections(rejection_reason)"
+                ))
+                _sr_c.execute(sql_text(
+                    "CREATE INDEX IF NOT EXISTS idx_yt_rejections_channel "
+                    "ON youtube_scraper_rejections(channel_id)"
+                ))
+                _sr_c.commit()
+                print("[Startup] scraper_runs + youtube_scraper_rejections ready")
+        except Exception as _sre:
+            print(f"[Startup] scraper_runs/yt_rejections error: {_sre}")
+
         # ── Clean up company descriptions — first sentence only, no "..." ──
         try:
             with engine.connect() as _desc_c:

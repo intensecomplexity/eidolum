@@ -679,6 +679,64 @@ class XScraperRejection(Base):
     closeness_level = Column(SmallInteger, nullable=True, index=True)
 
 
+class ScraperRun(Base):
+    """One row per scraper run. Replaces the never-created scheduler_logs
+    referenced (and silently caught) by /api/admin/social-stats. Used by
+    the admin Social Scrapers card to render last-run funnel counts and
+    7d aggregates symmetrically across X and YouTube.
+
+    Lifecycle:
+      - INSERT at the top of run_<scraper>() with status='running'
+      - UPDATE at the end with finished_at, status='ok'/'error', counts
+    """
+    __tablename__ = "scraper_runs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    source = Column(String(20), nullable=False, index=True)  # 'x', 'youtube', ...
+    started_at = Column(DateTime, nullable=False,
+                        default=datetime.datetime.utcnow,
+                        server_default=func.now(), index=True)
+    finished_at = Column(DateTime, nullable=True)
+    status = Column(String(20), nullable=False, default="running",
+                    server_default="running")  # running | ok | error
+    items_fetched = Column(Integer, nullable=False, default=0,
+                           server_default="0")  # tweets / videos
+    items_processed = Column(Integer, nullable=False, default=0,
+                             server_default="0")  # passed prefilter / transcripts ok
+    items_llm_sent = Column(Integer, nullable=False, default=0,
+                            server_default="0")
+    items_inserted = Column(Integer, nullable=False, default=0,
+                            server_default="0")
+    items_rejected = Column(Integer, nullable=False, default=0,
+                            server_default="0")
+    items_deduped = Column(Integer, nullable=False, default=0,
+                           server_default="0")
+    error_message = Column(Text, nullable=True)
+
+
+class YouTubeScraperRejection(Base):
+    """Persisted record of every video rejected by the YouTube scraper
+    pipeline. Mirror of x_scraper_rejections — same shape, same 7-day
+    prune cadence, same admin role: surface the funnel breakdown so we
+    can tune the prefilters and the Haiku prompt without grepping logs.
+    """
+    __tablename__ = "youtube_scraper_rejections"
+
+    id = Column(Integer, primary_key=True, index=True)
+    video_id = Column(String(20), nullable=True, index=True)
+    channel_id = Column(String(30), nullable=True, index=True)
+    channel_name = Column(String(200), nullable=True)
+    video_title = Column(Text, nullable=True)
+    video_published_at = Column(DateTime, nullable=True)
+    rejected_at = Column(DateTime, nullable=False,
+                         default=datetime.datetime.utcnow,
+                         server_default=func.now(), index=True)
+    rejection_reason = Column(String(50), nullable=False, index=True)
+    haiku_reason = Column(Text, nullable=True)
+    haiku_raw_response = Column(JSON, nullable=True)
+    transcript_snippet = Column(Text, nullable=True)
+
+
 class Config(Base):
     __tablename__ = "config"
     key = Column(String, primary_key=True)

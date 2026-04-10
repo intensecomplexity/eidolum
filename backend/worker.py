@@ -251,6 +251,67 @@ def main():
     except Exception as e:
         log.warning(f"[Worker] closeness_level migration: {e}")
 
+    # scraper_runs + youtube_scraper_rejections — belt-and-braces migration.
+    # Base.metadata.create_all above is the primary creator (the SQLAlchemy
+    # models live in models.py), but on existing DBs the indexes / column
+    # adds may need ALTER guarantees. All statements use IF NOT EXISTS so
+    # this block is safe to re-run on every worker boot. Both services
+    # (worker + API) execute this — whichever boots first wins; the second
+    # is a no-op.
+    try:
+        with engine.connect() as conn:
+            conn.execute(sql_text("""
+                CREATE TABLE IF NOT EXISTS scraper_runs (
+                    id SERIAL PRIMARY KEY,
+                    source VARCHAR(20) NOT NULL,
+                    started_at TIMESTAMP NOT NULL DEFAULT NOW(),
+                    finished_at TIMESTAMP,
+                    status VARCHAR(20) NOT NULL DEFAULT 'running',
+                    items_fetched INTEGER NOT NULL DEFAULT 0,
+                    items_processed INTEGER NOT NULL DEFAULT 0,
+                    items_llm_sent INTEGER NOT NULL DEFAULT 0,
+                    items_inserted INTEGER NOT NULL DEFAULT 0,
+                    items_rejected INTEGER NOT NULL DEFAULT 0,
+                    items_deduped INTEGER NOT NULL DEFAULT 0,
+                    error_message TEXT
+                )
+            """))
+            conn.execute(sql_text(
+                "CREATE INDEX IF NOT EXISTS idx_scraper_runs_source_started "
+                "ON scraper_runs(source, started_at DESC)"
+            ))
+            conn.execute(sql_text("""
+                CREATE TABLE IF NOT EXISTS youtube_scraper_rejections (
+                    id SERIAL PRIMARY KEY,
+                    video_id VARCHAR(20),
+                    channel_id VARCHAR(30),
+                    channel_name VARCHAR(200),
+                    video_title TEXT,
+                    video_published_at TIMESTAMP,
+                    rejected_at TIMESTAMP NOT NULL DEFAULT NOW(),
+                    rejection_reason VARCHAR(50) NOT NULL,
+                    haiku_reason TEXT,
+                    haiku_raw_response JSONB,
+                    transcript_snippet TEXT
+                )
+            """))
+            conn.execute(sql_text(
+                "CREATE INDEX IF NOT EXISTS idx_yt_rejections_rejected_at "
+                "ON youtube_scraper_rejections(rejected_at)"
+            ))
+            conn.execute(sql_text(
+                "CREATE INDEX IF NOT EXISTS idx_yt_rejections_reason "
+                "ON youtube_scraper_rejections(rejection_reason)"
+            ))
+            conn.execute(sql_text(
+                "CREATE INDEX IF NOT EXISTS idx_yt_rejections_channel "
+                "ON youtube_scraper_rejections(channel_id)"
+            ))
+            conn.commit()
+        log.info("[Worker] scraper_runs + youtube_scraper_rejections ensured")
+    except Exception as e:
+        log.warning(f"[Worker] scraper_runs/yt_rejections migration: {e}")
+
     # Dormancy: add forecasters.last_prediction_at + is_dormant columns,
     # backfill on first run, then create the partial index.
     # Idempotent: subsequent runs ALTER IF NOT EXISTS and the UPDATE only
