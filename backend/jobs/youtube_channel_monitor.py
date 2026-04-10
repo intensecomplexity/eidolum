@@ -429,6 +429,16 @@ def _run_inner(db):
             if inserted_for_video > 0:
                 channel_inserted += inserted_for_video
 
+            # Per-channel auto-prune counter update. Only counts videos
+            # that reached Haiku and got a verdict (ok_inserted /
+            # ok_no_predictions); transcript failures and classifier
+            # errors are excluded so transient infrastructure problems
+            # cannot push a channel toward false-positive deactivation.
+            _update_channel_yield_counters(
+                db, channel_id, channel_name,
+                transcript_status, inserted_for_video,
+            )
+
             _record_processed_video(
                 db, video_id, channel_name, title, description, publish_date_str,
                 transcript_status, transcript_chars, inserted_for_video,
@@ -657,6 +667,60 @@ def _parse_publish_date(s: str):
         except ValueError:
             continue
     return None
+
+
+# ── Per-channel yield tracking ──────────────────────────────────────────────
+
+# A channel is reached-Haiku if classify_video returned a verdict, i.e.
+# transcript_status is one of these. classifier_error is intentionally
+# excluded — a Haiku outage should not push channels toward auto-prune.
+_REACHED_HAIKU_STATUSES = {"ok_inserted", "ok_no_predictions"}
+
+
+def _update_channel_yield_counters(db, youtube_channel_id, channel_name,
+                                    transcript_status, inserted_for_video):
+    """Increment per-channel yield counters after a video is processed.
+
+    videos_processed_count: +1 if the video reached Haiku and got a
+                            verdict (regardless of how many predictions
+                            survived the post-Haiku validation).
+    predictions_extracted_count: +1 if at least one prediction from this
+                            video was inserted into the predictions
+                            table — the only signal that the channel is
+                            actually producing usable content.
+
+    Best-effort: a write failure must NEVER break the scrape loop. The
+    counters resync from youtube_videos on the next worker boot via the
+    backfill in main.py / worker.py.
+    """
+    if transcript_status not in _REACHED_HAIKU_STATUSES:
+        return
+
+    if not youtube_channel_id:
+        # Older channels may have NULL youtube_channel_id; fall back to
+        # channel_name. Both columns are populated for live monitor runs.
+        where_clause = "channel_name = :name"
+    else:
+        where_clause = "youtube_channel_id = :cid"
+
+    inc_predictions = 1 if (inserted_for_video or 0) > 0 else 0
+    try:
+        db.execute(sql_text(f"""
+            UPDATE youtube_channels
+            SET videos_processed_count = videos_processed_count + 1,
+                predictions_extracted_count = predictions_extracted_count + :inc_p
+            WHERE {where_clause}
+              AND is_active = TRUE
+        """), {"cid": youtube_channel_id, "name": channel_name,
+               "inc_p": inc_predictions})
+        db.commit()
+    except Exception as e:
+        print(f"[ChannelMonitor] yield counter update failed for "
+              f"{channel_name}: {e}")
+        try:
+            db.rollback()
+        except Exception:
+            pass
 
 
 def _record_processed_video(db, video_id, channel_name, title, description, publish_str,
