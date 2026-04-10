@@ -40,7 +40,7 @@ import os
 import json
 import time
 import httpx
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from sqlalchemy import text as sql_text
 
@@ -63,6 +63,13 @@ VIDEOS_PER_CHANNEL_PER_RUN = 50
 # history (some channels have 5000+ videos) shouldn't be allowed to
 # eat the whole daily quota in one shot.
 MAX_LIST_PAGES_PER_CHANNEL = 60  # 60 pages × 50 items = 3000 videos cap
+
+# Historical age cap. Videos older than this are dropped during
+# enumeration AND skipped at processing time (defensive layer for
+# cursors that were enumerated before this cap shipped — they still
+# hold pre-cap video IDs and need to drain past them on the way to
+# the in-window region of the upload history).
+YOUTUBE_BACKFILL_MAX_AGE_DAYS = 1095  # 3 years
 
 
 def run_youtube_backfill(db=None):
@@ -113,6 +120,7 @@ def _run_inner(db):
     total_processed = 0
     total_inserted = 0
     total_quota = 0
+    cutoff = datetime.utcnow() - timedelta(days=YOUTUBE_BACKFILL_MAX_AGE_DAYS)
 
     for row in rows:
         channel_name, channel_id, cursor_json = row[0], row[1], row[2]
@@ -169,6 +177,20 @@ def _run_inner(db):
             m = meta.get(vid) or {}
             title = m.get("title") or ""
             publish_str = m.get("published_at") or ""
+
+            # 3-year cap defensive layer. Enumeration filters new
+            # cursors at creation time, but cursors created before this
+            # cap shipped still hold pre-cap video IDs at the head of
+            # the oldest-first list. Skip them silently so the cursor
+            # can drain past them on the way to the in-window region.
+            publish_dt = _parse_publish_date(publish_str)
+            if publish_dt and publish_dt < cutoff:
+                print(
+                    f"[YOUTUBE-BACKFILL] Skipping {vid} from {channel_name}: "
+                    f"published {publish_str or 'unknown'}, older than "
+                    f"{YOUTUBE_BACKFILL_MAX_AGE_DAYS // 365} year cap"
+                )
+                continue
 
             # Skip Shorts cheaply
             if m.get("duration_seconds") and m.get("duration_seconds") < 60:
@@ -227,8 +249,16 @@ def _enumerate_uploads(channel_id: str) -> tuple[list[str], int]:
          (1 quota unit per page, 50 items per page)
     Returns (video_ids_in_playlist_order, quota_units_used).
     The list is in YouTube's natural newest-first order — caller flips it.
+
+    Age cap: pages come back newest-first, and items within a page are
+    also newest-first, so the FIRST video older than the cutoff means
+    every subsequent item / page is even older. We stop the pagination
+    immediately on hitting that boundary. Adding 'snippet' to the part
+    parameter does NOT change quota cost — playlistItems.list is 1 unit
+    per call regardless of how many parts you ask for.
     """
     units = 0
+    cutoff = datetime.utcnow() - timedelta(days=YOUTUBE_BACKFILL_MAX_AGE_DAYS)
     # Get the uploads playlist ID
     r = httpx.get(f"{YOUTUBE_API}/channels", params={
         "part": "contentDetails", "id": channel_id, "key": YOUTUBE_API_KEY,
@@ -250,9 +280,10 @@ def _enumerate_uploads(channel_id: str) -> tuple[list[str], int]:
     video_ids: list[str] = []
     page_token = None
     pages = 0
+    hit_age_cap = False
     while pages < MAX_LIST_PAGES_PER_CHANNEL:
         params = {
-            "part": "contentDetails",
+            "part": "snippet,contentDetails",
             "playlistId": uploads_playlist,
             "maxResults": 50,
             "key": YOUTUBE_API_KEY,
@@ -269,9 +300,21 @@ def _enumerate_uploads(channel_id: str) -> tuple[list[str], int]:
             break
         data = r.json()
         for it in data.get("items", []):
-            vid = it.get("contentDetails", {}).get("videoId")
+            pub_str = (it.get("snippet") or {}).get("publishedAt", "")
+            pub_dt = _parse_publish_date(pub_str)
+            if pub_dt and pub_dt < cutoff:
+                hit_age_cap = True
+                break
+            vid = (it.get("contentDetails") or {}).get("videoId")
             if vid:
                 video_ids.append(vid)
+        if hit_age_cap:
+            print(
+                f"[YT-Backfill] hit {YOUTUBE_BACKFILL_MAX_AGE_DAYS}-day cap "
+                f"after {pages + 1} pages, stopping enumeration "
+                f"({len(video_ids)} in-window videos collected)"
+            )
+            break
         page_token = data.get("nextPageToken")
         pages += 1
         if not page_token:
