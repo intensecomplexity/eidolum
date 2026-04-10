@@ -519,6 +519,27 @@ def main():
     except Exception as e:
         log.warning(f"[Worker] sector_etf_aliases migration: {e}")
 
+    # predictions.prediction_category — ticker_call vs sector_call.
+    # Default ticker_call preserves all existing row semantics.
+    try:
+        with engine.connect() as conn:
+            conn.execute(sql_text(
+                "ALTER TABLE predictions ADD COLUMN IF NOT EXISTS "
+                "prediction_category VARCHAR(20) DEFAULT 'ticker_call'"
+            ))
+            conn.execute(sql_text(
+                "CREATE INDEX IF NOT EXISTS idx_predictions_category "
+                "ON predictions(prediction_category)"
+            ))
+            conn.execute(sql_text(
+                "UPDATE predictions SET prediction_category = 'ticker_call' "
+                "WHERE prediction_category IS NULL"
+            ))
+            conn.commit()
+        log.info("[Worker] predictions.prediction_category ready")
+    except Exception as e:
+        log.warning(f"[Worker] prediction_category migration: {e}")
+
     # scraper_runs + youtube_scraper_rejections — belt-and-braces migration.
     # Base.metadata.create_all above is the primary creator (the SQLAlchemy
     # models live in models.py), but on existing DBs the indexes / column

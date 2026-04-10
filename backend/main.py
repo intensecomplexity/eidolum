@@ -1617,6 +1617,33 @@ async def lifespan(app):
         except Exception as _sae:
             print(f"[Startup] sector_etf_aliases migration error: {_sae}")
 
+        # ── predictions.prediction_category (ticker_call | sector_call) ──
+        # Default ticker_call preserves all existing row semantics — every
+        # prediction already in the table is a ticker call. New sector_call
+        # rows are only inserted by the YouTube classifier's gated sector
+        # extraction path (feature flag default 0%).
+        try:
+            with engine.connect() as _pc_c:
+                _pc_c.execute(sql_text(
+                    "ALTER TABLE predictions ADD COLUMN IF NOT EXISTS "
+                    "prediction_category VARCHAR(20) DEFAULT 'ticker_call'"
+                ))
+                _pc_c.execute(sql_text(
+                    "CREATE INDEX IF NOT EXISTS idx_predictions_category "
+                    "ON predictions(prediction_category)"
+                ))
+                # Backfill NULLs to 'ticker_call' for any row inserted before
+                # the column default landed (defensive — DEFAULT covers new
+                # rows but not historical inserts on some Postgres versions).
+                _pc_c.execute(sql_text(
+                    "UPDATE predictions SET prediction_category = 'ticker_call' "
+                    "WHERE prediction_category IS NULL"
+                ))
+                _pc_c.commit()
+                print("[Startup] predictions.prediction_category ready")
+        except Exception as _pce:
+            print(f"[Startup] prediction_category migration error: {_pce}")
+
         # ── youtube_channel_meta totals backfill ────────────────────────
         # Historical backfill for the admin card counters. Three columns:
         #   - total_predictions_extracted (display)

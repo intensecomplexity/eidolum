@@ -120,6 +120,12 @@ class Prediction(Base):
     # + add_position_fields.sql). Defaults match the DB defaults so new ORM-only
     # inserts behave identically to existing rows.
     prediction_type = Column(String(32), nullable=False, default="price_target")
+    # Category distinguishes ticker calls (specific stock/crypto picks) from
+    # sector calls (broad sector bets mapped to ETFs). Exists alongside
+    # prediction_type so the leaderboard can surface sector skill as a
+    # separate column without conflating it with individual ticker accuracy.
+    prediction_category = Column(String(20), nullable=False, default="ticker_call",
+                                 server_default="ticker_call")
     confidence_tier = Column(Numeric(3, 2), nullable=False, default=1.0)
     # Position disclosure fields: NULL for price_target predictions.
     position_action = Column(String(16), nullable=True)   # open|add|trim|exit
