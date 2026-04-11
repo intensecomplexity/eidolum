@@ -32,6 +32,7 @@ import os
 import re
 import json
 import time
+import hashlib
 import logging
 from datetime import datetime, timedelta
 
@@ -788,6 +789,99 @@ Rules:
 Output JSON only. Be concise."""
 
 
+# Binary-event-call instructions. Appended to the active prompt when
+# ENABLE_BINARY_EVENT_EXTRACTION is flipped on. Teaches Haiku to
+# recognize yes/no-event predictions — a specific discrete event will
+# or won't happen by a concrete deadline. Unlike conditional_call
+# ("IF X then Y"), binary_event_call only predicts whether the event
+# itself occurs; there is no second-order market reaction. Scoring is
+# trivially binary: happened = hit, didn't = miss, no data source to
+# check = stays pending. Lands as a NEW prediction_category value
+# ('binary_event_call'). event_type is REUSED from the earnings_call
+# ship (its allowed vocabulary is extended — see the allowlist below).
+YOUTUBE_HAIKU_BINARY_EVENT_INSTRUCTIONS = """BINARY EVENT CALLS:
+If the speaker makes a yes/no prediction that a specific discrete event will happen by a concrete deadline, emit it as a binary_event_call. These are scored trivially: the event happened or it didn't. No price targets, no tolerance, no partial credit. If the statement also predicts a market reaction to the event ("if the Fed cuts, stocks rally"), that's a conditional_call — NOT a binary_event_call. Binary event calls only ask: did the event itself occur?
+
+event_type allowlist — MUST use one of these canonical values verbatim as the `event_type` field:
+
+- fed_decision       Fed rate moves, QE/QT announcements, FOMC statement outcomes
+- corporate_action   Dividends, stock splits, buybacks, spin-offs, capital returns
+- mna                Mergers, acquisitions, deal closings, takeover announcements
+- ipo                IPO / direct listing / SPAC completion events
+- index_inclusion    Addition to / removal from S&P 500, Dow, Nasdaq-100
+- economic_declaration   NBER recession call, BLS employment revision, GDP revision
+- regulatory         FDA approval, SEC enforcement action, DOJ decision, CMA ruling
+- other              Anything else with a clean binary outcome and a deadline
+
+Required fields on every binary_event_call output:
+
+- event_type: one of the allowlist values above
+- expected_outcome_text: a short natural-language description of the predicted event (e.g. "Fed cuts rates 50bps at March FOMC", "AAPL announces stock split")
+- event_deadline: hard ISO date (YYYY-MM-DD) by which the event must occur — parse named meetings (March FOMC → actual FOMC date), "end of year", "by Q3", etc.
+- direction: "bullish" — ALWAYS bullish on the event happening. There is no bearish binary_event_call; for negated events ("Fed will NOT cut"), keep direction=bullish and put the negation into expected_outcome_text ("no rate change at March FOMC").
+- derived_from: "binary_event_call"
+- ticker: REQUIRED for corporate_action / mna / ipo / index_inclusion / regulatory events tied to a specific company. OPTIONAL (set null) for fed_decision and economic_declaration — those are company-agnostic. For `other`, include a ticker if the event attaches to one.
+
+Output format:
+{
+  "event_type": "fed_decision",
+  "expected_outcome_text": "Fed cuts rates 50bps at the March 2026 FOMC meeting",
+  "event_deadline": "2026-03-18",
+  "direction": "bullish",
+  "derived_from": "binary_event_call",
+  "context_quote": "The Fed is going to cut by fifty basis points in March"
+}
+
+Examples:
+
+Input: "The Fed will cut rates by 50bps at the March meeting"
+Output: {"event_type": "fed_decision", "expected_outcome_text": "Fed cuts 50bps at March FOMC", "event_deadline": "2026-03-18", "direction": "bullish", "derived_from": "binary_event_call", "context_quote": "Fed will cut 50bps at March meeting"}
+
+Input: "Apple is going to announce a stock split by the end of 2026"
+Output: {"event_type": "corporate_action", "ticker": "AAPL", "expected_outcome_text": "AAPL announces stock split", "event_deadline": "2026-12-31", "direction": "bullish", "derived_from": "binary_event_call", "context_quote": "Apple will announce a stock split by end of 2026"}
+
+Input: "NVDA will acquire a small AI startup this year"
+Output: {"event_type": "mna", "ticker": "NVDA", "expected_outcome_text": "NVDA completes acquisition of an AI startup", "event_deadline": "2026-12-31", "direction": "bullish", "derived_from": "binary_event_call", "context_quote": "NVDA will acquire a small AI startup this year"}
+
+Input: "Stripe is finally going to IPO before end of 2026"
+Output: {"event_type": "ipo", "ticker": "STRP", "expected_outcome_text": "Stripe IPO / direct listing completes", "event_deadline": "2026-12-31", "direction": "bullish", "derived_from": "binary_event_call", "context_quote": "Stripe finally going to IPO before end of 2026"}
+(ticker may be a placeholder if the company is private — the insert path may reject unknown tickers; this is OK.)
+
+Input: "Tesla gets added to the Dow by end of 2027"
+Output: {"event_type": "index_inclusion", "ticker": "TSLA", "expected_outcome_text": "TSLA added to the Dow Jones Industrial Average", "event_deadline": "2027-12-31", "direction": "bullish", "derived_from": "binary_event_call", "context_quote": "Tesla gets added to the Dow by end of 2027"}
+
+Input: "NBER will declare a recession before the end of 2026"
+Output: {"event_type": "economic_declaration", "expected_outcome_text": "NBER officially declares a recession", "event_deadline": "2026-12-31", "direction": "bullish", "derived_from": "binary_event_call", "context_quote": "NBER will declare a recession before end of 2026"}
+
+Input: "The FDA will approve that Eli Lilly obesity drug by Q3"
+Output: {"event_type": "regulatory", "ticker": "LLY", "expected_outcome_text": "FDA approval for LLY obesity drug", "event_deadline": "2026-09-30", "direction": "bullish", "derived_from": "binary_event_call", "context_quote": "FDA will approve the LLY obesity drug by Q3"}
+
+Input: "The Fed will NOT cut rates at the March meeting — they're holding"
+Output: {"event_type": "fed_decision", "expected_outcome_text": "no rate change at March FOMC (Fed holds)", "event_deadline": "2026-03-18", "direction": "bullish", "derived_from": "binary_event_call", "context_quote": "Fed will NOT cut rates at March meeting, holding"}
+
+Input: "Apple will probably have a good year"
+Output: (do NOT extract — no concrete event, no deadline, no binary outcome)
+
+Input: "If the Fed cuts 50bps in March, stocks rally 10%"
+Output: (do NOT extract as binary_event_call — this is a conditional_call, let that prompt block handle it)
+
+Input: "Something big is coming for NVDA this year"
+Output: (do NOT extract — vague, no specific event)
+
+Rules:
+- MUST set derived_from: "binary_event_call".
+- MUST use direction: "bullish" regardless of whether the event is a "yes" or "no" prediction — flip the framing via expected_outcome_text for negations.
+- MUST use an event_type from the allowlist above verbatim.
+- MUST provide a concrete event_deadline (ISO YYYY-MM-DD). Reject if the deadline is vague ("soon", "eventually", "this decade").
+- MUST NOT emit price_target on binary_event_call rows — the outcome is the event, not a price level.
+- MUST NOT emit binary_event_call for statements that also predict a market reaction ("if X then Y") — those are conditional_calls.
+- MUST NOT emit binary_event_call for soft / hedgy / vague claims with no checkable outcome.
+- ticker is optional for fed_decision and economic_declaration (they're company-agnostic).
+- If the same event is mentioned twice in a transcript, emit it once — the dedup layer will collapse duplicates anyway.
+
+Output JSON only. Be concise."""
+
+
 # ── Transcript fetching ─────────────────────────────────────────────────────
 
 def _build_transcript_api():
@@ -1025,6 +1119,7 @@ def classify_video(channel_name: str, title: str, publish_date: str,
     use_earnings = False
     use_macro = False
     use_pair = False
+    use_binary_event = False
     if db is not None and video_id:
         try:
             from feature_flags import should_use_sector_prompt
@@ -1069,13 +1164,21 @@ def classify_video(channel_name: str, title: str, publish_date: str,
         except Exception as _e:
             log.warning("[YT-CLF] pair flag check failed: %s", _e)
             use_pair = False
+        try:
+            from feature_flags import is_binary_event_extraction_enabled
+            use_binary_event = is_binary_event_extraction_enabled(db)
+        except Exception as _e:
+            log.warning("[YT-CLF] binary event flag check failed: %s", _e)
+            use_binary_event = False
     base_system = YOUTUBE_HAIKU_SECTOR_SYSTEM if use_sector_prompt else HAIKU_SYSTEM
     # Append optional instruction blocks ONLY when each flag is on. When
     # every flag is off (the default), base_system is sent byte-for-byte
     # unchanged so Anthropic's prompt cache hit rate on the base prompt
     # stays at 100%. Order matters for cache hits: ranked list → revisions
-    # → options → earnings → macro → pair, stable across calls with any
-    # combination of flags on so extended-prompt cache entries match.
+    # → options → earnings → macro → pair → binary_event, stable across
+    # calls with any combination of flags on so extended-prompt cache
+    # entries match. (conditional_call slots in between pair and
+    # binary_event when it lands — this append order leaves room.)
     active_system = base_system
     if use_ranked_list:
         active_system = active_system + "\n\n" + YOUTUBE_HAIKU_RANKED_LIST_INSTRUCTIONS
@@ -1089,6 +1192,8 @@ def classify_video(channel_name: str, title: str, publish_date: str,
         active_system = active_system + "\n\n" + YOUTUBE_HAIKU_MACRO_INSTRUCTIONS
     if use_pair:
         active_system = active_system + "\n\n" + YOUTUBE_HAIKU_PAIR_INSTRUCTIONS
+    if use_binary_event:
+        active_system = active_system + "\n\n" + YOUTUBE_HAIKU_BINARY_EVENT_INSTRUCTIONS
     telemetry["prompt_variant"] = "sector" if use_sector_prompt else "standard"
     telemetry["ranked_list_enabled"] = bool(use_ranked_list)
     telemetry["revisions_enabled"] = bool(use_revisions)
@@ -1096,6 +1201,7 @@ def classify_video(channel_name: str, title: str, publish_date: str,
     telemetry["earnings_enabled"] = bool(use_earnings)
     telemetry["macro_enabled"] = bool(use_macro)
     telemetry["pair_enabled"] = bool(use_pair)
+    telemetry["binary_event_enabled"] = bool(use_binary_event)
     print(
         f"[YOUTUBE-HAIKU] video={video_id or '?'} channel={channel_name} "
         f"prompt_variant={telemetry['prompt_variant']} "
@@ -1104,7 +1210,8 @@ def classify_video(channel_name: str, title: str, publish_date: str,
         f"options={'on' if use_options else 'off'} "
         f"earnings={'on' if use_earnings else 'off'} "
         f"macro={'on' if use_macro else 'off'} "
-        f"pair={'on' if use_pair else 'off'}",
+        f"pair={'on' if use_pair else 'off'} "
+        f"binary_event={'on' if use_binary_event else 'off'}",
         flush=True,
     )
 
@@ -1202,6 +1309,25 @@ _VALID_DIRECTIONS = {"bullish", "bearish", "neutral"}
 # Sector calls only support bullish/bearish — neutral doesn't make sense
 # at the sector level (a "hold the sector" call is not a prediction).
 _SECTOR_VALID_DIRECTIONS = {"bullish", "bearish"}
+# Canonical allowlist for binary_event_call event_type values. Kept in
+# sync with YOUTUBE_HAIKU_BINARY_EVENT_INSTRUCTIONS above — the prompt
+# teaches Haiku the exact same vocabulary and this set enforces it on
+# the validator side so unknown event_type values drop on the floor
+# instead of contaminating the new prediction_category='binary_event_call'.
+# event_type is a REUSED column (originally added for earnings_call);
+# 'earnings' itself is intentionally NOT in this set — earnings-tagged
+# rows stay as ticker_call with event_type='earnings', they are not
+# binary event rows.
+_BINARY_EVENT_TYPES = {
+    "fed_decision",
+    "corporate_action",
+    "mna",
+    "ipo",
+    "index_inclusion",
+    "economic_declaration",
+    "regulatory",
+    "other",
+}
 
 
 def _validate_and_dedupe_predictions(raw: list) -> list[dict]:
@@ -1221,6 +1347,7 @@ def _validate_and_dedupe_predictions(raw: list) -> list[dict]:
     seen_sectors: set[tuple[str, str]] = set()
     seen_macros: set[tuple[str, str]] = set()
     seen_pairs: set[tuple[str, str]] = set()
+    seen_binary_events: set[tuple[str, str]] = set()
     out: list[dict] = []
     for p in raw:
         if not isinstance(p, dict):
@@ -1261,6 +1388,58 @@ def _validate_and_dedupe_predictions(raw: list) -> list[dict]:
                 p["ticker"] = long_t
             out.append(p)
             continue
+
+        # Binary-event call branch: derived_from='binary_event_call'
+        # with expected_outcome_text, event_type (from allowlist), and
+        # event_deadline. Direction is always bullish (negations live
+        # inside expected_outcome_text). ticker is optional for
+        # fed_decision / economic_declaration; required for the others
+        # but the insert path (not the validator) makes the final call.
+        # Dedupe on (event_type, md5(expected_outcome_text_lower)) so
+        # duplicate mentions collapse.
+        if str(p.get("derived_from") or "").strip().lower() == "binary_event_call":
+            raw_evtype = (p.get("event_type") or "").strip().lower()
+            if raw_evtype not in _BINARY_EVENT_TYPES:
+                continue
+            outcome_text = (p.get("expected_outcome_text") or "").strip()
+            if not outcome_text or len(outcome_text) > 500:
+                continue
+            raw_deadline = p.get("event_deadline")
+            if not raw_deadline:
+                continue
+            try:
+                from datetime import datetime as _dt
+                deadline = _dt.strptime(str(raw_deadline)[:10], "%Y-%m-%d").date()
+            except (TypeError, ValueError):
+                continue
+            # Hash the outcome text (lowercased, collapsed whitespace)
+            # for a stable dedup key — different wordings of the same
+            # event still collide if Haiku happens to reuse the key.
+            _norm = re.sub(r"\s+", " ", outcome_text.lower()).strip()
+            _digest = hashlib.md5(_norm.encode("utf-8")).hexdigest()[:16]
+            key = (raw_evtype, _digest)
+            if key in seen_binary_events:
+                continue
+            seen_binary_events.add(key)
+            p["direction"] = "bullish"  # always bullish-on-event-happening
+            p["_kind"] = "binary_event_call"
+            p["_event_type"] = raw_evtype
+            p["_expected_outcome_text"] = outcome_text[:500]
+            p["_event_deadline"] = deadline
+            p["_outcome_digest"] = _digest
+            p["_derived_from"] = "binary_event_call"
+            # Normalize ticker if present (may be None for fed_decision
+            # and economic_declaration). Stamp a placeholder `ticker`
+            # field so downstream logging doesn't KeyError.
+            raw_tkr = (p.get("ticker") or "").upper().strip().lstrip("$")
+            raw_tkr = re.sub(r"[^A-Z0-9]", "", raw_tkr)
+            if raw_tkr and len(raw_tkr) <= 5:
+                p["ticker"] = raw_tkr
+            else:
+                p["ticker"] = f"__event__{raw_evtype}"
+            out.append(p)
+            continue
+
         # Sector call branch: type='sector_call' with sector + direction
         if str(p.get("type") or "").strip().lower() == "sector_call":
             sector_name = (p.get("sector") or "").strip()
@@ -1375,15 +1554,19 @@ def _validate_and_dedupe_predictions(raw: list) -> list[dict]:
         # from specialized vocabulary. Not stored in the DB — only used
         # by the insert path to route the row and increment the per-run
         # counter for the matching sub-type. Canonical values:
-        # 'options_position', 'earnings_call', 'macro_call', 'pair_call'.
-        # pair_call rows never reach this branch (they're handled above
-        # and skipped via `continue`) but we keep the value in the
-        # accepted set for symmetry with future refactors.
+        # 'options_position', 'earnings_call', 'macro_call', 'pair_call',
+        # 'binary_event_call'. pair_call and binary_event_call rows
+        # never reach this branch (they're handled above and skipped
+        # via `continue`) but we keep those values in the accepted set
+        # for symmetry with future refactors.
         raw_derived = p.get("derived_from")
         derived_from = None
         if raw_derived is not None:
             _rd = str(raw_derived).strip().lower()
-            if _rd in ("options_position", "earnings_call", "macro_call", "pair_call"):
+            if _rd in (
+                "options_position", "earnings_call", "macro_call",
+                "pair_call", "binary_event_call",
+            ):
                 derived_from = _rd
 
         # Event metadata for earnings_call (and future event-tied types).
@@ -2301,5 +2484,217 @@ def insert_youtube_pair_prediction(
     if stats is not None:
         stats["pair_calls_extracted"] = int(
             stats.get("pair_calls_extracted", 0)
+        ) + 1
+    return True
+
+
+def _binary_event_exists_cross_scraper(
+    event_type: str, outcome_digest: str,
+    forecaster_id: int, prediction_date, db,
+) -> bool:
+    """Binary-event variant of prediction_exists_cross_scraper.
+
+    Dedup key is (event_type, md5(expected_outcome_text), forecaster, date)
+    rather than (ticker, direction) because:
+      - Two binary events for the same ticker at the same time are
+        independent bets (e.g. "AAPL will split AND AAPL will raise
+        dividend" should both insert).
+      - The outcome digest collapses different wordings of the same
+        event into one cross-scraper row.
+      - fed_decision / economic_declaration events may carry no ticker
+        at all, so a ticker-keyed dedup would over-match.
+
+    Returns True if a matching event row already exists for this
+    forecaster within a 24h window, False otherwise.
+    """
+    if not (event_type and outcome_digest and forecaster_id and prediction_date):
+        return False
+    try:
+        from datetime import timedelta
+        date_start = prediction_date - timedelta(hours=24)
+        date_end = prediction_date + timedelta(hours=24)
+        row = db.execute(sql_text("""
+            SELECT 1 FROM predictions
+            WHERE prediction_category = 'binary_event_call'
+              AND event_type = :et
+              AND forecaster_id = :fid
+              AND source_platform_id LIKE :digest_like
+              AND prediction_date BETWEEN :ds AND :de
+            LIMIT 1
+        """), {
+            "et": event_type,
+            "fid": int(forecaster_id),
+            "digest_like": f"%_{outcome_digest}",
+            "ds": date_start,
+            "de": date_end,
+        }).first()
+    except Exception as _e:
+        log.warning("[YT-CLF] binary_event cross-scraper dedup failed: %s", _e)
+        return False
+    return row is not None
+
+
+def insert_youtube_binary_event_prediction(
+    pred: dict,
+    *,
+    channel_name: str,
+    channel_id: str | None,
+    video_id: str,
+    video_title: str,
+    publish_date: datetime,
+    db,
+    transcript_snippet: str | None = None,
+    stats: dict | None = None,
+) -> bool:
+    """Insert a binary_event_call prediction.
+
+    Stores the row with prediction_category='binary_event_call' (NEW
+    category) and the reused event_type column plus the four new
+    binary-event columns (expected_outcome_text, event_deadline,
+    event_resolved_at, event_resolution_source). Direction is always
+    bullish — negations live inside expected_outcome_text rather than
+    as a bearish variant.
+
+    ticker policy:
+      - fed_decision / economic_declaration: ticker may be absent;
+        we store a sentinel 'EVENT' in the ticker column (because the
+        existing NOT NULL constraint requires a value) and leave the
+        row's semantic ticker information in expected_outcome_text.
+      - Everything else: ticker is required and must pass
+        validate_ticker_in_db. Unknown tickers reject.
+
+    Rejection paths (all log to youtube_scraper_rejections):
+      - missing expected_outcome_text → 'binary_event_missing_outcome'
+      - missing / unparseable event_deadline → 'binary_event_missing_deadline'
+      - event_type not in allowlist → 'binary_event_invalid_type'
+      - ticker required but invalid → 'binary_event_invalid_ticker'
+      - dedup collision → 'dedup_collision'
+      - cross-scraper dedup → 'cross_scraper_dupe'
+      - forecaster create failure → 'forecaster_creation_failed'
+    """
+    from models import Prediction
+
+    def _reject(reason: str, hr: str | None = None) -> bool:
+        log_youtube_rejection(
+            db,
+            video_id=video_id,
+            channel_id=channel_id,
+            channel_name=channel_name,
+            video_title=video_title,
+            video_published_at=publish_date,
+            reason=reason,
+            haiku_reason=hr,
+            haiku_raw=pred,
+            transcript_snippet=transcript_snippet,
+            stats=stats,
+        )
+        return False
+
+    event_type = (pred.get("_event_type") or pred.get("event_type") or "").strip().lower()
+    outcome_text = (pred.get("_expected_outcome_text") or pred.get("expected_outcome_text") or "").strip()
+    deadline = pred.get("_event_deadline")
+    digest = (pred.get("_outcome_digest") or "").strip().lower()
+
+    if event_type not in _BINARY_EVENT_TYPES:
+        return _reject("binary_event_invalid_type", hr=event_type or None)
+    if not outcome_text:
+        return _reject("binary_event_missing_outcome")
+    if not deadline:
+        return _reject("binary_event_missing_deadline")
+
+    # Ticker handling: company-anchored event_types require a real
+    # ticker; company-agnostic ones allow a sentinel.
+    raw_ticker = (pred.get("ticker") or "").upper().strip().lstrip("$")
+    raw_ticker = re.sub(r"[^A-Z0-9]", "", raw_ticker)
+    is_company_agnostic = event_type in ("fed_decision", "economic_declaration")
+    ticker_to_store: str
+    if raw_ticker and not raw_ticker.startswith("EVENT") and len(raw_ticker) <= 5:
+        if validate_ticker_in_db(raw_ticker, db):
+            ticker_to_store = raw_ticker
+        elif is_company_agnostic:
+            ticker_to_store = "EVENT"
+        else:
+            return _reject("binary_event_invalid_ticker", hr=raw_ticker)
+    elif is_company_agnostic:
+        ticker_to_store = "EVENT"
+    else:
+        return _reject("binary_event_invalid_ticker", hr=raw_ticker or event_type)
+
+    # Per-video dedup via a canonical source_platform_id that embeds
+    # the event_type and outcome digest so two different events in the
+    # same video insert as separate rows.
+    if not digest:
+        _norm = re.sub(r"\s+", " ", outcome_text.lower()).strip()
+        digest = hashlib.md5(_norm.encode("utf-8")).hexdigest()[:16]
+    source_id = f"yt_{video_id}_event_{event_type}_{digest}"
+    if db.execute(
+        sql_text("SELECT 1 FROM predictions WHERE source_platform_id = :sid LIMIT 1"),
+        {"sid": source_id},
+    ).first():
+        if stats is not None:
+            stats["items_deduped"] = int(stats.get("items_deduped", 0)) + 1
+        return _reject("dedup_collision", hr=f"{event_type}/{digest}")
+
+    forecaster = find_or_create_youtube_forecaster(channel_name, channel_id, db)
+    if not forecaster:
+        return _reject("forecaster_creation_failed")
+
+    if _binary_event_exists_cross_scraper(
+        event_type, digest, forecaster.id, publish_date, db,
+    ):
+        if stats is not None:
+            stats["items_deduped"] = int(stats.get("items_deduped", 0)) + 1
+        return _reject("cross_scraper_dupe", hr=f"{event_type}/{digest}")
+
+    # Evaluation window: eval_date is the deadline itself — the
+    # evaluator polls once per day and scores any binary event whose
+    # deadline is in the past. window_days is just the delta from
+    # prediction_date to deadline for display purposes.
+    from datetime import datetime as _dt
+    eval_date = _dt.combine(deadline, _dt.min.time())
+    window_days = max(1, (eval_date - publish_date).days) if publish_date else 30
+
+    quote = (pred.get("context_quote") or pred.get("quote") or "").strip()
+    parts = [f"{channel_name}: {event_type} — {outcome_text[:160]}"]
+    if quote:
+        parts.append(f'"{quote[:120]}"')
+    context_str = ". ".join(parts)[:500]
+
+    source_url = f"https://www.youtube.com/watch?v={video_id}"
+
+    db.add(
+        Prediction(
+            forecaster_id=forecaster.id,
+            ticker=ticker_to_store,
+            direction="bullish",  # always bullish on the event happening
+            prediction_date=publish_date,
+            evaluation_date=eval_date,
+            window_days=window_days,
+            target_price=None,  # binary events have no price target
+            entry_price=None,
+            source_url=source_url,
+            archive_url=source_url,
+            source_type="youtube",
+            source_title=(video_title or "")[:500],
+            source_platform_id=source_id,
+            sector=None,
+            context=context_str,
+            exact_quote=(quote or context_str)[:500],
+            outcome="pending",
+            verified_by=VERIFIED_BY,
+            call_type="binary_event_call",
+            prediction_category="binary_event_call",
+            event_type=event_type,
+            expected_outcome_text=outcome_text[:2000],
+            event_deadline=deadline,
+            # event_resolved_at + event_resolution_source stay NULL
+            # until the evaluator confirms the outcome (stubbed — see
+            # _score_binary_event for the follow-up-ship TODO).
+        )
+    )
+    db.flush()
+    if stats is not None:
+        stats["binary_events_extracted"] = int(
+            stats.get("binary_events_extracted", 0)
         ) + 1
     return True
