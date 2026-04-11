@@ -462,6 +462,25 @@ def _run_inner(db):
         # insert_youtube_regime_prediction. Stays 0 when
         # ENABLE_REGIME_CALL_EXTRACTION is off. Ship #12.
         "regime_calls_extracted": 0,
+        # Ship #9 (rescoped) — prediction metadata enrichment.
+        # timeframes_explicit counts accepted preds where Haiku
+        # parsed an explicit timeframe; timeframes_inferred counts
+        # accepted preds where the window came from a category
+        # default; timeframes_rejected counts rejections with
+        # reason='no_timeframe_determinable'; reference_rejected
+        # counts rejections with reason='unresolvable_reference'.
+        # Conviction counters break down the conviction_level
+        # distribution per run. All stay 0 when
+        # ENABLE_PREDICTION_METADATA_ENRICHMENT is off.
+        "timeframes_explicit": 0,
+        "timeframes_inferred": 0,
+        "timeframes_rejected": 0,
+        "reference_rejected": 0,
+        "conviction_strong": 0,
+        "conviction_moderate": 0,
+        "conviction_hedged": 0,
+        "conviction_hypothetical": 0,
+        "conviction_unknown": 0,
     }
 
     for row in batch_rows:
@@ -693,7 +712,16 @@ def _run_inner(db):
                     disclosures_extracted = :disclosures,
                     timestamps_matched = :timestamps_matched,
                     timestamps_failed = :timestamps_failed,
-                    regime_calls_extracted = :regime_calls
+                    regime_calls_extracted = :regime_calls,
+                    timeframes_explicit = :tf_explicit,
+                    timeframes_inferred = :tf_inferred,
+                    timeframes_rejected = :tf_rejected,
+                    reference_rejected = :ref_rejected,
+                    conviction_strong = :conv_strong,
+                    conviction_moderate = :conv_moderate,
+                    conviction_hedged = :conv_hedged,
+                    conviction_hypothetical = :conv_hypothetical,
+                    conviction_unknown = :conv_unknown
                 WHERE id = :id
             """), {
                 "id": run_id,
@@ -721,6 +749,15 @@ def _run_inner(db):
                 "timestamps_matched": int(stats.get("timestamps_matched", 0)),
                 "timestamps_failed": int(stats.get("timestamps_failed", 0)),
                 "regime_calls": int(stats.get("regime_calls_extracted", 0)),
+                "tf_explicit": int(stats.get("timeframes_explicit", 0)),
+                "tf_inferred": int(stats.get("timeframes_inferred", 0)),
+                "tf_rejected": int(stats.get("timeframes_rejected", 0)),
+                "ref_rejected": int(stats.get("reference_rejected", 0)),
+                "conv_strong": int(stats.get("conviction_strong", 0)),
+                "conv_moderate": int(stats.get("conviction_moderate", 0)),
+                "conv_hedged": int(stats.get("conviction_hedged", 0)),
+                "conv_hypothetical": int(stats.get("conviction_hypothetical", 0)),
+                "conv_unknown": int(stats.get("conviction_unknown", 0)),
             })
             db.commit()
         except Exception as e:
@@ -851,6 +888,38 @@ def _process_one_video(db, channel_name, channel_id, video_id, title, publish_da
     )
     stats["videos_classified"] += 1
     stats["predictions_extracted"] += telem.get("predictions_validated", 0)
+
+    # Ship #9 (rescoped) — drain Haiku's explicit rejection entries.
+    # The metadata_enrichment prompt block teaches Haiku to emit
+    # {"rejected": true, "reason": "no_timeframe_determinable" |
+    # "unresolvable_reference", "notes": "..."} for predictions that
+    # fail the new rejection checks. classify_video buffered these on
+    # telemetry["rejections"] with full per-rejection context; log
+    # each to youtube_scraper_rejections here where we have the
+    # channel_id / publish_dt / transcript_snippet context classify_video
+    # doesn't. Counter totals (timeframes_rejected + reference_rejected)
+    # flow into scraper_runs via stats so the admin diagnostics panel
+    # can show the per-run distribution.
+    for _rej in telem.get("rejections", []) or []:
+        _reason = str(_rej.get("reason") or "haiku_rejection").strip().lower()[:50]
+        _notes = _rej.get("notes")
+        log_youtube_rejection(
+            db,
+            video_id=video_id,
+            channel_id=channel_id,
+            channel_name=channel_name,
+            video_title=title,
+            video_published_at=publish_dt,
+            reason=_reason or "haiku_rejection",
+            haiku_reason=(str(_notes)[:500] if _notes else None),
+            haiku_raw=_rej,
+            transcript_snippet=transcript_snippet,
+            stats=stats,
+        )
+        if _reason == "no_timeframe_determinable":
+            stats["timeframes_rejected"] = int(stats.get("timeframes_rejected", 0)) + 1
+        elif _reason == "unresolvable_reference":
+            stats["reference_rejected"] = int(stats.get("reference_rejected", 0)) + 1
 
     # Aggregate per-call token + cost telemetry into the run-level
     # stats dict. Finalize writes these to scraper_runs so the admin

@@ -2301,7 +2301,30 @@ def classify_video(channel_name: str, title: str, publish_date: str,
             return [], telemetry
 
         telemetry["predictions_raw"] += len(parsed)
-        all_preds.extend(parsed)
+        # Ship #9 (rescoped) — rejection handling. Split Haiku's
+        # response into accepted entries and explicit rejections. The
+        # metadata enrichment prompt block teaches Haiku to emit
+        # {"rejected": true, "reason": "...", "notes": "..."} for
+        # predictions that fail the no_timeframe_determinable or
+        # unresolvable_reference checks. These entries are NOT fed to
+        # the validator — instead, they're buffered on telemetry so
+        # the channel monitor can log them to youtube_scraper_rejections
+        # with full context (channel_id, publish_dt, transcript snippet)
+        # that isn't in scope here.
+        for _p in parsed:
+            if isinstance(_p, dict) and _p.get("rejected") is True:
+                telemetry.setdefault("rejections", []).append(_p)
+                reason = str(_p.get("reason") or "").strip().lower()
+                if reason == "no_timeframe_determinable":
+                    telemetry["timeframes_rejected"] = int(
+                        telemetry.get("timeframes_rejected", 0)
+                    ) + 1
+                elif reason == "unresolvable_reference":
+                    telemetry["reference_rejected"] = int(
+                        telemetry.get("reference_rejected", 0)
+                    ) + 1
+            else:
+                all_preds.append(_p)
 
         # 1-second pacing between API calls per the spec
         if i < len(chunks) - 1:
