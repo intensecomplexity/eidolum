@@ -3389,6 +3389,64 @@ def health():
     return {"status": "ok", "app": "Eidolum API"}
 
 
+@app.get("/api/health/scraper-activity")
+def scraper_activity_health(db: "_Session" = None):
+    """Public counts-only health signal for background scrapers. Surfaces
+    the per-source scraper_runs activity over the last 24h so we can tell
+    whether the worker is alive without needing admin auth. No PII, no
+    row data — only aggregate counts and timestamps."""
+    from sqlalchemy import text as _ft
+    from database import get_db as _gdb
+    # Open a fresh session since this endpoint has no Depends
+    gen = _gdb()
+    db = next(gen)
+    try:
+        # Total runs + most recent across all sources
+        overall = db.execute(_ft("""
+            SELECT COUNT(*) AS total_runs,
+                   MAX(started_at) AS most_recent_run,
+                   COUNT(*) FILTER (WHERE started_at > NOW() - INTERVAL '24 hours') AS runs_24h
+            FROM scraper_runs
+        """)).first()
+        # Per-source breakdown over 24h
+        by_source_rows = db.execute(_ft("""
+            SELECT source,
+                   COUNT(*) AS runs_24h,
+                   MAX(started_at) AS most_recent,
+                   SUM(items_fetched) AS items_fetched_24h,
+                   SUM(items_inserted) AS items_inserted_24h,
+                   SUM(items_rejected) AS items_rejected_24h
+            FROM scraper_runs
+            WHERE started_at > NOW() - INTERVAL '24 hours'
+            GROUP BY source
+            ORDER BY source
+        """)).fetchall()
+        return {
+            "status": "ok",
+            "total_runs": int(overall[0] or 0) if overall else 0,
+            "most_recent_run": overall[1].isoformat() if overall and overall[1] else None,
+            "runs_24h": int(overall[2] or 0) if overall else 0,
+            "by_source_24h": [
+                {
+                    "source": r[0],
+                    "runs": int(r[1] or 0),
+                    "most_recent": r[2].isoformat() if r[2] else None,
+                    "items_fetched": int(r[3] or 0),
+                    "items_inserted": int(r[4] or 0),
+                    "items_rejected": int(r[5] or 0),
+                }
+                for r in by_source_rows
+            ],
+        }
+    except Exception as e:
+        return {"status": "error", "error": str(e)[:200]}
+    finally:
+        try:
+            next(gen, None)
+        except Exception:
+            pass
+
+
 from fastapi import Depends as _Depends
 from sqlalchemy.orm import Session as _Session
 from database import get_db as _get_db
