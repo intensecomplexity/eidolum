@@ -8,7 +8,8 @@ from sqlalchemy import func, text as sql_text
 from database import get_db
 from models import (
     Forecaster, Prediction, TrackedXAccount, SuggestedXAccount,
-    XScraperRejection, YouTubeChannelMeta, SectorEtfAlias, Config,
+    XScraperRejection, YouTubeChannelMeta, SectorEtfAlias,
+    MacroConceptAlias, Config,
 )
 from middleware.auth import require_admin, require_admin_user
 from rate_limit import limiter
@@ -1567,3 +1568,152 @@ def youtube_run_details(
             "by_category": by_category,
         },
     }
+
+
+# ── Macro Concept Aliases Admin ────────────────────────────────────────────
+#
+# Admin CRUD for the macro_concept_aliases table — the canonical macro
+# concept → ETF proxy mapping used by the YouTube classifier's
+# macro_call extraction. Admin-only (require_admin / require_admin_user).
+# Matches the shape of the sector-aliases admin endpoints.
+
+
+def _serialize_macro_alias(row) -> dict:
+    return {
+        "id": int(row.id),
+        "concept": row.concept,
+        "direction_bias": row.direction_bias,
+        "primary_etf": row.primary_etf,
+        "secondary_etfs": row.secondary_etfs,
+        "aliases": row.aliases,
+        "created_at": row.created_at.isoformat() if row.created_at else None,
+    }
+
+
+@router.get("/admin/macro-concepts")
+@limiter.limit("30/minute")
+def list_macro_concepts(
+    request: Request,
+    admin: bool = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    """List every row in macro_concept_aliases ordered by concept name.
+    Used by the /admin/macro-concepts management page."""
+    rows = db.query(MacroConceptAlias).order_by(
+        MacroConceptAlias.concept.asc()
+    ).all()
+    return [_serialize_macro_alias(r) for r in rows]
+
+
+@router.post("/admin/macro-concepts")
+@limiter.limit("30/minute")
+async def add_macro_concept(
+    request: Request,
+    admin_id: int = Depends(require_admin_user),
+    db: Session = Depends(get_db),
+):
+    """Create a new macro concept → ETF mapping.
+    Body: {concept, primary_etf, direction_bias?, secondary_etfs?, aliases?}.
+    concept must be unique (409 on collision)."""
+    body = _json.loads(await request.body())
+    concept = (body.get("concept") or "").strip().lower()
+    primary_etf = (body.get("primary_etf") or "").strip().upper()
+    direction_bias = (body.get("direction_bias") or "direct").strip().lower()
+    secondary_etfs = (body.get("secondary_etfs") or "").strip() or None
+    aliases = (body.get("aliases") or "").strip() or None
+
+    if not concept:
+        raise HTTPException(status_code=400, detail="concept is required")
+    if not primary_etf:
+        raise HTTPException(status_code=400, detail="primary_etf is required")
+    if len(primary_etf) > 16:
+        raise HTTPException(status_code=400, detail="primary_etf max length 16")
+    if direction_bias not in ("direct", "inverse"):
+        raise HTTPException(
+            status_code=400,
+            detail="direction_bias must be 'direct' or 'inverse'",
+        )
+
+    existing = db.query(MacroConceptAlias).filter(
+        MacroConceptAlias.concept == concept
+    ).first()
+    if existing:
+        raise HTTPException(
+            status_code=409,
+            detail=f"concept '{concept}' already exists",
+        )
+
+    row = MacroConceptAlias(
+        concept=concept,
+        direction_bias=direction_bias,
+        primary_etf=primary_etf,
+        secondary_etfs=secondary_etfs,
+        aliases=aliases,
+    )
+    db.add(row)
+    db.commit()
+    db.refresh(row)
+    return _serialize_macro_alias(row)
+
+
+@router.patch("/admin/macro-concepts/{alias_id}")
+@limiter.limit("30/minute")
+async def update_macro_concept(
+    request: Request,
+    alias_id: int,
+    admin_id: int = Depends(require_admin_user),
+    db: Session = Depends(get_db),
+):
+    """Update one or more fields on an existing macro concept row.
+    Body fields are all optional; unspecified fields stay unchanged."""
+    row = db.query(MacroConceptAlias).filter(
+        MacroConceptAlias.id == alias_id
+    ).first()
+    if not row:
+        raise HTTPException(status_code=404, detail="concept not found")
+
+    body = _json.loads(await request.body())
+    if "primary_etf" in body:
+        new_etf = (body.get("primary_etf") or "").strip().upper()
+        if not new_etf:
+            raise HTTPException(status_code=400, detail="primary_etf cannot be empty")
+        if len(new_etf) > 16:
+            raise HTTPException(status_code=400, detail="primary_etf max length 16")
+        row.primary_etf = new_etf
+    if "direction_bias" in body:
+        new_bias = (body.get("direction_bias") or "").strip().lower()
+        if new_bias not in ("direct", "inverse"):
+            raise HTTPException(
+                status_code=400,
+                detail="direction_bias must be 'direct' or 'inverse'",
+            )
+        row.direction_bias = new_bias
+    if "secondary_etfs" in body:
+        row.secondary_etfs = (body.get("secondary_etfs") or "").strip() or None
+    if "aliases" in body:
+        row.aliases = (body.get("aliases") or "").strip() or None
+    db.commit()
+    db.refresh(row)
+    return _serialize_macro_alias(row)
+
+
+@router.delete("/admin/macro-concepts/{alias_id}")
+@limiter.limit("30/minute")
+def delete_macro_concept(
+    request: Request,
+    alias_id: int,
+    admin_id: int = Depends(require_admin_user),
+    db: Session = Depends(get_db),
+):
+    """Delete a macro concept row. Predictions already inserted against
+    the mapped ETF stay in the database — only the concept→ETF resolver
+    loses access to this mapping."""
+    row = db.query(MacroConceptAlias).filter(
+        MacroConceptAlias.id == alias_id
+    ).first()
+    if not row:
+        raise HTTPException(status_code=404, detail="concept not found")
+    snapshot = _serialize_macro_alias(row)
+    db.delete(row)
+    db.commit()
+    return {"deleted": True, "snapshot": snapshot}
