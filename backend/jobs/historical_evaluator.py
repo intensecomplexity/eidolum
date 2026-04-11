@@ -110,6 +110,25 @@ def evaluate_batch(max_tickers: int | None = None) -> dict:
     _history_cache.clear()  # Clear between batches
     now = datetime.utcnow()
 
+    # ── STEP 0: Phase-based scoring for conditional_call predictions ───
+    # Conditional calls need a two-phase sweep that doesn't fit the
+    # main eval loop's prediction_date→evaluation_date window logic.
+    # Phase 1 checks whether the trigger has fired; Phase 2 scores
+    # the outcome once it does. Runs first so trigger_fired_at is
+    # populated before the main loop considers these rows.
+    try:
+        _conditional_stats = _process_conditional_calls(now)
+        if any(_conditional_stats.values()):
+            print(
+                f"[HistEval] conditional_call pass: "
+                f"unresolved={_conditional_stats['unresolved']} "
+                f"triggers_fired={_conditional_stats['triggers_fired']} "
+                f"scored={_conditional_stats['scored']}",
+                flush=True,
+            )
+    except Exception as _ce:
+        print(f"[HistEval] conditional_call pass error: {_ce}")
+
     # ── STEP 1: Read pending predictions (short DB connection) ──────────
     # Whitelist: only US tickers are supported by Polygon/Tiingo/FMP. A US
     # ticker is 1-5 uppercase letters (AAPL, NVDA, F) or 2-3 letters + dot +
@@ -971,3 +990,298 @@ def refresh_all_forecaster_stats():
         return {"error": str(e)}
     finally:
         db.close()
+
+
+# ── Conditional call phase-based scoring ────────────────────────────────────
+#
+# Runs at the top of evaluate_batch before the main per-ticker loop.
+# Handles the three states a conditional_call row can be in:
+#
+#   Phase 1 — trigger not yet fired:
+#     - If trigger_deadline has passed: set outcome='unresolved'
+#     - Else if trigger_type is price_hold or price_break: check price
+#       data. If the trigger fires, set trigger_fired_at and leave the
+#       row pending for phase 2 on the next eval pass.
+#     - Else (non-price triggers): leave pending. The row will expire
+#       to 'unresolved' once trigger_deadline passes.
+#
+#   Phase 2 — trigger has fired, outcome not yet scored:
+#     - If (trigger_fired_at + outcome_window_days) has passed, score
+#       the outcome using the normal ticker_call scoring path
+#       (anchoring at trigger_fired_at instead of prediction_date).
+#     - Else: leave pending.
+#
+# The new outcome value 'unresolved' is EXCLUDED from accuracy
+# denominators — see the aggregation queries in routers/leaderboard.py
+# and routers/forecasters.py which filter
+# `outcome IN ('hit','near','miss','correct','incorrect')`. 'unresolved'
+# is not in that set.
+
+
+def _check_price_trigger(trigger_ticker: str, threshold: float, trigger_type: str,
+                          since: datetime, until: datetime) -> tuple[datetime | None, str]:
+    """Return (fired_at, reason) for a price-based conditional trigger.
+
+    Fetches historical prices for trigger_ticker, walks the window from
+    `since` to `until`, and decides whether the trigger has fired.
+
+    trigger_type='price_hold':
+      - Fires if the ticker NEVER closed below threshold for the full
+        window. Returns (until, 'hold_completed') once since+window has
+        fully elapsed with no break, or (None, 'hold_broken') as soon
+        as a close below threshold is observed, or (None, 'still_holding')
+        while the window is still open and the hold has not yet been
+        broken.
+
+    trigger_type='price_break':
+      - Fires the first day the ticker closes on the opposite side of
+        threshold from the anchor close (close at `since`). Returns
+        (first_cross_day, 'break_down') or ('break_up') on fire, or
+        (None, 'not_fired') while the window is still open without a
+        cross.
+
+    Returns (None, 'no_data') on any fetch failure so the caller can
+    leave the row pending and retry later.
+    """
+    try:
+        prices = _fetch_history(trigger_ticker, None, None)
+    except Exception:
+        return None, "no_data"
+    if not prices:
+        return None, "no_data"
+
+    # Walk dates in the window. prices is keyed by date strings (Y-M-D)
+    # or datetime, depending on the source; normalize to sorted list.
+    since_d = since.date() if hasattr(since, "date") else since
+    until_d = until.date() if hasattr(until, "date") else until
+
+    # Build a sorted list of (date, close_price) within the window
+    def _coerce_date(k):
+        try:
+            if isinstance(k, str):
+                return datetime.strptime(k[:10], "%Y-%m-%d").date()
+            if hasattr(k, "date"):
+                return k.date()
+            return k
+        except Exception:
+            return None
+
+    walk: list[tuple] = []
+    for k, v in prices.items():
+        d = _coerce_date(k)
+        if d is None:
+            continue
+        if since_d <= d <= until_d:
+            try:
+                walk.append((d, float(v)))
+            except (TypeError, ValueError):
+                continue
+    walk.sort(key=lambda x: x[0])
+    if not walk:
+        return None, "no_data"
+
+    anchor_close = walk[0][1]
+
+    if trigger_type == "price_hold":
+        # Fire if we complete the window with no close below threshold.
+        for d, close in walk:
+            if close < threshold:
+                # Hold broken — report the break date so the caller can
+                # mark 'unresolved' immediately.
+                return None, "hold_broken"
+        # Walked the full window with no break
+        return walk[-1][0], "hold_completed"
+
+    if trigger_type == "price_break":
+        # Direction of the break is inferred from the anchor: if anchor
+        # is above threshold, break means "closed below"; if below,
+        # break means "closed above". If anchor == threshold, use "below".
+        if anchor_close >= threshold:
+            for d, close in walk[1:]:
+                if close < threshold:
+                    return d, "break_down"
+            return None, "not_fired"
+        else:
+            for d, close in walk[1:]:
+                if close > threshold:
+                    return d, "break_up"
+            return None, "not_fired"
+
+    return None, "unsupported_trigger_type"
+
+
+def _process_conditional_calls(now: datetime) -> dict:
+    """Phase-based scoring pass for conditional_call rows. Handles
+    three states: (1) trigger pending + deadline expired → unresolved,
+    (2) price trigger pending + deadline open → price check,
+    (3) trigger fired + outcome window elapsed → outcome scoring.
+
+    Returns a counters dict for the caller to log.
+    """
+    from database import BgSessionLocal as SessionLocal
+    counters = {"unresolved": 0, "triggers_fired": 0, "scored": 0}
+
+    db = SessionLocal()
+    try:
+        rows = db.execute(sql_text("""
+            SELECT id, ticker, direction, target_price, entry_price,
+                   prediction_date, window_days,
+                   trigger_type, trigger_ticker, trigger_price,
+                   trigger_deadline, trigger_fired_at, outcome_window_days,
+                   created_at
+            FROM predictions
+            WHERE prediction_category = 'conditional_call'
+              AND (outcome = 'pending' OR outcome IS NULL OR outcome = '')
+              AND (ticker ~ '^[A-Z]{1,5}$' OR ticker ~ '^[A-Z]{1,3}\\.[A-Z]$')
+            LIMIT 1000
+        """)).fetchall()
+    except Exception as _e:
+        db.close()
+        return counters
+
+    if not rows:
+        db.close()
+        return counters
+
+    updates: list[tuple] = []  # (id, outcome, trigger_fired_at, actual_return, summary)
+
+    for r in rows:
+        (pid, ticker, direction, target_price, entry_price,
+         prediction_date, window_days,
+         trigger_type, trigger_ticker, trigger_price,
+         trigger_deadline, trigger_fired_at, outcome_window_days,
+         created_at) = r
+
+        # Phase 1: trigger not yet fired
+        if trigger_fired_at is None:
+            # Deadline expired → unresolved
+            if trigger_deadline and now > trigger_deadline:
+                updates.append((pid, "unresolved", None, None,
+                                f"Trigger deadline passed without firing: {trigger_type}"))
+                counters["unresolved"] += 1
+                continue
+
+            # Price-based triggers: attempt resolution via price history
+            if trigger_type in ("price_hold", "price_break") and trigger_ticker and trigger_price:
+                fired_at, reason = _check_price_trigger(
+                    trigger_ticker=trigger_ticker,
+                    threshold=float(trigger_price),
+                    trigger_type=trigger_type,
+                    since=created_at or prediction_date,
+                    until=min(now, trigger_deadline) if trigger_deadline else now,
+                )
+                if reason == "hold_broken":
+                    # Hold-type trigger failed mid-window: the
+                    # precondition was never satisfied, so the whole
+                    # conditional is unresolved.
+                    updates.append((pid, "unresolved", None, None,
+                                    "price_hold broken: ticker closed below threshold"))
+                    counters["unresolved"] += 1
+                    continue
+                if fired_at is not None:
+                    # Trigger fired — write timestamp and leave pending
+                    # for the next pass to run phase 2 scoring.
+                    fired_dt = datetime.combine(fired_at, datetime.min.time()) \
+                        if hasattr(fired_at, "isoformat") and not hasattr(fired_at, "hour") else fired_at
+                    updates.append((pid, "pending", fired_dt, None,
+                                    f"trigger_fired ({reason})"))
+                    counters["triggers_fired"] += 1
+                    continue
+            # Non-price triggers or price triggers still pending: skip
+            continue
+
+        # Phase 2: trigger has fired, check outcome window
+        window = int(outcome_window_days or window_days or 90)
+        outcome_eval_at = trigger_fired_at + timedelta(days=window)
+        if now < outcome_eval_at:
+            continue  # outcome window still open
+
+        # Score the outcome using normal ticker_call scoring anchored
+        # at trigger_fired_at (entry) and outcome_eval_at (exit).
+        prices = _fetch_history(ticker, None, None)
+        if not prices:
+            continue
+        entry = _closest_price(prices, trigger_fired_at)
+        exit_price = _closest_price(prices, outcome_eval_at)
+        if entry is None or exit_price is None:
+            continue
+
+        raw_move = round(((exit_price - entry) / entry) * 100, 2)
+        ret = -raw_move if direction == "bearish" else raw_move
+        tolerance = _get_tolerance(window, _TOLERANCE)
+        min_movement = _get_tolerance(window, _MIN_MOVEMENT)
+
+        if direction == "neutral":
+            abs_ret = abs(raw_move)
+            if abs_ret <= 5.0:
+                outcome = "hit"
+            elif abs_ret <= 10.0:
+                outcome = "near"
+            else:
+                outcome = "miss"
+        elif target_price and float(target_price) > 0:
+            tp = float(target_price)
+            target_dist_pct = abs(exit_price - tp) / tp * 100
+            if direction == "bullish":
+                if exit_price >= tp or target_dist_pct <= tolerance:
+                    outcome = "hit"
+                elif raw_move >= min_movement:
+                    outcome = "near"
+                else:
+                    outcome = "miss"
+            else:
+                if exit_price <= tp or target_dist_pct <= tolerance:
+                    outcome = "hit"
+                elif raw_move <= -min_movement:
+                    outcome = "near"
+                else:
+                    outcome = "miss"
+        else:
+            if direction == "bullish":
+                outcome = "hit" if exit_price > entry else "miss"
+            else:
+                outcome = "hit" if exit_price < entry else "miss"
+
+        summary = (
+            f"Conditional outcome: trigger fired {trigger_fired_at.date()}, "
+            f"{direction} {ticker} "
+            f"{'+'if ret >= 0 else ''}{ret:.2f}% over {window}d → {outcome}"
+        )
+        updates.append((pid, outcome, None, ret, summary[:500]))
+        counters["scored"] += 1
+
+    # Apply updates
+    try:
+        for pid, outcome, fired_at, ret, summary in updates:
+            if fired_at is not None:
+                db.execute(sql_text("""
+                    UPDATE predictions
+                    SET trigger_fired_at = :fa,
+                        evaluation_summary = :s,
+                        evaluated_at = :now
+                    WHERE id = :id
+                """), {"fa": fired_at, "s": summary, "now": now, "id": pid})
+            elif outcome == "unresolved":
+                db.execute(sql_text("""
+                    UPDATE predictions
+                    SET outcome = 'unresolved',
+                        evaluation_summary = :s,
+                        evaluated_at = :now
+                    WHERE id = :id
+                """), {"s": summary, "now": now, "id": pid})
+            else:
+                db.execute(sql_text("""
+                    UPDATE predictions
+                    SET outcome = :o,
+                        actual_return = :r,
+                        evaluation_summary = :s,
+                        evaluated_at = :now
+                    WHERE id = :id
+                """), {"o": outcome, "r": ret, "s": summary, "now": now, "id": pid})
+        db.commit()
+    except Exception as _e:
+        db.rollback()
+        print(f"[HistEval] conditional_call update error: {_e}")
+    finally:
+        db.close()
+    return counters
