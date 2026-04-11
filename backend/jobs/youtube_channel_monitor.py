@@ -49,6 +49,7 @@ from jobs.youtube_classifier import (
     insert_youtube_metric_forecast_prediction,
     insert_youtube_conditional_prediction,
     insert_youtube_disclosure,
+    insert_youtube_regime_prediction,
     log_youtube_rejection,
     transcript_proxy_status,
     PIPELINE_VERSION,
@@ -457,6 +458,10 @@ def _run_inner(db):
         # (failed).
         "timestamps_matched": 0,
         "timestamps_failed": 0,
+        # Per-run regime_call counter — incremented inside
+        # insert_youtube_regime_prediction. Stays 0 when
+        # ENABLE_REGIME_CALL_EXTRACTION is off. Ship #12.
+        "regime_calls_extracted": 0,
     }
 
     for row in batch_rows:
@@ -687,7 +692,8 @@ def _run_inner(db):
                     conditional_calls_extracted = :conditional_calls,
                     disclosures_extracted = :disclosures,
                     timestamps_matched = :timestamps_matched,
-                    timestamps_failed = :timestamps_failed
+                    timestamps_failed = :timestamps_failed,
+                    regime_calls_extracted = :regime_calls
                 WHERE id = :id
             """), {
                 "id": run_id,
@@ -714,6 +720,7 @@ def _run_inner(db):
                 "disclosures": int(stats.get("disclosures_extracted", 0)),
                 "timestamps_matched": int(stats.get("timestamps_matched", 0)),
                 "timestamps_failed": int(stats.get("timestamps_failed", 0)),
+                "regime_calls": int(stats.get("regime_calls_extracted", 0)),
             })
             db.commit()
         except Exception as e:
@@ -998,6 +1005,18 @@ def _process_one_video(db, channel_name, channel_id, video_id, title, publish_da
                     transcript_snippet=transcript_snippet,
                     stats=stats,
                     transcript_data=transcript_data,
+                )
+            elif kind == "regime_call":
+                ok = insert_youtube_regime_prediction(
+                    pred,
+                    channel_name=channel_name,
+                    channel_id=channel_id,
+                    video_id=video_id,
+                    video_title=title,
+                    publish_date=publish_dt,
+                    db=db,
+                    transcript_snippet=transcript_snippet,
+                    stats=stats,
                 )
             else:
                 ok = insert_youtube_prediction(

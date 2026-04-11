@@ -2184,6 +2184,7 @@ def _validate_and_dedupe_predictions(raw: list) -> list[dict]:
     seen_metrics: set[tuple[str, str, str]] = set()
     seen_conditionals: set[tuple[str, str, str]] = set()
     seen_disclosures: set[tuple[str, str, str]] = set()
+    seen_regimes: set[tuple[str, str]] = set()
     out: list[dict] = []
     for p in raw:
         if not isinstance(p, dict):
@@ -2492,6 +2493,53 @@ def _validate_and_dedupe_predictions(raw: list) -> list[dict]:
             p["_size_pct"] = p.get("size_pct")
             p["_entry_price"] = p.get("entry_price")
             p["_reasoning_text"] = (p.get("reasoning_text") or None)
+            out.append(p)
+            continue
+
+        # Regime-call branch: derived_from='regime_call' — structural
+        # market-phase claim. No price target, no explicit direction
+        # (direction is derived from regime_type at insert time). The
+        # validator enforces the 8-value regime_type allowlist and
+        # defaults the instrument to SPY. Dedup on
+        # (regime_type, regime_instrument) per video so duplicate
+        # mentions across transcript chunks collapse.
+        if str(p.get("derived_from") or "").strip().lower() == "regime_call":
+            regime_type = (p.get("regime_type") or "").strip().lower()
+            if regime_type not in (
+                "bull_continuing", "bull_starting", "topping",
+                "bear_starting", "bear_continuing", "bottoming",
+                "correction", "consolidation",
+            ):
+                continue
+            instrument = (p.get("regime_instrument") or "").upper().strip().lstrip("$")
+            instrument = re.sub(r"[^A-Z0-9]", "", instrument)
+            if not instrument:
+                instrument = "SPY"
+            if len(instrument) > 5:
+                continue
+            key = (regime_type, instrument)
+            if key in seen_regimes:
+                continue
+            seen_regimes.add(key)
+            # Derive direction from regime_type so the existing ticker
+            # index / direction queries still work. bull_* and bottoming
+            # are bullish; bear_* and topping are bearish; correction
+            # and consolidation are neutral (no directional bet).
+            if regime_type in ("bull_continuing", "bull_starting", "bottoming"):
+                derived_dir = "bullish"
+            elif regime_type in ("bear_continuing", "bear_starting", "topping"):
+                derived_dir = "bearish"
+            else:
+                derived_dir = "neutral"
+            p["ticker"] = instrument
+            p["direction"] = derived_dir
+            p["_kind"] = "regime_call"
+            p["_derived_from"] = "regime_call"
+            p["_regime_type"] = regime_type
+            p["_regime_instrument"] = instrument
+            # Ensure no stray price_target sneaks through from a Haiku
+            # hallucination — regime_call is always target-free.
+            p["price_target"] = None
             out.append(p)
             continue
 
@@ -4427,5 +4475,228 @@ def insert_youtube_disclosure(
     if stats is not None:
         stats["disclosures_extracted"] = int(
             stats.get("disclosures_extracted", 0)
+        ) + 1
+    return True
+
+
+# ── Regime call insertion (ship #12) ───────────────────────────────────────
+#
+# regime_call rows land in the predictions table with
+# prediction_category='regime_call' and the regime_type / regime_instrument
+# columns populated. Unlike every prior type they have NO price target —
+# the claim is structural, not magnitude-based. Scoring is computed by
+# the evaluator's drawdown/runup/new-high rule set, not by comparing a
+# final price to a target. direction is derived from regime_type so the
+# existing (ticker, direction) indexes still cover these rows without
+# special cases in query code.
+
+
+REGIME_TYPES_ALLOWED = (
+    "bull_continuing",
+    "bull_starting",
+    "topping",
+    "bear_starting",
+    "bear_continuing",
+    "bottoming",
+    "correction",
+    "consolidation",
+)
+
+REGIME_DEFAULT_WINDOW_DAYS = 180  # 6 months — regime claims are longer-horizon
+
+
+def _regime_call_exists_cross_scraper(
+    regime_type: str, regime_instrument: str,
+    forecaster_id: int, prediction_date, db,
+) -> bool:
+    """Cross-scraper dedup for regime calls. Key is
+    (regime_type, regime_instrument, forecaster, date) within a 24h
+    window. Two distinct regime_types on the same instrument from the
+    same forecaster on the same day are both legitimate — e.g. a
+    forecaster could say "SPY is consolidating AND small caps are
+    starting a new bull". The dedup only collapses literal repeats."""
+    if not (regime_type and regime_instrument and forecaster_id and prediction_date):
+        return False
+    try:
+        from datetime import timedelta
+        date_start = prediction_date - timedelta(hours=24)
+        date_end = prediction_date + timedelta(hours=24)
+        row = db.execute(sql_text("""
+            SELECT 1 FROM predictions
+            WHERE prediction_category = 'regime_call'
+              AND regime_type = :rt
+              AND regime_instrument = :ri
+              AND forecaster_id = :fid
+              AND prediction_date BETWEEN :ds AND :de
+            LIMIT 1
+        """), {
+            "rt": regime_type,
+            "ri": regime_instrument,
+            "fid": int(forecaster_id),
+            "ds": date_start,
+            "de": date_end,
+        }).first()
+    except Exception as _e:
+        log.warning("[YT-CLF] regime_call cross-scraper dedup failed: %s", _e)
+        return False
+    return row is not None
+
+
+def insert_youtube_regime_prediction(
+    pred: dict,
+    *,
+    channel_name: str,
+    channel_id: str | None,
+    video_id: str,
+    video_title: str,
+    publish_date: datetime,
+    db,
+    transcript_snippet: str | None = None,
+    stats: dict | None = None,
+) -> bool:
+    """Insert a regime_call prediction.
+
+    Stores the row with prediction_category='regime_call' and the
+    two required regime_* metadata columns. direction is derived from
+    regime_type (bull_* and bottoming = bullish, bear_* and topping =
+    bearish, correction and consolidation = neutral). target_price
+    stays NULL. Evaluation date defaults to publish_date + 6 months
+    when the speaker doesn't give an explicit window.
+
+    Rejection paths (each logs to youtube_scraper_rejections):
+      - regime_type not in allowlist → 'regime_invalid_type'
+      - regime_instrument invalid / too long → 'regime_invalid_instrument'
+      - per-video dedup hit → 'dedup_collision'
+      - cross-scraper dupe → 'cross_scraper_dupe'
+      - forecaster create failure → 'forecaster_creation_failed'
+    """
+    from models import Prediction
+
+    def _reject(reason: str, hr: str | None = None) -> bool:
+        log_youtube_rejection(
+            db,
+            video_id=video_id,
+            channel_id=channel_id,
+            channel_name=channel_name,
+            video_title=video_title,
+            video_published_at=publish_date,
+            reason=reason,
+            haiku_reason=hr,
+            haiku_raw=pred,
+            transcript_snippet=transcript_snippet,
+            stats=stats,
+        )
+        return False
+
+    regime_type = (
+        pred.get("_regime_type") or pred.get("regime_type") or ""
+    ).strip().lower()
+    if regime_type not in REGIME_TYPES_ALLOWED:
+        return _reject("regime_invalid_type", hr=regime_type or None)
+
+    instrument = (
+        pred.get("_regime_instrument") or pred.get("regime_instrument") or "SPY"
+    ).upper().strip().lstrip("$")
+    instrument = re.sub(r"[^A-Z0-9]", "", instrument)
+    if not instrument or len(instrument) > 5:
+        return _reject("regime_invalid_instrument", hr=instrument or None)
+
+    # Derive direction from regime_type (validator already stamped it
+    # but we re-derive defensively so calling insert() with a raw
+    # classifier output also works).
+    if regime_type in ("bull_continuing", "bull_starting", "bottoming"):
+        direction = "bullish"
+    elif regime_type in ("bear_continuing", "bear_starting", "topping"):
+        direction = "bearish"
+    else:
+        direction = "neutral"
+
+    # Per-video dedup via canonical source_platform_id.
+    source_id = f"yt_{video_id}_regime_{regime_type}_{instrument}"
+    if db.execute(
+        sql_text("SELECT 1 FROM predictions WHERE source_platform_id = :sid LIMIT 1"),
+        {"sid": source_id},
+    ).first():
+        if stats is not None:
+            stats["items_deduped"] = int(stats.get("items_deduped", 0)) + 1
+        return _reject("dedup_collision", hr=f"{regime_type}/{instrument}")
+
+    # Validate the instrument against ticker_sectors. SPY/QQQ/IWM/BTC
+    # are all in the sector table so this is a cheap sanity check.
+    if not validate_ticker_in_db(instrument, db):
+        return _reject("regime_invalid_instrument", hr=instrument)
+
+    forecaster = find_or_create_youtube_forecaster(channel_name, channel_id, db)
+    if not forecaster:
+        return _reject("forecaster_creation_failed")
+
+    if _regime_call_exists_cross_scraper(
+        regime_type, instrument, forecaster.id, publish_date, db,
+    ):
+        if stats is not None:
+            stats["items_deduped"] = int(stats.get("items_deduped", 0)) + 1
+        return _reject("cross_scraper_dupe", hr=f"{regime_type}/{instrument}")
+
+    # Evaluation window: prefer Haiku's timeframe if given, otherwise
+    # default to publish_date + 6 months. Regime claims are longer-
+    # horizon than ticker_call so 180 days is the right floor.
+    eval_date, window_days = _parse_evaluation_date(
+        pred.get("timeframe"), publish_date,
+    )
+    if not window_days or window_days < 60:
+        from datetime import timedelta
+        eval_date = publish_date + timedelta(days=REGIME_DEFAULT_WINDOW_DAYS)
+        window_days = REGIME_DEFAULT_WINDOW_DAYS
+
+    quote = (pred.get("context_quote") or pred.get("quote") or "").strip()
+    _label = regime_type.replace("_", " ").title()
+    parts = [f"{channel_name}: {_label} on {instrument}"]
+    if quote:
+        parts.append(f'"{quote[:140]}"')
+    context_str = ". ".join(parts)[:500]
+
+    source_url = f"https://www.youtube.com/watch?v={video_id}"
+
+    # Sector lookup (best-effort) — SPY/QQQ/IWM normally resolve to
+    # "ETF" or a broad classification, which is fine for display.
+    sector = None
+    try:
+        from jobs.sector_lookup import get_sector
+        sector = get_sector(instrument, db)
+    except Exception:
+        sector = None
+
+    db.add(
+        Prediction(
+            forecaster_id=forecaster.id,
+            ticker=instrument,
+            direction=direction,
+            prediction_date=publish_date,
+            evaluation_date=eval_date,
+            window_days=window_days,
+            target_price=None,  # regime_call has no explicit target
+            entry_price=None,
+            source_url=source_url,
+            archive_url=source_url,
+            source_type="youtube",
+            source_title=(video_title or "")[:500],
+            source_platform_id=source_id,
+            sector=sector,
+            context=context_str,
+            exact_quote=(quote or context_str)[:500],
+            outcome="pending",
+            verified_by=VERIFIED_BY,
+            call_type="regime_call",
+            prediction_category="regime_call",
+            regime_type=regime_type,
+            regime_instrument=instrument,
+            # regime_max_drawdown / regime_max_runup / regime_new_highs
+            # / regime_new_lows stay NULL until the evaluator scores.
+        )
+    )
+    db.flush()
+    if stats is not None:
+        stats["regime_calls_extracted"] = int(
+            stats.get("regime_calls_extracted", 0)
         ) + 1
     return True
