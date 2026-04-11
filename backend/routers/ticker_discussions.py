@@ -12,6 +12,7 @@ from database import get_db
 from models import TickerDiscussion, TickerDiscussionLike, User
 from middleware.auth import require_user
 from rate_limit import limiter
+from utils.ticker import ticker_is_known
 
 router = APIRouter()
 
@@ -51,6 +52,13 @@ def create_discussion_post(
 ):
     ticker = ticker.upper().strip()
     text = req.text.strip()
+
+    # Ship #13B Bug 12: don't let users attach a discussion thread to a
+    # ticker that doesn't exist in the system. If the asset page would
+    # 404, this endpoint should too, so the DB never accumulates
+    # discussions keyed on bogus symbols.
+    if not ticker_is_known(db, ticker):
+        raise HTTPException(status_code=404, detail=f"Unknown ticker: {ticker}")
 
     if len(text) < 2:
         raise HTTPException(status_code=400, detail="Post must be at least 2 characters")

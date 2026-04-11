@@ -1,10 +1,11 @@
 import time as _time
-from fastapi import APIRouter, Depends, Query, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy.orm import Session
 from sqlalchemy import text as sql_text
 from database import get_db
 from models import Prediction, Forecaster, format_timestamp, get_youtube_timestamp_url
 from utils import compute_forecaster_stats
+from utils.ticker import ticker_is_known
 from rate_limit import limiter
 
 router = APIRouter()
@@ -343,7 +344,12 @@ def get_asset_consensus(
     db: Session = Depends(get_db),
     days: int = Query(90, description="Look-back window in days"),
 ):
-    ticker = ticker.upper()
+    ticker = ticker.upper().strip()
+    if not ticker_is_known(db, ticker):
+        # Ship #13B Bug 12: don't render an empty "0 calls" asset page
+        # for a path that was never a real ticker. Known means any of
+        # TICKER_INFO, ticker_sectors, or at least one prediction.
+        raise HTTPException(status_code=404, detail=f"Unknown ticker: {ticker}")
 
     # Get company info
     _sector = None
