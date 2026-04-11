@@ -1323,6 +1323,38 @@ def main():
     except Exception as e:
         log.warning(f"[Worker] macro_call schema migration: {e}")
 
+    # predictions.pair_long_ticker + pair_short_ticker + pair_spread_return +
+    # scraper_runs.pair_calls_extracted + partial index — ship #4 of the
+    # new prediction types (pair_call). Relative-value predictions
+    # scored on the spread between two tickers.
+    try:
+        with engine.connect() as conn:
+            conn.execute(sql_text(
+                "ALTER TABLE predictions ADD COLUMN IF NOT EXISTS "
+                "pair_long_ticker VARCHAR(16)"
+            ))
+            conn.execute(sql_text(
+                "ALTER TABLE predictions ADD COLUMN IF NOT EXISTS "
+                "pair_short_ticker VARCHAR(16)"
+            ))
+            conn.execute(sql_text(
+                "ALTER TABLE predictions ADD COLUMN IF NOT EXISTS "
+                "pair_spread_return NUMERIC(10,4)"
+            ))
+            conn.execute(sql_text(
+                "CREATE INDEX IF NOT EXISTS idx_predictions_pair "
+                "ON predictions(pair_long_ticker, pair_short_ticker) "
+                "WHERE pair_long_ticker IS NOT NULL"
+            ))
+            conn.execute(sql_text(
+                "ALTER TABLE scraper_runs ADD COLUMN IF NOT EXISTS "
+                "pair_calls_extracted INTEGER NOT NULL DEFAULT 0"
+            ))
+            conn.commit()
+        log.info("[Worker] predictions pair_call columns + scraper_runs.pair_calls_extracted ready")
+    except Exception as e:
+        log.warning(f"[Worker] pair_call schema migration: {e}")
+
     # predictions.list_id + list_rank — ranked list extraction metadata.
     # Partial index keeps the index small because most rows won't be in
     # lists. No backfill: historical predictions have no ranking data.

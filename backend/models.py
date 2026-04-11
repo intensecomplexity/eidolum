@@ -163,6 +163,19 @@ class Prediction(Base):
     # can filter by concept family and the admin UI can audit mappings.
     # NULL for every non-macro row.
     macro_concept = Column(String(64), nullable=True)
+    # Pair-call metadata for prediction_category='pair_call' rows. Pair
+    # calls express a relative-value view ("Meta beats Google over the
+    # next year", "long NVDA short INTC") and are scored on the spread
+    # (long_return − short_return) rather than absolute movement. The
+    # `ticker` column on pair_call rows is set to pair_long_ticker so
+    # the existing ticker index still covers the long leg for filtering;
+    # pair_short_ticker is the underperformer. pair_spread_return is
+    # computed at scoring time by the evaluator and stored as a decimal
+    # percent (e.g. 4.25 means the long beat the short by 4.25%). NULL
+    # on every non-pair row.
+    pair_long_ticker = Column(String(16), nullable=True)
+    pair_short_ticker = Column(String(16), nullable=True)
+    pair_spread_return = Column(Numeric(10, 4), nullable=True)
     confidence_tier = Column(Numeric(3, 2), nullable=False, default=1.0)
     # Position disclosure fields: NULL for price_target predictions.
     position_action = Column(String(16), nullable=True)   # open|add|trim|exit
@@ -812,6 +825,14 @@ class ScraperRun(Base):
     # when pred._derived_from=='macro_call' resolves to a valid concept.
     macro_calls_extracted = Column(Integer, nullable=False, default=0,
                                     server_default="0")
+    # Count of pair_call predictions extracted in this run. Ship #4 of
+    # the new prediction types. Pair calls are scored on the spread
+    # between two tickers (long outperforms short) rather than on a
+    # single ticker's movement, so they land with a new
+    # prediction_category='pair_call' value. Stays 0 until
+    # ENABLE_PAIR_CALL_EXTRACTION is flipped on.
+    pair_calls_extracted = Column(Integer, nullable=False, default=0,
+                                   server_default="0")
 
 
 class YouTubeScraperRejection(Base):

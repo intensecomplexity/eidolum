@@ -2474,6 +2474,42 @@ async def lifespan(app):
         except Exception as _mse:
             print(f"[Startup] macro_concept_aliases seed error: {_mse}")
 
+        # ── predictions.pair_long_ticker / pair_short_ticker /
+        #    pair_spread_return + scraper_runs.pair_calls_extracted +
+        #    partial index ──
+        # Ship #4 of the new prediction types: pair_call. Relative-value
+        # predictions where the outcome is the spread between a long leg
+        # and a short leg (e.g. "META beats GOOGL over the next year").
+        # Lands as a new prediction_category='pair_call'. Columns stay
+        # NULL for every non-pair row so the index is partial and tiny.
+        try:
+            with engine.connect() as _pc_c:
+                _pc_c.execute(sql_text(
+                    "ALTER TABLE predictions ADD COLUMN IF NOT EXISTS "
+                    "pair_long_ticker VARCHAR(16)"
+                ))
+                _pc_c.execute(sql_text(
+                    "ALTER TABLE predictions ADD COLUMN IF NOT EXISTS "
+                    "pair_short_ticker VARCHAR(16)"
+                ))
+                _pc_c.execute(sql_text(
+                    "ALTER TABLE predictions ADD COLUMN IF NOT EXISTS "
+                    "pair_spread_return NUMERIC(10,4)"
+                ))
+                _pc_c.execute(sql_text(
+                    "CREATE INDEX IF NOT EXISTS idx_predictions_pair "
+                    "ON predictions(pair_long_ticker, pair_short_ticker) "
+                    "WHERE pair_long_ticker IS NOT NULL"
+                ))
+                _pc_c.execute(sql_text(
+                    "ALTER TABLE scraper_runs ADD COLUMN IF NOT EXISTS "
+                    "pair_calls_extracted INTEGER NOT NULL DEFAULT 0"
+                ))
+                _pc_c.commit()
+                print("[Startup] predictions pair_call columns + scraper_runs.pair_calls_extracted ready")
+        except Exception as _pce:
+            print(f"[Startup] pair_call schema migration error: {_pce}")
+
         # ── predictions.list_id + list_rank (ranked list extraction) ────
         # Stores speaker-declared rank position within a ranked list
         # ("my top 5 stocks: NVDA, AMD, TSM, AAPL, MSFT"). Both columns
@@ -2632,6 +2668,23 @@ async def lifespan(app):
                 print("[Startup] ENABLE_MACRO_CALL_EXTRACTION flag seeded")
         except Exception as _mfe:
             print(f"[Startup] ENABLE_MACRO_CALL_EXTRACTION seed error: {_mfe}")
+
+        # ── ENABLE_PAIR_CALL_EXTRACTION flag seed ──────────────────────
+        # Default 'false'. Admin flips via POST /api/admin/toggle-pair-
+        # extraction. Teaches Haiku to recognize relative-value vocabulary
+        # ("X over Y", "long X short Y", "prefer X to Y") and emit a
+        # pair_call with pair_long_ticker and pair_short_ticker both set.
+        try:
+            with engine.connect() as _pf_c:
+                _pf_c.execute(sql_text("""
+                    INSERT INTO config (key, value)
+                    VALUES ('ENABLE_PAIR_CALL_EXTRACTION', 'false')
+                    ON CONFLICT (key) DO NOTHING
+                """))
+                _pf_c.commit()
+                print("[Startup] ENABLE_PAIR_CALL_EXTRACTION flag seeded")
+        except Exception as _pfe:
+            print(f"[Startup] ENABLE_PAIR_CALL_EXTRACTION seed error: {_pfe}")
 
         # ── youtube_channel_meta totals backfill ────────────────────────
         # Historical backfill for the admin card counters. Three columns:
@@ -3665,10 +3718,15 @@ def get_features(db: _Session = _Depends(_get_db)):
         # and resolves macro concepts to ETF proxies via macro_concept_aliases.
         # Default false.
         "macro_call_extraction": False,
+        # Boolean: pair_call extraction appends the pair instructions so
+        # relative-value statements ("long NVDA short INTC", "META over
+        # GOOGL") extract as a new prediction_category='pair_call' with
+        # both legs. Default false.
+        "pair_call_extraction": False,
     }
     try:
         rows = db.execute(_ft(
-            "SELECT key, value FROM config WHERE key IN ('tournaments_enabled','daily_challenge_enabled','duels_enabled','compete_enabled','compare_analysts_enabled','EVALUATE_X_PREDICTIONS','ENABLE_YOUTUBE_SECTOR_CALLS','ENABLE_RANKED_LIST_EXTRACTION','ENABLE_TARGET_REVISIONS','ENABLE_OPTIONS_POSITION_EXTRACTION','ENABLE_EARNINGS_CALL_EXTRACTION','ENABLE_MACRO_CALL_EXTRACTION')"
+            "SELECT key, value FROM config WHERE key IN ('tournaments_enabled','daily_challenge_enabled','duels_enabled','compete_enabled','compare_analysts_enabled','EVALUATE_X_PREDICTIONS','ENABLE_YOUTUBE_SECTOR_CALLS','ENABLE_RANKED_LIST_EXTRACTION','ENABLE_TARGET_REVISIONS','ENABLE_OPTIONS_POSITION_EXTRACTION','ENABLE_EARNINGS_CALL_EXTRACTION','ENABLE_MACRO_CALL_EXTRACTION','ENABLE_PAIR_CALL_EXTRACTION')"
         )).fetchall()
         for r in rows:
             if r[0] == "EVALUATE_X_PREDICTIONS":
@@ -3689,6 +3747,8 @@ def get_features(db: _Session = _Depends(_get_db)):
                 flags["earnings_call_extraction"] = str(r[1]).strip().lower() == "true"
             elif r[0] == "ENABLE_MACRO_CALL_EXTRACTION":
                 flags["macro_call_extraction"] = str(r[1]).strip().lower() == "true"
+            elif r[0] == "ENABLE_PAIR_CALL_EXTRACTION":
+                flags["pair_call_extraction"] = str(r[1]).strip().lower() == "true"
             else:
                 flags[r[0].replace("_enabled", "")] = r[1] == "true"
     except Exception:
@@ -3887,6 +3947,34 @@ def toggle_macro_extraction(
     new_val = db.query(Config).filter(Config.key == "ENABLE_MACRO_CALL_EXTRACTION").first()
     return {
         "macro_call_extraction": (
+            str(new_val.value).strip().lower() == "true" if new_val else False
+        )
+    }
+
+
+@app.post("/api/admin/toggle-pair-extraction")
+def toggle_pair_extraction(
+    admin_id: int = _Depends(_require_admin),
+    db: _Session = _Depends(_get_db),
+):
+    """Flip ENABLE_PAIR_CALL_EXTRACTION between 'true' and 'false'.
+    Invalidates the feature_flags cache so the new value takes effect
+    on the next classify_video call instead of waiting 60s for the TTL."""
+    from models import Config
+    row = db.query(Config).filter(Config.key == "ENABLE_PAIR_CALL_EXTRACTION").first()
+    if row:
+        row.value = "false" if str(row.value).strip().lower() == "true" else "true"
+    else:
+        db.add(Config(key="ENABLE_PAIR_CALL_EXTRACTION", value="true"))
+    db.commit()
+    try:
+        from feature_flags import invalidate_pair_extraction_flag_cache
+        invalidate_pair_extraction_flag_cache()
+    except Exception:
+        pass
+    new_val = db.query(Config).filter(Config.key == "ENABLE_PAIR_CALL_EXTRACTION").first()
+    return {
+        "pair_call_extraction": (
             str(new_val.value).strip().lower() == "true" if new_val else False
         )
     }
