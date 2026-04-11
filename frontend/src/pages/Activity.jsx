@@ -6,7 +6,14 @@ import { useAuth } from '../context/AuthContext';
 import TickerLink from '../components/TickerLink';
 import Footer from '../components/Footer';
 import PageHeader from '../components/PageHeader';
-import { getActivityRecentCalls, getActivityScoredCalls, getActivityExpiring, getActivityFriendsCalls } from '../api';
+import {
+  getActivityRecentCalls,
+  getActivityScoredCalls,
+  getActivityExpiring,
+  getActivityFriendsCalls,
+  getActivityDisclosures,
+} from '../api';
+import DisclosureCard from '../components/DisclosureCard';
 import timeLeft from '../utils/timeLeft';
 import PlatformBadge from '../components/PlatformBadge';
 import { getSourceBadgeKey } from '../utils/getSourceBadgeKey';
@@ -16,6 +23,10 @@ const TABS = [
   { key: 'new', label: 'New Calls' },
   { key: 'scored', label: 'Scored' },
   { key: 'expiring', label: 'Expiring' },
+  // Ship #8 — disclosures are past-tense position statements, not
+  // predictions. They get their own feed tab so users can see real
+  // trades without mixing them with forward-looking calls.
+  { key: 'disclosures', label: 'Disclosures' },
 ];
 
 function timeAgo(dateStr) {
@@ -212,6 +223,7 @@ export default function Activity() {
   const [scored, setScored] = useState([]);
   const [expiring, setExpiring] = useState([]);
   const [friends, setFriends] = useState([]);
+  const [disclosures, setDisclosures] = useState([]);
   const [loading, setLoading] = useState(true);
 
   const tabs = isAuthenticated
@@ -224,14 +236,17 @@ export default function Activity() {
       getActivityRecentCalls().catch(() => []),
       getActivityScoredCalls().catch(() => []),
       getActivityExpiring().catch(() => []),
+      getActivityDisclosures(50).catch(() => ({ disclosures: [] })),
     ];
     if (isAuthenticated) {
       fetches.push(getActivityFriendsCalls().catch(() => []));
     }
-    Promise.all(fetches).then(([p, s, e, f]) => {
+    Promise.all(fetches).then((results) => {
+      const [p, s, e, d, f] = results;
       setPredictions(p || []);
       setScored(s || []);
       setExpiring(e || []);
+      setDisclosures((d && d.disclosures) || []);
       setFriends(f || []);
     }).finally(() => setLoading(false));
   }, [isAuthenticated]);
@@ -246,6 +261,9 @@ export default function Activity() {
 
   // Build display items based on tab
   let items = [];
+  // Disclosures get their own rendering branch below — they're not
+  // shaped like the other activity items (no direction/outcome), so
+  // we render them with DisclosureCard instead of ActivityItem.
   if (tab === 'all') {
     // Interleave all types, sorted by timestamp desc
     const all = [
@@ -253,6 +271,9 @@ export default function Activity() {
       ...scored.map(s => ({ ...s, _ts: s.scored_at || s.evaluation_date })),
       ...expiring.slice(0, 5).map(e => ({ ...e, _ts: e.prediction_date })),
       ...friends.map(f => ({ ...f, _ts: f.created_at })),
+      // Stamp type='disclosure' so the renderer below routes these
+      // to DisclosureCard instead of ActivityItem.
+      ...disclosures.slice(0, 10).map(d => ({ ...d, type: 'disclosure', _ts: d.disclosed_at })),
     ];
     all.sort((a, b) => new Date(b._ts || 0) - new Date(a._ts || 0));
     items = all;
@@ -264,6 +285,8 @@ export default function Activity() {
     items = expiring;
   } else if (tab === 'friends') {
     items = friends;
+  } else if (tab === 'disclosures') {
+    items = disclosures.map(d => ({ ...d, type: 'disclosure' }));
   }
 
   return (
@@ -300,9 +323,20 @@ export default function Activity() {
           </div>
         ) : (
           <div className="space-y-2">
-            {items.map((item, i) => (
-              <ActivityItem key={`${item.type}-${item.id}-${i}`} item={item} />
-            ))}
+            {items.map((item, i) => {
+              if (item.type === 'disclosure') {
+                return (
+                  <DisclosureCard
+                    key={`disclosure-${item.id}-${i}`}
+                    disclosure={item}
+                    showForecaster
+                  />
+                );
+              }
+              return (
+                <ActivityItem key={`${item.type}-${item.id}-${i}`} item={item} />
+              );
+            })}
           </div>
         )}
       </div>
