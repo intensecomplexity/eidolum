@@ -1832,6 +1832,7 @@ def classify_video(channel_name: str, title: str, publish_date: str,
     use_metric_forecast = False
     use_conditional = False
     use_disclosure = False
+    use_regime = False
     use_source_timestamps = False
     if db is not None and video_id:
         try:
@@ -1902,6 +1903,12 @@ def classify_video(channel_name: str, title: str, publish_date: str,
             log.warning("[YT-CLF] disclosure flag check failed: %s", _e)
             use_disclosure = False
         try:
+            from feature_flags import is_regime_call_extraction_enabled
+            use_regime = is_regime_call_extraction_enabled(db)
+        except Exception as _e:
+            log.warning("[YT-CLF] regime flag check failed: %s", _e)
+            use_regime = False
+        try:
             from feature_flags import is_source_timestamps_enabled
             use_source_timestamps = is_source_timestamps_enabled(db)
         except Exception as _e:
@@ -1938,12 +1945,14 @@ def classify_video(channel_name: str, title: str, publish_date: str,
         active_system = active_system + "\n\n" + YOUTUBE_HAIKU_METRIC_FORECAST_INSTRUCTIONS
     if use_disclosure:
         active_system = active_system + "\n\n" + YOUTUBE_HAIKU_DISCLOSURE_INSTRUCTIONS
+    if use_regime:
+        active_system = active_system + "\n\n" + YOUTUBE_HAIKU_REGIME_INSTRUCTIONS
     # The SOURCE_TIMESTAMP block is ALWAYS the last layer. It asks
     # Haiku to add a verbatim_quote field to every prediction emitted
-    # by ANY of the previous blocks, so it must be appended after the
-    # category-specific instructions. (Placing it earlier would still
-    # work functionally but would break the stable cache order and
-    # shift every extended-prompt cache entry.)
+    # by ANY of the previous blocks (regime_call included), so it must
+    # be appended after the category-specific instructions. Placing it
+    # earlier would still work functionally but would break the stable
+    # cache order and shift every extended-prompt cache entry.
     if use_source_timestamps:
         active_system = active_system + "\n\n" + YOUTUBE_HAIKU_SOURCE_TIMESTAMP_INSTRUCTIONS
     telemetry["prompt_variant"] = "sector" if use_sector_prompt else "standard"
@@ -1957,6 +1966,7 @@ def classify_video(channel_name: str, title: str, publish_date: str,
     telemetry["metric_forecast_enabled"] = bool(use_metric_forecast)
     telemetry["conditional_enabled"] = bool(use_conditional)
     telemetry["disclosure_enabled"] = bool(use_disclosure)
+    telemetry["regime_enabled"] = bool(use_regime)
     telemetry["source_timestamps_enabled"] = bool(use_source_timestamps)
     print(
         f"[YOUTUBE-HAIKU] video={video_id or '?'} channel={channel_name} "
@@ -1971,6 +1981,7 @@ def classify_video(channel_name: str, title: str, publish_date: str,
         f"metric_forecast={'on' if use_metric_forecast else 'off'} "
         f"conditional={'on' if use_conditional else 'off'} "
         f"disclosure={'on' if use_disclosure else 'off'} "
+        f"regime={'on' if use_regime else 'off'} "
         f"timestamps={'on' if use_source_timestamps else 'off'}",
         flush=True,
     )
