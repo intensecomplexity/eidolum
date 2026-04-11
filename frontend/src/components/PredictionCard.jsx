@@ -236,6 +236,137 @@ function PairCallCard({ prediction: p, forecaster: fc, showForecaster, compact }
   );
 }
 
+function BinaryEventCard({ prediction: p, forecaster: fc, showForecaster, compact }) {
+  // Dedicated layout for prediction_category === 'binary_event_call'.
+  // Binary events are yes/no calls on discrete checkable events
+  // ("Fed will cut 50bps in March", "AAPL will split by end of 2026").
+  // No prices, no tolerance. The card shows the expected event,
+  // hard deadline, event_type tag, and either HIT/MISS (scored) or
+  // an "Awaiting Resolution" badge for rows still pending a resolver.
+  const predId = p.id || p.prediction_id;
+  const isPending = !p.outcome || p.outcome === 'pending';
+  const outcomeText = p.expected_outcome_text || p.context || '';
+  const deadline = p.event_deadline || p.evaluation_date;
+  const evType = (p.event_type || 'other').replace(/_/g, ' ');
+  const tickerIsSentinel = !p.ticker || /^(event|__event__)/i.test(p.ticker);
+  return (
+    <div className={`bg-surface border rounded-xl p-4 overflow-hidden ${
+      isPending ? 'border-warning/30' : 'border-border'
+    }`} style={{ wordBreak: 'break-word' }}>
+      {(showForecaster || fc) && fc && (
+        <div className="flex items-center gap-1.5 mb-2 flex-wrap">
+          <PlatformBadge platform={getSourceBadgeKey(p, fc)} size={14} />
+          <Link to={`/forecaster/${fc.id}`} className="text-sm font-medium text-text-primary hover:text-accent transition-colors">
+            {fc.name}
+          </Link>
+          {fc.firm && <span className="text-[10px] text-muted">at {fc.firm}</span>}
+          <CredibilityBadge
+            userId={fc.id}
+            username={fc.name}
+            accuracy={fc.accuracy_rate}
+            scored={fc.total_predictions || 0}
+            isInstitutional={['institutional', 'congress'].includes(fc.platform)}
+            linkToProfile={false}
+          />
+        </div>
+      )}
+
+      {/* Header: ticker (if real) + TYPE tag + outcome badge */}
+      <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
+        <div className="flex items-center gap-2 flex-wrap min-w-0">
+          {!tickerIsSentinel && (
+            <>
+              <TickerLogo ticker={p.ticker} logoUrl={p.logo_url} size={20} />
+              <Link to={`/asset/${p.ticker}`} className="font-mono text-accent text-base font-bold hover:underline shrink-0">
+                {p.ticker}
+              </Link>
+            </>
+          )}
+          <span
+            className="text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full font-semibold"
+            style={{ background: 'rgba(140,100,220,0.15)', color: 'rgb(190,170,240)' }}
+          >
+            {evType}
+          </span>
+        </div>
+        <div className="flex items-center gap-1.5 shrink-0">
+          {predId && !compact && <BookmarkButton predictionId={predId} />}
+          {isPending ? (
+            <span
+              className="text-[10px] px-2 py-0.5 rounded-full font-semibold"
+              style={{ background: 'rgba(120,120,140,0.2)', color: 'var(--color-text-secondary)' }}
+            >
+              Awaiting Resolution
+            </span>
+          ) : (
+            <>
+              {p.outcome !== 'no_data' && (
+                <span className="text-[9px] text-muted italic">The verdict:</span>
+              )}
+              <PredictionBadge outcome={p.outcome} />
+            </>
+          )}
+        </div>
+      </div>
+
+      {/* Event block */}
+      <div className="mb-2 pl-2 border-l-2 border-accent/30">
+        <div className="text-[9px] uppercase tracking-wider text-muted font-semibold mb-0.5">
+          Event
+        </div>
+        <div className="text-sm text-text-primary leading-snug break-words">
+          {outcomeText}
+        </div>
+      </div>
+
+      {/* Deadline */}
+      <div className="flex items-center gap-2 text-xs font-mono mb-2 flex-wrap">
+        <span className="text-[9px] uppercase tracking-wider text-muted font-semibold">Deadline:</span>
+        <span className="text-text-secondary">{formatDate(deadline) || '—'}</span>
+        {p.event_resolved_at && (
+          <>
+            <span className="text-muted">|</span>
+            <span className="text-muted text-[10px]">
+              Resolved {formatDate(p.event_resolved_at)}
+              {p.event_resolution_source && ` via ${p.event_resolution_source}`}
+            </span>
+          </>
+        )}
+      </div>
+
+      {!compact && p.exact_quote && p.exact_quote !== p.context && (
+        <p className="text-xs text-text-secondary italic leading-relaxed mb-2 break-words">
+          {p.exact_quote}
+        </p>
+      )}
+
+      {p.evaluation_summary && (
+        <p className={`text-xs italic leading-relaxed mb-2 ${
+          p.outcome === 'hit' ? 'text-positive/80' :
+          p.outcome === 'miss' ? 'text-negative/80' : 'text-muted'
+        }`}>
+          {p.evaluation_summary}
+        </p>
+      )}
+
+      <div className="flex items-center gap-2 text-[10px] text-muted flex-wrap">
+        <SourceBadge verifiedBy={p.verified_by} />
+        <LockedDate dateStr={p.prediction_date} />
+      </div>
+      <ProofLinks p={p} />
+
+      {!compact && predId && (
+        <CommentSection predictionId={predId} source={fc ? 'analyst' : 'user'} />
+      )}
+      {!compact && (
+        <p className="text-muted/50 text-[9px] italic mt-2 pt-1.5 border-t border-border/20 leading-relaxed">
+          Binary event — scored on yes/no outcome at deadline. Not investment advice.
+        </p>
+      )}
+    </div>
+  );
+}
+
 export default function PredictionCard({ prediction: p, showForecaster = false, forecaster = null, compact = false }) {
   const predId = p.id || p.prediction_id;
   const evalDate = p.evaluation_date || p.resolution_date;
@@ -246,6 +377,17 @@ export default function PredictionCard({ prediction: p, showForecaster = false, 
   if ((p.prediction_category || '').toLowerCase() === 'pair_call') {
     return (
       <PairCallCard
+        prediction={p}
+        forecaster={fc}
+        showForecaster={showForecaster}
+        compact={compact}
+      />
+    );
+  }
+
+  if ((p.prediction_category || '').toLowerCase() === 'binary_event_call') {
+    return (
+      <BinaryEventCard
         prediction={p}
         forecaster={fc}
         showForecaster={showForecaster}
