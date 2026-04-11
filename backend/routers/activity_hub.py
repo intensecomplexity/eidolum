@@ -23,7 +23,10 @@ _optional_bearer = HTTPBearer(auto_error=False)
 @router.get("/activity/recent-predictions")
 @limiter.limit("60/minute")
 def recent_predictions(request: Request, db: Session = Depends(get_db)):
-    """Most recent analyst predictions submitted."""
+    """Most recent analyst predictions submitted. Ordering uses
+    publish-time (prediction_date), not ingest-time (created_at),
+    so a Jan 2024 prediction backfilled today doesn't dominate the
+    top of the feed with a "3h ago" label."""
     rows = db.execute(sql_text("""
         SELECT p.id, p.ticker, p.direction, p.target_price, p.entry_price,
                p.prediction_date, p.window_days, p.context, p.exact_quote,
@@ -34,7 +37,7 @@ def recent_predictions(request: Request, db: Session = Depends(get_db)):
         FROM predictions p
         JOIN forecasters f ON f.id = p.forecaster_id
         LEFT JOIN ticker_sectors ts ON ts.ticker = p.ticker
-        ORDER BY p.created_at DESC
+        ORDER BY COALESCE(p.prediction_date, p.created_at) DESC
         LIMIT 20
     """)).fetchall()
 

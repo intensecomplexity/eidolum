@@ -6,6 +6,7 @@ import { useAuth } from '../context/AuthContext';
 import TickerLink from '../components/TickerLink';
 import Footer from '../components/Footer';
 import PageHeader from '../components/PageHeader';
+import { usePublicFlag } from '../hooks/usePublicFlag';
 import {
   getActivityRecentCalls,
   getActivityScoredCalls,
@@ -118,7 +119,7 @@ function PredictionCard({ item }) {
             <span className="text-[10px] font-mono text-muted">{item.accuracy}%</span>
           )}
         </div>
-        <span className="text-[10px] text-muted flex-shrink-0">{timeAgo(item.created_at || item.prediction_date)}</span>
+        <span className="text-[10px] text-muted flex-shrink-0">{timeAgo(item.prediction_date || item.created_at)}</span>
       </div>
       <div className="flex items-center gap-2 mt-1.5">
         <DirectionBadge direction={item.direction} />
