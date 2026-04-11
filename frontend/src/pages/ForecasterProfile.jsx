@@ -1188,6 +1188,105 @@ function UnresolvedBadge({ p }) {
 }
 
 
+// Ship #12 — regime_call visual components. Color-coded per regime
+// type: bull_* green, bear_* red, topping + bear_starting amber,
+// correction + consolidation gray, bottoming blue. Displayed instead
+// of (or alongside) the normal direction badge.
+const REGIME_STYLES = {
+  bull_continuing: { bg: 'rgba(52,211,153,0.15)', fg: '#34d399', label: 'BULL CONTINUING' },
+  bull_starting:   { bg: 'rgba(52,211,153,0.18)', fg: '#10b981', label: 'BULL STARTING' },
+  bottoming:       { bg: 'rgba(96,165,250,0.15)', fg: '#60a5fa', label: 'BOTTOMING' },
+  topping:         { bg: 'rgba(251,191,36,0.15)', fg: '#fbbf24', label: 'TOPPING' },
+  bear_starting:   { bg: 'rgba(251,146,60,0.15)', fg: '#fb923c', label: 'BEAR STARTING' },
+  bear_continuing: { bg: 'rgba(248,113,113,0.15)', fg: '#f87171', label: 'BEAR CONTINUING' },
+  correction:      { bg: 'rgba(148,163,184,0.15)', fg: '#94a3b8', label: 'CORRECTION' },
+  consolidation:   { bg: 'rgba(148,163,184,0.12)', fg: '#cbd5e1', label: 'CONSOLIDATION' },
+};
+
+function RegimeBadge({ p }) {
+  if (!p || p.prediction_category !== 'regime_call') return null;
+  const rt = p.regime_type;
+  const s = REGIME_STYLES[rt] || { bg: 'rgba(148,163,184,0.15)', fg: '#94a3b8', label: rt?.toUpperCase() || 'REGIME' };
+  const instrument = p.regime_instrument || p.ticker;
+  return (
+    <span
+      className="inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide whitespace-nowrap"
+      style={{ backgroundColor: s.bg, color: s.fg }}
+      title={`Regime call on ${instrument}: ${s.label}. Scored on structural price behavior (drawdown, runup, new highs/lows) over the evaluation window rather than final price vs target.`}
+    >
+      REGIME: {s.label}
+    </span>
+  );
+}
+
+function RegimeMetricsLine({ p }) {
+  // Renders the computed drawdown/runup/new-high stats inside an
+  // expanded regime_call row. Only shown when the evaluator has
+  // populated the numbers (i.e. outcome is not pending). The copy
+  // adapts by outcome so a HIT says "bull continued", a MISS says
+  // "bull ended", etc — useful for skimming a forecaster's page.
+  if (!p || p.prediction_category !== 'regime_call') return null;
+  if (p.regime_max_drawdown === null || p.regime_max_drawdown === undefined) return null;
+  const dd = (p.regime_max_drawdown * 100).toFixed(1);
+  const ru = p.regime_max_runup !== null && p.regime_max_runup !== undefined
+    ? (p.regime_max_runup * 100).toFixed(1) : null;
+  const nh = p.regime_new_highs ?? 0;
+  const nl = p.regime_new_lows ?? 0;
+  const instrument = p.regime_instrument || p.ticker;
+  const rt = p.regime_type;
+  const outcome = p.outcome;
+  let verdict;
+  if (outcome === 'hit') {
+    verdict = _regimeHitText(rt, instrument);
+  } else if (outcome === 'near') {
+    verdict = `Mixed — ${instrument} partially matched the ${rt?.replace('_',' ')} thesis.`;
+  } else if (outcome === 'miss') {
+    verdict = _regimeMissText(rt, instrument);
+  } else {
+    verdict = null;
+  }
+  return (
+    <div className="flex flex-col gap-1 text-[11px]">
+      <div className="flex items-center gap-3 text-text-secondary font-mono">
+        <span>Max Drawdown: <span className="text-negative">-{dd}%</span></span>
+        {ru !== null && <span>Max Run-up: <span className="text-positive">+{ru}%</span></span>}
+        <span>New Highs: <span className="text-positive">{nh}</span></span>
+        <span>New Lows: <span className="text-negative">{nl}</span></span>
+      </div>
+      {verdict && <div className="text-[11px] text-text-secondary italic">{verdict}</div>}
+    </div>
+  );
+}
+
+function _regimeHitText(rt, instrument) {
+  switch (rt) {
+    case 'bull_continuing': return `Bull continued — ${instrument} held up with shallow drawdown and made new highs. Call was correct.`;
+    case 'bull_starting':   return `New bull confirmed — ${instrument} rallied 10%+ with no new lows.`;
+    case 'topping':         return `Top played out — ${instrument} rolled over from the window high with meaningful decline.`;
+    case 'bear_starting':   return `Bear confirmed — ${instrument} dropped 10%+ and made new lows.`;
+    case 'bear_continuing': return `Bear extended — ${instrument} kept making new lows.`;
+    case 'bottoming':       return `Bottom confirmed — ${instrument} rallied 5%+ off the lows with no new lows made.`;
+    case 'correction':      return `Correction played out — ${instrument} pulled back 5-15% then recovered to prior highs.`;
+    case 'consolidation':   return `Consolidated — ${instrument} held a tight range (≤8%).`;
+    default: return `Regime call was correct.`;
+  }
+}
+
+function _regimeMissText(rt, instrument) {
+  switch (rt) {
+    case 'bull_continuing': return `Bull ended — ${instrument} had a deep drawdown with no new highs reached.`;
+    case 'bull_starting':   return `New bull failed — ${instrument} made new lows or didn't rally.`;
+    case 'topping':         return `No top — ${instrument} kept making new highs with no meaningful decline.`;
+    case 'bear_starting':   return `No bear — ${instrument} held above the start level.`;
+    case 'bear_continuing': return `Bear stalled or reversed — ${instrument} rallied instead of making new lows.`;
+    case 'bottoming':       return `No bottom — ${instrument} made lower lows inside the window.`;
+    case 'correction':      return `Not a correction — drawdown exceeded 20% or no recovery.`;
+    case 'consolidation':   return `Not consolidating — ${instrument} broke out of the range.`;
+    default: return `Regime call was incorrect.`;
+  }
+}
+
+
 function PredictionRow({ p, forecaster: fc }) {
   const [expanded, setExpanded] = useState(false);
   const evalDate = p.evaluation_date || p.resolution_date;
@@ -1223,6 +1322,7 @@ function PredictionRow({ p, forecaster: fc }) {
             <ConditionalIfBadge p={p} />
             <TriggerFiredBadge p={p} />
             <UnresolvedBadge p={p} />
+            <RegimeBadge p={p} />
           </div>
         </td>
         <td className="px-6 py-3">
@@ -1277,6 +1377,15 @@ function PredictionRow({ p, forecaster: fc }) {
 
             {/* Platform-specific proof */}
             <ProofBlock p={p} />
+
+            {/* Regime-call structural metrics (ship #12). Only
+                renders when prediction_category='regime_call' AND
+                the evaluator has populated regime_max_drawdown. */}
+            {p.prediction_category === 'regime_call' && p.regime_max_drawdown !== null && p.regime_max_drawdown !== undefined && (
+              <div className="mt-2 mb-3 ml-4 p-2 rounded-md bg-surface-1 border border-border/40">
+                <RegimeMetricsLine p={p} />
+              </div>
+            )}
 
             {/* Time horizon note */}
             {evalDate && (
