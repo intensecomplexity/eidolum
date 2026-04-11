@@ -2446,6 +2446,36 @@ async def lifespan(app):
         except Exception as _mce:
             print(f"[Startup] macro_call schema migration error: {_mce}")
 
+        # ── conditional_call schema (ship #5) ──────────────────────────
+        # Seven trigger_* columns on predictions plus a per-run counter
+        # on scraper_runs and a partial index for the evaluator's
+        # phase-1 deadline sweep. Idempotent.
+        try:
+            with engine.connect() as _cc_c:
+                for _ddl in (
+                    "ALTER TABLE predictions ADD COLUMN IF NOT EXISTS trigger_condition TEXT",
+                    "ALTER TABLE predictions ADD COLUMN IF NOT EXISTS trigger_type VARCHAR(32)",
+                    "ALTER TABLE predictions ADD COLUMN IF NOT EXISTS trigger_ticker VARCHAR(16)",
+                    "ALTER TABLE predictions ADD COLUMN IF NOT EXISTS trigger_price NUMERIC(12,4)",
+                    "ALTER TABLE predictions ADD COLUMN IF NOT EXISTS trigger_deadline TIMESTAMP",
+                    "ALTER TABLE predictions ADD COLUMN IF NOT EXISTS trigger_fired_at TIMESTAMP",
+                    "ALTER TABLE predictions ADD COLUMN IF NOT EXISTS outcome_window_days INTEGER",
+                ):
+                    _cc_c.execute(sql_text(_ddl))
+                _cc_c.execute(sql_text(
+                    "CREATE INDEX IF NOT EXISTS idx_predictions_conditional "
+                    "ON predictions(trigger_type, trigger_deadline) "
+                    "WHERE trigger_type IS NOT NULL"
+                ))
+                _cc_c.execute(sql_text(
+                    "ALTER TABLE scraper_runs ADD COLUMN IF NOT EXISTS "
+                    "conditional_calls_extracted INTEGER NOT NULL DEFAULT 0"
+                ))
+                _cc_c.commit()
+                print("[Startup] predictions.trigger_* + conditional_calls_extracted ready")
+        except Exception as _cce:
+            print(f"[Startup] conditional_call schema migration error: {_cce}")
+
         # ── macro_concept_aliases seed ───────────────────────────────
         # Canonical ~50 concepts covering currency, rates, inflation,
         # volatility, commodities, equity macro, international/EM,

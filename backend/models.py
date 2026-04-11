@@ -226,6 +226,37 @@ class Prediction(Base):
     metric_release_date = Column(Date, nullable=True)
     metric_actual = Column(Numeric(18, 6), nullable=True)
     metric_error_pct = Column(Numeric(10, 4), nullable=True)
+    # Conditional-call metadata for prediction_category='conditional_call'
+    # rows. A conditional is "IF trigger_condition THEN outcome" — the
+    # outcome side reuses the existing ticker / direction / target_price /
+    # window_days columns (scored as a normal ticker_call once the trigger
+    # fires). The trigger side is stored in the columns below.
+    #
+    #   trigger_condition  — free-text natural language description
+    #   trigger_type       — enum: price_hold, price_break, economic_data,
+    #                        fed_decision, market_event, corporate_action,
+    #                        other. Only price_hold and price_break get
+    #                        auto-resolved by the evaluator in this ship.
+    #   trigger_ticker     — for price-based triggers, the symbol being
+    #                        watched (may differ from prediction.ticker).
+    #   trigger_price      — for price-based triggers, the threshold.
+    #   trigger_deadline   — when the trigger must fire by; if today is
+    #                        past this with trigger_fired_at still NULL,
+    #                        the evaluator sets outcome='unresolved'.
+    #   trigger_fired_at   — timestamp the trigger actually fired. NULL
+    #                        until it does. Phase 2 scoring starts here.
+    #   outcome_window_days — days after trigger_fired_at for the outcome
+    #                        scoring window (separate from window_days so
+    #                        we can keep both the original timeframe and
+    #                        the phase-2 budget).
+    # All NULL for non-conditional rows.
+    trigger_condition = Column(Text, nullable=True)
+    trigger_type = Column(String(32), nullable=True)
+    trigger_ticker = Column(String(16), nullable=True)
+    trigger_price = Column(Numeric(12, 4), nullable=True)
+    trigger_deadline = Column(DateTime, nullable=True)
+    trigger_fired_at = Column(DateTime, nullable=True)
+    outcome_window_days = Column(Integer, nullable=True)
     confidence_tier = Column(Numeric(3, 2), nullable=False, default=1.0)
     # Position disclosure fields: NULL for price_target predictions.
     position_action = Column(String(16), nullable=True)   # open|add|trim|exit
@@ -895,6 +926,16 @@ class ScraperRun(Base):
     # ENABLE_METRIC_FORECAST_EXTRACTION is flipped on.
     metric_forecasts_extracted = Column(Integer, nullable=False, default=0,
                                          server_default="0")
+    # Count of conditional_call predictions extracted in this run.
+    # prediction_category='conditional_call' — a new category. The
+    # outcome side is stored like a ticker_call (ticker/direction/target/
+    # window_days), and the trigger side lives in the new trigger_*
+    # columns on predictions. Scoring is phase-based: Phase 1 checks
+    # whether the trigger fires inside trigger_deadline, Phase 2 scores
+    # the outcome window starting from trigger_fired_at. A new outcome
+    # value 'unresolved' is written when the trigger never fires.
+    conditional_calls_extracted = Column(Integer, nullable=False, default=0,
+                                          server_default="0")
 
 
 class YouTubeScraperRejection(Base):

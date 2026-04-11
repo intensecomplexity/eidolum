@@ -1437,6 +1437,34 @@ def main():
     except Exception as e:
         log.warning(f"[Worker] metric_forecast_call schema migration: {e}")
 
+    # predictions.trigger_* + scraper_runs.conditional_calls_extracted
+    # for ship #5 (conditional_call). Idempotent.
+    try:
+        with engine.connect() as conn:
+            for _ddl in (
+                "ALTER TABLE predictions ADD COLUMN IF NOT EXISTS trigger_condition TEXT",
+                "ALTER TABLE predictions ADD COLUMN IF NOT EXISTS trigger_type VARCHAR(32)",
+                "ALTER TABLE predictions ADD COLUMN IF NOT EXISTS trigger_ticker VARCHAR(16)",
+                "ALTER TABLE predictions ADD COLUMN IF NOT EXISTS trigger_price NUMERIC(12,4)",
+                "ALTER TABLE predictions ADD COLUMN IF NOT EXISTS trigger_deadline TIMESTAMP",
+                "ALTER TABLE predictions ADD COLUMN IF NOT EXISTS trigger_fired_at TIMESTAMP",
+                "ALTER TABLE predictions ADD COLUMN IF NOT EXISTS outcome_window_days INTEGER",
+            ):
+                conn.execute(sql_text(_ddl))
+            conn.execute(sql_text(
+                "CREATE INDEX IF NOT EXISTS idx_predictions_conditional "
+                "ON predictions(trigger_type, trigger_deadline) "
+                "WHERE trigger_type IS NOT NULL"
+            ))
+            conn.execute(sql_text(
+                "ALTER TABLE scraper_runs ADD COLUMN IF NOT EXISTS "
+                "conditional_calls_extracted INTEGER NOT NULL DEFAULT 0"
+            ))
+            conn.commit()
+        log.info("[Worker] predictions.trigger_* + conditional_calls_extracted ready")
+    except Exception as e:
+        log.warning(f"[Worker] conditional_call schema migration: {e}")
+
     # predictions.list_id + list_rank — ranked list extraction metadata.
     # Partial index keeps the index small because most rows won't be in
     # lists. No backfill: historical predictions have no ranking data.
