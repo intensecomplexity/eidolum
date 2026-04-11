@@ -32,6 +32,7 @@ import httpx
 from crypto_prices import CRYPTO_TICKERS, is_crypto
 
 POLYGON_KEY = os.getenv("MASSIVE_API_KEY", "").strip()
+TIINGO_KEY = os.getenv("TIINGO_API_KEY", "").strip()
 
 # Process-wide cache so a single batch run only hits Polygon once per
 # crypto ticker. Same shape (and same lifetime semantics) as
@@ -76,16 +77,60 @@ def polygon_crypto_history(ticker: str, days: int = 730) -> dict:
         return {}
 
 
+def tiingo_crypto_history(ticker: str, days: int = 1825) -> dict:
+    """Fetch daily close history for a crypto ticker from Tiingo.
+
+    Fallback for when Polygon rejects the MASSIVE_API_KEY (verified 401
+    "Unknown API Key" from inside the worker pod on 2026-04-12). Tiingo
+    crypto is free and returns the same daily close shape we need.
+    Returns {date_str: close_price} or {} on any failure.
+    """
+    if not TIINGO_KEY:
+        return {}
+    sym = f"{ticker.lower()}usd"
+    end = datetime.utcnow().date()
+    start = end - timedelta(days=days)
+    try:
+        r = httpx.get(
+            "https://api.tiingo.com/tiingo/crypto/prices",
+            params={
+                "tickers": sym,
+                "startDate": str(start),
+                "endDate": str(end),
+                "resampleFreq": "1day",
+                "token": TIINGO_KEY,
+            },
+            timeout=20,
+        )
+        if r.status_code != 200:
+            return {}
+        payload = r.json()
+        if not payload:
+            return {}
+        price_data = payload[0].get("priceData") or []
+        prices: dict[str, float] = {}
+        for bar in price_data:
+            date_iso = bar.get("date", "")
+            close = bar.get("close")
+            if date_iso and close and float(close) > 0:
+                prices[date_iso[:10]] = round(float(close), 2)
+        return prices
+    except Exception:
+        return {}
+
+
 def fetch_crypto_history(ticker: str) -> dict:
-    """Cached wrapper around `polygon_crypto_history`. Returns {} for
-    non-crypto tickers so callers can use this as a guarded short-circuit
-    in front of an equity fetcher chain."""
+    """Cached wrapper: try Polygon first, fall back to Tiingo on empty.
+    Returns {} for non-crypto tickers so callers can use this as a
+    guarded short-circuit in front of an equity fetcher chain."""
     if not is_crypto(ticker):
         return {}
     sym = ticker.upper()
     if sym in _crypto_history_cache:
         return _crypto_history_cache[sym]
     prices = polygon_crypto_history(sym)
+    if not prices:
+        prices = tiingo_crypto_history(sym)
     if prices:
         _crypto_history_cache[sym] = prices
     return prices
@@ -101,6 +146,7 @@ __all__ = [
     "is_crypto",
     "polygon_crypto_symbol",
     "polygon_crypto_history",
+    "tiingo_crypto_history",
     "fetch_crypto_history",
     "clear_crypto_cache",
 ]
