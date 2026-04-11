@@ -50,8 +50,15 @@ def get_smart_money(
     top_ids = [r[0] for r in top_analysts]
     analyst_info = {r[0]: {"name": r[1], "accuracy": round(float(r[2]), 1), "firm": r[3]} for r in top_analysts}
 
-    # Get pending predictions from top analysts
+    # Get pending predictions from top analysts. Exclude expired calls
+    # (expires_at passed) and stale "pending" rows that were published
+    # more than 18 months ago — those are predictions whose evaluation
+    # window has effectively already run and whose targets got blown
+    # past without the evaluator catching up. They should not feed the
+    # "who's currently betting on X" aggregate.
     where = "AND p.direction IN ('bullish', 'bearish', 'neutral')"
+    where += " AND (p.expires_at IS NULL OR p.expires_at > NOW())"
+    where += " AND (p.prediction_date IS NULL OR p.prediction_date >= NOW() - INTERVAL '18 months')"
     params = {"ids": top_ids}
     if sector:
         where += " AND ts.sector = :sector"
@@ -97,6 +104,25 @@ def get_smart_money(
     bullish_list = []
     bearish_list = []
 
+    # Resolve the real live price for each unique ticker so upside_pct
+    # reflects today's reality. Falling back to entries[-1] would re-use
+    # a stale entry price from an old prediction and is exactly why
+    # SNOW/MSFT were appearing on Bullish Bets with negative upside.
+    try:
+        from routers.ticker_detail import _fetch_price_data
+    except Exception:
+        _fetch_price_data = None  # type: ignore
+    live_prices: dict = {}
+    if _fetch_price_data is not None:
+        for ticker in ticker_data.keys():
+            try:
+                data = _fetch_price_data(ticker)
+                lp = data.get("current_price") if data else None
+                if lp and lp > 0:
+                    live_prices[ticker] = float(lp)
+            except Exception:
+                pass
+
     for ticker, td in ticker_data.items():
         bull_ids = list(set(td["bullish"]))
         bear_ids = list(set(td["bearish"]))
@@ -104,7 +130,9 @@ def get_smart_money(
         total_top = len(bull_ids) + len(bear_ids) + len(neut_ids)
 
         avg_target = round(sum(td["targets"]) / len(td["targets"]), 2) if td["targets"] else None
-        current = td["entries"][-1] if td["entries"] else None
+        current = live_prices.get(ticker)
+        if current is None and td["entries"]:
+            current = td["entries"][-1]
         upside = round((avg_target - current) / current * 100, 1) if avg_target and current and current > 0 else None
 
         base = {
@@ -123,7 +151,16 @@ def get_smart_money(
             "conviction_pct": round(len(bull_ids) / total_top * 100) if total_top > 0 else 0,
         }
 
-        if len(bull_ids) >= min_analysts:
+        # Direction-consistent filter: only surface a bullish card when
+        # the aggregate target is still ABOVE the live price (otherwise
+        # it's not a bullish bet anymore — the stock already ran past).
+        # Same check in reverse for bearish. When we have no live price,
+        # we can't make this call so we keep the card and let the
+        # frontend render it without an upside.
+        target_bullish_ok = (avg_target is None or current is None or avg_target > current)
+        target_bearish_ok = (avg_target is None or current is None or avg_target < current)
+
+        if len(bull_ids) >= min_analysts and target_bullish_ok:
             bullish_list.append({
                 **base,
                 "analyst_count": len(bull_ids),
@@ -132,7 +169,7 @@ def get_smart_money(
                               "firm": analyst_info[fid]["firm"]} for fid in bull_ids[:10]],
             })
 
-        if len(bear_ids) >= min_analysts:
+        if len(bear_ids) >= min_analysts and target_bearish_ok:
             bearish_list.append({
                 **base,
                 "analyst_count": len(bear_ids),
