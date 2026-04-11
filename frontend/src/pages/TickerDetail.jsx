@@ -158,21 +158,25 @@ export default function TickerDetail() {
         {/* ── PRICE CHART WITH PREDICTION MARKERS ──────────────────── */}
         <StockChart ticker={ticker} />
 
-        {stats.top_forecaster && stats.top_forecaster.name && (
-          <div className="card py-2.5 px-4 mb-6 flex items-center gap-2 text-xs flex-wrap">
-            <Trophy className="w-3.5 h-3.5 text-accent flex-shrink-0" />
-            <span className="text-muted">Top analyst on {ticker}:</span>
-            <Link to={`/forecaster/${stats.top_forecaster.id}`} className="text-accent font-medium hover:underline">
-              {stats.top_forecaster.name}
-            </Link>
-            {(stats.top_forecaster.accuracy || stats.top_forecaster.ticker_accuracy) > 0 && (
-              <span className="font-mono text-positive">({(stats.top_forecaster.accuracy || stats.top_forecaster.ticker_accuracy).toFixed(1)}%)</span>
-            )}
-            {(stats.top_forecaster.predictions || stats.top_forecaster.ticker_predictions) > 0 && (
-              <span className="text-muted">{pluralize(stats.top_forecaster.predictions || stats.top_forecaster.ticker_predictions, 'call')}</span>
-            )}
-          </div>
-        )}
+        {stats.top_forecaster && stats.top_forecaster.name && (() => {
+          // Require ≥5 evaluated calls before promoting anyone as "top analyst on TICKER".
+          // 1-of-1 or 1-of-2 is statistically meaningless and brand-damaging.
+          const evaluated = stats.top_forecaster.predictions || stats.top_forecaster.ticker_predictions || 0;
+          if (evaluated < 5) return null;
+          return (
+            <div className="card py-2.5 px-4 mb-6 flex items-center gap-2 text-xs flex-wrap">
+              <Trophy className="w-3.5 h-3.5 text-accent flex-shrink-0" />
+              <span className="text-muted">Top analyst on {ticker}:</span>
+              <Link to={`/forecaster/${stats.top_forecaster.id}`} className="text-accent font-medium hover:underline">
+                {stats.top_forecaster.name}
+              </Link>
+              {(stats.top_forecaster.accuracy || stats.top_forecaster.ticker_accuracy) > 0 && (
+                <span className="font-mono text-positive">({(stats.top_forecaster.accuracy || stats.top_forecaster.ticker_accuracy).toFixed(1)}%)</span>
+              )}
+              <span className="text-muted">{pluralize(evaluated, 'call')}</span>
+            </div>
+          );
+        })()}
 
         {/* ── SECTION 1: CURRENT ANALYST OUTLOOK ────────────────────────── */}
         <div className="mb-8">

@@ -258,7 +258,7 @@ export default function Dashboard() {
                   title={
                     heroEnabled
                       ? 'Capped return vs S&P 500 over the same window — see scoring rules.'
-                      : 'Score reflects conviction × outcome. ±200% is the maximum for high-conviction calls.'
+                      : "Stock's actual return from the call date to evaluation, capped at \u00B1200%."
                   }
                 >
                   {p.actual_return >= 0 ? '+' : ''}{p.actual_return}%
