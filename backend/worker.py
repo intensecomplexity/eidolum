@@ -1252,6 +1252,41 @@ def main():
     except Exception as e:
         log.warning(f"[Worker] scraper_runs options_positions migration: {e}")
 
+    # predictions.event_type + event_date — earnings_call metadata + any
+    # future event-tied prediction types. Partial index keeps it small.
+    try:
+        with engine.connect() as conn:
+            conn.execute(sql_text(
+                "ALTER TABLE predictions ADD COLUMN IF NOT EXISTS "
+                "event_type VARCHAR(32)"
+            ))
+            conn.execute(sql_text(
+                "ALTER TABLE predictions ADD COLUMN IF NOT EXISTS "
+                "event_date DATE"
+            ))
+            conn.execute(sql_text(
+                "CREATE INDEX IF NOT EXISTS idx_predictions_event "
+                "ON predictions(event_type, event_date) "
+                "WHERE event_type IS NOT NULL"
+            ))
+            conn.commit()
+        log.info("[Worker] predictions.event_type + event_date ready")
+    except Exception as e:
+        log.warning(f"[Worker] predictions event columns migration: {e}")
+
+    # scraper_runs.earnings_calls_extracted — per-run counter for the
+    # earnings_call path. Stays at 0 until the flag is on.
+    try:
+        with engine.connect() as conn:
+            conn.execute(sql_text(
+                "ALTER TABLE scraper_runs ADD COLUMN IF NOT EXISTS "
+                "earnings_calls_extracted INTEGER NOT NULL DEFAULT 0"
+            ))
+            conn.commit()
+        log.info("[Worker] scraper_runs.earnings_calls_extracted ready")
+    except Exception as e:
+        log.warning(f"[Worker] scraper_runs earnings_calls migration: {e}")
+
     # predictions.list_id + list_rank — ranked list extraction metadata.
     # Partial index keeps the index small because most rows won't be in
     # lists. No backfill: historical predictions have no ranking data.

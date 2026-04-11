@@ -2362,6 +2362,49 @@ async def lifespan(app):
         except Exception as _ope:
             print(f"[Startup] scraper_runs options_positions migration error: {_ope}")
 
+        # ── predictions.event_type / event_date + partial index ─────────
+        # Earnings calls and future event-tied prediction types share
+        # this pair of columns. event_type identifies the sub-type
+        # ('earnings' for earnings_call). event_date is the scheduled
+        # release date. Both stay NULL for plain ticker_call rows.
+        # Partial index only covers rows where event_type is set, so
+        # it stays small (the overwhelming majority will never be
+        # event-tied). No backfill: historical predictions have no
+        # event metadata.
+        try:
+            with engine.connect() as _ev_c:
+                _ev_c.execute(sql_text(
+                    "ALTER TABLE predictions ADD COLUMN IF NOT EXISTS "
+                    "event_type VARCHAR(32)"
+                ))
+                _ev_c.execute(sql_text(
+                    "ALTER TABLE predictions ADD COLUMN IF NOT EXISTS "
+                    "event_date DATE"
+                ))
+                _ev_c.execute(sql_text(
+                    "CREATE INDEX IF NOT EXISTS idx_predictions_event "
+                    "ON predictions(event_type, event_date) "
+                    "WHERE event_type IS NOT NULL"
+                ))
+                _ev_c.commit()
+                print("[Startup] predictions.event_type + event_date ready")
+        except Exception as _eve:
+            print(f"[Startup] predictions event columns migration error: {_eve}")
+
+        # ── scraper_runs.earnings_calls_extracted ───────────────────────
+        # Per-run counter for earnings_call predictions (event_type='earnings').
+        # Stays at 0 until the ENABLE_EARNINGS_CALL_EXTRACTION flag is on.
+        try:
+            with engine.connect() as _ec_c:
+                _ec_c.execute(sql_text(
+                    "ALTER TABLE scraper_runs ADD COLUMN IF NOT EXISTS "
+                    "earnings_calls_extracted INTEGER NOT NULL DEFAULT 0"
+                ))
+                _ec_c.commit()
+                print("[Startup] scraper_runs.earnings_calls_extracted ready")
+        except Exception as _ece:
+            print(f"[Startup] scraper_runs earnings_calls migration error: {_ece}")
+
         # ── predictions.list_id + list_rank (ranked list extraction) ────
         # Stores speaker-declared rank position within a ranked list
         # ("my top 5 stocks: NVDA, AMD, TSM, AAPL, MSFT"). Both columns

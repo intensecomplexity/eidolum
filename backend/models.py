@@ -143,6 +143,17 @@ class Prediction(Base):
     # early prediction just severs the link, never cascades.
     revision_of = Column(Integer, ForeignKey("predictions.id", ondelete="SET NULL"),
                          nullable=True)
+    # Scheduled-event metadata. Populated on prediction types whose
+    # evaluation window is tied to a specific corporate event rather
+    # than a fixed number of days from the prediction date. Current
+    # values for event_type:
+    #   'earnings' — prediction tied to the company's next earnings
+    #                release (ENABLE_EARNINGS_CALL_EXTRACTION).
+    # event_date is the scheduled event date when Haiku extracted it
+    # from the transcript (or the evaluator later looks it up). Both
+    # columns stay NULL for plain ticker_call / sector_call rows.
+    event_type = Column(String(32), nullable=True)
+    event_date = Column(DateTime, nullable=True)
     confidence_tier = Column(Numeric(3, 2), nullable=False, default=1.0)
     # Position disclosure fields: NULL for price_target predictions.
     position_action = Column(String(16), nullable=True)   # open|add|trim|exit
@@ -773,6 +784,16 @@ class ScraperRun(Base):
     # introducing a new prediction_category value.
     options_positions_extracted = Column(Integer, nullable=False, default=0,
                                           server_default="0")
+    # Count of earnings_call predictions extracted in this run.
+    # Incremented when Haiku marks a prediction with
+    # derived_from='earnings_call' under the
+    # ENABLE_EARNINGS_CALL_EXTRACTION flag. Earnings calls stay as
+    # prediction_category='ticker_call' but also carry
+    # event_type='earnings' and optionally an event_date. The
+    # evaluator scores them via a separate pre-/post-earnings reaction
+    # branch (stubbed in this ship — plumbing is follow-up work).
+    earnings_calls_extracted = Column(Integer, nullable=False, default=0,
+                                       server_default="0")
 
 
 class YouTubeScraperRejection(Base):
