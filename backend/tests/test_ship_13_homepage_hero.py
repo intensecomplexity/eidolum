@@ -164,7 +164,11 @@ class HeroComponentRendersTests(unittest.TestCase):
 
     def test_hero_band_has_h1(self):
         src = self._read("components/home/HeroBand.jsx")
-        self.assertIn("Who should you actually listen to?", src)
+        # Ship #14 wraps "actually" in a <span> for brand-ink highlight,
+        # so assert the three fragments instead of the joined literal.
+        self.assertIn("Who should you", src)
+        self.assertIn("actually", src)
+        self.assertIn("listen to?", src)
         self.assertIn("Predictions Tracked", src)
         self.assertIn("Forecasters Watched", src)
         self.assertIn("Calls Graded", src)
