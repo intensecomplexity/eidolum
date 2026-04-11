@@ -399,6 +399,12 @@ def _run_inner(db):
         # scraper_runs.sector_calls_extracted at finalize. Stays at 0
         # when ENABLE_YOUTUBE_SECTOR_CALLS flag is off (default).
         "sector_calls_extracted": 0,
+        # Per-run options-position counter — incremented inside
+        # insert_youtube_prediction when the pred dict carries
+        # _derived_from='options_position'. Written to
+        # scraper_runs.options_positions_extracted at finalize.
+        # Stays at 0 when ENABLE_OPTIONS_POSITION_EXTRACTION is off.
+        "options_positions_extracted": 0,
     }
 
     for row in batch_rows:
@@ -619,7 +625,8 @@ def _run_inner(db):
                     total_cache_read_tokens = :cr_tok,
                     estimated_cost_usd = :cost,
                     haiku_retries_count = :retries,
-                    sector_calls_extracted = :sector_calls
+                    sector_calls_extracted = :sector_calls,
+                    options_positions_extracted = :options_positions
                 WHERE id = :id
             """), {
                 "id": run_id,
@@ -636,6 +643,7 @@ def _run_inner(db):
                 "cost": round(float(stats.get("estimated_cost_usd", 0.0)), 4),
                 "retries": int(stats.get("haiku_retries_count", 0)),
                 "sector_calls": int(stats.get("sector_calls_extracted", 0)),
+                "options_positions": int(stats.get("options_positions_extracted", 0)),
             })
             db.commit()
         except Exception as e:

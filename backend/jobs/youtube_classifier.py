@@ -440,6 +440,80 @@ Rules for revision detection:
 Output JSON only. Be concise."""
 
 
+# Options-position instructions. Appended to the active prompt when
+# ENABLE_OPTIONS_POSITION_EXTRACTION is flipped on. Teaches Haiku to
+# map options vocabulary to equivalent ticker_call predictions — the
+# output rows land in the predictions table as normal ticker_call
+# objects, just with a `derived_from` marker so the insertion code can
+# count them separately for admin telemetry. No new prediction_category.
+YOUTUBE_HAIKU_OPTIONS_INSTRUCTIONS = """OPTIONS POSITIONS:
+If the speaker describes an options position instead of a plain stock call, map it to an equivalent ticker_call with the correct direction. Options vocabulary is common in YouTube finance content and usually carries a clear directional thesis — don't skip these. Strike prices become price targets; expirations become timeframes.
+
+Mapping table (options vocabulary → ticker_call direction):
+
+Bullish (report as direction: bullish):
+- "Buying calls on X" / "Long calls on X"
+- "Selling puts on X" / "Cash-secured puts on X"
+- "Call debit spread on X" / "Bull call spread on X"
+- "Bull put spread on X"
+
+Bearish (report as direction: bearish):
+- "Buying puts on X" / "Long puts on X"
+- "Selling calls on X" / "Naked calls on X"
+- "Put debit spread on X" / "Bear put spread on X"
+- "Bear call spread on X"
+- "Covered calls on X" (selling upside, capping gains — bearish lean)
+
+Neutral (report as direction: neutral):
+- "Iron condor on X" / "Iron butterfly on X"
+- "Short strangle on X" / "Short straddle on X"
+- "Calendar spread on X" / "Diagonal spread on X"
+
+Strike prices: if a strike is mentioned (e.g. "$200 calls", "150 strike puts"), use it as the price_target for the ticker_call. For spreads with two legs, use the higher leg for bullish and the lower leg for bearish.
+
+Expirations: if an expiration date or month is mentioned, use it as the timeframe (convert to an absolute ISO date like 2026-06-30 using the video's publish date as the anchor). If the speaker says "LEAPs" or "long-dated", default to 1 year from publish date. If no expiration is mentioned at all, default to 1 month.
+
+Output format for options-derived predictions (add a derived_from field so the insertion code can count these separately — the field is NOT stored in the database, it's only a marker):
+{
+  "ticker": "AAPL",
+  "direction": "bullish",
+  "price_target": 200,
+  "timeframe": "2026-06-30",
+  "derived_from": "options_position",
+  "context_quote": "I'm buying $200 June calls on Apple"
+}
+
+Examples:
+
+Input: "I'm buying $200 calls on AAPL expiring June"
+Output: {"ticker": "AAPL", "direction": "bullish", "price_target": 200, "timeframe": "2026-06-30", "derived_from": "options_position", "context_quote": "buying $200 calls on AAPL expiring June"}
+
+Input: "Selling $150 cash-secured puts on NVDA for next month"
+Output: {"ticker": "NVDA", "direction": "bullish", "price_target": 150, "timeframe": "2026-05-11", "derived_from": "options_position", "context_quote": "selling $150 cash-secured puts on NVDA"}
+
+Input: "I loaded up on TSLA puts — this stock is way overvalued"
+Output: {"ticker": "TSLA", "direction": "bearish", "timeframe": "2026-05-11", "derived_from": "options_position", "context_quote": "loaded up on TSLA puts"}
+
+Input: "Running an iron condor on SPY between 420 and 460 into monthly expiration"
+Output: {"ticker": "SPY", "direction": "neutral", "timeframe": "2026-05-11", "derived_from": "options_position", "context_quote": "iron condor on SPY between 420 and 460"}
+
+Input: "I'm LEAPs long on MSFT, grabbing January 2027 calls"
+Output: {"ticker": "MSFT", "direction": "bullish", "timeframe": "2027-01-15", "derived_from": "options_position", "context_quote": "LEAPs long on MSFT, January 2027 calls"}
+
+Input: "Running covered calls on AAPL, capping my upside here"
+Output: {"ticker": "AAPL", "direction": "bearish", "timeframe": "2026-05-11", "derived_from": "options_position", "context_quote": "covered calls on AAPL, capping my upside"}
+
+Rules:
+- MUST use direction from the existing ticker_call vocabulary: bullish / bearish / neutral. Do NOT invent a new direction for options.
+- MUST set derived_from: "options_position" on every options-derived prediction so the insertion code can count them separately.
+- Do NOT output a new prediction type or category — every options-derived extraction is still a ticker_call row in the database.
+- Do NOT extract a position that lacks a clear direction (e.g. "playing options on NVDA" with no specifics).
+- Do NOT extract if the speaker is only describing options mechanics or hypotheticals ("you could buy puts here if you wanted to" as a theoretical comment is NOT a prediction).
+- If the same video contains both a plain ticker_call AND an options-position on the same (ticker, direction), emit only ONE prediction — the dedup layer will drop the duplicate anyway.
+
+Output JSON only. Be concise."""
+
+
 # ── Transcript fetching ─────────────────────────────────────────────────────
 
 def _build_transcript_api():
@@ -673,6 +747,7 @@ def classify_video(channel_name: str, title: str, publish_date: str,
     use_sector_prompt = False
     use_ranked_list = False
     use_revisions = False
+    use_options = False
     if db is not None and video_id:
         try:
             from feature_flags import should_use_sector_prompt
@@ -693,26 +768,36 @@ def classify_video(channel_name: str, title: str, publish_date: str,
         except Exception as _e:
             log.warning("[YT-CLF] revisions flag check failed: %s", _e)
             use_revisions = False
+        try:
+            from feature_flags import is_options_extraction_enabled
+            use_options = is_options_extraction_enabled(db)
+        except Exception as _e:
+            log.warning("[YT-CLF] options flag check failed: %s", _e)
+            use_options = False
     base_system = YOUTUBE_HAIKU_SECTOR_SYSTEM if use_sector_prompt else HAIKU_SYSTEM
     # Append optional instruction blocks ONLY when each flag is on. When
     # every flag is off (the default), base_system is sent byte-for-byte
     # unchanged so Anthropic's prompt cache hit rate on the base prompt
-    # stays at 100%. Order matters for cache hits: ranked list then
-    # revisions, so the extended-prompt cache entry is consistent
-    # across calls with both flags on.
+    # stays at 100%. Order matters for cache hits: ranked list → revisions
+    # → options, stable across calls with any combination of flags on so
+    # extended-prompt cache entries match.
     active_system = base_system
     if use_ranked_list:
         active_system = active_system + "\n\n" + YOUTUBE_HAIKU_RANKED_LIST_INSTRUCTIONS
     if use_revisions:
         active_system = active_system + "\n\n" + YOUTUBE_HAIKU_REVISIONS_INSTRUCTIONS
+    if use_options:
+        active_system = active_system + "\n\n" + YOUTUBE_HAIKU_OPTIONS_INSTRUCTIONS
     telemetry["prompt_variant"] = "sector" if use_sector_prompt else "standard"
     telemetry["ranked_list_enabled"] = bool(use_ranked_list)
     telemetry["revisions_enabled"] = bool(use_revisions)
+    telemetry["options_enabled"] = bool(use_options)
     print(
         f"[YOUTUBE-HAIKU] video={video_id or '?'} channel={channel_name} "
         f"prompt_variant={telemetry['prompt_variant']} "
         f"ranked_list={'on' if use_ranked_list else 'off'} "
-        f"revisions={'on' if use_revisions else 'off'}",
+        f"revisions={'on' if use_revisions else 'off'} "
+        f"options={'on' if use_options else 'off'}",
         flush=True,
     )
 
@@ -906,6 +991,15 @@ def _validate_and_dedupe_predictions(raw: list) -> list[dict]:
         rev_dir = (p.get("revision_direction") or "").strip().lower() or None
         if rev_dir not in (None, "up", "down", "direction_change"):
             rev_dir = None
+        # Options-position marker. Haiku sets derived_from='options_position'
+        # on predictions it mapped from options vocabulary. The marker is
+        # NOT stored in the DB — it's only used by the insert path to
+        # increment scraper_runs.options_positions_extracted. We normalize
+        # any truthy string to the canonical value.
+        raw_derived = p.get("derived_from")
+        derived_from = None
+        if raw_derived is not None and str(raw_derived).strip().lower() == "options_position":
+            derived_from = "options_position"
         key = (ticker, direction)
         if key in seen_tickers:
             continue
@@ -920,6 +1014,7 @@ def _validate_and_dedupe_predictions(raw: list) -> list[dict]:
         p["_is_revision"] = is_revision
         p["_previous_target_hint"] = prev_target_hint
         p["_revision_direction_hint"] = rev_dir
+        p["_derived_from"] = derived_from
         out.append(p)
     return out
 
@@ -1270,6 +1365,16 @@ def insert_youtube_prediction(
         )
     )
     db.flush()
+    # Options-position counter: if Haiku marked this prediction as
+    # derived from options vocabulary, bump the per-run counter so
+    # scraper_runs.options_positions_extracted reflects how much of
+    # the run's ticker_call yield came from the options prompt block.
+    # The marker is NOT stored in the Prediction row — we just drop it
+    # here after reading.
+    if pred.get("_derived_from") == "options_position" and stats is not None:
+        stats["options_positions_extracted"] = int(
+            stats.get("options_positions_extracted", 0)
+        ) + 1
     return True
 
 
