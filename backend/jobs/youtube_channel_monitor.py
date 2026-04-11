@@ -39,6 +39,7 @@ from sqlalchemy import text as sql_text
 
 from jobs.youtube_classifier import (
     fetch_transcript,
+    fetch_transcript_with_timestamps,
     classify_video,
     insert_youtube_prediction,
     insert_youtube_sector_prediction,
@@ -448,6 +449,14 @@ def _run_inner(db):
         # counter in this dict, the rows counted here do NOT live
         # in the predictions table — they live in `disclosures`.
         "disclosures_extracted": 0,
+        # Ship #9 source-timestamp telemetry. Both stay 0 when the
+        # flag is off; when it's on, every prediction (across every
+        # type) goes through timestamp_matcher and lands in one of
+        # these two counters depending on whether a real second was
+        # resolved (matched) or source_timestamp_seconds stayed NULL
+        # (failed).
+        "timestamps_matched": 0,
+        "timestamps_failed": 0,
     }
 
     for row in batch_rows:
@@ -676,7 +685,9 @@ def _run_inner(db):
                     binary_events_extracted = :binary_events,
                     metric_forecasts_extracted = :metric_forecasts,
                     conditional_calls_extracted = :conditional_calls,
-                    disclosures_extracted = :disclosures
+                    disclosures_extracted = :disclosures,
+                    timestamps_matched = :timestamps_matched,
+                    timestamps_failed = :timestamps_failed
                 WHERE id = :id
             """), {
                 "id": run_id,
@@ -701,6 +712,8 @@ def _run_inner(db):
                 "metric_forecasts": int(stats.get("metric_forecasts_extracted", 0)),
                 "conditional_calls": int(stats.get("conditional_calls_extracted", 0)),
                 "disclosures": int(stats.get("disclosures_extracted", 0)),
+                "timestamps_matched": int(stats.get("timestamps_matched", 0)),
+                "timestamps_failed": int(stats.get("timestamps_failed", 0)),
             })
             db.commit()
         except Exception as e:
@@ -776,7 +789,31 @@ def _process_one_video(db, channel_name, channel_id, video_id, title, publish_da
     """Fetch transcript → classify → insert. Returns (inserted, transcript_chars, status)."""
     publish_dt = _parse_publish_date(publish_date_str)
 
-    text, transcript_status = fetch_transcript(video_id)
+    # Ship #9: check the source-timestamps flag once per video. When
+    # on, fetch with the rich path so transcript_data (segments + words
+    # + has_word_level) stays in scope through classify → insert. When
+    # off, use the legacy text-only fetcher to stay byte-for-byte
+    # identical to pre-ship behavior.
+    use_ts = False
+    try:
+        from feature_flags import is_source_timestamps_enabled
+        use_ts = is_source_timestamps_enabled(db)
+    except Exception:
+        use_ts = False
+
+    transcript_data: dict | None = None
+    if use_ts:
+        rich = fetch_transcript_with_timestamps(video_id)
+        if rich.get("status") == "ok" and rich.get("text"):
+            transcript_data = rich
+            text = rich["text"]
+            transcript_status = rich.get("lang") or "ok"
+        else:
+            text = None
+            transcript_status = rich.get("status") or "no_transcript"
+    else:
+        text, transcript_status = fetch_transcript(video_id)
+
     if not text:
         stats["videos_skipped_no_transcript"] += 1
         print(f"[ChannelMonitor] {channel_name}: no transcript for {video_id} ({transcript_status})")
@@ -876,6 +913,7 @@ def _process_one_video(db, channel_name, channel_id, video_id, title, publish_da
                     db=db,
                     transcript_snippet=transcript_snippet,
                     stats=stats,
+                    transcript_data=transcript_data,
                 )
             elif kind == "macro_call":
                 ok = insert_youtube_macro_prediction(
@@ -888,6 +926,7 @@ def _process_one_video(db, channel_name, channel_id, video_id, title, publish_da
                     db=db,
                     transcript_snippet=transcript_snippet,
                     stats=stats,
+                    transcript_data=transcript_data,
                 )
             elif kind == "pair_call":
                 ok = insert_youtube_pair_prediction(
@@ -900,6 +939,7 @@ def _process_one_video(db, channel_name, channel_id, video_id, title, publish_da
                     db=db,
                     transcript_snippet=transcript_snippet,
                     stats=stats,
+                    transcript_data=transcript_data,
                 )
             elif kind == "binary_event_call":
                 ok = insert_youtube_binary_event_prediction(
@@ -912,6 +952,7 @@ def _process_one_video(db, channel_name, channel_id, video_id, title, publish_da
                     db=db,
                     transcript_snippet=transcript_snippet,
                     stats=stats,
+                    transcript_data=transcript_data,
                 )
             elif kind == "metric_forecast_call":
                 ok = insert_youtube_metric_forecast_prediction(
@@ -924,6 +965,7 @@ def _process_one_video(db, channel_name, channel_id, video_id, title, publish_da
                     db=db,
                     transcript_snippet=transcript_snippet,
                     stats=stats,
+                    transcript_data=transcript_data,
                 )
             elif kind == "conditional_call":
                 ok = insert_youtube_conditional_prediction(
@@ -936,6 +978,7 @@ def _process_one_video(db, channel_name, channel_id, video_id, title, publish_da
                     db=db,
                     transcript_snippet=transcript_snippet,
                     stats=stats,
+                    transcript_data=transcript_data,
                 )
             elif kind == "disclosure":
                 # Disclosures land in the `disclosures` table, NOT
@@ -954,6 +997,7 @@ def _process_one_video(db, channel_name, channel_id, video_id, title, publish_da
                     db=db,
                     transcript_snippet=transcript_snippet,
                     stats=stats,
+                    transcript_data=transcript_data,
                 )
             else:
                 ok = insert_youtube_prediction(
@@ -966,6 +1010,7 @@ def _process_one_video(db, channel_name, channel_id, video_id, title, publish_da
                     db=db,
                     transcript_snippet=transcript_snippet,
                     stats=stats,
+                    transcript_data=transcript_data,
                 )
             if ok:
                 inserted += 1
