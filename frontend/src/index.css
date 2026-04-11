@@ -2,6 +2,26 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Honor prefers-reduced-motion: short-circuit every animation and
+   transition the user can't already opt out of via component code. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Visible focus rings for keyboard users. Components opting out of
+   the default browser ring (focus:outline-none) get a gold visible
+   ring on focus-visible. */
+:focus-visible {
+  outline: 2px solid rgba(212,168,67,0.6);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
 :root {
   /* Ship #14 — brand-ink is a theme-adaptive oxblood/clay accent. */
   /* Dark-mode default: warm clay (rose-terracotta). */
