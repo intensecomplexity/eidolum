@@ -18,6 +18,8 @@ from apscheduler.schedulers.blocking import BlockingScheduler
 from apscheduler.executors.pool import ThreadPoolExecutor as APThreadPool
 from sqlalchemy import text as sql_text
 
+# 2026-04-12: force redeploy for services/price_fetch.py Tiingo crypto fallback
+
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s", datefmt="%H:%M:%S")
 log = logging.getLogger("worker")
 
