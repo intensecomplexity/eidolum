@@ -1472,6 +1472,7 @@ def classify_video(channel_name: str, title: str, publish_date: str,
     use_binary_event = False
     use_metric_forecast = False
     use_conditional = False
+    use_disclosure = False
     if db is not None and video_id:
         try:
             from feature_flags import should_use_sector_prompt
@@ -1534,6 +1535,12 @@ def classify_video(channel_name: str, title: str, publish_date: str,
         except Exception as _e:
             log.warning("[YT-CLF] conditional flag check failed: %s", _e)
             use_conditional = False
+        try:
+            from feature_flags import is_disclosure_extraction_enabled
+            use_disclosure = is_disclosure_extraction_enabled(db)
+        except Exception as _e:
+            log.warning("[YT-CLF] disclosure flag check failed: %s", _e)
+            use_disclosure = False
     base_system = YOUTUBE_HAIKU_SECTOR_SYSTEM if use_sector_prompt else HAIKU_SYSTEM
     # Append optional instruction blocks ONLY when each flag is on. When
     # every flag is off (the default), base_system is sent byte-for-byte
@@ -1563,6 +1570,8 @@ def classify_video(channel_name: str, title: str, publish_date: str,
         active_system = active_system + "\n\n" + YOUTUBE_HAIKU_BINARY_EVENT_INSTRUCTIONS
     if use_metric_forecast:
         active_system = active_system + "\n\n" + YOUTUBE_HAIKU_METRIC_FORECAST_INSTRUCTIONS
+    if use_disclosure:
+        active_system = active_system + "\n\n" + YOUTUBE_HAIKU_DISCLOSURE_INSTRUCTIONS
     telemetry["prompt_variant"] = "sector" if use_sector_prompt else "standard"
     telemetry["ranked_list_enabled"] = bool(use_ranked_list)
     telemetry["revisions_enabled"] = bool(use_revisions)
@@ -1573,6 +1582,7 @@ def classify_video(channel_name: str, title: str, publish_date: str,
     telemetry["binary_event_enabled"] = bool(use_binary_event)
     telemetry["metric_forecast_enabled"] = bool(use_metric_forecast)
     telemetry["conditional_enabled"] = bool(use_conditional)
+    telemetry["disclosure_enabled"] = bool(use_disclosure)
     print(
         f"[YOUTUBE-HAIKU] video={video_id or '?'} channel={channel_name} "
         f"prompt_variant={telemetry['prompt_variant']} "
@@ -1584,7 +1594,8 @@ def classify_video(channel_name: str, title: str, publish_date: str,
         f"pair={'on' if use_pair else 'off'} "
         f"binary_event={'on' if use_binary_event else 'off'} "
         f"metric_forecast={'on' if use_metric_forecast else 'off'} "
-        f"conditional={'on' if use_conditional else 'off'}",
+        f"conditional={'on' if use_conditional else 'off'} "
+        f"disclosure={'on' if use_disclosure else 'off'}",
         flush=True,
     )
 
@@ -1785,6 +1796,7 @@ def _validate_and_dedupe_predictions(raw: list) -> list[dict]:
     seen_binary_events: set[tuple[str, str]] = set()
     seen_metrics: set[tuple[str, str, str]] = set()
     seen_conditionals: set[tuple[str, str, str]] = set()
+    seen_disclosures: set[tuple[str, str, str]] = set()
     out: list[dict] = []
     for p in raw:
         if not isinstance(p, dict):
@@ -2023,6 +2035,64 @@ def _validate_and_dedupe_predictions(raw: list) -> list[dict]:
             p["_trigger_ticker"] = trig_ticker
             p["_trigger_price"] = trig_price
             p["_trigger_deadline"] = trig_deadline
+            out.append(p)
+            continue
+
+        # Disclosure branch: derived_from='disclosure' — past-tense
+        # position statement. Goes into the disclosures table, NOT
+        # predictions. Required fields are ticker and action (from the
+        # 7-value allowlist). Dedup key is (ticker_upper, action_lower,
+        # disclosed_date) so the same "I bought AMD today" mention
+        # repeated in two transcript chunks collapses, but buy + add
+        # on the same ticker in the same video stay distinct.
+        if str(p.get("derived_from") or "").strip().lower() == "disclosure":
+            ticker_val = (p.get("ticker") or "").upper().strip().lstrip("$")
+            ticker_val = re.sub(r"[^A-Z0-9]", "", ticker_val)
+            action_val = (p.get("action") or "").strip().lower()
+            if not ticker_val or len(ticker_val) > 5:
+                continue
+            if action_val not in ("buy", "sell", "add", "trim", "starter", "exit", "hold"):
+                continue
+            # disclosed_at: parse ISO date if given, else fall back to
+            # the video's publish date (Haiku should have resolved
+            # "today"/"yesterday" already but this is a safety net).
+            raw_date = p.get("disclosed_at")
+            disclosed_date = None
+            if raw_date:
+                try:
+                    from datetime import datetime as _dt
+                    disclosed_date = _dt.strptime(
+                        str(raw_date)[:10], "%Y-%m-%d"
+                    ).date()
+                except (TypeError, ValueError):
+                    disclosed_date = None
+            # Key on the date string (or "unknown") so two disclosures
+            # on different days survive. The insert path falls back to
+            # publish_date when disclosed_date is None.
+            key = (
+                ticker_val,
+                action_val,
+                disclosed_date.isoformat() if disclosed_date else "unknown",
+            )
+            if key in seen_disclosures:
+                continue
+            seen_disclosures.add(key)
+            p["ticker"] = ticker_val
+            p["_kind"] = "disclosure"
+            p["_derived_from"] = "disclosure"
+            p["_disclosure_action"] = action_val
+            p["_disclosed_at_date"] = disclosed_date
+            # Size fields: normalize one-of. If the speaker gave a
+            # qualitative size, lowercase it. Numeric sizes pass
+            # through as-is; the insert path will coerce.
+            qual = (p.get("size_qualitative") or "").strip().lower() or None
+            if qual and qual not in ("small", "medium", "large", "full"):
+                qual = None
+            p["_size_qualitative"] = qual
+            p["_size_shares"] = p.get("size_shares")
+            p["_size_pct"] = p.get("size_pct")
+            p["_entry_price"] = p.get("entry_price")
+            p["_reasoning_text"] = (p.get("reasoning_text") or None)
             out.append(p)
             continue
 
