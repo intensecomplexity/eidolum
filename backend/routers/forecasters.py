@@ -687,18 +687,11 @@ def get_portfolio_simulator(
         _sim_cache[forecaster_id] = (result, _time.time())
         return result
 
-    # Return caps by evaluation window — prevents corrupted data
-    # (evaluator used today's price instead of historical for some old predictions)
-    def _max_return(window_days):
-        if not window_days or window_days <= 0:
-            window_days = 90
-        if window_days <= 30:
-            return 50.0    # Max ±50% in 30 days
-        if window_days <= 90:
-            return 100.0   # Max ±100% in 90 days
-        if window_days <= 180:
-            return 150.0   # Max ±150% in 6 months
-        return 200.0       # Max ±200% in 1 year
+    # Bug 7: caps moved into services/eval_caps so the historical evaluator
+    # and the portfolio simulator share one source of truth. Old data still
+    # benefits because we apply the cap defensively at every render — the
+    # evaluator's stamped value will already be clipped for new rows.
+    from services.eval_caps import max_return_pct as _max_return
 
     # Simulate portfolio: $1,000 per trade, compounding portfolio value
     starting = 10000

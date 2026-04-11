@@ -128,6 +128,16 @@ def recalculate_forecaster_stats(forecaster_id: int, db: Session):
     # Three-tier accuracy: hits=1.0, nears=0.5, misses=0
     accuracy = round((hits + nears * 0.5) / total * 100, 1) if total > 0 else 0
 
+    # Bug 9: alpha and avg_return used to be maintained by historical_evaluator's
+    # private _update_stats. We now compute them here too so a single call
+    # to this function is enough to fully refresh a forecaster's cached
+    # row — total / correct / accuracy / streak / alpha / avg_return all
+    # land in one place. Keeps the backfill scripts simple.
+    alphas = [float(p.alpha) for p in evaluated if p.alpha is not None]
+    rets = [float(p.actual_return) for p in evaluated if p.actual_return is not None]
+    avg_alpha = round(sum(alphas) / len(alphas), 2) if alphas else 0.0
+    avg_ret = round(sum(rets) / len(rets), 2) if rets else 0.0
+
     # Streak: count consecutive same-outcome from most recent (hit/near = positive, miss = negative)
     streak_count = 0
     streak_positive = None
@@ -145,8 +155,13 @@ def recalculate_forecaster_stats(forecaster_id: int, db: Session):
         forecaster.correct_predictions = hits  # backward compat: "correct" = hits
         forecaster.accuracy_score = accuracy
         forecaster.streak = streak_count if streak_positive else -streak_count
+        forecaster.alpha = avg_alpha
+        forecaster.avg_return = avg_ret
         db.commit()
-        print(f"[Stats] {forecaster.name}: {hits}H/{nears}N/{misses}M = {accuracy}%, streak {forecaster.streak}")
+        print(
+            f"[Stats] {forecaster.name}: {hits}H/{nears}N/{misses}M = {accuracy}%, "
+            f"streak {forecaster.streak}, α {avg_alpha}, avg {avg_ret}%"
+        )
     except Exception as e:
         db.rollback()
         print(f"[Stats] Could not persist stats for {forecaster.name}: {e}")
