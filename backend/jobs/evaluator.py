@@ -84,6 +84,71 @@ def _get_threshold(window_days: int, table: dict) -> float:
     return table[keys[-1]]
 
 
+def _resolve_fed_decision(p: Prediction) -> str:
+    """Stub resolver for fed_decision binary events.
+
+    The follow-up ship will plumb in a real Fed data source. Options
+    evaluated for that ship:
+      1. FRED API — https://fred.stlouisfed.org/docs/api/fred/
+         Free, rate-limited, exposes DFEDTARU / FEDFUNDS series so we
+         can read the actual policy rate on the FOMC meeting date and
+         diff against the prior rate to confirm cut/hold/raise size.
+      2. FOMC statement scraping — the Fed posts each meeting's
+         statement PDF under federalreserve.gov/newsevents/pressreleases
+         the day of the meeting. Text contains the explicit policy
+         action.
+      3. A small internally-maintained fed_decisions table populated
+         by hand / a scheduled job on FOMC meeting days.
+
+    For this ship we return 'no_data' unconditionally so rows stay
+    pending and the follow-up ship can drop in the real resolver
+    without having to re-score existing predictions.
+    """
+    # TODO(follow-up-ship): plumb FRED DFEDTARU + FOMC statement parser
+    return "no_data"
+
+
+def _score_binary_event(p: Prediction, now: datetime) -> str:
+    """Score a binary_event_call prediction.
+
+    Returns one of: 'hit' | 'miss' | 'no_data' | 'pending'.
+      - 'pending' means the deadline hasn't arrived yet — caller
+        should leave the row untouched.
+      - 'hit' / 'miss' means a resolver confirmed the outcome.
+      - 'no_data' means the deadline has passed but no resolver is
+        wired up yet (current state for every event_type) — caller
+        should leave outcome='pending' so the follow-up ship can
+        still score the row when the resolver lands.
+
+    Current state (ship #6): every resolver is stubbed. fed_decision
+    routes through _resolve_fed_decision which returns 'no_data' with
+    a TODO for the follow-up ship. All other event types fall through
+    to 'no_data' directly. This is intentional — the plumbing is here,
+    the data sources are the work for the next ship.
+    """
+    deadline = p.event_deadline
+    if deadline is None:
+        return "no_data"
+    # Deadline not reached yet — don't touch the row.
+    today = now.date() if hasattr(now, "date") else now
+    if today < deadline:
+        return "pending"
+
+    etype = (p.event_type or "").strip().lower()
+    if etype == "fed_decision":
+        return _resolve_fed_decision(p)
+    # corporate_action / mna / ipo / index_inclusion / economic_declaration /
+    # regulatory / other — all stubbed.
+    # TODO(follow-up-ship): add resolvers for each event_type using:
+    #   corporate_action → Polygon / FMP corporate actions feed
+    #   mna              → SEC EDGAR 8-K filings + deal close detection
+    #   ipo              → NASDAQ IPO calendar / SEC S-1 filing tracker
+    #   index_inclusion  → S&P Dow Jones press releases
+    #   economic_declaration → NBER.org + BLS data release tracking
+    #   regulatory       → FDA approvals RSS + SEC/DOJ press
+    return "no_data"
+
+
 def _evaluate_pair_call(p: Prediction, now: datetime) -> str:
     """Score a pair_call prediction on the spread between long and short
     legs. Returns one of: 'hit' | 'near' | 'miss' | 'no_data' | 'skip'.
@@ -297,6 +362,24 @@ def run_evaluator(db: Session):
                 skipped += 1
             continue
 
+        # binary_event_call rows are scored on a yes/no outcome against
+        # a real-world data source (FRED, FOMC parser, corporate
+        # actions feed, etc). The resolver is stubbed in this ship —
+        # every event_type currently returns 'no_data', leaving the row
+        # pending until the follow-up ship plumbs in real sources.
+        if (p.prediction_category or "").strip().lower() == "binary_event_call":
+            result = _score_binary_event(p, now)
+            if result in ("hit", "miss"):
+                scored += 1
+            elif result == "pending":
+                skipped += 1
+            else:  # 'no_data'
+                # Leave outcome='pending' deliberately so the follow-up
+                # ship can drop in a real resolver and still score these
+                # rows. Count them as skipped for telemetry.
+                skipped += 1
+            continue
+
         if not p.ticker or p.ticker == "UNKNOWN":
             continue
 
@@ -383,6 +466,24 @@ def sweep_stuck_predictions(db: Session):
             if result in ("hit", "near", "miss"):
                 scored += 1
             else:
+                p.outcome = "no_data"
+                p.evaluated_at = now
+                no_data_count += 1
+            continue
+
+        # Binary-event rows: the sweep runs on rows stuck past the
+        # deadline + 7 days. Still try the resolver, then fall through
+        # to no_data if the stub returns nothing. Leaves outcome on
+        # 'pending' if the resolver says the row isn't ready.
+        if (p.prediction_category or "").strip().lower() == "binary_event_call":
+            result = _score_binary_event(p, now)
+            if result in ("hit", "miss"):
+                scored += 1
+            else:
+                # Stub resolver + deadline long past → mark no_data so
+                # we stop re-processing forever. Real resolver in the
+                # follow-up ship will either score these or keep them
+                # pending until data arrives.
                 p.outcome = "no_data"
                 p.evaluated_at = now
                 no_data_count += 1
