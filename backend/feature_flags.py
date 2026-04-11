@@ -447,3 +447,37 @@ def invalidate_conditional_extraction_flag_cache() -> None:
     """Reset the 60-second cache — called from the admin toggle endpoint
     so changes take effect immediately instead of waiting for the TTL."""
     _CONDITIONAL_EXTRACTION_FLAG_CACHE["fetched_at"] = 0.0
+
+
+# ── Disclosure extraction flag ─────────────────────────────────────────────
+#
+# Boolean all-or-nothing flag. When true, the YouTube classifier appends
+# the disclosure instruction block to the Haiku system prompt so
+# past-tense position statements ("I bought 500 AMD today", "I trimmed
+# my NVDA") get extracted as disclosure rows. Disclosures are NOT
+# predictions — they land in the dedicated `disclosures` table and
+# carry follow-through (1/3/6/12m return after the disclosed_at date)
+# rather than HIT/NEAR/MISS scoring. This is ship #8 of the new
+# prediction type series.
+
+_DISCLOSURE_EXTRACTION_FLAG_CACHE: dict = {"enabled": False, "fetched_at": 0.0}
+_DISCLOSURE_EXTRACTION_FLAG_TTL = 60  # seconds
+
+
+def is_disclosure_extraction_enabled(db) -> bool:
+    """Return True if ENABLE_DISCLOSURE_EXTRACTION is 'true' in
+    the config table. Default False. Cached 60s so tight classifier
+    loops don't hammer the config table."""
+    now = time.time()
+    if (now - _DISCLOSURE_EXTRACTION_FLAG_CACHE["fetched_at"]) < _DISCLOSURE_EXTRACTION_FLAG_TTL:
+        return bool(_DISCLOSURE_EXTRACTION_FLAG_CACHE["enabled"])
+    enabled = _read_bool(db, "ENABLE_DISCLOSURE_EXTRACTION", default=False)
+    _DISCLOSURE_EXTRACTION_FLAG_CACHE["enabled"] = enabled
+    _DISCLOSURE_EXTRACTION_FLAG_CACHE["fetched_at"] = now
+    return enabled
+
+
+def invalidate_disclosure_extraction_flag_cache() -> None:
+    """Reset the 60-second cache — called from the admin toggle endpoint
+    so changes take effect immediately instead of waiting for the TTL."""
+    _DISCLOSURE_EXTRACTION_FLAG_CACHE["fetched_at"] = 0.0
