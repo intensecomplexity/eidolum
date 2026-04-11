@@ -2,8 +2,9 @@
  * Translates analyst jargon into plain English and adds glossary tooltips.
  * Used by PredictionCard, EvidenceCard, and PredictionRow.
  */
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { getTickerPrice } from '../api';
 
 // ── Glossary: analyst terms → plain-English tooltips ────────────────────────
 const GLOSSARY = [
@@ -101,8 +102,14 @@ export function annotateContext(text, ticker = null) {
 /**
  * Generate a simple one-line explanation of what the prediction means.
  * Handles the nuance of rating action vs price target direction.
+ *
+ * The "(currently $X, +Y%)" parenthetical MUST be computed from the
+ * live price, not the entry price — otherwise it shows stale prose
+ * like "Target $31 (currently $25)" while the stock is actually at
+ * $17.85. If no live price is available, we omit the parenthetical
+ * entirely rather than fabricating a fake "current" from entry.
  */
-export function simpleExplainer(prediction) {
+export function simpleExplainer(prediction, currentPrice = null) {
   const p = prediction;
   const ticker = p.ticker || '';
   const entry = p.entry_price;
@@ -120,11 +127,19 @@ export function simpleExplainer(prediction) {
   const rating = ratingMatch ? ratingMatch[1].replace(/[\s-]+/g, ' ').trim() : '';
   const ratingCap = rating ? rating.charAt(0).toUpperCase() + rating.slice(1) : '';
 
-  if (target && entry && entry > 0) {
-    const pctChange = ((target - entry) / entry * 100).toFixed(1);
-    const sign = target >= entry ? '+' : '';
-    const priceInfo = `Target $${target.toFixed(0)} (currently $${entry.toFixed(0)}, ${sign}${pctChange}%)`;
-    const targetAbove = target > entry;
+  const livePrice = (typeof currentPrice === 'number' && currentPrice > 0) ? currentPrice : null;
+
+  if (target) {
+    // Price math uses the live price when available; we only fall back to
+    // entry to decide directional copy (bullish/bearish) — never to claim
+    // it's the current price.
+    let priceInfo = `Target $${target.toFixed(0)}`;
+    if (livePrice) {
+      const pctChange = ((target - livePrice) / livePrice * 100).toFixed(1);
+      const sign = target >= livePrice ? '+' : '';
+      priceInfo = `Target $${target.toFixed(0)} (currently $${livePrice.toFixed(2)}, ${sign}${pctChange}%)`;
+    }
+    const targetAbove = livePrice ? target > livePrice : (entry && entry > 0 ? target > entry : true);
 
     // CASE 1: Downgrade but target ABOVE current (less optimistic, still sees upside)
     if (isDowngrade && targetAbove) {
@@ -219,14 +234,67 @@ export function ratingChangeLabel(prediction) {
   return null;
 }
 
+// Module-level cache so that rendering N ExplainerLines for the same
+// ticker (e.g. N predictions on /asset/MDWD) shares a single fetch.
+// TTL is short so we never serve very-stale prices in user-facing prose.
+const LIVE_PRICE_TTL_MS = 60_000;
+const _priceCache = new Map(); // ticker -> { value: number|null, at: epoch_ms }
+const _inflight = new Map();   // ticker -> Promise<number|null>
+
+function fetchLivePrice(ticker) {
+  if (!ticker) return Promise.resolve(null);
+  const cached = _priceCache.get(ticker);
+  if (cached && (Date.now() - cached.at) < LIVE_PRICE_TTL_MS) {
+    return Promise.resolve(cached.value);
+  }
+  const pending = _inflight.get(ticker);
+  if (pending) return pending;
+  const p = getTickerPrice(ticker)
+    .then(d => {
+      const v = (d && typeof d.current_price === 'number') ? d.current_price : null;
+      _priceCache.set(ticker, { value: v, at: Date.now() });
+      _inflight.delete(ticker);
+      return v;
+    })
+    .catch(() => {
+      _priceCache.set(ticker, { value: null, at: Date.now() });
+      _inflight.delete(ticker);
+      return null;
+    });
+  _inflight.set(ticker, p);
+  return p;
+}
+
 /**
  * Render the explainer with styled "In simple terms:" prefix.
  * Ticker symbols in the body become clickable links to /ticker/{TICKER}.
+ *
+ * If the caller already knows the live price (e.g. TickerDetail), it can
+ * pass `currentPrice` as a prop to skip the lazy fetch. Otherwise we
+ * resolve it from the shared module-level cache.
  */
-export function ExplainerLine({ prediction, className = '' }) {
-  const text = simpleExplainer(prediction);
+export function ExplainerLine({ prediction, className = '', currentPrice = null }) {
+  const ticker = prediction?.ticker || '';
+  const hasTarget = prediction?.target_price != null;
+  const [livePrice, setLivePrice] = useState(currentPrice);
+
+  useEffect(() => {
+    if (currentPrice != null) {
+      setLivePrice(currentPrice);
+      return;
+    }
+    // Only bother fetching when the explainer is going to render a
+    // "(currently $X, +Y%)" parenthetical — i.e. when there IS a target
+    // to compare against. Saves needless requests for directional-only
+    // predictions.
+    if (!hasTarget || !ticker) return;
+    let mounted = true;
+    fetchLivePrice(ticker).then(v => { if (mounted) setLivePrice(v); });
+    return () => { mounted = false; };
+  }, [ticker, hasTarget, currentPrice]);
+
+  const text = simpleExplainer(prediction, livePrice);
   if (!text) return null;
-  const ticker = prediction.ticker || '';
   const prefix = 'In simple terms:';
   const body = text.startsWith(prefix) ? text.slice(prefix.length).trim() : text;
 
