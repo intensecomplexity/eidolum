@@ -8,6 +8,7 @@ are marked as "no_data" instead of being left pending forever.
 import httpx
 import os
 from datetime import datetime, timedelta
+from sqlalchemy import text as sql_text
 from sqlalchemy.orm import Session
 from models import Prediction, Forecaster
 
@@ -82,6 +83,196 @@ def _get_threshold(window_days: int, table: dict) -> float:
         if window_days <= k:
             return table[k]
     return table[keys[-1]]
+
+
+def fetch_fmp_earnings_metric(
+    ticker: str, metric: str, period: str | None, db
+) -> float | None:
+    """Look up an actual reported metric value from the earnings_history
+    table populated by backend/jobs/fmp_bulk_harvest.py::harvest_earnings_calendar.
+
+    Supported metrics in this ship: eps, revenue, guidance_eps,
+    guidance_revenue. Other company metrics (margin, users, FCF, etc)
+    return None — they need additional FMP endpoints (key_metrics,
+    income_statement) that are harvested to different tables and are
+    out of scope for this ship.
+
+    `period` is the Haiku-supplied period label ("Q1_2026", "Jan_2026",
+    "fiscal_2026"). The earnings_history table stores a free-form
+    `fiscal_period` column alongside the report date — we match on
+    it when provided, or fall back to the most recent earnings row
+    for the ticker if period is None.
+
+    Returns the numeric actual value (float) or None if not available.
+    """
+    if not ticker or not metric:
+        return None
+    # Only the four metrics backed by earnings_history are resolvable
+    # today. Map the metric name to the right column.
+    col_map = {
+        "eps": "eps_actual",
+        "guidance_eps": "eps_actual",  # best effort: the reported actual
+        "revenue": "revenue_actual",
+        "guidance_revenue": "revenue_actual",
+    }
+    if metric not in col_map:
+        return None
+    col = col_map[metric]
+    try:
+        if period:
+            row = db.execute(sql_text(f"""
+                SELECT {col} FROM earnings_history
+                WHERE ticker = :t
+                  AND fiscal_period = :p
+                  AND {col} IS NOT NULL
+                ORDER BY date DESC
+                LIMIT 1
+            """), {"t": ticker.upper(), "p": period}).first()
+            if row and row[0] is not None:
+                return float(row[0])
+        # Fallback: most recent earnings row for the ticker with the
+        # requested column populated. Only acceptable when period was
+        # missing from the prediction or the period-specific lookup
+        # came up empty (e.g. Haiku used an unfamiliar period format).
+        row = db.execute(sql_text(f"""
+            SELECT {col} FROM earnings_history
+            WHERE ticker = :t
+              AND {col} IS NOT NULL
+            ORDER BY date DESC
+            LIMIT 1
+        """), {"t": ticker.upper()}).first()
+        if row and row[0] is not None:
+            return float(row[0])
+    except Exception as _e:
+        print(f"[Evaluator] earnings_history lookup failed for {ticker}/{metric}: {_e}")
+        return None
+    return None
+
+
+# Metric-forecast scoring tolerances (category-based). Kept next to
+# _score_metric_forecast below so the tolerance constants and the
+# routing logic live side by side.
+_METRIC_RELATIVE_HIT_PCT = 0.05   # ±5% of target → hit
+_METRIC_RELATIVE_NEAR_PCT = 0.15  # ±15% of target → near
+_METRIC_PP_HIT = 0.001            # ±0.1 percentage points → hit (decimal rate)
+_METRIC_PP_NEAR = 0.003           # ±0.3 percentage points → near
+_METRIC_COUNT_HIT_PCT = 0.10      # ±10% of target → hit
+_METRIC_COUNT_NEAR_PCT = 0.25     # ±25% of target → near
+
+
+def _score_metric_forecast(p: Prediction, now: datetime, db) -> str:
+    """Score a metric_forecast_call prediction.
+
+    Returns one of: 'hit' | 'near' | 'miss' | 'no_data' | 'pending'.
+      - 'pending' → release date hasn't arrived; leave row untouched.
+      - 'hit' / 'near' / 'miss' → resolver found the actual value and
+        tolerance buckets the error.
+      - 'no_data' → release date passed, no data source wired up for
+        this metric (every macro metric + a few non-earnings_history
+        company metrics). Leaves outcome='pending'; sweep flips to
+        'no_data' after 7 days.
+
+    Side effects on hit/near/miss: mutates p.metric_actual,
+    p.metric_error_pct, p.actual_return (for leaderboard sorting),
+    p.outcome, p.evaluated_at.
+    """
+    release = p.metric_release_date
+    if release is None:
+        return "no_data"
+    today = now.date() if hasattr(now, "date") else now
+    if today < release:
+        return "pending"
+
+    metric = (p.metric_type or "").strip().lower()
+    if not metric:
+        return "no_data"
+
+    # Only company metrics with earnings_history backing have a real
+    # resolver. Macro metrics fall through to no_data with a
+    # TODO(follow-up-ship) for BLS/BEA/FRED plumbing.
+    actual: float | None = None
+    source_tag: str | None = None
+    if metric in ("eps", "revenue", "guidance_eps", "guidance_revenue"):
+        actual = fetch_fmp_earnings_metric(p.ticker, metric, p.metric_period, db)
+        source_tag = "earnings_history"
+    else:
+        # TODO(follow-up-ship): plumb the remaining resolvers:
+        #   subscribers / users / free_cash_flow / margin / same_store_sales
+        #     → FMP income_statement + key_metrics endpoints (need a
+        #       dedicated harvester — those fields aren't in earnings_history)
+        #   growth_yoy → derived from two earnings_history rows
+        #   cpi / core_cpi / pce         → BLS CPI data series
+        #   unemployment / nonfarm_payrolls / jolts → BLS
+        #   gdp_growth / retail_sales    → BEA / Census
+        #   pmi_manufacturing / pmi_services / ism_manufacturing
+        #                                → ISM / S&P Global PMI releases
+        #   housing_starts               → Census Bureau
+        pass
+
+    if actual is None:
+        return "no_data"
+
+    target = float(p.metric_target) if p.metric_target is not None else None
+    if target is None:
+        return "no_data"
+
+    error = actual - target
+    # Error percent for telemetry / frontend display — relative to
+    # target, safe against zero targets.
+    if target != 0:
+        error_pct = (error / target) * 100.0
+    else:
+        error_pct = 0.0 if error == 0 else 100.0
+
+    # Bucket by category
+    from jobs.youtube_classifier import (
+        _METRIC_RELATIVE_SCORING,
+        _METRIC_PERCENTAGE_POINT_SCORING,
+        _METRIC_COUNT_SCORING,
+    )
+    if metric in _METRIC_RELATIVE_SCORING:
+        rel = abs(error / target) if target != 0 else abs(error)
+        if rel <= _METRIC_RELATIVE_HIT_PCT:
+            outcome = "hit"
+        elif rel <= _METRIC_RELATIVE_NEAR_PCT:
+            outcome = "near"
+        else:
+            outcome = "miss"
+    elif metric in _METRIC_PERCENTAGE_POINT_SCORING:
+        abs_err = abs(error)
+        if abs_err <= _METRIC_PP_HIT:
+            outcome = "hit"
+        elif abs_err <= _METRIC_PP_NEAR:
+            outcome = "near"
+        else:
+            outcome = "miss"
+    elif metric in _METRIC_COUNT_SCORING:
+        rel = abs(error / target) if target != 0 else abs(error)
+        if rel <= _METRIC_COUNT_HIT_PCT:
+            outcome = "hit"
+        elif rel <= _METRIC_COUNT_NEAR_PCT:
+            outcome = "near"
+        else:
+            outcome = "miss"
+    else:
+        # Metric isn't in any scoring bucket — safest default is
+        # relative scoring at the relative tolerance.
+        rel = abs(error / target) if target != 0 else abs(error)
+        if rel <= _METRIC_RELATIVE_HIT_PCT:
+            outcome = "hit"
+        elif rel <= _METRIC_RELATIVE_NEAR_PCT:
+            outcome = "near"
+        else:
+            outcome = "miss"
+
+    p.metric_actual = actual
+    p.metric_error_pct = round(error_pct, 4)
+    p.actual_return = round(error_pct, 2)  # lets leaderboard sort by it
+    p.outcome = outcome
+    p.evaluated_at = now
+    if source_tag:
+        p.event_resolution_source = source_tag  # reuse column for audit
+    return outcome
 
 
 def _resolve_fed_decision(p: Prediction) -> str:
@@ -380,6 +571,23 @@ def run_evaluator(db: Session):
                 skipped += 1
             continue
 
+        # metric_forecast_call rows compare a predicted numerical target
+        # against an actual released value using category-based tolerance.
+        # Company metrics (eps / revenue / guidance) resolve via the
+        # earnings_history table; macro metrics (CPI / unemployment /
+        # GDP / …) are stubbed pending follow-up data-source plumbing.
+        if (p.prediction_category or "").strip().lower() == "metric_forecast_call":
+            result = _score_metric_forecast(p, now, db)
+            if result in ("hit", "near", "miss"):
+                scored += 1
+            elif result == "pending":
+                skipped += 1
+            else:  # 'no_data'
+                # Keep outcome='pending' so the follow-up ship can
+                # score these when macro resolvers land.
+                skipped += 1
+            continue
+
         if not p.ticker or p.ticker == "UNKNOWN":
             continue
 
@@ -484,6 +692,19 @@ def sweep_stuck_predictions(db: Session):
                 # we stop re-processing forever. Real resolver in the
                 # follow-up ship will either score these or keep them
                 # pending until data arrives.
+                p.outcome = "no_data"
+                p.evaluated_at = now
+                no_data_count += 1
+            continue
+
+        # Metric-forecast rows: 7+ days past release date. Try the
+        # resolver once more, then give up if no data found (macro
+        # metrics currently always land here).
+        if (p.prediction_category or "").strip().lower() == "metric_forecast_call":
+            result = _score_metric_forecast(p, now, db)
+            if result in ("hit", "near", "miss"):
+                scored += 1
+            else:
                 p.outcome = "no_data"
                 p.evaluated_at = now
                 no_data_count += 1
