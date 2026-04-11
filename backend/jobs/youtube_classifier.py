@@ -514,6 +514,85 @@ Rules:
 Output JSON only. Be concise."""
 
 
+# Earnings-call instructions. Appended to the active prompt when
+# ENABLE_EARNINGS_CALL_EXTRACTION is flipped on. Teaches Haiku to
+# recognize predictions tied to a company's next earnings release
+# and emit them as a ticker_call with event_type='earnings' plus an
+# optional event_date. The scoring window for these is the
+# pre-earnings close vs post-earnings close (earnings reaction),
+# which is different from a plain 30-day ticker_call. No new
+# prediction_category — same ticker_call row, just flagged.
+YOUTUBE_HAIKU_EARNINGS_INSTRUCTIONS = """EARNINGS CALLS:
+If the speaker makes a prediction tied to a company's next earnings release, emit it as a ticker_call with event_type='earnings'. These predictions are scored on the earnings reaction (pre-earnings close vs post-earnings close) rather than a fixed N-day window.
+
+Signals that indicate an earnings-tied prediction:
+- "earnings next week" / "reports Thursday" / "reporting on the 25th"
+- "into earnings" / "going into earnings" / "ahead of earnings"
+- "pre-earnings" / "post-earnings" / "earnings reaction"
+- "I expect a beat" / "they'll beat" / "miss expectations" / "earnings miss"
+- "guidance raise" / "weak guidance" / "Q3 numbers"
+- "I'm long X into earnings" / "short X going into print"
+- "post-earnings dip" / "post-earnings rally"
+
+Direction mapping:
+- Expecting a beat, rally, strong numbers, raised guidance → bullish
+- Expecting a miss, drop, weak numbers, cut guidance → bearish
+- Hedging / "could go either way" / expecting range-bound reaction → neutral
+
+Event date extraction:
+- If the speaker mentions a specific day / date ("reports Thursday", "earnings on the 25th", "Q3 earnings October 22"), convert it to an absolute ISO date (YYYY-MM-DD) using the video's publish date as the anchor. Example: publish date 2026-04-10, speaker says "earnings next Wednesday" → event_date: "2026-04-15".
+- If the speaker only says "earnings next week" without a specific day, default to the Wednesday of the following week.
+- If the speaker gives no date at all, leave event_date as null — the evaluator will look up the company's next earnings release date from an external source.
+
+Price target (optional):
+- If the speaker gives a specific price target for the earnings reaction ("I see NVDA popping to $145 post-earnings"), set price_target to that value. Otherwise leave it null — direction alone is sufficient.
+
+Output format for earnings-tied predictions (add event_type, event_date, and derived_from):
+{
+  "ticker": "NVDA",
+  "direction": "bullish",
+  "price_target": 145,
+  "event_type": "earnings",
+  "event_date": "2026-04-15",
+  "derived_from": "earnings_call",
+  "context_quote": "I think NVDA beats earnings next Wednesday and runs to 145"
+}
+
+Examples:
+
+Input: "I think NVDA is going to beat earnings next Wednesday and pop 10 percent"
+Output: {"ticker": "NVDA", "direction": "bullish", "event_type": "earnings", "event_date": "2026-04-15", "derived_from": "earnings_call", "context_quote": "NVDA beats earnings next Wednesday, pops 10 percent"}
+
+Input: "AAPL reports next Thursday — I expect a miss and a 5 percent drop"
+Output: {"ticker": "AAPL", "direction": "bearish", "event_type": "earnings", "event_date": "2026-04-16", "derived_from": "earnings_call", "context_quote": "AAPL reports next Thursday, expect a miss, 5 percent drop"}
+
+Input: "META earnings are going to be ugly"
+Output: {"ticker": "META", "direction": "bearish", "event_type": "earnings", "event_date": null, "derived_from": "earnings_call", "context_quote": "META earnings are going to be ugly"}
+
+Input: "I'm long GOOGL into earnings, expecting a guidance raise"
+Output: {"ticker": "GOOGL", "direction": "bullish", "event_type": "earnings", "event_date": null, "derived_from": "earnings_call", "context_quote": "long GOOGL into earnings, expecting a guidance raise"}
+
+Input: "I see NVDA popping to $145 post-earnings on Wednesday"
+Output: {"ticker": "NVDA", "direction": "bullish", "price_target": 145, "event_type": "earnings", "event_date": "2026-04-15", "derived_from": "earnings_call", "context_quote": "NVDA popping to 145 post-earnings Wednesday"}
+
+Input: "TSLA reports tomorrow and I'm flat — could go either way"
+Output: (do NOT extract — "flat" and "could go either way" is not a directional prediction)
+
+Input: "MSFT post-earnings dip is a buying opportunity" (spoken after the earnings release)
+Output: {"ticker": "MSFT", "direction": "bullish", "event_type": "earnings", "event_date": null, "derived_from": "earnings_call", "context_quote": "MSFT post-earnings dip is a buying opportunity"}
+
+Rules:
+- MUST use direction from the existing ticker_call vocabulary: bullish / bearish / neutral.
+- MUST set event_type: "earnings" so the evaluator routes to the earnings-reaction scoring path.
+- MUST set derived_from: "earnings_call" so the insertion code can count these separately.
+- event_date is OPTIONAL — omit or set to null when the transcript doesn't give a specific date. The evaluator looks up missing dates from external data sources.
+- Do NOT emit event_type='earnings' for predictions that only happen to mention earnings in passing without making a forward-looking claim about the next release.
+- Do NOT extract if the forecaster explicitly says they are flat or undecided into earnings ("I'm flat into earnings" is NOT a prediction).
+- Do NOT invent a date the speaker didn't give — set event_date: null instead of guessing.
+
+Output JSON only. Be concise."""
+
+
 # ── Transcript fetching ─────────────────────────────────────────────────────
 
 def _build_transcript_api():
@@ -748,6 +827,7 @@ def classify_video(channel_name: str, title: str, publish_date: str,
     use_ranked_list = False
     use_revisions = False
     use_options = False
+    use_earnings = False
     if db is not None and video_id:
         try:
             from feature_flags import should_use_sector_prompt
@@ -774,13 +854,19 @@ def classify_video(channel_name: str, title: str, publish_date: str,
         except Exception as _e:
             log.warning("[YT-CLF] options flag check failed: %s", _e)
             use_options = False
+        try:
+            from feature_flags import is_earnings_extraction_enabled
+            use_earnings = is_earnings_extraction_enabled(db)
+        except Exception as _e:
+            log.warning("[YT-CLF] earnings flag check failed: %s", _e)
+            use_earnings = False
     base_system = YOUTUBE_HAIKU_SECTOR_SYSTEM if use_sector_prompt else HAIKU_SYSTEM
     # Append optional instruction blocks ONLY when each flag is on. When
     # every flag is off (the default), base_system is sent byte-for-byte
     # unchanged so Anthropic's prompt cache hit rate on the base prompt
     # stays at 100%. Order matters for cache hits: ranked list → revisions
-    # → options, stable across calls with any combination of flags on so
-    # extended-prompt cache entries match.
+    # → options → earnings, stable across calls with any combination of
+    # flags on so extended-prompt cache entries match.
     active_system = base_system
     if use_ranked_list:
         active_system = active_system + "\n\n" + YOUTUBE_HAIKU_RANKED_LIST_INSTRUCTIONS
@@ -788,16 +874,20 @@ def classify_video(channel_name: str, title: str, publish_date: str,
         active_system = active_system + "\n\n" + YOUTUBE_HAIKU_REVISIONS_INSTRUCTIONS
     if use_options:
         active_system = active_system + "\n\n" + YOUTUBE_HAIKU_OPTIONS_INSTRUCTIONS
+    if use_earnings:
+        active_system = active_system + "\n\n" + YOUTUBE_HAIKU_EARNINGS_INSTRUCTIONS
     telemetry["prompt_variant"] = "sector" if use_sector_prompt else "standard"
     telemetry["ranked_list_enabled"] = bool(use_ranked_list)
     telemetry["revisions_enabled"] = bool(use_revisions)
     telemetry["options_enabled"] = bool(use_options)
+    telemetry["earnings_enabled"] = bool(use_earnings)
     print(
         f"[YOUTUBE-HAIKU] video={video_id or '?'} channel={channel_name} "
         f"prompt_variant={telemetry['prompt_variant']} "
         f"ranked_list={'on' if use_ranked_list else 'off'} "
         f"revisions={'on' if use_revisions else 'off'} "
-        f"options={'on' if use_options else 'off'}",
+        f"options={'on' if use_options else 'off'} "
+        f"earnings={'on' if use_earnings else 'off'}",
         flush=True,
     )
 
@@ -991,15 +1081,38 @@ def _validate_and_dedupe_predictions(raw: list) -> list[dict]:
         rev_dir = (p.get("revision_direction") or "").strip().lower() or None
         if rev_dir not in (None, "up", "down", "direction_change"):
             rev_dir = None
-        # Options-position marker. Haiku sets derived_from='options_position'
-        # on predictions it mapped from options vocabulary. The marker is
-        # NOT stored in the DB — it's only used by the insert path to
-        # increment scraper_runs.options_positions_extracted. We normalize
-        # any truthy string to the canonical value.
+        # derived_from marker. Haiku sets this on predictions it mapped
+        # from specialized vocabulary. Not stored in the DB — only used
+        # by the insert path to increment the per-run counter for the
+        # matching sub-type. Canonical values: 'options_position',
+        # 'earnings_call'. Unknown values normalize to None.
         raw_derived = p.get("derived_from")
         derived_from = None
-        if raw_derived is not None and str(raw_derived).strip().lower() == "options_position":
-            derived_from = "options_position"
+        if raw_derived is not None:
+            _rd = str(raw_derived).strip().lower()
+            if _rd in ("options_position", "earnings_call"):
+                derived_from = _rd
+
+        # Event metadata for earnings_call (and future event-tied types).
+        # Only stamped when derived_from == 'earnings_call' AND Haiku
+        # supplied event_type='earnings'. event_date is parsed as ISO
+        # YYYY-MM-DD; unparseable values fall through to None so the
+        # evaluator's future lookup path handles them.
+        event_type_val = None
+        event_date_val = None
+        if derived_from == "earnings_call":
+            raw_evtype = (p.get("event_type") or "").strip().lower()
+            if raw_evtype == "earnings":
+                event_type_val = "earnings"
+            raw_evdate = p.get("event_date")
+            if raw_evdate:
+                try:
+                    from datetime import datetime as _dt
+                    event_date_val = _dt.strptime(
+                        str(raw_evdate)[:10], "%Y-%m-%d"
+                    ).date()
+                except (TypeError, ValueError):
+                    event_date_val = None
         key = (ticker, direction)
         if key in seen_tickers:
             continue
@@ -1015,6 +1128,8 @@ def _validate_and_dedupe_predictions(raw: list) -> list[dict]:
         p["_previous_target_hint"] = prev_target_hint
         p["_revision_direction_hint"] = rev_dir
         p["_derived_from"] = derived_from
+        p["_event_type"] = event_type_val
+        p["_event_date"] = event_date_val
         out.append(p)
     return out
 
