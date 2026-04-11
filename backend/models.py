@@ -271,6 +271,25 @@ class Prediction(Base):
     trigger_deadline = Column(DateTime, nullable=True)
     trigger_fired_at = Column(DateTime, nullable=True)
     outcome_window_days = Column(Integer, nullable=True)
+    # Source-timestamp metadata (ship #9). Every YouTube-derived
+    # prediction can link to the exact second in the video where the
+    # forecaster said it via youtube.com/watch?v=VID&t=272s. Populated
+    # by backend/jobs/timestamp_matcher.py when ENABLE_SOURCE_TIMESTAMPS
+    # is on. Stays NULL on every row extracted with the flag off, on
+    # every non-YouTube prediction, and on any extraction where the
+    # matcher couldn't find a reliable link.
+    #
+    #   source_timestamp_seconds    integer second into the video
+    #   source_timestamp_method     'word_level' | 'fuzzy_match' |
+    #                               'two_pass' | 'unknown'
+    #   source_verbatim_quote       exact words Haiku extracted — drives
+    #                               both the match AND the frontend audit
+    #                               trail tooltip
+    #   source_timestamp_confidence 0.000..1.000 match confidence
+    source_timestamp_seconds = Column(Integer, nullable=True)
+    source_timestamp_method = Column(String(16), nullable=True)
+    source_verbatim_quote = Column(Text, nullable=True)
+    source_timestamp_confidence = Column(Numeric(4, 3), nullable=True)
     confidence_tier = Column(Numeric(3, 2), nullable=False, default=1.0)
     # Position disclosure fields: NULL for price_target predictions.
     position_action = Column(String(16), nullable=True)   # open|add|trim|exit
@@ -958,6 +977,18 @@ class ScraperRun(Base):
     # Stays 0 until ENABLE_DISCLOSURE_EXTRACTION is flipped on.
     disclosures_extracted = Column(Integer, nullable=False, default=0,
                                     server_default="0")
+    # Source-timestamp matching telemetry — ship #9. When
+    # ENABLE_SOURCE_TIMESTAMPS is on, every prediction extracted by
+    # the YouTube classifier gets passed through timestamp_matcher to
+    # resolve its verbatim_quote to an integer second in the video.
+    # timestamps_matched counts successful matches via any path
+    # (word_level / fuzzy_match / two_pass); timestamps_failed counts
+    # predictions that got source_timestamp_seconds=NULL. Both stay 0
+    # when the flag is off or when no predictions were emitted.
+    timestamps_matched = Column(Integer, nullable=False, default=0,
+                                 server_default="0")
+    timestamps_failed = Column(Integer, nullable=False, default=0,
+                                server_default="0")
 
 
 class Disclosure(Base):
@@ -1005,6 +1036,14 @@ class Disclosure(Base):
     follow_through_6m = Column(Numeric(10, 4), nullable=True)
     follow_through_12m = Column(Numeric(10, 4), nullable=True)
     last_follow_through_update = Column(DateTime, nullable=True)
+    # Source-timestamp metadata — ship #9. Mirrors the four
+    # source_timestamp_* columns on predictions; populated the same
+    # way (via backend/jobs/timestamp_matcher.py) when
+    # ENABLE_SOURCE_TIMESTAMPS is on.
+    source_timestamp_seconds = Column(Integer, nullable=True)
+    source_timestamp_method = Column(String(16), nullable=True)
+    source_verbatim_quote = Column(Text, nullable=True)
+    source_timestamp_confidence = Column(Numeric(4, 3), nullable=True)
     created_at = Column(DateTime, nullable=False,
                         default=datetime.datetime.utcnow,
                         server_default=func.now())

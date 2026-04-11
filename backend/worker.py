@@ -1523,6 +1523,64 @@ def main():
     except Exception as e:
         log.warning(f"[Worker] disclosure schema migration: {e}")
 
+    # predictions source_timestamp_* columns + scraper_runs timestamp
+    # counters + partial index — ship #9 (source timestamps). Every
+    # YouTube-derived prediction can link to the exact second in the
+    # video where the forecaster said it. Populated by the hybrid
+    # timestamp_matcher when ENABLE_SOURCE_TIMESTAMPS is on.
+    try:
+        with engine.connect() as conn:
+            conn.execute(sql_text(
+                "ALTER TABLE predictions ADD COLUMN IF NOT EXISTS "
+                "source_timestamp_seconds INTEGER"
+            ))
+            conn.execute(sql_text(
+                "ALTER TABLE predictions ADD COLUMN IF NOT EXISTS "
+                "source_timestamp_method VARCHAR(16)"
+            ))
+            conn.execute(sql_text(
+                "ALTER TABLE predictions ADD COLUMN IF NOT EXISTS "
+                "source_verbatim_quote TEXT"
+            ))
+            conn.execute(sql_text(
+                "ALTER TABLE predictions ADD COLUMN IF NOT EXISTS "
+                "source_timestamp_confidence NUMERIC(4,3)"
+            ))
+            conn.execute(sql_text(
+                "CREATE INDEX IF NOT EXISTS idx_predictions_source_timestamp "
+                "ON predictions(source_platform_id, source_timestamp_seconds) "
+                "WHERE source_timestamp_seconds IS NOT NULL"
+            ))
+            conn.execute(sql_text(
+                "ALTER TABLE scraper_runs ADD COLUMN IF NOT EXISTS "
+                "timestamps_matched INTEGER NOT NULL DEFAULT 0"
+            ))
+            conn.execute(sql_text(
+                "ALTER TABLE scraper_runs ADD COLUMN IF NOT EXISTS "
+                "timestamps_failed INTEGER NOT NULL DEFAULT 0"
+            ))
+            # Mirror the four source_timestamp_* columns onto disclosures.
+            conn.execute(sql_text(
+                "ALTER TABLE disclosures ADD COLUMN IF NOT EXISTS "
+                "source_timestamp_seconds INTEGER"
+            ))
+            conn.execute(sql_text(
+                "ALTER TABLE disclosures ADD COLUMN IF NOT EXISTS "
+                "source_timestamp_method VARCHAR(16)"
+            ))
+            conn.execute(sql_text(
+                "ALTER TABLE disclosures ADD COLUMN IF NOT EXISTS "
+                "source_verbatim_quote TEXT"
+            ))
+            conn.execute(sql_text(
+                "ALTER TABLE disclosures ADD COLUMN IF NOT EXISTS "
+                "source_timestamp_confidence NUMERIC(4,3)"
+            ))
+            conn.commit()
+        log.info("[Worker] predictions + disclosures source_timestamp_* columns + scraper_runs timestamp counters ready")
+    except Exception as e:
+        log.warning(f"[Worker] source_timestamps schema migration: {e}")
+
     # predictions.list_id + list_rank — ranked list extraction metadata.
     # Partial index keeps the index small because most rows won't be in
     # lists. No backfill: historical predictions have no ranking data.

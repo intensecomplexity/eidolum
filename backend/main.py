@@ -2710,6 +2710,68 @@ async def lifespan(app):
         except Exception as _mfee:
             print(f"[Startup] metric_forecast_call schema migration error: {_mfee}")
 
+        # ── predictions source_timestamp_* columns + scraper_runs
+        #    timestamps_matched / timestamps_failed + partial index ──────
+        # Ship #9: every YouTube-derived prediction can link to the exact
+        # second in the video where the forecaster said it. Populated
+        # by the hybrid timestamp_matcher (word-level JSON3 ASR / fuzzy
+        # SequenceMatcher / two-pass Haiku / give up to NULL). Columns
+        # stay NULL until ENABLE_SOURCE_TIMESTAMPS is flipped on.
+        try:
+            with engine.connect() as _st_c:
+                _st_c.execute(sql_text(
+                    "ALTER TABLE predictions ADD COLUMN IF NOT EXISTS "
+                    "source_timestamp_seconds INTEGER"
+                ))
+                _st_c.execute(sql_text(
+                    "ALTER TABLE predictions ADD COLUMN IF NOT EXISTS "
+                    "source_timestamp_method VARCHAR(16)"
+                ))
+                _st_c.execute(sql_text(
+                    "ALTER TABLE predictions ADD COLUMN IF NOT EXISTS "
+                    "source_verbatim_quote TEXT"
+                ))
+                _st_c.execute(sql_text(
+                    "ALTER TABLE predictions ADD COLUMN IF NOT EXISTS "
+                    "source_timestamp_confidence NUMERIC(4,3)"
+                ))
+                _st_c.execute(sql_text(
+                    "CREATE INDEX IF NOT EXISTS idx_predictions_source_timestamp "
+                    "ON predictions(source_platform_id, source_timestamp_seconds) "
+                    "WHERE source_timestamp_seconds IS NOT NULL"
+                ))
+                _st_c.execute(sql_text(
+                    "ALTER TABLE scraper_runs ADD COLUMN IF NOT EXISTS "
+                    "timestamps_matched INTEGER NOT NULL DEFAULT 0"
+                ))
+                _st_c.execute(sql_text(
+                    "ALTER TABLE scraper_runs ADD COLUMN IF NOT EXISTS "
+                    "timestamps_failed INTEGER NOT NULL DEFAULT 0"
+                ))
+                # Mirror the four source_timestamp_* columns onto the
+                # disclosures table — ship #9 also covers disclosure rows
+                # so they can link back to the exact video moment.
+                _st_c.execute(sql_text(
+                    "ALTER TABLE disclosures ADD COLUMN IF NOT EXISTS "
+                    "source_timestamp_seconds INTEGER"
+                ))
+                _st_c.execute(sql_text(
+                    "ALTER TABLE disclosures ADD COLUMN IF NOT EXISTS "
+                    "source_timestamp_method VARCHAR(16)"
+                ))
+                _st_c.execute(sql_text(
+                    "ALTER TABLE disclosures ADD COLUMN IF NOT EXISTS "
+                    "source_verbatim_quote TEXT"
+                ))
+                _st_c.execute(sql_text(
+                    "ALTER TABLE disclosures ADD COLUMN IF NOT EXISTS "
+                    "source_timestamp_confidence NUMERIC(4,3)"
+                ))
+                _st_c.commit()
+                print("[Startup] predictions + disclosures source_timestamp_* columns + scraper_runs timestamp counters ready")
+        except Exception as _ste:
+            print(f"[Startup] source_timestamps schema migration error: {_ste}")
+
         # ── predictions.list_id + list_rank (ranked list extraction) ────
         # Stores speaker-declared rank position within a ranked list
         # ("my top 5 stocks: NVDA, AMD, TSM, AAPL, MSFT"). Both columns
@@ -2956,6 +3018,24 @@ async def lifespan(app):
                 print("[Startup] ENABLE_DISCLOSURE_EXTRACTION flag seeded")
         except Exception as _dfe:
             print(f"[Startup] ENABLE_DISCLOSURE_EXTRACTION seed error: {_dfe}")
+
+        # ── ENABLE_SOURCE_TIMESTAMPS flag seed ──────────────────────────
+        # Ship #9. Default 'false'. Admin flips via POST /api/admin/
+        # toggle-source-timestamps. Enables the 12th (and last) additive
+        # Haiku instruction block teaching verbatim_quote extraction,
+        # then the hybrid matcher in backend/jobs/timestamp_matcher.py
+        # resolves each quote to an integer second in the source video.
+        try:
+            with engine.connect() as _st_c:
+                _st_c.execute(sql_text("""
+                    INSERT INTO config (key, value)
+                    VALUES ('ENABLE_SOURCE_TIMESTAMPS', 'false')
+                    ON CONFLICT (key) DO NOTHING
+                """))
+                _st_c.commit()
+                print("[Startup] ENABLE_SOURCE_TIMESTAMPS flag seeded")
+        except Exception as _stse:
+            print(f"[Startup] ENABLE_SOURCE_TIMESTAMPS seed error: {_stse}")
 
         # ── youtube_channel_meta totals backfill ────────────────────────
         # Historical backfill for the admin card counters. Three columns:
@@ -4020,10 +4100,15 @@ def get_features(db: _Session = _Depends(_get_db)):
         # own `disclosures` table (NOT predictions) and carry
         # follow-through scoring instead of HIT/NEAR/MISS. Default false.
         "disclosure_extraction": False,
+        # Boolean: ship #9. When true, the YouTube classifier appends
+        # the verbatim_quote instruction block and the hybrid
+        # timestamp_matcher resolves each prediction's quote to an
+        # integer second in the source video for ?t=Ns deep linking.
+        "source_timestamps": False,
     }
     try:
         rows = db.execute(_ft(
-            "SELECT key, value FROM config WHERE key IN ('tournaments_enabled','daily_challenge_enabled','duels_enabled','compete_enabled','compare_analysts_enabled','EVALUATE_X_PREDICTIONS','ENABLE_YOUTUBE_SECTOR_CALLS','ENABLE_RANKED_LIST_EXTRACTION','ENABLE_TARGET_REVISIONS','ENABLE_OPTIONS_POSITION_EXTRACTION','ENABLE_EARNINGS_CALL_EXTRACTION','ENABLE_MACRO_CALL_EXTRACTION','ENABLE_PAIR_CALL_EXTRACTION','ENABLE_BINARY_EVENT_EXTRACTION','ENABLE_METRIC_FORECAST_EXTRACTION','ENABLE_CONDITIONAL_CALL_EXTRACTION','ENABLE_DISCLOSURE_EXTRACTION')"
+            "SELECT key, value FROM config WHERE key IN ('tournaments_enabled','daily_challenge_enabled','duels_enabled','compete_enabled','compare_analysts_enabled','EVALUATE_X_PREDICTIONS','ENABLE_YOUTUBE_SECTOR_CALLS','ENABLE_RANKED_LIST_EXTRACTION','ENABLE_TARGET_REVISIONS','ENABLE_OPTIONS_POSITION_EXTRACTION','ENABLE_EARNINGS_CALL_EXTRACTION','ENABLE_MACRO_CALL_EXTRACTION','ENABLE_PAIR_CALL_EXTRACTION','ENABLE_BINARY_EVENT_EXTRACTION','ENABLE_METRIC_FORECAST_EXTRACTION','ENABLE_CONDITIONAL_CALL_EXTRACTION','ENABLE_DISCLOSURE_EXTRACTION','ENABLE_SOURCE_TIMESTAMPS')"
         )).fetchall()
         for r in rows:
             if r[0] == "EVALUATE_X_PREDICTIONS":
@@ -4054,6 +4139,8 @@ def get_features(db: _Session = _Depends(_get_db)):
                 flags["conditional_call_extraction"] = str(r[1]).strip().lower() == "true"
             elif r[0] == "ENABLE_DISCLOSURE_EXTRACTION":
                 flags["disclosure_extraction"] = str(r[1]).strip().lower() == "true"
+            elif r[0] == "ENABLE_SOURCE_TIMESTAMPS":
+                flags["source_timestamps"] = str(r[1]).strip().lower() == "true"
             else:
                 flags[r[0].replace("_enabled", "")] = r[1] == "true"
     except Exception:
@@ -4414,6 +4501,127 @@ def toggle_disclosure_extraction(
             str(new_val.value).strip().lower() == "true" if new_val else False
         )
     }
+
+
+@app.post("/api/admin/toggle-source-timestamps")
+def toggle_source_timestamps(
+    admin_id: int = _Depends(_require_admin),
+    db: _Session = _Depends(_get_db),
+):
+    """Flip ENABLE_SOURCE_TIMESTAMPS between 'true' and 'false'.
+    Invalidates the feature_flags cache so the new value takes effect
+    on the next classify_video call instead of waiting 60s for the TTL.
+
+    When on, Haiku adds a verbatim_quote to each prediction and the
+    hybrid timestamp_matcher resolves it to an integer second in the
+    video. Rows get source_timestamp_seconds / source_timestamp_method /
+    source_verbatim_quote / source_timestamp_confidence populated.
+    Frontend prediction cards then generate `?t=<sec>s` anchor links
+    and render the verbatim quote as an audit-trail tooltip."""
+    from models import Config
+    row = db.query(Config).filter(Config.key == "ENABLE_SOURCE_TIMESTAMPS").first()
+    if row:
+        row.value = "false" if str(row.value).strip().lower() == "true" else "true"
+    else:
+        db.add(Config(key="ENABLE_SOURCE_TIMESTAMPS", value="true"))
+    db.commit()
+    try:
+        from feature_flags import invalidate_source_timestamps_flag_cache
+        invalidate_source_timestamps_flag_cache()
+    except Exception:
+        pass
+    new_val = db.query(Config).filter(Config.key == "ENABLE_SOURCE_TIMESTAMPS").first()
+    return {
+        "source_timestamps": (
+            str(new_val.value).strip().lower() == "true" if new_val else False
+        )
+    }
+
+
+@app.get("/api/admin/timestamp-diagnostics")
+def timestamp_diagnostics(
+    admin_id: int = _Depends(_require_admin),
+    db: _Session = _Depends(_get_db),
+):
+    """Diagnostic breakdown of source-timestamp matching quality.
+
+    Returns:
+      total_matched            how many predictions have a source_timestamp_seconds set
+      total_failed             how many have source_timestamp_method = 'unknown'
+      method_breakdown         {word_level, fuzzy_match, two_pass, unknown} counts
+      avg_confidence           mean of source_timestamp_confidence across matched rows
+      worst_videos             up to 20 video_ids where ALL predictions from that
+                               video failed to match (debugging signal — either the
+                               transcript is broken, Haiku paraphrased everything,
+                               or the quotes don't survive normalization)
+    Only considers YouTube-sourced predictions (source_type='youtube').
+    """
+    from sqlalchemy import text as _st
+    try:
+        # Aggregate counts by method
+        rows = db.execute(_st("""
+            SELECT COALESCE(source_timestamp_method, 'unset') AS method,
+                   COUNT(*) AS cnt,
+                   AVG(source_timestamp_confidence) AS avg_conf
+            FROM predictions
+            WHERE source_type = 'youtube'
+              AND source_platform_id LIKE 'yt_%'
+            GROUP BY COALESCE(source_timestamp_method, 'unset')
+        """)).fetchall()
+        method_breakdown = {}
+        total_matched = 0
+        total_failed = 0
+        weighted_conf_sum = 0.0
+        weighted_conf_n = 0
+        for method, cnt, avg_conf in rows:
+            method_breakdown[str(method)] = int(cnt)
+            if method in ("word_level", "fuzzy_match", "two_pass"):
+                total_matched += int(cnt)
+                if avg_conf is not None:
+                    weighted_conf_sum += float(avg_conf) * int(cnt)
+                    weighted_conf_n += int(cnt)
+            elif method == "unknown":
+                total_failed += int(cnt)
+        avg_confidence = (
+            round(weighted_conf_sum / weighted_conf_n, 4) if weighted_conf_n else None
+        )
+
+        # Videos where every prediction failed to match. Grouped by the
+        # yt_{video_id}_* prefix of source_platform_id, then filtered to
+        # groups where zero rows have a non-NULL source_timestamp_seconds.
+        worst = db.execute(_st("""
+            SELECT split_part(source_platform_id, '_', 2) AS video_id,
+                   COUNT(*) AS total_preds,
+                   SUM(CASE WHEN source_timestamp_seconds IS NOT NULL THEN 1 ELSE 0 END) AS matched
+            FROM predictions
+            WHERE source_type = 'youtube'
+              AND source_platform_id LIKE 'yt_%'
+            GROUP BY split_part(source_platform_id, '_', 2)
+            HAVING SUM(CASE WHEN source_timestamp_seconds IS NOT NULL THEN 1 ELSE 0 END) = 0
+               AND COUNT(*) >= 1
+            ORDER BY total_preds DESC
+            LIMIT 20
+        """)).fetchall()
+        worst_videos = [
+            {"video_id": str(r[0]), "total_preds": int(r[1])}
+            for r in worst
+        ]
+        return {
+            "total_matched": total_matched,
+            "total_failed": total_failed,
+            "method_breakdown": method_breakdown,
+            "avg_confidence": avg_confidence,
+            "worst_videos": worst_videos,
+        }
+    except Exception as e:
+        return {
+            "error": f"{type(e).__name__}: {str(e)[:200]}",
+            "total_matched": 0,
+            "total_failed": 0,
+            "method_breakdown": {},
+            "avg_confidence": None,
+            "worst_videos": [],
+        }
 
 
 # ── SEO: sitemap.xml + robots.txt ──────────────────────────────────────────
