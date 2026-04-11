@@ -193,6 +193,39 @@ class Prediction(Base):
     event_deadline = Column(Date, nullable=True)
     event_resolved_at = Column(DateTime, nullable=True)
     event_resolution_source = Column(String(64), nullable=True)
+    # Metric-forecast metadata for prediction_category='metric_forecast_call'
+    # rows. These are numerical predictions for specific fundamental
+    # or macro metrics — "NVDA will report $5.20 EPS", "CPI prints
+    # 3.2%", "unemployment ticks to 4.5%". Different from earnings_call
+    # (which predicts price reaction) and from binary_event_call (which
+    # predicts yes/no). Scoring compares the predicted target against
+    # the actual released value using category-based tolerance.
+    #
+    #   metric_type         Canonical metric name (eps / revenue / cpi /
+    #                       unemployment / pmi_manufacturing / …). Constrained
+    #                       to _METRIC_FORECAST_TYPES in youtube_classifier.py.
+    #   metric_target       The forecaster's predicted value. Stored in the
+    #                       metric's natural unit (dollars for EPS/revenue,
+    #                       decimal rate for percentages — e.g. 0.032 for
+    #                       3.2% CPI, 150000 for 150K nonfarm payrolls).
+    #   metric_period       Reporting period label ("Q1_2026", "fiscal_2026",
+    #                       "Jan_2026"). Free-form — used for dedup and
+    #                       FMP earnings lookup.
+    #   metric_release_date Scheduled date the actual value will be released.
+    #                       Evaluator waits until this date before scoring.
+    #   metric_actual       Populated by the evaluator once the real value
+    #                       is fetched (from earnings_history for company
+    #                       metrics, stubbed for macro metrics).
+    #   metric_error_pct    Relative error percent computed at scoring time
+    #                       — (actual - target) / target * 100. Used by the
+    #                       frontend for the ERROR display.
+    # All NULL on every non-metric row.
+    metric_type = Column(String(48), nullable=True)
+    metric_target = Column(Numeric(18, 6), nullable=True)
+    metric_period = Column(String(16), nullable=True)
+    metric_release_date = Column(Date, nullable=True)
+    metric_actual = Column(Numeric(18, 6), nullable=True)
+    metric_error_pct = Column(Numeric(10, 4), nullable=True)
     confidence_tier = Column(Numeric(3, 2), nullable=False, default=1.0)
     # Position disclosure fields: NULL for price_target predictions.
     position_action = Column(String(16), nullable=True)   # open|add|trim|exit
@@ -856,6 +889,12 @@ class ScraperRun(Base):
     # until ENABLE_BINARY_EVENT_EXTRACTION is flipped on.
     binary_events_extracted = Column(Integer, nullable=False, default=0,
                                       server_default="0")
+    # Count of metric_forecast_call predictions extracted in this run.
+    # Ship #7 of the new prediction types. Numerical metric predictions
+    # ("NVDA will report $5.20 EPS", "CPI prints 3.2%"). Stays 0 until
+    # ENABLE_METRIC_FORECAST_EXTRACTION is flipped on.
+    metric_forecasts_extracted = Column(Integer, nullable=False, default=0,
+                                         server_default="0")
 
 
 class YouTubeScraperRejection(Base):

@@ -1393,6 +1393,50 @@ def main():
     except Exception as e:
         log.warning(f"[Worker] binary_event_call schema migration: {e}")
 
+    # predictions metric-forecast columns + scraper_runs.metric_forecasts_extracted
+    # + partial index — ship #7 of the new prediction types
+    # (metric_forecast_call). Numerical metric predictions scored
+    # against released values using category-based tolerance.
+    try:
+        with engine.connect() as conn:
+            conn.execute(sql_text(
+                "ALTER TABLE predictions ADD COLUMN IF NOT EXISTS "
+                "metric_type VARCHAR(48)"
+            ))
+            conn.execute(sql_text(
+                "ALTER TABLE predictions ADD COLUMN IF NOT EXISTS "
+                "metric_target NUMERIC(18,6)"
+            ))
+            conn.execute(sql_text(
+                "ALTER TABLE predictions ADD COLUMN IF NOT EXISTS "
+                "metric_period VARCHAR(16)"
+            ))
+            conn.execute(sql_text(
+                "ALTER TABLE predictions ADD COLUMN IF NOT EXISTS "
+                "metric_release_date DATE"
+            ))
+            conn.execute(sql_text(
+                "ALTER TABLE predictions ADD COLUMN IF NOT EXISTS "
+                "metric_actual NUMERIC(18,6)"
+            ))
+            conn.execute(sql_text(
+                "ALTER TABLE predictions ADD COLUMN IF NOT EXISTS "
+                "metric_error_pct NUMERIC(10,4)"
+            ))
+            conn.execute(sql_text(
+                "CREATE INDEX IF NOT EXISTS idx_predictions_metric "
+                "ON predictions(metric_type, metric_release_date) "
+                "WHERE metric_type IS NOT NULL"
+            ))
+            conn.execute(sql_text(
+                "ALTER TABLE scraper_runs ADD COLUMN IF NOT EXISTS "
+                "metric_forecasts_extracted INTEGER NOT NULL DEFAULT 0"
+            ))
+            conn.commit()
+        log.info("[Worker] predictions metric-forecast columns + scraper_runs.metric_forecasts_extracted ready")
+    except Exception as e:
+        log.warning(f"[Worker] metric_forecast_call schema migration: {e}")
+
     # predictions.list_id + list_rank — ranked list extraction metadata.
     # Partial index keeps the index small because most rows won't be in
     # lists. No backfill: historical predictions have no ranking data.

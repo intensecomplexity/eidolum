@@ -2553,6 +2553,56 @@ async def lifespan(app):
         except Exception as _bee:
             print(f"[Startup] binary_event_call schema migration error: {_bee}")
 
+        # ── predictions metric-forecast columns + scraper_runs.metric_forecasts_extracted
+        #    + partial index ─────────────────────────────────────────────
+        # Ship #7 of the new prediction types: metric_forecast_call.
+        # Numerical predictions for known metrics ("NVDA will report
+        # $5.20 EPS", "CPI prints 3.2%", "unemployment ticks to 4.5%").
+        # Different from earnings_call (price reaction) and from
+        # binary_event_call (yes/no). Lands as a new
+        # prediction_category='metric_forecast_call'. Six new columns
+        # all scoped to that category; partial index keeps the footprint
+        # small until the flag is flipped on.
+        try:
+            with engine.connect() as _mf_c:
+                _mf_c.execute(sql_text(
+                    "ALTER TABLE predictions ADD COLUMN IF NOT EXISTS "
+                    "metric_type VARCHAR(48)"
+                ))
+                _mf_c.execute(sql_text(
+                    "ALTER TABLE predictions ADD COLUMN IF NOT EXISTS "
+                    "metric_target NUMERIC(18,6)"
+                ))
+                _mf_c.execute(sql_text(
+                    "ALTER TABLE predictions ADD COLUMN IF NOT EXISTS "
+                    "metric_period VARCHAR(16)"
+                ))
+                _mf_c.execute(sql_text(
+                    "ALTER TABLE predictions ADD COLUMN IF NOT EXISTS "
+                    "metric_release_date DATE"
+                ))
+                _mf_c.execute(sql_text(
+                    "ALTER TABLE predictions ADD COLUMN IF NOT EXISTS "
+                    "metric_actual NUMERIC(18,6)"
+                ))
+                _mf_c.execute(sql_text(
+                    "ALTER TABLE predictions ADD COLUMN IF NOT EXISTS "
+                    "metric_error_pct NUMERIC(10,4)"
+                ))
+                _mf_c.execute(sql_text(
+                    "CREATE INDEX IF NOT EXISTS idx_predictions_metric "
+                    "ON predictions(metric_type, metric_release_date) "
+                    "WHERE metric_type IS NOT NULL"
+                ))
+                _mf_c.execute(sql_text(
+                    "ALTER TABLE scraper_runs ADD COLUMN IF NOT EXISTS "
+                    "metric_forecasts_extracted INTEGER NOT NULL DEFAULT 0"
+                ))
+                _mf_c.commit()
+                print("[Startup] predictions metric-forecast columns + scraper_runs.metric_forecasts_extracted ready")
+        except Exception as _mfee:
+            print(f"[Startup] metric_forecast_call schema migration error: {_mfee}")
+
         # ── predictions.list_id + list_rank (ranked list extraction) ────
         # Stores speaker-declared rank position within a ranked list
         # ("my top 5 stocks: NVDA, AMD, TSM, AAPL, MSFT"). Both columns
@@ -2746,6 +2796,24 @@ async def lifespan(app):
                 print("[Startup] ENABLE_BINARY_EVENT_EXTRACTION flag seeded")
         except Exception as _befe:
             print(f"[Startup] ENABLE_BINARY_EVENT_EXTRACTION seed error: {_befe}")
+
+        # ── ENABLE_METRIC_FORECAST_EXTRACTION flag seed ────────────────
+        # Default 'false'. Admin flips via POST /api/admin/toggle-metric-
+        # forecast-extraction. Teaches Haiku to recognize numerical
+        # metric predictions ("NVDA will report $5.20 EPS", "CPI prints
+        # 3.2%") and emit them as metric_forecast_call with a canonical
+        # metric_type, metric_target, period, and release date.
+        try:
+            with engine.connect() as _mff_c:
+                _mff_c.execute(sql_text("""
+                    INSERT INTO config (key, value)
+                    VALUES ('ENABLE_METRIC_FORECAST_EXTRACTION', 'false')
+                    ON CONFLICT (key) DO NOTHING
+                """))
+                _mff_c.commit()
+                print("[Startup] ENABLE_METRIC_FORECAST_EXTRACTION flag seeded")
+        except Exception as _mffe:
+            print(f"[Startup] ENABLE_METRIC_FORECAST_EXTRACTION seed error: {_mffe}")
 
         # ── youtube_channel_meta totals backfill ────────────────────────
         # Historical backfill for the admin card counters. Three columns:
@@ -3791,10 +3859,18 @@ def get_features(db: _Session = _Depends(_get_db)):
         # expected_outcome_text, event_deadline, and event_type. Default
         # false. Resolver is stubbed pending real data source plumbing.
         "binary_event_extraction": False,
+        # Boolean: metric_forecast_call extraction appends the metric
+        # instructions so numerical metric predictions ("NVDA will
+        # report $5.20 EPS", "CPI prints 3.2%") extract as a new
+        # prediction_category='metric_forecast_call'. Company metrics
+        # resolve via the earnings_history table (FMP harvest); macro
+        # metrics (CPI / unemployment / GDP / …) are stubbed pending
+        # BLS / BEA / FRED plumbing in a follow-up ship. Default false.
+        "metric_forecast_extraction": False,
     }
     try:
         rows = db.execute(_ft(
-            "SELECT key, value FROM config WHERE key IN ('tournaments_enabled','daily_challenge_enabled','duels_enabled','compete_enabled','compare_analysts_enabled','EVALUATE_X_PREDICTIONS','ENABLE_YOUTUBE_SECTOR_CALLS','ENABLE_RANKED_LIST_EXTRACTION','ENABLE_TARGET_REVISIONS','ENABLE_OPTIONS_POSITION_EXTRACTION','ENABLE_EARNINGS_CALL_EXTRACTION','ENABLE_MACRO_CALL_EXTRACTION','ENABLE_PAIR_CALL_EXTRACTION','ENABLE_BINARY_EVENT_EXTRACTION')"
+            "SELECT key, value FROM config WHERE key IN ('tournaments_enabled','daily_challenge_enabled','duels_enabled','compete_enabled','compare_analysts_enabled','EVALUATE_X_PREDICTIONS','ENABLE_YOUTUBE_SECTOR_CALLS','ENABLE_RANKED_LIST_EXTRACTION','ENABLE_TARGET_REVISIONS','ENABLE_OPTIONS_POSITION_EXTRACTION','ENABLE_EARNINGS_CALL_EXTRACTION','ENABLE_MACRO_CALL_EXTRACTION','ENABLE_PAIR_CALL_EXTRACTION','ENABLE_BINARY_EVENT_EXTRACTION','ENABLE_METRIC_FORECAST_EXTRACTION')"
         )).fetchall()
         for r in rows:
             if r[0] == "EVALUATE_X_PREDICTIONS":
@@ -3819,6 +3895,8 @@ def get_features(db: _Session = _Depends(_get_db)):
                 flags["pair_call_extraction"] = str(r[1]).strip().lower() == "true"
             elif r[0] == "ENABLE_BINARY_EVENT_EXTRACTION":
                 flags["binary_event_extraction"] = str(r[1]).strip().lower() == "true"
+            elif r[0] == "ENABLE_METRIC_FORECAST_EXTRACTION":
+                flags["metric_forecast_extraction"] = str(r[1]).strip().lower() == "true"
             else:
                 flags[r[0].replace("_enabled", "")] = r[1] == "true"
     except Exception:
@@ -4078,6 +4156,41 @@ def toggle_binary_event_extraction(
     new_val = db.query(Config).filter(Config.key == "ENABLE_BINARY_EVENT_EXTRACTION").first()
     return {
         "binary_event_extraction": (
+            str(new_val.value).strip().lower() == "true" if new_val else False
+        )
+    }
+
+
+@app.post("/api/admin/toggle-metric-forecast-extraction")
+def toggle_metric_forecast_extraction(
+    admin_id: int = _Depends(_require_admin),
+    db: _Session = _Depends(_get_db),
+):
+    """Flip ENABLE_METRIC_FORECAST_EXTRACTION between 'true' and 'false'.
+    Invalidates the feature_flags cache so the new value takes effect
+    on the next classify_video call instead of waiting 60s for the TTL.
+
+    Note: metric_forecast_call rows insert fully when this is on.
+    Company metrics (EPS / revenue / guidance) resolve via the
+    earnings_history table populated by the FMP bulk harvest. Macro
+    metrics (CPI / unemployment / GDP / …) are stubbed — those rows
+    will sit at outcome='pending' until the follow-up ship plumbs in
+    BLS / BEA / FRED data sources."""
+    from models import Config
+    row = db.query(Config).filter(Config.key == "ENABLE_METRIC_FORECAST_EXTRACTION").first()
+    if row:
+        row.value = "false" if str(row.value).strip().lower() == "true" else "true"
+    else:
+        db.add(Config(key="ENABLE_METRIC_FORECAST_EXTRACTION", value="true"))
+    db.commit()
+    try:
+        from feature_flags import invalidate_metric_forecast_flag_cache
+        invalidate_metric_forecast_flag_cache()
+    except Exception:
+        pass
+    new_val = db.query(Config).filter(Config.key == "ENABLE_METRIC_FORECAST_EXTRACTION").first()
+    return {
+        "metric_forecast_extraction": (
             str(new_val.value).strip().lower() == "true" if new_val else False
         )
     }
