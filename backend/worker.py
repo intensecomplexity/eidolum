@@ -1581,6 +1581,31 @@ def main():
     except Exception as e:
         log.warning(f"[Worker] source_timestamps schema migration: {e}")
 
+    # predictions regime_* columns + scraper_runs.regime_calls_extracted
+    # (ship #12). Structural market phase claims — no price target,
+    # scored via drawdown/runup/new-high computation. All ALTERs are
+    # ADD COLUMN IF NOT EXISTS. Partial index keeps the index small.
+    try:
+        with engine.connect() as conn:
+            for _ddl in (
+                "ALTER TABLE predictions ADD COLUMN IF NOT EXISTS regime_type VARCHAR(24)",
+                "ALTER TABLE predictions ADD COLUMN IF NOT EXISTS regime_instrument VARCHAR(16)",
+                "ALTER TABLE predictions ADD COLUMN IF NOT EXISTS regime_max_drawdown NUMERIC(10,4)",
+                "ALTER TABLE predictions ADD COLUMN IF NOT EXISTS regime_max_runup NUMERIC(10,4)",
+                "ALTER TABLE predictions ADD COLUMN IF NOT EXISTS regime_new_highs INTEGER",
+                "ALTER TABLE predictions ADD COLUMN IF NOT EXISTS regime_new_lows INTEGER",
+                "CREATE INDEX IF NOT EXISTS idx_predictions_regime "
+                "ON predictions(regime_type, regime_instrument) "
+                "WHERE regime_type IS NOT NULL",
+                "ALTER TABLE scraper_runs ADD COLUMN IF NOT EXISTS "
+                "regime_calls_extracted INTEGER NOT NULL DEFAULT 0",
+            ):
+                conn.execute(sql_text(_ddl))
+            conn.commit()
+        log.info("[Worker] predictions.regime_* + regime_calls_extracted ready")
+    except Exception as e:
+        log.warning(f"[Worker] regime_call schema migration: {e}")
+
     # predictions.list_id + list_rank — ranked list extraction metadata.
     # Partial index keeps the index small because most rows won't be in
     # lists. No backfill: historical predictions have no ranking data.

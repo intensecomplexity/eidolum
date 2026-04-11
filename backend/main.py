@@ -2553,6 +2553,37 @@ async def lifespan(app):
         except Exception as _dsce:
             print(f"[Startup] disclosure schema migration error: {_dsce}")
 
+        # ── regime_call schema (ship #12) ──────────────────────────────
+        # Six regime_* columns on predictions plus a per-run counter on
+        # scraper_runs and a partial index scoped to regime_type IS NOT
+        # NULL. Regime calls are structural market phase claims with
+        # NO price target — scoring is drawdown/runup/new-high based.
+        # Idempotent.
+        try:
+            with engine.connect() as _rc_c:
+                for _ddl in (
+                    "ALTER TABLE predictions ADD COLUMN IF NOT EXISTS regime_type VARCHAR(24)",
+                    "ALTER TABLE predictions ADD COLUMN IF NOT EXISTS regime_instrument VARCHAR(16)",
+                    "ALTER TABLE predictions ADD COLUMN IF NOT EXISTS regime_max_drawdown NUMERIC(10,4)",
+                    "ALTER TABLE predictions ADD COLUMN IF NOT EXISTS regime_max_runup NUMERIC(10,4)",
+                    "ALTER TABLE predictions ADD COLUMN IF NOT EXISTS regime_new_highs INTEGER",
+                    "ALTER TABLE predictions ADD COLUMN IF NOT EXISTS regime_new_lows INTEGER",
+                ):
+                    _rc_c.execute(sql_text(_ddl))
+                _rc_c.execute(sql_text(
+                    "CREATE INDEX IF NOT EXISTS idx_predictions_regime "
+                    "ON predictions(regime_type, regime_instrument) "
+                    "WHERE regime_type IS NOT NULL"
+                ))
+                _rc_c.execute(sql_text(
+                    "ALTER TABLE scraper_runs ADD COLUMN IF NOT EXISTS "
+                    "regime_calls_extracted INTEGER NOT NULL DEFAULT 0"
+                ))
+                _rc_c.commit()
+                print("[Startup] predictions.regime_* + regime_calls_extracted ready")
+        except Exception as _rce:
+            print(f"[Startup] regime_call schema migration error: {_rce}")
+
         # ── macro_concept_aliases seed ───────────────────────────────
         # Canonical ~50 concepts covering currency, rates, inflation,
         # volatility, commodities, equity macro, international/EM,

@@ -290,6 +290,41 @@ class Prediction(Base):
     source_timestamp_method = Column(String(16), nullable=True)
     source_verbatim_quote = Column(Text, nullable=True)
     source_timestamp_confidence = Column(Numeric(4, 3), nullable=True)
+    # Regime-call metadata for prediction_category='regime_call' rows
+    # (ship #12 — structural market phase claims). Regime calls carry
+    # NO price target — the claim is about a STRUCTURAL outcome for
+    # `regime_instrument` (default SPY) over the evaluation window:
+    # "no top yet", "bottom is in", "topping process", "correction
+    # not bear market". Scoring is based on max drawdown, max runup,
+    # and new-high/new-low counts during the window rather than
+    # final price vs target.
+    #
+    #   regime_type          One of 8 canonical values: bull_continuing,
+    #                        bull_starting, topping, bear_starting,
+    #                        bear_continuing, bottoming, correction,
+    #                        consolidation. Enforced by the validator;
+    #                        no DB CHECK constraint so adding a 9th
+    #                        value later is a one-liner.
+    #   regime_instrument    Ticker/ETF being claimed about (SPY, QQQ,
+    #                        IWM, BTC, …). Defaults to 'SPY' when the
+    #                        forecaster says "the market" / "stocks".
+    #   regime_max_drawdown  Populated by the evaluator at score time —
+    #                        max peak-to-trough drawdown inside the
+    #                        window (for bull_* / correction rules) OR
+    #                        max drawdown from window_start (for
+    #                        topping / bear_* rules, depending on the
+    #                        per-type rule logic).
+    #   regime_max_runup     Populated by the evaluator — max gain from
+    #                        window_start or window_low.
+    #   regime_new_highs     Count of daily closes above start * 1.01.
+    #   regime_new_lows      Count of daily closes below start * 0.99.
+    # All NULL for non-regime rows.
+    regime_type = Column(String(24), nullable=True)
+    regime_instrument = Column(String(16), nullable=True)
+    regime_max_drawdown = Column(Numeric(10, 4), nullable=True)
+    regime_max_runup = Column(Numeric(10, 4), nullable=True)
+    regime_new_highs = Column(Integer, nullable=True)
+    regime_new_lows = Column(Integer, nullable=True)
     confidence_tier = Column(Numeric(3, 2), nullable=False, default=1.0)
     # Position disclosure fields: NULL for price_target predictions.
     position_action = Column(String(16), nullable=True)   # open|add|trim|exit
@@ -989,6 +1024,15 @@ class ScraperRun(Base):
                                  server_default="0")
     timestamps_failed = Column(Integer, nullable=False, default=0,
                                 server_default="0")
+    # Count of regime_call predictions extracted in this run. Regime
+    # calls capture structural market phase claims ("no market top",
+    # "bottom is in", "topping process", "correction not bear market")
+    # with NO price target. Scoring is based on structural price
+    # behavior (drawdown, runup, new highs/lows) during the window
+    # rather than final price vs target. Stays 0 until
+    # ENABLE_REGIME_CALL_EXTRACTION is flipped on.
+    regime_calls_extracted = Column(Integer, nullable=False, default=0,
+                                     server_default="0")
 
 
 class Disclosure(Base):
