@@ -341,3 +341,38 @@ def invalidate_pair_extraction_flag_cache() -> None:
     """Reset the 60-second cache — called from the admin toggle endpoint
     so changes take effect immediately instead of waiting for the TTL."""
     _PAIR_EXTRACTION_FLAG_CACHE["fetched_at"] = 0.0
+
+
+# ── Binary event extraction flag ────────────────────────────────────────────
+#
+# Boolean all-or-nothing flag. When true, the YouTube classifier appends
+# the binary-event instruction block to the Haiku system prompt so
+# yes/no-event vocabulary ("Fed will cut 50bps in March", "AAPL will
+# split by end of 2026", "Recession declared by NBER before 2027")
+# extracts as a new prediction_category='binary_event_call' with an
+# expected_outcome_text, event_deadline, and (reused) event_type. The
+# resolver is stubbed in this ship — real Fed/FOMC/corporate-action
+# data source plumbing is a follow-up ship, so rows stay pending until
+# a future resolver confirms the outcome.
+
+_BINARY_EVENT_EXTRACTION_FLAG_CACHE: dict = {"enabled": False, "fetched_at": 0.0}
+_BINARY_EVENT_EXTRACTION_FLAG_TTL = 60  # seconds
+
+
+def is_binary_event_extraction_enabled(db) -> bool:
+    """Return True if ENABLE_BINARY_EVENT_EXTRACTION is 'true' in the
+    config table. Default False. Cached 60s so tight classifier loops
+    don't hammer the config table."""
+    now = time.time()
+    if (now - _BINARY_EVENT_EXTRACTION_FLAG_CACHE["fetched_at"]) < _BINARY_EVENT_EXTRACTION_FLAG_TTL:
+        return bool(_BINARY_EVENT_EXTRACTION_FLAG_CACHE["enabled"])
+    enabled = _read_bool(db, "ENABLE_BINARY_EVENT_EXTRACTION", default=False)
+    _BINARY_EVENT_EXTRACTION_FLAG_CACHE["enabled"] = enabled
+    _BINARY_EVENT_EXTRACTION_FLAG_CACHE["fetched_at"] = now
+    return enabled
+
+
+def invalidate_binary_event_extraction_flag_cache() -> None:
+    """Reset the 60-second cache — called from the admin toggle endpoint
+    so changes take effect immediately instead of waiting for the TTL."""
+    _BINARY_EVENT_EXTRACTION_FLAG_CACHE["fetched_at"] = 0.0
