@@ -10,7 +10,7 @@ import {
   getFeatureFlags, toggleDuelsAdmin, toggleCompeteAdmin, toggleCompareAnalystsAdmin,
   toggleEvaluateXAdmin, toggleRankedListExtractionAdmin, toggleTargetRevisionsAdmin,
   toggleOptionsExtractionAdmin, toggleEarningsExtractionAdmin,
-  toggleMacroExtractionAdmin,
+  toggleMacroExtractionAdmin, togglePairExtractionAdmin,
   getAdminUrlQuality, getSocialStats,
   getPrunedYouTubeChannels, reactivateYouTubeChannel,
   setYouTubeSectorTraffic,
@@ -135,6 +135,7 @@ function FeatureToggles() {
         { key: 'options_position_extraction', label: 'YouTube Options Positions', fn: toggleOptionsExtractionAdmin },
         { key: 'earnings_call_extraction', label: 'YouTube Earnings Calls', fn: toggleEarningsExtractionAdmin },
         { key: 'macro_call_extraction', label: 'YouTube Macro Calls', fn: toggleMacroExtractionAdmin },
+        { key: 'pair_call_extraction', label: 'YouTube Pair Calls', fn: togglePairExtractionAdmin },
       ].map(f => (
         <div key={f.key} className="flex items-center justify-between py-1.5">
           <span className="text-sm text-text-secondary">{f.label}</span>

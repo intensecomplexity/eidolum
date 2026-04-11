@@ -415,6 +415,7 @@ export default function Leaderboard() {
                           </th>
                           <th className="px-3 py-3 text-right">Predictions</th>
                           <th className="px-3 py-3 text-right hidden xl:table-cell w-20" title="Sector call accuracy (separate from ticker call accuracy)">Sector Calls</th>
+                          <th className="px-3 py-3 text-right hidden 2xl:table-cell w-20" title="Pair call accuracy — spread-scored relative-value predictions (long beats short).">Pair Calls</th>
                           <th className="px-3 py-3 text-right hidden xl:table-cell w-20" title="Accuracy on ordering stocks within their ranked lists. Higher = better at predicting which picks will outperform which.">Ranking</th>
                           <th className="px-3 py-3 text-center hidden xl:table-cell w-16">Streak</th>
                           <th className="px-3 py-3 hidden xl:table-cell max-w-[180px]">Top Sector</th>
@@ -489,6 +490,18 @@ export default function Leaderboard() {
                                     {f.sector_call_accuracy.toFixed(1)}%
                                   </span>
                                   <span className="text-muted text-[10px] font-mono">{f.sector_call_total} calls</span>
+                                </div>
+                              ) : (
+                                <span className="font-mono text-muted">—</span>
+                              )}
+                            </td>
+                            <td className="px-3 py-3 text-right hidden 2xl:table-cell">
+                              {f.pair_call_total > 0 && f.pair_call_accuracy != null ? (
+                                <div className="flex flex-col items-end">
+                                  <span className={`font-mono text-sm ${f.pair_call_accuracy >= 60 ? 'text-positive' : 'text-negative'}`}>
+                                    {f.pair_call_accuracy.toFixed(1)}%
+                                  </span>
+                                  <span className="text-muted text-[10px] font-mono">{f.pair_call_total} calls</span>
                                 </div>
                               ) : (
                                 <span className="font-mono text-muted">—</span>

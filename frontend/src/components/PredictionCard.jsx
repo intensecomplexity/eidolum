@@ -117,12 +117,142 @@ function ProofLinks({ p }) {
   );
 }
 
+function PairCallCard({ prediction: p, forecaster: fc, showForecaster, compact }) {
+  // Dedicated layout for prediction_category === 'pair_call'. Pair
+  // calls have two tickers (long / short) and are scored on the
+  // spread between them, so the card shows both symbols side by side,
+  // a single bullish-on-the-spread direction, and (when scored) the
+  // spread return summary.
+  const predId = p.id || p.prediction_id;
+  const evalDate = p.evaluation_date || p.resolution_date;
+  const windowDays = p.window_days || p.evaluation_window_days;
+  const isPending = !p.outcome || p.outcome === 'pending';
+  const longT = p.pair_long_ticker || p.ticker;
+  const shortT = p.pair_short_ticker || '—';
+  const spread = p.pair_spread_return != null
+    ? Number(p.pair_spread_return)
+    : (p.actual_return != null ? Number(p.actual_return) : null);
+  return (
+    <div className={`bg-surface border rounded-xl p-4 overflow-hidden ${
+      isPending ? 'border-warning/30' : 'border-border'
+    }`} style={{ wordBreak: 'break-word' }}>
+      {(showForecaster || fc) && fc && (
+        <div className="flex items-center gap-1.5 mb-2 flex-wrap">
+          <PlatformBadge platform={getSourceBadgeKey(p, fc)} size={14} />
+          <Link to={`/forecaster/${fc.id}`} className="text-sm font-medium text-text-primary hover:text-accent transition-colors">
+            {fc.name}
+          </Link>
+          {fc.firm && <span className="text-[10px] text-muted">at {fc.firm}</span>}
+          <CredibilityBadge
+            userId={fc.id}
+            username={fc.name}
+            accuracy={fc.accuracy_rate}
+            scored={fc.total_predictions || 0}
+            isInstitutional={['institutional', 'congress'].includes(fc.platform)}
+            linkToProfile={false}
+          />
+        </div>
+      )}
+
+      {/* Pair header: Long X / Short Y */}
+      <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
+        <div className="flex items-center gap-2 flex-wrap min-w-0">
+          <span className="text-[10px] uppercase tracking-wider text-positive font-semibold">Long</span>
+          <TickerLogo ticker={longT} logoUrl={p.logo_url} size={20} />
+          <Link to={`/asset/${longT}`} className="font-mono text-accent text-base font-bold hover:underline shrink-0">
+            {longT}
+          </Link>
+          <span className="text-muted font-mono">vs</span>
+          <span className="text-[10px] uppercase tracking-wider text-negative font-semibold">Short</span>
+          <TickerLogo ticker={shortT} size={20} />
+          <Link to={`/asset/${shortT}`} className="font-mono text-accent text-base font-bold hover:underline shrink-0">
+            {shortT}
+          </Link>
+        </div>
+        <div className="flex items-center gap-1.5 shrink-0">
+          {predId && !compact && <BookmarkButton predictionId={predId} />}
+          {p.outcome && p.outcome !== 'pending' && p.outcome !== 'no_data' && (
+            <span className="text-[9px] text-muted italic">The verdict:</span>
+          )}
+          <PredictionBadge outcome={p.outcome} />
+        </div>
+      </div>
+
+      {/* Spread summary (scored) or direction (pending) */}
+      <div className="flex items-center gap-2 text-xs font-mono mb-1.5 flex-wrap">
+        {!isPending && spread != null ? (
+          <span className={`font-semibold ${spread >= 0 ? 'text-positive' : 'text-negative'}`}>
+            Spread: {spread >= 0 ? '+' : ''}{spread.toFixed(2)}% {longT} vs {shortT}
+          </span>
+        ) : (
+          <span className="text-text-secondary">Bullish on {longT} / {shortT} spread</span>
+        )}
+        {windowDays && (
+          <>
+            <span className="text-muted">|</span>
+            <span className="text-muted">{windowDays}d window</span>
+          </>
+        )}
+        {evalDate && (
+          <>
+            <span className="text-muted">|</span>
+            <span className="text-muted">
+              {isPending ? `Evaluates ${formatDate(evalDate)}` : `Scored ${formatDate(evalDate)}`}
+            </span>
+          </>
+        )}
+      </div>
+
+      {!compact && p.exact_quote && p.exact_quote !== p.context && (
+        <p className="text-xs text-text-secondary italic leading-relaxed mb-2 break-words">
+          {annotateContext(p.exact_quote, longT)}
+        </p>
+      )}
+
+      {p.evaluation_summary && (
+        <p className={`text-xs italic leading-relaxed mb-2 ${
+          p.outcome === 'hit' ? 'text-positive/80' :
+          p.outcome === 'near' ? 'text-warning/80' : 'text-negative/80'
+        }`}>
+          {p.evaluation_summary}
+        </p>
+      )}
+
+      <div className="flex items-center gap-2 text-[10px] text-muted flex-wrap">
+        <SourceBadge verifiedBy={p.verified_by} />
+        <LockedDate dateStr={p.prediction_date} />
+      </div>
+      <ProofLinks p={p} />
+
+      {!compact && predId && (
+        <CommentSection predictionId={predId} source={fc ? 'analyst' : 'user'} />
+      )}
+      {!compact && (
+        <p className="text-muted/50 text-[9px] italic mt-2 pt-1.5 border-t border-border/20 leading-relaxed">
+          Pair call — scored on spread between long and short legs. Not investment advice.
+        </p>
+      )}
+    </div>
+  );
+}
+
 export default function PredictionCard({ prediction: p, showForecaster = false, forecaster = null, compact = false }) {
   const predId = p.id || p.prediction_id;
   const evalDate = p.evaluation_date || p.resolution_date;
   const windowDays = p.window_days || p.evaluation_window_days;
   const isPending = !p.outcome || p.outcome === 'pending';
   const fc = p.forecaster || forecaster;
+
+  if ((p.prediction_category || '').toLowerCase() === 'pair_call') {
+    return (
+      <PairCallCard
+        prediction={p}
+        forecaster={fc}
+        showForecaster={showForecaster}
+        compact={compact}
+      />
+    );
+  }
 
   return (
     <div className={`bg-surface border rounded-xl p-4 overflow-hidden ${
