@@ -1278,7 +1278,18 @@ def get_homepage_data(request: Request, db: Session = Depends(get_db)):
     except Exception as e:
         print(f"[HomepageData] Top 5 error: {e}")
 
-    # Biggest Calls: recently scored predictions with highest realistic return
+    # Biggest Calls: highest-magnitude scored predictions.
+    #
+    # Ship #13B Bug 15: deterministic uncapped sort. Previously the query
+    # hard-capped ABS(actual_return) at 200 AND had no tie-breaker, so
+    # two different "200% win" rows could swap positions between requests
+    # (the homepage widget reshuffled on every reload). We now:
+    #   - drop the upper cap (the floor stays at 5% so noise doesn't
+    #     drown out real calls); the raw actual_return column is already
+    #     uncapped in storage, so no new column is needed
+    #   - add ``p.id ASC`` as a hard tiebreaker so two rows with
+    #     identical magnitudes always sort the same way, and the LIMIT 5
+    #     picks the same five rows every request
     biggest_calls = []
     try:
         bc_rows = db.execute(sql_text("""
@@ -1292,13 +1303,13 @@ def get_homepage_data(request: Request, db: Session = Depends(get_db)):
             LEFT JOIN ticker_sectors ts ON ts.ticker = p.ticker
             WHERE p.outcome IN ('hit','near','miss','correct','incorrect')
               AND p.actual_return IS NOT NULL
-              AND ABS(p.actual_return) BETWEEN 5 AND 200
+              AND ABS(p.actual_return) >= 5
               AND p.target_price IS NOT NULL AND p.target_price > 0
               AND p.entry_price IS NOT NULL AND p.entry_price > 0
               AND p.ticker IN (
                   SELECT ticker FROM predictions GROUP BY ticker HAVING COUNT(*) >= 20
               )
-            ORDER BY ABS(p.actual_return) DESC
+            ORDER BY ABS(p.actual_return) DESC, p.id ASC
             LIMIT 5
         """)).fetchall()
         for r in bc_rows:
