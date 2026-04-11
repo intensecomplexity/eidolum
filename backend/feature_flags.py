@@ -205,3 +205,37 @@ def invalidate_target_revisions_flag_cache() -> None:
     """Reset the 60-second cache — called from the admin toggle endpoint
     so changes take effect immediately instead of waiting for the TTL."""
     _TARGET_REVISIONS_FLAG_CACHE["fetched_at"] = 0.0
+
+
+# ── Options position extraction flag ────────────────────────────────────────
+#
+# Boolean all-or-nothing flag. When true, the YouTube classifier appends
+# the options-position instruction block to the Haiku system prompt so
+# options vocabulary ("buying $200 calls on AAPL", "selling puts on NVDA",
+# "iron condor on SPY") gets mapped to an equivalent ticker_call with
+# the correct direction and (when available) strike as target_price.
+# Options-derived predictions are NOT a new category — they land as
+# prediction_category='ticker_call' in the database. The counter on
+# scraper_runs.options_positions_extracted tracks extraction volume.
+
+_OPTIONS_EXTRACTION_FLAG_CACHE: dict = {"enabled": False, "fetched_at": 0.0}
+_OPTIONS_EXTRACTION_FLAG_TTL = 60  # seconds
+
+
+def is_options_extraction_enabled(db) -> bool:
+    """Return True if ENABLE_OPTIONS_POSITION_EXTRACTION is 'true' in
+    the config table. Default False. Cached 60s to avoid hammering the
+    config table in tight classifier loops (one check per video chunk)."""
+    now = time.time()
+    if (now - _OPTIONS_EXTRACTION_FLAG_CACHE["fetched_at"]) < _OPTIONS_EXTRACTION_FLAG_TTL:
+        return bool(_OPTIONS_EXTRACTION_FLAG_CACHE["enabled"])
+    enabled = _read_bool(db, "ENABLE_OPTIONS_POSITION_EXTRACTION", default=False)
+    _OPTIONS_EXTRACTION_FLAG_CACHE["enabled"] = enabled
+    _OPTIONS_EXTRACTION_FLAG_CACHE["fetched_at"] = now
+    return enabled
+
+
+def invalidate_options_extraction_flag_cache() -> None:
+    """Reset the 60-second cache — called from the admin toggle endpoint
+    so changes take effect immediately instead of waiting for the TTL."""
+    _OPTIONS_EXTRACTION_FLAG_CACHE["fetched_at"] = 0.0
