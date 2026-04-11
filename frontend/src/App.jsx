@@ -25,6 +25,7 @@ import AdminDashboard from './pages/AdminDashboard';
 import AdminXAccounts from './pages/AdminXAccounts';
 import AdminYouTubeChannels from './pages/AdminYouTubeChannels';
 import AdminSectorAliases from './pages/AdminSectorAliases';
+import AdminMacroConcepts from './pages/AdminMacroConcepts';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import ForgotPassword from './pages/ForgotPassword';
@@ -116,6 +117,7 @@ export default function App() {
         <Route path="/admin/x-accounts" element={<AdminXAccounts />} />
         <Route path="/admin/youtube-channels" element={<AdminYouTubeChannels />} />
         <Route path="/admin/sector-aliases" element={<AdminSectorAliases />} />
+        <Route path="/admin/macro-concepts" element={<AdminMacroConcepts />} />
         {/* Phase 2 */}
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />

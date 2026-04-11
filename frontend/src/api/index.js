@@ -117,6 +117,28 @@ export function toggleEarningsExtractionAdmin() {
   return api.post('/admin/toggle-earnings-extraction', {}, { headers: authHeaders() }).then(r => r.data);
 }
 
+export function toggleMacroExtractionAdmin() {
+  return api.post('/admin/toggle-macro-extraction', {}, { headers: authHeaders() }).then(r => r.data);
+}
+
+// ——— Macro Concepts CRUD (admin) ———
+
+export function getMacroConcepts() {
+  return api.get('/admin/macro-concepts', { headers: authHeaders() }).then(r => r.data);
+}
+
+export function addMacroConcept(data) {
+  return api.post('/admin/macro-concepts', data, { headers: authHeaders() }).then(r => r.data);
+}
+
+export function updateMacroConcept(id, data) {
+  return api.patch(`/admin/macro-concepts/${id}`, data, { headers: authHeaders() }).then(r => r.data);
+}
+
+export function deleteMacroConcept(id) {
+  return api.delete(`/admin/macro-concepts/${id}`, { headers: authHeaders() }).then(r => r.data);
+}
+
 // ——— YouTube Runs Inspector ———
 
 export function getYouTubeRunsAdmin() {

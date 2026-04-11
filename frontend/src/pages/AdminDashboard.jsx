@@ -10,6 +10,7 @@ import {
   getFeatureFlags, toggleDuelsAdmin, toggleCompeteAdmin, toggleCompareAnalystsAdmin,
   toggleEvaluateXAdmin, toggleRankedListExtractionAdmin, toggleTargetRevisionsAdmin,
   toggleOptionsExtractionAdmin, toggleEarningsExtractionAdmin,
+  toggleMacroExtractionAdmin,
   getAdminUrlQuality, getSocialStats,
   getPrunedYouTubeChannels, reactivateYouTubeChannel,
   setYouTubeSectorTraffic,
@@ -72,6 +73,10 @@ export default function AdminDashboard() {
           className="px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap text-text-secondary border border-border hover:text-accent transition-colors">
           Sector Aliases
         </Link>
+        <Link to="/admin/macro-concepts"
+          className="px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap text-text-secondary border border-border hover:text-accent transition-colors">
+          Macro Concepts
+        </Link>
       </div>
 
       {tab === 'Overview' && <OverviewTab dashboard={dashboard} />}
@@ -129,6 +134,7 @@ function FeatureToggles() {
         { key: 'target_revisions', label: 'YouTube Target Revisions', fn: toggleTargetRevisionsAdmin },
         { key: 'options_position_extraction', label: 'YouTube Options Positions', fn: toggleOptionsExtractionAdmin },
         { key: 'earnings_call_extraction', label: 'YouTube Earnings Calls', fn: toggleEarningsExtractionAdmin },
+        { key: 'macro_call_extraction', label: 'YouTube Macro Calls', fn: toggleMacroExtractionAdmin },
       ].map(f => (
         <div key={f.key} className="flex items-center justify-between py-1.5">
           <span className="text-sm text-text-secondary">{f.label}</span>
