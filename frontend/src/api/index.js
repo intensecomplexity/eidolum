@@ -160,6 +160,10 @@ export function toggleConditionalExtractionAdmin() {
   return api.post('/admin/toggle-conditional-extraction', {}, { headers: authHeaders() }).then(r => r.data);
 }
 
+export function toggleDisclosureExtractionAdmin() {
+  return api.post('/admin/toggle-disclosure-extraction', {}, { headers: authHeaders() }).then(r => r.data);
+}
+
 // ——— Macro Concepts CRUD (admin) ———
 
 export function getMacroConcepts() {
