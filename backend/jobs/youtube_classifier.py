@@ -1112,6 +1112,126 @@ Rules:
 Output JSON only. Be concise."""
 
 
+# Disclosure instructions. Appended to the active prompt when
+# ENABLE_DISCLOSURE_EXTRACTION is flipped on. Teaches Haiku to
+# recognize PAST-TENSE position statements — what the forecaster
+# actually DID with real money, not what they expect the market
+# to do. Disclosures land in their own `disclosures` table (NOT
+# predictions) and carry follow-through scoring (stock return in
+# the 1/3/6/12 months after the disclosed_at date) instead of
+# HIT/NEAR/MISS. This is ship #8, the final ship in the new
+# prediction type series, and the key to catching real portfolio
+# signal buried in casual "I bought / I added / I trimmed" asides.
+#
+# CRITICAL distinction from the other prompts: disclosure is PAST
+# TENSE ("I bought AMD yesterday"); ticker_call is FUTURE TENSE
+# ("I'm going to buy AMD"). The disclosure prompt spends most of
+# its length hammering this distinction because Haiku otherwise
+# blurs them.
+YOUTUBE_HAIKU_DISCLOSURE_INSTRUCTIONS = """DISCLOSURES (PAST-TENSE POSITION STATEMENTS):
+If the speaker says they already took a position — bought, sold, added, trimmed, started, exited, or is still holding a stock — emit it as a disclosure. Disclosures are NOT predictions. They capture what the forecaster actually DID with real money, which is scored by "follow-through" (did the stock move the right way after they said it?) rather than HIT/NEAR/MISS. The most important signal here is TENSE.
+
+PAST TENSE = disclosure. FUTURE TENSE = ticker_call (or another prediction type). This distinction is the whole point of the disclosure prompt. Read it twice.
+
+Examples of PAST TENSE disclosure language:
+- "I bought 500 shares of AMD today"
+- "I picked up some NVDA yesterday"
+- "I added 5% AAPL to my portfolio this week"
+- "I trimmed my TSLA position"
+- "I'm out of META, closed the position last Friday"
+- "I just started a new position in GOOGL"
+- "I loaded up on Intel at $20"
+- "I've been holding AAPL since 2018"
+- "I sold half my NVDA at $900"
+
+Examples of FUTURE TENSE — do NOT emit as disclosure, let ticker_call handle it:
+- "I'm going to buy AMD tomorrow"                → ticker_call (future intent, not past action)
+- "I'm planning to add to NVDA on the next dip"  → ticker_call
+- "I might pick up some TSLA"                    → ticker_call
+- "If it drops 10%, I'm buying"                  → conditional_call (IF/THEN)
+- "You should buy AAPL"                          → ticker_call (recommendation, not personal action)
+- "AMD is a buy here"                            → ticker_call (recommendation)
+
+Actions (REQUIRED — pick exactly one from this list):
+- buy:     fresh purchase ("I bought 500 AMD")
+- sell:    full sale (no shares left)
+- add:     increased an existing position ("I added 5% NVDA")
+- trim:    reduced an existing position (some shares left)
+- starter: new position, smaller-than-target size ("starting a position", "dipping a toe in")
+- exit:    closed out completely ("I'm out", "closed the position")
+- hold:    neither bought nor sold, but affirmed conviction ("still holding AAPL from 2018")
+
+Fields to extract:
+- ticker (REQUIRED): the symbol
+- action (REQUIRED): from the list above
+- size_shares: number of shares if the speaker says one ("500 shares" → 500)
+- size_pct: portfolio percentage if given ("5% of portfolio" → 0.05)
+- size_qualitative: one of 'small','medium','large','full' if no specific size ("a small position" → small, "a full position" → full)
+- entry_price: purchase/sale price if mentioned ("at $180" → 180)
+- reasoning_text: why they did it, if explained ("because the chart looks bullish")
+- disclosed_at: when they say it happened ("today", "yesterday", "last week") — convert to absolute date using the video's publish date
+- derived_from: "disclosure"
+
+At least ONE of size_shares / size_pct / size_qualitative should be set when the size is mentioned. All three can be NULL if the speaker gave no size info.
+
+Output format:
+{
+  "ticker": "AMD",
+  "action": "buy",
+  "size_shares": 500,
+  "size_pct": null,
+  "size_qualitative": null,
+  "entry_price": 180,
+  "reasoning_text": "chart looks bullish above 180",
+  "disclosed_at": "2026-04-11",
+  "derived_from": "disclosure",
+  "context_quote": "I just bought 500 AMD today at 180"
+}
+
+Examples:
+
+Input: "I just bought 500 shares of AMD today"
+Output: {"ticker":"AMD","action":"buy","size_shares":500,"disclosed_at":"2026-04-11","derived_from":"disclosure","context_quote":"I just bought 500 shares of AMD today"}
+
+Input: "Added 5% NVDA to the portfolio this week at 180"
+Output: {"ticker":"NVDA","action":"add","size_pct":0.05,"entry_price":180,"disclosed_at":"2026-04-11","derived_from":"disclosure","context_quote":"added 5% NVDA to the portfolio this week at 180"}
+
+Input: "Starting a small position in GOOGL"
+Output: {"ticker":"GOOGL","action":"starter","size_qualitative":"small","disclosed_at":"2026-04-11","derived_from":"disclosure","context_quote":"starting a small position in GOOGL"}
+
+Input: "I trimmed my NVDA yesterday after the big run — locked in some profits"
+Output: {"ticker":"NVDA","action":"trim","reasoning_text":"locked in profits after the big run","disclosed_at":"2026-04-10","derived_from":"disclosure","context_quote":"trimmed my NVDA yesterday after the big run"}
+
+Input: "I'm out of META, closed the position last Friday"
+Output: {"ticker":"META","action":"exit","disclosed_at":"2026-04-04","derived_from":"disclosure","context_quote":"I'm out of META, closed the position last Friday"}
+
+Input: "Picked up a small starter in PLTR"
+Output: {"ticker":"PLTR","action":"starter","size_qualitative":"small","disclosed_at":"2026-04-11","derived_from":"disclosure","context_quote":"picked up a small starter in PLTR"}
+
+Input: "Still long AAPL from 2018, not selling a share"
+Output: {"ticker":"AAPL","action":"hold","reasoning_text":"conviction hold since 2018","disclosed_at":"2026-04-11","derived_from":"disclosure","context_quote":"still long AAPL from 2018, not selling a share"}
+
+Input: "I might buy AMD tomorrow if it drops to 170"
+Output: (do NOT emit as disclosure — future intent, and conditional. Let conditional_call or ticker_call handle it.)
+
+Input: "I recommend buying NVDA"
+Output: (do NOT emit as disclosure — this is a recommendation to others, not a personal action. Let ticker_call handle it.)
+
+Input: "NVDA is my biggest position"
+Output: (do NOT emit as disclosure — no action verb, no specific trade. This is portfolio description, not a transaction.)
+
+Rules:
+- MUST set derived_from: "disclosure".
+- MUST use PAST tense. Any future tense or conditional language → reject and let another prediction type handle it.
+- MUST pick an action from the allowlist.
+- MUST set disclosed_at to an absolute ISO date. "Today" = the video's publish date. "Yesterday" = publish_date − 1 day. "Last week" = publish_date − 7 days.
+- MUST set ticker.
+- MUST NOT set price_target, direction, timeframe — disclosures have no price target and no explicit direction (direction is implicit in the action).
+- If the same disclosure is mentioned twice in a transcript (e.g. the speaker repeats "like I said, I bought AMD today"), emit it once — the dedup layer collapses duplicates on (ticker, action, date).
+
+Output JSON only. Be concise."""
+
+
 # ── Transcript fetching ─────────────────────────────────────────────────────
 
 def _build_transcript_api():
