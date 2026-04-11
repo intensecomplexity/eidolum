@@ -69,9 +69,12 @@ export default function FollowButton({ forecaster, compact = false }) {
   return (
     <>
       <button
+        type="button"
         onClick={handleClick}
         disabled={loading}
-        className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors min-h-[36px] ${
+        aria-label={isFollowing ? `Stop watching ${forecaster?.name || 'forecaster'}` : `Add ${forecaster?.name || 'forecaster'} to watchlist`}
+        title={isFollowing ? 'Stop watching' : 'Add to watchlist'}
+        className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors min-h-[36px] focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 ${
           isFollowing
             ? 'bg-accent/10 text-accent border border-accent/20'
             : 'bg-surface-2 text-text-secondary border border-border active:border-accent/50 active:text-accent'

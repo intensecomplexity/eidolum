@@ -233,6 +233,18 @@ export default function Leaderboard() {
       <PageHeader title="The Eidolum 100" subtitle="The top 100 financial forecasters, ranked by accuracy against real market data." watermark />
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-6 sm:pb-10">
 
+        {/* Min-calls disclosure + accuracy donut legend. minPreds is read
+            from the same state that drives the dropdown — no hardcoded "10". */}
+        <div className="mb-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-muted">
+          <span>Showing forecasters with {minPreds}+ scored {minPreds === 1 ? 'call' : 'calls'}.</span>
+          <span className="flex items-center gap-3">
+            <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: '#34d399' }} /> Hits</span>
+            <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: '#fbbf24' }} /> Nears</span>
+            <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: '#f87171' }} /> Misses</span>
+            <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: '#6b7280' }} /> Pending</span>
+          </span>
+        </div>
+
         {/* Tabs — horizontal scroll on mobile */}
         <div className="flex items-center gap-1 mb-4 sm:mb-6 bg-surface border border-border rounded-xl p-1 overflow-x-auto pills-scroll w-full sm:w-fit">
           {TABS.map(({ key, label, mobileLabel, icon: Icon }) => (
