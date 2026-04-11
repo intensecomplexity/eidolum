@@ -412,3 +412,38 @@ def invalidate_metric_forecast_flag_cache() -> None:
     """Reset the 60-second cache — called from the admin toggle endpoint
     so changes take effect immediately instead of waiting for the TTL."""
     _METRIC_FORECAST_FLAG_CACHE["fetched_at"] = 0.0
+
+
+# ── Conditional call extraction flag ───────────────────────────────────────
+#
+# Boolean all-or-nothing flag. When true, the YouTube classifier appends
+# the conditional-call instruction block to the Haiku system prompt so
+# "IF trigger THEN outcome" language gets extracted as a conditional_call
+# prediction. The insert path writes it as
+# prediction_category='conditional_call' with trigger_* columns
+# populated. The evaluator then runs phase-based scoring: phase 1
+# checks the trigger, phase 2 scores the outcome window starting from
+# trigger_fired_at. Unresolved triggers (deadline expired without
+# firing) get outcome='unresolved' — a new outcome value that is
+# excluded from accuracy denominators.
+
+_CONDITIONAL_EXTRACTION_FLAG_CACHE: dict = {"enabled": False, "fetched_at": 0.0}
+_CONDITIONAL_EXTRACTION_FLAG_TTL = 60  # seconds
+
+
+def is_conditional_extraction_enabled(db) -> bool:
+    """Return True if ENABLE_CONDITIONAL_CALL_EXTRACTION is 'true' in
+    the config table. Default False. Cached 60s."""
+    now = time.time()
+    if (now - _CONDITIONAL_EXTRACTION_FLAG_CACHE["fetched_at"]) < _CONDITIONAL_EXTRACTION_FLAG_TTL:
+        return bool(_CONDITIONAL_EXTRACTION_FLAG_CACHE["enabled"])
+    enabled = _read_bool(db, "ENABLE_CONDITIONAL_CALL_EXTRACTION", default=False)
+    _CONDITIONAL_EXTRACTION_FLAG_CACHE["enabled"] = enabled
+    _CONDITIONAL_EXTRACTION_FLAG_CACHE["fetched_at"] = now
+    return enabled
+
+
+def invalidate_conditional_extraction_flag_cache() -> None:
+    """Reset the 60-second cache — called from the admin toggle endpoint
+    so changes take effect immediately instead of waiting for the TTL."""
+    _CONDITIONAL_EXTRACTION_FLAG_CACHE["fetched_at"] = 0.0
