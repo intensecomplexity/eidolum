@@ -13,8 +13,9 @@ import {
   getPrunedYouTubeChannels, reactivateYouTubeChannel,
   setYouTubeSectorTraffic,
 } from '../api';
+import YouTubeRunsInspector from '../components/admin/YouTubeRunsInspector';
 
-const TABS = ['Overview', 'Users', 'Forecasters', 'Predictions', 'Audit Log'];
+const TABS = ['Overview', 'Users', 'Forecasters', 'Predictions', 'Audit Log', 'YouTube Runs'];
 
 export default function AdminDashboard() {
   const navigate = useNavigate();
@@ -77,6 +78,7 @@ export default function AdminDashboard() {
       {tab === 'Forecasters' && <ForecastersTab showToast={showToast} />}
       {tab === 'Predictions' && <PredictionsTab showToast={showToast} />}
       {tab === 'Audit Log' && <AuditTab />}
+      {tab === 'YouTube Runs' && <YouTubeRunsInspector />}
 
       {toast && (
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[70] px-4 py-2.5 rounded-xl text-xs font-medium bg-surface border border-border shadow-lg">
