@@ -1245,28 +1245,32 @@ Output JSON only. Be concise."""
 # This block is additive — it doesn't change any previous block's
 # output schema, it just appends ONE field. So every other block's
 # rules, allowlists, and examples continue to apply verbatim.
-YOUTUBE_HAIKU_SOURCE_TIMESTAMP_INSTRUCTIONS = """SOURCE TIMESTAMPS:
-For EVERY prediction you emit — regardless of type (ticker_call, sector_call, pair_call, conditional_call, binary_event_call, metric_forecast_call, disclosure) — include an additional `verbatim_quote` field. This quote is how the backend links each prediction back to the exact moment in the video where the forecaster said it.
+YOUTUBE_HAIKU_SOURCE_TIMESTAMP_INSTRUCTIONS = """SOURCE TIMESTAMPS (EXPANDED VERBATIM QUOTES):
+For EVERY prediction you emit — regardless of type (ticker_call, sector_call, pair_call, conditional_call, binary_event_call, metric_forecast_call, disclosure) — include an additional `verbatim_quote` field. This quote has TWO jobs: (1) link the prediction back to the exact moment in the video for the timestamp matcher, and (2) preserve enough surrounding context that any pronoun or vague reference inside the prediction statement resolves unambiguously.
 
 Rules for `verbatim_quote`:
 
 1. COPY the exact words the forecaster used, character-for-character from the transcript. Do NOT paraphrase. Do NOT rewrite. Do NOT clean up disfluencies, filler words, or grammar. "I think uh Apple's gonna like probably hit two fifty by year end" stays exactly that — with "uh", "gonna", "like", "probably" all intact.
 
-2. LENGTH: 10 to 30 words. Long enough to be uniquely findable in the transcript (so the word-level matcher can lock onto a single moment), short enough that the quote is clearly a single utterance. If the forecaster spent two minutes rambling around the call, pick the single sentence that most clearly contains the prediction.
+2. LENGTH: 20 to 60 words. Include ONE OR TWO sentences BEFORE the prediction statement plus the prediction sentence itself. The preceding sentences supply the antecedent for any pronoun ("these stocks", "it", "that name") inside the prediction so a human reading the quote in isolation can unambiguously identify what the forecaster meant. A single naked prediction sentence is no longer acceptable.
 
-3. DO NOT SYNTHESIZE across sentences. If the prediction is spread across multiple statements ("I like NVIDIA. Oh, I forgot to say — I think it goes to 200 by March"), pick the ONE sentence that contains the clearest version of the call. In that example the quote is "I think it goes to 200 by March", not a merged construction.
+3. REFERENCE RESOLUTION IS MANDATORY. Inside the expanded quote, every pronoun and every vague reference ("these stocks", "that ticker", "the name", "this one", "it") must have a concrete antecedent — a specific ticker, company, or sector named earlier in the quote. If the forecaster says "a relief rally in these magnificent stocks could drive a rebound" and NO earlier sentence in the surrounding context names which stocks, REJECT the prediction with rejected=true, reason="unresolvable_reference". Better to drop one prediction than guess the ticker.
 
-4. FIRST STATEMENT WINS. If the forecaster made the same prediction multiple times across the video (e.g. once at 2:15 and again at 18:40), pick the FIRST clear statement. The timestamp matcher will resolve to whichever utterance matches best, but picking the first maximizes recall on long videos.
+4. INCLUDE THE SETUP, NOT JUST THE PUNCHLINE. Good quotes read like "Tesla is so beaten down here, I've been watching it closely. A relief rally in these magnificent stocks could potentially drive a significant rebound." Bad quotes read like "a relief rally in these magnificent stocks" alone — the reader has no idea what's being discussed. Another example: "Let me talk about Apple for a second. I think it hits two fifty by year end based on services growth" is good; "I think it hits two fifty by year end" alone is bad because "it" is unresolved.
 
-5. For RANGES, pick the sentence that names the range. For "Tesla EPS will land between sixty cents and seventy cents" the quote is that whole sentence verbatim.
+5. FIRST STATEMENT WINS when the same prediction is repeated. If the forecaster made the same call twice (e.g. once at 2:15 and again at 18:40), pick the surrounding sentences around the FIRST clear statement. The timestamp matcher will resolve to whichever utterance matches best.
 
-6. For REVISIONS, pick the sentence that actually announces the revision. "I was at two hundred on AAPL but now I'm moving up to two twenty" → that exact sentence is the quote, not "AAPL target 220".
+6. For RANGES, include the sentence that names the range plus the setup sentence. For "Tesla had a rough quarter but the numbers are turning. EPS will land between sixty cents and seventy cents next print" the entire two-sentence block is the quote.
 
-7. For NEGATED binary events ("Fed will NOT cut"), pick the sentence that contains the negation. The negation is what makes the prediction.
+7. For REVISIONS, include the sentence that announces the revision plus enough prior context to make the old target unambiguous. "I've been at two hundred on AAPL for a while now. But now I'm moving up to two twenty based on services growth" — the whole two-sentence block.
 
-8. For DISCLOSURES, pick the sentence where the past-tense action is stated: "Yeah I bought five hundred shares of AMD this morning, great entry point" → keep the whole sentence.
+8. For NEGATED binary events ("Fed will NOT cut"), the quote must make clear WHICH event is being negated. "Everyone expects a cut at the March meeting but I don't see it. They are not cutting in March, no way" — include the setup.
+
+9. For DISCLOSURES (past-tense actions), include the setup sentence that identifies the ticker plus the action statement. "I've been watching AMD all week. Yeah I bought five hundred shares of AMD this morning, great entry point" — the whole block.
 
 CRITICAL: If Haiku paraphrases or invents a quote that isn't in the transcript, the timestamp matcher breaks and the prediction either (a) gets stamped with the wrong timestamp or (b) falls through to NULL. Both outcomes undermine the training data being collected from this feature. COPY THE EXACT WORDS.
+
+EQUALLY CRITICAL: If the context inside the expanded quote does NOT resolve a pronoun or vague reference, REJECT the prediction. Emit an object of the form {"rejected": true, "reason": "unresolvable_reference", "notes": "<what was ambiguous>"} instead of an accepted prediction. The backend will log this to youtube_scraper_rejections and skip the insert. Do not guess the ticker.
 
 Output the quote as a string field alongside the existing fields:
 {
@@ -1274,42 +1278,50 @@ Output the quote as a string field alongside the existing fields:
   "direction": "bullish",
   "price_target": 250,
   "timeframe": "2026-12-31",
-  "verbatim_quote": "I think Apple gets to two fifty by end of year, they're gonna crush earnings"
+  "verbatim_quote": "Let me talk about Apple for a second. I think it hits two fifty by end of year, they're gonna crush earnings on services growth."
 }
 
-Examples (verbatim_quote field only, for each prediction type):
+Rejection example (unresolvable reference):
+{
+  "rejected": true,
+  "reason": "unresolvable_reference",
+  "notes": "'these stocks' has no antecedent in the surrounding sentences — could not identify which tickers are being discussed."
+}
+
+Examples (verbatim_quote field only, for each prediction type, with proper context setup):
 
 ticker_call:
-  verbatim_quote: "I think Apple gets to two fifty by end of year, they're gonna crush earnings"
+  verbatim_quote: "Let me talk about Apple for a second. I think it hits two fifty by end of year, they're gonna crush earnings on services growth."
 
 sector_call:
-  verbatim_quote: "Energy is setting up for a massive run this year, oil's going to one ten"
+  verbatim_quote: "I've been watching the energy complex all quarter. Energy is setting up for a massive run this year, oil's going to one ten."
 
 pair_call:
-  verbatim_quote: "Between Meta and Google I'd take Meta all day, Google is slowing down hard"
+  verbatim_quote: "Meta and Google are both going to report but they're in very different places. Between Meta and Google I'd take Meta all day — Google is slowing down hard."
 
 conditional_call:
-  verbatim_quote: "If the Fed cuts fifty bips in March stocks rally ten percent easy"
+  verbatim_quote: "The Fed meeting is the next big macro catalyst. If the Fed cuts fifty bips in March stocks rally ten percent easy, no question in my mind."
 
 binary_event_call (fed_decision):
-  verbatim_quote: "The Fed is gonna cut by fifty basis points at the March meeting, I'm confident"
+  verbatim_quote: "Everyone is arguing about what the Fed does next. The Fed is gonna cut by fifty basis points at the March meeting, I'm confident in that."
 
 binary_event_call (negated):
-  verbatim_quote: "They are not cutting in March, no way, they're holding rates flat"
+  verbatim_quote: "Powell has been clear about the data-dependency framing. They are not cutting in March, no way, they're holding rates flat through Q2."
 
 metric_forecast_call (EPS):
-  verbatim_quote: "NVIDIA is gonna report five twenty EPS next quarter, maybe a little higher"
+  verbatim_quote: "NVIDIA's next print is the one everyone is watching. NVIDIA is gonna report five twenty EPS next quarter, maybe a little higher on data center."
 
 disclosure:
-  verbatim_quote: "I added five percent NVDA to my portfolio at one eighty this morning"
+  verbatim_quote: "I've been watching NVDA closely this month. I added five percent NVDA to my portfolio at one eighty this morning."
 
 Rules recap (all predictions, every type):
 - MUST include verbatim_quote on every prediction object in the output array.
 - MUST copy exact words from the transcript — no paraphrasing, no cleanup.
-- MUST be 10-30 words long.
+- MUST be 20-60 words with 1-2 sentences of context BEFORE the prediction.
+- MUST make every pronoun in the quote resolvable from the surrounding context.
 - MUST pick the FIRST clear statement when the same call is made multiple times.
-- MUST NOT synthesize across sentences — one sentence per quote.
-- MUST NOT skip the quote — emit "" (empty string) only if the transcript is so garbled the prediction can't be traced to any single sentence (this should be very rare).
+- MUST emit {"rejected": true, "reason": "unresolvable_reference", ...} when the reference cannot be resolved — do NOT guess the ticker.
+- MUST NOT skip the quote — emit "" (empty string) only if the transcript is so garbled the prediction can't be traced to any single utterance (this should be very rare).
 
 Output JSON only. Be concise."""
 
