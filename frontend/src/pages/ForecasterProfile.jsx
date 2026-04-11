@@ -21,7 +21,16 @@ import TickerLogo from '../components/TickerLogo';
 import Footer from '../components/Footer';
 import MiniPieChart from '../components/MiniPieChart';
 import PortfolioSimulator from '../components/PortfolioSimulator';
-import { getForecaster, getForecasterBySlug, getForecasterSectors, getPlatformDetail, getReportCards } from '../api';
+import {
+  getForecaster,
+  getForecasterBySlug,
+  getForecasterSectors,
+  getPlatformDetail,
+  getReportCards,
+  getForecasterDisclosures,
+  getForecasterImpliedPortfolio,
+} from '../api';
+import DisclosureCard from '../components/DisclosureCard';
 import { annotateContext, ExplainerLine, ratingChangeLabel } from '../utils/predictionExplainer';
 
 function SectorScroller({ sectors, activeSector, setActiveSector, totalPredictions }) {
@@ -106,6 +115,15 @@ export default function ForecasterProfile() {
   const [activeSector, setActiveSector] = useState('All');
   const [sectorCounts, setSectorCounts] = useState([]);
   const [sectorPage, setSectorPage] = useState(0);
+  // Ship #8 — Holdings / Implied Portfolio tabs. activeTab stays
+  // 'predictions' by default so the existing behavior is unchanged
+  // when the disclosure flag is off and no rows exist. The holdings
+  // fetch is lazy — only fires when the tab is first activated.
+  const [activeTab, setActiveTab] = useState('predictions');
+  const [disclosures, setDisclosures] = useState(null);
+  const [disclosuresLoading, setDisclosuresLoading] = useState(false);
+  const [impliedPortfolio, setImpliedPortfolio] = useState(null);
+  const [impliedLoading, setImpliedLoading] = useState(false);
   // Map forecaster platform to platformId for routing
   const PLATFORM_ID_MAP = { youtube: 'youtube', x: 'twitter', reddit: 'reddit', congress: 'congress', institutional: 'institutional' };
 
@@ -159,6 +177,26 @@ export default function ForecasterProfile() {
       setData(d);
     }).catch(() => {});
   }, [activeSector]);
+
+  // Lazy-fetch disclosures the first time the Holdings tab activates.
+  // Reuses the same forecaster id resolved by the slug or route param.
+  useEffect(() => {
+    if (!data) return;
+    if (activeTab === 'holdings' && disclosures === null && !disclosuresLoading) {
+      setDisclosuresLoading(true);
+      getForecasterDisclosures(data.id, { limit: 200 })
+        .then((r) => setDisclosures(r?.disclosures || []))
+        .catch(() => setDisclosures([]))
+        .finally(() => setDisclosuresLoading(false));
+    }
+    if (activeTab === 'portfolio' && impliedPortfolio === null && !impliedLoading) {
+      setImpliedLoading(true);
+      getForecasterImpliedPortfolio(data.id)
+        .then((r) => setImpliedPortfolio(r))
+        .catch(() => setImpliedPortfolio({ positions: [], total_disclosures: 0 }))
+        .finally(() => setImpliedLoading(false));
+    }
+  }, [activeTab, data]);
 
   // SEO hook MUST be before any early returns (React hooks rule)
   const forecasterJsonLd = data ? (() => {
@@ -791,7 +829,32 @@ export default function ForecasterProfile() {
           </div>
         )}
 
+        {/* Tab toggle — Predictions / Holdings / Implied Portfolio.
+            Ship #8: Holdings + Implied Portfolio surface the new
+            disclosures table. The Predictions tab is the default and
+            preserves the original layout. */}
+        <div className="mb-4 flex items-center gap-2 flex-wrap">
+          <TabButton active={activeTab === 'predictions'} onClick={() => setActiveTab('predictions')}>
+            Predictions ({data.total_predictions ?? 0})
+          </TabButton>
+          <TabButton active={activeTab === 'holdings'} onClick={() => setActiveTab('holdings')}>
+            Holdings{data.disclosure_count ? ` (${data.disclosure_count})` : ''}
+          </TabButton>
+          <TabButton active={activeTab === 'portfolio'} onClick={() => setActiveTab('portfolio')}>
+            Implied Portfolio
+          </TabButton>
+        </div>
+
+        {activeTab === 'holdings' && (
+          <HoldingsPanel disclosures={disclosures} loading={disclosuresLoading} />
+        )}
+
+        {activeTab === 'portfolio' && (
+          <ImpliedPortfolioPanel snapshot={impliedPortfolio} loading={impliedLoading} />
+        )}
+
         {/* Predictions — cards on mobile with evidence inside */}
+        {activeTab === 'predictions' && <>
         <div className="sm:hidden space-y-3 mb-6 mx-0">
           <h2 className="text-base font-semibold mb-2">Prediction History</h2>
           {displayedPredictions.map((p) => (
@@ -834,9 +897,129 @@ export default function ForecasterProfile() {
             </table>
           </div>
         </div>
+        </>}
       </div>
 
       <Footer />
+    </div>
+  );
+}
+
+// ── Ship #8 tab components ────────────────────────────────────────────────
+// Three small helpers for the new Holdings / Implied Portfolio tabs.
+// Kept inside this file (not factored into separate components) because
+// they only render on this page and share its layout conventions.
+
+function TabButton({ active, onClick, children }) {
+  return (
+    <button
+      onClick={onClick}
+      className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-colors border ${
+        active
+          ? 'bg-accent/15 text-accent border-accent/40'
+          : 'bg-surface-1 text-text-secondary border-border hover:bg-surface-2'
+      }`}
+    >
+      {children}
+    </button>
+  );
+}
+
+function HoldingsPanel({ disclosures, loading }) {
+  if (loading) {
+    return (
+      <div className="card px-6 py-8 text-center text-text-secondary text-sm">
+        Loading holdings…
+      </div>
+    );
+  }
+  if (!disclosures || disclosures.length === 0) {
+    return (
+      <div className="card px-6 py-8 text-center text-text-secondary text-sm">
+        No disclosed positions yet. Disclosures are past-tense statements like “I bought 500 AMD today” — they show up here once the extraction flag is on and this forecaster has mentioned a trade.
+      </div>
+    );
+  }
+  return (
+    <div className="card p-0 overflow-hidden">
+      <div className="px-6 py-4 border-b border-border">
+        <h2 className="text-lg font-semibold">Holdings</h2>
+        <p className="text-xs text-muted mt-1">
+          Past-tense position disclosures — not predictions. Scored by follow-through (stock move in the months after the disclosure), with sell/trim/exit returns sign-flipped so positive = good call.
+        </p>
+      </div>
+      <div className="p-4 space-y-2">
+        {disclosures.map((d) => (
+          <DisclosureCard key={d.id} disclosure={d} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function ImpliedPortfolioPanel({ snapshot, loading }) {
+  if (loading) {
+    return (
+      <div className="card px-6 py-8 text-center text-text-secondary text-sm">
+        Loading implied portfolio…
+      </div>
+    );
+  }
+  if (!snapshot || !snapshot.positions || snapshot.positions.length === 0) {
+    return (
+      <div className="card px-6 py-8 text-center text-text-secondary text-sm">
+        No disclosures to aggregate yet. The implied portfolio rolls up buys minus sells per ticker once this forecaster starts disclosing positions.
+      </div>
+    );
+  }
+  const openPositions = snapshot.positions.filter((p) => p.is_open);
+  return (
+    <div className="card p-0 overflow-hidden">
+      <div className="px-6 py-4 border-b border-border">
+        <h2 className="text-lg font-semibold">Implied Portfolio</h2>
+        <p className="text-xs text-muted mt-1">
+          Aggregated from {snapshot.total_disclosures} disclosure{snapshot.total_disclosures === 1 ? '' : 's'}. Net direction = buys/adds/starters minus sells/trims/exits. Conviction = share of this forecaster's disclosure activity concentrated on this ticker.
+        </p>
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full">
+          <thead>
+            <tr className="text-left text-muted text-xs uppercase tracking-wider border-b border-border">
+              <th className="px-6 py-3">Ticker</th>
+              <th className="px-6 py-3 text-right">Net Direction</th>
+              <th className="px-6 py-3 text-right">Disclosures</th>
+              <th className="px-6 py-3 text-right">Conviction</th>
+              <th className="px-6 py-3">Last Action</th>
+              <th className="px-6 py-3">Last Disclosed</th>
+              <th className="px-6 py-3 text-center">Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {snapshot.positions.map((p) => (
+              <tr key={p.ticker} className="border-b border-border/30 hover:bg-surface-1">
+                <td className="px-6 py-3">
+                  <Link to={`/asset/${p.ticker}`} className="ticker-mono text-accent hover:underline">{p.ticker}</Link>
+                </td>
+                <td className={`px-6 py-3 text-right font-mono ${p.net_direction > 0 ? 'text-positive' : p.net_direction < 0 ? 'text-negative' : 'text-text-secondary'}`}>
+                  {p.net_direction > 0 ? `+${p.net_direction}` : p.net_direction}
+                </td>
+                <td className="px-6 py-3 text-right font-mono text-text-secondary">{p.disclosure_count}</td>
+                <td className="px-6 py-3 text-right font-mono text-text-secondary">{(p.conviction_score * 100).toFixed(1)}%</td>
+                <td className="px-6 py-3 text-xs uppercase text-text-secondary">{p.last_action}</td>
+                <td className="px-6 py-3 text-xs text-muted">{p.last_disclosed_at ? new Date(p.last_disclosed_at).toLocaleDateString() : '—'}</td>
+                <td className="px-6 py-3 text-center">
+                  <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold ${p.is_open ? 'bg-positive/15 text-positive' : 'bg-surface-2 text-muted'}`}>
+                    {p.is_open ? 'OPEN' : 'CLOSED'}
+                  </span>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <div className="px-6 py-3 border-t border-border/30 text-xs text-muted">
+        {openPositions.length} open · {snapshot.positions.length - openPositions.length} closed
+      </div>
     </div>
   );
 }
