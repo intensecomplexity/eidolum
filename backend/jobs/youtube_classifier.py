@@ -1446,6 +1446,228 @@ Rules:
 Output JSON only. Be concise."""
 
 
+# Prediction metadata enrichment (ship #9 rescoped). Appended to the
+# active prompt when ENABLE_PREDICTION_METADATA_ENRICHMENT is flipped
+# on. Teaches Haiku two classification tasks that modify EVERY
+# extracted prediction's JSON shape:
+#
+#   1. Category-aware timeframe inference. The current default of
+#      "3 months when no explicit date" is wrong for macro theses
+#      ("M2 ticking up") which operate on 12+ month horizons, and
+#      wrong for swing trades ("this week") which operate on 14-day
+#      horizons. Haiku classifies the prediction into one of 11
+#      categories with a known default. No explicit timeframe AND
+#      no category match → REJECT, do not invent a default.
+#
+#   2. Conviction level classification. "AAPL will hit 250" and
+#      "AAPL could maybe see upside" are currently scored identically.
+#      This block captures conviction as a label-only field — leaderboard
+#      accuracy math is unchanged. The fine-tuned model will learn
+#      conviction natively; meanwhile the product team can decide
+#      post-launch how to use it in filters.
+#
+# Neither feature affects direction extraction or price targets.
+# Quote guidance lives in the SOURCE_TIMESTAMP block (which is edited
+# to request expanded 20-60 word quotes with context) and does NOT
+# duplicate here — the two blocks are co-gated by design so metadata
+# without timestamps still works.
+YOUTUBE_HAIKU_METADATA_ENRICHMENT_INSTRUCTIONS = """PREDICTION METADATA ENRICHMENT:
+For EVERY prediction you emit — ticker_call, sector_call, macro_call, pair_call, conditional_call, binary_event_call, metric_forecast_call, regime_call, and disclosure — add THREE new classification fields: inferred_timeframe_days, timeframe_source, and conviction_level (plus timeframe_category when source is a category default). These fields carry extraction-time labels that downstream scoring, display, and fine-tuning depend on.
+
+═══════════════════════════════════════════════════════════
+SECTION 1: TIMEFRAME INFERENCE (NO INVENTED DEFAULTS)
+═══════════════════════════════════════════════════════════
+
+The prior system stamped every prediction without an explicit timeframe with a 3-month default. That is wrong for many categories:
+- "M2 ticking up means higher Bitcoin" is a macro thesis with a 12+ month horizon, NOT a 3-month trade.
+- "Scalping TSLA into close" is an intraday call, NOT a 3-month trade.
+- "Weekly calls on NVDA" is a 7-day options bet, NOT a 3-month trade.
+
+NEW RULE: every prediction must EITHER carry an explicit timeframe extracted from the speaker's own words, OR match one of 11 categories with a known default window. Predictions that match neither are REJECTED — do NOT invent a default.
+
+DECISION TREE (apply in order):
+
+  1. Did the speaker name an explicit window?
+     - "by Friday", "next week", "in 30 days", "by year end", "in Q2",
+       a specific date like "March 15 2026".
+     → set inferred_timeframe_days to the resolved integer day count
+       from the video publish date to the named target, and set
+       timeframe_source="explicit". Do NOT set timeframe_category.
+
+  2. Otherwise, does the statement match one of these 11 categories?
+
+     | Category                 | Signal phrases                                          | Default days |
+     |--------------------------|---------------------------------------------------------|-------------:|
+     | day_trading              | intraday, today, this session, scalp, day trade         |           1 |
+     | options_short            | weekly calls, Friday options, this week's expiration    |           7 |
+     | swing_trade              | this week, next week, swing position, short-term swing  |          14 |
+     | options_monthly          | monthly options, end of month, front-month expiry       |          30 |
+     | technical_chart          | chart pattern, breakout, next leg, technical setup      |          30 |
+     | earnings_cycle           | this earnings, next earnings, into earnings, Q1/Q2/Q3/Q4|          90 |
+     | fundamental_quarterly    | next quarter, near-term fundamentals                    |          90 |
+     | cyclical_medium          | next few months, into year end, second half, into summer|         180 |
+     | macro_thesis             | M2, Fed policy, monetary, liquidity cycle, inflation regime |     365 |
+     | structural               | bull market, bear market, new cycle, secular trend      |         365 |
+     | long_term_fundamental    | long-term hold, multi-year, secular growth              |         365 |
+
+     → set inferred_timeframe_days to the category's default,
+       timeframe_source="category_default", and timeframe_category
+       to the category name verbatim.
+
+  3. Neither explicit nor category match?
+     → REJECT the prediction. Emit
+       {"rejected": true, "reason": "no_timeframe_determinable",
+        "notes": "<why>"}
+       instead of an accepted prediction. Do NOT invent a default.
+       The backend counts these under
+       scraper_runs.timeframes_rejected.
+
+EXAMPLES (timeframe only):
+
+Input: "I think Apple hits 250 by end of year"
+→ inferred_timeframe_days resolved to days-until-December-31 from publish date, timeframe_source="explicit".
+
+Input: "I'm scalping TSLA into the close today"
+→ inferred_timeframe_days=1, timeframe_source="category_default", timeframe_category="day_trading".
+
+Input: "Weekly calls on NVDA for this Friday"
+→ inferred_timeframe_days=7, timeframe_source="category_default", timeframe_category="options_short".
+
+Input: "Nice swing setup on AMD this week"
+→ inferred_timeframe_days=14, timeframe_source="category_default", timeframe_category="swing_trade".
+
+Input: "AAPL has a cup-and-handle forming, next leg up is coming"
+→ inferred_timeframe_days=30, timeframe_source="category_default", timeframe_category="technical_chart".
+
+Input: "NVDA is going to crush earnings this quarter"
+→ inferred_timeframe_days=90, timeframe_source="category_default", timeframe_category="earnings_cycle".
+
+Input: "Energy is setting up for a big run into the second half"
+→ inferred_timeframe_days=180, timeframe_source="category_default", timeframe_category="cyclical_medium".
+
+Input: "M2 is ticking up, Bitcoin gets a liquidity tailwind"
+→ inferred_timeframe_days=365, timeframe_source="category_default", timeframe_category="macro_thesis".
+
+Input: "We're in a new secular bull market for semis"
+→ inferred_timeframe_days=365, timeframe_source="category_default", timeframe_category="structural".
+
+Input: "I like AAPL long-term"
+→ REJECT. {"rejected": true, "reason": "no_timeframe_determinable", "notes": "'long-term' is vague with no category signal phrase — could be 1 year or 5 years"}.
+
+Input: "Apple is a great business"
+→ REJECT. This isn't a prediction at all, but if Haiku were tempted to extract it as bullish AAPL, rejection reason is no_timeframe_determinable.
+
+Input: "TSLA looks good"
+→ REJECT. No timeframe, no category match, and not clearly a prediction.
+
+═══════════════════════════════════════════════════════════
+SECTION 2: CONVICTION LEVEL CLASSIFICATION
+═══════════════════════════════════════════════════════════
+
+The problem: "TSLA will hit $250" and "TSLA could maybe see upside" are currently scored as the same bullish call. They are not the same. Forecasters hedge to avoid accountability. This field captures the hedging so downstream filters and the fine-tuned model can distinguish confident calls from throwaway guesses.
+
+This field does NOT affect direction, target price, or scoring. It is label-only metadata at this stage. Leaderboard accuracy math is unchanged.
+
+Every prediction MUST carry a conviction_level. No NULLs. Default to "unknown" only when truly indeterminable.
+
+CONVICTION VOCABULARY (assign based on the language INSIDE the verbatim quote):
+
+- strong:       definitive, high-confidence language. Signal phrases:
+                "will", "is going to", "absolutely", "definitely", "no doubt",
+                "mark my words", "I'm calling it", "guaranteed", "lock",
+                "100%", "no question", "without a doubt".
+- moderate:     confident opinion but softened. Signal phrases:
+                "I think", "expect to", "likely", "probably", "believe",
+                "my view is", "I see", "should", "looking like".
+- hedged:       explicit uncertainty. Signal phrases:
+                "could", "might", "maybe", "potentially", "possibly",
+                "perhaps", "if things go right", "in my opinion", "I could see".
+- hypothetical: conditional framing where the claim is contingent on
+                another event. Signal phrases:
+                "if X then Y", "in a world where", "assuming",
+                "should X happen", "were X to", "provided that".
+                Conditional_call predictions are almost always
+                hypothetical by construction.
+- unknown:      no clear signal from the verbatim quote. Use sparingly —
+                assign this only when the sentence genuinely doesn't
+                commit to any of the four levels above.
+
+CONVICTION EXAMPLES:
+
+"AAPL is going to hit two fifty by December, mark my words"
+  → conviction_level="strong"
+
+"I think NVDA crushes earnings next quarter"
+  → conviction_level="moderate"
+
+"TSLA could potentially see upside into year end"
+  → conviction_level="hedged"
+
+"If the Fed cuts fifty bips in March, stocks rally ten percent easy"
+  → conviction_level="hypothetical"
+
+"The Fed is absolutely going to cut at the March meeting"
+  → conviction_level="strong"
+
+"I expect MSFT to report five dollars EPS next print"
+  → conviction_level="moderate"
+
+"Maybe ROKU sees a bounce here if the charts hold"
+  → conviction_level="hedged"
+
+"Assuming inflation prints cool, bonds rally hard"
+  → conviction_level="hypothetical"
+
+═══════════════════════════════════════════════════════════
+SECTION 3: COMBINED OUTPUT FORMAT
+═══════════════════════════════════════════════════════════
+
+Add the new fields to every accepted prediction object alongside the existing type-specific fields. Example combining all four ship features on one ticker_call:
+
+{
+  "ticker": "TSLA",
+  "direction": "bullish",
+  "price_target": null,
+  "verbatim_quote": "Tesla is so beaten down here, I've been watching it closely. A relief rally in these magnificent stocks could potentially drive a significant rebound into the summer.",
+  "inferred_timeframe_days": 180,
+  "timeframe_source": "category_default",
+  "timeframe_category": "cyclical_medium",
+  "conviction_level": "hedged",
+  "reasoning": "TSLA is the antecedent for 'these magnificent stocks' (resolved). 'Into the summer' from a winter publish = cyclical_medium (~180d). 'Could potentially' is hedged language."
+}
+
+Rejection example (unresolvable reference — from the SOURCE_TIMESTAMP block rule):
+
+{
+  "rejected": true,
+  "reason": "unresolvable_reference",
+  "notes": "'these stocks' has no antecedent in the surrounding sentences — could not identify which tickers are being discussed."
+}
+
+Rejection example (no determinable timeframe — this block's new rule):
+
+{
+  "rejected": true,
+  "reason": "no_timeframe_determinable",
+  "notes": "'long term' is vague — no explicit window, no category signal phrase strong enough to infer a default."
+}
+
+═══════════════════════════════════════════════════════════
+RULES RECAP
+═══════════════════════════════════════════════════════════
+
+- MUST add inferred_timeframe_days, timeframe_source, and conviction_level to every ACCEPTED prediction object.
+- MUST add timeframe_category when timeframe_source="category_default".
+- MUST reject with reason="no_timeframe_determinable" when neither explicit nor category works.
+- MUST pick conviction from the five-value vocabulary above — no free-text.
+- MUST use "unknown" conviction sparingly.
+- MUST NOT use inferred_timeframe_days to override direction or target.
+- MUST NOT treat conviction as affecting the prediction's scoring — it is label-only metadata captured for fine-tuning.
+- Rejections follow the same shape as the SOURCE_TIMESTAMP block's reference-resolution rejections: emit a single object with rejected=true, reason, and notes.
+
+Output JSON only. Be concise."""
+
+
 # ── Transcript fetching ─────────────────────────────────────────────────────
 
 def _build_transcript_api():
