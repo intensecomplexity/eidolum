@@ -6,7 +6,7 @@ from sqlalchemy import func, or_
 from typing import Optional
 
 from database import get_db
-from models import User, UserPrediction, Follow
+from models import User, UserPrediction, Follow, Forecaster
 from middleware.auth import require_user
 from rate_limit import limiter
 from ticker_lookup import search_tickers as _search_tickers
@@ -49,7 +49,7 @@ def _accepted():
 def unified_search(request: Request, q: str = Query(""), credentials: Optional[HTTPAuthorizationCredentials] = Depends(_optional_bearer), db: Session = Depends(get_db)):
     query = q.strip()
     if not query:
-        return {"tickers": [], "users": []}
+        return {"tickers": [], "users": [], "forecasters": []}
 
     tickers = _search_tickers(query)
     for t in tickers:
@@ -74,7 +74,54 @@ def unified_search(request: Request, q: str = Query(""), credentials: Optional[H
         scored = _user_scored_count(u.id, db)
         users.append({"user_id": u.id, "username": u.username, "display_name": u.display_name, "accuracy": _user_accuracy(u.id, db), "scored": scored, "rank": _rank_name(scored), "is_friend": u.id in friend_ids, "type": "user"})
 
-    return {"tickers": tickers, "users": users}
+    # Ship #13B Bug 18: include forecasters (Wall Street + YouTube
+    # analysts) in the unified search response. The frontend had a
+    # TODO placeholder for this because the endpoint used to only
+    # join users + tickers, so the search modal had no ANALYSTS
+    # section and hitting ⌘K + typing "jefferies" returned nothing.
+    #
+    # We match against name, handle, and firm (case-insensitive),
+    # require at least one prediction so brand-new empty rows don't
+    # clutter the list, and rank by total_predictions DESC so the
+    # most-tracked analysts surface first. accuracy_score is the
+    # cached three-tier number the leaderboard uses, so the number
+    # in the dropdown matches what the user sees on the profile.
+    forecasters = []
+    try:
+        forecaster_rows = (
+            db.query(Forecaster)
+            .filter(
+                or_(
+                    func.lower(Forecaster.name).like(pattern),
+                    func.lower(Forecaster.handle).like(pattern),
+                    func.lower(func.coalesce(Forecaster.firm, "")).like(pattern),
+                )
+            )
+            .filter(func.coalesce(Forecaster.total_predictions, 0) >= 1)
+            .order_by(Forecaster.total_predictions.desc().nullslast())
+            .limit(5)
+            .all()
+        )
+        for f in forecaster_rows:
+            forecasters.append({
+                "type": "forecaster",
+                "forecaster_id": f.id,
+                "id": f.id,
+                "name": f.name or "",
+                "handle": f.handle or "",
+                "firm": getattr(f, "firm", None),
+                "platform": f.platform or "youtube",
+                "accuracy": round(float(f.accuracy_score or 0), 1),
+                "total_predictions": int(f.total_predictions or 0),
+                "profile_image_url": f.profile_image_url,
+            })
+    except Exception:
+        try:
+            db.rollback()
+        except Exception:
+            pass
+
+    return {"tickers": tickers, "users": users, "forecasters": forecasters}
 
 
 # ── GET /api/friends/suggestions ──────────────────────────────────────────────

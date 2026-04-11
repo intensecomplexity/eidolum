@@ -7,19 +7,19 @@ import TypeBadge from './TypeBadge';
 import FriendButton from './FriendButton';
 
 /**
- * Universal search — searches tickers + users, shows dropdown with two sections.
- * Props:
- *  - onClose(): called when the dropdown should close (e.g. after navigation)
- *  - className: wrapper class
- *  - inputClassName: input class
- *  - placeholder: string
- *  - onStartDuel(opponent): callback when user clicks Duel button
+ * Universal search — searches tickers + analysts (forecasters) + people,
+ * shows dropdown with three sections.
+ *
+ * Ship #13B Bug 18: the ANALYSTS section was missing because the backend
+ * /search endpoint only joined tickers + users. It now returns a
+ * forecasters array too (see routers/user_follows.py), so the modal
+ * surfaces Wall Street + YouTube analysts alongside everything else.
  */
 export default function UniversalSearch({
   onClose,
   className = '',
   inputClassName = '',
-  placeholder = 'Search tickers or people...',
+  placeholder = 'Search any ticker, analyst, or person...',
   onStartDuel,
   autoFocus = false,
 }) {
@@ -64,7 +64,8 @@ export default function UniversalSearch({
       universalSearch(text.trim())
         .then(r => {
           setResults(r);
-          setOpen((r.tickers?.length || 0) + (r.users?.length || 0) > 0);
+          const totalHits = (r.tickers?.length || 0) + (r.users?.length || 0) + (r.forecasters?.length || 0);
+          setOpen(totalHits > 0);
         })
         .catch(() => { setResults(null); setOpen(false); });
     }, 300);
@@ -74,7 +75,7 @@ export default function UniversalSearch({
     setOpen(false);
     setQuery('');
     if (onClose) onClose();
-    navigate(`/ticker/${ticker}`);
+    navigate(`/asset/${ticker}`);
   }
 
   function handleUserClick(userId) {
@@ -82,6 +83,13 @@ export default function UniversalSearch({
     setQuery('');
     if (onClose) onClose();
     navigate(`/profile/${userId}`);
+  }
+
+  function handleForecasterClick(forecasterId) {
+    setOpen(false);
+    setQuery('');
+    if (onClose) onClose();
+    navigate(`/forecaster/${forecasterId}`);
   }
 
   const handleFriendAction = useCallback(async (userId, action) => {
@@ -104,6 +112,7 @@ export default function UniversalSearch({
 
   const hasTickers = results?.tickers?.length > 0;
   const hasUsers = results?.users?.length > 0;
+  const hasForecasters = results?.forecasters?.length > 0;
 
   return (
     <div className={`relative ${className}`} ref={wrapperRef}>
@@ -113,15 +122,54 @@ export default function UniversalSearch({
           type="text"
           value={query}
           onChange={e => handleInput(e.target.value)}
-          onFocus={() => { if (results && ((results.tickers?.length || 0) + (results.users?.length || 0) > 0)) setOpen(true); }}
+          onFocus={() => {
+            if (results && ((results.tickers?.length || 0) + (results.users?.length || 0) + (results.forecasters?.length || 0) > 0)) setOpen(true);
+          }}
           placeholder={placeholder}
           autoFocus={autoFocus}
           className={`w-full pl-9 pr-3 py-2 bg-surface border border-border rounded-lg text-text-primary placeholder:text-muted focus:outline-none focus:border-accent/50 ${inputClassName}`}
         />
       </div>
 
-      {open && results && (hasTickers || hasUsers) && (
+      {open && results && (hasTickers || hasForecasters || hasUsers) && (
         <div className="absolute z-[60] w-full sm:w-80 mt-1 bg-surface border border-border rounded-lg shadow-lg overflow-hidden max-h-[70vh] overflow-y-auto">
+          {/* Analysts (forecasters) — placed first because "search for an
+              analyst" is the Ship #13B motivating use case. */}
+          {hasForecasters && (
+            <div>
+              <div className="px-3 py-1.5 text-[10px] text-muted uppercase tracking-wider font-bold bg-surface-2/50">
+                Analysts
+              </div>
+              {results.forecasters.map(f => (
+                <button
+                  key={`forecaster-${f.forecaster_id || f.id}`}
+                  type="button"
+                  onClick={() => handleForecasterClick(f.forecaster_id || f.id)}
+                  className="w-full flex items-center gap-2.5 px-3 py-2.5 text-left hover:bg-surface-2 active:bg-surface-2 transition-colors"
+                >
+                  <div className="w-8 h-8 rounded-full bg-accent/10 border border-accent/20 flex items-center justify-center flex-shrink-0">
+                    <span className="font-mono text-xs text-accent font-bold">
+                      {(f.name || '?')[0].toUpperCase()}
+                    </span>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-sm font-medium truncate">{f.name}</span>
+                      {f.firm && <span className="text-[10px] text-muted truncate">· {f.firm}</span>}
+                    </div>
+                    <div className="flex items-center gap-2 text-[10px] text-muted">
+                      <span className={`font-mono ${(f.accuracy || 0) >= 60 ? 'text-positive' : 'text-negative'}`}>{f.accuracy}%</span>
+                      <span>{f.total_predictions} {f.total_predictions === 1 ? 'call' : 'calls'}</span>
+                    </div>
+                  </div>
+                </button>
+              ))}
+            </div>
+          )}
+
+          {/* Divider between Analysts and Tickers */}
+          {hasForecasters && hasTickers && <div className="border-t border-border" />}
+
           {/* Tickers */}
           {hasTickers && (
             <div>
