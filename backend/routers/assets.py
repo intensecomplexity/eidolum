@@ -297,7 +297,7 @@ def _build_ticker_detail(ticker: str, db) -> dict:
                    COUNT(*) as t
             FROM predictions p JOIN forecasters f ON f.id = p.forecaster_id
             WHERE p.ticker = :t AND p.outcome IN ('hit','near','miss','correct','incorrect')
-            GROUP BY f.id, f.name HAVING COUNT(*) >= 2
+            GROUP BY f.id, f.name HAVING COUNT(*) >= 3
             ORDER BY SUM(CASE WHEN p.outcome='correct' THEN 1 ELSE 0 END) * 1.0 / COUNT(*) DESC
             LIMIT 1
         """), {"t": ticker}).first()
@@ -460,9 +460,16 @@ def get_asset_consensus(
         if p.outcome in ("correct", "hit"):
             forecaster_stats[fid]["correct"] += 1
 
+    # Ship #13 Bug I: require a real sample before crowning someone the
+    # "Top analyst on {ticker}". With the old `< 1` gate a single 100%
+    # call would win, which is why /asset/MDWD was surfacing
+    # "Joshua Jennings (100.0%) 1 call". The main leaderboard already
+    # requires 10+ scored; 3 is a softer per-ticker threshold that still
+    # filters out the single-call noise.
+    MIN_TICKER_SCORED = 3
     top = []
     for fid, s in forecaster_stats.items():
-        if s["total"] < 1:
+        if s["total"] < MIN_TICKER_SCORED:
             continue
         f = db.query(Forecaster).filter(Forecaster.id == fid).first()
         if not f:
