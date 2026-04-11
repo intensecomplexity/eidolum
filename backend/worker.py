@@ -1287,6 +1287,42 @@ def main():
     except Exception as e:
         log.warning(f"[Worker] scraper_runs earnings_calls migration: {e}")
 
+    # macro_concept_aliases + predictions.macro_concept + scraper_runs
+    # counter — ship #3 of the new prediction types (macro_call).
+    try:
+        with engine.connect() as conn:
+            conn.execute(sql_text("""
+                CREATE TABLE IF NOT EXISTS macro_concept_aliases (
+                    id SERIAL PRIMARY KEY,
+                    concept VARCHAR(64) NOT NULL UNIQUE,
+                    direction_bias VARCHAR(16) NOT NULL DEFAULT 'direct',
+                    primary_etf VARCHAR(16) NOT NULL,
+                    secondary_etfs VARCHAR(128),
+                    aliases TEXT,
+                    created_at TIMESTAMP NOT NULL DEFAULT NOW()
+                )
+            """))
+            conn.execute(sql_text(
+                "CREATE INDEX IF NOT EXISTS idx_macro_aliases_concept "
+                "ON macro_concept_aliases(concept)"
+            ))
+            conn.execute(sql_text(
+                "ALTER TABLE predictions ADD COLUMN IF NOT EXISTS "
+                "macro_concept VARCHAR(64)"
+            ))
+            conn.execute(sql_text(
+                "CREATE INDEX IF NOT EXISTS idx_predictions_macro_concept "
+                "ON predictions(macro_concept) WHERE macro_concept IS NOT NULL"
+            ))
+            conn.execute(sql_text(
+                "ALTER TABLE scraper_runs ADD COLUMN IF NOT EXISTS "
+                "macro_calls_extracted INTEGER NOT NULL DEFAULT 0"
+            ))
+            conn.commit()
+        log.info("[Worker] macro_concept_aliases + macro_concept column ready")
+    except Exception as e:
+        log.warning(f"[Worker] macro_call schema migration: {e}")
+
     # predictions.list_id + list_rank — ranked list extraction metadata.
     # Partial index keeps the index small because most rows won't be in
     # lists. No backfill: historical predictions have no ranking data.

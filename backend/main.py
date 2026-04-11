@@ -2405,6 +2405,47 @@ async def lifespan(app):
         except Exception as _ece:
             print(f"[Startup] scraper_runs earnings_calls migration error: {_ece}")
 
+        # ── macro_concept_aliases table + predictions.macro_concept +
+        #    scraper_runs.macro_calls_extracted + partial index ──────────
+        # Backs ship #3 of the new prediction types: macro_call.
+        # Macroeconomic predictions get stored as a new
+        # prediction_category='macro_call' on the mapped ETF (unlike
+        # options/earnings which stay as ticker_call). The table holds
+        # the concept→ETF mapping; admin-editable via /admin/macro-concepts.
+        try:
+            with engine.connect() as _mc_c:
+                _mc_c.execute(sql_text("""
+                    CREATE TABLE IF NOT EXISTS macro_concept_aliases (
+                        id SERIAL PRIMARY KEY,
+                        concept VARCHAR(64) NOT NULL UNIQUE,
+                        direction_bias VARCHAR(16) NOT NULL DEFAULT 'direct',
+                        primary_etf VARCHAR(16) NOT NULL,
+                        secondary_etfs VARCHAR(128),
+                        aliases TEXT,
+                        created_at TIMESTAMP NOT NULL DEFAULT NOW()
+                    )
+                """))
+                _mc_c.execute(sql_text(
+                    "CREATE INDEX IF NOT EXISTS idx_macro_aliases_concept "
+                    "ON macro_concept_aliases(concept)"
+                ))
+                _mc_c.execute(sql_text(
+                    "ALTER TABLE predictions ADD COLUMN IF NOT EXISTS "
+                    "macro_concept VARCHAR(64)"
+                ))
+                _mc_c.execute(sql_text(
+                    "CREATE INDEX IF NOT EXISTS idx_predictions_macro_concept "
+                    "ON predictions(macro_concept) WHERE macro_concept IS NOT NULL"
+                ))
+                _mc_c.execute(sql_text(
+                    "ALTER TABLE scraper_runs ADD COLUMN IF NOT EXISTS "
+                    "macro_calls_extracted INTEGER NOT NULL DEFAULT 0"
+                ))
+                _mc_c.commit()
+                print("[Startup] macro_concept_aliases + predictions.macro_concept ready")
+        except Exception as _mce:
+            print(f"[Startup] macro_call schema migration error: {_mce}")
+
         # ── predictions.list_id + list_rank (ranked list extraction) ────
         # Stores speaker-declared rank position within a ranked list
         # ("my top 5 stocks: NVDA, AMD, TSM, AAPL, MSFT"). Both columns

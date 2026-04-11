@@ -154,6 +154,15 @@ class Prediction(Base):
     # columns stay NULL for plain ticker_call / sector_call rows.
     event_type = Column(String(32), nullable=True)
     event_date = Column(DateTime, nullable=True)
+    # Macro concept identifier for prediction_category='macro_call' rows.
+    # The forecaster spoke in macroeconomic terms (e.g. "dollar", "rates
+    # up", "gold to 3000"); Haiku emitted a canonical concept name; the
+    # insert path resolved it to a tradeable ETF via macro_concept_aliases
+    # and stored the prediction as a ticker_call-shaped row on that ETF.
+    # macro_concept preserves the original concept so the leaderboard
+    # can filter by concept family and the admin UI can audit mappings.
+    # NULL for every non-macro row.
+    macro_concept = Column(String(64), nullable=True)
     confidence_tier = Column(Numeric(3, 2), nullable=False, default=1.0)
     # Position disclosure fields: NULL for price_target predictions.
     position_action = Column(String(16), nullable=True)   # open|add|trim|exit
@@ -794,6 +803,15 @@ class ScraperRun(Base):
     # branch (stubbed in this ship — plumbing is follow-up work).
     earnings_calls_extracted = Column(Integer, nullable=False, default=0,
                                        server_default="0")
+    # Count of macro_call predictions extracted in this run. Unlike
+    # options/earnings which stay as prediction_category='ticker_call',
+    # macro_call is a new category value — macroeconomic predictions
+    # are a distinct skill and should be filterable as their own class
+    # on the leaderboard. The concept-to-ETF mapping lives in the
+    # macro_concept_aliases table. Incremented by insert_youtube_prediction
+    # when pred._derived_from=='macro_call' resolves to a valid concept.
+    macro_calls_extracted = Column(Integer, nullable=False, default=0,
+                                    server_default="0")
 
 
 class YouTubeScraperRejection(Base):
@@ -833,6 +851,36 @@ class SectorEtfAlias(Base):
     canonical_sector = Column(String(50), nullable=False, index=True)
     etf_ticker = Column(String(10), nullable=False)
     notes = Column(Text, nullable=True)
+
+
+class MacroConceptAlias(Base):
+    """Canonical macro concept → ETF proxy mapping used by the YouTube
+    classifier's macro_call extraction. The forecaster says "dollar
+    strengthening" or "rates are going up"; Haiku emits a canonical
+    concept name (e.g. 'dollar', 'rates_up'); the insert path resolves
+    the concept to a tradeable ETF (UUP, TBT) via this table.
+
+    direction_bias is either 'direct' (bullish-on-concept means
+    bullish-on-ETF) or 'inverse' (bullish-on-concept means bearish-on-
+    ETF — used for inverse bond mappings like bullish-on-rates-up →
+    bearish-on-TLT). The insert path flips the direction when
+    direction_bias='inverse' before storing the prediction.
+
+    aliases is a comma-separated list of natural language phrases
+    mapped to the concept, included inline in the Haiku prompt as a
+    recognition guide. Admin-editable via /admin/macro-concepts.
+    """
+    __tablename__ = "macro_concept_aliases"
+
+    id = Column(Integer, primary_key=True, index=True)
+    concept = Column(String(64), nullable=False, unique=True)
+    direction_bias = Column(String(16), nullable=False, default="direct",
+                            server_default="direct")
+    primary_etf = Column(String(16), nullable=False)
+    secondary_etfs = Column(String(128), nullable=True)
+    aliases = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow,
+                        server_default=func.now())
 
 
 class YouTubeChannelMeta(Base):
