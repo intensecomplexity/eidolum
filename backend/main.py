@@ -2446,6 +2446,34 @@ async def lifespan(app):
         except Exception as _mce:
             print(f"[Startup] macro_call schema migration error: {_mce}")
 
+        # ── macro_concept_aliases seed ───────────────────────────────
+        # Canonical ~50 concepts covering currency, rates, inflation,
+        # volatility, commodities, equity macro, international/EM,
+        # credit, real estate, crypto, yield curve. Idempotent: each
+        # row INSERT ... ON CONFLICT (concept) DO NOTHING.
+        try:
+            from seed_data.macro_concepts import MACRO_CONCEPTS as _MACRO_SEED
+            with engine.connect() as _ms_c:
+                for entry in _MACRO_SEED:
+                    _ms_c.execute(sql_text("""
+                        INSERT INTO macro_concept_aliases
+                            (concept, direction_bias, primary_etf,
+                             secondary_etfs, aliases)
+                        VALUES (:concept, :direction_bias, :primary_etf,
+                                :secondary_etfs, :aliases)
+                        ON CONFLICT (concept) DO NOTHING
+                    """), {
+                        "concept": entry["concept"],
+                        "direction_bias": entry.get("direction_bias", "direct"),
+                        "primary_etf": entry["primary_etf"],
+                        "secondary_etfs": entry.get("secondary_etfs") or None,
+                        "aliases": entry.get("aliases") or None,
+                    })
+                _ms_c.commit()
+                print(f"[Startup] macro_concept_aliases seeded ({len(_MACRO_SEED)} concepts)")
+        except Exception as _mse:
+            print(f"[Startup] macro_concept_aliases seed error: {_mse}")
+
         # ── predictions.list_id + list_rank (ranked list extraction) ────
         # Stores speaker-declared rank position within a ranked list
         # ("my top 5 stocks: NVDA, AMD, TSM, AAPL, MSFT"). Both columns
