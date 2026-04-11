@@ -750,7 +750,14 @@ export default function PredictionCard({ prediction: p, showForecaster = false, 
           <>
             <span className="text-muted">|</span>
             <span className="text-text-secondary">
-              Reached: ${(p.entry_price * (1 + p.actual_return / 100)).toFixed(0)}
+              {/* Bug 2: actual_return is the SIGNED return relative to direction
+                  (positive = the call was right). For a bearish call, a positive
+                  signed return means the stock fell, so the displayed reached
+                  price must subtract the move, not add it. Old formula
+                  (entry × (1 + actual_return/100)) put a winning bear call
+                  ABOVE entry on screen and confused readers across AAPL, MSFT,
+                  and 5+ others. Scoring is unchanged. */}
+              Reached: ${(p.entry_price * (1 + (p.direction === 'bearish' ? -p.actual_return : p.actual_return) / 100)).toFixed(0)}
             </span>
           </>
         )}
