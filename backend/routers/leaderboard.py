@@ -20,13 +20,20 @@ INTEGRITY_CHECK_TTL = 600
 _last_forecaster_count: int = 0
 
 
-def _apply_dormancy(db: Session, results: list, include_dormant: bool) -> list:
+def _apply_dormancy(db: Session, results: list, include_dormant: bool, top_n: int = 100) -> list:
     """Annotate each result row with is_dormant + last_prediction_at, then
     filter out dormant rows unless include_dormant=True.
 
-    Idempotent and cache-safe — works on any list of result dicts that
-    have an "id" field. Mutates the list members and returns a (possibly
-    filtered) copy.
+    Upstream queries intentionally over-fetch (LIMIT 200) so that after
+    dormant forecasters are removed we still have enough entries to fill
+    the Eidolum 100 without gaps. This function trims the post-filter list
+    to ``top_n`` and re-assigns sequential ranks starting at 1 so the
+    displayed leaderboard never skips a rank number.
+
+    Works on any list of result dicts that have an "id" field. Returns
+    deep-copied result dicts for the slice being returned so that mutating
+    the rank doesn't poison shared cache entries across calls that differ
+    only in ``include_dormant``.
     """
     if not results:
         return results
@@ -48,8 +55,18 @@ def _apply_dormancy(db: Session, results: list, include_dormant: bool) -> list:
         r["is_dormant"] = is_d
         r["last_prediction_at"] = last_at.isoformat() if last_at else None
     if include_dormant:
-        return results
-    return [r for r in results if not r.get("is_dormant")]
+        filtered = results
+    else:
+        filtered = [r for r in results if not r.get("is_dormant")]
+    # Trim to top_n and re-rank so dormant removal never leaves gaps like
+    # 1, 2, 4, 5, ... — the Eidolum 100 must always be a dense 1..100.
+    filtered = filtered[:top_n]
+    out = []
+    for i, r in enumerate(filtered):
+        r_copy = dict(r)
+        r_copy["rank"] = i + 1
+        out.append(r_copy)
+    return out
 
 
 def _enrich_category_stats(results: list, db: Session):
@@ -421,7 +438,7 @@ def _refresh_leaderboard(db: Session) -> list | dict:
             WHERE COALESCE(f.total_predictions, 0) >= :min_preds
               AND COALESCE(f.accuracy_score, 0) > 0
             ORDER BY f.accuracy_score DESC, f.total_predictions DESC
-            LIMIT 100
+            LIMIT 200
         """), {"min_preds": min_preds}).fetchall()
 
         if rows:
@@ -788,7 +805,9 @@ def _build_filtered_leaderboard(db: Session, sector=None, call_type=None, sort="
 
     where_sql = " AND ".join(where_clauses)
     params["min_preds"] = min_predictions
-    params["lim"] = min(limit, 100)
+    # Over-fetch 2x so _apply_dormancy has headroom to filter dormant
+    # forecasters without leaving gaps or fewer than `limit` entries.
+    params["lim"] = min(limit, 100) * 2
 
     # Sort order
     if sort == "volume":
