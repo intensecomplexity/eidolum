@@ -121,6 +121,13 @@ def evaluate_batch(max_tickers: int | None = None) -> dict:
         from feature_flags import x_filter_sql
         x_filter_p = x_filter_sql(db, table_alias="p")
         x_filter_bare = x_filter_sql(db)
+        # TODO(earnings_call): earnings-tied predictions (event_type='earnings')
+        # need a separate scoring path — pre-earnings close vs post-earnings
+        # close, not the default window_days-from-publish evaluation. The
+        # plumbing (external earnings-date lookup + reaction-window scoring)
+        # is a follow-up ship. Until it lands, exclude event_type='earnings'
+        # rows from the default scorer so they stay outcome='pending' and
+        # don't get incorrectly scored as a 90-day window_days call.
         rows = db.execute(sql_text(r"""
             SELECT p.id, p.ticker, p.direction, p.target_price, p.entry_price,
                    p.evaluation_date, p.prediction_date, p.forecaster_id, p.window_days,
@@ -131,6 +138,7 @@ def evaluate_batch(max_tickers: int | None = None) -> dict:
               AND p.evaluation_date IS NOT NULL
               AND p.evaluation_date < :now
               AND (p.ticker ~ '^[A-Z]{1,5}$' OR p.ticker ~ '^[A-Z]{1,3}\.[A-Z]$')
+              AND (p.event_type IS NULL OR p.event_type != 'earnings')
               """ + x_filter_p + r"""
             ORDER BY p.ticker
             LIMIT 5000
@@ -141,6 +149,7 @@ def evaluate_batch(max_tickers: int | None = None) -> dict:
             WHERE (outcome = 'pending' OR outcome IS NULL OR outcome = '')
               AND evaluation_date IS NOT NULL AND evaluation_date < :now
               AND (ticker ~ '^[A-Z]{1,5}$' OR ticker ~ '^[A-Z]{1,3}\.[A-Z]$')
+              AND (event_type IS NULL OR event_type != 'earnings')
               """ + x_filter_bare + r"""
         """), {"now": now}).scalar() or 0
     finally:
