@@ -65,6 +65,7 @@ def _enrich_category_stats(results: list, db: Session):
       - conditional_call_total / conditional_call_accuracy
         + conditional_unresolved_total (separate counter for 'unresolved'
           outcomes which are NOT in the accuracy denominator)
+      - regime_call_total / regime_call_accuracy
 
     Accuracy uses the same weighting as the main leaderboard: hit/correct
     count as 1.0, near counts as 0.5, miss/incorrect count as 0. Any
@@ -99,6 +100,8 @@ def _enrich_category_stats(results: list, db: Session):
         r.setdefault("conditional_call_total", 0)
         r.setdefault("conditional_call_accuracy", None)
         r.setdefault("conditional_unresolved_total", 0)
+        r.setdefault("regime_call_total", 0)
+        r.setdefault("regime_call_accuracy", None)
 
     if not results:
         return
@@ -137,6 +140,7 @@ def _enrich_category_stats(results: list, db: Session):
                 "metric_forecast_total": 0, "metric_forecast_accuracy": None,
                 "conditional_call_total": 0, "conditional_call_accuracy": None,
                 "conditional_unresolved_total": 0,
+                "regime_call_total": 0, "regime_call_accuracy": None,
             }
         if cat == "sector_call":
             by_fid[fid]["sector_call_total"] = evaluated
@@ -169,6 +173,14 @@ def _enrich_category_stats(results: list, db: Session):
             if evaluated > 0:
                 by_fid[fid]["conditional_call_accuracy"] = round(score / evaluated * 100, 1)
             by_fid[fid]["conditional_unresolved_total"] = unresolved
+        elif cat == "regime_call":
+            # Structural market-phase claims — scored by the evaluator's
+            # drawdown/runup/new-high rule set but the outcome values
+            # are the same hit/near/miss enum so aggregation works
+            # without any special casing.
+            by_fid[fid]["regime_call_total"] = evaluated
+            if evaluated > 0:
+                by_fid[fid]["regime_call_accuracy"] = round(score / evaluated * 100, 1)
         elif cat == "ticker_call":
             # Explicit match so any NEW category value added later
             # doesn't silently overwrite ticker_call stats via the
@@ -188,6 +200,7 @@ def _enrich_category_stats(results: list, db: Session):
             "metric_forecast_total": 0, "metric_forecast_accuracy": None,
             "conditional_call_total": 0, "conditional_call_accuracy": None,
             "conditional_unresolved_total": 0,
+            "regime_call_total": 0, "regime_call_accuracy": None,
         })
         r.update(stats)
 

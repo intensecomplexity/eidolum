@@ -284,6 +284,7 @@ def get_forecaster(
         "macro_call_total": 0, "macro_call_accuracy": None,
         "conditional_call_total": 0, "conditional_call_accuracy": None,
         "conditional_unresolved_total": 0,
+        "regime_call_total": 0, "regime_call_accuracy": None,
     }
     try:
         cat_rows = db.execute(sql_text("""
@@ -313,6 +314,10 @@ def get_forecaster(
                 if evaluated > 0:
                     category_stats["conditional_call_accuracy"] = round(score / evaluated * 100, 1)
                 category_stats["conditional_unresolved_total"] = unresolved
+            elif cat == "regime_call":
+                category_stats["regime_call_total"] = evaluated
+                if evaluated > 0:
+                    category_stats["regime_call_accuracy"] = round(score / evaluated * 100, 1)
             elif cat == "ticker_call":
                 category_stats["ticker_call_total"] = evaluated
                 if evaluated > 0:
@@ -525,7 +530,10 @@ def _get_preds(fid, page, limit, filter_type, sector, db):
                    p.prediction_category,
                    p.trigger_condition, p.trigger_type, p.trigger_ticker,
                    p.trigger_price, p.trigger_deadline, p.trigger_fired_at,
-                   p.outcome_window_days
+                   p.outcome_window_days,
+                   p.regime_type, p.regime_instrument,
+                   p.regime_max_drawdown, p.regime_max_runup,
+                   p.regime_new_highs, p.regime_new_lows
             FROM predictions p
             LEFT JOIN ticker_sectors ts ON ts.ticker = p.ticker
             LEFT JOIN predictions prior ON prior.id = p.revision_of
@@ -548,7 +556,8 @@ def _get_preds(fid, page, limit, filter_type, sector, db):
                        ts.logo_domain, ts.logo_url, ts.company_name,
                        p.url_quality,
                        NULL, NULL, NULL, FALSE,
-                       NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL
+                       NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+                       NULL, NULL, NULL, NULL, NULL, NULL
                 FROM predictions p
                 LEFT JOIN ticker_sectors ts ON ts.ticker = p.ticker
                 WHERE p.forecaster_id = :fid {where}
@@ -602,6 +611,16 @@ def _get_preds(fid, page, limit, filter_type, sector, db):
             "trigger_deadline": p[35].isoformat() if p[35] else None,
             "trigger_fired_at": p[36].isoformat() if p[36] else None,
             "outcome_window_days": p[37],
+            # Regime-call metadata (ship #12). Populated only for
+            # prediction_category='regime_call' rows; NULL on every
+            # other row. Frontend uses these to render the REGIME
+            # card with color-coded header + drawdown/runup metrics.
+            "regime_type": p[38],
+            "regime_instrument": p[39],
+            "regime_max_drawdown": float(p[40]) if p[40] is not None else None,
+            "regime_max_runup": float(p[41]) if p[41] is not None else None,
+            "regime_new_highs": p[42],
+            "regime_new_lows": p[43],
         })
     return results
 
