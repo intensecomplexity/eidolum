@@ -64,6 +64,12 @@ def get_current_price(ticker: str) -> float | None:
 _TOLERANCE = {1: 2, 7: 3, 14: 4, 30: 5, 90: 5, 180: 7, 365: 10}
 # Minimum movement (%) for NEAR — right direction, meaningful move
 _MIN_MOVEMENT = {1: 0.5, 7: 1, 14: 1.5, 30: 2, 90: 2, 180: 3, 365: 4}
+# Pair-call spread tolerance (%) for HIT. Tighter than ticker_call's
+# tolerance because pair spreads are noisier than absolute moves — a
+# 3% spread over 3 months is a more decisive relative-value call than
+# a 3% absolute move on a single stock. HIT when spread >= tolerance.
+# NEAR when spread > 0 but < tolerance. MISS when spread <= 0.
+_PAIR_TOLERANCE = {1: 1.0, 7: 1.5, 14: 2.0, 30: 2.5, 90: 3.0, 180: 4.0, 365: 6.0}
 
 
 def _get_threshold(window_days: int, table: dict) -> float:
@@ -76,6 +82,89 @@ def _get_threshold(window_days: int, table: dict) -> float:
         if window_days <= k:
             return table[k]
     return table[keys[-1]]
+
+
+def _evaluate_pair_call(p: Prediction, now: datetime) -> str:
+    """Score a pair_call prediction on the spread between long and short
+    legs. Returns one of: 'hit' | 'near' | 'miss' | 'no_data' | 'skip'.
+
+    Spread math:
+      long_return  = (long_exit  − long_entry)  / long_entry
+      short_return = (short_exit − short_entry) / short_entry
+      spread_pct   = (long_return − short_return) * 100
+
+    Tolerance is pulled from _PAIR_TOLERANCE by window_days (tighter
+    than ticker_call's _TOLERANCE because spreads are noisier). HIT
+    when spread >= tolerance, NEAR when spread > 0 but below tolerance,
+    MISS when spread <= 0.
+
+    Entry prices: the long leg's entry is read from p.entry_price if
+    populated, otherwise fetched historically via price_checker.
+    The short leg is ALWAYS fetched historically because the existing
+    schema only stores one entry_price column. Missing prices on
+    either side → 'no_data'. The computed spread is stamped onto
+    p.pair_spread_return for downstream display.
+
+    Side effects: mutates p.outcome / p.actual_return / p.evaluated_at /
+    p.pair_spread_return. Caller commits.
+    """
+    long_ticker = (p.pair_long_ticker or "").strip().upper()
+    short_ticker = (p.pair_short_ticker or "").strip().upper()
+    if not long_ticker or not short_ticker:
+        return "skip"
+
+    try:
+        from jobs.price_checker import get_stock_price_on_date as _get_hist
+    except Exception:
+        _get_hist = None  # noqa: F841
+
+    prediction_date = p.prediction_date
+    if not prediction_date:
+        return "skip"
+    entry_date_str = prediction_date.strftime("%Y-%m-%d")
+
+    # Long entry: prefer the stored entry_price (set if/when the entry
+    # evaluator ran earlier), otherwise look up historically.
+    long_entry = None
+    if p.entry_price and p.entry_price > 0:
+        long_entry = float(p.entry_price)
+    if long_entry is None and _get_hist is not None:
+        long_entry = _get_hist(long_ticker, entry_date_str)
+
+    # Short entry is always fetched historically — there's no column to
+    # persist it (only the 3 pair columns on the row).
+    short_entry = _get_hist(short_ticker, entry_date_str) if _get_hist else None
+
+    # Exit prices: use current price at evaluation time (which is also
+    # approximately the eval_date since this function only runs after
+    # the evaluator decided the row is overdue).
+    long_exit = get_current_price(long_ticker)
+    short_exit = get_current_price(short_ticker)
+
+    if (long_entry is None or long_entry <= 0
+            or short_entry is None or short_entry <= 0
+            or long_exit is None or short_exit is None):
+        return "no_data"
+
+    long_return = (long_exit - long_entry) / long_entry
+    short_return = (short_exit - short_entry) / short_entry
+    spread_pct = round((long_return - short_return) * 100, 2)
+
+    window = p.window_days or 90
+    tolerance = _get_threshold(window, _PAIR_TOLERANCE)
+
+    if spread_pct >= tolerance:
+        outcome = "hit"
+    elif spread_pct > 0:
+        outcome = "near"
+    else:
+        outcome = "miss"
+
+    p.outcome = outcome
+    p.actual_return = spread_pct
+    p.pair_spread_return = spread_pct
+    p.evaluated_at = now
+    return outcome
 
 
 def _evaluate_prediction(p: Prediction, price: float, now: datetime):
@@ -187,6 +276,27 @@ def run_evaluator(db: Session):
     skipped = 0
 
     for p in overdue:
+        # pair_call rows have a different scoring path — two tickers,
+        # spread-based outcome. Route them to the dedicated scorer
+        # BEFORE the ticker-centric guards below would trip on them.
+        if (p.prediction_category or "").strip().lower() == "pair_call":
+            result = _evaluate_pair_call(p, now)
+            if result in ("hit", "near", "miss"):
+                scored += 1
+            elif result == "no_data":
+                eval_date = p.evaluation_date or (
+                    p.prediction_date + timedelta(days=p.window_days or 30) if p.prediction_date else None
+                )
+                if eval_date and (now - eval_date).days > 7:
+                    p.outcome = "no_data"
+                    p.evaluated_at = now
+                    no_data_count += 1
+                else:
+                    skipped += 1
+            else:  # 'skip'
+                skipped += 1
+            continue
+
         if not p.ticker or p.ticker == "UNKNOWN":
             continue
 
@@ -266,6 +376,18 @@ def sweep_stuck_predictions(db: Session):
     no_data_count = 0
 
     for p in stuck:
+        # Pair-call rows use spread-based scoring; route first so the
+        # ticker-centric guards don't mis-handle them.
+        if (p.prediction_category or "").strip().lower() == "pair_call":
+            result = _evaluate_pair_call(p, now)
+            if result in ("hit", "near", "miss"):
+                scored += 1
+            else:
+                p.outcome = "no_data"
+                p.evaluated_at = now
+                no_data_count += 1
+            continue
+
         if not p.ticker or p.ticker == "UNKNOWN":
             p.outcome = "no_data"
             p.evaluated_at = now
