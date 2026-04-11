@@ -3,52 +3,61 @@
 @tailwind utilities;
 
 :root {
-  color-scheme: dark;
-  --color-card-bg: #0f1115;
-  --color-card-border: rgba(212,168,67,0.08);
-  --color-scrollbar-track: #0d0f13;
-  --color-scrollbar-thumb: rgba(255,255,255,0.08);
+  /* Ship #14 — brand-ink is a theme-adaptive oxblood/clay accent. */
+  /* Dark-mode default: warm clay (rose-terracotta). */
+  --brand-ink: #E8B4A0;
+  --color-card-bg: #1C1913;
+  --color-card-border: rgba(212,168,67,0.10);
+  --color-scrollbar-track: #16140E;
+  --color-scrollbar-thumb: rgba(232,180,160,0.10);
 }
 
 html {
+  background: #16140E;
+  color: #EDE8DC;
   color-scheme: dark;
-  background: #0d0f13;
-  color: #e8e6e1;
 }
 
-[data-theme="light"] {
+html[data-theme="light"] {
+  /* Light-mode brand-ink: deep oxblood. */
+  --brand-ink: #7A1F1F;
+  background: #F8F5EE;
+  color: #16140E;
+  color-scheme: light;
   --color-card-bg: #ffffff;
-  --color-card-border: #e4e4e7;
-  --color-scrollbar-track: #f5f5f7;
+  --color-card-border: #e7e1d3;
+  --color-scrollbar-track: #F8F5EE;
   --color-scrollbar-thumb: rgba(0,0,0,0.12);
 }
 
 /* Light mode overrides — applied via specificity on [data-theme="light"] */
-[data-theme="light"] body { background: #f5f5f7; color: #18181b; }
-[data-theme="light"] .bg-bg { background-color: #f5f5f7 !important; }
+[data-theme="light"] body { background: #F8F5EE; color: #16140E; }
+[data-theme="light"] .bg-bg { background-color: #F8F5EE !important; }
 [data-theme="light"] .bg-surface { background-color: #ffffff !important; }
-[data-theme="light"] .bg-surface-2 { background-color: #f0f0f3 !important; }
-[data-theme="light"] .border-border { border-color: #d4d4d8 !important; }
-[data-theme="light"] .text-text-primary { color: #18181b !important; }
-[data-theme="light"] .text-text-secondary { color: #52525b !important; }
-[data-theme="light"] .text-muted { color: #8b8fa0 !important; }
+[data-theme="light"] .bg-surface-2 { background-color: #F1ECDF !important; }
+[data-theme="light"] .border-border { border-color: #E3DCC9 !important; }
+[data-theme="light"] .text-text-primary { color: #16140E !important; }
+[data-theme="light"] .text-text-secondary { color: #5A5246 !important; }
+[data-theme="light"] .text-muted { color: #8B8373 !important; }
 [data-theme="light"] .text-accent { color: #b8922e !important; }
 [data-theme="light"] .bg-accent { background-color: #b8922e !important; }
 [data-theme="light"] .border-accent { border-color: #b8922e !important; }
+[data-theme="light"] .text-brand-ink { color: #7A1F1F !important; }
+[data-theme="light"] .bg-brand-ink { background-color: #7A1F1F !important; }
 [data-theme="light"] .text-positive { color: #16a34a !important; }
 [data-theme="light"] .text-negative { color: #dc2626 !important; }
 [data-theme="light"] .text-warning { color: #d97706 !important; }
-[data-theme="light"] nav.sticky { background: rgba(245,245,247,0.8) !important; border-color: #e4e4e7 !important; }
+[data-theme="light"] nav.sticky { background: rgba(248,245,238,0.85) !important; border-color: #E3DCC9 !important; }
 [data-theme="light"] nav.sticky * { --tw-border-opacity: 1; }
 [data-theme="light"] input, [data-theme="light"] select, [data-theme="light"] textarea {
-  background-color: #f0f0f3 !important; border-color: #d4d4d8 !important; color: #18181b !important;
+  background-color: #F1ECDF !important; border-color: #E3DCC9 !important; color: #16140E !important;
 }
-[data-theme="light"] .card { background: #ffffff !important; border-color: #e4e4e7 !important; }
-[data-theme="light"] table tbody tr { border-color: #e4e4e7 !important; }
+[data-theme="light"] .card { background: #ffffff !important; border-color: #E3DCC9 !important; }
+[data-theme="light"] table tbody tr { border-color: #E3DCC9 !important; }
 [data-theme="light"] .badge-pending { background: rgba(0,0,0,0.03) !important; color: #71717a !important; border-color: rgba(0,0,0,0.08) !important; }
 [data-theme="light"] .btn-secondary { color: #b8922e !important; border-color: rgba(184,146,46,0.3) !important; }
 [data-theme="light"] .glossary-term:hover::after, [data-theme="light"] .glossary-term:focus::after {
-  background: #ffffff !important; color: #18181b !important; border-color: #d4d4d8 !important;
+  background: #ffffff !important; color: #16140E !important; border-color: #E3DCC9 !important;
 }
 
 @layer base {
@@ -550,5 +559,94 @@ tbody tr { border-bottom: 1px solid rgba(255,255,255,0.08); }
   .glossary-term:focus::after {
     bottom: auto;
     top: calc(100% + 4px);
+  }
+}
+
+/* ── Ship #14: brand-ink utility (theme-adaptive via CSS var) ──────────── */
+.text-brand-ink { color: var(--brand-ink); }
+.bg-brand-ink { background-color: var(--brand-ink); }
+.border-brand-ink { border-color: var(--brand-ink); }
+
+/* ── Ship #14: leaderboard row hover preview slide-down ─────────────────
+   GPU-only — transform + opacity. Lives inside a row whose max-height is
+   toggled by React state, so no layout thrashing from the container. */
+@keyframes lb-preview-slide {
+  from { opacity: 0; transform: translateY(-6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.lb-preview-enter {
+  animation: lb-preview-slide 200ms ease-out forwards;
+  will-change: transform, opacity;
+}
+
+/* ── Ship #14: HIT badge shimmer sweep (one of two micro-interactions)
+   600ms gold gradient mask swept across the pill via transform. Plays
+   once per mount — the host toggles .hit-shimmer-once on render. */
+@keyframes hit-shimmer-sweep {
+  0%   { transform: translateX(-120%); opacity: 0; }
+  15%  { opacity: 1; }
+  85%  { opacity: 1; }
+  100% { transform: translateX(120%); opacity: 0; }
+}
+.hit-shimmer-host {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+}
+.hit-shimmer-host::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(
+    100deg,
+    transparent 20%,
+    rgba(253, 230, 138, 0.55) 45%,
+    rgba(255, 255, 255, 0.85) 50%,
+    rgba(253, 230, 138, 0.55) 55%,
+    transparent 80%
+  );
+  transform: translateX(-120%);
+  mix-blend-mode: screen;
+  will-change: transform, opacity;
+}
+.hit-shimmer-once::after {
+  animation: hit-shimmer-sweep 600ms ease-out forwards;
+}
+
+/* ── Ship #14: empty-state CTA pulse (two of two micro-interactions)
+   Subtle box-shadow on a transform-backed pseudo element so the pulse
+   is purely compositor-level. 4-second cycle. Stops on hover. */
+@keyframes cta-pulse {
+  0%, 100% { transform: scale(1); opacity: 0.55; }
+  50%      { transform: scale(1.06); opacity: 0; }
+}
+.cta-pulse-host { position: relative; isolation: isolate; }
+.cta-pulse-host::before {
+  content: "";
+  position: absolute;
+  inset: -2px;
+  border-radius: inherit;
+  background: transparent;
+  box-shadow: 0 0 0 2px rgba(212, 168, 67, 0.65);
+  pointer-events: none;
+  opacity: 0;
+  transform: scale(1);
+  will-change: transform, opacity;
+}
+.cta-pulse-active::before {
+  animation: cta-pulse 4s ease-in-out infinite;
+}
+.cta-pulse-host:hover::before,
+.cta-pulse-host:focus-visible::before {
+  animation-play-state: paused;
+  opacity: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lb-preview-enter,
+  .hit-shimmer-host::after,
+  .cta-pulse-host::before {
+    animation: none !important;
   }
 }

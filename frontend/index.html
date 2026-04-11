@@ -2,13 +2,29 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
+    <script>
+      (function () {
+        try {
+          var stored = localStorage.getItem('eidolum_theme');
+          var prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+          var theme = stored || (prefersDark ? 'dark' : 'light');
+          var html = document.documentElement;
+          html.setAttribute('data-theme', theme);
+          html.classList.remove('theme-light', 'theme-dark');
+          html.classList.add(theme === 'light' ? 'theme-light' : 'theme-dark');
+        } catch (e) {
+          document.documentElement.setAttribute('data-theme', 'dark');
+          document.documentElement.classList.add('theme-dark');
+        }
+      })();
+    </script>
     <link rel="icon" href="/favicon.ico?v=4" sizes="any" />
     <link rel="icon" href="/favicon.svg?v=4" type="image/svg+xml" />
     <link rel="icon" href="/favicon-16x16.png?v=4" type="image/png" sizes="16x16" />
     <link rel="icon" href="/favicon-32x32.png?v=4" type="image/png" sizes="32x32" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png?v=4" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="color-scheme" content="dark" />
+    <meta name="color-scheme" content="dark light" />
     <meta name="theme-color" content="#0d0f13" />
     <title>Eidolum — Analyst Accuracy Scored by Reality</title>
 
@@ -39,7 +55,6 @@
     <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Sora:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
   </head>
   <body>
-    <script>document.documentElement.setAttribute('data-theme',localStorage.getItem('eidolum_theme')||'dark')</script>
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
   </body>
