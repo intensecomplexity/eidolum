@@ -352,10 +352,31 @@ def evaluate_batch(max_tickers: int | None = None) -> dict:
                 skipped_no_eval_price += 1
                 continue
 
+            # Bug 8: prefer the historical close at prediction_date as the
+            # canonical entry_price. If the row already has an entry_price
+            # but it deviates by more than 2% from the historical close,
+            # re-lock — that gap means the original entry was sampled late
+            # (delayed retry path, "current price" fallback, equity bleed
+            # for a crypto ticker before bug 1) and the prediction is
+            # being measured against the wrong baseline.
+            historical_entry = _closest_price(prices, p["prediction_date"])
             ref = p["entry_price"]
-            if not ref or ref <= 0:
-                # Look up the entry price on the day the position opened
-                ref = _closest_price(prices, p["prediction_date"])
+            if historical_entry and historical_entry > 0:
+                if not ref or ref <= 0:
+                    ref = historical_entry
+                else:
+                    try:
+                        deviation = abs(float(ref) - historical_entry) / historical_entry
+                    except Exception:
+                        deviation = 0.0
+                    if deviation > 0.02:
+                        print(
+                            f"[HistEval] Bug-8 re-lock: id={p['id']} {p['ticker']} "
+                            f"stored_entry={ref} historical_entry={historical_entry:.2f} "
+                            f"deviation={deviation:.1%}",
+                            flush=True,
+                        )
+                        ref = historical_entry
             if not ref or ref <= 0:
                 days_overdue = (now - p["evaluation_date"]).days if p["evaluation_date"] else 0
                 if days_overdue >= 7:
@@ -391,13 +412,25 @@ def evaluate_batch(max_tickers: int | None = None) -> dict:
 
             target = p["target_price"]
 
-            # Determine effective direction from price target when available
-            direction = p["direction"]
-            if target and target > 0 and ref > 0:
-                if target > ref:
-                    direction = "bullish"
-                elif target < ref:
-                    direction = "bearish"
+            # Bug 4: drop absurd targets BEFORE they shape the scoring.
+            # Haiku occasionally pulls "$2000 by year end" off a throwaway
+            # line and pins a 40x target on a $50 stock. The target then
+            # makes a perfectly fine +20% prediction score MISS. The
+            # rejected target falls through to direction-only scoring.
+            from services.target_sanity import sanity_check_target
+            target = sanity_check_target(ref, target, p.get("window_days"))
+
+            # Bug 3: an explicit direction is canonical. The OLD code
+            # silently flipped direction whenever target_price > entry
+            # (or vice versa), which mis-scored bearish predictions whose
+            # entry_price had been locked from a stale or wrong source.
+            # services.direction_classifier.classify() returns the explicit
+            # direction when present and only falls back to target-vs-entry
+            # inference when the direction is missing/unparseable.
+            from services.direction_classifier import classify as classify_direction
+            direction = classify_direction(
+                p["direction"], entry_price=ref, target_price=target,
+            ) or "bullish"
 
             # Calculate return
             raw_move = round(((eval_price - ref) / ref) * 100, 2)
@@ -406,6 +439,13 @@ def evaluate_batch(max_tickers: int | None = None) -> dict:
             else:
                 ret = raw_move
 
+            # Bug 7: clamp the signed return to the per-window cap so the
+            # leaderboard's accuracy / avg_return / alpha and the portfolio
+            # simulator both render off the same numbers. The simulator
+            # used to clamp on its own, which made the two views diverge.
+            from services.eval_caps import clamp_return
+            ret = clamp_return(ret, p.get("window_days"))
+
             # Three-tier scoring: hit / near / miss
             window = p.get("window_days") or 90
             tolerance = _get_tolerance(window, _TOLERANCE)
@@ -413,6 +453,10 @@ def evaluate_batch(max_tickers: int | None = None) -> dict:
 
             if direction == "neutral":
                 abs_ret = abs(raw_move)
+                # Bug 5: use a strict upper bound on the NEAR band so the
+                # neutral 5% / 10% boundaries don't double-count. abs_ret
+                # exactly 5 is HIT (inclusive lower bound), 5 < x ≤ 10 is
+                # NEAR, anything above is MISS.
                 if abs_ret <= 5.0:
                     outcome = "hit"
                 elif abs_ret <= 10.0:
@@ -422,14 +466,20 @@ def evaluate_batch(max_tickers: int | None = None) -> dict:
             elif target and target > 0:
                 target_dist_pct = abs(eval_price - target) / target * 100
                 if direction == "bullish":
-                    if eval_price >= target or target_dist_pct <= tolerance:
+                    # Bug 5: HIT-by-tolerance only counts when the move
+                    # was in the predicted direction. Without this guard
+                    # a stock that crashed past a bullish target was
+                    # being scored HIT just because it was within
+                    # `tolerance` of the target on the way down.
+                    if eval_price >= target or (target_dist_pct <= tolerance and raw_move >= 0):
                         outcome = "hit"
                     elif raw_move >= min_movement:
                         outcome = "near"
                     else:
                         outcome = "miss"
                 else:  # bearish
-                    if eval_price <= target or target_dist_pct <= tolerance:
+                    # Same direction guard for bearish — see above.
+                    if eval_price <= target or (target_dist_pct <= tolerance and raw_move <= 0):
                         outcome = "hit"
                     elif raw_move <= -min_movement:
                         outcome = "near"
@@ -470,9 +520,15 @@ def evaluate_batch(max_tickers: int | None = None) -> dict:
             db = SessionLocal()
             try:
                 for u in updates:
+                    # Bug 8: always overwrite entry_price with the (possibly
+                    # re-locked) ref. Old code used COALESCE which kept a
+                    # stale entry forever even when the bug-8 re-lock above
+                    # detected the deviation. Re-locking is idempotent for
+                    # already-correct rows because the historical close
+                    # matches the stored value within 2% (the bug-8 cutoff).
                     db.execute(sql_text("""
                         UPDATE predictions SET outcome=:o, actual_return=:r, direction=:d,
-                        entry_price=COALESCE(entry_price,:ep), evaluation_summary=:s,
+                        entry_price=:ep, evaluation_summary=:s,
                         sp500_return=:spy, alpha=:alp, evaluated_at=:eval_at WHERE id=:id
                     """), {
                         "o": u["outcome"], "r": u["ret"], "d": u["direction"],
@@ -533,11 +589,30 @@ _MIN_MOVEMENT = {1: 0.5, 7: 1, 14: 1.5, 30: 2, 90: 2, 180: 3, 365: 4}
 SECTOR_CALL_TOLERANCE_MULTIPLIER = 1.5
 
 
-def _get_tolerance(window_days: int, table: dict) -> float:
-    if not window_days or window_days <= 0:
-        window_days = 30
+def _get_tolerance(window_days, table: dict) -> float:
+    """Map a window_days value to its tolerance bucket.
+
+    Bug 6: the producer side (Haiku's inferred_timeframe_days, the
+    "by end of month" parser, the X scraper's heuristic) emits window
+    values that are sometimes floats or off-by-an-hour, e.g. 6.9 days
+    for "about a week". The original `int()` truncation flipped a
+    1-week call into the 6-day slot which then walked up to the 7-day
+    bucket — fine — but a 0.99-day call truncated to 0, fell through
+    the upper-bound search, and landed on the 365-day bucket (10%)
+    instead of the 1-day bucket (2%).
+
+    The fix: round (not truncate) to the nearest whole day, then walk
+    the sorted bucket keys looking for the smallest `k >= window_days`.
+    Anything beyond the table top (>365 days) gets the largest bucket.
+    """
+    try:
+        n = int(round(float(window_days)))
+    except (TypeError, ValueError):
+        n = 30
+    if n <= 0:
+        n = 30
     for k in sorted(table.keys()):
-        if window_days <= k:
+        if n <= k:
             return table[k]
     return table[max(table.keys())]
 
@@ -815,12 +890,26 @@ def _try_finnhub(ticker: str) -> dict:
 def _fetch_history(ticker: str, start, end) -> dict:
     """Fetch historical daily prices for a ticker. Returns {date_str: close_price, ...}.
 
-    Priority is gated by FMP_PLAN:
+    Crypto tickers (BTC, ETH, etc.) are routed to Polygon's X:{SYMBOL}USD
+    spot endpoint and never fall back to the equity chain — many crypto
+    tickers collide with real US stock tickers (BTC = Bit Origin Ltd, a
+    biotech around $3) and equity prices would corrupt the evaluation.
+
+    Equity priority is gated by FMP_PLAN:
       - Ultimate: FMP (primary, fast, global) -> Tiingo -> Finnhub
       - Starter:  Tiingo (free)                -> FMP (budget) -> Finnhub
     """
     if ticker in _history_cache:
         return _history_cache[ticker]
+
+    # Crypto branch — exclusive. Bug 1: never let a crypto ticker fall
+    # through to an equity fetcher.
+    from services.price_fetch import is_crypto, fetch_crypto_history
+    if is_crypto(ticker):
+        prices = fetch_crypto_history(ticker)
+        if prices:
+            _history_cache[ticker] = prices
+        return prices
 
     if FMP_IS_PRIMARY:
         sources = (_try_fmp, _try_tiingo, _try_finnhub)
@@ -872,47 +961,35 @@ def _closest_price(prices: dict, target_date) -> float | None:
 
 
 def _update_stats(fids: set):
-    """Update forecaster cached stats including alpha and avg_return. Short DB connection."""
+    """Update forecaster cached stats including alpha, avg_return, AND streak.
+
+    Bug 9: the legacy SQL aggregation in this function never touched the
+    `streak` column, so changing a prediction from miss → hit (via the
+    crypto backfill, the bug-8 re-lock, or any future status flip) left
+    the cached HIT streak pointing at the old value. The forecaster's
+    leaderboard card kept showing the stale streak until something else
+    happened to call recalculate_forecaster_stats.
+
+    The fix is to delegate to `utils.recalculate_forecaster_stats`, which
+    is the single source of truth for the per-forecaster aggregate cache
+    and DOES update streak. Keeping a per-fid loop here so the caller's
+    "bg connection per fid" semantics survive.
+    """
     from database import BgSessionLocal as SessionLocal
-    from feature_flags import x_filter_sql
-    db = SessionLocal()
+    from utils import recalculate_forecaster_stats
     updated = 0
-    try:
-        x_filter = x_filter_sql(db)
-        for fid in fids:
-            row = db.execute(sql_text(f"""
-                SELECT COUNT(*),
-                       SUM(CASE WHEN outcome IN {_HIT_OUTCOMES} THEN 1 ELSE 0 END),
-                       SUM(CASE WHEN outcome = 'near' THEN 1 ELSE 0 END),
-                       AVG(alpha),
-                       AVG(actual_return)
-                FROM predictions
-                WHERE forecaster_id = :f AND outcome IN {_SCORED_OUTCOMES}
-                  AND actual_return IS NOT NULL
-                  {x_filter}
-            """), {"f": fid}).first()
-            total = row[0] or 0
-            hits = row[1] or 0
-            nears = row[2] or 0
-            avg_alpha = row[3]
-            avg_ret = row[4]
-            if total > 0:
-                acc = round((hits + nears * 0.5) / total * 100, 1)
-                alp = round(float(avg_alpha), 2) if avg_alpha is not None else 0
-                ar = round(float(avg_ret), 2) if avg_ret is not None else 0
-                db.execute(sql_text(
-                    "UPDATE forecasters SET total_predictions=:t, correct_predictions=:c, accuracy_score=:a, alpha=:alp, avg_return=:ar WHERE id=:f"
-                ), {"t": total, "c": hits, "a": acc, "alp": alp, "ar": ar, "f": fid})
-                updated += 1
-        db.commit()
-        print(f"[HistEval] Updated stats for {updated}/{len(fids)} forecasters")
-    except Exception as e:
-        db.rollback()
-        print(f"[HistEval] Stats update error: {e}")
-        import traceback
-        traceback.print_exc()
-    finally:
-        db.close()
+    failed = 0
+    for fid in fids:
+        db = SessionLocal()
+        try:
+            recalculate_forecaster_stats(fid, db)
+            updated += 1
+        except Exception as e:
+            failed += 1
+            print(f"[HistEval] Stats update error for forecaster {fid}: {e}")
+        finally:
+            db.close()
+    print(f"[HistEval] Updated stats for {updated}/{len(fids)} forecasters ({failed} failed)")
 
 
 _SCORED_OUTCOMES = "('hit','near','miss','correct','incorrect')"
