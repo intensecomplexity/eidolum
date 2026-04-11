@@ -304,3 +304,40 @@ def invalidate_macro_extraction_flag_cache() -> None:
     """Reset the 60-second cache — called from the admin toggle endpoint
     so changes take effect immediately instead of waiting for the TTL."""
     _MACRO_EXTRACTION_FLAG_CACHE["fetched_at"] = 0.0
+
+
+# ── Pair call extraction flag ───────────────────────────────────────────────
+#
+# Boolean all-or-nothing flag. When true, the YouTube classifier appends
+# the pair-call instruction block to the Haiku system prompt so
+# relative-value vocabulary ("long NVDA short INTC", "META over GOOGL",
+# "I'd rather own AMD than Intel", "pair trade JPM GS") extracts as a
+# pair_call prediction with both legs. Pair calls land as a new
+# prediction_category='pair_call' row, with `ticker` set to the long
+# leg (so the existing ticker index still covers it) and the dedicated
+# pair_long_ticker / pair_short_ticker columns holding the canonical
+# pair identity. Scoring is spread-based: (long_return − short_return)
+# against a tolerance band that is tighter than ticker_call's because
+# pair spreads are noisier than absolute moves.
+
+_PAIR_EXTRACTION_FLAG_CACHE: dict = {"enabled": False, "fetched_at": 0.0}
+_PAIR_EXTRACTION_FLAG_TTL = 60  # seconds
+
+
+def is_pair_extraction_enabled(db) -> bool:
+    """Return True if ENABLE_PAIR_CALL_EXTRACTION is 'true' in the
+    config table. Default False. Cached 60s so tight classifier loops
+    don't hammer the config table."""
+    now = time.time()
+    if (now - _PAIR_EXTRACTION_FLAG_CACHE["fetched_at"]) < _PAIR_EXTRACTION_FLAG_TTL:
+        return bool(_PAIR_EXTRACTION_FLAG_CACHE["enabled"])
+    enabled = _read_bool(db, "ENABLE_PAIR_CALL_EXTRACTION", default=False)
+    _PAIR_EXTRACTION_FLAG_CACHE["enabled"] = enabled
+    _PAIR_EXTRACTION_FLAG_CACHE["fetched_at"] = now
+    return enabled
+
+
+def invalidate_pair_extraction_flag_cache() -> None:
+    """Reset the 60-second cache — called from the admin toggle endpoint
+    so changes take effect immediately instead of waiting for the TTL."""
+    _PAIR_EXTRACTION_FLAG_CACHE["fetched_at"] = 0.0
