@@ -133,6 +133,10 @@ export function toggleMetricForecastExtractionAdmin() {
   return api.post('/admin/toggle-metric-forecast-extraction', {}, { headers: authHeaders() }).then(r => r.data);
 }
 
+export function toggleConditionalExtractionAdmin() {
+  return api.post('/admin/toggle-conditional-extraction', {}, { headers: authHeaders() }).then(r => r.data);
+}
+
 // ——— Macro Concepts CRUD (admin) ———
 
 export function getMacroConcepts() {

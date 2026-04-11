@@ -12,6 +12,7 @@ import {
   toggleOptionsExtractionAdmin, toggleEarningsExtractionAdmin,
   toggleMacroExtractionAdmin, togglePairExtractionAdmin,
   toggleBinaryEventExtractionAdmin, toggleMetricForecastExtractionAdmin,
+  toggleConditionalExtractionAdmin,
   getAdminUrlQuality, getSocialStats,
   getPrunedYouTubeChannels, reactivateYouTubeChannel,
   setYouTubeSectorTraffic,
@@ -139,6 +140,7 @@ function FeatureToggles() {
         { key: 'pair_call_extraction', label: 'YouTube Pair Calls', fn: togglePairExtractionAdmin },
         { key: 'binary_event_extraction', label: 'YouTube Binary Events', fn: toggleBinaryEventExtractionAdmin },
         { key: 'metric_forecast_extraction', label: 'YouTube Metric Forecasts', fn: toggleMetricForecastExtractionAdmin },
+        { key: 'conditional_call_extraction', label: 'YouTube Conditional Calls (IF/THEN)', fn: toggleConditionalExtractionAdmin },
       ].map(f => (
         <div key={f.key} className="flex items-center justify-between py-1.5">
           <span className="text-sm text-text-secondary">{f.label}</span>

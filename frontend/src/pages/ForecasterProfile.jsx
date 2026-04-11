@@ -956,6 +956,55 @@ function SupersededMarker({ p }) {
 }
 
 
+// Conditional-call IF/THEN badges. Renders an amber "IF …" chip in
+// the direction cell when p.prediction_category === 'conditional_call'.
+// The THEN side is covered by the existing PredictionBadge (direction +
+// target). A second chip shows "Trigger Fired" when trigger_fired_at is
+// set, or "Unresolved" when outcome === 'unresolved'. Lucide icons only.
+function ConditionalIfBadge({ p }) {
+  if (!p || p.prediction_category !== 'conditional_call') return null;
+  const cond = (p.trigger_condition || '').trim();
+  if (!cond) return null;
+  const truncated = cond.length > 60 ? cond.slice(0, 60) + '…' : cond;
+  return (
+    <span
+      className="inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[9px] font-semibold whitespace-nowrap ml-1"
+      style={{ backgroundColor: 'rgba(251,191,36,0.12)', color: '#fbbf24' }}
+      title={`IF: ${cond}`}
+    >
+      IF {truncated}
+    </span>
+  );
+}
+
+function TriggerFiredBadge({ p }) {
+  if (!p || p.prediction_category !== 'conditional_call') return null;
+  if (!p.trigger_fired_at) return null;
+  return (
+    <span
+      className="inline-flex items-center rounded-full px-1.5 py-0.5 text-[9px] font-semibold whitespace-nowrap ml-1"
+      style={{ backgroundColor: 'rgba(52,211,153,0.12)', color: '#34d399' }}
+      title={`Trigger fired: ${p.trigger_fired_at.slice(0, 10)}`}
+    >
+      TRIGGER FIRED
+    </span>
+  );
+}
+
+function UnresolvedBadge({ p }) {
+  if (!p || p.outcome !== 'unresolved') return null;
+  return (
+    <span
+      className="inline-flex items-center rounded-full px-1.5 py-0.5 text-[9px] font-semibold whitespace-nowrap ml-1"
+      style={{ backgroundColor: 'rgba(148,163,184,0.15)', color: '#94a3b8' }}
+      title="The trigger never fired within the evaluation window. The prediction is neither right nor wrong — it was simply untested."
+    >
+      UNRESOLVED
+    </span>
+  );
+}
+
+
 function PredictionRow({ p, forecaster: fc }) {
   const [expanded, setExpanded] = useState(false);
   const evalDate = p.evaluation_date || p.resolution_date;
@@ -988,6 +1037,9 @@ function PredictionRow({ p, forecaster: fc }) {
             {p.has_conflict && <ConflictBadge note={p.conflict_note} size="small" />}
             <RevisionBadge p={p} />
             <SupersededMarker p={p} />
+            <ConditionalIfBadge p={p} />
+            <TriggerFiredBadge p={p} />
+            <UnresolvedBadge p={p} />
           </div>
         </td>
         <td className="px-6 py-3">

@@ -521,7 +521,11 @@ def _get_preds(fid, page, limit, filter_type, sector, db):
                    EXISTS (
                        SELECT 1 FROM predictions later
                        WHERE later.revision_of = p.id
-                   ) AS was_superseded
+                   ) AS was_superseded,
+                   p.prediction_category,
+                   p.trigger_condition, p.trigger_type, p.trigger_ticker,
+                   p.trigger_price, p.trigger_deadline, p.trigger_fired_at,
+                   p.outcome_window_days
             FROM predictions p
             LEFT JOIN ticker_sectors ts ON ts.ticker = p.ticker
             LEFT JOIN predictions prior ON prior.id = p.revision_of
@@ -532,7 +536,7 @@ def _get_preds(fid, page, limit, filter_type, sector, db):
         """), params).fetchall()
     except Exception:
         # Fallback to the pre-revision query shape for environments where
-        # revision_of or the EXISTS subquery isn't supported yet.
+        # revision_of or trigger_* columns don't exist yet.
         try:
             rows = db.execute(sql_text(f"""
                 SELECT p.id, p.ticker, p.direction, p.target_price, p.entry_price,
@@ -543,7 +547,8 @@ def _get_preds(fid, page, limit, filter_type, sector, db):
                        p.verified_by, p.has_conflict, p.conflict_note,
                        ts.logo_domain, ts.logo_url, ts.company_name,
                        p.url_quality,
-                       NULL, NULL, NULL, FALSE
+                       NULL, NULL, NULL, FALSE,
+                       NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL
                 FROM predictions p
                 LEFT JOIN ticker_sectors ts ON ts.ticker = p.ticker
                 WHERE p.forecaster_id = :fid {where}
@@ -585,6 +590,18 @@ def _get_preds(fid, page, limit, filter_type, sector, db):
             "previous_target": float(p[27]) if p[27] is not None else None,
             "previous_direction": p[28],
             "was_superseded": bool(p[29]) if p[29] is not None else False,
+            # Conditional-call metadata (ship #5). Populated only for
+            # prediction_category='conditional_call' rows; NULL on
+            # every other row. Frontend uses these to render the
+            # IF/THEN card layout.
+            "prediction_category": p[30],
+            "trigger_condition": p[31],
+            "trigger_type": p[32],
+            "trigger_ticker": p[33],
+            "trigger_price": float(p[34]) if p[34] is not None else None,
+            "trigger_deadline": p[35].isoformat() if p[35] else None,
+            "trigger_fired_at": p[36].isoformat() if p[36] else None,
+            "outcome_window_days": p[37],
         })
     return results
 
