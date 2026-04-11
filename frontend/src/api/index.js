@@ -61,6 +61,29 @@ export function getForecasterSectors(id) {
   return api.get(`/forecaster/${id}/sectors`).then(r => r.data);
 }
 
+// ── Disclosures (ship #8) ───────────────────────────────────────────────
+// Disclosures live in their own table and have their own scoring concept
+// (follow-through). The backend router is mounted under /api so the
+// paths here are relative to that prefix.
+
+export function getForecasterDisclosures(id, { limit = 100, offset = 0 } = {}) {
+  return api.get(`/forecasters/${id}/disclosures`, { params: { limit, offset } }).then(r => r.data);
+}
+
+export function getForecasterImpliedPortfolio(id) {
+  return api.get(`/forecasters/${id}/implied-portfolio`).then(r => r.data);
+}
+
+export function getActivityDisclosures(limit = 50) {
+  return api.get('/activity/disclosures', { params: { limit } }).then(r => r.data);
+}
+
+export function getFollowThroughLeaderboard({ window = '3m', limit = 50, minDisclosures = 5 } = {}) {
+  return api.get('/leaderboard/follow-through', {
+    params: { window, limit, min_disclosures: minDisclosures },
+  }).then(r => r.data);
+}
+
 export function getAssetConsensus(ticker, days = 90) {
   return api.get(`/asset/${ticker}/consensus`, { params: { days } }).then(r => r.data);
 }
