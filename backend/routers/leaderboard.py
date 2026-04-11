@@ -401,7 +401,9 @@ def _refresh_leaderboard(db: Session) -> list | dict:
                 f.subscriber_count, f.profile_image_url, f.streak,
                 f.total_predictions, f.correct_predictions, f.accuracy_score,
                 COALESCE(f.alpha, 0) as alpha,
-                COALESCE(f.avg_return, 0) as avg_return
+                COALESCE(f.avg_return, 0) as avg_return,
+                COALESCE(f.disclosure_count, 0) as disclosure_count,
+                f.avg_follow_through_3m
             FROM forecasters f
             WHERE COALESCE(f.total_predictions, 0) >= :min_preds
               AND COALESCE(f.accuracy_score, 0) > 0
@@ -443,6 +445,11 @@ def _refresh_leaderboard(db: Session) -> list | dict:
             "scored_count": r[8] or 0,
             "alpha": float(r[11] or 0),
             "avg_return": float(r[12] or 0),
+            # Ship #8: disclosure aggregate (separate from prediction accuracy).
+            # The signed average is computed by the daily follow-through job
+            # with sell/trim/exit returns flipped — positive = good call.
+            "disclosure_count": int(r[13] or 0),
+            "avg_follow_through_3m": float(r[14]) if r[14] is not None else None,
             "rank": i + 1,
             "rank_movement": {"direction": "none", "change": 0},
             "has_disclosed_positions": False,

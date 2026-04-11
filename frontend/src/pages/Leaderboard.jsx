@@ -418,6 +418,7 @@ export default function Leaderboard() {
                           <th className="px-3 py-3 text-right hidden 2xl:table-cell w-20" title="Pair call accuracy — spread-scored relative-value predictions (long beats short).">Pair Calls</th>
                           <th className="px-3 py-3 text-right hidden 2xl:table-cell w-20" title="Binary event accuracy — yes/no predictions on discrete events (Fed decisions, M&amp;A, IPOs, index inclusions).">Binary Events</th>
                           <th className="px-3 py-3 text-right hidden 2xl:table-cell w-20" title="Metric forecast accuracy — numerical predictions on EPS, revenue, CPI, unemployment, etc. Scored on target vs actual.">Metric Forecasts</th>
+                          <th className="px-3 py-3 text-right hidden 2xl:table-cell w-24" title="Average 3-month follow-through on disclosed positions — what the stock did after the forecaster said they bought / sold / added / trimmed. Sell-side actions are sign-flipped so positive = good call. SEPARATE from prediction accuracy.">Avg Follow-Through 3M</th>
                           <th className="px-3 py-3 text-right hidden xl:table-cell w-20" title="Accuracy on ordering stocks within their ranked lists. Higher = better at predicting which picks will outperform which.">Ranking</th>
                           <th className="px-3 py-3 text-center hidden xl:table-cell w-16">Streak</th>
                           <th className="px-3 py-3 hidden xl:table-cell max-w-[180px]">Top Sector</th>
@@ -528,6 +529,19 @@ export default function Leaderboard() {
                                     {f.metric_forecast_accuracy.toFixed(1)}%
                                   </span>
                                   <span className="text-muted text-[10px] font-mono">{f.metric_forecast_total} forecasts</span>
+                                </div>
+                              ) : (
+                                <span className="font-mono text-muted">—</span>
+                              )}
+                            </td>
+                            <td className="px-3 py-3 text-right hidden 2xl:table-cell"
+                              title="Average 3-month follow-through on disclosed positions — separate from prediction accuracy.">
+                              {f.disclosure_count > 0 && f.avg_follow_through_3m != null ? (
+                                <div className="flex flex-col items-end">
+                                  <span className={`font-mono text-sm ${f.avg_follow_through_3m >= 0 ? 'text-positive' : 'text-negative'}`}>
+                                    {f.avg_follow_through_3m >= 0 ? '+' : ''}{(f.avg_follow_through_3m * 100).toFixed(1)}%
+                                  </span>
+                                  <span className="text-muted text-[10px] font-mono">{f.disclosure_count} disclosures</span>
                                 </div>
                               ) : (
                                 <span className="font-mono text-muted">—</span>
