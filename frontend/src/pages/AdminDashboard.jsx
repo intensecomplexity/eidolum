@@ -14,6 +14,7 @@ import {
   toggleBinaryEventExtractionAdmin, toggleMetricForecastExtractionAdmin,
   toggleConditionalExtractionAdmin, toggleDisclosureExtractionAdmin,
   toggleSourceTimestampsAdmin, getTimestampDiagnostics,
+  toggleRegimeCallExtractionAdmin,
   getAdminUrlQuality, getSocialStats,
   getPrunedYouTubeChannels, reactivateYouTubeChannel,
   setYouTubeSectorTraffic,
@@ -144,6 +145,7 @@ function FeatureToggles() {
         { key: 'conditional_call_extraction', label: 'YouTube Conditional Calls (IF/THEN)', fn: toggleConditionalExtractionAdmin },
         { key: 'disclosure_extraction', label: 'YouTube Disclosures (past-tense positions)', fn: toggleDisclosureExtractionAdmin },
         { key: 'source_timestamps', label: 'YouTube Source Timestamps (?t=Ns anchors)', fn: toggleSourceTimestampsAdmin },
+        { key: 'regime_call_extraction', label: 'YouTube Regime Calls (structural market phase)', fn: toggleRegimeCallExtractionAdmin },
       ].map(f => (
         <div key={f.key} className="flex items-center justify-between py-1.5">
           <span className="text-sm text-text-secondary">{f.label}</span>

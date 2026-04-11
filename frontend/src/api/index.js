@@ -172,6 +172,10 @@ export function getTimestampDiagnostics() {
   return api.get('/admin/timestamp-diagnostics', { headers: authHeaders() }).then(r => r.data);
 }
 
+export function toggleRegimeCallExtractionAdmin() {
+  return api.post('/admin/toggle-regime-call-extraction', {}, { headers: authHeaders() }).then(r => r.data);
+}
+
 // ——— Macro Concepts CRUD (admin) ———
 
 export function getMacroConcepts() {
