@@ -1285,6 +1285,19 @@ Rules:
 - MUST NOT set price_target, direction, timeframe — disclosures have no price target and no explicit direction (direction is implicit in the action).
 - If the same disclosure is mentioned twice in a transcript (e.g. the speaker repeats "like I said, I bought AMD today"), emit it once — the dedup layer collapses duplicates on (ticker, action, date).
 
+PRECEDENCE over ticker_call NEUTRAL (critical routing rule):
+
+When a statement describes the speaker's OWN ownership of a position — phrases like "we own", "we hold", "we continue to hold", "our position in X", "our position remains unchanged", "we remain long", "we're still long", "still holding X", "long-term position in X", "our fund holds X", "we still have exposure to X", "I still own X", "I still hold X" — this block CLAIMS OWNERSHIP and emits a disclosure with action=hold. Do NOT emit a ticker_call with direction=neutral for such statements when this block is active. The base-prompt rule that maps "holding" to direction=neutral applies ONLY to analyst-rating voice, not to portfolio-ownership voice.
+
+The OWNERSHIP-vs-RATING test:
+  - "we continue to hold our long-term position in ANET" → ownership voice → disclosure with action=hold.
+  - "our fund still holds GOOG" → ownership voice → disclosure with action=hold.
+  - "we rate ANET a hold" → RATING voice → ticker_call with direction=neutral.
+  - "I have AAPL at a hold here, expect sideways action" → RATING voice → ticker_call with direction=neutral.
+  - "ANET is a hold in our view" → RATING voice → ticker_call with direction=neutral.
+
+Decision heuristic when ambiguous: does the sentence describe the speaker's CURRENT PORTFOLIO ("we own X", "our position in X is") or does it describe their RECOMMENDATION to others ("we rate X a hold", "X is a hold here")? Portfolio → disclosure. Recommendation → ticker_call. If the speaker is ambiguous about whether they own the position, default to disclosure when the flag is active — portfolio mis-classification (hold vs not-hold) is recoverable via follow-through scoring; ticker_call NEUTRAL mis-classification penalizes real gains/losses and is not recoverable.
+
 Output JSON only. Be concise."""
 
 
