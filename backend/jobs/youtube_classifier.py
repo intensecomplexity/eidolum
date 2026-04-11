@@ -1232,6 +1232,88 @@ Rules:
 Output JSON only. Be concise."""
 
 
+# Source-timestamp instructions. Ship #9 — the 12th and LAST additive
+# instruction block. Applies to every other block's output (ticker_call,
+# sector_call, pair_call, conditional_call, binary_event_call,
+# metric_forecast_call, disclosure, and plain ticker_call) by asking
+# Haiku to include a single new `verbatim_quote` field on every
+# prediction emitted. The backend then runs that quote through the
+# hybrid timestamp matcher (word-level JSON3 ASR → fuzzy segment
+# match → two-pass Haiku → NULL) to resolve it to an integer second
+# in the source video for ?t=Ns deep linking.
+#
+# This block is additive — it doesn't change any previous block's
+# output schema, it just appends ONE field. So every other block's
+# rules, allowlists, and examples continue to apply verbatim.
+YOUTUBE_HAIKU_SOURCE_TIMESTAMP_INSTRUCTIONS = """SOURCE TIMESTAMPS:
+For EVERY prediction you emit — regardless of type (ticker_call, sector_call, pair_call, conditional_call, binary_event_call, metric_forecast_call, disclosure) — include an additional `verbatim_quote` field. This quote is how the backend links each prediction back to the exact moment in the video where the forecaster said it.
+
+Rules for `verbatim_quote`:
+
+1. COPY the exact words the forecaster used, character-for-character from the transcript. Do NOT paraphrase. Do NOT rewrite. Do NOT clean up disfluencies, filler words, or grammar. "I think uh Apple's gonna like probably hit two fifty by year end" stays exactly that — with "uh", "gonna", "like", "probably" all intact.
+
+2. LENGTH: 10 to 30 words. Long enough to be uniquely findable in the transcript (so the word-level matcher can lock onto a single moment), short enough that the quote is clearly a single utterance. If the forecaster spent two minutes rambling around the call, pick the single sentence that most clearly contains the prediction.
+
+3. DO NOT SYNTHESIZE across sentences. If the prediction is spread across multiple statements ("I like NVIDIA. Oh, I forgot to say — I think it goes to 200 by March"), pick the ONE sentence that contains the clearest version of the call. In that example the quote is "I think it goes to 200 by March", not a merged construction.
+
+4. FIRST STATEMENT WINS. If the forecaster made the same prediction multiple times across the video (e.g. once at 2:15 and again at 18:40), pick the FIRST clear statement. The timestamp matcher will resolve to whichever utterance matches best, but picking the first maximizes recall on long videos.
+
+5. For RANGES, pick the sentence that names the range. For "Tesla EPS will land between sixty cents and seventy cents" the quote is that whole sentence verbatim.
+
+6. For REVISIONS, pick the sentence that actually announces the revision. "I was at two hundred on AAPL but now I'm moving up to two twenty" → that exact sentence is the quote, not "AAPL target 220".
+
+7. For NEGATED binary events ("Fed will NOT cut"), pick the sentence that contains the negation. The negation is what makes the prediction.
+
+8. For DISCLOSURES, pick the sentence where the past-tense action is stated: "Yeah I bought five hundred shares of AMD this morning, great entry point" → keep the whole sentence.
+
+CRITICAL: If Haiku paraphrases or invents a quote that isn't in the transcript, the timestamp matcher breaks and the prediction either (a) gets stamped with the wrong timestamp or (b) falls through to NULL. Both outcomes undermine the training data being collected from this feature. COPY THE EXACT WORDS.
+
+Output the quote as a string field alongside the existing fields:
+{
+  "ticker": "AAPL",
+  "direction": "bullish",
+  "price_target": 250,
+  "timeframe": "2026-12-31",
+  "verbatim_quote": "I think Apple gets to two fifty by end of year, they're gonna crush earnings"
+}
+
+Examples (verbatim_quote field only, for each prediction type):
+
+ticker_call:
+  verbatim_quote: "I think Apple gets to two fifty by end of year, they're gonna crush earnings"
+
+sector_call:
+  verbatim_quote: "Energy is setting up for a massive run this year, oil's going to one ten"
+
+pair_call:
+  verbatim_quote: "Between Meta and Google I'd take Meta all day, Google is slowing down hard"
+
+conditional_call:
+  verbatim_quote: "If the Fed cuts fifty bips in March stocks rally ten percent easy"
+
+binary_event_call (fed_decision):
+  verbatim_quote: "The Fed is gonna cut by fifty basis points at the March meeting, I'm confident"
+
+binary_event_call (negated):
+  verbatim_quote: "They are not cutting in March, no way, they're holding rates flat"
+
+metric_forecast_call (EPS):
+  verbatim_quote: "NVIDIA is gonna report five twenty EPS next quarter, maybe a little higher"
+
+disclosure:
+  verbatim_quote: "I added five percent NVDA to my portfolio at one eighty this morning"
+
+Rules recap (all predictions, every type):
+- MUST include verbatim_quote on every prediction object in the output array.
+- MUST copy exact words from the transcript — no paraphrasing, no cleanup.
+- MUST be 10-30 words long.
+- MUST pick the FIRST clear statement when the same call is made multiple times.
+- MUST NOT synthesize across sentences — one sentence per quote.
+- MUST NOT skip the quote — emit "" (empty string) only if the transcript is so garbled the prediction can't be traced to any single sentence (this should be very rare).
+
+Output JSON only. Be concise."""
+
+
 # ── Transcript fetching ─────────────────────────────────────────────────────
 
 def _build_transcript_api():
@@ -1302,33 +1384,54 @@ def transcript_proxy_status() -> str:
     return "none (datacenter IPs are typically blocked by YouTube)"
 
 
-def fetch_transcript(video_id: str) -> tuple[str | None, str | None]:
-    """Fetch a YouTube video's auto-captions via youtube-transcript-api.
+def fetch_transcript_with_timestamps(video_id: str) -> dict:
+    """Fetch a YouTube video's captions with both segment-level and
+    (when available) word-level timing data.
 
-    Returns (transcript_text, status):
-      - (text, "en")            — English transcript fetched
-      - (text, "<lang>")        — non-English transcript (still usable; Haiku
-                                  speaks dozens of languages so the prompt
-                                  works regardless)
-      - (None, "no_transcript") — disabled / live stream / age-gated / shorts
-                                  with no captions / region-blocked
-      - (None, "error: IpBlocked: ...") — datacenter IP block. See
-                                  _build_transcript_api() for the proxy
-                                  env vars to set.
-      - (None, "error: ...")    — other library error
+    Returns a dict with shape:
+      {
+        "text":           concatenated transcript text (str), empty on failure
+        "lang":           ISO language code of the captions (e.g. "en")
+        "status":         "ok" | "no_transcript" | "transcripts_disabled" |
+                          "video_unavailable" | "empty_transcript" |
+                          "library_missing" | "error: <ClassName>: <msg>"
+        "segments":       list of {"start_ms", "duration_ms", "text"} dicts,
+                          one per segment from the base XML feed. Always
+                          populated when text is non-empty.
+        "words":          list of {"start_ms", "text"} word-level entries
+                          derived from YouTube's JSON3 ASR format, OR None
+                          if the captions are manually-authored (one seg
+                          per event) or the JSON3 endpoint refused.
+        "has_word_level": bool — True only when `words` is a populated list
+                          with at least one entry.
+        "is_generated":   bool — whether the captions are auto-ASR
+        "fetched_at":     UTC datetime of the fetch
+      }
+
+    Strategy:
+      1. Call api.list(video_id) to enumerate available transcripts.
+      2. Prefer an English caption. Among English tracks, prefer the
+         GENERATED (auto-ASR) one because only auto-ASR produces word-
+         level timing in JSON3. If only manual is available, use that
+         and accept that word-level data won't exist.
+      3. Fetch the raw XML via the library's existing path to populate
+         segments + text (this preserves backward compat).
+      4. Attempt a parallel fetch of the same URL with &fmt=json3 using
+         the library's internal HTTP client (so Webshare proxy + cookies
+         are inherited). Parse the JSON3 events → word-level list.
+      5. On any JSON3 failure, silently fall back: has_word_level=False,
+         words=None. segments/text stay populated.
 
     Does NOT consume YouTube Data API quota — the library scrapes the
-    transcript endpoints directly.
-
-    NOTE on API shape: youtube-transcript-api 1.x is INSTANCE-based —
-    you create a `YouTubeTranscriptApi()` and call `.fetch(video_id)`,
-    which returns an iterable of `FetchedTranscriptSnippet` objects with
-    `.text` / `.start` / `.duration` attributes (not dicts). The 0.x
-    classmethod API (`get_transcript`) is broken since YouTube changed
-    the underlying endpoint format. We require >=1.2 in requirements.txt.
+    timedtext endpoints directly.
     """
+    from datetime import datetime as _dt
     if not video_id:
-        return None, "no_video_id"
+        return {
+            "text": "", "lang": None, "status": "no_video_id",
+            "segments": [], "words": None, "has_word_level": False,
+            "is_generated": False, "fetched_at": _dt.utcnow(),
+        }
     try:
         from youtube_transcript_api import (
             TranscriptsDisabled,
@@ -1336,48 +1439,184 @@ def fetch_transcript(video_id: str) -> tuple[str | None, str | None]:
             VideoUnavailable,
         )
     except ImportError:
-        return None, "library_missing"
+        return {
+            "text": "", "lang": None, "status": "library_missing",
+            "segments": [], "words": None, "has_word_level": False,
+            "is_generated": False, "fetched_at": _dt.utcnow(),
+        }
 
+    api = _build_transcript_api()
+
+    # Step 1: list available transcripts and pick one.
+    chosen_transcript = None
     try:
-        api = _build_transcript_api()
-        # Prefer English; fall back to any available language. The 1.x
-        # API picks the best match given a language priority list.
-        try:
-            fetched = api.fetch(video_id, languages=["en"])
-            lang = "en"
-        except NoTranscriptFound:
-            # No English captions — let the library pick the default lang
-            fetched = api.fetch(video_id)
-            lang = getattr(fetched, "language_code", None) or "unknown"
+        tl = api.list(video_id)
+        # Collect into a list so we can iterate multiple times.
+        available = list(tl)
+        # Prefer English, with generated (auto-ASR) first for word-level.
+        english = [t for t in available if t.language_code == "en"]
+        english_generated = [t for t in english if t.is_generated]
+        if english_generated:
+            chosen_transcript = english_generated[0]
+        elif english:
+            chosen_transcript = english[0]
+        elif available:
+            chosen_transcript = available[0]
+    except TranscriptsDisabled:
+        return {
+            "text": "", "lang": None, "status": "transcripts_disabled",
+            "segments": [], "words": None, "has_word_level": False,
+            "is_generated": False, "fetched_at": _dt.utcnow(),
+        }
+    except VideoUnavailable:
+        return {
+            "text": "", "lang": None, "status": "video_unavailable",
+            "segments": [], "words": None, "has_word_level": False,
+            "is_generated": False, "fetched_at": _dt.utcnow(),
+        }
+    except NoTranscriptFound:
+        return {
+            "text": "", "lang": None, "status": "no_transcript",
+            "segments": [], "words": None, "has_word_level": False,
+            "is_generated": False, "fetched_at": _dt.utcnow(),
+        }
+    except Exception as e:
+        return {
+            "text": "", "lang": None,
+            "status": f"error: {type(e).__name__}: {str(e)[:120]}",
+            "segments": [], "words": None, "has_word_level": False,
+            "is_generated": False, "fetched_at": _dt.utcnow(),
+        }
 
-        # Snippets expose .text as an attribute (FetchedTranscriptSnippet
-        # objects). Old 0.x returned dicts; we no longer support that.
-        parts = []
+    if chosen_transcript is None:
+        return {
+            "text": "", "lang": None, "status": "no_transcript",
+            "segments": [], "words": None, "has_word_level": False,
+            "is_generated": False, "fetched_at": _dt.utcnow(),
+        }
+
+    # Step 2: fetch the XML payload via the library (same as before) to
+    # populate segments + text. Use the library's public .fetch() so any
+    # retries / proxy logic stays centralized.
+    lang = chosen_transcript.language_code or "unknown"
+    is_generated = bool(chosen_transcript.is_generated)
+    segments: list[dict] = []
+    text_parts: list[str] = []
+    try:
+        fetched = chosen_transcript.fetch()
         for snippet in fetched:
             t = getattr(snippet, "text", None)
             if t is None and isinstance(snippet, dict):
                 t = snippet.get("text")
-            if t:
-                parts.append(t.strip())
-        if not parts:
-            return None, "empty_transcript"
-        text = re.sub(r"\s+", " ", " ".join(parts)).strip()
-        if not text:
-            return None, "empty_transcript"
-        return text, lang
-
-    except TranscriptsDisabled:
-        return None, "transcripts_disabled"
-    except VideoUnavailable:
-        return None, "video_unavailable"
-    except NoTranscriptFound:
-        return None, "no_transcript"
+            if not t:
+                continue
+            start = float(getattr(snippet, "start", 0.0) or 0.0)
+            dur = float(getattr(snippet, "duration", 0.0) or 0.0)
+            segments.append({
+                "start_ms": int(round(start * 1000)),
+                "duration_ms": int(round(dur * 1000)),
+                "text": t.strip(),
+            })
+            text_parts.append(t.strip())
     except Exception as e:
-        # Library raises a long tail of internal errors (XML parse, HTTP
-        # 429, age-gate, member-only, etc.). Roll them all into a single
-        # tag so we can grep the rejection log without enumerating every
-        # exception class.
-        return None, f"error: {type(e).__name__}: {str(e)[:120]}"
+        return {
+            "text": "", "lang": lang,
+            "status": f"error: {type(e).__name__}: {str(e)[:120]}",
+            "segments": [], "words": None, "has_word_level": False,
+            "is_generated": is_generated, "fetched_at": _dt.utcnow(),
+        }
+
+    if not text_parts:
+        return {
+            "text": "", "lang": lang, "status": "empty_transcript",
+            "segments": [], "words": None, "has_word_level": False,
+            "is_generated": is_generated, "fetched_at": _dt.utcnow(),
+        }
+    text = re.sub(r"\s+", " ", " ".join(text_parts)).strip()
+
+    # Step 3: try the JSON3 endpoint for word-level data. The library's
+    # internal http client has the Webshare proxy attached, so reusing
+    # it keeps proxy discipline automatic. chosen_transcript._url is
+    # the same timedtext URL the library used above — we just append
+    # &fmt=json3 to flip YouTube's response format.
+    words = None
+    has_word_level = False
+    if is_generated:  # only auto-ASR produces word-level data
+        try:
+            raw_url = getattr(chosen_transcript, "_url", None)
+            http_client = getattr(chosen_transcript, "_http_client", None)
+            if raw_url and http_client is not None:
+                json3_url = raw_url + ("&" if "?" in raw_url else "?") + "fmt=json3"
+                resp = http_client.get(json3_url)
+                if getattr(resp, "status_code", 0) == 200:
+                    import json as _json
+                    data = _json.loads(resp.text)
+                    events = data.get("events") or []
+                    words_out: list[dict] = []
+                    for ev in events:
+                        ev_start = int(ev.get("tStartMs") or 0)
+                        segs = ev.get("segs") or []
+                        if not segs:
+                            continue
+                        # Multi-seg events carry per-word timing. Single-seg
+                        # events (manual captions, or auto-ASR on a section
+                        # where YouTube didn't provide word splits) are just
+                        # treated as one word starting at ev_start.
+                        for s in segs:
+                            w_text = s.get("utf8") or ""
+                            if not w_text or w_text == "\n":
+                                continue
+                            offset = int(s.get("tOffsetMs") or 0)
+                            words_out.append({
+                                "start_ms": ev_start + offset,
+                                "text": w_text,
+                            })
+                    if words_out:
+                        words = words_out
+                        # Only claim word-level if at least SOME events had
+                        # multi-segment splits (= actual per-word data).
+                        # A purely single-seg JSON3 response means the same
+                        # information is in segments already.
+                        multi = sum(
+                            1 for ev in events
+                            if len(ev.get("segs") or []) > 1
+                        )
+                        has_word_level = multi > 0
+        except Exception as _je:
+            log.info("[YT-CLF] JSON3 word-level fetch failed for %s: %s", video_id, _je)
+            words = None
+            has_word_level = False
+
+    return {
+        "text": text,
+        "lang": lang,
+        "status": "ok",
+        "segments": segments,
+        "words": words,
+        "has_word_level": has_word_level,
+        "is_generated": is_generated,
+        "fetched_at": _dt.utcnow(),
+    }
+
+
+def fetch_transcript(video_id: str) -> tuple[str | None, str | None]:
+    """Legacy wrapper over fetch_transcript_with_timestamps that returns
+    only (text, status) — preserved so existing callers in youtube_backfill,
+    the channel monitor pre-ship-9 path, and any external jobs keep
+    working unchanged. When the new ship's timestamp flag is OFF, this
+    wrapper is what the monitor calls; when the flag is on, the monitor
+    calls the richer fetcher directly to keep word-level data in scope.
+    """
+    if not video_id:
+        return None, "no_video_id"
+    result = fetch_transcript_with_timestamps(video_id)
+    if not result["text"]:
+        return None, result["status"]
+    # Status values from the rich fetcher are richer than the legacy tags,
+    # but "ok" → lang tag for backward compat with callers that special-case
+    # the string "en" vs "error: …".
+    status = result["lang"] if result["status"] == "ok" else result["status"]
+    return result["text"], status
 
 
 def chunk_transcript(text: str) -> list[str]:
@@ -1473,6 +1712,7 @@ def classify_video(channel_name: str, title: str, publish_date: str,
     use_metric_forecast = False
     use_conditional = False
     use_disclosure = False
+    use_source_timestamps = False
     if db is not None and video_id:
         try:
             from feature_flags import should_use_sector_prompt
@@ -1541,6 +1781,12 @@ def classify_video(channel_name: str, title: str, publish_date: str,
         except Exception as _e:
             log.warning("[YT-CLF] disclosure flag check failed: %s", _e)
             use_disclosure = False
+        try:
+            from feature_flags import is_source_timestamps_enabled
+            use_source_timestamps = is_source_timestamps_enabled(db)
+        except Exception as _e:
+            log.warning("[YT-CLF] source_timestamps flag check failed: %s", _e)
+            use_source_timestamps = False
     base_system = YOUTUBE_HAIKU_SECTOR_SYSTEM if use_sector_prompt else HAIKU_SYSTEM
     # Append optional instruction blocks ONLY when each flag is on. When
     # every flag is off (the default), base_system is sent byte-for-byte
@@ -1572,6 +1818,14 @@ def classify_video(channel_name: str, title: str, publish_date: str,
         active_system = active_system + "\n\n" + YOUTUBE_HAIKU_METRIC_FORECAST_INSTRUCTIONS
     if use_disclosure:
         active_system = active_system + "\n\n" + YOUTUBE_HAIKU_DISCLOSURE_INSTRUCTIONS
+    # The SOURCE_TIMESTAMP block is ALWAYS the last layer. It asks
+    # Haiku to add a verbatim_quote field to every prediction emitted
+    # by ANY of the previous blocks, so it must be appended after the
+    # category-specific instructions. (Placing it earlier would still
+    # work functionally but would break the stable cache order and
+    # shift every extended-prompt cache entry.)
+    if use_source_timestamps:
+        active_system = active_system + "\n\n" + YOUTUBE_HAIKU_SOURCE_TIMESTAMP_INSTRUCTIONS
     telemetry["prompt_variant"] = "sector" if use_sector_prompt else "standard"
     telemetry["ranked_list_enabled"] = bool(use_ranked_list)
     telemetry["revisions_enabled"] = bool(use_revisions)
@@ -1583,6 +1837,7 @@ def classify_video(channel_name: str, title: str, publish_date: str,
     telemetry["metric_forecast_enabled"] = bool(use_metric_forecast)
     telemetry["conditional_enabled"] = bool(use_conditional)
     telemetry["disclosure_enabled"] = bool(use_disclosure)
+    telemetry["source_timestamps_enabled"] = bool(use_source_timestamps)
     print(
         f"[YOUTUBE-HAIKU] video={video_id or '?'} channel={channel_name} "
         f"prompt_variant={telemetry['prompt_variant']} "
@@ -1595,7 +1850,8 @@ def classify_video(channel_name: str, title: str, publish_date: str,
         f"binary_event={'on' if use_binary_event else 'off'} "
         f"metric_forecast={'on' if use_metric_forecast else 'off'} "
         f"conditional={'on' if use_conditional else 'off'} "
-        f"disclosure={'on' if use_disclosure else 'off'}",
+        f"disclosure={'on' if use_disclosure else 'off'} "
+        f"timestamps={'on' if use_source_timestamps else 'off'}",
         flush=True,
     )
 
@@ -1801,6 +2057,18 @@ def _validate_and_dedupe_predictions(raw: list) -> list[dict]:
     for p in raw:
         if not isinstance(p, dict):
             continue
+
+        # Ship #9 — source_timestamps. Normalize the verbatim_quote
+        # field on EVERY prediction dict BEFORE any branch takes it.
+        # All 8 insert functions will look at p["_verbatim_quote"]
+        # (via _resolve_source_timestamp) so normalizing once here
+        # means each branch below doesn't need its own extraction.
+        _raw_vq = p.get("verbatim_quote")
+        if isinstance(_raw_vq, str):
+            _norm_vq = re.sub(r"\s+", " ", _raw_vq).strip()[:500]
+        else:
+            _norm_vq = ""
+        p["_verbatim_quote"] = _norm_vq or None
 
         # Pair call branch: derived_from='pair_call' with pair_long_ticker
         # and pair_short_ticker. Both legs must be present, valid ticker
@@ -2399,6 +2667,81 @@ def _find_prior_prediction_for_revision(
     return prior_id, prior_target
 
 
+def _resolve_source_timestamp(
+    pred: dict,
+    transcript_data: dict | None,
+    stats: dict | None,
+) -> dict:
+    """Ship #9 shared helper. Resolves a prediction's verbatim_quote
+    to a source_timestamp_seconds / method / confidence triple and
+    returns a kwargs dict suitable for splatting into the Prediction
+    constructor.
+
+    Contract:
+      - When transcript_data is None (flag off, non-YouTube scraper,
+        or backfill mode without the rich fetcher), returns {} so the
+        caller's existing Prediction(...) construction is unchanged.
+      - When transcript_data is a dict but there is no verbatim_quote
+        on pred, returns {} — still a no-op, but records the miss in
+        stats["timestamps_failed"] so admin diagnostics show the gap.
+      - When the matcher returns a real timestamp, returns all four
+        source_timestamp_* column values AND increments
+        stats["timestamps_matched"].
+      - When the matcher returns 'unknown', returns the verbatim quote
+        and method='unknown' (so the audit trail is still stored) but
+        leaves source_timestamp_seconds=None. Increments
+        stats["timestamps_failed"].
+
+    NEVER raises — any internal failure is caught and degraded to a
+    silent empty-dict return so the prediction insert is unaffected.
+    """
+    try:
+        if transcript_data is None:
+            return {}
+        verbatim = pred.get("_verbatim_quote") or pred.get("verbatim_quote")
+        if not verbatim or not isinstance(verbatim, str):
+            if stats is not None:
+                stats["timestamps_failed"] = int(
+                    stats.get("timestamps_failed", 0)
+                ) + 1
+            return {}
+        # Import inside the function to avoid a module-load-time cycle
+        # if the matcher ever imports back from youtube_classifier.
+        from jobs.timestamp_matcher import match_quote_to_timestamp
+        seconds, method, confidence = match_quote_to_timestamp(
+            verbatim, transcript_data,
+        )
+        if seconds is not None:
+            if stats is not None:
+                stats["timestamps_matched"] = int(
+                    stats.get("timestamps_matched", 0)
+                ) + 1
+            return {
+                "source_timestamp_seconds": int(seconds),
+                "source_timestamp_method": method,
+                "source_verbatim_quote": verbatim[:2000],
+                "source_timestamp_confidence": float(confidence),
+            }
+        # Match failed — still store the quote for audit, leave seconds NULL.
+        if stats is not None:
+            stats["timestamps_failed"] = int(
+                stats.get("timestamps_failed", 0)
+            ) + 1
+        return {
+            "source_timestamp_seconds": None,
+            "source_timestamp_method": "unknown",
+            "source_verbatim_quote": verbatim[:2000],
+            "source_timestamp_confidence": 0.0,
+        }
+    except Exception as _e:
+        log.info("[YT-CLF] _resolve_source_timestamp failed: %s", _e)
+        if stats is not None:
+            stats["timestamps_failed"] = int(
+                stats.get("timestamps_failed", 0)
+            ) + 1
+        return {}
+
+
 def insert_youtube_prediction(
     pred: dict,
     *,
@@ -2410,6 +2753,7 @@ def insert_youtube_prediction(
     db,
     transcript_snippet: str | None = None,
     stats: dict | None = None,
+    transcript_data: dict | None = None,
 ) -> bool:
     """Insert one classifier-extracted prediction following the
     massive_benzinga.py pattern.
@@ -2576,6 +2920,11 @@ def insert_youtube_prediction(
     event_type_val = pred.get("_event_type")
     event_date_val = pred.get("_event_date")
 
+    # Ship #9: resolve source timestamp from Haiku's verbatim quote.
+    # No-ops silently when transcript_data is None (flag off or
+    # non-monitor caller).
+    _ts_fields = _resolve_source_timestamp(pred, transcript_data, stats)
+
     db.add(
         Prediction(
             forecaster_id=forecaster.id,
@@ -2603,6 +2952,7 @@ def insert_youtube_prediction(
             revision_of=revision_of_val,
             event_type=event_type_val,
             event_date=event_date_val,
+            **_ts_fields,
         )
     )
     db.flush()
@@ -2634,6 +2984,7 @@ def insert_youtube_sector_prediction(
     db,
     transcript_snippet: str | None = None,
     stats: dict | None = None,
+    transcript_data: dict | None = None,
 ) -> bool:
     """Insert a sector_call prediction.
 
@@ -2717,6 +3068,8 @@ def insert_youtube_sector_prediction(
 
     source_url = f"https://www.youtube.com/watch?v={video_id}"
 
+    _ts_fields = _resolve_source_timestamp(pred, transcript_data, stats)
+
     db.add(
         Prediction(
             forecaster_id=forecaster.id,
@@ -2743,6 +3096,7 @@ def insert_youtube_sector_prediction(
             # leaderboard's separate-accuracy column.
             prediction_type="sector_call",
             prediction_category="sector_call",
+            **_ts_fields,
         )
     )
     db.flush()
@@ -2808,6 +3162,7 @@ def insert_youtube_macro_prediction(
     db,
     transcript_snippet: str | None = None,
     stats: dict | None = None,
+    transcript_data: dict | None = None,
 ) -> bool:
     """Insert a macro_call prediction.
 
@@ -2917,6 +3272,8 @@ def insert_youtube_macro_prediction(
 
     source_url = f"https://www.youtube.com/watch?v={video_id}"
 
+    _ts_fields = _resolve_source_timestamp(pred, transcript_data, stats)
+
     db.add(
         Prediction(
             forecaster_id=forecaster.id,
@@ -2940,6 +3297,7 @@ def insert_youtube_macro_prediction(
             call_type="macro_call",
             prediction_category="macro_call",
             macro_concept=concept,
+            **_ts_fields,
         )
     )
     db.flush()
@@ -2997,6 +3355,7 @@ def insert_youtube_pair_prediction(
     db,
     transcript_snippet: str | None = None,
     stats: dict | None = None,
+    transcript_data: dict | None = None,
 ) -> bool:
     """Insert a pair_call prediction.
 
@@ -3096,6 +3455,8 @@ def insert_youtube_pair_prediction(
 
     source_url = f"https://www.youtube.com/watch?v={video_id}"
 
+    _ts_fields = _resolve_source_timestamp(pred, transcript_data, stats)
+
     db.add(
         Prediction(
             forecaster_id=forecaster.id,
@@ -3120,6 +3481,7 @@ def insert_youtube_pair_prediction(
             prediction_category="pair_call",
             pair_long_ticker=long_ticker,
             pair_short_ticker=short_ticker,
+            **_ts_fields,
         )
     )
     db.flush()
@@ -3187,6 +3549,7 @@ def insert_youtube_binary_event_prediction(
     db,
     transcript_snippet: str | None = None,
     stats: dict | None = None,
+    transcript_data: dict | None = None,
 ) -> bool:
     """Insert a binary_event_call prediction.
 
@@ -3304,6 +3667,8 @@ def insert_youtube_binary_event_prediction(
 
     source_url = f"https://www.youtube.com/watch?v={video_id}"
 
+    _ts_fields = _resolve_source_timestamp(pred, transcript_data, stats)
+
     db.add(
         Prediction(
             forecaster_id=forecaster.id,
@@ -3332,6 +3697,7 @@ def insert_youtube_binary_event_prediction(
             # event_resolved_at + event_resolution_source stay NULL
             # until the evaluator confirms the outcome (stubbed — see
             # _score_binary_event for the follow-up-ship TODO).
+            **_ts_fields,
         )
     )
     db.flush()
@@ -3391,6 +3757,7 @@ def insert_youtube_metric_forecast_prediction(
     db,
     transcript_snippet: str | None = None,
     stats: dict | None = None,
+    transcript_data: dict | None = None,
 ) -> bool:
     """Insert a metric_forecast_call prediction.
 
@@ -3516,6 +3883,8 @@ def insert_youtube_metric_forecast_prediction(
 
     source_url = f"https://www.youtube.com/watch?v={video_id}"
 
+    _ts_fields = _resolve_source_timestamp(pred, transcript_data, stats)
+
     db.add(
         Prediction(
             forecaster_id=forecaster.id,
@@ -3544,6 +3913,7 @@ def insert_youtube_metric_forecast_prediction(
             metric_release_date=release,
             # metric_actual + metric_error_pct stay NULL until the
             # evaluator fetches the real value.
+            **_ts_fields,
         )
     )
     db.flush()
@@ -3591,6 +3961,7 @@ def insert_youtube_conditional_prediction(
     db,
     transcript_snippet: str | None = None,
     stats: dict | None = None,
+    transcript_data: dict | None = None,
 ) -> bool:
     """Insert a conditional_call prediction.
 
@@ -3714,6 +4085,8 @@ def insert_youtube_conditional_prediction(
     if trig_ticker:
         trig_ticker = str(trig_ticker).upper().strip().lstrip("$")
 
+    _ts_fields = _resolve_source_timestamp(pred, transcript_data, stats)
+
     db.add(
         Prediction(
             forecaster_id=forecaster.id,
@@ -3743,6 +4116,7 @@ def insert_youtube_conditional_prediction(
             trigger_deadline=trig_deadline_dt,
             trigger_fired_at=None,
             outcome_window_days=outcome_window_days,
+            **_ts_fields,
         )
     )
     db.flush()
@@ -3775,6 +4149,7 @@ def insert_youtube_disclosure(
     db,
     transcript_snippet: str | None = None,
     stats: dict | None = None,
+    transcript_data: dict | None = None,
 ) -> bool:
     """Insert a disclosure row.
 
@@ -3889,6 +4264,8 @@ def insert_youtube_disclosure(
     reasoning = (pred.get("_reasoning_text") or pred.get("reasoning_text") or "")
     reasoning = reasoning.strip()[:2000] if reasoning else None
 
+    _ts_fields = _resolve_source_timestamp(pred, transcript_data, stats)
+
     db.add(
         Disclosure(
             forecaster_id=forecaster.id,
@@ -3902,6 +4279,7 @@ def insert_youtube_disclosure(
             disclosed_at=disclosed_at_dt,
             source_video_id=video_id,
             source_platform_id=source_id,
+            **_ts_fields,
         )
     )
     # Bump the cached counter on the forecaster row. Average
