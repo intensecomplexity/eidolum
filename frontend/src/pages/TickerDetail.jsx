@@ -25,8 +25,8 @@ function accuracyColor(acc) {
 }
 
 export default function TickerDetail() {
-  const params = useParams();
-  const ticker = (params.ticker || params.symbol || '').toUpperCase();
+  const { ticker: tickerParam } = useParams();
+  const ticker = (tickerParam || '').toUpperCase();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(!!ticker);
   const [error, setError] = useState(false);

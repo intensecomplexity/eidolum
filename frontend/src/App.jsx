@@ -1,4 +1,4 @@
-import { Routes, Route } from 'react-router-dom';
+import { Routes, Route, useParams } from 'react-router-dom';
 import Navbar from './components/Navbar';
 import BottomNav from './components/BottomNav';
 import SaveToast from './components/SaveToast';
@@ -38,6 +38,15 @@ import CommunityLeaderboard from './pages/CommunityLeaderboard';
 import Badges from './pages/Badges';
 import Consensus from './pages/Consensus';
 import { Navigate } from 'react-router-dom';
+
+// Ship #13 Bug B: /ticker/:symbol is a legacy alias. Redirect to the
+// canonical /asset/:ticker URL so TickerDetail only ever receives one
+// param name and there is a single source of truth for price/SEO.
+function LegacyTickerRedirect() {
+  const { symbol } = useParams();
+  return <Navigate to={`/asset/${symbol}`} replace />;
+}
+
 import Duels from './pages/Duels';
 import Seasons from './pages/Seasons';
 import Friends from './pages/Friends';
@@ -84,7 +93,10 @@ export default function App() {
   const [showOnboarding, setShowOnboarding] = useState(() => {
     return !localStorage.getItem('eidolum_token') && !localStorage.getItem('eidolum_onboarding_complete');
   });
-  const [splashDone, setSplashDone] = useState(() => !!sessionStorage.getItem('eidolum_splash_seen'));
+  const [splashDone, setSplashDone] = useState(() =>
+    !!sessionStorage.getItem('eidolum_splash_seen') ||
+    !!localStorage.getItem('eidolum_visited')
+  );
 
   return (
     <CompareProvider>
@@ -139,7 +151,7 @@ export default function App() {
         <Route path="/seasons" element={features.compete ? <Seasons /> : <ComingSoon feature="Compete" />} />
         <Route path="/friends" element={<Friends />} />
         <Route path="/notifications" element={<Notifications />} />
-        <Route path="/ticker/:symbol" element={<TickerDetail />} />
+        <Route path="/ticker/:symbol" element={<LegacyTickerRedirect />} />
         <Route path="/activity" element={<Activity />} />
         <Route path="/prediction/:predictionId" element={<PredictionView />} />
         <Route path="/daily-challenge" element={<DailyChallengePage />} />
