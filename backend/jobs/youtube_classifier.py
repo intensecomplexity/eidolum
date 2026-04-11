@@ -689,6 +689,105 @@ Rules:
 Output JSON only. Be concise."""
 
 
+# Pair-call instructions. Appended to the active prompt when
+# ENABLE_PAIR_CALL_EXTRACTION is flipped on. Teaches Haiku to recognize
+# relative-value vocabulary — statements where the outcome depends on
+# the SPREAD between two specific tickers rather than on either one's
+# absolute movement. Pair calls land as a NEW prediction_category value
+# ('pair_call') with pair_long_ticker and pair_short_ticker both set.
+# Critical constraint: BOTH legs must be real individual stock tickers.
+# Sectors, concepts, indexes, and asset classes are rejected here and
+# left to ticker_call / sector_call / macro_call to handle.
+YOUTUBE_HAIKU_PAIR_INSTRUCTIONS = """PAIR CALLS:
+If the speaker makes a relative-value prediction — one specific ticker will outperform another specific ticker over a stated window — emit it as a pair_call with both legs. Pair calls are scored on the spread (long_return − short_return), not on absolute movement, so the only direction is "bullish on the spread" (long leg beats short leg).
+
+Signals that indicate a pair-call prediction:
+- "X over Y" / "X better than Y" / "prefer X to Y"
+- "long X short Y" / "long X, short Y" / "pair trade X Y"
+- "I'd rather own X than Y" / "I'd pick X over Y" / "X instead of Y"
+- "between these two, I pick X" / "X beats Y" (as an investment, not a product)
+- "X is a better buy than Y" / "X will outperform Y"
+- "swap Y for X" / "rotate out of Y into X"
+
+Both legs MUST be real individual stock tickers (or well-known crypto like BTC/ETH). Reject the prediction and let another prediction type handle it if either side is:
+- A sector or industry ("tech over energy", "semis beating software") → let sector_call handle it, do NOT emit pair_call
+- A concept or asset class ("stocks over bonds", "growth over value") → do NOT emit pair_call
+- An index or broad benchmark ("AAPL over the S&P 500", "NVDA beats the market") → do NOT emit pair_call, let ticker_call handle AAPL/NVDA with SPY as the implicit benchmark
+- A vague reference ("X is better than everything else") → do NOT emit
+- Missing or unclear on one side ("I like NVDA as a pair trade") → do NOT emit
+
+Identifying the legs:
+- The LONG leg is the ticker the speaker expects to OUTPERFORM (the "better one", the "X" in "X over Y").
+- The SHORT leg is the ticker expected to UNDERPERFORM (the "Y" in "X over Y").
+- When the speaker says "long X short Y", X is long, Y is short.
+- When the speaker says "X is better than Y" or "X over Y", X is long, Y is short.
+- When the speaker gives a three-way ranking ("I like NVDA over AMD over INTC"), only extract the STRONGEST conviction pair — the best vs the worst. For "NVDA > AMD > INTC", emit long=NVDA short=INTC as a single pair_call.
+
+Timeframe:
+- If the speaker names a window ("over the next year", "for Q2", "into 2027", "six months out"), convert it to an absolute ISO date using the video's publish date as the anchor.
+- If no window is mentioned, default to 3 months from publish date.
+
+No price target:
+- Pair calls do NOT carry a price_target field. The outcome is the spread, not a level. Do NOT emit price_target on pair_call rows.
+
+Direction:
+- Direction is implicitly bullish on the spread. Emit direction: "bullish". There is no "bearish pair_call" — if the speaker's conviction is inverted, flip which ticker is long and which is short. "Short NVDA long INTC" is just another pair_call with long=INTC short=NVDA.
+
+Output format for pair-call predictions (add pair_long_ticker, pair_short_ticker, derived_from):
+{
+  "pair_long_ticker": "META",
+  "pair_short_ticker": "GOOGL",
+  "direction": "bullish",
+  "timeframe": "2027-04-11",
+  "derived_from": "pair_call",
+  "context_quote": "Meta is a better buy than Google over the next year"
+}
+
+Examples:
+
+Input: "Meta is a better buy than Google over the next year"
+Output: {"pair_long_ticker": "META", "pair_short_ticker": "GOOGL", "direction": "bullish", "timeframe": "2027-04-11", "derived_from": "pair_call", "context_quote": "Meta is a better buy than Google over the next year"}
+
+Input: "Long NVDA, short INTC as a trade into year end"
+Output: {"pair_long_ticker": "NVDA", "pair_short_ticker": "INTC", "direction": "bullish", "timeframe": "2026-12-31", "derived_from": "pair_call", "context_quote": "long NVDA short INTC as a trade into year end"}
+
+Input: "I'd rather own AMD than Intel right now"
+Output: {"pair_long_ticker": "AMD", "pair_short_ticker": "INTC", "direction": "bullish", "timeframe": "2026-07-11", "derived_from": "pair_call", "context_quote": "I'd rather own AMD than Intel right now"}
+
+Input: "Pairs trade: long JPM short GS"
+Output: {"pair_long_ticker": "JPM", "pair_short_ticker": "GS", "direction": "bullish", "timeframe": "2026-07-11", "derived_from": "pair_call", "context_quote": "pairs trade: long JPM short GS"}
+
+Input: "Between these two, I pick AAPL over MSFT for the next six months"
+Output: {"pair_long_ticker": "AAPL", "pair_short_ticker": "MSFT", "direction": "bullish", "timeframe": "2026-10-11", "derived_from": "pair_call", "context_quote": "between these two, I pick AAPL over MSFT for the next six months"}
+
+Input: "I like NVDA over AMD over INTC"
+Output: {"pair_long_ticker": "NVDA", "pair_short_ticker": "INTC", "direction": "bullish", "timeframe": "2026-07-11", "derived_from": "pair_call", "context_quote": "I like NVDA over AMD over INTC"}
+(three-way ranking → extract the strongest-conviction pair, best vs worst)
+
+Input: "Semiconductors will beat software this year"
+Output: (do NOT extract as pair_call — two sectors, not two tickers. Let sector_call handle it.)
+
+Input: "AAPL is better than the S&P 500 over the next year"
+Output: (do NOT extract as pair_call — ticker vs index. Let ticker_call handle AAPL with SPY as the implicit benchmark.)
+
+Input: "Stocks are going to beat bonds in 2026"
+Output: (do NOT extract — asset classes, not tickers.)
+
+Input: "NVDA is going to rip"
+Output: (do NOT extract as pair_call — no comparison leg. Extract as a plain ticker_call.)
+
+Rules:
+- MUST set both pair_long_ticker AND pair_short_ticker — neither can be empty or vague.
+- MUST use direction: "bullish" (on the spread). No bearish/neutral pair_calls.
+- MUST set derived_from: "pair_call".
+- MUST NOT emit price_target on a pair_call row — the target is implicit ("long beats short").
+- MUST NOT emit pair_call for sector-vs-sector, concept-vs-concept, ticker-vs-index, or asset-class-vs-asset-class comparisons. Reject and let the appropriate prediction type handle it.
+- If the same pair (same long, same short) is mentioned twice in the transcript, emit it only once — the dedup layer will drop duplicates anyway.
+- Long and short MUST be different tickers. Reject if they're the same symbol.
+
+Output JSON only. Be concise."""
+
+
 # ── Transcript fetching ─────────────────────────────────────────────────────
 
 def _build_transcript_api():
@@ -925,6 +1024,7 @@ def classify_video(channel_name: str, title: str, publish_date: str,
     use_options = False
     use_earnings = False
     use_macro = False
+    use_pair = False
     if db is not None and video_id:
         try:
             from feature_flags import should_use_sector_prompt
@@ -963,12 +1063,18 @@ def classify_video(channel_name: str, title: str, publish_date: str,
         except Exception as _e:
             log.warning("[YT-CLF] macro flag check failed: %s", _e)
             use_macro = False
+        try:
+            from feature_flags import is_pair_extraction_enabled
+            use_pair = is_pair_extraction_enabled(db)
+        except Exception as _e:
+            log.warning("[YT-CLF] pair flag check failed: %s", _e)
+            use_pair = False
     base_system = YOUTUBE_HAIKU_SECTOR_SYSTEM if use_sector_prompt else HAIKU_SYSTEM
     # Append optional instruction blocks ONLY when each flag is on. When
     # every flag is off (the default), base_system is sent byte-for-byte
     # unchanged so Anthropic's prompt cache hit rate on the base prompt
     # stays at 100%. Order matters for cache hits: ranked list → revisions
-    # → options → earnings → macro, stable across calls with any
+    # → options → earnings → macro → pair, stable across calls with any
     # combination of flags on so extended-prompt cache entries match.
     active_system = base_system
     if use_ranked_list:
@@ -981,12 +1087,15 @@ def classify_video(channel_name: str, title: str, publish_date: str,
         active_system = active_system + "\n\n" + YOUTUBE_HAIKU_EARNINGS_INSTRUCTIONS
     if use_macro:
         active_system = active_system + "\n\n" + YOUTUBE_HAIKU_MACRO_INSTRUCTIONS
+    if use_pair:
+        active_system = active_system + "\n\n" + YOUTUBE_HAIKU_PAIR_INSTRUCTIONS
     telemetry["prompt_variant"] = "sector" if use_sector_prompt else "standard"
     telemetry["ranked_list_enabled"] = bool(use_ranked_list)
     telemetry["revisions_enabled"] = bool(use_revisions)
     telemetry["options_enabled"] = bool(use_options)
     telemetry["earnings_enabled"] = bool(use_earnings)
     telemetry["macro_enabled"] = bool(use_macro)
+    telemetry["pair_enabled"] = bool(use_pair)
     print(
         f"[YOUTUBE-HAIKU] video={video_id or '?'} channel={channel_name} "
         f"prompt_variant={telemetry['prompt_variant']} "
@@ -994,7 +1103,8 @@ def classify_video(channel_name: str, title: str, publish_date: str,
         f"revisions={'on' if use_revisions else 'off'} "
         f"options={'on' if use_options else 'off'} "
         f"earnings={'on' if use_earnings else 'off'} "
-        f"macro={'on' if use_macro else 'off'}",
+        f"macro={'on' if use_macro else 'off'} "
+        f"pair={'on' if use_pair else 'off'}",
         flush=True,
     )
 
@@ -1110,9 +1220,46 @@ def _validate_and_dedupe_predictions(raw: list) -> list[dict]:
     seen_tickers: set[tuple[str, str]] = set()
     seen_sectors: set[tuple[str, str]] = set()
     seen_macros: set[tuple[str, str]] = set()
+    seen_pairs: set[tuple[str, str]] = set()
     out: list[dict] = []
     for p in raw:
         if not isinstance(p, dict):
+            continue
+
+        # Pair call branch: derived_from='pair_call' with pair_long_ticker
+        # and pair_short_ticker. Both legs must be present, valid ticker
+        # shape, and different from each other. Dedupe on
+        # (long_upper, short_upper) so repeated mentions collapse.
+        # Direction is always bullish on the spread.
+        if str(p.get("derived_from") or "").strip().lower() == "pair_call":
+            long_t = (p.get("pair_long_ticker") or "").upper().strip().lstrip("$")
+            short_t = (p.get("pair_short_ticker") or "").upper().strip().lstrip("$")
+            long_t = re.sub(r"[^A-Z0-9]", "", long_t)
+            short_t = re.sub(r"[^A-Z0-9]", "", short_t)
+            if not long_t or not short_t:
+                continue
+            if len(long_t) > 5 or len(short_t) > 5:
+                continue
+            if long_t == short_t:
+                continue
+            key = (long_t, short_t)
+            if key in seen_pairs:
+                continue
+            seen_pairs.add(key)
+            # Stamp a bullish direction regardless of what Haiku emitted —
+            # pair_call has no bearish/neutral variant. Also stamp a
+            # placeholder `ticker` so downstream code that touches p["ticker"]
+            # (error logging, rejection context, etc.) doesn't KeyError.
+            p["direction"] = "bullish"
+            p["pair_long_ticker"] = long_t
+            p["pair_short_ticker"] = short_t
+            p["_kind"] = "pair_call"
+            p["_pair_long"] = long_t
+            p["_pair_short"] = short_t
+            p["_derived_from"] = "pair_call"
+            if not p.get("ticker"):
+                p["ticker"] = long_t
+            out.append(p)
             continue
         # Sector call branch: type='sector_call' with sector + direction
         if str(p.get("type") or "").strip().lower() == "sector_call":
@@ -1228,13 +1375,15 @@ def _validate_and_dedupe_predictions(raw: list) -> list[dict]:
         # from specialized vocabulary. Not stored in the DB — only used
         # by the insert path to route the row and increment the per-run
         # counter for the matching sub-type. Canonical values:
-        # 'options_position', 'earnings_call', 'macro_call'. Unknown
-        # values normalize to None.
+        # 'options_position', 'earnings_call', 'macro_call', 'pair_call'.
+        # pair_call rows never reach this branch (they're handled above
+        # and skipped via `continue`) but we keep the value in the
+        # accepted set for symmetry with future refactors.
         raw_derived = p.get("derived_from")
         derived_from = None
         if raw_derived is not None:
             _rd = str(raw_derived).strip().lower()
-            if _rd in ("options_position", "earnings_call", "macro_call"):
+            if _rd in ("options_position", "earnings_call", "macro_call", "pair_call"):
                 derived_from = _rd
 
         # Event metadata for earnings_call (and future event-tied types).
@@ -1972,5 +2121,185 @@ def insert_youtube_macro_prediction(
     if stats is not None:
         stats["macro_calls_extracted"] = int(
             stats.get("macro_calls_extracted", 0)
+        ) + 1
+    return True
+
+
+def _pair_call_exists_cross_scraper(
+    long_ticker: str, short_ticker: str,
+    forecaster_id: int, prediction_date, db,
+) -> bool:
+    """Pair-call variant of prediction_exists_cross_scraper. Same 24-hour
+    window but keyed on the canonical pair identity (long, short,
+    forecaster, date) rather than on (ticker, direction) — two separate
+    pair calls from the same forecaster with different legs should both
+    insert even though they share ticker=long_ticker. Returns True if a
+    matching pair row already exists from any scraper."""
+    if not (long_ticker and short_ticker and forecaster_id and prediction_date):
+        return False
+    try:
+        from datetime import timedelta
+        date_start = prediction_date - timedelta(hours=24)
+        date_end = prediction_date + timedelta(hours=24)
+        row = db.execute(sql_text("""
+            SELECT 1 FROM predictions
+            WHERE pair_long_ticker = :long
+              AND pair_short_ticker = :short
+              AND forecaster_id = :fid
+              AND prediction_date BETWEEN :ds AND :de
+            LIMIT 1
+        """), {
+            "long": long_ticker,
+            "short": short_ticker,
+            "fid": int(forecaster_id),
+            "ds": date_start,
+            "de": date_end,
+        }).first()
+    except Exception as _e:
+        log.warning("[YT-CLF] pair_call cross-scraper dedup failed: %s", _e)
+        return False
+    return row is not None
+
+
+def insert_youtube_pair_prediction(
+    pred: dict,
+    *,
+    channel_name: str,
+    channel_id: str | None,
+    video_id: str,
+    video_title: str,
+    publish_date: datetime,
+    db,
+    transcript_snippet: str | None = None,
+    stats: dict | None = None,
+) -> bool:
+    """Insert a pair_call prediction.
+
+    Stores the row with prediction_category='pair_call' (NEW category)
+    and both pair_long_ticker / pair_short_ticker set. The `ticker`
+    column is set to the long leg so the existing ticker index still
+    covers it. Direction is always bullish on the spread — there is no
+    bearish/neutral pair_call. No price target (target is implicit).
+
+    Rejection paths (each logs to youtube_scraper_rejections and
+    returns False):
+      - missing or invalid long/short leg → 'pair_call_missing_leg'
+      - same symbol on both sides → 'pair_call_same_symbol'
+      - long leg not in ticker_sectors → 'pair_call_invalid_long'
+      - short leg not in ticker_sectors → 'pair_call_invalid_short'
+      - per-video pair dedup hit → 'dedup_collision'
+      - cross-scraper pair dedup hit → 'cross_scraper_dupe'
+      - forecaster create failure → 'forecaster_creation_failed'
+    """
+    from models import Prediction
+
+    def _reject(reason: str, hr: str | None = None) -> bool:
+        log_youtube_rejection(
+            db,
+            video_id=video_id,
+            channel_id=channel_id,
+            channel_name=channel_name,
+            video_title=video_title,
+            video_published_at=publish_date,
+            reason=reason,
+            haiku_reason=hr,
+            haiku_raw=pred,
+            transcript_snippet=transcript_snippet,
+            stats=stats,
+        )
+        return False
+
+    long_ticker = (
+        pred.get("_pair_long") or pred.get("pair_long_ticker") or ""
+    ).upper().strip().lstrip("$")
+    short_ticker = (
+        pred.get("_pair_short") or pred.get("pair_short_ticker") or ""
+    ).upper().strip().lstrip("$")
+    long_ticker = re.sub(r"[^A-Z0-9]", "", long_ticker)
+    short_ticker = re.sub(r"[^A-Z0-9]", "", short_ticker)
+
+    if not long_ticker or not short_ticker:
+        return _reject("pair_call_missing_leg", hr=f"{long_ticker}/{short_ticker}")
+    if long_ticker == short_ticker:
+        return _reject("pair_call_same_symbol", hr=long_ticker)
+
+    # Both legs must exist in ticker_sectors — same hallucination guard
+    # ticker_call uses. Fail closed on the long leg first so the rejection
+    # reason points at the specific side that was bad.
+    if not validate_ticker_in_db(long_ticker, db):
+        return _reject("pair_call_invalid_long", hr=long_ticker)
+    if not validate_ticker_in_db(short_ticker, db):
+        return _reject("pair_call_invalid_short", hr=short_ticker)
+
+    # Per-video dedup via a canonical source_platform_id. Two different
+    # pairs in the same video insert as separate rows; the same pair
+    # mentioned twice collapses.
+    source_id = f"yt_{video_id}_pair_{long_ticker}_{short_ticker}"
+    if db.execute(
+        sql_text("SELECT 1 FROM predictions WHERE source_platform_id = :sid LIMIT 1"),
+        {"sid": source_id},
+    ).first():
+        if stats is not None:
+            stats["items_deduped"] = int(stats.get("items_deduped", 0)) + 1
+        return _reject("dedup_collision", hr=f"{long_ticker}/{short_ticker}")
+
+    forecaster = find_or_create_youtube_forecaster(channel_name, channel_id, db)
+    if not forecaster:
+        return _reject("forecaster_creation_failed")
+
+    # Cross-scraper dedup on (long, short, forecaster, date). Unlike
+    # ticker_call this deliberately does NOT use (ticker, direction)
+    # because the same forecaster can hold simultaneous pair calls with
+    # overlapping long legs (e.g. long NVDA/short INTC and long NVDA/
+    # short AMD) and both are independent bets.
+    if _pair_call_exists_cross_scraper(
+        long_ticker, short_ticker, forecaster.id, publish_date, db,
+    ):
+        if stats is not None:
+            stats["items_deduped"] = int(stats.get("items_deduped", 0)) + 1
+        return _reject("cross_scraper_dupe", hr=f"{long_ticker}/{short_ticker}")
+
+    eval_date, window_days = _parse_evaluation_date(
+        pred.get("timeframe"), publish_date,
+    )
+
+    quote = (pred.get("context_quote") or pred.get("quote") or "").strip()
+    parts = [f"{channel_name}: Long {long_ticker} / Short {short_ticker}"]
+    if quote:
+        parts.append(f'"{quote[:120]}"')
+    context_str = ". ".join(parts)[:500]
+
+    source_url = f"https://www.youtube.com/watch?v={video_id}"
+
+    db.add(
+        Prediction(
+            forecaster_id=forecaster.id,
+            ticker=long_ticker,  # long leg fills the ticker index slot
+            direction="bullish",  # always bullish on the spread
+            prediction_date=publish_date,
+            evaluation_date=eval_date,
+            window_days=window_days,
+            target_price=None,  # pair_call has no explicit price target
+            entry_price=None,
+            source_url=source_url,
+            archive_url=source_url,
+            source_type="youtube",
+            source_title=(video_title or "")[:500],
+            source_platform_id=source_id,
+            sector=None,
+            context=context_str,
+            exact_quote=(quote or context_str)[:500],
+            outcome="pending",
+            verified_by=VERIFIED_BY,
+            call_type="pair_call",
+            prediction_category="pair_call",
+            pair_long_ticker=long_ticker,
+            pair_short_ticker=short_ticker,
+        )
+    )
+    db.flush()
+    if stats is not None:
+        stats["pair_calls_extracted"] = int(
+            stats.get("pair_calls_extracted", 0)
         ) + 1
     return True
