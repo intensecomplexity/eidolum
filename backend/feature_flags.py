@@ -239,3 +239,36 @@ def invalidate_options_extraction_flag_cache() -> None:
     """Reset the 60-second cache — called from the admin toggle endpoint
     so changes take effect immediately instead of waiting for the TTL."""
     _OPTIONS_EXTRACTION_FLAG_CACHE["fetched_at"] = 0.0
+
+
+# ── Earnings call extraction flag ───────────────────────────────────────────
+#
+# Boolean all-or-nothing flag. When true, the YouTube classifier appends
+# the earnings-call instruction block to the Haiku system prompt so
+# vocabulary like "earnings next week", "into earnings", "expecting a
+# beat", "reports Thursday" gets mapped to a ticker_call prediction
+# tagged with event_type='earnings' and (when Haiku can extract it)
+# event_date. Rows still insert as prediction_category='ticker_call' —
+# no new category.
+
+_EARNINGS_EXTRACTION_FLAG_CACHE: dict = {"enabled": False, "fetched_at": 0.0}
+_EARNINGS_EXTRACTION_FLAG_TTL = 60  # seconds
+
+
+def is_earnings_extraction_enabled(db) -> bool:
+    """Return True if ENABLE_EARNINGS_CALL_EXTRACTION is 'true' in the
+    config table. Default False. Cached 60s so tight classifier loops
+    don't hammer the config table."""
+    now = time.time()
+    if (now - _EARNINGS_EXTRACTION_FLAG_CACHE["fetched_at"]) < _EARNINGS_EXTRACTION_FLAG_TTL:
+        return bool(_EARNINGS_EXTRACTION_FLAG_CACHE["enabled"])
+    enabled = _read_bool(db, "ENABLE_EARNINGS_CALL_EXTRACTION", default=False)
+    _EARNINGS_EXTRACTION_FLAG_CACHE["enabled"] = enabled
+    _EARNINGS_EXTRACTION_FLAG_CACHE["fetched_at"] = now
+    return enabled
+
+
+def invalidate_earnings_extraction_flag_cache() -> None:
+    """Reset the 60-second cache — called from the admin toggle endpoint
+    so changes take effect immediately instead of waiting for the TTL."""
+    _EARNINGS_EXTRACTION_FLAG_CACHE["fetched_at"] = 0.0
