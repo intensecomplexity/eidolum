@@ -3312,8 +3312,12 @@ def _resolve_metadata_enrichment(
         eval_date = fallback_eval
 
         inferred = pred.get("inferred_timeframe_days")
-        if isinstance(inferred, (int, float)) and 0 < int(inferred) <= 2000:
-            inferred_int = int(inferred)
+        # Bug 6: round, not truncate. Haiku occasionally emits 6.9 for
+        # "about a week" or 0.99 for "tomorrow", and `int()` was
+        # collapsing those into 6 / 0 — the 0 then fell through every
+        # tolerance lookup and got the year-long bucket.
+        if isinstance(inferred, (int, float)) and 0 < int(round(float(inferred))) <= 2000:
+            inferred_int = int(round(float(inferred)))
             fields["inferred_timeframe_days"] = inferred_int
             ts_src = pred.get("timeframe_source")
             if isinstance(ts_src, str) and ts_src in _VALID_TIMEFRAME_SOURCES:
@@ -3494,6 +3498,41 @@ def insert_youtube_prediction(
                 target_price = None
         except (ValueError, TypeError):
             target_price = None
+
+    # Bug 4: best-effort sanity check against a live spot price. If we can
+    # see what the stock costs right now and Haiku's target implies more
+    # than the per-window cap (e.g. a 40x move in 90 days), drop the
+    # target and let the prediction score direction-only. Failing the
+    # spot lookup is fine — the historical evaluator runs the same check
+    # later with the locked entry_price as the reference.
+    if target_price is not None:
+        try:
+            from services.target_sanity import sanity_check_target
+            from services.price_fetch import is_crypto, fetch_crypto_history
+            spot_price = None
+            if is_crypto(ticker):
+                _hist = fetch_crypto_history(ticker)
+                if _hist:
+                    # newest date in the history
+                    _latest = max((k for k in _hist.keys() if not k.startswith("_")), default=None)
+                    if _latest:
+                        spot_price = _hist[_latest]
+            else:
+                try:
+                    from jobs.historical_evaluator import _try_finnhub
+                    _q = _try_finnhub(ticker)
+                    spot_price = _q.get("_current") if _q else None
+                except Exception:
+                    spot_price = None
+            checked = sanity_check_target(spot_price, target_price, window_days)
+            if spot_price is not None and checked is None:
+                log.info(
+                    "[YT-CLF] Bug-4 sanity reject: %s target=%s spot=%s window=%sd → direction-only",
+                    ticker, target_price, spot_price, window_days,
+                )
+                target_price = None
+        except Exception as _e:
+            log.debug("[YT-CLF] sanity check skipped for %s: %s", ticker, _e)
 
     # Build a compact human-readable context
     quote = (pred.get("quote") or "").strip()

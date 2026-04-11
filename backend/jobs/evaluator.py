@@ -73,14 +73,22 @@ _MIN_MOVEMENT = {1: 0.5, 7: 1, 14: 1.5, 30: 2, 90: 2, 180: 3, 365: 4}
 _PAIR_TOLERANCE = {1: 1.0, 7: 1.5, 14: 2.0, 30: 2.5, 90: 3.0, 180: 4.0, 365: 6.0}
 
 
-def _get_threshold(window_days: int, table: dict) -> float:
-    """Interpolate threshold from table based on window_days."""
-    if not window_days or window_days <= 0:
-        window_days = 30
+def _get_threshold(window_days, table: dict) -> float:
+    """Interpolate threshold from table based on window_days.
+
+    Bug 6: round (not truncate) the input so a Haiku-supplied 6.9 for
+    "about a week" doesn't fall through the search and grab the year
+    bucket. Mirrors historical_evaluator._get_tolerance.
+    """
+    try:
+        n = int(round(float(window_days)))
+    except (TypeError, ValueError):
+        n = 30
+    if n <= 0:
+        n = 30
     keys = sorted(table.keys())
-    # Find the two closest keys
-    for i, k in enumerate(keys):
-        if window_days <= k:
+    for k in keys:
+        if n <= k:
             return table[k]
     return table[keys[-1]]
 
@@ -433,10 +441,21 @@ def _evaluate_prediction(p: Prediction, price: float, now: datetime):
     tolerance = _get_threshold(window, _TOLERANCE)
     min_movement = _get_threshold(window, _MIN_MOVEMENT)
 
-    if p.direction == "bullish":
+    # Bug 3: canonicalise the row's direction through the shared
+    # classifier so this 15-min loop agrees with historical_evaluator.
+    from services.direction_classifier import classify as classify_direction
+    p_direction = classify_direction(
+        p.direction, entry_price=p.entry_price, target_price=p.target_price,
+    ) or "bullish"
+
+    if p_direction == "bullish":
         if p.target_price and p.target_price > 0:
             target_dist_pct = abs(price - p.target_price) / p.target_price * 100
-            if price >= p.target_price or target_dist_pct <= tolerance:
+            # Bug 5: HIT-by-tolerance only counts when the move was in
+            # the predicted direction. Without this guard a stock that
+            # massively rallied past a bearish target was being scored
+            # HIT just because it was within `tolerance` of the target.
+            if price >= p.target_price or (target_dist_pct <= tolerance and actual_return >= 0):
                 p.outcome = "hit"
             elif actual_return >= min_movement:
                 p.outcome = "near"
@@ -445,10 +464,10 @@ def _evaluate_prediction(p: Prediction, price: float, now: datetime):
         else:
             p.outcome = "hit" if actual_return > 0 else "miss"
 
-    elif p.direction == "bearish":
+    elif p_direction == "bearish":
         if p.target_price and p.target_price > 0:
             target_dist_pct = abs(price - p.target_price) / p.target_price * 100
-            if price <= p.target_price or target_dist_pct <= tolerance:
+            if price <= p.target_price or (target_dist_pct <= tolerance and actual_return <= 0):
                 p.outcome = "hit"
             elif actual_return <= -min_movement:
                 p.outcome = "near"
@@ -457,7 +476,7 @@ def _evaluate_prediction(p: Prediction, price: float, now: datetime):
         else:
             p.outcome = "hit" if actual_return < 0 else "miss"
 
-    elif p.direction == "neutral":
+    elif p_direction == "neutral":
         abs_ret = abs(actual_return)
         if abs_ret <= 5.0:
             p.outcome = "hit"

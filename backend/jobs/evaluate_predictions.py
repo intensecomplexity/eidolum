@@ -137,7 +137,14 @@ def evaluate_all_pending(db):
                     errors += 1
                     continue
 
-                direction = (p.direction or "bullish").lower()
+                # Bug 3: route through the unified direction classifier
+                # so this legacy 15-min evaluator agrees with the historical
+                # path. Inference from target/entry only kicks in when the
+                # row's direction column is missing/unparseable.
+                from services.direction_classifier import classify as classify_direction
+                direction = classify_direction(
+                    p.direction, entry_price=entry, target_price=p.target_price,
+                ) or "bullish"
                 pct_return = round(((exit_price - entry) / entry) * 100, 2)
 
                 if direction in ("bear", "bearish"):
