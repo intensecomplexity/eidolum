@@ -360,6 +360,18 @@ class Prediction(Base):
     position_action = Column(String(16), nullable=True)   # open|add|trim|exit
     position_closed_at = Column(DateTime, nullable=True)
 
+    # Ship #12 — soft training-set exclusion. Rows flagged by
+    # backend/scripts/ship_12_audit.py (disclosure mis-routes,
+    # invented timeframes, unresolvable pronoun references, basket
+    # shoehorns, duplicate sources) are kept in place but filtered
+    # out of the fine-tune training loader. Leaderboard queries do
+    # NOT filter on these — historical scores stay stable.
+    excluded_from_training = Column(Boolean, nullable=False, default=False,
+                                     server_default="false")
+    exclusion_reason = Column(String(64), nullable=True)
+    exclusion_flagged_at = Column(DateTime(timezone=True), nullable=True)
+    exclusion_rule_version = Column(String(16), nullable=True)
+
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
 
     forecaster = relationship("Forecaster", back_populates="predictions")
@@ -1146,6 +1158,20 @@ class Disclosure(Base):
     source_timestamp_method = Column(String(16), nullable=True)
     source_verbatim_quote = Column(Text, nullable=True)
     source_timestamp_confidence = Column(Numeric(4, 3), nullable=True)
+    # Ship #12 — soft training-set exclusion mirror of the predictions
+    # columns. Disclosures can also be mis-categorized (e.g. a forward-
+    # looking position call that reads like a disclosure), so the
+    # fine-tune loader skips these too. Leaderboard follow-through
+    # scoring is unaffected.
+    excluded_from_training = Column(Boolean, nullable=False, default=False,
+                                     server_default="false")
+    exclusion_reason = Column(String(64), nullable=True)
+    exclusion_flagged_at = Column(DateTime(timezone=True), nullable=True)
+    exclusion_rule_version = Column(String(16), nullable=True)
+    source_prediction_id = Column(Integer,
+                                  ForeignKey("predictions.id",
+                                             ondelete="SET NULL"),
+                                  nullable=True)
     created_at = Column(DateTime, nullable=False,
                         default=datetime.datetime.utcnow,
                         server_default=func.now())
