@@ -1131,7 +1131,19 @@ Output JSON only. Be concise."""
 YOUTUBE_HAIKU_DISCLOSURE_INSTRUCTIONS = """DISCLOSURES (PAST-TENSE POSITION STATEMENTS):
 If the speaker says they already took a position — bought, sold, added, trimmed, started, exited, or is still holding a stock — emit it as a disclosure. Disclosures are NOT predictions. They capture what the forecaster actually DID with real money, which is scored by "follow-through" (did the stock move the right way after they said it?) rather than HIT/NEAR/MISS. The most important signal here is TENSE.
 
-PAST TENSE = disclosure. FUTURE TENSE = ticker_call (or another prediction type). This distinction is the whole point of the disclosure prompt. Read it twice.
+TENSE RULES — read carefully:
+
+Disclosures cover TWO tense patterns, and only these two:
+
+(A) PAST-TENSE transactional actions — the verb describes a completed trade: "I bought 500 AMD today", "we added NVDA this week", "I trimmed META yesterday", "we exited NFLX last Friday", "I sold half my TSLA at 250".
+
+(B) PRESENT or PRESENT-CONTINUOUS ownership statements — the verb describes what the speaker CURRENTLY OWNS: "I still hold AAPL", "we continue to hold ANET", "we own NVDA", "our position in AAPL remains unchanged", "we remain long SPY", "our fund still holds GOOG", "I've been holding AAPL since 2018". Pattern (B) is limited to HOLD / OWN / POSITION-DESCRIBING language only — "we continue to BUY" does NOT qualify because "buy" is a transactional verb and must be past-tense to count. Present-continuous is the pass reserved for the verbs of CONTINUED OWNERSHIP, not continued transacting.
+
+FUTURE TENSE is NOT a disclosure — "I'm going to buy AMD tomorrow", "we will add NVDA on the next dip", "I might pick up some TSLA" all describe intent that hasn't happened yet. Future intent belongs to ticker_call.
+
+CONDITIONAL statements ("if X drops to 180, we buy") are NOT disclosures either — those belong to conditional_call.
+
+The test that matters: has the action ALREADY HAPPENED (past-tense transaction) OR is the position CURRENTLY OWNED (present-continuous hold/own)? If neither, it's not a disclosure — punt to the appropriate prediction type.
 
 Examples of PAST TENSE disclosure language:
 - "I bought 500 shares of AMD today"
