@@ -173,6 +173,13 @@ def get_forecaster(
     else:
         live_accuracy = 0
 
+    # Ship #13 Bug D: "scorable" count = scored + in-flight. This is the
+    # single number that matches the stats block (Hits + Nears + Misses +
+    # Pending), which is what we want in the header subtitle. total_all
+    # includes unresolved/unknown rows that inflated the header to 11589
+    # while the tabs and stats block counted 4186.
+    scorable_predictions = pred_counts["evaluated"] + pred_counts["pending"]
+
     # Revisions count — how many of this forecaster's predictions are
     # revisions of earlier ones (revision_of IS NOT NULL). Small stat
     # shown on the profile page; doesn't affect accuracy calculations.
@@ -358,6 +365,7 @@ def get_forecaster(
         "first_prediction_date": first_pred_date,
         "sector_count": sector_count,
         "total_all_predictions": total_all,
+        "scorable_predictions": scorable_predictions,
         "sector_strengths": [],
         "accuracy_over_time": _build_accuracy_trend(forecaster_id, db, sector),
         "prediction_counts": pred_counts,

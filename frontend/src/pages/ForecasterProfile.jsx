@@ -301,7 +301,7 @@ export default function ForecasterProfile() {
                   <span>Since {new Date(data.first_prediction_date).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}</span>
                 )}
                 {data.first_prediction_date && <span className="text-border">·</span>}
-                <span>{data.total_all_predictions || data.total_predictions || 0} predictions</span>
+                <span>{data.scorable_predictions ?? data.total_predictions ?? 0} predictions</span>
                 {data.sector_count > 0 && (
                   <>
                     <span className="text-border">·</span>
