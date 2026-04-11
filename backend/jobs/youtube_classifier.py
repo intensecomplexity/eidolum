@@ -1314,6 +1314,126 @@ Rules recap (all predictions, every type):
 Output JSON only. Be concise."""
 
 
+# Regime-call instructions (ship #12). Appended to the active prompt
+# when ENABLE_REGIME_CALL_EXTRACTION is flipped on. Teaches Haiku to
+# recognize structural market-phase claims — "no market top yet",
+# "bottom is in", "topping process", "correction not bear market",
+# "sideways chop" — and emit them as regime_call predictions. Regime
+# calls carry NO price target: the claim is about STRUCTURE, not
+# magnitude. Scoring is based on drawdown / runup / new-high / new-low
+# behavior during the evaluation window rather than final price vs
+# target, so "market grinds sideways or up 1% = correct no-top call"
+# becomes scoreable in a way ticker_call never could.
+YOUTUBE_HAIKU_REGIME_INSTRUCTIONS = """REGIME CALLS (STRUCTURAL MARKET PHASE):
+If the speaker makes a structural claim about the market's PHASE — whether a bull market is continuing, topping, rolling over, bottoming, correcting, or consolidating — WITHOUT naming a specific price target, emit it as a regime_call. These claims are scored by what the instrument DOES structurally (drawdown, runup, new highs, new lows) during the window, not by final price vs target.
+
+The problem this prediction type solves: "we're not going to see a market top until later this year" is a real forecaster claim that ticker_call extracts as "bullish SPY" and then scores MISS if SPY grinds sideways +1%. But the forecaster was RIGHT — no top happened. regime_call scores that structurally: small drawdown + any new highs = bull_continuing HIT.
+
+regime_type allowlist — MUST use one of these eight canonical values verbatim:
+
+- bull_continuing    "still in a bull market / no top yet / higher highs ahead / buy the dip / bull is intact"
+- bull_starting      "new bull market / new cycle / bottom is in / off to the races / breaking out"
+- topping            "forming a top / distribution phase / bull is ending / rolling over / toppy"
+- bear_starting      "bear market begins / cycle top confirmed / here comes the decline / crash incoming"
+- bear_continuing    "still in a bear / lower lows ahead / more downside / bounce is a head-fake"
+- bottoming          "forming a bottom / capitulation / washed out / bear is ending / close to lows"
+- correction         "pullback within a bull / healthy correction / not a bear / 10-15% drop max"
+- consolidation      "sideways / chopping / trendless / base-building / range-bound"
+
+Required fields on every regime_call output:
+- regime_type: one of the allowlist values above
+- regime_instrument: the ticker/ETF being claimed about. Default to "SPY" when the speaker says "the market", "stocks", "equities", "the indices". Use "QQQ" for "nasdaq", "tech". Use "IWM" for "small caps", "russell". Use "BTC" for "crypto", "bitcoin". If the speaker names a specific ETF or index, use that.
+- timeframe: when the claim should be evaluated. Default to 6 months (longer than ticker_call defaults — regime calls are longer-horizon). If the speaker gives an explicit window ("by year end", "next 3 months"), parse it to an absolute ISO date.
+- derived_from: "regime_call"
+- direction: DO NOT set explicitly. The insert path derives direction from regime_type (bull_* and bottoming = bullish, bear_* and topping = bearish, correction and consolidation = neutral).
+- price_target: DO NOT set. regime_call has no explicit target.
+
+Distinguish carefully from other prediction types:
+
+regime_call vs ticker_call:
+- "SPY to $650 by year end"                 → ticker_call (has a specific price target)
+- "SPY is going up"                         → ticker_call (directional, no regime language)
+- "Still in a bull market, no top yet"      → regime_call, bull_continuing, SPY
+- "Market's about to top out"               → regime_call, topping, SPY
+
+regime_call vs macro_call:
+- "Dollar weakening"                        → macro_call (macro concept, ETF-mapped)
+- "Yield curve steepening"                  → macro_call (macro concept)
+- "Equity bull market continues into 2026"  → regime_call, bull_continuing
+- "Fed has to pivot"                        → macro_call (policy concept)
+
+regime_call vs individual-stock commentary:
+- "NVDA topping out here"                   → ticker_call bearish (individual stock, not a market regime)
+- "Apple's in a new bull cycle"             → ticker_call bullish (individual stock, not a market regime)
+- "The market is topping"                   → regime_call, topping, SPY
+- "Tech is in a new bull run"               → regime_call, bull_starting, QQQ
+
+Output format:
+{
+  "regime_type": "bull_continuing",
+  "regime_instrument": "SPY",
+  "timeframe": "2026-10-11",
+  "derived_from": "regime_call",
+  "context_quote": "we're not going to see a market top until later this year if not in 2026"
+}
+
+Examples:
+
+Input: "we're not going to see a market top until later this year if not in 2026"
+Output: {"regime_type":"bull_continuing","regime_instrument":"SPY","timeframe":"2026-10-11","derived_from":"regime_call","context_quote":"we're not going to see a market top until later this year if not in 2026"}
+
+Input: "Bottom is in for Bitcoin — this is a new cycle"
+Output: {"regime_type":"bull_starting","regime_instrument":"BTC","timeframe":"2026-10-11","derived_from":"regime_call","context_quote":"Bottom is in for Bitcoin — this is a new cycle"}
+
+Input: "The market is in the distribution phase, bull is ending"
+Output: {"regime_type":"topping","regime_instrument":"SPY","timeframe":"2026-07-11","derived_from":"regime_call","context_quote":"market is in the distribution phase, bull is ending"}
+
+Input: "Bear market is officially starting — cycle top is confirmed"
+Output: {"regime_type":"bear_starting","regime_instrument":"SPY","timeframe":"2026-10-11","derived_from":"regime_call","context_quote":"bear market is officially starting — cycle top is confirmed"}
+
+Input: "More lower lows ahead before this ends"
+Output: {"regime_type":"bear_continuing","regime_instrument":"SPY","timeframe":"2026-07-11","derived_from":"regime_call","context_quote":"more lower lows ahead before this ends"}
+
+Input: "Capitulation has happened, we're close to the bottom"
+Output: {"regime_type":"bottoming","regime_instrument":"SPY","timeframe":"2026-07-11","derived_from":"regime_call","context_quote":"capitulation has happened, we're close to the bottom"}
+
+Input: "This is a correction in a bull market, not a bear"
+Output: {"regime_type":"correction","regime_instrument":"SPY","timeframe":"2026-07-11","derived_from":"regime_call","context_quote":"this is a correction in a bull market, not a bear"}
+
+Input: "Sideways chop for months — no trend either way"
+Output: {"regime_type":"consolidation","regime_instrument":"SPY","timeframe":"2026-10-11","derived_from":"regime_call","context_quote":"sideways chop for months — no trend either way"}
+
+Input: "Small caps entering a new bull cycle, watch the Russell"
+Output: {"regime_type":"bull_starting","regime_instrument":"IWM","timeframe":"2027-04-11","derived_from":"regime_call","context_quote":"small caps entering a new bull cycle, watch the Russell"}
+
+Input: "NVDA is topping out here"
+Output: (do NOT extract as regime_call — individual stock, not a market regime. Let ticker_call handle NVDA with bearish direction.)
+
+Input: "Oil going to $100"
+Output: (do NOT extract — specific price, let macro_call or ticker_call handle.)
+
+Input: "SPY to $650 by year end"
+Output: (do NOT extract — specific price target, let ticker_call handle.)
+
+Input: "It feels bearish to me"
+Output: (do NOT extract — vague sentiment, not a structural claim. Reject.)
+
+Rules:
+- MUST set derived_from: "regime_call".
+- MUST use regime_type from the allowlist above verbatim.
+- MUST NOT set price_target — the claim has no target.
+- MUST NOT set direction — the insert path derives it from regime_type.
+- MUST set regime_instrument. Default to SPY for "the market"/"stocks"/"equities"; use QQQ for "nasdaq"/"tech sector broadly"; IWM for "small caps"/"russell"; BTC for "crypto"/"bitcoin".
+- MUST NOT emit regime_call for individual-stock commentary. "NVDA topping out" is a ticker_call, not a regime_call — regime is a STATEMENT ABOUT THE MARKET'S PHASE, not about a single name.
+- MUST NOT emit regime_call when a specific price target is named. Let ticker_call handle anything with a target.
+- MUST NOT emit regime_call for macro-concept statements ("dollar weakening", "rates going up", "yield curve steepening"). Let macro_call handle those.
+- REJECT vague sentiment with no regime language ("feels bearish", "I don't like this market"). regime_call requires explicit structural phase language.
+- Default timeframe is 6 months. Parse explicit windows when given ("by year end" → end of calendar year; "next 3 months" → publish_date + 90 days).
+- If the same regime_type/instrument combo is mentioned twice in a transcript, emit once — the dedup layer collapses (regime_type, instrument) per video.
+
+Output JSON only. Be concise."""
+
+
 # ── Transcript fetching ─────────────────────────────────────────────────────
 
 def _build_transcript_api():
