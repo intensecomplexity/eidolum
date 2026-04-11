@@ -1,0 +1,22 @@
+{
+  "id": "anet_tier2",
+  "case_tier": 2,
+  "case_label": "medium_complexity",
+  "description": "Mid-difficulty: explicit bullish call on ANET with a concrete target but softer conviction language ('I think', 'should'). Timeframe is relative ('six months from now') and must be resolved against the publish_date anchor.",
+  "input": {
+    "channel_name": "The Compound",
+    "title": "Arista Networks Earnings Preview",
+    "publish_date": "2026-04-11",
+    "transcript": "Let's talk about Arista Networks, ticker ANET. I think Arista is one of the more underrated names in the AI infrastructure build-out. They are the plumbing behind the hyperscalers and the cloud capex cycle is not slowing down. My view: ANET should reach one hundred and forty dollars in the next six months. It's a moderate conviction call for me. Not my biggest position but I am adding selectively. The risk is hyperscaler capex guidance coming in softer than expected, but I don't think that happens. Arista, ANET, one forty, six months from now."
+  },
+  "expected": {
+    "ticker": "ANET",
+    "direction": "bullish",
+    "timeframe": "2026-10-11",
+    "timeframe_tolerance_days": 14,
+    "conviction": "medium",
+    "tier_score": 140.0,
+    "tolerance_pct_override": null,
+    "_tolerance_note": "~180-day window → 7% from _TOLERANCE table"
+  }
+}

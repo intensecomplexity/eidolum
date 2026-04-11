@@ -1,0 +1,22 @@
+{
+  "id": "tsla_tier1",
+  "case_tier": 1,
+  "case_label": "golden_path",
+  "description": "Canonical ticker_call: explicit ticker, direction, target, end-of-year timeframe, strong conviction. HAIKU_SYSTEM should extract this cleanly with zero ambiguity.",
+  "input": {
+    "channel_name": "Meet Kevin",
+    "title": "Why I'm Loading Up On Tesla For 2026",
+    "publish_date": "2026-04-11",
+    "transcript": "Alright folks welcome back to the channel. Today I want to talk about Tesla, ticker TSLA. I have been watching this stock very closely and I'm going to make a very clear call right here. Tesla is going to four hundred dollars by the end of 2026. I am extremely bullish on TSLA. This is my highest conviction trade of the year. The robotaxi story is finally going to hit, margins are bottoming, and the stock has been consolidating for months. My price target: four hundred dollars on TSLA by December thirty first, 2026. I'm buying more this week and I'll be adding on any dip. This is not a hedged call, this is a direct, high confidence prediction. Tesla, four hundred bucks, end of year."
+  },
+  "expected": {
+    "ticker": "TSLA",
+    "direction": "bullish",
+    "timeframe": "2026-12-31",
+    "timeframe_tolerance_days": 7,
+    "conviction": "high",
+    "tier_score": 400.0,
+    "tolerance_pct_override": null,
+    "_tolerance_note": "365-day window → 10% from _TOLERANCE table in evaluator.py"
+  }
+}

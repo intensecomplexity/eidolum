@@ -1,0 +1,22 @@
+{
+  "id": "btc_tier3",
+  "case_tier": 3,
+  "case_label": "edge_case_crypto",
+  "description": "Edge case: crypto ticker (BTC) with a large round-number target. Tests that the classifier (a) recognizes BTC as a valid ticker per HAIKU_SYSTEM's 'stock or crypto ticker' rule, (b) handles a 6-figure price target without dropping the extraction, and (c) resolves 'end of year' against the publish_date.",
+  "input": {
+    "channel_name": "Coin Bureau",
+    "title": "My Bitcoin Price Target For 2026",
+    "publish_date": "2026-04-11",
+    "transcript": "Hi folks, today we're talking about Bitcoin. I want to give you my direct call on BTC for the rest of 2026. I am bullish on Bitcoin. Very bullish. My target for BTC is one hundred and fifty thousand dollars by the end of this year. That's right, one fifty k on Bitcoin by December thirty first. This is a high conviction call from me. The halving supply shock, ETF inflows, and sovereign demand all point the same direction. I'm holding BTC, I'm adding on every dip into the next six months, and I see no reason to be anywhere else in crypto right now. Bitcoin, one hundred fifty thousand dollars, end of 2026, bullish."
+  },
+  "expected": {
+    "ticker": "BTC",
+    "direction": "bullish",
+    "timeframe": "2026-12-31",
+    "timeframe_tolerance_days": 7,
+    "conviction": "high",
+    "tier_score": 150000.0,
+    "tolerance_pct_override": null,
+    "_tolerance_note": "365-day window → 10% from _TOLERANCE table"
+  }
+}
