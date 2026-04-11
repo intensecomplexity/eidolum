@@ -36,6 +36,27 @@ from ship_12_audit import (  # noqa: E402
 )
 
 
+# Phase B approved reasons — hardcoded allowlist. basket_shoehorn and
+# invented_timeframe are deferred to later ships and must not be
+# runnable from this script even though they appear in REASONS.
+#
+# basket_shoehorn was rewritten as v12.4 (3-signal AND with conviction
+# markers and PHASE_A_PROTECTED_IDS) but the rule has not been validated
+# against enough real data to pull the trigger automatically on 554K
+# rows. invented_timeframe currently flags 351,836 rows (63% of the
+# corpus) and needs the window_days upper-cap fix (Ship #12.2) before
+# it's safe to apply.
+#
+# Editing this set is the only legitimate way to widen Phase B's scope
+# — that change should be reviewed in its own commit, not snuck in via
+# a `--reason` argument at the call site.
+_PHASE_B_APPROVED_REASONS: frozenset[str] = frozenset({
+    "disclosure_misroute",
+    "duplicate_source",
+    "unresolvable_reference",
+})
+
+
 def _apply_one_reason(
     conn,
     reason: str,
@@ -129,6 +150,21 @@ def main(argv: List[str] | None = None) -> int:
         parser.error("--apply requires --reason <name>")
     if args.dry_run and args.apply:
         parser.error("--dry-run and --apply are mutually exclusive")
+    # Phase B allowlist enforcement. The argparse `choices` accept the
+    # full REASONS tuple for telemetry / dry-run reasons, but `--apply`
+    # is restricted to the deliberately-narrow allowlist defined above.
+    # `manual_review` is also accepted as an escape hatch for one-off
+    # admin work; basket_shoehorn / invented_timeframe are NOT.
+    if (
+        args.apply
+        and args.reason not in _PHASE_B_APPROVED_REASONS
+        and args.reason != "manual_review"
+    ):
+        parser.error(
+            f"--reason {args.reason!r} is not approved for Phase B. "
+            f"Approved: {sorted(_PHASE_B_APPROVED_REASONS)}. "
+            f"To change this, edit _PHASE_B_APPROVED_REASONS in ship_12_apply.py."
+        )
 
     conn = _connect()
     try:

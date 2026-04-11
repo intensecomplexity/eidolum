@@ -566,5 +566,78 @@ class HitRowSafetyGuardTests(unittest.TestCase):
         self.assertEqual(sorted(offenders), [605937, 606405])
 
 
+class Ship12ApplyAllowlistTests(unittest.TestCase):
+    """Phase B allowlist guard. ship_12_apply.py hard-rejects
+    `--apply --reason basket_shoehorn` and `--apply --reason invented_timeframe`
+    even though they appear in REASONS — those rules are deferred to
+    later ships."""
+
+    def test_apply_rejects_basket_shoehorn(self):
+        from scripts import ship_12_apply
+        # parser.error calls sys.exit(2) — argparse always uses code 2
+        # for usage errors, regardless of the message text.
+        with self.assertRaises(SystemExit) as ctx:
+            ship_12_apply.main(["--apply", "--reason", "basket_shoehorn"])
+        self.assertEqual(ctx.exception.code, 2)
+
+    def test_apply_rejects_invented_timeframe(self):
+        from scripts import ship_12_apply
+        with self.assertRaises(SystemExit) as ctx:
+            ship_12_apply.main(["--apply", "--reason", "invented_timeframe"])
+        self.assertEqual(ctx.exception.code, 2)
+
+    def test_apply_accepts_disclosure_misroute_past_gate(self):
+        """Approved reason must pass the allowlist gate. Past the gate
+        the runner tries to connect to the DB; we patch `_connect` to
+        raise a sentinel so the test asserts we crossed the gate
+        without needing live Postgres credentials."""
+        from unittest.mock import patch
+        from scripts import ship_12_apply
+
+        sentinel = RuntimeError("sentinel: gate passed, _connect was called")
+        with patch.object(ship_12_apply, "_connect", side_effect=sentinel):
+            with self.assertRaises(RuntimeError) as ctx:
+                ship_12_apply.main(
+                    ["--apply", "--reason", "disclosure_misroute"]
+                )
+            self.assertIn("sentinel", str(ctx.exception))
+
+    def test_apply_accepts_duplicate_source_past_gate(self):
+        from unittest.mock import patch
+        from scripts import ship_12_apply
+
+        sentinel = RuntimeError("sentinel: gate passed")
+        with patch.object(ship_12_apply, "_connect", side_effect=sentinel):
+            with self.assertRaises(RuntimeError):
+                ship_12_apply.main(
+                    ["--apply", "--reason", "duplicate_source"]
+                )
+
+    def test_apply_accepts_unresolvable_reference_past_gate(self):
+        from unittest.mock import patch
+        from scripts import ship_12_apply
+
+        sentinel = RuntimeError("sentinel: gate passed")
+        with patch.object(ship_12_apply, "_connect", side_effect=sentinel):
+            with self.assertRaises(RuntimeError):
+                ship_12_apply.main(
+                    ["--apply", "--reason", "unresolvable_reference"]
+                )
+
+    def test_apply_accepts_manual_review_past_gate(self):
+        """`manual_review` is the documented escape hatch for ad-hoc
+        admin work — it stays accepted for `--apply` even though it's
+        not in the deferred Ship #12 reason list."""
+        from unittest.mock import patch
+        from scripts import ship_12_apply
+
+        sentinel = RuntimeError("sentinel: gate passed")
+        with patch.object(ship_12_apply, "_connect", side_effect=sentinel):
+            with self.assertRaises(RuntimeError):
+                ship_12_apply.main(
+                    ["--apply", "--reason", "manual_review"]
+                )
+
+
 if __name__ == "__main__":
     unittest.main()
