@@ -621,6 +621,7 @@ def get_global_stats(request: Request, db: Session = Depends(get_db)):
         "total_users": total_users,
         "average_accuracy": avg_accuracy,
         "active_predictions": up_active,
+        "total_scored": total_scored,
     }
 
 

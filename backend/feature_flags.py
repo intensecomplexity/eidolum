@@ -615,3 +615,39 @@ def invalidate_prediction_metadata_enrichment_flag_cache() -> None:
     """Reset the 60-second cache — called from the admin toggle endpoint
     so changes take effect immediately instead of waiting for the TTL."""
     _PREDICTION_METADATA_ENRICHMENT_FLAG_CACHE["fetched_at"] = 0.0
+
+
+# ── Homepage hero flag ─────────────────────────────────────────────────────
+#
+# Ship #13. Gates the new hero band, how-it-works strip, "Receipts" rename,
+# and first-call CTA on the `/` home page. Frontend-only flag (no backend
+# behavior change): when true, Dashboard.jsx renders <HeroBand /> and
+# <HowItWorks /> above the existing content and swaps "Biggest Calls" →
+# "Receipts". When false, the home page renders as before.
+#
+# Read from the public /api/public/flags endpoint only — intentionally
+# NOT added to /api/features (which leaks internal Haiku flags) so this
+# UI-only flag doesn't travel through the existing classifier cache.
+#
+# Default False. Nimrod flips manually after browser verification.
+
+_HOMEPAGE_HERO_FLAG_CACHE: dict = {"enabled": False, "fetched_at": 0.0}
+_HOMEPAGE_HERO_FLAG_TTL = 60  # seconds
+
+
+def is_homepage_hero_enabled(db) -> bool:
+    """Return True if ENABLE_HOMEPAGE_HERO is 'true' in the config table.
+    Default False. Cached 60s."""
+    now = time.time()
+    if (now - _HOMEPAGE_HERO_FLAG_CACHE["fetched_at"]) < _HOMEPAGE_HERO_FLAG_TTL:
+        return bool(_HOMEPAGE_HERO_FLAG_CACHE["enabled"])
+    enabled = _read_bool(db, "ENABLE_HOMEPAGE_HERO", default=False)
+    _HOMEPAGE_HERO_FLAG_CACHE["enabled"] = enabled
+    _HOMEPAGE_HERO_FLAG_CACHE["fetched_at"] = now
+    return enabled
+
+
+def invalidate_homepage_hero_flag_cache() -> None:
+    """Reset the 60-second cache — called from the admin toggle endpoint
+    so the new value takes effect immediately."""
+    _HOMEPAGE_HERO_FLAG_CACHE["fetched_at"] = 0.0

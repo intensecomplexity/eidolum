@@ -16,6 +16,7 @@ import {
   toggleSourceTimestampsAdmin, getTimestampDiagnostics,
   toggleRegimeCallExtractionAdmin,
   togglePredictionMetadataEnrichmentAdmin, getMetadataEnrichmentDiagnostics,
+  toggleHomepageHeroAdmin, getPublicFlags,
   getAdminUrlQuality, getSocialStats,
   getPrunedYouTubeChannels, reactivateYouTubeChannel,
   setYouTubeSectorTraffic,
@@ -117,15 +118,23 @@ function FeatureToggles() {
   const [flags, setFlags] = useState(null);
   const [error, setError] = useState(null);
 
+  async function loadFlags(fresh = false) {
+    const [features, publicFlags] = await Promise.all([
+      getFeatureFlags({ fresh }),
+      getPublicFlags({ fresh }).catch(() => ({})),
+    ]);
+    return { ...features, ...publicFlags };
+  }
+
   useEffect(() => {
-    getFeatureFlags().then(setFlags).catch(() => {});
+    loadFlags().then(setFlags).catch(() => {});
   }, []);
 
   async function toggle(name, fn) {
     setError(null);
     try {
       await fn();
-      const updated = await getFeatureFlags({ fresh: true });
+      const updated = await loadFlags(true);
       setFlags(updated);
     } catch (e) {
       const detail = e?.response?.data?.detail || e?.message || 'unknown error';
@@ -160,6 +169,7 @@ function FeatureToggles() {
         { key: 'source_timestamps', label: 'YouTube Source Timestamps (?t=Ns anchors)', fn: toggleSourceTimestampsAdmin },
         { key: 'regime_call_extraction', label: 'YouTube Regime Calls (structural market phase)', fn: toggleRegimeCallExtractionAdmin },
         { key: 'prediction_metadata_enrichment', label: 'YouTube Metadata Enrichment (timeframe inference + conviction)', fn: togglePredictionMetadataEnrichmentAdmin },
+        { key: 'homepage_hero', label: 'Homepage Hero (Ship #13 — hero band + Receipts + first-call CTA)', fn: toggleHomepageHeroAdmin },
       ].map(f => (
         <div key={f.key} className="flex items-center justify-between py-1.5">
           <span className="text-sm text-text-secondary">{f.label}</span>

@@ -111,6 +111,18 @@ export function getFeatureFlags({ fresh = false } = {}) {
   return cachedGet('/features', 300000).then(r => r.data);
 }
 
+export function getPublicFlags({ fresh = false } = {}) {
+  // Ship #13. Allow-listed UI flags (currently { homepage_hero }).
+  // Distinct from /features so the public home page doesn't fetch
+  // the full Haiku-internal flag bundle.
+  if (fresh) delete _responseCache['/public/flags'];
+  return cachedGet('/public/flags', 300000).then(r => r.data);
+}
+
+export function toggleHomepageHeroAdmin() {
+  return api.post('/admin/toggle-homepage-hero', {}, { headers: authHeaders() }).then(r => r.data);
+}
+
 export function toggleDuelsAdmin() {
   return api.post('/admin/toggle-duels', {}, { headers: authHeaders() }).then(r => r.data);
 }

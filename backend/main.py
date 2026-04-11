@@ -3154,6 +3154,22 @@ async def lifespan(app):
         except Exception as _pmee:
             print(f"[Startup] ENABLE_PREDICTION_METADATA_ENRICHMENT seed error: {_pmee}")
 
+        # ── ENABLE_HOMEPAGE_HERO flag seed ──────────────────────────────
+        # Default 'false'. Admin flips via POST /api/admin/toggle-homepage-
+        # hero. Gates the new Ship #13 hero band / how-it-works strip /
+        # Receipts rename / first-call CTA on `/`. Frontend-only flag.
+        try:
+            with engine.connect() as _hh_c:
+                _hh_c.execute(sql_text("""
+                    INSERT INTO config (key, value)
+                    VALUES ('ENABLE_HOMEPAGE_HERO', 'false')
+                    ON CONFLICT (key) DO NOTHING
+                """))
+                _hh_c.commit()
+                print("[Startup] ENABLE_HOMEPAGE_HERO flag seeded")
+        except Exception as _hhe:
+            print(f"[Startup] ENABLE_HOMEPAGE_HERO seed error: {_hhe}")
+
         # ── youtube_channel_meta totals backfill ────────────────────────
         # Historical backfill for the admin card counters. Three columns:
         #   - total_predictions_extracted (display)
@@ -4746,6 +4762,62 @@ def toggle_prediction_metadata_enrichment(
             str(new_val.value).strip().lower() == "true" if new_val else False
         )
     }
+
+
+@app.post("/api/admin/toggle-homepage-hero")
+def toggle_homepage_hero(
+    admin_id: int = _Depends(_require_admin),
+    db: _Session = _Depends(_get_db),
+):
+    """Flip ENABLE_HOMEPAGE_HERO between 'true' and 'false'. Ship #13.
+
+    Frontend-only flag — when on, Dashboard.jsx renders the new HeroBand
+    and HowItWorks strip above the existing content and swaps the
+    'Biggest Calls' section header to 'Receipts'. Default false; Nimrod
+    flips manually after browser verification.
+    """
+    from models import Config
+    row = db.query(Config).filter(Config.key == "ENABLE_HOMEPAGE_HERO").first()
+    if row:
+        row.value = "false" if str(row.value).strip().lower() == "true" else "true"
+    else:
+        db.add(Config(key="ENABLE_HOMEPAGE_HERO", value="true"))
+    db.commit()
+    try:
+        from feature_flags import invalidate_homepage_hero_flag_cache
+        invalidate_homepage_hero_flag_cache()
+    except Exception:
+        pass
+    new_val = db.query(Config).filter(Config.key == "ENABLE_HOMEPAGE_HERO").first()
+    return {
+        "homepage_hero": (
+            str(new_val.value).strip().lower() == "true" if new_val else False
+        )
+    }
+
+
+@app.get("/api/public/flags")
+def get_public_flags(db: _Session = _Depends(_get_db)):
+    """Public, unauthenticated, allow-listed UI feature flags.
+
+    Ship #13. Intentionally distinct from `/api/features`: only exposes
+    flags the frontend *renders* against. Adding a flag here is an
+    explicit opt-in — never mirror classifier or Haiku flags through
+    this endpoint.
+    """
+    from sqlalchemy import text as _ft
+    flags = {
+        "homepage_hero": False,
+    }
+    try:
+        row = db.execute(
+            _ft("SELECT value FROM config WHERE key = 'ENABLE_HOMEPAGE_HERO'")
+        ).fetchone()
+        if row:
+            flags["homepage_hero"] = str(row[0]).strip().lower() == "true"
+    except Exception:
+        pass
+    return flags
 
 
 @app.get("/api/admin/timestamp-diagnostics")
