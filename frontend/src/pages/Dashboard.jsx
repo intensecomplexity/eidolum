@@ -163,7 +163,7 @@ export default function Dashboard() {
         </div>
         <Divider />
         {streak >= 1 && (<><StatusItem label="Streak" value={<><Flame className="w-3 h-3 text-orange-400 inline" /> {streak}</>} /><Divider /></>)}
-        <StatusItem label="Pred. Streak" value={`${predStreak}d`} />
+        <StatusItem label="Streak" value={`${predStreak}d`} />
       </div>
       <Link
         to="/submit"
@@ -241,7 +241,7 @@ export default function Dashboard() {
         </div>
       ) : (
         <h2 className="font-semibold text-sm text-muted uppercase tracking-wider mb-3">
-          Biggest Calls
+          Biggest Hits & Misses
         </h2>
       )}
       <div className="space-y-2">
