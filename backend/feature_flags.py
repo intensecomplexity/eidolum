@@ -481,3 +481,46 @@ def invalidate_disclosure_extraction_flag_cache() -> None:
     """Reset the 60-second cache — called from the admin toggle endpoint
     so changes take effect immediately instead of waiting for the TTL."""
     _DISCLOSURE_EXTRACTION_FLAG_CACHE["fetched_at"] = 0.0
+
+
+# ── Source timestamp matching flag ──────────────────────────────────────────
+#
+# Ship #9. When true, the YouTube classifier appends the
+# SOURCE_TIMESTAMP instruction block (12th and last layer of the
+# additive prompt stack) asking Haiku to include a `verbatim_quote`
+# field on every prediction. After extraction, the channel monitor
+# passes the Haiku quote plus the word-level JSON3 transcript (or
+# segment-level fallback) to backend/jobs/timestamp_matcher.py, which
+# resolves the quote to an integer second in the video via a
+# 4-path hybrid (word-level Jaccard → fuzzy SequenceMatcher →
+# two-pass Haiku → NULL). The resolved second flows into
+# source_timestamp_seconds + friends on the Prediction row so the
+# frontend can generate `?t=<sec>s` anchor links and display the
+# exact verbatim quote as an audit tooltip.
+#
+# Default False. The ship is zero-behavior-change until an admin
+# flips the flag, at which point the next classify_video call picks
+# up the 12th instruction block and the monitor starts routing
+# transcript_data through the matcher.
+
+_SOURCE_TIMESTAMPS_FLAG_CACHE: dict = {"enabled": False, "fetched_at": 0.0}
+_SOURCE_TIMESTAMPS_FLAG_TTL = 60  # seconds
+
+
+def is_source_timestamps_enabled(db) -> bool:
+    """Return True if ENABLE_SOURCE_TIMESTAMPS is 'true' in the config
+    table. Default False. Cached 60s so tight classifier loops don't
+    hammer the config table."""
+    now = time.time()
+    if (now - _SOURCE_TIMESTAMPS_FLAG_CACHE["fetched_at"]) < _SOURCE_TIMESTAMPS_FLAG_TTL:
+        return bool(_SOURCE_TIMESTAMPS_FLAG_CACHE["enabled"])
+    enabled = _read_bool(db, "ENABLE_SOURCE_TIMESTAMPS", default=False)
+    _SOURCE_TIMESTAMPS_FLAG_CACHE["enabled"] = enabled
+    _SOURCE_TIMESTAMPS_FLAG_CACHE["fetched_at"] = now
+    return enabled
+
+
+def invalidate_source_timestamps_flag_cache() -> None:
+    """Reset the 60-second cache — called from the admin toggle endpoint
+    so changes take effect immediately instead of waiting for the TTL."""
+    _SOURCE_TIMESTAMPS_FLAG_CACHE["fetched_at"] = 0.0
