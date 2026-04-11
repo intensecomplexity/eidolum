@@ -49,12 +49,33 @@ export default function Navbar() {
     };
   }, [userDropdown]);
 
-  // Close dropdown + search on Escape
+  // Escape closes overlays. ⌘K / Ctrl+K and "/" open search anywhere.
   useEffect(() => {
-    function handle(e) { if (e.key === 'Escape') { setUserDropdown(false); setSearchExpanded(false); } }
+    function handle(e) {
+      if (e.key === 'Escape') {
+        setUserDropdown(false);
+        setSearchExpanded(false);
+        return;
+      }
+      if (e.key === 'k' && (e.metaKey || e.ctrlKey)) {
+        e.preventDefault();
+        setSearchExpanded(true);
+        return;
+      }
+      if (e.key === '/') {
+        const t = e.target;
+        const tag = t && t.tagName;
+        if (tag === 'INPUT' || tag === 'TEXTAREA' || (t && t.isContentEditable)) return;
+        e.preventDefault();
+        setSearchExpanded(true);
+      }
+    }
     document.addEventListener('keydown', handle);
     return () => document.removeEventListener('keydown', handle);
   }, []);
+
+  const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPod|iPad/i.test(navigator.platform);
+  const shortcutHint = isMac ? '\u2318K' : 'Ctrl K';
 
   // Close search on outside click
   useEffect(() => {
@@ -111,11 +132,21 @@ export default function Navbar() {
 
             {/* ── RIGHT: Search + Help + Bell + User dropdown ─────── */}
             <div className="flex items-center gap-2">
-              {/* Desktop search — icon opens an absolute overlay */}
+              {/* Desktop search — icon opens an absolute overlay. The
+                  ⌘K / Ctrl K hint reminds power users of the global
+                  shortcut wired up at the top of this component. */}
               <div className="hidden sm:block" ref={searchRef}>
-                <button onClick={() => setSearchExpanded(true)}
-                  className="flex items-center justify-center w-9 h-9 rounded-lg text-text-secondary hover:text-accent transition-colors" title="Search">
+                <button
+                  type="button"
+                  onClick={() => setSearchExpanded(true)}
+                  aria-label={`Search (${shortcutHint})`}
+                  title={`Search · ${shortcutHint}`}
+                  className="flex items-center gap-1.5 h-9 px-2 rounded-lg text-text-secondary hover:text-accent transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
+                >
                   <Search className="w-4.5 h-4.5" />
+                  <span className="hidden md:inline-block text-[10px] font-mono px-1.5 py-0.5 rounded border border-border text-muted">
+                    {shortcutHint}
+                  </span>
                 </button>
               </div>
               {searchExpanded && (
