@@ -3136,6 +3136,24 @@ async def lifespan(app):
         except Exception as _rfe:
             print(f"[Startup] ENABLE_REGIME_CALL_EXTRACTION seed error: {_rfe}")
 
+        # ── ENABLE_PREDICTION_METADATA_ENRICHMENT flag seed ─────────────
+        # Default 'false'. Admin flips via POST /api/admin/toggle-
+        # prediction-metadata-enrichment. Gates category-aware timeframe
+        # inference + expanded verbatim quotes + conviction classification
+        # and the new rejection paths (no_timeframe, unresolvable_reference).
+        # Ship #9 rescoped.
+        try:
+            with engine.connect() as _pme_c:
+                _pme_c.execute(sql_text("""
+                    INSERT INTO config (key, value)
+                    VALUES ('ENABLE_PREDICTION_METADATA_ENRICHMENT', 'false')
+                    ON CONFLICT (key) DO NOTHING
+                """))
+                _pme_c.commit()
+                print("[Startup] ENABLE_PREDICTION_METADATA_ENRICHMENT flag seeded")
+        except Exception as _pmee:
+            print(f"[Startup] ENABLE_PREDICTION_METADATA_ENRICHMENT seed error: {_pmee}")
+
         # ── youtube_channel_meta totals backfill ────────────────────────
         # Historical backfill for the admin card counters. Three columns:
         #   - total_predictions_extracted (display)
@@ -4209,10 +4227,16 @@ def get_features(db: _Session = _Depends(_get_db)):
         # claim is about drawdown/runup behavior over the window.
         # Default false.
         "regime_call_extraction": False,
+        # Boolean: ship #9 (rescoped). Prediction metadata enrichment —
+        # category-aware timeframe inference + expanded verbatim quotes +
+        # conviction classification + reject-on-unresolvable-reference.
+        # Captures label data the fine-tuning backfill depends on.
+        # Default false.
+        "prediction_metadata_enrichment": False,
     }
     try:
         rows = db.execute(_ft(
-            "SELECT key, value FROM config WHERE key IN ('tournaments_enabled','daily_challenge_enabled','duels_enabled','compete_enabled','compare_analysts_enabled','EVALUATE_X_PREDICTIONS','ENABLE_YOUTUBE_SECTOR_CALLS','ENABLE_RANKED_LIST_EXTRACTION','ENABLE_TARGET_REVISIONS','ENABLE_OPTIONS_POSITION_EXTRACTION','ENABLE_EARNINGS_CALL_EXTRACTION','ENABLE_MACRO_CALL_EXTRACTION','ENABLE_PAIR_CALL_EXTRACTION','ENABLE_BINARY_EVENT_EXTRACTION','ENABLE_METRIC_FORECAST_EXTRACTION','ENABLE_CONDITIONAL_CALL_EXTRACTION','ENABLE_DISCLOSURE_EXTRACTION','ENABLE_SOURCE_TIMESTAMPS','ENABLE_REGIME_CALL_EXTRACTION')"
+            "SELECT key, value FROM config WHERE key IN ('tournaments_enabled','daily_challenge_enabled','duels_enabled','compete_enabled','compare_analysts_enabled','EVALUATE_X_PREDICTIONS','ENABLE_YOUTUBE_SECTOR_CALLS','ENABLE_RANKED_LIST_EXTRACTION','ENABLE_TARGET_REVISIONS','ENABLE_OPTIONS_POSITION_EXTRACTION','ENABLE_EARNINGS_CALL_EXTRACTION','ENABLE_MACRO_CALL_EXTRACTION','ENABLE_PAIR_CALL_EXTRACTION','ENABLE_BINARY_EVENT_EXTRACTION','ENABLE_METRIC_FORECAST_EXTRACTION','ENABLE_CONDITIONAL_CALL_EXTRACTION','ENABLE_DISCLOSURE_EXTRACTION','ENABLE_SOURCE_TIMESTAMPS','ENABLE_REGIME_CALL_EXTRACTION','ENABLE_PREDICTION_METADATA_ENRICHMENT')"
         )).fetchall()
         for r in rows:
             if r[0] == "EVALUATE_X_PREDICTIONS":
@@ -4247,6 +4271,8 @@ def get_features(db: _Session = _Depends(_get_db)):
                 flags["source_timestamps"] = str(r[1]).strip().lower() == "true"
             elif r[0] == "ENABLE_REGIME_CALL_EXTRACTION":
                 flags["regime_call_extraction"] = str(r[1]).strip().lower() == "true"
+            elif r[0] == "ENABLE_PREDICTION_METADATA_ENRICHMENT":
+                flags["prediction_metadata_enrichment"] = str(r[1]).strip().lower() == "true"
             else:
                 flags[r[0].replace("_enabled", "")] = r[1] == "true"
     except Exception:
@@ -4672,6 +4698,51 @@ def toggle_regime_call_extraction(
     new_val = db.query(Config).filter(Config.key == "ENABLE_REGIME_CALL_EXTRACTION").first()
     return {
         "regime_call_extraction": (
+            str(new_val.value).strip().lower() == "true" if new_val else False
+        )
+    }
+
+
+@app.post("/api/admin/toggle-prediction-metadata-enrichment")
+def toggle_prediction_metadata_enrichment(
+    admin_id: int = _Depends(_require_admin),
+    db: _Session = _Depends(_get_db),
+):
+    """Flip ENABLE_PREDICTION_METADATA_ENRICHMENT between 'true' and
+    'false'. Invalidates the feature_flags cache so the new value takes
+    effect on the next classify_video call instead of waiting 60s.
+
+    Ship #9 (rescoped). When on, the classifier appends the
+    METADATA_ENRICHMENT instruction block asking Haiku for:
+      - category-aware inferred_timeframe_days + timeframe_source +
+        timeframe_category (or REJECT if no timeframe determinable)
+      - conviction_level classification (strong / moderate / hedged /
+        hypothetical / unknown)
+      - rejection on unresolvable pronoun references inside the
+        expanded verbatim quote
+    Accepted predictions get the four metadata columns populated on
+    insert; rejected entries route to youtube_scraper_rejections with
+    reason='no_timeframe_determinable' or 'unresolvable_reference' and
+    increment the corresponding scraper_runs counters."""
+    from models import Config
+    row = db.query(Config).filter(
+        Config.key == "ENABLE_PREDICTION_METADATA_ENRICHMENT"
+    ).first()
+    if row:
+        row.value = "false" if str(row.value).strip().lower() == "true" else "true"
+    else:
+        db.add(Config(key="ENABLE_PREDICTION_METADATA_ENRICHMENT", value="true"))
+    db.commit()
+    try:
+        from feature_flags import invalidate_prediction_metadata_enrichment_flag_cache
+        invalidate_prediction_metadata_enrichment_flag_cache()
+    except Exception:
+        pass
+    new_val = db.query(Config).filter(
+        Config.key == "ENABLE_PREDICTION_METADATA_ENRICHMENT"
+    ).first()
+    return {
+        "prediction_metadata_enrichment": (
             str(new_val.value).strip().lower() == "true" if new_val else False
         )
     }

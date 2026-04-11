@@ -558,3 +558,60 @@ def invalidate_regime_call_extraction_flag_cache() -> None:
     """Reset the 60-second cache — called from the admin toggle endpoint
     so changes take effect immediately instead of waiting for the TTL."""
     _REGIME_CALL_EXTRACTION_FLAG_CACHE["fetched_at"] = 0.0
+
+
+# ── Prediction metadata enrichment flag ────────────────────────────────────
+#
+# Ship #9 (rescoped). Single flag gating three extraction-time metadata
+# features that all modify the Haiku output schema and the predictions
+# insert path:
+#
+#   1. Category-aware timeframe inference. Haiku must either extract an
+#      explicit window from the transcript or classify the prediction
+#      into one of 11 categories with a known default window
+#      (macro_thesis → 365d, technical_chart → 30d, …). Predictions
+#      that match neither are REJECTED, not inserted with an invented
+#      3-month default.
+#   2. Expanded verbatim quotes with context. The SOURCE_TIMESTAMP
+#      prompt block is edited to request 20-60 word quotes that include
+#      1-2 sentences BEFORE the prediction so pronoun references ("these
+#      stocks", "it") resolve unambiguously. Predictions whose references
+#      cannot be resolved from the expanded context are REJECTED.
+#   3. Conviction level classification. Every prediction carries
+#      strong/moderate/hedged/hypothetical/unknown. Captured but NOT
+#      scored yet — lives as label data for the fine-tune and shows as
+#      a subtle pill badge on the prediction card.
+#
+# Independent of ENABLE_SOURCE_TIMESTAMPS. The source-timestamp flag
+# controls whether the timestamp matcher runs and whether the
+# (now-expanded) SOURCE_TIMESTAMP instruction block is appended to the
+# stack. The metadata enrichment flag controls whether the new
+# METADATA_ENRICHMENT block is appended and whether timeframe/conviction
+# fields are populated on insert. Flipping metadata without
+# source_timestamps still works — Haiku emits timeframe + conviction,
+# just without a verbatim quote / linked timestamp.
+#
+# Default False. Zero behavior change on deploy until an admin flips
+# the flag in /admin.
+
+_PREDICTION_METADATA_ENRICHMENT_FLAG_CACHE: dict = {"enabled": False, "fetched_at": 0.0}
+_PREDICTION_METADATA_ENRICHMENT_FLAG_TTL = 60  # seconds
+
+
+def is_prediction_metadata_enrichment_enabled(db) -> bool:
+    """Return True if ENABLE_PREDICTION_METADATA_ENRICHMENT is 'true'
+    in the config table. Default False. Cached 60s so tight classifier
+    loops don't hammer the config table."""
+    now = time.time()
+    if (now - _PREDICTION_METADATA_ENRICHMENT_FLAG_CACHE["fetched_at"]) < _PREDICTION_METADATA_ENRICHMENT_FLAG_TTL:
+        return bool(_PREDICTION_METADATA_ENRICHMENT_FLAG_CACHE["enabled"])
+    enabled = _read_bool(db, "ENABLE_PREDICTION_METADATA_ENRICHMENT", default=False)
+    _PREDICTION_METADATA_ENRICHMENT_FLAG_CACHE["enabled"] = enabled
+    _PREDICTION_METADATA_ENRICHMENT_FLAG_CACHE["fetched_at"] = now
+    return enabled
+
+
+def invalidate_prediction_metadata_enrichment_flag_cache() -> None:
+    """Reset the 60-second cache — called from the admin toggle endpoint
+    so changes take effect immediately instead of waiting for the TTL."""
+    _PREDICTION_METADATA_ENRICHMENT_FLAG_CACHE["fetched_at"] = 0.0
