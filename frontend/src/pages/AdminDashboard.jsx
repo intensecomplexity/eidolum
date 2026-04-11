@@ -9,6 +9,7 @@ import {
   deleteForecasterAdmin, deletePredictionAdmin, listPredictionsAdmin,
   getFeatureFlags, toggleDuelsAdmin, toggleCompeteAdmin, toggleCompareAnalystsAdmin,
   toggleEvaluateXAdmin, toggleRankedListExtractionAdmin, toggleTargetRevisionsAdmin,
+  toggleOptionsExtractionAdmin,
   getAdminUrlQuality, getSocialStats,
   getPrunedYouTubeChannels, reactivateYouTubeChannel,
   setYouTubeSectorTraffic,
@@ -126,6 +127,7 @@ function FeatureToggles() {
         { key: 'evaluate_x_predictions', label: 'Evaluate X Predictions', fn: toggleEvaluateXAdmin },
         { key: 'ranked_list_extraction', label: 'YouTube Ranked List Extraction', fn: toggleRankedListExtractionAdmin },
         { key: 'target_revisions', label: 'YouTube Target Revisions', fn: toggleTargetRevisionsAdmin },
+        { key: 'options_position_extraction', label: 'YouTube Options Positions', fn: toggleOptionsExtractionAdmin },
       ].map(f => (
         <div key={f.key} className="flex items-center justify-between py-1.5">
           <span className="text-sm text-text-secondary">{f.label}</span>

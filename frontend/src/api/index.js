@@ -109,6 +109,10 @@ export function toggleTargetRevisionsAdmin() {
   return api.post('/admin/toggle-target-revisions', {}, { headers: authHeaders() }).then(r => r.data);
 }
 
+export function toggleOptionsExtractionAdmin() {
+  return api.post('/admin/toggle-options-extraction', {}, { headers: authHeaders() }).then(r => r.data);
+}
+
 // ——— YouTube Runs Inspector ———
 
 export function getYouTubeRunsAdmin() {
