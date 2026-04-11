@@ -39,8 +39,22 @@ class Forecaster(Base):
     last_synced_at = Column(DateTime, nullable=True)
     last_fetched_video_id = Column(String, nullable=True)
 
+    # Disclosure tracking (ship #8). Disclosures are not predictions —
+    # they're past-tense position statements ("I bought 500 AMD today")
+    # that live in the `disclosures` table. These cached aggregates are
+    # updated by compute_disclosure_follow_through on its daily run so
+    # the leaderboard/profile pages can sort by conviction quality
+    # without re-aggregating on every page load.
+    disclosure_count = Column(Integer, nullable=False, default=0,
+                               server_default="0")
+    avg_follow_through_1m = Column(Numeric(10, 4), nullable=True)
+    avg_follow_through_3m = Column(Numeric(10, 4), nullable=True)
+    avg_follow_through_6m = Column(Numeric(10, 4), nullable=True)
+    avg_follow_through_12m = Column(Numeric(10, 4), nullable=True)
+
     videos = relationship("Video", back_populates="forecaster", cascade="all, delete-orphan")
     predictions = relationship("Prediction", back_populates="forecaster", cascade="all, delete-orphan")
+    disclosures = relationship("Disclosure", back_populates="forecaster", cascade="all, delete-orphan")
 
 
 class Video(Base):
@@ -936,6 +950,66 @@ class ScraperRun(Base):
     # value 'unresolved' is written when the trigger never fires.
     conditional_calls_extracted = Column(Integer, nullable=False, default=0,
                                           server_default="0")
+    # Count of disclosure rows extracted in this run. Ship #8 — the
+    # final ship in the new prediction type series. Unlike the other
+    # ships, disclosures do NOT land in predictions at all; they live
+    # in the `disclosures` table and carry follow-through (1/3/6/12m
+    # return after the disclosed_at date) instead of HIT/NEAR/MISS.
+    # Stays 0 until ENABLE_DISCLOSURE_EXTRACTION is flipped on.
+    disclosures_extracted = Column(Integer, nullable=False, default=0,
+                                    server_default="0")
+
+
+class Disclosure(Base):
+    """Forecaster position disclosures — past-tense statements about
+    what they actually bought, sold, added, trimmed, or hold. NOT a
+    prediction. NOT scored with HIT/NEAR/MISS.
+
+    Scoring is "follow-through": what did the stock do in the 1/3/6/12
+    months after the disclosed_at date? For buy/add/starter/hold
+    actions a POSITIVE return is good follow-through (bought before
+    it went up); for sell/trim/exit a NEGATIVE return is good (sold
+    before it went down). The sign flip is applied at read time by
+    the API endpoints — the raw follow_through_* columns store the
+    unsigned stock return so backfills don't have to re-apply the
+    action sign.
+
+    Dedup key is source_platform_id = 'yt_{video_id}_{ticker}_{action}_{date}'
+    — the same video claiming "I bought 500 AMD today" twice collapses,
+    but a buy + an add in the same video both insert (different
+    actions), and two different days' disclosures on AMD both insert
+    (different source_video_id or different date).
+    """
+    __tablename__ = "disclosures"
+
+    id = Column(Integer, primary_key=True, index=True)
+    forecaster_id = Column(Integer, ForeignKey("forecasters.id"),
+                           nullable=False, index=True)
+    ticker = Column(String(16), nullable=False, index=True)
+    # Action enum — enforced by a CHECK constraint at migration time
+    # (see main.py migration block). Kept as String here so SQLAlchemy
+    # doesn't try to manage a Postgres enum type.
+    action = Column(String(16), nullable=False)
+    # Exactly one of size_shares / size_pct / size_qualitative is
+    # populated; all can be NULL when Haiku didn't extract a size.
+    size_shares = Column(Numeric(12, 2), nullable=True)
+    size_pct = Column(Numeric(5, 4), nullable=True)
+    size_qualitative = Column(String(16), nullable=True)
+    entry_price = Column(Numeric(12, 4), nullable=True)
+    reasoning_text = Column(Text, nullable=True)
+    disclosed_at = Column(DateTime, nullable=False, index=True)
+    source_video_id = Column(String(64), nullable=True)
+    source_platform_id = Column(String(128), unique=True, nullable=True)
+    follow_through_1m = Column(Numeric(10, 4), nullable=True)
+    follow_through_3m = Column(Numeric(10, 4), nullable=True)
+    follow_through_6m = Column(Numeric(10, 4), nullable=True)
+    follow_through_12m = Column(Numeric(10, 4), nullable=True)
+    last_follow_through_update = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, nullable=False,
+                        default=datetime.datetime.utcnow,
+                        server_default=func.now())
+
+    forecaster = relationship("Forecaster", back_populates="disclosures")
 
 
 class YouTubeScraperRejection(Base):

@@ -1465,6 +1465,64 @@ def main():
     except Exception as e:
         log.warning(f"[Worker] conditional_call schema migration: {e}")
 
+    # disclosures table (ship #8) — disclosures are NOT predictions;
+    # they live in their own table. Idempotent CREATE TABLE + indexes +
+    # action CHECK constraint + forecaster follow-through columns +
+    # scraper_runs counter. All ALTERs are ADD COLUMN IF NOT EXISTS.
+    try:
+        with engine.connect() as conn:
+            conn.execute(sql_text("""
+                CREATE TABLE IF NOT EXISTS disclosures (
+                    id SERIAL PRIMARY KEY,
+                    forecaster_id INTEGER NOT NULL REFERENCES forecasters(id) ON DELETE CASCADE,
+                    ticker VARCHAR(16) NOT NULL,
+                    action VARCHAR(16) NOT NULL,
+                    size_shares NUMERIC(12,2),
+                    size_pct NUMERIC(5,4),
+                    size_qualitative VARCHAR(16),
+                    entry_price NUMERIC(12,4),
+                    reasoning_text TEXT,
+                    disclosed_at TIMESTAMP NOT NULL,
+                    source_video_id VARCHAR(64),
+                    source_platform_id VARCHAR(128),
+                    follow_through_1m NUMERIC(10,4),
+                    follow_through_3m NUMERIC(10,4),
+                    follow_through_6m NUMERIC(10,4),
+                    follow_through_12m NUMERIC(10,4),
+                    last_follow_through_update TIMESTAMP,
+                    created_at TIMESTAMP NOT NULL DEFAULT NOW()
+                )
+            """))
+            for _ddl in (
+                "CREATE UNIQUE INDEX IF NOT EXISTS idx_disclosures_source_platform_id "
+                "ON disclosures(source_platform_id) WHERE source_platform_id IS NOT NULL",
+                "CREATE INDEX IF NOT EXISTS idx_disclosures_forecaster ON disclosures(forecaster_id)",
+                "CREATE INDEX IF NOT EXISTS idx_disclosures_ticker ON disclosures(ticker)",
+                "CREATE INDEX IF NOT EXISTS idx_disclosures_disclosed_at ON disclosures(disclosed_at DESC)",
+                "ALTER TABLE forecasters ADD COLUMN IF NOT EXISTS disclosure_count INTEGER NOT NULL DEFAULT 0",
+                "ALTER TABLE forecasters ADD COLUMN IF NOT EXISTS avg_follow_through_1m NUMERIC(10,4)",
+                "ALTER TABLE forecasters ADD COLUMN IF NOT EXISTS avg_follow_through_3m NUMERIC(10,4)",
+                "ALTER TABLE forecasters ADD COLUMN IF NOT EXISTS avg_follow_through_6m NUMERIC(10,4)",
+                "ALTER TABLE forecasters ADD COLUMN IF NOT EXISTS avg_follow_through_12m NUMERIC(10,4)",
+                "ALTER TABLE scraper_runs ADD COLUMN IF NOT EXISTS disclosures_extracted INTEGER NOT NULL DEFAULT 0",
+            ):
+                conn.execute(sql_text(_ddl))
+            conn.execute(sql_text("""
+                DO $$
+                BEGIN
+                    IF NOT EXISTS (
+                        SELECT 1 FROM pg_constraint WHERE conname = 'disclosures_action_check'
+                    ) THEN
+                        ALTER TABLE disclosures ADD CONSTRAINT disclosures_action_check
+                            CHECK (action IN ('buy','sell','add','trim','starter','exit','hold'));
+                    END IF;
+                END$$
+            """))
+            conn.commit()
+        log.info("[Worker] disclosures table + forecaster follow-through columns ready")
+    except Exception as e:
+        log.warning(f"[Worker] disclosure schema migration: {e}")
+
     # predictions.list_id + list_rank — ranked list extraction metadata.
     # Partial index keeps the index small because most rows won't be in
     # lists. No backfill: historical predictions have no ranking data.

@@ -2476,6 +2476,83 @@ async def lifespan(app):
         except Exception as _cce:
             print(f"[Startup] conditional_call schema migration error: {_cce}")
 
+        # ── disclosure schema (ship #8) ────────────────────────────────
+        # Disclosures live in their own table — they are NOT predictions
+        # and don't get scored with HIT/NEAR/MISS. Idempotent.
+        #
+        # The CHECK constraint on action is dropped-and-recreated on
+        # each boot (DO block) so adding a new action value in a
+        # follow-up ship is a one-line migration instead of a Postgres
+        # enum dance.
+        try:
+            with engine.connect() as _dsc_c:
+                _dsc_c.execute(sql_text("""
+                    CREATE TABLE IF NOT EXISTS disclosures (
+                        id SERIAL PRIMARY KEY,
+                        forecaster_id INTEGER NOT NULL REFERENCES forecasters(id) ON DELETE CASCADE,
+                        ticker VARCHAR(16) NOT NULL,
+                        action VARCHAR(16) NOT NULL,
+                        size_shares NUMERIC(12,2),
+                        size_pct NUMERIC(5,4),
+                        size_qualitative VARCHAR(16),
+                        entry_price NUMERIC(12,4),
+                        reasoning_text TEXT,
+                        disclosed_at TIMESTAMP NOT NULL,
+                        source_video_id VARCHAR(64),
+                        source_platform_id VARCHAR(128),
+                        follow_through_1m NUMERIC(10,4),
+                        follow_through_3m NUMERIC(10,4),
+                        follow_through_6m NUMERIC(10,4),
+                        follow_through_12m NUMERIC(10,4),
+                        last_follow_through_update TIMESTAMP,
+                        created_at TIMESTAMP NOT NULL DEFAULT NOW()
+                    )
+                """))
+                _dsc_c.execute(sql_text(
+                    "CREATE UNIQUE INDEX IF NOT EXISTS idx_disclosures_source_platform_id "
+                    "ON disclosures(source_platform_id) "
+                    "WHERE source_platform_id IS NOT NULL"
+                ))
+                _dsc_c.execute(sql_text(
+                    "CREATE INDEX IF NOT EXISTS idx_disclosures_forecaster "
+                    "ON disclosures(forecaster_id)"
+                ))
+                _dsc_c.execute(sql_text(
+                    "CREATE INDEX IF NOT EXISTS idx_disclosures_ticker "
+                    "ON disclosures(ticker)"
+                ))
+                _dsc_c.execute(sql_text(
+                    "CREATE INDEX IF NOT EXISTS idx_disclosures_disclosed_at "
+                    "ON disclosures(disclosed_at DESC)"
+                ))
+                # Action check constraint — drop-and-recreate so adding
+                # a new value later is a one-liner.
+                _dsc_c.execute(sql_text("""
+                    DO $$
+                    BEGIN
+                        IF NOT EXISTS (
+                            SELECT 1 FROM pg_constraint WHERE conname = 'disclosures_action_check'
+                        ) THEN
+                            ALTER TABLE disclosures ADD CONSTRAINT disclosures_action_check
+                                CHECK (action IN ('buy','sell','add','trim','starter','exit','hold'));
+                        END IF;
+                    END$$
+                """))
+                # Forecaster follow-through aggregate columns.
+                for _ddl in (
+                    "ALTER TABLE forecasters ADD COLUMN IF NOT EXISTS disclosure_count INTEGER NOT NULL DEFAULT 0",
+                    "ALTER TABLE forecasters ADD COLUMN IF NOT EXISTS avg_follow_through_1m NUMERIC(10,4)",
+                    "ALTER TABLE forecasters ADD COLUMN IF NOT EXISTS avg_follow_through_3m NUMERIC(10,4)",
+                    "ALTER TABLE forecasters ADD COLUMN IF NOT EXISTS avg_follow_through_6m NUMERIC(10,4)",
+                    "ALTER TABLE forecasters ADD COLUMN IF NOT EXISTS avg_follow_through_12m NUMERIC(10,4)",
+                    "ALTER TABLE scraper_runs ADD COLUMN IF NOT EXISTS disclosures_extracted INTEGER NOT NULL DEFAULT 0",
+                ):
+                    _dsc_c.execute(sql_text(_ddl))
+                _dsc_c.commit()
+                print("[Startup] disclosures table + forecaster follow-through columns ready")
+        except Exception as _dsce:
+            print(f"[Startup] disclosure schema migration error: {_dsce}")
+
         # ── macro_concept_aliases seed ───────────────────────────────
         # Canonical ~50 concepts covering currency, rates, inflation,
         # volatility, commodities, equity macro, international/EM,
