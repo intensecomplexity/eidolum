@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { ChevronDown, Filter, Trophy, Flame, Clock } from 'lucide-react';
 import useSEO from '../hooks/useSEO';
 import LoadingSpinner from '../components/LoadingSpinner';
@@ -94,6 +94,11 @@ function getMetricValue(f, metricKey) {
 export default function Leaderboard() {
   const [data, setData] = useState([]);
   const navigate = useNavigate();
+  // Ship #13B Bug 14: hydrate filter state from the URL once at mount
+  // so a shared link like /leaderboard?sector=Technology&sort=accuracy
+  // lands on the right filter state, then write every change back to
+  // the URL so copy-link captures the current view.
+  const [searchParams, setSearchParams] = useSearchParams();
   // Ship #14 — hover preview of last scored call. Gated on the same
   // hero flag as the other Ship #14 polish so it can ship behind one
   // kill switch.
@@ -101,19 +106,35 @@ export default function Leaderboard() {
   const [previewId, setPreviewId] = useState(null);
   const [weekData, setWeekData] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState('alltime');
+  const [activeTab, setActiveTab] = useState(() => searchParams.get('tab') || 'alltime');
   const [emptyMessage, setEmptyMessage] = useState(null);
-  const [sector, setSector] = useState('All');
-  const [direction, setDirection] = useState('All');
-  const [metric, setMetric] = useState(() => localStorage.getItem('eidolum_metric') || 'avg_return');
+  const [sector, setSector] = useState(() => searchParams.get('sector') || 'All');
+  const [direction, setDirection] = useState(() => searchParams.get('direction') || 'All');
+  const [metric, setMetric] = useState(() => searchParams.get('metric') || localStorage.getItem('eidolum_metric') || 'avg_return');
   const [metricOpen, setMetricOpen] = useState(false);
   const [expandedId, setExpandedId] = useState(null);
   const metricRef = useRef(null);
-  const [timeframe, setTimeframe] = useState('all');
-  const [source, setSource] = useState('all');
-  const [minPreds, setMinPreds] = useState(10);
-  const [showDormant, setShowDormant] = useState(false);
+  const [timeframe, setTimeframe] = useState(() => searchParams.get('timeframe') || 'all');
+  const [source, setSource] = useState(() => searchParams.get('source') || 'all');
+  const [minPreds, setMinPreds] = useState(() => Number(searchParams.get('min_preds')) || 10);
+  const [showDormant, setShowDormant] = useState(() => searchParams.get('dormant') === 'true');
   const [availableTf, setAvailableTf] = useState({ all: true, short: true, medium: true, long: true });
+
+  // Ship #13B Bug 14: write current filter state back to the URL so
+  // copy-link always captures the current view. Uses {replace:true}
+  // to avoid polluting browser history on every dropdown change.
+  useEffect(() => {
+    const next = {};
+    if (activeTab !== 'alltime') next.tab = activeTab;
+    if (sector !== 'All') next.sector = sector;
+    if (direction !== 'All') next.direction = direction;
+    if (metric !== 'avg_return') next.metric = metric;
+    if (timeframe !== 'all') next.timeframe = timeframe;
+    if (source !== 'all') next.source = source;
+    if (minPreds !== 10) next.min_preds = String(minPreds);
+    if (showDormant) next.dormant = 'true';
+    setSearchParams(next, { replace: true });
+  }, [activeTab, sector, direction, metric, timeframe, source, minPreds, showDormant, setSearchParams]);
 
   useEffect(() => {
     getAvailableTimeframes().then(tf => {
