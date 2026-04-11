@@ -381,7 +381,12 @@ export default function ForecasterProfile() {
                       size={72}
                       showCenter
                     />
-                    <div className="flex gap-3 text-[10px]">
+                    {/* Ship #13B Bug 17: pending count lives on the
+                        direction row so readers see that the pie
+                        includes unevaluated calls and numbers match
+                        total_predictions. Previously pending was only
+                        surfaced on the outcome row. */}
+                    <div className="flex gap-3 text-[10px] flex-wrap justify-center">
                       {data.prediction_counts?.bullish > 0 && (
                         <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-positive" /><span className="text-text-secondary">{data.prediction_counts.bullish} Bull</span></span>
                       )}
@@ -390,6 +395,9 @@ export default function ForecasterProfile() {
                       )}
                       {data.prediction_counts?.bearish > 0 && (
                         <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-negative" /><span className="text-text-secondary">{data.prediction_counts.bearish} Bear</span></span>
+                      )}
+                      {(data.prediction_counts?.pending || 0) > 0 && (
+                        <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full" style={{ backgroundColor: '#4b5563' }} /><span className="text-text-secondary">{data.prediction_counts.pending} Pending</span></span>
                       )}
                     </div>
                   </div>
