@@ -3390,14 +3390,16 @@ def health():
 
 
 @app.get("/api/health/scraper-activity")
-def scraper_activity_health(db: "_Session" = None):
+def scraper_activity_health():
     """Public counts-only health signal for background scrapers. Surfaces
     the per-source scraper_runs activity over the last 24h so we can tell
     whether the worker is alive without needing admin auth. No PII, no
     row data — only aggregate counts and timestamps."""
     from sqlalchemy import text as _ft
     from database import get_db as _gdb
-    # Open a fresh session since this endpoint has no Depends
+    # Open a fresh session directly — this endpoint has no Depends
+    # because `_Session` isn't in module globals yet at this file
+    # position, and we only need a short-lived read session.
     gen = _gdb()
     db = next(gen)
     try:
