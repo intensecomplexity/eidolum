@@ -103,10 +103,9 @@ export default function TickerDetail() {
     <div>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-10">
 
-        {/* Back */}
-        <Link to="/consensus" className="inline-flex items-center gap-1 text-muted text-sm mb-4 sm:mb-6 min-h-[44px]">
-          <ArrowLeft className="w-4 h-4" /> Back to Consensus
-        </Link>
+        {/* Smart back: history-aware. Hidden if no internal referrer. */}
+        <SmartBack />
+
 
         {/* ── HEADER ────────────────────────────────────────────────────── */}
         <div className="card mb-6">
@@ -149,11 +148,18 @@ export default function TickerDetail() {
           </div>
           <div className="card py-3 text-center">
             <div className={`text-lg font-mono font-bold ${(hist.accuracy || 0) >= 50 ? 'text-positive' : 'text-negative'}`}>
-              {hist.total_evaluated > 0 ? `${hist.accuracy}%` : '\u2014'}
+              {(hist.total_evaluated || 0) >= 10 ? `${hist.accuracy}%` : '\u2014'}
             </div>
             <div className="text-[10px] text-muted uppercase tracking-wider">Hist. Accuracy</div>
           </div>
         </div>
+
+        {/* Disclaimer when most calls are still in their evaluation window. */}
+        {(hist.total_evaluated || 0) > 0 && (cc.total || 0) / Math.max(1, hist.total_evaluated) > 3 && (
+          <p className="text-[11px] text-muted -mt-3 mb-6 italic">
+            Most calls are still in their evaluation window.
+          </p>
+        )}
 
         {/* ── PRICE CHART WITH PREDICTION MARKERS ──────────────────── */}
         <StockChart ticker={ticker} />
@@ -307,15 +313,27 @@ export default function TickerDetail() {
                 How accurate have analysts been on <span className="font-mono font-bold text-accent">{ticker}</span>?
               </div>
 
-              {/* Overall accuracy */}
-              <div className="flex items-center gap-3 mb-4">
-                <div className={`text-2xl font-mono font-bold ${hist.accuracy >= 50 ? 'text-positive' : 'text-negative'}`}>
-                  {hist.accuracy}%
+              {/* Overall accuracy. n<10 hides the percentage entirely
+                  ('not enough scored calls'); n<30 shows a 'small sample'
+                  caveat next to the count. Both thresholds operate on the
+                  real evaluated count — purely presentational over real data. */}
+              {(hist.total_evaluated || 0) < 10 ? (
+                <div className="text-xs text-muted mb-4">
+                  Not enough scored calls yet ({hist.total_evaluated || 0}).
                 </div>
-                <div className="text-xs text-muted">
-                  historical accuracy ({hist.correct}/{hist.total_evaluated} correct)
+              ) : (
+                <div className="flex items-center gap-3 mb-4 flex-wrap">
+                  <div className={`text-2xl font-mono font-bold ${hist.accuracy >= 50 ? 'text-positive' : 'text-negative'}`}>
+                    {hist.accuracy}%
+                  </div>
+                  <div className="text-xs text-muted">
+                    historical accuracy ({hist.correct}/{hist.total_evaluated} correct)
+                    {hist.total_evaluated < 30 && (
+                      <span className="text-muted/80"> · small sample</span>
+                    )}
+                  </div>
                 </div>
-              </div>
+              )}
 
               {hist.avg_target && (
                 <div className="text-xs text-muted mb-4">
@@ -384,6 +402,26 @@ export default function TickerDetail() {
   );
 }
 
+
+function SmartBack() {
+  // Hide entirely if there's no internal referrer (cold-load, external visit).
+  if (typeof document === 'undefined') return null;
+  const ref = document.referrer || '';
+  const sameOrigin = ref && ref.startsWith(window.location.origin);
+  if (!sameOrigin) return null;
+  const fromConsensus = ref.includes('/consensus');
+  const label = fromConsensus ? 'Back to Consensus' : 'Back';
+  return (
+    <button
+      type="button"
+      onClick={() => window.history.back()}
+      className="inline-flex items-center gap-1 text-muted text-sm mb-4 sm:mb-6 min-h-[44px] hover:text-accent transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 rounded"
+      aria-label={label}
+    >
+      <ArrowLeft className="w-4 h-4" /> {label}
+    </button>
+  );
+}
 
 function OutcomeBadge({ outcome }) {
   const cfg = {
