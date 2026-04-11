@@ -1,5 +1,5 @@
 import datetime
-from sqlalchemy import Column, Integer, BigInteger, SmallInteger, String, Float, DateTime, ForeignKey, Text, Numeric, Boolean, JSON, UniqueConstraint, CheckConstraint, func
+from sqlalchemy import Column, Integer, BigInteger, SmallInteger, String, Float, DateTime, Date, ForeignKey, Text, Numeric, Boolean, JSON, UniqueConstraint, CheckConstraint, func
 from sqlalchemy.orm import relationship
 from database import Base
 
@@ -176,6 +176,23 @@ class Prediction(Base):
     pair_long_ticker = Column(String(16), nullable=True)
     pair_short_ticker = Column(String(16), nullable=True)
     pair_spread_return = Column(Numeric(10, 4), nullable=True)
+    # Binary-event metadata for prediction_category='binary_event_call'
+    # rows. Binary event calls are yes/no predictions on discrete
+    # checkable events ("Fed will cut 50bps in March", "AAPL will split
+    # by end of 2026"). event_type is REUSED from the earnings_call ship
+    # (see above) and extended here with: fed_decision / corporate_action
+    # / mna / ipo / index_inclusion / economic_declaration / regulatory /
+    # other. expected_outcome_text holds a natural language description
+    # of the event Haiku extracted. event_deadline is the hard cutoff —
+    # if the event doesn't happen by this date, the row scores MISS.
+    # event_resolved_at + event_resolution_source are set by the
+    # evaluator when a real-world data source confirms the outcome; they
+    # stay NULL until the follow-up ship plumbs in FRED / FOMC /
+    # corporate-action data. All NULL on every non-binary row.
+    expected_outcome_text = Column(Text, nullable=True)
+    event_deadline = Column(Date, nullable=True)
+    event_resolved_at = Column(DateTime, nullable=True)
+    event_resolution_source = Column(String(64), nullable=True)
     confidence_tier = Column(Numeric(3, 2), nullable=False, default=1.0)
     # Position disclosure fields: NULL for price_target predictions.
     position_action = Column(String(16), nullable=True)   # open|add|trim|exit
@@ -833,6 +850,12 @@ class ScraperRun(Base):
     # ENABLE_PAIR_CALL_EXTRACTION is flipped on.
     pair_calls_extracted = Column(Integer, nullable=False, default=0,
                                    server_default="0")
+    # Count of binary_event_call predictions extracted in this run.
+    # Ship #6 of the new prediction types. Binary events are yes/no
+    # calls on discrete checkable events with a hard deadline. Stays 0
+    # until ENABLE_BINARY_EVENT_EXTRACTION is flipped on.
+    binary_events_extracted = Column(Integer, nullable=False, default=0,
+                                      server_default="0")
 
 
 class YouTubeScraperRejection(Base):

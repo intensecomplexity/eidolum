@@ -1355,6 +1355,44 @@ def main():
     except Exception as e:
         log.warning(f"[Worker] pair_call schema migration: {e}")
 
+    # predictions binary-event columns + scraper_runs.binary_events_extracted
+    # + partial index — ship #6 of the new prediction types
+    # (binary_event_call). Yes/no predictions on discrete checkable
+    # events. event_type is reused from the earnings_call ship; the
+    # four new columns are scoped to prediction_category=
+    # 'binary_event_call' and stay NULL on every other row.
+    try:
+        with engine.connect() as conn:
+            conn.execute(sql_text(
+                "ALTER TABLE predictions ADD COLUMN IF NOT EXISTS "
+                "expected_outcome_text TEXT"
+            ))
+            conn.execute(sql_text(
+                "ALTER TABLE predictions ADD COLUMN IF NOT EXISTS "
+                "event_deadline DATE"
+            ))
+            conn.execute(sql_text(
+                "ALTER TABLE predictions ADD COLUMN IF NOT EXISTS "
+                "event_resolved_at TIMESTAMP"
+            ))
+            conn.execute(sql_text(
+                "ALTER TABLE predictions ADD COLUMN IF NOT EXISTS "
+                "event_resolution_source VARCHAR(64)"
+            ))
+            conn.execute(sql_text(
+                "CREATE INDEX IF NOT EXISTS idx_predictions_binary_event "
+                "ON predictions(event_type, event_deadline) "
+                "WHERE event_type IS NOT NULL AND event_deadline IS NOT NULL"
+            ))
+            conn.execute(sql_text(
+                "ALTER TABLE scraper_runs ADD COLUMN IF NOT EXISTS "
+                "binary_events_extracted INTEGER NOT NULL DEFAULT 0"
+            ))
+            conn.commit()
+        log.info("[Worker] predictions binary-event columns + scraper_runs.binary_events_extracted ready")
+    except Exception as e:
+        log.warning(f"[Worker] binary_event_call schema migration: {e}")
+
     # predictions.list_id + list_rank — ranked list extraction metadata.
     # Partial index keeps the index small because most rows won't be in
     # lists. No backfill: historical predictions have no ranking data.
