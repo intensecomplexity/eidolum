@@ -129,6 +129,25 @@ def evaluate_batch(max_tickers: int | None = None) -> dict:
     except Exception as _ce:
         print(f"[HistEval] conditional_call pass error: {_ce}")
 
+    # ── STEP 0.5: Structural scoring for regime_call predictions ───────
+    # regime_call rows carry NO price target — their scoring rule is a
+    # per-type function over drawdown/runup/new-high/new-low metrics.
+    # The sweep runs before the main loop so the rows are already
+    # evaluated and the main loop's ticker-grouped ticker_call path
+    # doesn't accidentally re-process them with the wrong scorer.
+    try:
+        _regime_stats = _process_regime_calls(now)
+        if any(_regime_stats.values()):
+            print(
+                f"[HistEval] regime_call pass: "
+                f"scored={_regime_stats['scored']} "
+                f"no_data={_regime_stats['no_data']} "
+                f"not_ready={_regime_stats['not_ready']}",
+                flush=True,
+            )
+    except Exception as _re:
+        print(f"[HistEval] regime_call pass error: {_re}")
+
     # ── STEP 1: Read pending predictions (short DB connection) ──────────
     # Whitelist: only US tickers are supported by Polygon/Tiingo/FMP. A US
     # ticker is 1-5 uppercase letters (AAPL, NVDA, F) or 2-3 letters + dot +
@@ -1282,6 +1301,298 @@ def _process_conditional_calls(now: datetime) -> dict:
     except Exception as _e:
         db.rollback()
         print(f"[HistEval] conditional_call update error: {_e}")
+    finally:
+        db.close()
+    return counters
+
+
+# ── Regime call structural scoring ─────────────────────────────────────────
+#
+# Unlike every other scored prediction type, regime_call outcome is
+# NOT derived from final price vs target. It is derived from the
+# STRUCTURE of the window: max drawdown, max runup, and new-high /
+# new-low behavior. Each regime_type has its own pass/fail rule below.
+# See the ship spec for the rule table.
+
+
+def _compute_regime_metrics(closes: list[float]) -> dict:
+    """Compute the shared metric bundle used by every regime rule.
+
+    Returns a dict with:
+      - window_start_price
+      - final_price
+      - window_high, window_low
+      - max_drawdown_from_high: peak-to-trough drawdown anywhere in the window
+      - max_drawdown_from_start: largest drop below window_start
+      - max_runup: largest gain above window_start (reaches window_high)
+      - new_highs: count of closes > window_start_price * 1.01
+      - new_lows:  count of closes < window_start_price * 0.99
+      - range_pct: (window_high - window_low) / window_start_price
+    """
+    window_start_price = closes[0]
+    final_price = closes[-1]
+    window_high = max(closes)
+    window_low = min(closes)
+
+    # Peak-to-trough drawdown anywhere in the window.
+    max_dd_from_high = 0.0
+    running_high = closes[0]
+    for p in closes:
+        if p > running_high:
+            running_high = p
+        if running_high > 0:
+            dd = (running_high - p) / running_high
+            if dd > max_dd_from_high:
+                max_dd_from_high = dd
+
+    max_dd_from_start = max(
+        0.0,
+        (window_start_price - window_low) / window_start_price
+        if window_start_price > 0 else 0.0,
+    )
+    max_runup = (
+        (window_high - window_start_price) / window_start_price
+        if window_start_price > 0 else 0.0
+    )
+
+    new_highs = sum(1 for p in closes if p > window_start_price * 1.01)
+    new_lows = sum(1 for p in closes if p < window_start_price * 0.99)
+
+    range_pct = (
+        (window_high - window_low) / window_start_price
+        if window_start_price > 0 else 0.0
+    )
+
+    return {
+        "window_start_price": window_start_price,
+        "final_price": final_price,
+        "window_high": window_high,
+        "window_low": window_low,
+        "max_dd_from_high": max_dd_from_high,
+        "max_dd_from_start": max_dd_from_start,
+        "max_runup": max_runup,
+        "new_highs": new_highs,
+        "new_lows": new_lows,
+        "range_pct": range_pct,
+    }
+
+
+def _score_regime_call(regime_type: str, m: dict) -> str:
+    """Apply the regime-specific HIT/NEAR/MISS rule to a metrics bundle
+    produced by _compute_regime_metrics. Returns 'hit' | 'near' | 'miss'.
+    """
+    window_start_price = m["window_start_price"]
+    final_price = m["final_price"]
+    window_high = m["window_high"]
+    window_low = m["window_low"]
+    dd_from_high = m["max_dd_from_high"]
+    dd_from_start = m["max_dd_from_start"]
+    new_highs = m["new_highs"]
+    new_lows = m["new_lows"]
+    range_pct = m["range_pct"]
+
+    if regime_type == "bull_continuing":
+        if dd_from_high <= 0.10 and new_highs >= 1:
+            return "hit"
+        if dd_from_high <= 0.15 and final_price >= window_high * 0.95:
+            return "near"
+        return "miss"
+
+    if regime_type == "bull_starting":
+        if final_price >= window_start_price * 1.10 and new_lows == 0:
+            return "hit"
+        if final_price >= window_start_price * 1.05 and new_lows == 0:
+            return "near"
+        return "miss"
+
+    if regime_type == "topping":
+        if dd_from_start >= 0.10 and final_price < window_start_price * 0.95:
+            return "hit"
+        if 0.05 <= dd_from_start < 0.10:
+            return "near"
+        return "miss"
+
+    if regime_type == "bear_starting":
+        if final_price <= window_start_price * 0.90 and new_lows >= 1:
+            return "hit"
+        if final_price <= window_start_price * 0.95:
+            return "near"
+        return "miss"
+
+    if regime_type == "bear_continuing":
+        if new_lows >= 1 and final_price <= window_start_price * 0.95:
+            return "hit"
+        # Flat or small decline counts as partial credit: the bear is
+        # stalling but hasn't been reversed.
+        if (final_price <= window_start_price * 1.00
+                and final_price > window_start_price * 0.97):
+            return "near"
+        return "miss"
+
+    if regime_type == "bottoming":
+        if final_price >= window_start_price * 1.05 and new_lows == 0:
+            return "hit"
+        if final_price >= window_start_price * 0.97 and new_lows == 0:
+            return "near"
+        return "miss"
+
+    if regime_type == "correction":
+        recovery_threshold = window_high * 0.97
+        if 0.05 <= dd_from_high <= 0.15 and final_price >= recovery_threshold:
+            return "hit"
+        if 0.15 < dd_from_high <= 0.20 and final_price >= window_high * 0.90:
+            return "near"
+        return "miss"
+
+    if regime_type == "consolidation":
+        if range_pct <= 0.08:
+            return "hit"
+        if range_pct <= 0.15:
+            return "near"
+        return "miss"
+
+    # Unknown regime type — bail rather than score as miss
+    return "miss"
+
+
+def _fetch_regime_closes(ticker: str) -> list[tuple]:
+    """Return the cached (date_str, close) history for a ticker in
+    chronological order. Wraps _fetch_history so each regime row
+    doesn't re-hit the price API.
+    """
+    prices = _fetch_history(ticker, None, None)
+    if not prices:
+        return []
+    # Drop sentinel keys (anything starting with '_') and sort by date.
+    filtered = [(k, v) for k, v in prices.items() if not str(k).startswith("_")]
+    filtered.sort()
+    return filtered
+
+
+def _closes_in_window(history: list[tuple], start_date, end_date) -> list[float]:
+    """Slice a cached history list to [start_date, end_date] inclusive
+    and return the close prices only, in chronological order."""
+    sd = start_date.date() if hasattr(start_date, "date") else start_date
+    ed = end_date.date() if hasattr(end_date, "date") else end_date
+    out = []
+    for ds, close in history:
+        try:
+            parts = str(ds).split("-")
+            d = _date(int(parts[0]), int(parts[1]), int(parts[2]))
+        except Exception:
+            continue
+        if d < sd or d > ed:
+            continue
+        try:
+            out.append(float(close))
+        except (TypeError, ValueError):
+            continue
+    return out
+
+
+def _process_regime_calls(now: datetime) -> dict:
+    """Score eligible regime_call rows.
+
+    A row is eligible when its evaluation_date has passed and its
+    outcome is still pending. For each eligible row we fetch the
+    instrument's close history for the window, compute the metric
+    bundle via _compute_regime_metrics, apply the per-regime rule,
+    and write outcome + regime_max_drawdown/runup/new_highs/new_lows
+    back in a single UPDATE per row. All price fetching reuses the
+    _history_cache populated by the main evaluator loop, so a
+    subsequent ticker_call scoring pass on the same instrument is
+    a cache hit.
+    """
+    from database import BgSessionLocal as SessionLocal
+    counters = {"scored": 0, "no_data": 0, "not_ready": 0}
+
+    db = SessionLocal()
+    try:
+        rows = db.execute(sql_text("""
+            SELECT id, regime_type, regime_instrument,
+                   prediction_date, evaluation_date
+            FROM predictions
+            WHERE prediction_category = 'regime_call'
+              AND (outcome = 'pending' OR outcome IS NULL OR outcome = '')
+              AND regime_type IS NOT NULL
+              AND regime_instrument IS NOT NULL
+            LIMIT 1000
+        """)).fetchall()
+    except Exception as _e:
+        db.close()
+        return counters
+
+    if not rows:
+        db.close()
+        return counters
+
+    updates: list[tuple] = []  # (id, outcome, metrics, summary, ret_pct)
+
+    for r in rows:
+        (pid, regime_type, instrument, prediction_date, evaluation_date) = r
+
+        if not evaluation_date or evaluation_date > now:
+            counters["not_ready"] += 1
+            continue
+
+        history = _fetch_regime_closes(instrument)
+        if not history:
+            counters["no_data"] += 1
+            continue
+
+        closes = _closes_in_window(history, prediction_date, evaluation_date)
+        if len(closes) < 10:
+            counters["no_data"] += 1
+            continue
+
+        metrics = _compute_regime_metrics(closes)
+        outcome = _score_regime_call(regime_type, metrics)
+        counters["scored"] += 1
+
+        ret_pct = round(
+            (metrics["final_price"] - metrics["window_start_price"])
+            / metrics["window_start_price"] * 100,
+            2,
+        ) if metrics["window_start_price"] else 0.0
+
+        label = regime_type.replace("_", " ").title()
+        summary = (
+            f"Regime {label} on {instrument}: "
+            f"max_dd={metrics['max_dd_from_high']*100:.1f}% "
+            f"runup={metrics['max_runup']*100:.1f}% "
+            f"new_highs={metrics['new_highs']} new_lows={metrics['new_lows']} "
+            f"→ {outcome}"
+        )
+        updates.append((pid, outcome, metrics, summary[:500], ret_pct))
+
+    try:
+        for pid, outcome, metrics, summary, ret_pct in updates:
+            db.execute(sql_text("""
+                UPDATE predictions
+                SET outcome = :o,
+                    actual_return = :r,
+                    evaluation_summary = :s,
+                    evaluated_at = :now,
+                    regime_max_drawdown = :dd,
+                    regime_max_runup = :ru,
+                    regime_new_highs = :nh,
+                    regime_new_lows = :nl
+                WHERE id = :id
+            """), {
+                "o": outcome,
+                "r": ret_pct,
+                "s": summary,
+                "now": now,
+                "dd": round(metrics["max_dd_from_high"], 4),
+                "ru": round(metrics["max_runup"], 4),
+                "nh": int(metrics["new_highs"]),
+                "nl": int(metrics["new_lows"]),
+                "id": pid,
+            })
+        db.commit()
+    except Exception as _e:
+        db.rollback()
+        print(f"[HistEval] regime_call update error: {_e}")
     finally:
         db.close()
     return counters
