@@ -272,3 +272,35 @@ def invalidate_earnings_extraction_flag_cache() -> None:
     """Reset the 60-second cache — called from the admin toggle endpoint
     so changes take effect immediately instead of waiting for the TTL."""
     _EARNINGS_EXTRACTION_FLAG_CACHE["fetched_at"] = 0.0
+
+
+# ── Macro call extraction flag ──────────────────────────────────────────────
+#
+# Boolean all-or-nothing flag. When true, the YouTube classifier appends
+# the macro-call instruction block to the Haiku system prompt so
+# macroeconomic vocabulary (dollar, rates, inflation, volatility, gold,
+# oil, recession, yield curve, emerging markets, …) gets extracted as a
+# macro_call prediction with a concept name. The insert path then
+# resolves the concept to a tradeable ETF via the macro_concept_aliases
+# table and stores the row with prediction_category='macro_call'.
+
+_MACRO_EXTRACTION_FLAG_CACHE: dict = {"enabled": False, "fetched_at": 0.0}
+_MACRO_EXTRACTION_FLAG_TTL = 60  # seconds
+
+
+def is_macro_extraction_enabled(db) -> bool:
+    """Return True if ENABLE_MACRO_CALL_EXTRACTION is 'true' in the
+    config table. Default False. Cached 60s."""
+    now = time.time()
+    if (now - _MACRO_EXTRACTION_FLAG_CACHE["fetched_at"]) < _MACRO_EXTRACTION_FLAG_TTL:
+        return bool(_MACRO_EXTRACTION_FLAG_CACHE["enabled"])
+    enabled = _read_bool(db, "ENABLE_MACRO_CALL_EXTRACTION", default=False)
+    _MACRO_EXTRACTION_FLAG_CACHE["enabled"] = enabled
+    _MACRO_EXTRACTION_FLAG_CACHE["fetched_at"] = now
+    return enabled
+
+
+def invalidate_macro_extraction_flag_cache() -> None:
+    """Reset the 60-second cache — called from the admin toggle endpoint
+    so changes take effect immediately instead of waiting for the TTL."""
+    _MACRO_EXTRACTION_FLAG_CACHE["fetched_at"] = 0.0

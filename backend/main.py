@@ -2588,6 +2588,23 @@ async def lifespan(app):
         except Exception as _efe:
             print(f"[Startup] ENABLE_EARNINGS_CALL_EXTRACTION seed error: {_efe}")
 
+        # ── ENABLE_MACRO_CALL_EXTRACTION flag seed ──────────────────────
+        # Default 'false'. Admin flips via POST /api/admin/toggle-macro-
+        # extraction. Teaches Haiku to map macro vocabulary to a
+        # canonical concept, then the insert path resolves the concept
+        # to a tradeable ETF via macro_concept_aliases.
+        try:
+            with engine.connect() as _mf_c:
+                _mf_c.execute(sql_text("""
+                    INSERT INTO config (key, value)
+                    VALUES ('ENABLE_MACRO_CALL_EXTRACTION', 'false')
+                    ON CONFLICT (key) DO NOTHING
+                """))
+                _mf_c.commit()
+                print("[Startup] ENABLE_MACRO_CALL_EXTRACTION flag seeded")
+        except Exception as _mfe:
+            print(f"[Startup] ENABLE_MACRO_CALL_EXTRACTION seed error: {_mfe}")
+
         # ── youtube_channel_meta totals backfill ────────────────────────
         # Historical backfill for the admin card counters. Three columns:
         #   - total_predictions_extracted (display)
@@ -3616,10 +3633,14 @@ def get_features(db: _Session = _Depends(_get_db)):
         # instructions and tags ticker_call rows with event_type='earnings'.
         # Default false.
         "earnings_call_extraction": False,
+        # Boolean: macro_call extraction appends the macro instructions
+        # and resolves macro concepts to ETF proxies via macro_concept_aliases.
+        # Default false.
+        "macro_call_extraction": False,
     }
     try:
         rows = db.execute(_ft(
-            "SELECT key, value FROM config WHERE key IN ('tournaments_enabled','daily_challenge_enabled','duels_enabled','compete_enabled','compare_analysts_enabled','EVALUATE_X_PREDICTIONS','ENABLE_YOUTUBE_SECTOR_CALLS','ENABLE_RANKED_LIST_EXTRACTION','ENABLE_TARGET_REVISIONS','ENABLE_OPTIONS_POSITION_EXTRACTION','ENABLE_EARNINGS_CALL_EXTRACTION')"
+            "SELECT key, value FROM config WHERE key IN ('tournaments_enabled','daily_challenge_enabled','duels_enabled','compete_enabled','compare_analysts_enabled','EVALUATE_X_PREDICTIONS','ENABLE_YOUTUBE_SECTOR_CALLS','ENABLE_RANKED_LIST_EXTRACTION','ENABLE_TARGET_REVISIONS','ENABLE_OPTIONS_POSITION_EXTRACTION','ENABLE_EARNINGS_CALL_EXTRACTION','ENABLE_MACRO_CALL_EXTRACTION')"
         )).fetchall()
         for r in rows:
             if r[0] == "EVALUATE_X_PREDICTIONS":
@@ -3638,6 +3659,8 @@ def get_features(db: _Session = _Depends(_get_db)):
                 flags["options_position_extraction"] = str(r[1]).strip().lower() == "true"
             elif r[0] == "ENABLE_EARNINGS_CALL_EXTRACTION":
                 flags["earnings_call_extraction"] = str(r[1]).strip().lower() == "true"
+            elif r[0] == "ENABLE_MACRO_CALL_EXTRACTION":
+                flags["macro_call_extraction"] = str(r[1]).strip().lower() == "true"
             else:
                 flags[r[0].replace("_enabled", "")] = r[1] == "true"
     except Exception:
@@ -3808,6 +3831,34 @@ def toggle_earnings_extraction(
     new_val = db.query(Config).filter(Config.key == "ENABLE_EARNINGS_CALL_EXTRACTION").first()
     return {
         "earnings_call_extraction": (
+            str(new_val.value).strip().lower() == "true" if new_val else False
+        )
+    }
+
+
+@app.post("/api/admin/toggle-macro-extraction")
+def toggle_macro_extraction(
+    admin_id: int = _Depends(_require_admin),
+    db: _Session = _Depends(_get_db),
+):
+    """Flip ENABLE_MACRO_CALL_EXTRACTION between 'true' and 'false'.
+    Invalidates the feature_flags cache so changes take effect on the
+    next classify_video call instead of waiting 60s for the TTL."""
+    from models import Config
+    row = db.query(Config).filter(Config.key == "ENABLE_MACRO_CALL_EXTRACTION").first()
+    if row:
+        row.value = "false" if str(row.value).strip().lower() == "true" else "true"
+    else:
+        db.add(Config(key="ENABLE_MACRO_CALL_EXTRACTION", value="true"))
+    db.commit()
+    try:
+        from feature_flags import invalidate_macro_extraction_flag_cache
+        invalidate_macro_extraction_flag_cache()
+    except Exception:
+        pass
+    new_val = db.query(Config).filter(Config.key == "ENABLE_MACRO_CALL_EXTRACTION").first()
+    return {
+        "macro_call_extraction": (
             str(new_val.value).strip().lower() == "true" if new_val else False
         )
     }
