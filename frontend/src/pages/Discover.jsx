@@ -6,7 +6,7 @@ import Footer from '../components/Footer';
 import PageHeader from '../components/PageHeader';
 import { useFeatures } from '../context/FeatureContext';
 import TickerLogo from '../components/TickerLogo';
-import { searchTickers, getTrendingTickers, getSectors, getExpiringPredictions, getLeaderboard } from '../api';
+import { searchTickers, getTrendingTickers, getSectors, getExpiringPredictions, getLeaderboard, getHomepageData } from '../api';
 
 function formatBullBear(bull, bear) {
   const total = bull + bear;
@@ -25,6 +25,7 @@ export default function Discover() {
   const [sectors, setSectors] = useState([]);
   const [expiring, setExpiring] = useState([]);
   const [risingStar, setRisingStar] = useState([]);
+  const [mostDivided, setMostDivided] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -33,7 +34,8 @@ export default function Discover() {
       getSectors().catch(() => []),
       getExpiringPredictions().catch(() => []),
       getLeaderboard({ sort: 'accuracy', limit: 100 }).catch(() => []),
-    ]).then(([t, s, e, lb]) => {
+      getHomepageData().catch(() => null),
+    ]).then(([t, s, e, lb, hp]) => {
       setTrending(t);
       setSectors(s);
       setExpiring(e.slice(0, 10));
@@ -43,6 +45,14 @@ export default function Discover() {
         .sort((a, b) => b.accuracy_rate - a.accuracy_rate)
         .slice(0, 6);
       setRisingStar(stars);
+      // Most Divided comes from /homepage-data, which runs the same
+      // SQL (ORDER BY ABS(bull_pct - 0.5), HAVING COUNT >= 10) the
+      // homepage uses. Deriving it from `trending` here was wrong —
+      // trending is ordered by volume so we'd only see the highest-
+      // volume tickers sorted by how close they happen to be to
+      // 50/50, which is why TSLA 69/31, AAPL 73/27, NFLX 81/19
+      // were showing up instead of the real split crowd.
+      setMostDivided(Array.isArray(hp?.most_divided) ? hp.most_divided : []);
     }).finally(() => setLoading(false));
   }, []);
 
@@ -60,11 +70,11 @@ export default function Discover() {
     }
   }
 
-  // Derived: most divided tickers (closest to 50/50)
-  const divided = [...trending]
-    .map(t => ({ ...t, split: Math.abs(t.bull_pct - 50) }))
-    .sort((a, b) => a.split - b.split)
-    .slice(0, 5);
+  // Most divided now comes pre-sorted from the /homepage-data SQL. Don't
+  // re-derive from `trending` — that list is volume-ordered and would
+  // just show the biggest-volume tickers sorted by their accidental
+  // distance from 50/50.
+  const divided = mostDivided.slice(0, 5);
 
   if (loading) return <div className="flex items-center justify-center min-h-[60vh]"><LoadingSpinner size="lg" /></div>;
 
@@ -139,21 +149,24 @@ export default function Discover() {
               <AlertTriangle className="w-4 h-4 text-warning" /> Most Divided
             </h2>
             <div className="space-y-2">
-              {divided.map(t => (
-                <Link key={t.ticker} to={`/asset/${t.ticker}`}
-                  className="card py-3 flex items-center justify-between hover:bg-surface-2 transition-colors">
-                  <div className="flex items-center gap-2">
-                    <TickerLogo ticker={t.ticker} logoUrl={t.logo_url} size={20} />
-                    <span className="font-mono text-accent font-bold">{t.ticker}</span>
-                    <span className="text-text-secondary text-sm">{t.name}</span>
-                  </div>
-                  <div className="flex items-center gap-2 text-xs font-mono">
-                    <span className="text-positive">{t.bull_pct}% Bull</span>
-                    <span className="text-muted">vs</span>
-                    <span className="text-negative">{100 - t.bull_pct}% Bear</span>
-                  </div>
-                </Link>
-              ))}
+              {divided.map(t => {
+                const bullPct = Math.round(t.bull_pct ?? 50);
+                return (
+                  <Link key={t.ticker} to={`/asset/${t.ticker}`}
+                    className="card py-3 flex items-center justify-between hover:bg-surface-2 transition-colors">
+                    <div className="flex items-center gap-2">
+                      <TickerLogo ticker={t.ticker} logoUrl={t.logo_url} size={20} />
+                      <span className="font-mono text-accent font-bold">{t.ticker}</span>
+                      <span className="text-text-secondary text-sm">{t.name || t.company_name}</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-xs font-mono">
+                      <span className="text-positive">{bullPct}% Bull</span>
+                      <span className="text-muted">vs</span>
+                      <span className="text-negative">{100 - bullPct}% Bear</span>
+                    </div>
+                  </Link>
+                );
+              })}
             </div>
           </div>
         )}
