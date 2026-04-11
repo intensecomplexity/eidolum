@@ -113,6 +113,10 @@ export function toggleOptionsExtractionAdmin() {
   return api.post('/admin/toggle-options-extraction', {}, { headers: authHeaders() }).then(r => r.data);
 }
 
+export function toggleEarningsExtractionAdmin() {
+  return api.post('/admin/toggle-earnings-extraction', {}, { headers: authHeaders() }).then(r => r.data);
+}
+
 // ——— YouTube Runs Inspector ———
 
 export function getYouTubeRunsAdmin() {
