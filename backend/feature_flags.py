@@ -376,3 +376,39 @@ def invalidate_binary_event_extraction_flag_cache() -> None:
     """Reset the 60-second cache — called from the admin toggle endpoint
     so changes take effect immediately instead of waiting for the TTL."""
     _BINARY_EVENT_EXTRACTION_FLAG_CACHE["fetched_at"] = 0.0
+
+
+# ── Metric forecast extraction flag ─────────────────────────────────────────
+#
+# Boolean all-or-nothing flag. When true, the YouTube classifier appends
+# the metric-forecast instruction block to the Haiku system prompt so
+# numerical metric predictions ("NVDA will report $5.20 EPS", "CPI
+# prints 3.2%", "unemployment ticks up to 4.5%") extract as a new
+# prediction_category='metric_forecast_call' with a canonical
+# metric_type, metric_target, optional metric_period and metric_release_date.
+# Company metrics (EPS / revenue / guidance_eps / …) get resolved at
+# scoring time via the earnings_history table populated by the FMP
+# bulk harvest. Macro metrics (CPI / unemployment / GDP / …) are
+# stubbed pending real BLS / BEA / FRED plumbing in a follow-up ship.
+
+_METRIC_FORECAST_FLAG_CACHE: dict = {"enabled": False, "fetched_at": 0.0}
+_METRIC_FORECAST_FLAG_TTL = 60  # seconds
+
+
+def is_metric_forecast_enabled(db) -> bool:
+    """Return True if ENABLE_METRIC_FORECAST_EXTRACTION is 'true' in
+    the config table. Default False. Cached 60s so tight classifier
+    loops don't hammer the config table."""
+    now = time.time()
+    if (now - _METRIC_FORECAST_FLAG_CACHE["fetched_at"]) < _METRIC_FORECAST_FLAG_TTL:
+        return bool(_METRIC_FORECAST_FLAG_CACHE["enabled"])
+    enabled = _read_bool(db, "ENABLE_METRIC_FORECAST_EXTRACTION", default=False)
+    _METRIC_FORECAST_FLAG_CACHE["enabled"] = enabled
+    _METRIC_FORECAST_FLAG_CACHE["fetched_at"] = now
+    return enabled
+
+
+def invalidate_metric_forecast_flag_cache() -> None:
+    """Reset the 60-second cache — called from the admin toggle endpoint
+    so changes take effect immediately instead of waiting for the TTL."""
+    _METRIC_FORECAST_FLAG_CACHE["fetched_at"] = 0.0
