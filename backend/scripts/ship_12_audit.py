@@ -37,7 +37,7 @@ import re
 import sys
 from typing import Dict, List, Sequence, Tuple
 
-RULE_VERSION = "v12.1"
+RULE_VERSION = "v12.2"
 
 REASONS: Tuple[str, ...] = (
     "disclosure_misroute",
@@ -91,10 +91,14 @@ _PRONOUN_OPENER_RE = re.compile(
 _CASHTAG_RE = re.compile(r"\$[A-Z]{1,5}\b")
 
 # Basket phrases that the extractor force-assigned to a single ticker.
+# v12.2: dropped bare singular sector nouns (semis, semiconductors, banks,
+# miners, airlines, retailers) — they collide with proper-noun company
+# names like "Alaska Airlines", "NXP Semiconductors", "Bank of America"
+# and produce false positives. Also dropped "all of them" because it
+# usually refers to non-stock plurals (DD posts, comments, etc).
 _BASKET_RE = re.compile(
-    r"\b(?:semis|semiconductors|banks|miners|airlines|retailers|"
-    r"mag\s*7|magnificent\s+seven|faang|the\s+group|the\s+sector|"
-    r"the\s+space|all\s+of\s+them|these\s+names|these\s+stocks|"
+    r"\b(?:mag\s*7|magnificent\s+seven|faang|the\s+group|the\s+sector|"
+    r"the\s+space|these\s+names|these\s+stocks|"
     r"the\s+basket|the\s+index|small\s+caps|large\s+caps|mid\s+caps|"
     r"growth\s+names|value\s+names|chinese\s+stocks|eu\s+stocks)\b",
     re.IGNORECASE,
