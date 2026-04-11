@@ -69,6 +69,7 @@ import SmartMoney from './pages/SmartMoney';
 import Tournaments from './pages/Tournaments';
 import HowItWorks from './pages/HowItWorks';
 import FirmProfile from './pages/FirmProfile';
+import NotFound from './pages/NotFound';
 import OnboardingOverlay from './components/OnboardingOverlay';
 import VaultDoorSplash from './components/VaultDoorSplash';
 import ComparisonTray from './components/ComparisonTray';
@@ -169,6 +170,12 @@ export default function App() {
         <Route path="/firm/:slug" element={<FirmProfile />} />
         <Route path="/earnings" element={<EarningsPage />} />
         <Route path="/compete/tournaments" element={<Tournaments />} />
+        {/* Ship #13B Bug 11: catch-all 404. Must stay at the bottom so
+            every explicit route above wins first. Route-specific not-
+            found states still fire (e.g. /forecaster/99999999 renders
+            ForecasterProfile's own "not found"), and only truly
+            unmatched paths fall through to this component. */}
+        <Route path="*" element={<NotFound />} />
       </Routes>
       <SaveToast />
       <ComparisonTray />
