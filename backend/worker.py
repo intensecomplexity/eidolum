@@ -1868,6 +1868,30 @@ def main():
             log.error(f"[channel_monitor] {e}")
     sched.add_job(_standalone("channel_monitor", _channel_monitor), "interval", hours=12, id="channel_monitor", next_run_time=t0 + timedelta(minutes=90), executor='default')
 
+    # Disclosure follow-through (ship #8) — daily sweep that
+    # computes 1/3/6/12-month stock returns for every disclosure
+    # whose post-disclosure window has elapsed. Runs even when the
+    # flag is off; if no disclosures exist the function is a no-op.
+    # Starts 2h after worker boot so the first run doesn't race the
+    # schema migration.
+    def _disclosure_follow_through():
+        try:
+            from jobs.disclosure_follow_through import compute_disclosure_follow_through
+            db = BgSessionLocal()
+            try:
+                compute_disclosure_follow_through(db)
+            finally:
+                db.close()
+        except Exception as e:
+            log.error(f"[disclosure_follow_through] {e}")
+    sched.add_job(
+        _standalone("disclosure_follow_through", _disclosure_follow_through),
+        "interval", hours=24,
+        id="disclosure_follow_through",
+        next_run_time=t0 + timedelta(hours=2),
+        executor='default',
+    )
+
     # Cross-service work queue drain. Polls scraper_job_queue every
     # 60s and runs any pending rows on the worker container (where
     # scraping env vars live). Uses _standalone so it doesn't acquire
