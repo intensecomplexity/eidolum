@@ -882,6 +882,135 @@ Rules:
 Output JSON only. Be concise."""
 
 
+# Metric-forecast instructions. Appended to the active prompt when
+# ENABLE_METRIC_FORECAST_EXTRACTION is flipped on. Teaches Haiku to
+# recognize numerical metric predictions — a specific reported value
+# for a specific metric at a specific release date. Distinct from
+# earnings_call (which predicts price reaction to earnings) and from
+# binary_event_call (which predicts yes/no events). Lands as a NEW
+# prediction_category='metric_forecast_call'. The metric_type field
+# MUST come from the inlined allowlist — unknown metric types are
+# rejected, not silently widened.
+YOUTUBE_HAIKU_METRIC_FORECAST_INSTRUCTIONS = """METRIC FORECAST CALLS:
+If the speaker predicts a specific numerical value for a known reported metric (EPS, revenue, CPI, unemployment, PMI, …), emit it as a metric_forecast_call. These are scored against the actual released value using category-based tolerance (±5% for EPS/revenue/growth, ±0.1pp for rates like CPI/unemployment, ±10% for count metrics like payrolls).
+
+Distinguish carefully:
+- "AAPL will report $2.10 EPS next Thursday" → metric_forecast_call (predicts the number)
+- "AAPL will pop 10% after earnings" → earnings_call (predicts the price reaction, NOT the number)
+- "Fed hikes 25bps in March" → binary_event_call (discrete policy action, yes/no)
+- "CPI will come in at 3.2% next month" → metric_forecast_call (predicts the released rate)
+- "Inflation is going higher" → macro_call (concept-level bullish, no specific number)
+
+metric_type allowlist — MUST use one of these canonical names verbatim as the `metric_type` field. Unknown metrics (data center revenue, customer satisfaction, churn, etc) are REJECTED — let ticker_call / earnings_call handle those instead.
+
+COMPANY metrics (require a ticker):
+  metric_type        format              description
+  eps                decimal dollars     next-quarter earnings per share
+  revenue            absolute dollars    next-quarter total revenue (e.g. 95000000000 for $95B)
+  guidance_eps       decimal dollars     forward EPS guidance issued on the call
+  guidance_revenue   absolute dollars    forward revenue guidance
+  subscribers        count               subscriber count (services companies)
+  same_store_sales   decimal rate        SSS growth rate (e.g. 0.06 for 6%)
+  margin             decimal rate        operating or gross margin (e.g. 0.42 for 42%)
+  users              count               monthly/daily active users
+  free_cash_flow     absolute dollars    quarterly FCF
+  growth_yoy         decimal rate        year-over-year growth rate (any category)
+
+MACRO metrics (ticker optional — omit or set null):
+  metric_type        format              description
+  cpi                decimal rate        headline Consumer Price Index (YoY)
+  core_cpi           decimal rate        Core CPI ex food and energy
+  pce                decimal rate        PCE inflation
+  gdp_growth         decimal rate        quarterly GDP growth rate
+  unemployment       decimal rate        unemployment rate (e.g. 0.045 for 4.5%)
+  nonfarm_payrolls   count               jobs added (e.g. 250000 for 250K)
+  jolts              count               job openings
+  pmi_manufacturing  index level         manufacturing PMI (e.g. 48.5)
+  pmi_services       index level         services PMI
+  retail_sales       decimal rate        retail sales month-over-month
+  housing_starts     count               housing starts (annualized)
+  ism_manufacturing  index level         ISM manufacturing index
+
+Rules on parsing metric_target:
+- Convert all percentages to decimal form: "3.2%" → 0.032, "6 percent growth" → 0.06, "4.5% unemployment" → 0.045.
+- Revenue: always absolute dollars. "$95 billion" → 95000000000. "$2B" → 2000000000.
+- EPS: decimal dollars. "$5.20 EPS" → 5.20. "$2 and 10 cents" → 2.10.
+- Counts: absolute integer. "250K jobs" → 250000. "1.2 million subscribers" → 1200000.
+- If the forecaster gives a RANGE ("$5.15 to $5.25"), use the MIDPOINT (5.20).
+- If the forecaster just says "a beat" / "a miss" without a number, DO NOT EMIT metric_forecast_call — let earnings_call pick it up.
+
+Required fields on every metric_forecast_call output:
+- metric_type: one of the allowlist values above
+- metric_target: the predicted numerical value in the natural unit
+- metric_release_date: ISO YYYY-MM-DD when the actual value will be released. For company metrics this is usually the next earnings date. For macro metrics it is the scheduled data release. If the forecaster gives no date, default to:
+    * company metrics → +90 days from publish date
+    * macro metrics → +30 days from publish date
+- metric_period: OPTIONAL free-form period label ("Q1_2026", "fiscal_2026", "Jan_2026", "2026-Q2"). Omit if unclear.
+- ticker: REQUIRED for company metrics, OPTIONAL for macro metrics (omit or set null)
+- direction: "bullish" if the forecaster frames it as a beat, "bearish" for a miss, "neutral" for a pure number prediction with no beat/miss framing. Pure number predictions default to "neutral".
+- derived_from: "metric_forecast_call"
+
+Output format:
+{
+  "ticker": "NVDA",
+  "metric_type": "eps",
+  "metric_target": 5.20,
+  "metric_period": "Q1_2026",
+  "metric_release_date": "2026-05-21",
+  "direction": "bullish",
+  "derived_from": "metric_forecast_call",
+  "context_quote": "NVIDIA is going to report five twenty EPS next quarter"
+}
+
+Examples:
+
+Input: "NVDA will report $5.20 EPS next Wednesday"
+Output: {"ticker": "NVDA", "metric_type": "eps", "metric_target": 5.20, "metric_release_date": "2026-04-15", "direction": "neutral", "derived_from": "metric_forecast_call", "context_quote": "NVDA will report $5.20 EPS next Wednesday"}
+
+Input: "AAPL revenue coming in around $95 billion this quarter"
+Output: {"ticker": "AAPL", "metric_type": "revenue", "metric_target": 95000000000, "metric_period": "Q2_2026", "metric_release_date": "2026-05-01", "direction": "neutral", "derived_from": "metric_forecast_call", "context_quote": "AAPL revenue around $95 billion this quarter"}
+
+Input: "Meta's services growing 15% year over year"
+Output: {"ticker": "META", "metric_type": "growth_yoy", "metric_target": 0.15, "metric_period": "Q1_2026", "metric_release_date": "2026-04-26", "direction": "bullish", "derived_from": "metric_forecast_call", "context_quote": "Meta services growing 15% year over year"}
+
+Input: "CPI is going to print 3.2% next month"
+Output: {"metric_type": "cpi", "metric_target": 0.032, "metric_release_date": "2026-05-13", "direction": "neutral", "derived_from": "metric_forecast_call", "context_quote": "CPI going to print 3.2% next month"}
+
+Input: "Unemployment ticks up to 4.5% in the next jobs report"
+Output: {"metric_type": "unemployment", "metric_target": 0.045, "metric_release_date": "2026-05-02", "direction": "bearish", "derived_from": "metric_forecast_call", "context_quote": "unemployment ticks up to 4.5% in the next jobs report"}
+
+Input: "Apple guides for $2.20 EPS next quarter"
+Output: {"ticker": "AAPL", "metric_type": "guidance_eps", "metric_target": 2.20, "metric_period": "Q3_2026", "metric_release_date": "2026-08-01", "direction": "bullish", "derived_from": "metric_forecast_call", "context_quote": "Apple guides for $2.20 EPS next quarter"}
+
+Input: "Tesla will report between $0.60 and $0.70 EPS this quarter"
+Output: {"ticker": "TSLA", "metric_type": "eps", "metric_target": 0.65, "metric_release_date": "2026-04-24", "direction": "neutral", "derived_from": "metric_forecast_call", "context_quote": "Tesla will report between $0.60 and $0.70 EPS this quarter"}
+(range → midpoint)
+
+Input: "Nonfarm payrolls will come in at 200 thousand next Friday"
+Output: {"metric_type": "nonfarm_payrolls", "metric_target": 200000, "metric_release_date": "2026-05-02", "direction": "neutral", "derived_from": "metric_forecast_call", "context_quote": "nonfarm payrolls at 200 thousand next Friday"}
+
+Input: "NVIDIA is going to have good earnings"
+Output: (do NOT extract as metric_forecast_call — no specific number. Let earnings_call handle as a directional call.)
+
+Input: "They'll report strong numbers eventually"
+Output: (do NOT extract — no release date, no specific metric, vague.)
+
+Input: "NVDA data center revenue hits $30 billion"
+Output: (do NOT extract — data center revenue is a segment, NOT in the allowlist. Emit as a ticker_call if there's a directional view, otherwise skip.)
+
+Rules:
+- MUST set derived_from: "metric_forecast_call".
+- MUST use metric_type from the allowlist above verbatim.
+- MUST provide metric_target as a number in the natural unit (decimal rate for percentages, absolute dollars for revenue, absolute count for payrolls, decimal dollars for EPS).
+- MUST provide metric_release_date — use the default fallback if the forecaster doesn't name one, but NEVER leave it null.
+- MUST include ticker for every COMPANY metric. MAY omit ticker for MACRO metrics.
+- MUST NOT emit for metrics outside the allowlist — let ticker_call / earnings_call / macro_call handle those.
+- MUST NOT emit for vague "good earnings" / "strong numbers" statements without a specific target.
+- If the same metric prediction appears twice in a transcript, emit once — the dedup layer collapses duplicates on (metric_type, period, target).
+
+Output JSON only. Be concise."""
+
+
 # ── Transcript fetching ─────────────────────────────────────────────────────
 
 def _build_transcript_api():
@@ -1120,6 +1249,7 @@ def classify_video(channel_name: str, title: str, publish_date: str,
     use_macro = False
     use_pair = False
     use_binary_event = False
+    use_metric_forecast = False
     if db is not None and video_id:
         try:
             from feature_flags import should_use_sector_prompt
@@ -1170,15 +1300,22 @@ def classify_video(channel_name: str, title: str, publish_date: str,
         except Exception as _e:
             log.warning("[YT-CLF] binary event flag check failed: %s", _e)
             use_binary_event = False
+        try:
+            from feature_flags import is_metric_forecast_enabled
+            use_metric_forecast = is_metric_forecast_enabled(db)
+        except Exception as _e:
+            log.warning("[YT-CLF] metric forecast flag check failed: %s", _e)
+            use_metric_forecast = False
     base_system = YOUTUBE_HAIKU_SECTOR_SYSTEM if use_sector_prompt else HAIKU_SYSTEM
     # Append optional instruction blocks ONLY when each flag is on. When
     # every flag is off (the default), base_system is sent byte-for-byte
     # unchanged so Anthropic's prompt cache hit rate on the base prompt
     # stays at 100%. Order matters for cache hits: ranked list → revisions
-    # → options → earnings → macro → pair → binary_event, stable across
-    # calls with any combination of flags on so extended-prompt cache
-    # entries match. (conditional_call slots in between pair and
-    # binary_event when it lands — this append order leaves room.)
+    # → options → earnings → macro → pair → binary_event → metric_forecast,
+    # stable across calls with any combination of flags on so extended-
+    # prompt cache entries match. (conditional_call slots in between pair
+    # and binary_event when it lands; disclosure slots AFTER metric_forecast
+    # when that ship lands — the append order leaves room for both.)
     active_system = base_system
     if use_ranked_list:
         active_system = active_system + "\n\n" + YOUTUBE_HAIKU_RANKED_LIST_INSTRUCTIONS
@@ -1194,6 +1331,8 @@ def classify_video(channel_name: str, title: str, publish_date: str,
         active_system = active_system + "\n\n" + YOUTUBE_HAIKU_PAIR_INSTRUCTIONS
     if use_binary_event:
         active_system = active_system + "\n\n" + YOUTUBE_HAIKU_BINARY_EVENT_INSTRUCTIONS
+    if use_metric_forecast:
+        active_system = active_system + "\n\n" + YOUTUBE_HAIKU_METRIC_FORECAST_INSTRUCTIONS
     telemetry["prompt_variant"] = "sector" if use_sector_prompt else "standard"
     telemetry["ranked_list_enabled"] = bool(use_ranked_list)
     telemetry["revisions_enabled"] = bool(use_revisions)
@@ -1202,6 +1341,7 @@ def classify_video(channel_name: str, title: str, publish_date: str,
     telemetry["macro_enabled"] = bool(use_macro)
     telemetry["pair_enabled"] = bool(use_pair)
     telemetry["binary_event_enabled"] = bool(use_binary_event)
+    telemetry["metric_forecast_enabled"] = bool(use_metric_forecast)
     print(
         f"[YOUTUBE-HAIKU] video={video_id or '?'} channel={channel_name} "
         f"prompt_variant={telemetry['prompt_variant']} "
@@ -1211,7 +1351,8 @@ def classify_video(channel_name: str, title: str, publish_date: str,
         f"earnings={'on' if use_earnings else 'off'} "
         f"macro={'on' if use_macro else 'off'} "
         f"pair={'on' if use_pair else 'off'} "
-        f"binary_event={'on' if use_binary_event else 'off'}",
+        f"binary_event={'on' if use_binary_event else 'off'} "
+        f"metric_forecast={'on' if use_metric_forecast else 'off'}",
         flush=True,
     )
 
@@ -1328,6 +1469,68 @@ _BINARY_EVENT_TYPES = {
     "regulatory",
     "other",
 }
+# Canonical allowlist for metric_forecast_call metric_type values.
+# Kept in sync with YOUTUBE_HAIKU_METRIC_FORECAST_INSTRUCTIONS above —
+# the prompt teaches Haiku the exact vocabulary and this set enforces
+# it on the validator side. Unknown metric types drop on the floor.
+# Split into COMPANY vs MACRO so the insert path can apply the
+# ticker-required rule and so the evaluator can route to
+# earnings_history lookups (company) vs stubbed resolvers (macro).
+_METRIC_FORECAST_COMPANY_TYPES = {
+    "eps",
+    "revenue",
+    "guidance_eps",
+    "guidance_revenue",
+    "subscribers",
+    "same_store_sales",
+    "margin",
+    "users",
+    "free_cash_flow",
+    "growth_yoy",
+}
+_METRIC_FORECAST_MACRO_TYPES = {
+    "cpi",
+    "core_cpi",
+    "pce",
+    "gdp_growth",
+    "unemployment",
+    "nonfarm_payrolls",
+    "jolts",
+    "pmi_manufacturing",
+    "pmi_services",
+    "retail_sales",
+    "housing_starts",
+    "ism_manufacturing",
+}
+_METRIC_FORECAST_TYPES = _METRIC_FORECAST_COMPANY_TYPES | _METRIC_FORECAST_MACRO_TYPES
+# Scoring category buckets — used by _score_metric_forecast in
+# jobs/evaluator.py to pick the right tolerance band. Relative metrics
+# score on % error of the target; percentage-point metrics score on
+# absolute difference in decimal rate; count metrics score on % error
+# of the target with a looser band.
+_METRIC_RELATIVE_SCORING = {
+    # Company metrics that are absolute dollar / integer values — score
+    # on percent error of the target.
+    "eps", "revenue", "guidance_eps", "guidance_revenue",
+    "subscribers", "users", "free_cash_flow",
+    # Growth / margin rates — also scored on percent error since a
+    # 1pp miss on a 42% margin is smaller than a 1pp miss on 6% SSS.
+    "same_store_sales", "margin", "growth_yoy",
+}
+_METRIC_PERCENTAGE_POINT_SCORING = {
+    # Macro rates reported in percentage points — score on absolute
+    # decimal-rate difference (0.001 = 0.1pp).
+    "cpi", "core_cpi", "pce", "gdp_growth", "unemployment",
+    "retail_sales",
+}
+_METRIC_COUNT_SCORING = {
+    # Count / index-level metrics — score on percent error of the
+    # target, but with a looser band than _METRIC_RELATIVE_SCORING
+    # because these reports are noisy (employment revisions, PMI
+    # bounces) and a 10% miss is still a reasonable forecast.
+    "nonfarm_payrolls", "jolts", "housing_starts",
+    "pmi_manufacturing", "pmi_services", "ism_manufacturing",
+}
 
 
 def _validate_and_dedupe_predictions(raw: list) -> list[dict]:
@@ -1348,6 +1551,7 @@ def _validate_and_dedupe_predictions(raw: list) -> list[dict]:
     seen_macros: set[tuple[str, str]] = set()
     seen_pairs: set[tuple[str, str]] = set()
     seen_binary_events: set[tuple[str, str]] = set()
+    seen_metrics: set[tuple[str, str, str]] = set()
     out: list[dict] = []
     for p in raw:
         if not isinstance(p, dict):
@@ -1437,6 +1641,69 @@ def _validate_and_dedupe_predictions(raw: list) -> list[dict]:
                 p["ticker"] = raw_tkr
             else:
                 p["ticker"] = f"__event__{raw_evtype}"
+            out.append(p)
+            continue
+
+        # Metric-forecast branch: derived_from='metric_forecast_call'
+        # with metric_type (from allowlist), numeric metric_target, and
+        # metric_release_date. Direction is "bullish"/"bearish"/"neutral"
+        # — it's a free choice (forecaster may frame as beat or just
+        # quote a number). ticker required for company metrics,
+        # optional for macro metrics. Dedupe on
+        # (metric_type, metric_period_or_release, target-rounded) so
+        # repeated mentions of the same forecast collapse.
+        if str(p.get("derived_from") or "").strip().lower() == "metric_forecast_call":
+            mt = (p.get("metric_type") or "").strip().lower()
+            if mt not in _METRIC_FORECAST_TYPES:
+                continue
+            raw_target = p.get("metric_target")
+            try:
+                target_num = float(raw_target)
+            except (TypeError, ValueError):
+                continue
+            # Sanity bound — reject absurd values to catch parse errors.
+            # Allow negative (e.g. negative EPS losses, negative growth).
+            if not (-1e15 < target_num < 1e15):
+                continue
+            raw_release = p.get("metric_release_date")
+            if not raw_release:
+                continue
+            try:
+                from datetime import datetime as _dt
+                release = _dt.strptime(str(raw_release)[:10], "%Y-%m-%d").date()
+            except (TypeError, ValueError):
+                continue
+            mp = (p.get("metric_period") or "").strip()[:16] or None
+            direction = (p.get("direction") or "neutral").strip().lower()
+            if direction not in _VALID_DIRECTIONS:
+                direction = "neutral"
+            # Dedup key: (metric_type, period-or-release-iso, rounded-target).
+            # Rounding target to 6 sig figures so "$5.20" and "$5.200001"
+            # collapse. Period used when present for company metrics;
+            # release_date used for macro metrics.
+            period_key = mp or release.isoformat()
+            target_key = f"{target_num:.6g}"
+            key = (mt, period_key, target_key)
+            if key in seen_metrics:
+                continue
+            seen_metrics.add(key)
+            # Normalize ticker (may be absent for macro metrics).
+            raw_tkr = (p.get("ticker") or "").upper().strip().lstrip("$")
+            raw_tkr = re.sub(r"[^A-Z0-9]", "", raw_tkr)
+            if raw_tkr and len(raw_tkr) <= 5:
+                p["ticker"] = raw_tkr
+            else:
+                # Macro metric placeholder so downstream logging
+                # doesn't KeyError on p["ticker"]. The insert path
+                # rewrites this to a sentinel for storage.
+                p["ticker"] = f"__metric__{mt}"
+            p["direction"] = direction
+            p["_kind"] = "metric_forecast_call"
+            p["_metric_type"] = mt
+            p["_metric_target"] = target_num
+            p["_metric_period"] = mp
+            p["_metric_release_date"] = release
+            p["_derived_from"] = "metric_forecast_call"
             out.append(p)
             continue
 
@@ -1555,17 +1822,17 @@ def _validate_and_dedupe_predictions(raw: list) -> list[dict]:
         # by the insert path to route the row and increment the per-run
         # counter for the matching sub-type. Canonical values:
         # 'options_position', 'earnings_call', 'macro_call', 'pair_call',
-        # 'binary_event_call'. pair_call and binary_event_call rows
-        # never reach this branch (they're handled above and skipped
-        # via `continue`) but we keep those values in the accepted set
-        # for symmetry with future refactors.
+        # 'binary_event_call', 'metric_forecast_call'. pair_call,
+        # binary_event_call, and metric_forecast_call rows never reach
+        # this branch (they're handled above and skipped via `continue`)
+        # but we keep those values in the accepted set for symmetry.
         raw_derived = p.get("derived_from")
         derived_from = None
         if raw_derived is not None:
             _rd = str(raw_derived).strip().lower()
             if _rd in (
                 "options_position", "earnings_call", "macro_call",
-                "pair_call", "binary_event_call",
+                "pair_call", "binary_event_call", "metric_forecast_call",
             ):
                 derived_from = _rd
 
@@ -2696,5 +2963,217 @@ def insert_youtube_binary_event_prediction(
     if stats is not None:
         stats["binary_events_extracted"] = int(
             stats.get("binary_events_extracted", 0)
+        ) + 1
+    return True
+
+
+def _metric_forecast_exists_cross_scraper(
+    metric_type: str, period_key: str, forecaster_id: int, prediction_date, db,
+) -> bool:
+    """Metric-forecast variant of prediction_exists_cross_scraper.
+
+    Dedup key is (metric_type, metric_period|release_date, forecaster,
+    date) within a 24h window. The LIKE match on source_platform_id
+    keeps cross-scraper dedup cheap without needing a dedicated
+    composite index — the source_id encodes the period_key at insert
+    time so a matching row prefix means a matching logical forecast.
+    """
+    if not (metric_type and period_key and forecaster_id and prediction_date):
+        return False
+    try:
+        from datetime import timedelta
+        date_start = prediction_date - timedelta(hours=24)
+        date_end = prediction_date + timedelta(hours=24)
+        row = db.execute(sql_text("""
+            SELECT 1 FROM predictions
+            WHERE prediction_category = 'metric_forecast_call'
+              AND metric_type = :mt
+              AND forecaster_id = :fid
+              AND source_platform_id LIKE :sid_like
+              AND prediction_date BETWEEN :ds AND :de
+            LIMIT 1
+        """), {
+            "mt": metric_type,
+            "fid": int(forecaster_id),
+            "sid_like": f"%_metric_{metric_type}_{period_key}%",
+            "ds": date_start,
+            "de": date_end,
+        }).first()
+    except Exception as _e:
+        log.warning("[YT-CLF] metric_forecast cross-scraper dedup failed: %s", _e)
+        return False
+    return row is not None
+
+
+def insert_youtube_metric_forecast_prediction(
+    pred: dict,
+    *,
+    channel_name: str,
+    channel_id: str | None,
+    video_id: str,
+    video_title: str,
+    publish_date: datetime,
+    db,
+    transcript_snippet: str | None = None,
+    stats: dict | None = None,
+) -> bool:
+    """Insert a metric_forecast_call prediction.
+
+    Stores the row with prediction_category='metric_forecast_call'
+    (NEW category) and the six new metric_* columns populated from the
+    validator's stamped fields. Direction is a free choice (bullish /
+    bearish / neutral) — the forecaster may frame the prediction as
+    a beat, a miss, or a pure number. The scoring path in the
+    evaluator uses metric_target vs metric_actual with category-based
+    tolerance; direction does NOT enter the scoring calculation.
+
+    ticker policy:
+      - Company metrics (eps, revenue, guidance_*, subscribers, etc):
+        ticker is REQUIRED and must pass validate_ticker_in_db.
+      - Macro metrics (cpi, unemployment, gdp_growth, etc): ticker is
+        OPTIONAL. We store a sentinel 'MACRO' in the ticker column
+        (existing NOT NULL constraint) and leave the semantic metric
+        information in metric_type.
+
+    Rejection paths (all log to youtube_scraper_rejections):
+      - metric_type not in allowlist → 'metric_forecast_invalid_type'
+      - missing / non-numeric metric_target → 'metric_forecast_invalid_target'
+      - missing metric_release_date → 'metric_forecast_missing_release'
+      - ticker required but invalid → 'metric_forecast_invalid_ticker'
+      - per-video dedup hit → 'dedup_collision'
+      - cross-scraper dedup hit → 'cross_scraper_dupe'
+      - forecaster create failure → 'forecaster_creation_failed'
+    """
+    from models import Prediction
+
+    def _reject(reason: str, hr: str | None = None) -> bool:
+        log_youtube_rejection(
+            db,
+            video_id=video_id,
+            channel_id=channel_id,
+            channel_name=channel_name,
+            video_title=video_title,
+            video_published_at=publish_date,
+            reason=reason,
+            haiku_reason=hr,
+            haiku_raw=pred,
+            transcript_snippet=transcript_snippet,
+            stats=stats,
+        )
+        return False
+
+    metric_type = (pred.get("_metric_type") or pred.get("metric_type") or "").strip().lower()
+    raw_target = pred.get("_metric_target")
+    if raw_target is None:
+        raw_target = pred.get("metric_target")
+    release = pred.get("_metric_release_date")
+    period = pred.get("_metric_period") or pred.get("metric_period") or None
+    direction = (pred.get("direction") or "neutral").strip().lower()
+    if direction not in _VALID_DIRECTIONS:
+        direction = "neutral"
+
+    if metric_type not in _METRIC_FORECAST_TYPES:
+        return _reject("metric_forecast_invalid_type", hr=metric_type or None)
+    try:
+        target_num = float(raw_target)
+    except (TypeError, ValueError):
+        return _reject("metric_forecast_invalid_target", hr=str(raw_target)[:120])
+    if not release:
+        return _reject("metric_forecast_missing_release", hr=metric_type)
+
+    is_company = metric_type in _METRIC_FORECAST_COMPANY_TYPES
+
+    # Ticker handling. Company metrics require a real ticker; macro
+    # metrics fall back to the 'MACRO' sentinel.
+    raw_ticker = (pred.get("ticker") or "").upper().strip().lstrip("$")
+    raw_ticker = re.sub(r"[^A-Z0-9]", "", raw_ticker)
+    ticker_to_store: str
+    if raw_ticker and not raw_ticker.startswith("METRIC") and len(raw_ticker) <= 5:
+        if validate_ticker_in_db(raw_ticker, db):
+            ticker_to_store = raw_ticker
+        elif is_company:
+            return _reject("metric_forecast_invalid_ticker", hr=raw_ticker)
+        else:
+            ticker_to_store = "MACRO"
+    elif is_company:
+        return _reject("metric_forecast_invalid_ticker", hr=metric_type)
+    else:
+        ticker_to_store = "MACRO"
+
+    # Per-video dedup: canonical source_platform_id embeds metric_type
+    # and period_key so two different forecasts in the same video
+    # insert as separate rows but the same forecast mentioned twice
+    # collapses.
+    period_key = (period or release.isoformat()).replace(" ", "_")[:24]
+    target_key = f"{target_num:.6g}".replace(".", "p").replace("-", "n")
+    source_id = f"yt_{video_id}_metric_{metric_type}_{period_key}_{target_key}"
+    if db.execute(
+        sql_text("SELECT 1 FROM predictions WHERE source_platform_id = :sid LIMIT 1"),
+        {"sid": source_id},
+    ).first():
+        if stats is not None:
+            stats["items_deduped"] = int(stats.get("items_deduped", 0)) + 1
+        return _reject("dedup_collision", hr=f"{metric_type}/{period_key}")
+
+    forecaster = find_or_create_youtube_forecaster(channel_name, channel_id, db)
+    if not forecaster:
+        return _reject("forecaster_creation_failed")
+
+    if _metric_forecast_exists_cross_scraper(
+        metric_type, period_key, forecaster.id, publish_date, db,
+    ):
+        if stats is not None:
+            stats["items_deduped"] = int(stats.get("items_deduped", 0)) + 1
+        return _reject("cross_scraper_dupe", hr=f"{metric_type}/{period_key}")
+
+    # Eval date is the metric release date; window_days is derived.
+    from datetime import datetime as _dt
+    eval_date = _dt.combine(release, _dt.min.time())
+    window_days = max(1, (eval_date - publish_date).days) if publish_date else 30
+
+    quote = (pred.get("context_quote") or pred.get("quote") or "").strip()
+    parts = [f"{channel_name}: {metric_type} {target_num:g}"]
+    if period:
+        parts.append(f"({period})")
+    if quote:
+        parts.append(f'"{quote[:120]}"')
+    context_str = ". ".join(parts)[:500]
+
+    source_url = f"https://www.youtube.com/watch?v={video_id}"
+
+    db.add(
+        Prediction(
+            forecaster_id=forecaster.id,
+            ticker=ticker_to_store,
+            direction=direction,
+            prediction_date=publish_date,
+            evaluation_date=eval_date,
+            window_days=window_days,
+            target_price=None,  # metric forecasts have no price target
+            entry_price=None,
+            source_url=source_url,
+            archive_url=source_url,
+            source_type="youtube",
+            source_title=(video_title or "")[:500],
+            source_platform_id=source_id,
+            sector=None,
+            context=context_str,
+            exact_quote=(quote or context_str)[:500],
+            outcome="pending",
+            verified_by=VERIFIED_BY,
+            call_type="metric_forecast_call",
+            prediction_category="metric_forecast_call",
+            metric_type=metric_type,
+            metric_target=target_num,
+            metric_period=period,
+            metric_release_date=release,
+            # metric_actual + metric_error_pct stay NULL until the
+            # evaluator fetches the real value.
+        )
+    )
+    db.flush()
+    if stats is not None:
+        stats["metric_forecasts_extracted"] = int(
+            stats.get("metric_forecasts_extracted", 0)
         ) + 1
     return True
