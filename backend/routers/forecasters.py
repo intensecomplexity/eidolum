@@ -269,21 +269,29 @@ def get_forecaster(
     except Exception:
         pass
 
-    # Per-category stats (ticker_call / sector_call / macro_call).
-    # Exposes the split so the profile page can render each category
-    # separately without inflating the main accuracy number. Gracefully
-    # degrades if the prediction_category column doesn't exist.
+    # Per-category stats (ticker_call / sector_call / macro_call /
+    # conditional_call). Exposes the split so the profile page can
+    # render each category separately without inflating the main
+    # accuracy number. 'unresolved' outcomes on conditional_call rows
+    # are counted as conditional_unresolved_total and EXCLUDED from
+    # the accuracy denominator — an unresolved trigger means the
+    # prediction was never tested, so it doesn't count for or against
+    # the forecaster. Gracefully degrades if the prediction_category
+    # column doesn't exist.
     category_stats = {
         "ticker_call_total": 0, "ticker_call_accuracy": None,
         "sector_call_total": 0, "sector_call_accuracy": None,
         "macro_call_total": 0, "macro_call_accuracy": None,
+        "conditional_call_total": 0, "conditional_call_accuracy": None,
+        "conditional_unresolved_total": 0,
     }
     try:
         cat_rows = db.execute(sql_text("""
             SELECT COALESCE(prediction_category, 'ticker_call') as cat,
                    COUNT(*) FILTER (WHERE outcome IN ('hit','near','miss','correct','incorrect')) as evaluated,
                    SUM(CASE WHEN outcome IN ('hit','correct') THEN 1.0
-                            WHEN outcome = 'near' THEN 0.5 ELSE 0 END) as score
+                            WHEN outcome = 'near' THEN 0.5 ELSE 0 END) as score,
+                   COUNT(*) FILTER (WHERE outcome = 'unresolved') as unresolved
             FROM predictions WHERE forecaster_id = :fid
             GROUP BY COALESCE(prediction_category, 'ticker_call')
         """), {"fid": forecaster_id}).fetchall()
@@ -291,6 +299,7 @@ def get_forecaster(
             cat = str(row[0] or "ticker_call")
             evaluated = int(row[1] or 0)
             score = float(row[2] or 0.0)
+            unresolved = int(row[3] or 0)
             if cat == "sector_call":
                 category_stats["sector_call_total"] = evaluated
                 if evaluated > 0:
@@ -299,6 +308,11 @@ def get_forecaster(
                 category_stats["macro_call_total"] = evaluated
                 if evaluated > 0:
                     category_stats["macro_call_accuracy"] = round(score / evaluated * 100, 1)
+            elif cat == "conditional_call":
+                category_stats["conditional_call_total"] = evaluated
+                if evaluated > 0:
+                    category_stats["conditional_call_accuracy"] = round(score / evaluated * 100, 1)
+                category_stats["conditional_unresolved_total"] = unresolved
             elif cat == "ticker_call":
                 category_stats["ticker_call_total"] = evaluated
                 if evaluated > 0:

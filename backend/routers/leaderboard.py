@@ -54,7 +54,7 @@ def _apply_dormancy(db: Session, results: list, include_dormant: bool) -> list:
 
 def _enrich_category_stats(results: list, db: Session):
     """Batch-fetch per-forecaster prediction counts split by
-    prediction_category. Adds twelve fields to each result dict:
+    prediction_category. Adds fifteen fields to each result dict:
 
       - ticker_call_total / ticker_call_accuracy
       - sector_call_total / sector_call_accuracy
@@ -62,10 +62,17 @@ def _enrich_category_stats(results: list, db: Session):
       - pair_call_total / pair_call_accuracy
       - binary_event_total / binary_event_accuracy
       - metric_forecast_total / metric_forecast_accuracy
+      - conditional_call_total / conditional_call_accuracy
+        + conditional_unresolved_total (separate counter for 'unresolved'
+          outcomes which are NOT in the accuracy denominator)
 
     Accuracy uses the same weighting as the main leaderboard: hit/correct
     count as 1.0, near counts as 0.5, miss/incorrect count as 0. Any
     evaluated outcome (in the SCORED set) contributes to the denominator.
+    'unresolved' is deliberately EXCLUDED from both numerator and
+    denominator — a conditional whose trigger never fired isn't wrong,
+    it's simply untested.
+
     Forecasters with zero predictions in a category get accuracy=None
     so the frontend can render '—' instead of a misleading 0%.
 
@@ -89,6 +96,9 @@ def _enrich_category_stats(results: list, db: Session):
         r.setdefault("binary_event_accuracy", None)
         r.setdefault("metric_forecast_total", 0)
         r.setdefault("metric_forecast_accuracy", None)
+        r.setdefault("conditional_call_total", 0)
+        r.setdefault("conditional_call_accuracy", None)
+        r.setdefault("conditional_unresolved_total", 0)
 
     if not results:
         return
@@ -101,7 +111,8 @@ def _enrich_category_stats(results: list, db: Session):
                    COALESCE(p.prediction_category, 'ticker_call') as cat,
                    COUNT(*) FILTER (WHERE p.outcome IN ('hit','near','miss','correct','incorrect')) as evaluated,
                    SUM(CASE WHEN p.outcome IN ('hit','correct') THEN 1.0
-                            WHEN p.outcome = 'near' THEN 0.5 ELSE 0 END) as score
+                            WHEN p.outcome = 'near' THEN 0.5 ELSE 0 END) as score,
+                   COUNT(*) FILTER (WHERE p.outcome = 'unresolved') as unresolved
             FROM predictions p
             WHERE p.forecaster_id = ANY(:fids)
             GROUP BY p.forecaster_id, COALESCE(p.prediction_category, 'ticker_call')
@@ -115,6 +126,7 @@ def _enrich_category_stats(results: list, db: Session):
         cat = str(row[1] or "ticker_call")
         evaluated = int(row[2] or 0)
         score = float(row[3] or 0.0)
+        unresolved = int(row[4] or 0)
         if fid not in by_fid:
             by_fid[fid] = {
                 "ticker_call_total": 0, "ticker_call_accuracy": None,
@@ -123,6 +135,8 @@ def _enrich_category_stats(results: list, db: Session):
                 "pair_call_total": 0, "pair_call_accuracy": None,
                 "binary_event_total": 0, "binary_event_accuracy": None,
                 "metric_forecast_total": 0, "metric_forecast_accuracy": None,
+                "conditional_call_total": 0, "conditional_call_accuracy": None,
+                "conditional_unresolved_total": 0,
             }
         if cat == "sector_call":
             by_fid[fid]["sector_call_total"] = evaluated
@@ -144,6 +158,17 @@ def _enrich_category_stats(results: list, db: Session):
             by_fid[fid]["metric_forecast_total"] = evaluated
             if evaluated > 0:
                 by_fid[fid]["metric_forecast_accuracy"] = round(score / evaluated * 100, 1)
+        elif cat == "conditional_call":
+            # 'unresolved' rows are counted separately and NEVER enter
+            # the accuracy denominator. The SQL above already filters
+            # evaluated to hit/near/miss only, so unresolved is auto-
+            # excluded from `evaluated`. We surface unresolved as a
+            # separate field so the frontend can show "X/Y pairs +
+            # Z unresolved" transparently.
+            by_fid[fid]["conditional_call_total"] = evaluated
+            if evaluated > 0:
+                by_fid[fid]["conditional_call_accuracy"] = round(score / evaluated * 100, 1)
+            by_fid[fid]["conditional_unresolved_total"] = unresolved
         elif cat == "ticker_call":
             # Explicit match so any NEW category value added later
             # doesn't silently overwrite ticker_call stats via the
@@ -161,6 +186,8 @@ def _enrich_category_stats(results: list, db: Session):
             "pair_call_total": 0, "pair_call_accuracy": None,
             "binary_event_total": 0, "binary_event_accuracy": None,
             "metric_forecast_total": 0, "metric_forecast_accuracy": None,
+            "conditional_call_total": 0, "conditional_call_accuracy": None,
+            "conditional_unresolved_total": 0,
         })
         r.update(stats)
 
