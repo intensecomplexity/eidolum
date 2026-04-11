@@ -593,6 +593,102 @@ Rules:
 Output JSON only. Be concise."""
 
 
+# Macro-call instructions. Appended to the active prompt when
+# ENABLE_MACRO_CALL_EXTRACTION is flipped on. Teaches Haiku to
+# recognize macroeconomic vocabulary and emit predictions with a
+# canonical `concept` name from the allowlist below. The insert path
+# then resolves the concept to a tradeable ETF via the
+# macro_concept_aliases table and stores the row with
+# prediction_category='macro_call' — a NEW category value (unlike
+# options_position and earnings_call which stay as ticker_call).
+# The allowlist is inlined here so Haiku can pattern-match without
+# a separate lookup.
+YOUTUBE_HAIKU_MACRO_INSTRUCTIONS = """MACRO CALLS:
+If the speaker makes a prediction about a macroeconomic concept (dollar, rates, inflation, volatility, gold, oil, recession, etc) without naming a specific company, emit a macro_call. The insertion path will resolve the concept to a tradeable ETF proxy.
+
+Concept allowlist — you MUST use one of these canonical names verbatim as the `concept` field. Any prediction that doesn't map to a concept in this list should NOT be emitted as macro_call; extract as a plain ticker_call if a specific ticker is mentioned, otherwise skip.
+
+Currency: dollar, dollar_weak, euro, yen, yuan
+Rates: rates_up, rates_down, short_rates_up, ten_year_up, thirty_year_up
+Inflation: inflation, deflation
+Volatility: volatility, vol_contraction
+Precious metals: gold, silver, gold_miners
+Energy: oil, natgas, uranium
+Industrial/ags: copper, lithium, agriculture, corn, wheat, coffee
+Equity macro: recession, small_cap, sp500, nasdaq
+International: emerging_markets, developed_international, china, india, japan, brazil
+Credit: high_yield, investment_grade, munis, emerging_debt
+Real estate: real_estate
+Crypto: bitcoin, ethereum, crypto_total
+Yield curve: curve_steepening, curve_flattening
+
+Direction rules:
+- "Dollar strengthening" → concept=dollar, direction=bullish
+- "Dollar weakening" → concept=dollar, direction=bearish (or dollar_weak, bullish — either works)
+- "Rates going higher" → concept=rates_up, direction=bullish
+- "Fed cutting, bonds rally" → concept=rates_down, direction=bullish
+- "Inflation coming back" → concept=inflation, direction=bullish
+- "Disinflation" → concept=deflation, direction=bullish (or inflation, bearish)
+- "Gold to 3000" → concept=gold, direction=bullish, price_target=300 (GLD is ~1/10 of spot, so adjust roughly — but you can leave target null and just emit direction)
+- "VIX too low, long vol" → concept=volatility, direction=bullish
+- "Recession coming" → concept=recession, direction=bullish
+- "Emerging markets rally" → concept=emerging_markets, direction=bullish
+
+Output format for macro-call predictions (add concept, derived_from):
+{
+  "concept": "dollar",
+  "direction": "bullish",
+  "timeframe": "2026-12-31",
+  "derived_from": "macro_call",
+  "context_quote": "I think the dollar is going to strengthen this year"
+}
+
+Note: the `ticker` field is NOT required on macro_call output — the insert path resolves the concept to an ETF and fills in the ticker. You MAY include a ticker if you want to override the default, but it's usually better to leave it out.
+
+Examples:
+
+Input: "The dollar is going to strengthen throughout 2026 as the Fed holds"
+Output: {"concept": "dollar", "direction": "bullish", "timeframe": "2026-12-31", "derived_from": "macro_call", "context_quote": "dollar is going to strengthen throughout 2026"}
+
+Input: "Rates are heading lower, bonds will rally hard"
+Output: {"concept": "rates_down", "direction": "bullish", "timeframe": "2026-10-11", "derived_from": "macro_call", "context_quote": "rates are heading lower, bonds rally hard"}
+
+Input: "Inflation is coming back and TIPS are the trade"
+Output: {"concept": "inflation", "direction": "bullish", "timeframe": "2026-10-11", "derived_from": "macro_call", "context_quote": "inflation coming back, TIPS are the trade"}
+
+Input: "VIX is too low, I'm long volatility into Q3"
+Output: {"concept": "volatility", "direction": "bullish", "timeframe": "2026-09-30", "derived_from": "macro_call", "context_quote": "VIX too low, long volatility into Q3"}
+
+Input: "Gold is headed to 3000 dollars"
+Output: {"concept": "gold", "direction": "bullish", "timeframe": "2026-10-11", "derived_from": "macro_call", "context_quote": "gold headed to 3000"}
+
+Input: "Oil is going to 100 on supply issues"
+Output: {"concept": "oil", "direction": "bullish", "timeframe": "2026-10-11", "derived_from": "macro_call", "context_quote": "oil going to 100 on supply issues"}
+
+Input: "Recession risk is real, I'm positioning defensively"
+Output: {"concept": "recession", "direction": "bullish", "timeframe": "2027-01-11", "derived_from": "macro_call", "context_quote": "recession risk is real, positioning defensively"}
+
+Input: "The yield curve will steepen meaningfully"
+Output: {"concept": "curve_steepening", "direction": "bullish", "timeframe": "2026-12-31", "derived_from": "macro_call", "context_quote": "yield curve will steepen meaningfully"}
+
+Input: "The economy is slowing"
+Output: (do NOT extract — too vague, no concrete concept from the allowlist)
+
+Input: "GDP growth will be under 2 percent"
+Output: (do NOT extract — this is a metric forecast, not a tradeable macro concept; there is no allowlist entry for GDP)
+
+Rules:
+- MUST use a canonical `concept` name from the allowlist above. Do NOT invent new concept names.
+- MUST set derived_from: "macro_call" so the insertion code knows to resolve the concept to an ETF.
+- MUST use direction from the existing ticker_call vocabulary: bullish / bearish / neutral.
+- Reject any macro prediction that does NOT map to an allowlist concept. Vague macro commentary ("economy slowing", "stagflation risk", "fiscal dominance") should NOT be emitted as macro_call — the allowlist is authoritative.
+- Reject quantitative macro forecasts that don't map to a tradeable ETF (GDP, CPI print numbers, unemployment rate forecasts). Those are metric_forecast_calls, a future ship.
+- Do NOT try to pick an ETF yourself — the insert path owns that mapping.
+- If the same video contains both a macro_call and a ticker_call on the same underlying concept (e.g. "inflation" + "TIP going up"), emit only ONE — the dedup layer will handle collisions.
+
+Output JSON only. Be concise."""
+
+
 # ── Transcript fetching ─────────────────────────────────────────────────────
 
 def _build_transcript_api():
@@ -828,6 +924,7 @@ def classify_video(channel_name: str, title: str, publish_date: str,
     use_revisions = False
     use_options = False
     use_earnings = False
+    use_macro = False
     if db is not None and video_id:
         try:
             from feature_flags import should_use_sector_prompt
@@ -860,13 +957,19 @@ def classify_video(channel_name: str, title: str, publish_date: str,
         except Exception as _e:
             log.warning("[YT-CLF] earnings flag check failed: %s", _e)
             use_earnings = False
+        try:
+            from feature_flags import is_macro_extraction_enabled
+            use_macro = is_macro_extraction_enabled(db)
+        except Exception as _e:
+            log.warning("[YT-CLF] macro flag check failed: %s", _e)
+            use_macro = False
     base_system = YOUTUBE_HAIKU_SECTOR_SYSTEM if use_sector_prompt else HAIKU_SYSTEM
     # Append optional instruction blocks ONLY when each flag is on. When
     # every flag is off (the default), base_system is sent byte-for-byte
     # unchanged so Anthropic's prompt cache hit rate on the base prompt
     # stays at 100%. Order matters for cache hits: ranked list → revisions
-    # → options → earnings, stable across calls with any combination of
-    # flags on so extended-prompt cache entries match.
+    # → options → earnings → macro, stable across calls with any
+    # combination of flags on so extended-prompt cache entries match.
     active_system = base_system
     if use_ranked_list:
         active_system = active_system + "\n\n" + YOUTUBE_HAIKU_RANKED_LIST_INSTRUCTIONS
@@ -876,18 +979,22 @@ def classify_video(channel_name: str, title: str, publish_date: str,
         active_system = active_system + "\n\n" + YOUTUBE_HAIKU_OPTIONS_INSTRUCTIONS
     if use_earnings:
         active_system = active_system + "\n\n" + YOUTUBE_HAIKU_EARNINGS_INSTRUCTIONS
+    if use_macro:
+        active_system = active_system + "\n\n" + YOUTUBE_HAIKU_MACRO_INSTRUCTIONS
     telemetry["prompt_variant"] = "sector" if use_sector_prompt else "standard"
     telemetry["ranked_list_enabled"] = bool(use_ranked_list)
     telemetry["revisions_enabled"] = bool(use_revisions)
     telemetry["options_enabled"] = bool(use_options)
     telemetry["earnings_enabled"] = bool(use_earnings)
+    telemetry["macro_enabled"] = bool(use_macro)
     print(
         f"[YOUTUBE-HAIKU] video={video_id or '?'} channel={channel_name} "
         f"prompt_variant={telemetry['prompt_variant']} "
         f"ranked_list={'on' if use_ranked_list else 'off'} "
         f"revisions={'on' if use_revisions else 'off'} "
         f"options={'on' if use_options else 'off'} "
-        f"earnings={'on' if use_earnings else 'off'}",
+        f"earnings={'on' if use_earnings else 'off'} "
+        f"macro={'on' if use_macro else 'off'}",
         flush=True,
     )
 
@@ -1002,6 +1109,7 @@ def _validate_and_dedupe_predictions(raw: list) -> list[dict]:
     """
     seen_tickers: set[tuple[str, str]] = set()
     seen_sectors: set[tuple[str, str]] = set()
+    seen_macros: set[tuple[str, str]] = set()
     out: list[dict] = []
     for p in raw:
         if not isinstance(p, dict):
@@ -1019,6 +1127,41 @@ def _validate_and_dedupe_predictions(raw: list) -> list[dict]:
             p["sector"] = sector_name
             p["direction"] = direction
             p["_kind"] = "sector_call"
+            out.append(p)
+            continue
+
+        # Macro call branch: derived_from='macro_call' with a `concept`
+        # field. The `ticker` field may be missing — the insert path
+        # resolves the concept to a tradeable ETF via macro_concept_aliases.
+        # Dedupe on (concept_lower, direction) so duplicate mentions of
+        # the same concept/direction across transcript chunks collapse.
+        # Dropping this row here when the ticker check below would have
+        # rejected it is critical — macro_call predictions are the only
+        # kind that legitimately arrive with no ticker.
+        if str(p.get("derived_from") or "").strip().lower() == "macro_call":
+            concept_name = (p.get("concept") or "").strip().lower()
+            direction = (p.get("direction") or "").strip().lower()
+            if not concept_name or direction not in _VALID_DIRECTIONS:
+                continue
+            # Normalize concept to snake_case-ish (spaces → underscores,
+            # keep alphanumerics and underscores only)
+            concept_name = re.sub(r"[^a-z0-9_]+", "_", concept_name).strip("_")
+            if not concept_name:
+                continue
+            key = (concept_name, direction)
+            if key in seen_macros:
+                continue
+            seen_macros.add(key)
+            p["direction"] = direction
+            p["_kind"] = "macro_call"
+            p["_concept"] = concept_name
+            p["_derived_from"] = "macro_call"
+            # No ticker yet — insert path will resolve the concept to
+            # an ETF via macro_concept_aliases. Stamp a placeholder so
+            # the caller can still access p["ticker"] without a KeyError
+            # during logging.
+            if not p.get("ticker"):
+                p["ticker"] = f"__macro__{concept_name}"
             out.append(p)
             continue
 
@@ -1083,14 +1226,15 @@ def _validate_and_dedupe_predictions(raw: list) -> list[dict]:
             rev_dir = None
         # derived_from marker. Haiku sets this on predictions it mapped
         # from specialized vocabulary. Not stored in the DB — only used
-        # by the insert path to increment the per-run counter for the
-        # matching sub-type. Canonical values: 'options_position',
-        # 'earnings_call'. Unknown values normalize to None.
+        # by the insert path to route the row and increment the per-run
+        # counter for the matching sub-type. Canonical values:
+        # 'options_position', 'earnings_call', 'macro_call'. Unknown
+        # values normalize to None.
         raw_derived = p.get("derived_from")
         derived_from = None
         if raw_derived is not None:
             _rd = str(raw_derived).strip().lower()
-            if _rd in ("options_position", "earnings_call"):
+            if _rd in ("options_position", "earnings_call", "macro_call"):
                 derived_from = _rd
 
         # Event metadata for earnings_call (and future event-tied types).
