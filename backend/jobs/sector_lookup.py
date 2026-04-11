@@ -46,8 +46,22 @@ KNOWN_SECTORS = {
 
 
 def get_sector(ticker: str, db=None) -> str:
-    """Get sector for a ticker. Checks: memory → DB → Finnhub → hardcoded → 'Other'."""
+    """Get sector for a ticker. Checks: crypto → memory → DB → Finnhub → hardcoded → 'Other'.
+
+    Bug 1: crypto tickers MUST resolve to "Crypto" before any other source
+    has a chance to override them. Several crypto symbols (BTC, ETH, …)
+    collide with real US equity tickers (BTC = Bit Origin Ltd, a biotech
+    around $3) and the Finnhub fallback / DB cache will happily return
+    those equity sectors, after which the price fetcher locks the wrong
+    instrument and the prediction is corrupted forever.
+    """
     ticker = ticker.upper().strip()
+
+    # 0. Crypto short-circuit (highest priority).
+    from services.price_fetch import is_crypto
+    if is_crypto(ticker):
+        _mem_cache[ticker] = "Crypto"
+        return "Crypto"
 
     # 1. Memory cache
     if ticker in _mem_cache:

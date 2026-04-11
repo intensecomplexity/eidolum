@@ -108,6 +108,16 @@ def _reset_counters():
 def _fetch_polygon(ticker: str, start_date: str, end_date: str) -> dict:
     if ticker in _price_cache:
         return _price_cache[ticker]
+    # Crypto tickers must NEVER be looked up against the equity ticker
+    # space (BTC the biotech, ETH the obscure ETF, etc.). Bug 1: route
+    # them through services.price_fetch.fetch_crypto_history (Polygon
+    # X:{SYMBOL}USD) instead. Backfill script picks up the historical
+    # rows; this short-circuit just prevents future equity bleed.
+    from services.price_fetch import is_crypto, fetch_crypto_history
+    if is_crypto(ticker):
+        prices = fetch_crypto_history(ticker)
+        _price_cache[ticker] = prices
+        return prices
     if not POLYGON_KEY or not is_us_ticker(ticker):
         return {}
     import httpx
@@ -138,6 +148,12 @@ def _fetch_tiingo(ticker: str, start_date: str, end_date: str) -> dict:
     global _tiingo_calls_today, _tiingo_blocked_until, _tiingo_consecutive_429s
     if ticker in _price_cache:
         return _price_cache[ticker]
+    # Bug 1: short-circuit crypto tickers — see _fetch_polygon for the rationale.
+    from services.price_fetch import is_crypto, fetch_crypto_history
+    if is_crypto(ticker):
+        prices = fetch_crypto_history(ticker)
+        _price_cache[ticker] = prices
+        return prices
     if not TIINGO_KEY or _tiingo_calls_today >= TIINGO_DAILY_LIMIT or not is_us_ticker(ticker):
         return {}
     if _tiingo_blocked_until and datetime.utcnow() < _tiingo_blocked_until:
@@ -204,6 +220,12 @@ def _fetch_fmp(ticker: str) -> dict:
     global _fmp_calls_today
     if ticker in _price_cache:
         return _price_cache[ticker]
+    # Bug 1: short-circuit crypto tickers — see _fetch_polygon for the rationale.
+    from services.price_fetch import is_crypto, fetch_crypto_history
+    if is_crypto(ticker):
+        prices = fetch_crypto_history(ticker)
+        _price_cache[ticker] = prices
+        return prices
     if not FMP_KEY or _fmp_calls_today >= FMP_DAILY_LIMIT or not is_us_ticker(ticker):
         return {}
     import httpx
@@ -371,10 +393,15 @@ def _score_predictions(preds, prices, now, ticker, verbose=False):
                 continue
 
             target = p["target_price"]
-            direction = p["direction"]
-            if target and target > 0 and ref > 0:
-                if target > ref: direction = "bullish"
-                elif target < ref: direction = "bearish"
+            # Bug 4: drop absurd targets (>cap × entry) so they degrade
+            # to direction-only scoring instead of dominating the verdict.
+            from services.target_sanity import sanity_check_target
+            target = sanity_check_target(ref, target, p.get("window_days"))
+            # Bug 3: explicit direction is canonical — see services.direction_classifier.
+            from services.direction_classifier import classify as classify_direction
+            direction = classify_direction(
+                p["direction"], entry_price=ref, target_price=target,
+            ) or "bullish"
             raw_move = round(((eval_price - ref) / ref) * 100, 2)
             ret = -raw_move if direction == "bearish" else raw_move
             window = p.get("window_days") or 90
@@ -385,12 +412,29 @@ def _score_predictions(preds, prices, now, ticker, verbose=False):
                 outcome = "hit" if abs_ret <= 5.0 else "near" if abs_ret <= 10.0 else "miss"
             elif target and target > 0:
                 target_dist_pct = abs(eval_price - target) / target * 100
+                # Bug 5: HIT-by-tolerance only counts when the move was
+                # in the predicted direction. A stock that crashed past a
+                # bullish target was incorrectly scored HIT just because
+                # it ended up close to the target on the way down.
                 if direction == "bullish":
-                    outcome = "hit" if (eval_price >= target or target_dist_pct <= tolerance) else "near" if raw_move >= min_movement else "miss"
+                    if eval_price >= target or (target_dist_pct <= tolerance and raw_move >= 0):
+                        outcome = "hit"
+                    elif raw_move >= min_movement:
+                        outcome = "near"
+                    else:
+                        outcome = "miss"
                 else:
-                    outcome = "hit" if (eval_price <= target or target_dist_pct <= tolerance) else "near" if raw_move <= -min_movement else "miss"
+                    if eval_price <= target or (target_dist_pct <= tolerance and raw_move <= 0):
+                        outcome = "hit"
+                    elif raw_move <= -min_movement:
+                        outcome = "near"
+                    else:
+                        outcome = "miss"
             else:
                 outcome = "hit" if (eval_price > ref if direction == "bullish" else eval_price < ref) else "miss"
+            # Bug 7: clamp to per-window cap so simulator + leaderboard agree.
+            from services.eval_caps import clamp_return
+            ret = clamp_return(ret, p.get("window_days"))
             summary = _build_summary(ticker, direction, outcome, ref, eval_price, target, ret)
 
             # CHECKPOINT E — Scoring decision
