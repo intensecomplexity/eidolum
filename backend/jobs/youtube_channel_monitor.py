@@ -42,6 +42,7 @@ from jobs.youtube_classifier import (
     classify_video,
     insert_youtube_prediction,
     insert_youtube_sector_prediction,
+    insert_youtube_macro_prediction,
     log_youtube_rejection,
     transcript_proxy_status,
     PIPELINE_VERSION,
@@ -410,6 +411,11 @@ def _run_inner(db):
         # 'earnings_call'. Stays at 0 when ENABLE_EARNINGS_CALL_EXTRACTION
         # is off.
         "earnings_calls_extracted": 0,
+        # Per-run macro_call counter — incremented inside
+        # insert_youtube_macro_prediction after successful resolution
+        # and insertion. Stays at 0 when ENABLE_MACRO_CALL_EXTRACTION
+        # is off.
+        "macro_calls_extracted": 0,
     }
 
     for row in batch_rows:
@@ -632,7 +638,8 @@ def _run_inner(db):
                     haiku_retries_count = :retries,
                     sector_calls_extracted = :sector_calls,
                     options_positions_extracted = :options_positions,
-                    earnings_calls_extracted = :earnings_calls
+                    earnings_calls_extracted = :earnings_calls,
+                    macro_calls_extracted = :macro_calls
                 WHERE id = :id
             """), {
                 "id": run_id,
@@ -651,6 +658,7 @@ def _run_inner(db):
                 "sector_calls": int(stats.get("sector_calls_extracted", 0)),
                 "options_positions": int(stats.get("options_positions_extracted", 0)),
                 "earnings_calls": int(stats.get("earnings_calls_extracted", 0)),
+                "macro_calls": int(stats.get("macro_calls_extracted", 0)),
             })
             db.commit()
         except Exception as e:
@@ -810,11 +818,25 @@ def _process_one_video(db, channel_name, channel_id, video_id, title, publish_da
     inserted = 0
     for pred in preds:
         try:
-            # Route sector_call objects to the sector-aware insert path.
-            # Ticker calls (the vast majority, and 100% of rows when the
-            # feature flag is at 0) take the existing path unchanged.
-            if pred.get("_kind") == "sector_call":
+            kind = pred.get("_kind")
+            # Route to the correct insert path based on the validator's
+            # _kind stamp. Plain ticker_call (the vast majority, and 100%
+            # of rows when every ship flag is off) takes the existing
+            # path unchanged.
+            if kind == "sector_call":
                 ok = insert_youtube_sector_prediction(
+                    pred,
+                    channel_name=channel_name,
+                    channel_id=channel_id,
+                    video_id=video_id,
+                    video_title=title,
+                    publish_date=publish_dt,
+                    db=db,
+                    transcript_snippet=transcript_snippet,
+                    stats=stats,
+                )
+            elif kind == "macro_call":
+                ok = insert_youtube_macro_prediction(
                     pred,
                     channel_name=channel_name,
                     channel_id=channel_id,
@@ -840,7 +862,10 @@ def _process_one_video(db, channel_name, channel_id, video_id, title, publish_da
             if ok:
                 inserted += 1
         except Exception as e:
-            _key = pred.get("ticker") or pred.get("sector") or "?"
+            _key = (
+                pred.get("ticker") or pred.get("sector")
+                or pred.get("_concept") or "?"
+            )
             print(f"[ChannelMonitor] insert error for {video_id} {_key}: {e}")
             db.rollback()
 

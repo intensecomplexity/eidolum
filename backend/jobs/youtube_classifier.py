@@ -1775,3 +1775,202 @@ def insert_youtube_sector_prediction(
     if stats is not None:
         stats["sector_calls_extracted"] = int(stats.get("sector_calls_extracted", 0)) + 1
     return True
+
+
+# ── Macro call insertion ────────────────────────────────────────────────────
+
+# Module-level cache of resolved concept → (primary_etf, direction_bias).
+# Populated lazily per monitor run. The monitor process is short-lived
+# (12h interval), so letting this grow for the lifetime of one run and
+# getting garbage-collected at shutdown is fine. No explicit eviction.
+_MACRO_CONCEPT_CACHE: dict[str, tuple[str, str] | None] = {}
+
+
+def _resolve_macro_concept(db, concept: str) -> tuple[str | None, str | None]:
+    """Look up a canonical macro concept in macro_concept_aliases.
+    Returns (primary_etf, direction_bias) or (None, None) if the concept
+    isn't in the allowlist — which triggers a rejection at the caller.
+
+    Cached per-process so a long classifier run doesn't hit the DB for
+    every prediction on the same concept.
+    """
+    if not concept:
+        return None, None
+    key = concept.strip().lower()
+    if not key:
+        return None, None
+    if key in _MACRO_CONCEPT_CACHE:
+        cached = _MACRO_CONCEPT_CACHE[key]
+        if cached is None:
+            return None, None
+        return cached
+    try:
+        row = db.execute(sql_text(
+            "SELECT primary_etf, direction_bias FROM macro_concept_aliases "
+            "WHERE LOWER(concept) = :c LIMIT 1"
+        ), {"c": key}).first()
+    except Exception as _e:
+        log.warning("[YT-CLF] macro concept lookup failed for %s: %s", key, _e)
+        return None, None
+    if not row:
+        _MACRO_CONCEPT_CACHE[key] = None
+        return None, None
+    primary_etf = (row[0] or "").upper()
+    direction_bias = (row[1] or "direct").strip().lower()
+    if direction_bias not in ("direct", "inverse"):
+        direction_bias = "direct"
+    _MACRO_CONCEPT_CACHE[key] = (primary_etf, direction_bias)
+    return primary_etf, direction_bias
+
+
+def insert_youtube_macro_prediction(
+    pred: dict,
+    *,
+    channel_name: str,
+    channel_id: str | None,
+    video_id: str,
+    video_title: str,
+    publish_date: datetime,
+    db,
+    transcript_snippet: str | None = None,
+    stats: dict | None = None,
+) -> bool:
+    """Insert a macro_call prediction.
+
+    Resolves the canonical concept to a tradeable ETF via
+    macro_concept_aliases, flips direction if the bias is 'inverse',
+    and stores the row as prediction_category='macro_call' (NEW
+    category — unlike options/earnings which stay as ticker_call).
+
+    Rejection paths (each logs to youtube_scraper_rejections and
+    returns False):
+      - missing concept → 'macro_concept_missing'
+      - concept not in allowlist → 'macro_concept_not_in_allowlist'
+      - invalid direction → 'neutral_or_no_direction'
+      - cross-scraper dedup collision → 'cross_scraper_dupe'
+      - forecaster create failure → 'forecaster_creation_failed'
+    """
+    from models import Prediction
+    from jobs.prediction_validator import prediction_exists_cross_scraper
+
+    def _reject(reason: str, hr: str | None = None) -> bool:
+        log_youtube_rejection(
+            db,
+            video_id=video_id,
+            channel_id=channel_id,
+            channel_name=channel_name,
+            video_title=video_title,
+            video_published_at=publish_date,
+            reason=reason,
+            haiku_reason=hr,
+            haiku_raw=pred,
+            transcript_snippet=transcript_snippet,
+            stats=stats,
+        )
+        return False
+
+    concept = (pred.get("_concept") or pred.get("concept") or "").strip().lower()
+    direction = (pred.get("direction") or "").strip().lower()
+
+    if not concept:
+        return _reject("macro_concept_missing")
+    if direction not in _VALID_DIRECTIONS:
+        return _reject("neutral_or_no_direction", hr=direction or None)
+
+    etf_ticker, direction_bias = _resolve_macro_concept(db, concept)
+    if not etf_ticker:
+        return _reject("macro_concept_not_in_allowlist", hr=concept[:200])
+
+    # Inverse bias flips bullish ↔ bearish before storing. Neutral passes
+    # through unchanged (hedging on an inverse-ETF is still hedging).
+    stored_direction = direction
+    if direction_bias == "inverse":
+        if direction == "bullish":
+            stored_direction = "bearish"
+        elif direction == "bearish":
+            stored_direction = "bullish"
+
+    # Per-video-per-concept dedup. Two concepts in the same video insert
+    # as separate rows; the same concept mentioned twice collapses via
+    # source_platform_id uniqueness.
+    canonical = re.sub(r"[^a-z0-9]+", "_", concept).strip("_")[:40]
+    source_id = f"yt_{video_id}_macro_{canonical}"
+    if db.execute(
+        sql_text("SELECT 1 FROM predictions WHERE source_platform_id = :sid LIMIT 1"),
+        {"sid": source_id},
+    ).first():
+        if stats is not None:
+            stats["items_deduped"] = int(stats.get("items_deduped", 0)) + 1
+        return _reject("dedup_collision", hr=canonical)
+
+    forecaster = find_or_create_youtube_forecaster(channel_name, channel_id, db)
+    if not forecaster:
+        return _reject("forecaster_creation_failed")
+
+    if prediction_exists_cross_scraper(
+        etf_ticker, forecaster.id, stored_direction, publish_date, db,
+    ):
+        if stats is not None:
+            stats["items_deduped"] = int(stats.get("items_deduped", 0)) + 1
+        return _reject("cross_scraper_dupe", hr=etf_ticker)
+
+    eval_date, window_days = _parse_evaluation_date(
+        pred.get("timeframe"), publish_date,
+    )
+
+    # Target price: macro_call usually doesn't carry a price target
+    # (forecasters speak in concept terms, not ETF price levels).
+    # If Haiku did extract one, sanity-bound it the same way as ticker calls.
+    target_price = pred.get("price_target")
+    if target_price is not None:
+        try:
+            target_price = float(target_price)
+            if not (0.5 < target_price < 100_000):
+                target_price = None
+        except (ValueError, TypeError):
+            target_price = None
+
+    quote = (pred.get("context_quote") or pred.get("quote") or "").strip()
+    parts = [
+        f"{channel_name}: {stored_direction.capitalize()} on "
+        f"{concept} → {etf_ticker}"
+    ]
+    if direction_bias == "inverse" and direction != stored_direction:
+        parts.append(f"(flipped from {direction} via inverse bias)")
+    if quote:
+        parts.append(f'"{quote[:120]}"')
+    context_str = ". ".join(parts)[:500]
+
+    source_url = f"https://www.youtube.com/watch?v={video_id}"
+
+    db.add(
+        Prediction(
+            forecaster_id=forecaster.id,
+            ticker=etf_ticker,
+            direction=stored_direction,
+            prediction_date=publish_date,
+            evaluation_date=eval_date,
+            window_days=window_days,
+            target_price=target_price,
+            entry_price=None,
+            source_url=source_url,
+            archive_url=source_url,
+            source_type="youtube",
+            source_title=(video_title or "")[:500],
+            source_platform_id=source_id,
+            sector=None,
+            context=context_str,
+            exact_quote=(quote or context_str)[:500],
+            outcome="pending",
+            verified_by=VERIFIED_BY,
+            call_type="macro_call",
+            prediction_category="macro_call",
+            macro_concept=concept,
+        )
+    )
+    db.flush()
+    if stats is not None:
+        stats["macro_calls_extracted"] = int(
+            stats.get("macro_calls_extracted", 0)
+        ) + 1
+    return True

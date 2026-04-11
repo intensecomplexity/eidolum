@@ -269,13 +269,14 @@ def get_forecaster(
     except Exception:
         pass
 
-    # Per-category stats (ticker_call vs sector_call). Exposes the split
-    # so the profile page can render a dedicated "Sector Calls" section
-    # without inflating the main accuracy number. Gracefully degrades
-    # if the prediction_category column doesn't exist on very old deploys.
+    # Per-category stats (ticker_call / sector_call / macro_call).
+    # Exposes the split so the profile page can render each category
+    # separately without inflating the main accuracy number. Gracefully
+    # degrades if the prediction_category column doesn't exist.
     category_stats = {
         "ticker_call_total": 0, "ticker_call_accuracy": None,
         "sector_call_total": 0, "sector_call_accuracy": None,
+        "macro_call_total": 0, "macro_call_accuracy": None,
     }
     try:
         cat_rows = db.execute(sql_text("""
@@ -294,10 +295,16 @@ def get_forecaster(
                 category_stats["sector_call_total"] = evaluated
                 if evaluated > 0:
                     category_stats["sector_call_accuracy"] = round(score / evaluated * 100, 1)
-            else:
+            elif cat == "macro_call":
+                category_stats["macro_call_total"] = evaluated
+                if evaluated > 0:
+                    category_stats["macro_call_accuracy"] = round(score / evaluated * 100, 1)
+            elif cat == "ticker_call":
                 category_stats["ticker_call_total"] = evaluated
                 if evaluated > 0:
                     category_stats["ticker_call_accuracy"] = round(score / evaluated * 100, 1)
+            # else: unknown future category — ignore rather than
+            # silently merging into ticker_call
     except Exception:
         pass
 
