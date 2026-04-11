@@ -1,8 +1,9 @@
 import { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
-import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, ReferenceDot } from 'recharts';
+import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, ReferenceDot, ReferenceLine } from 'recharts';
 import { X as XIcon } from 'lucide-react';
 import { getTickerChart } from '../api';
+import downsample from '../utils/downsample';
 
 const PERIODS = [
   { key: '1m', label: '1M' },
@@ -23,15 +24,34 @@ const OUTCOME_LABELS = {
   hit: 'HIT', correct: 'HIT', near: 'NEAR', miss: 'MISS', incorrect: 'MISS', pending: 'Pending',
 };
 
-function PriceTooltip({ active, payload }) {
-  if (!active || !payload?.length) return null;
-  const d = payload[0].payload;
-  return (
-    <div className="bg-surface border border-border rounded-lg px-3 py-2 text-xs shadow-lg">
-      <div className="text-muted mb-0.5">{d.date}</div>
-      <div className="font-mono text-accent font-bold">${d.close?.toFixed(2)}</div>
-    </div>
-  );
+function makePriceTooltip(predictionsByDate) {
+  return function PriceTooltip({ active, payload }) {
+    if (!active || !payload?.length) return null;
+    const d = payload[0].payload;
+    const dayPreds = predictionsByDate[d.date] || [];
+    return (
+      <div className="bg-surface border border-border rounded-lg px-3 py-2 text-xs shadow-lg max-w-[260px]">
+        <div className="text-muted mb-0.5">{d.date}</div>
+        <div className="font-mono text-accent font-bold">${d.close?.toFixed(2)}</div>
+        {dayPreds.length > 0 && (
+          <div className="mt-1.5 pt-1.5 border-t border-border space-y-1">
+            {dayPreds.slice(0, 3).map((p, i) => (
+              <div key={i} className="text-[10px] flex items-baseline gap-1.5">
+                <span className="font-medium text-text-primary truncate max-w-[120px]">{p.forecaster || 'Unknown'}</span>
+                <span className={p.direction === 'bullish' ? 'text-positive' : p.direction === 'bearish' ? 'text-negative' : 'text-warning'}>
+                  {p.direction === 'bullish' ? 'Bull' : p.direction === 'bearish' ? 'Bear' : 'Hold'}
+                </span>
+                {p.target != null && <span className="text-muted font-mono">→ ${Number(p.target).toFixed(0)}</span>}
+              </div>
+            ))}
+            {dayPreds.length > 3 && (
+              <div className="text-[10px] text-muted italic">+{dayPreds.length - 3} more — click dot</div>
+            )}
+          </div>
+        )}
+      </div>
+    );
+  };
 }
 
 export default function StockChart({ ticker }) {
@@ -79,15 +99,16 @@ export default function StockChart({ ticker }) {
 
   if (!data?.prices?.length) return null;
 
-  const prices = data.prices;
+  const rawPrices = data.prices;
+  const prices = rawPrices.length > 200 ? downsample(rawPrices, 120) : rawPrices;
   const predictions = data.predictions || [];
-  const currentPrice = prices[prices.length - 1]?.close;
-  const firstPrice = prices[0]?.close;
+  const currentPrice = rawPrices[rawPrices.length - 1]?.close;
+  const firstPrice = rawPrices[0]?.close;
   const changePct = firstPrice && currentPrice ? ((currentPrice - firstPrice) / firstPrice * 100).toFixed(1) : null;
   const isUp = changePct && parseFloat(changePct) >= 0;
 
   const priceMap = {};
-  for (const p of prices) priceMap[p.date] = p.close;
+  for (const p of rawPrices) priceMap[p.date] = p.close;
 
   const dots = predictions
     .filter(p => p.date && priceMap[p.date] !== undefined)
@@ -204,15 +225,39 @@ export default function StockChart({ ticker }) {
             </defs>
             <CartesianGrid horizontal vertical={false} stroke={gridColor} strokeWidth={0.5} />
             <XAxis dataKey="date" tick={{ fill: '#6b7280', fontSize: isMobile ? 9 : 10 }}
-              tickFormatter={d => d.slice(5)}
+              tickFormatter={d => {
+                if (!d) return '';
+                const dt = new Date(d + 'T12:00:00');
+                if (Number.isNaN(dt.getTime())) return d.slice(5);
+                if (prices.length > 90) return dt.toLocaleString('en-US', { month: 'short' });
+                return dt.toLocaleString('en-US', { month: 'short', day: 'numeric' });
+              }}
               axisLine={false} tickLine={false}
-              minTickGap={isMobile ? 60 : 40}
-              interval={isMobile ? Math.max(1, Math.floor(prices.length / 4)) : undefined} />
+              minTickGap={isMobile ? 60 : 80}
+              interval="preserveStartEnd" />
             <YAxis domain={['auto', 'auto']} tick={{ fill: '#6b7280', fontSize: isMobile ? 9 : 10 }}
               axisLine={false} tickLine={false}
               tickFormatter={v => `$${v >= 1000 ? Math.round(v) : v}`}
               tickCount={isMobile ? 4 : 6} width={isMobile ? 40 : 50} />
-            <Tooltip content={<PriceTooltip />} cursor={{ stroke: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)' }} />
+            <Tooltip content={makePriceTooltip(dotsByDate)} cursor={{ stroke: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)' }} />
+            {currentPrice != null && (
+              <ReferenceLine
+                y={currentPrice}
+                stroke="#D4A843"
+                strokeOpacity={0.4}
+                strokeDasharray="4 4"
+                strokeWidth={1}
+                label={{
+                  value: `$${currentPrice.toFixed(2)}`,
+                  position: 'right',
+                  fill: '#D4A843',
+                  fontSize: 9,
+                  fontWeight: 600,
+                  offset: 4,
+                }}
+                ifOverflow="extendDomain"
+              />
+            )}
             <Area
               type="monotone"
               dataKey="close"
