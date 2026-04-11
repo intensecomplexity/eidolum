@@ -115,23 +115,33 @@ function StatCard({ label, value }) {
 
 function FeatureToggles() {
   const [flags, setFlags] = useState(null);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
     getFeatureFlags().then(setFlags).catch(() => {});
   }, []);
 
   async function toggle(name, fn) {
+    setError(null);
     try {
       await fn();
-      const updated = await getFeatureFlags();
+      const updated = await getFeatureFlags({ fresh: true });
       setFlags(updated);
-    } catch {}
+    } catch (e) {
+      const detail = e?.response?.data?.detail || e?.message || 'unknown error';
+      setError(`Toggle failed for ${name}: ${detail}`);
+    }
   }
 
   if (!flags) return null;
   return (
     <div className="card mb-6">
       <h3 className="text-sm font-semibold text-muted uppercase tracking-wider mb-2">Feature Flags</h3>
+      {error && (
+        <div className="mb-2 text-xs text-negative bg-negative/10 px-2 py-1 rounded font-mono">
+          {error}
+        </div>
+      )}
       {[
         { key: 'duels', label: 'Duels', fn: toggleDuelsAdmin },
         { key: 'compete', label: 'Compete / Seasons', fn: toggleCompeteAdmin },

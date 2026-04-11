@@ -104,7 +104,10 @@ export function getHomepageData() {
   return cachedGet('/homepage-data').then(r => r.data);
 }
 
-export function getFeatureFlags() {
+export function getFeatureFlags({ fresh = false } = {}) {
+  // Admin toggle handlers pass fresh:true so the post-toggle refetch
+  // bypasses the 5-minute in-memory cache and reflects the new value.
+  if (fresh) delete _responseCache['/features'];
   return cachedGet('/features', 300000).then(r => r.data);
 }
 
