@@ -3167,6 +3167,92 @@ def _resolve_source_timestamp(
         return {}
 
 
+_VALID_CONVICTION_LEVELS = {
+    "strong", "moderate", "hedged", "hypothetical", "unknown",
+}
+_VALID_TIMEFRAME_SOURCES = {"explicit", "category_default"}
+
+
+def _resolve_metadata_enrichment(
+    pred: dict,
+    stats: dict | None,
+    *,
+    publish_date: datetime | None = None,
+    default_window_days: int = 90,
+) -> tuple[dict, int, datetime | None]:
+    """Ship #9 (rescoped) — prediction metadata enrichment resolver.
+
+    Reads the classifier's inferred_timeframe_days / timeframe_source /
+    timeframe_category / conviction_level fields and returns a kwargs
+    dict suitable for splatting into Prediction(...) PLUS the
+    potentially-overridden window_days + evaluation_date.
+
+    Contract:
+      - Called from EVERY insert_youtube_* function after the default
+        window_days has been computed, BEFORE the Prediction()
+        constructor.
+      - Returns ({}, default_window_days, default_eval_date) when pred
+        carries neither timeframe nor conviction data (flag off, or
+        Haiku's response didn't include the new fields yet). The caller
+        can unconditionally use the returned values — no conditional
+        splat required.
+      - When inferred_timeframe_days is present and valid (int, 0-2000
+        days), overrides the window and returns a metadata dict with
+        inferred_timeframe_days, timeframe_source (if valid), and
+        timeframe_category.
+      - Conviction_level is validated against the 5-value vocabulary.
+        Invalid values silently drop so the insert never fails.
+      - Stats counters incremented for timeframes_explicit /
+        timeframes_inferred and the conviction_<level> buckets so
+        admin diagnostics show the per-run distribution.
+
+    NEVER raises — any internal failure degrades to a pass-through
+    return of the defaults so the prediction insert is unaffected.
+    """
+    fallback_window = int(default_window_days) if default_window_days else DEFAULT_EVAL_WINDOW_DAYS
+    fallback_eval = (
+        publish_date + timedelta(days=fallback_window)
+        if publish_date is not None else None
+    )
+    try:
+        fields: dict = {}
+        window_days = fallback_window
+        eval_date = fallback_eval
+
+        inferred = pred.get("inferred_timeframe_days")
+        if isinstance(inferred, (int, float)) and 0 < int(inferred) <= 2000:
+            inferred_int = int(inferred)
+            fields["inferred_timeframe_days"] = inferred_int
+            ts_src = pred.get("timeframe_source")
+            if isinstance(ts_src, str) and ts_src in _VALID_TIMEFRAME_SOURCES:
+                fields["timeframe_source"] = ts_src
+                if stats is not None:
+                    key = (
+                        "timeframes_explicit" if ts_src == "explicit"
+                        else "timeframes_inferred"
+                    )
+                    stats[key] = int(stats.get(key, 0)) + 1
+            tf_cat = pred.get("timeframe_category")
+            if isinstance(tf_cat, str) and tf_cat:
+                fields["timeframe_category"] = tf_cat[:32]
+            # Override window + eval date from the inferred value.
+            window_days = inferred_int
+            if publish_date is not None:
+                eval_date = publish_date + timedelta(days=inferred_int)
+
+        conviction = pred.get("conviction_level")
+        if isinstance(conviction, str) and conviction in _VALID_CONVICTION_LEVELS:
+            fields["conviction_level"] = conviction
+            if stats is not None:
+                key = f"conviction_{conviction}"
+                stats[key] = int(stats.get(key, 0)) + 1
+
+        return fields, window_days, eval_date
+    except Exception as _e:
+        log.info("[YT-CLF] _resolve_metadata_enrichment failed: %s", _e)
+        return {}, fallback_window, fallback_eval
+
+
 def insert_youtube_prediction(
     pred: dict,
     *,
@@ -3349,6 +3435,14 @@ def insert_youtube_prediction(
     # No-ops silently when transcript_data is None (flag off or
     # non-monitor caller).
     _ts_fields = _resolve_source_timestamp(pred, transcript_data, stats)
+    # Ship #9 rescoped: metadata enrichment — category-inferred
+    # window + conviction level. Overrides window_days / eval_date
+    # when Haiku emits inferred_timeframe_days; no-ops silently when
+    # the flag is off or the pred dict doesn't carry the fields.
+    _meta_fields, window_days, eval_date = _resolve_metadata_enrichment(
+        pred, stats,
+        publish_date=publish_date, default_window_days=window_days,
+    )
 
     db.add(
         Prediction(
@@ -3378,6 +3472,7 @@ def insert_youtube_prediction(
             event_type=event_type_val,
             event_date=event_date_val,
             **_ts_fields,
+            **_meta_fields,
         )
     )
     db.flush()
@@ -3494,6 +3589,10 @@ def insert_youtube_sector_prediction(
     source_url = f"https://www.youtube.com/watch?v={video_id}"
 
     _ts_fields = _resolve_source_timestamp(pred, transcript_data, stats)
+    _meta_fields, window_days, eval_date = _resolve_metadata_enrichment(
+        pred, stats,
+        publish_date=publish_date, default_window_days=window_days,
+    )
 
     db.add(
         Prediction(
@@ -3522,6 +3621,7 @@ def insert_youtube_sector_prediction(
             prediction_type="sector_call",
             prediction_category="sector_call",
             **_ts_fields,
+            **_meta_fields,
         )
     )
     db.flush()
@@ -3698,6 +3798,10 @@ def insert_youtube_macro_prediction(
     source_url = f"https://www.youtube.com/watch?v={video_id}"
 
     _ts_fields = _resolve_source_timestamp(pred, transcript_data, stats)
+    _meta_fields, window_days, eval_date = _resolve_metadata_enrichment(
+        pred, stats,
+        publish_date=publish_date, default_window_days=window_days,
+    )
 
     db.add(
         Prediction(
@@ -3723,6 +3827,7 @@ def insert_youtube_macro_prediction(
             prediction_category="macro_call",
             macro_concept=concept,
             **_ts_fields,
+            **_meta_fields,
         )
     )
     db.flush()
@@ -3881,6 +3986,10 @@ def insert_youtube_pair_prediction(
     source_url = f"https://www.youtube.com/watch?v={video_id}"
 
     _ts_fields = _resolve_source_timestamp(pred, transcript_data, stats)
+    _meta_fields, window_days, eval_date = _resolve_metadata_enrichment(
+        pred, stats,
+        publish_date=publish_date, default_window_days=window_days,
+    )
 
     db.add(
         Prediction(
@@ -3907,6 +4016,7 @@ def insert_youtube_pair_prediction(
             pair_long_ticker=long_ticker,
             pair_short_ticker=short_ticker,
             **_ts_fields,
+            **_meta_fields,
         )
     )
     db.flush()
@@ -4093,6 +4203,15 @@ def insert_youtube_binary_event_prediction(
     source_url = f"https://www.youtube.com/watch?v={video_id}"
 
     _ts_fields = _resolve_source_timestamp(pred, transcript_data, stats)
+    # Binary events: window_days is driven by the event deadline, not by
+    # Haiku's inferred_timeframe_days. Use tuple throwaway so the helper
+    # still populates conviction + inferred_timeframe_days + timeframe_*
+    # columns as label data, but leaves the deadline-derived window
+    # untouched.
+    _meta_fields, _, _ = _resolve_metadata_enrichment(
+        pred, stats,
+        publish_date=publish_date, default_window_days=window_days,
+    )
 
     db.add(
         Prediction(
@@ -4123,6 +4242,7 @@ def insert_youtube_binary_event_prediction(
             # until the evaluator confirms the outcome (stubbed — see
             # _score_binary_event for the follow-up-ship TODO).
             **_ts_fields,
+            **_meta_fields,
         )
     )
     db.flush()
@@ -4309,6 +4429,13 @@ def insert_youtube_metric_forecast_prediction(
     source_url = f"https://www.youtube.com/watch?v={video_id}"
 
     _ts_fields = _resolve_source_timestamp(pred, transcript_data, stats)
+    # Metric forecasts: window_days is driven by the release date, not
+    # by Haiku's inferred_timeframe_days. Throw away the helper's
+    # window override but keep the metadata columns.
+    _meta_fields, _, _ = _resolve_metadata_enrichment(
+        pred, stats,
+        publish_date=publish_date, default_window_days=window_days,
+    )
 
     db.add(
         Prediction(
@@ -4339,6 +4466,7 @@ def insert_youtube_metric_forecast_prediction(
             # metric_actual + metric_error_pct stay NULL until the
             # evaluator fetches the real value.
             **_ts_fields,
+            **_meta_fields,
         )
     )
     db.flush()
@@ -4511,6 +4639,14 @@ def insert_youtube_conditional_prediction(
         trig_ticker = str(trig_ticker).upper().strip().lstrip("$")
 
     _ts_fields = _resolve_source_timestamp(pred, transcript_data, stats)
+    # Conditional calls: the outcome window is overridable by Haiku's
+    # inferred_timeframe_days — it's the Phase 2 scoring window after
+    # trigger fire, same semantics as ticker_call.
+    _meta_fields, window_days, eval_date = _resolve_metadata_enrichment(
+        pred, stats,
+        publish_date=publish_date, default_window_days=window_days,
+    )
+    outcome_window_days = int(window_days) if window_days else outcome_window_days
 
     db.add(
         Prediction(
@@ -4542,6 +4678,7 @@ def insert_youtube_conditional_prediction(
             trigger_fired_at=None,
             outcome_window_days=outcome_window_days,
             **_ts_fields,
+            **_meta_fields,
         )
     )
     db.flush()
@@ -4912,6 +5049,16 @@ def insert_youtube_regime_prediction(
     except Exception:
         sector = None
 
+    # Ship #9 (rescoped): metadata enrichment for regime_call.
+    # Regime uses its own default window (6 months) driven by the
+    # evaluator's drawdown/runup math, so we throw away the helper's
+    # window override but still populate conviction + timeframe
+    # label columns.
+    _meta_fields, _, _ = _resolve_metadata_enrichment(
+        pred, stats,
+        publish_date=publish_date, default_window_days=window_days,
+    )
+
     db.add(
         Prediction(
             forecaster_id=forecaster.id,
@@ -4938,6 +5085,7 @@ def insert_youtube_regime_prediction(
             regime_instrument=instrument,
             # regime_max_drawdown / regime_max_runup / regime_new_highs
             # / regime_new_lows stay NULL until the evaluator scores.
+            **_meta_fields,
         )
     )
     db.flush()
