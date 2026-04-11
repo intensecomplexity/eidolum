@@ -109,6 +109,16 @@ export function toggleTargetRevisionsAdmin() {
   return api.post('/admin/toggle-target-revisions', {}, { headers: authHeaders() }).then(r => r.data);
 }
 
+// ——— YouTube Runs Inspector ———
+
+export function getYouTubeRunsAdmin() {
+  return api.get('/admin/youtube-runs', { headers: authHeaders() }).then(r => r.data);
+}
+
+export function getYouTubeRunDetailsAdmin(runId) {
+  return api.get(`/admin/youtube-runs/${runId}/details`, { headers: authHeaders() }).then(r => r.data);
+}
+
 export function getTrendingTickers() {
   return api.get('/trending-tickers').then(r => r.data);
 }
