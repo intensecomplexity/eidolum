@@ -142,6 +142,51 @@ function VerbatimQuoteRow({ p }) {
   );
 }
 
+// Ship #9 (rescoped): conviction pill badge. Renders a small
+// color-coded pill for strong/moderate/hedged/hypothetical. 'unknown'
+// is deliberately hidden so the card isn't cluttered when Haiku
+// couldn't classify the conviction.
+function ConvictionBadge({ level }) {
+  if (!level || level === 'unknown') return null;
+  const cls = {
+    strong: 'bg-positive/15 text-positive',
+    moderate: 'bg-accent/15 text-accent',
+    hedged: 'bg-warning/15 text-warning',
+    hypothetical: 'bg-surface-2 text-muted',
+  }[level];
+  const label = {
+    strong: 'Strong',
+    moderate: 'Moderate',
+    hedged: 'Hedged',
+    hypothetical: 'Hypothetical',
+  }[level];
+  if (!cls) return null;
+  return (
+    <span
+      className={`inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-semibold uppercase tracking-wider ${cls}`}
+      title={`Conviction: ${label}`}
+    >
+      {label}
+    </span>
+  );
+}
+
+// Ship #9 (rescoped): small info suffix next to the evaluation window
+// when the timeframe came from a category default rather than an
+// explicit date in the transcript. Hover reveals the category.
+function TimeframeSourceTag({ p }) {
+  if (p.timeframe_source !== 'category_default') return null;
+  const cat = p.timeframe_category;
+  return (
+    <span
+      className="ml-1 text-[9px] text-muted/70 cursor-help"
+      title={cat ? `Inferred from category: ${cat}` : 'Inferred from category default'}
+    >
+      (inferred)
+    </span>
+  );
+}
+
 function ProofLinks({ p }) {
   const source = p.source_url || '';
   // Hide source link for generic/none URLs — only show real articles
@@ -677,6 +722,8 @@ export default function PredictionCard({ prediction: p, showForecaster = false, 
           </Link>
           {p.company_name && <span className="text-xs text-muted hidden sm:inline">{p.company_name}</span>}
           <PredictionBadge direction={p.direction} windowDays={windowDays} />
+          <TimeframeSourceTag p={p} />
+          <ConvictionBadge level={p.conviction_level} />
           {p.has_conflict && <ConflictBadge note={p.conflict_note} size="small" />}
         </div>
         <div className="flex items-center gap-1.5 shrink-0">

@@ -4834,6 +4834,95 @@ def timestamp_diagnostics(
         }
 
 
+@app.get("/api/admin/metadata-enrichment-diagnostics")
+def metadata_enrichment_diagnostics(
+    admin_id: int = _Depends(_require_admin),
+    db: _Session = _Depends(_get_db),
+):
+    """Ship #9 (rescoped). Diagnostic breakdown of prediction metadata
+    enrichment — timeframe source mix, top inferred categories,
+    conviction level distribution, and the two new rejection counts.
+
+    Returns:
+      timeframe_distribution     {explicit, category_default, unset} counts
+      top_categories             [{category, count}] top 11 categories
+      conviction_distribution    {strong, moderate, hedged, hypothetical, unknown, unset}
+      rejections_total           sum of timeframes_rejected + reference_rejected
+                                 across all scraper_runs in the last 7 days
+      rejections_breakdown       {no_timeframe_determinable, unresolvable_reference}
+    """
+    from sqlalchemy import text as _st
+    try:
+        out: dict = {
+            "timeframe_distribution": {},
+            "top_categories": [],
+            "conviction_distribution": {},
+            "rejections_total": 0,
+            "rejections_breakdown": {
+                "no_timeframe_determinable": 0,
+                "unresolvable_reference": 0,
+            },
+        }
+        # Timeframe source distribution (predictions-wide)
+        rows = db.execute(_st("""
+            SELECT COALESCE(timeframe_source, 'unset') AS src, COUNT(*)
+            FROM predictions
+            WHERE source_type = 'youtube'
+            GROUP BY COALESCE(timeframe_source, 'unset')
+        """)).fetchall()
+        for src, cnt in rows:
+            out["timeframe_distribution"][str(src)] = int(cnt)
+
+        # Top categories
+        rows = db.execute(_st("""
+            SELECT timeframe_category, COUNT(*) AS cnt
+            FROM predictions
+            WHERE source_type = 'youtube'
+              AND timeframe_category IS NOT NULL
+            GROUP BY timeframe_category
+            ORDER BY cnt DESC
+            LIMIT 11
+        """)).fetchall()
+        out["top_categories"] = [
+            {"category": str(r[0]), "count": int(r[1])} for r in rows
+        ]
+
+        # Conviction distribution
+        rows = db.execute(_st("""
+            SELECT COALESCE(conviction_level, 'unset') AS lvl, COUNT(*)
+            FROM predictions
+            WHERE source_type = 'youtube'
+            GROUP BY COALESCE(conviction_level, 'unset')
+        """)).fetchall()
+        for lvl, cnt in rows:
+            out["conviction_distribution"][str(lvl)] = int(cnt)
+
+        # Rejection counts (from scraper_runs over last 7 days)
+        r = db.execute(_st("""
+            SELECT COALESCE(SUM(timeframes_rejected), 0),
+                   COALESCE(SUM(reference_rejected), 0)
+            FROM scraper_runs
+            WHERE source = 'youtube'
+              AND started_at > NOW() - INTERVAL '7 days'
+        """)).first()
+        if r:
+            tf_rej = int(r[0] or 0)
+            ref_rej = int(r[1] or 0)
+            out["rejections_breakdown"]["no_timeframe_determinable"] = tf_rej
+            out["rejections_breakdown"]["unresolvable_reference"] = ref_rej
+            out["rejections_total"] = tf_rej + ref_rej
+        return out
+    except Exception as e:
+        return {
+            "error": f"{type(e).__name__}: {str(e)[:200]}",
+            "timeframe_distribution": {},
+            "top_categories": [],
+            "conviction_distribution": {},
+            "rejections_total": 0,
+            "rejections_breakdown": {},
+        }
+
+
 # ── SEO: sitemap.xml + robots.txt ──────────────────────────────────────────
 import time as _seo_time
 from fastapi.responses import Response as _RawResponse

@@ -176,6 +176,14 @@ export function toggleRegimeCallExtractionAdmin() {
   return api.post('/admin/toggle-regime-call-extraction', {}, { headers: authHeaders() }).then(r => r.data);
 }
 
+export function togglePredictionMetadataEnrichmentAdmin() {
+  return api.post('/admin/toggle-prediction-metadata-enrichment', {}, { headers: authHeaders() }).then(r => r.data);
+}
+
+export function getMetadataEnrichmentDiagnostics() {
+  return api.get('/admin/metadata-enrichment-diagnostics', { headers: authHeaders() }).then(r => r.data);
+}
+
 // ——— Macro Concepts CRUD (admin) ———
 
 export function getMacroConcepts() {

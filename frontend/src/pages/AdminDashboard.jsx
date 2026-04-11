@@ -15,6 +15,7 @@ import {
   toggleConditionalExtractionAdmin, toggleDisclosureExtractionAdmin,
   toggleSourceTimestampsAdmin, getTimestampDiagnostics,
   toggleRegimeCallExtractionAdmin,
+  togglePredictionMetadataEnrichmentAdmin, getMetadataEnrichmentDiagnostics,
   getAdminUrlQuality, getSocialStats,
   getPrunedYouTubeChannels, reactivateYouTubeChannel,
   setYouTubeSectorTraffic,
@@ -146,6 +147,7 @@ function FeatureToggles() {
         { key: 'disclosure_extraction', label: 'YouTube Disclosures (past-tense positions)', fn: toggleDisclosureExtractionAdmin },
         { key: 'source_timestamps', label: 'YouTube Source Timestamps (?t=Ns anchors)', fn: toggleSourceTimestampsAdmin },
         { key: 'regime_call_extraction', label: 'YouTube Regime Calls (structural market phase)', fn: toggleRegimeCallExtractionAdmin },
+        { key: 'prediction_metadata_enrichment', label: 'YouTube Metadata Enrichment (timeframe inference + conviction)', fn: togglePredictionMetadataEnrichmentAdmin },
       ].map(f => (
         <div key={f.key} className="flex items-center justify-between py-1.5">
           <span className="text-sm text-text-secondary">{f.label}</span>
@@ -225,6 +227,84 @@ function TimestampDiagnostics() {
             </div>
           </div>
         )}
+      </div>
+    </div>
+  );
+}
+
+
+function MetadataEnrichmentDiagnostics() {
+  // Ship #9 (rescoped) admin surface. Surfaces the timeframe source mix,
+  // top category distribution, conviction buckets, and rejection counts
+  // so drift is visible without grepping logs.
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  useEffect(() => {
+    getMetadataEnrichmentDiagnostics()
+      .then(setData)
+      .catch(() => setData({ error: 'failed_to_load' }))
+      .finally(() => setLoading(false));
+  }, []);
+  if (loading) return null;
+  if (!data || data.error) return null;
+  const td = data.timeframe_distribution || {};
+  const cd = data.conviction_distribution || {};
+  const tc = data.top_categories || [];
+  const rb = data.rejections_breakdown || {};
+  const convictionOrder = ['strong', 'moderate', 'hedged', 'hypothetical', 'unknown', 'unset'];
+  return (
+    <div className="card mb-6">
+      <h3 className="text-sm font-semibold text-muted uppercase tracking-wider mb-3">
+        Metadata Enrichment — Timeframe + Conviction (ship #9)
+      </h3>
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
+        <StatCard label="Explicit" value={(td.explicit || 0).toLocaleString()} />
+        <StatCard label="Category default" value={(td.category_default || 0).toLocaleString()} />
+        <StatCard label="Unset" value={(td.unset || 0).toLocaleString()} />
+        <StatCard label="Rejections (7d)" value={(data.rejections_total || 0).toLocaleString()} />
+      </div>
+      {tc.length > 0 && (
+        <div className="mb-4">
+          <div className="text-[10px] uppercase tracking-wider text-muted font-semibold mb-1.5">
+            Top inferred categories
+          </div>
+          <div className="flex items-center gap-2 flex-wrap font-mono text-[11px]">
+            {tc.map(c => (
+              <div key={c.category} className="flex items-center gap-1 px-2 py-0.5 rounded bg-surface-2/60">
+                <span className="text-muted">{c.category}</span>
+                <span className="text-text-primary">{c.count.toLocaleString()}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+      <div className="mb-3">
+        <div className="text-[10px] uppercase tracking-wider text-muted font-semibold mb-1.5">
+          Conviction distribution
+        </div>
+        <div className="flex items-center gap-3 flex-wrap text-xs">
+          {convictionOrder.map(lvl => (
+            <div key={lvl} className="flex items-center gap-1.5">
+              <span className="text-muted">{lvl}:</span>
+              <span className="font-mono text-text-primary">{(cd[lvl] || 0).toLocaleString()}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+      <div className="pt-3 border-t border-border/40">
+        <div className="text-[10px] uppercase tracking-wider text-muted font-semibold mb-1.5">
+          Rejections breakdown (last 7 days)
+        </div>
+        <div className="flex items-center gap-3 flex-wrap text-xs">
+          <div className="flex items-center gap-1.5">
+            <span className="text-muted">no_timeframe_determinable:</span>
+            <span className="font-mono text-text-primary">{(rb.no_timeframe_determinable || 0).toLocaleString()}</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <span className="text-muted">unresolvable_reference:</span>
+            <span className="font-mono text-text-primary">{(rb.unresolvable_reference || 0).toLocaleString()}</span>
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -866,6 +946,9 @@ function OverviewTab({ dashboard }) {
 
       {/* Ship #9: source timestamps match quality */}
       <TimestampDiagnostics />
+
+      {/* Ship #9 (rescoped): metadata enrichment (timeframe + conviction) */}
+      <MetadataEnrichmentDiagnostics />
 
       {/* Admins list */}
       {d.admins?.length > 0 && (

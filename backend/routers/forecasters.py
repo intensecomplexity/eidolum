@@ -533,7 +533,11 @@ def _get_preds(fid, page, limit, filter_type, sector, db):
                    p.outcome_window_days,
                    p.regime_type, p.regime_instrument,
                    p.regime_max_drawdown, p.regime_max_runup,
-                   p.regime_new_highs, p.regime_new_lows
+                   p.regime_new_highs, p.regime_new_lows,
+                   p.source_timestamp_seconds, p.source_timestamp_method,
+                   p.source_verbatim_quote, p.source_timestamp_confidence,
+                   p.inferred_timeframe_days, p.timeframe_source,
+                   p.timeframe_category, p.conviction_level
             FROM predictions p
             LEFT JOIN ticker_sectors ts ON ts.ticker = p.ticker
             LEFT JOIN predictions prior ON prior.id = p.revision_of
@@ -557,7 +561,9 @@ def _get_preds(fid, page, limit, filter_type, sector, db):
                        p.url_quality,
                        NULL, NULL, NULL, FALSE,
                        NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
-                       NULL, NULL, NULL, NULL, NULL, NULL
+                       NULL, NULL, NULL, NULL, NULL, NULL,
+                       NULL, NULL, NULL, NULL,
+                       NULL, NULL, NULL, NULL
                 FROM predictions p
                 LEFT JOIN ticker_sectors ts ON ts.ticker = p.ticker
                 WHERE p.forecaster_id = :fid {where}
@@ -621,6 +627,23 @@ def _get_preds(fid, page, limit, filter_type, sector, db):
             "regime_max_runup": float(p[41]) if p[41] is not None else None,
             "regime_new_highs": p[42],
             "regime_new_lows": p[43],
+            # Source timestamp metadata (ship #9). Populated when
+            # ENABLE_SOURCE_TIMESTAMPS is on AND the matcher resolved
+            # the verbatim quote to a real second. NULL otherwise.
+            # Frontend uses these to generate ?t=<N>s anchor links and
+            # render the verbatim quote as an audit trail tooltip.
+            "source_timestamp_seconds": p[44],
+            "source_timestamp_method": p[45],
+            "source_verbatim_quote": p[46],
+            "source_timestamp_confidence": float(p[47]) if p[47] is not None else None,
+            # Prediction metadata enrichment (ship #9 rescoped).
+            # Populated when ENABLE_PREDICTION_METADATA_ENRICHMENT is
+            # on. Frontend uses these to render the conviction pill
+            # badge and the timeframe source tooltip.
+            "inferred_timeframe_days": p[48],
+            "timeframe_source": p[49],
+            "timeframe_category": p[50],
+            "conviction_level": p[51],
         })
     return results
 
