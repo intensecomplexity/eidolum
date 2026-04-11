@@ -54,11 +54,12 @@ def _apply_dormancy(db: Session, results: list, include_dormant: bool) -> list:
 
 def _enrich_category_stats(results: list, db: Session):
     """Batch-fetch per-forecaster prediction counts split by
-    prediction_category. Adds six fields to each result dict:
+    prediction_category. Adds eight fields to each result dict:
 
       - ticker_call_total / ticker_call_accuracy
       - sector_call_total / sector_call_accuracy
       - macro_call_total / macro_call_accuracy
+      - pair_call_total / pair_call_accuracy
 
     Accuracy uses the same weighting as the main leaderboard: hit/correct
     count as 1.0, near counts as 0.5, miss/incorrect count as 0. Any
@@ -80,6 +81,8 @@ def _enrich_category_stats(results: list, db: Session):
         r.setdefault("sector_call_accuracy", None)
         r.setdefault("macro_call_total", 0)
         r.setdefault("macro_call_accuracy", None)
+        r.setdefault("pair_call_total", 0)
+        r.setdefault("pair_call_accuracy", None)
 
     if not results:
         return
@@ -111,6 +114,7 @@ def _enrich_category_stats(results: list, db: Session):
                 "ticker_call_total": 0, "ticker_call_accuracy": None,
                 "sector_call_total": 0, "sector_call_accuracy": None,
                 "macro_call_total": 0, "macro_call_accuracy": None,
+                "pair_call_total": 0, "pair_call_accuracy": None,
             }
         if cat == "sector_call":
             by_fid[fid]["sector_call_total"] = evaluated
@@ -120,6 +124,10 @@ def _enrich_category_stats(results: list, db: Session):
             by_fid[fid]["macro_call_total"] = evaluated
             if evaluated > 0:
                 by_fid[fid]["macro_call_accuracy"] = round(score / evaluated * 100, 1)
+        elif cat == "pair_call":
+            by_fid[fid]["pair_call_total"] = evaluated
+            if evaluated > 0:
+                by_fid[fid]["pair_call_accuracy"] = round(score / evaluated * 100, 1)
         elif cat == "ticker_call":
             # Explicit match so any NEW category value added later
             # doesn't silently overwrite ticker_call stats via the
@@ -134,6 +142,7 @@ def _enrich_category_stats(results: list, db: Session):
             "ticker_call_total": 0, "ticker_call_accuracy": None,
             "sector_call_total": 0, "sector_call_accuracy": None,
             "macro_call_total": 0, "macro_call_accuracy": None,
+            "pair_call_total": 0, "pair_call_accuracy": None,
         })
         r.update(stats)
 
