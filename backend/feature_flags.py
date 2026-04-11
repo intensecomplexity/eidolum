@@ -524,3 +524,37 @@ def invalidate_source_timestamps_flag_cache() -> None:
     """Reset the 60-second cache — called from the admin toggle endpoint
     so changes take effect immediately instead of waiting for the TTL."""
     _SOURCE_TIMESTAMPS_FLAG_CACHE["fetched_at"] = 0.0
+
+
+# ── Regime call extraction flag ────────────────────────────────────────────
+#
+# Boolean all-or-nothing flag. When true, the YouTube classifier appends
+# the regime instructions so structural market-phase claims ("no market
+# top yet", "bottom is in", "topping process", "correction not bear
+# market") get extracted as regime_call predictions. Regime calls carry
+# NO price target — the claim is about a STRUCTURAL outcome for the
+# instrument over the evaluation window. Scoring is based on max
+# drawdown, max runup, and new-high/new-low counts rather than final
+# price vs target. This is ship #12 (added after the 8-ship series).
+
+_REGIME_CALL_EXTRACTION_FLAG_CACHE: dict = {"enabled": False, "fetched_at": 0.0}
+_REGIME_CALL_EXTRACTION_FLAG_TTL = 60  # seconds
+
+
+def is_regime_call_extraction_enabled(db) -> bool:
+    """Return True if ENABLE_REGIME_CALL_EXTRACTION is 'true' in
+    the config table. Default False. Cached 60s so tight classifier
+    loops don't hammer the config table."""
+    now = time.time()
+    if (now - _REGIME_CALL_EXTRACTION_FLAG_CACHE["fetched_at"]) < _REGIME_CALL_EXTRACTION_FLAG_TTL:
+        return bool(_REGIME_CALL_EXTRACTION_FLAG_CACHE["enabled"])
+    enabled = _read_bool(db, "ENABLE_REGIME_CALL_EXTRACTION", default=False)
+    _REGIME_CALL_EXTRACTION_FLAG_CACHE["enabled"] = enabled
+    _REGIME_CALL_EXTRACTION_FLAG_CACHE["fetched_at"] = now
+    return enabled
+
+
+def invalidate_regime_call_extraction_flag_cache() -> None:
+    """Reset the 60-second cache — called from the admin toggle endpoint
+    so changes take effect immediately instead of waiting for the TTL."""
+    _REGIME_CALL_EXTRACTION_FLAG_CACHE["fetched_at"] = 0.0

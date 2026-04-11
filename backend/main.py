@@ -3068,6 +3068,23 @@ async def lifespan(app):
         except Exception as _stse:
             print(f"[Startup] ENABLE_SOURCE_TIMESTAMPS seed error: {_stse}")
 
+        # ── ENABLE_REGIME_CALL_EXTRACTION flag seed ─────────────────────
+        # Default 'false'. Admin flips via POST /api/admin/toggle-
+        # regime-call-extraction. Teaches Haiku to recognize structural
+        # market-phase claims and land them as regime_call predictions
+        # with drawdown/runup-based scoring. Ship #12.
+        try:
+            with engine.connect() as _rf_c:
+                _rf_c.execute(sql_text("""
+                    INSERT INTO config (key, value)
+                    VALUES ('ENABLE_REGIME_CALL_EXTRACTION', 'false')
+                    ON CONFLICT (key) DO NOTHING
+                """))
+                _rf_c.commit()
+                print("[Startup] ENABLE_REGIME_CALL_EXTRACTION flag seeded")
+        except Exception as _rfe:
+            print(f"[Startup] ENABLE_REGIME_CALL_EXTRACTION seed error: {_rfe}")
+
         # ── youtube_channel_meta totals backfill ────────────────────────
         # Historical backfill for the admin card counters. Three columns:
         #   - total_predictions_extracted (display)
@@ -4136,10 +4153,15 @@ def get_features(db: _Session = _Depends(_get_db)):
         # timestamp_matcher resolves each prediction's quote to an
         # integer second in the source video for ?t=Ns deep linking.
         "source_timestamps": False,
+        # Boolean: regime_call extraction appends the structural market
+        # phase instructions. Regime calls have NO price target — the
+        # claim is about drawdown/runup behavior over the window.
+        # Default false.
+        "regime_call_extraction": False,
     }
     try:
         rows = db.execute(_ft(
-            "SELECT key, value FROM config WHERE key IN ('tournaments_enabled','daily_challenge_enabled','duels_enabled','compete_enabled','compare_analysts_enabled','EVALUATE_X_PREDICTIONS','ENABLE_YOUTUBE_SECTOR_CALLS','ENABLE_RANKED_LIST_EXTRACTION','ENABLE_TARGET_REVISIONS','ENABLE_OPTIONS_POSITION_EXTRACTION','ENABLE_EARNINGS_CALL_EXTRACTION','ENABLE_MACRO_CALL_EXTRACTION','ENABLE_PAIR_CALL_EXTRACTION','ENABLE_BINARY_EVENT_EXTRACTION','ENABLE_METRIC_FORECAST_EXTRACTION','ENABLE_CONDITIONAL_CALL_EXTRACTION','ENABLE_DISCLOSURE_EXTRACTION','ENABLE_SOURCE_TIMESTAMPS')"
+            "SELECT key, value FROM config WHERE key IN ('tournaments_enabled','daily_challenge_enabled','duels_enabled','compete_enabled','compare_analysts_enabled','EVALUATE_X_PREDICTIONS','ENABLE_YOUTUBE_SECTOR_CALLS','ENABLE_RANKED_LIST_EXTRACTION','ENABLE_TARGET_REVISIONS','ENABLE_OPTIONS_POSITION_EXTRACTION','ENABLE_EARNINGS_CALL_EXTRACTION','ENABLE_MACRO_CALL_EXTRACTION','ENABLE_PAIR_CALL_EXTRACTION','ENABLE_BINARY_EVENT_EXTRACTION','ENABLE_METRIC_FORECAST_EXTRACTION','ENABLE_CONDITIONAL_CALL_EXTRACTION','ENABLE_DISCLOSURE_EXTRACTION','ENABLE_SOURCE_TIMESTAMPS','ENABLE_REGIME_CALL_EXTRACTION')"
         )).fetchall()
         for r in rows:
             if r[0] == "EVALUATE_X_PREDICTIONS":
@@ -4172,6 +4194,8 @@ def get_features(db: _Session = _Depends(_get_db)):
                 flags["disclosure_extraction"] = str(r[1]).strip().lower() == "true"
             elif r[0] == "ENABLE_SOURCE_TIMESTAMPS":
                 flags["source_timestamps"] = str(r[1]).strip().lower() == "true"
+            elif r[0] == "ENABLE_REGIME_CALL_EXTRACTION":
+                flags["regime_call_extraction"] = str(r[1]).strip().lower() == "true"
             else:
                 flags[r[0].replace("_enabled", "")] = r[1] == "true"
     except Exception:
@@ -4564,6 +4588,39 @@ def toggle_source_timestamps(
     new_val = db.query(Config).filter(Config.key == "ENABLE_SOURCE_TIMESTAMPS").first()
     return {
         "source_timestamps": (
+            str(new_val.value).strip().lower() == "true" if new_val else False
+        )
+    }
+
+
+@app.post("/api/admin/toggle-regime-call-extraction")
+def toggle_regime_call_extraction(
+    admin_id: int = _Depends(_require_admin),
+    db: _Session = _Depends(_get_db),
+):
+    """Flip ENABLE_REGIME_CALL_EXTRACTION between 'true' and 'false'.
+    Invalidates the feature_flags cache so the new value takes effect
+    on the next classify_video call instead of waiting 60s for the TTL.
+
+    Note: regime_call rows use structural scoring (max drawdown,
+    max runup, new-high/new-low counts) instead of final price vs
+    target. They stay outcome='pending' until the evaluator's daily
+    sweep computes the metrics and applies the per-regime rule."""
+    from models import Config
+    row = db.query(Config).filter(Config.key == "ENABLE_REGIME_CALL_EXTRACTION").first()
+    if row:
+        row.value = "false" if str(row.value).strip().lower() == "true" else "true"
+    else:
+        db.add(Config(key="ENABLE_REGIME_CALL_EXTRACTION", value="true"))
+    db.commit()
+    try:
+        from feature_flags import invalidate_regime_call_extraction_flag_cache
+        invalidate_regime_call_extraction_flag_cache()
+    except Exception:
+        pass
+    new_val = db.query(Config).filter(Config.key == "ENABLE_REGIME_CALL_EXTRACTION").first()
+    return {
+        "regime_call_extraction": (
             str(new_val.value).strip().lower() == "true" if new_val else False
         )
     }
