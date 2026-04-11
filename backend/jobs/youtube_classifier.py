@@ -1220,6 +1220,50 @@ Output: (do NOT emit as disclosure — this is a recommendation to others, not a
 Input: "NVDA is my biggest position"
 Output: (do NOT emit as disclosure — no action verb, no specific trade. This is portfolio description, not a transaction.)
 
+Plural voice (firms, funds, newsletters, institutional managers):
+
+When the speaker represents a firm, fund, newsletter, or institutional manager, they use first-person PLURAL pronouns ("we", "our", "the fund", "our portfolio") instead of "I". These statements are still disclosures — the speaker is describing what the institution bought, added to, trimmed, exited, or currently holds. The same seven actions apply; only the pronoun changes. Plural voice is EQUALLY valid as singular voice for disclosures. Do not skip these.
+
+Input: "we continue to hold our long term position in Arista"
+Output: {"ticker":"ANET","action":"hold","reasoning_text":"long-term position (conviction hold)","disclosed_at":"2026-04-11","derived_from":"disclosure","context_quote":"we continue to hold our long term position in Arista"}
+
+Input: "we own roughly 4% NVDA in the fund"
+Output: {"ticker":"NVDA","action":"hold","size_pct":0.04,"disclosed_at":"2026-04-11","derived_from":"disclosure","context_quote":"we own roughly 4% NVDA in the fund"}
+
+Input: "our position in AAPL remains unchanged this quarter"
+Output: {"ticker":"AAPL","action":"hold","disclosed_at":"2026-04-11","derived_from":"disclosure","context_quote":"our position in AAPL remains unchanged this quarter"}
+
+Input: "we added to our TSLA position this week"
+Output: {"ticker":"TSLA","action":"add","disclosed_at":"2026-04-11","derived_from":"disclosure","context_quote":"we added to our TSLA position this week"}
+
+Input: "we trimmed our META position at 520 after the run"
+Output: {"ticker":"META","action":"trim","entry_price":520,"reasoning_text":"locked in gains after the run","disclosed_at":"2026-04-11","derived_from":"disclosure","context_quote":"we trimmed our META position at 520 after the run"}
+
+Input: "we exited our NFLX position last month"
+Output: {"ticker":"NFLX","action":"exit","disclosed_at":"2026-03-11","derived_from":"disclosure","context_quote":"we exited our NFLX position last month"}
+
+Input: "we remain long SPY going into earnings season"
+Output: {"ticker":"SPY","action":"hold","reasoning_text":"long SPY into earnings season","disclosed_at":"2026-04-11","derived_from":"disclosure","context_quote":"we remain long SPY going into earnings season"}
+
+Input: "our fund still holds GOOG, not adding at this point"
+Output: {"ticker":"GOOG","action":"hold","reasoning_text":"still holds, not adding further","disclosed_at":"2026-04-11","derived_from":"disclosure","context_quote":"our fund still holds GOOG, not adding at this point"}
+
+IMPORTANT — distinguish portfolio ownership from analyst ratings:
+
+Plural voice alone is not a disclosure trigger. The speaker must be describing what the INSTITUTION OWNS, not what the institution RECOMMENDS to others. Analyst-rating language uses "we" the same way but means "our rating is", not "our portfolio".
+
+Input: "we rate AAPL a hold — expect sideways action over the next quarter"
+Output: (do NOT emit as disclosure — analyst RATING, not portfolio holding. The firm is recommending HOLD to others, not describing what they own. Let ticker_call handle with direction=neutral.)
+
+Input: "we have a hold rating on NVDA until earnings"
+Output: (do NOT emit as disclosure — rating voice, not portfolio voice. Let ticker_call handle.)
+
+The test that separates the two:
+- OWNERSHIP voice → disclosure: "we own", "we hold", "we continue to hold", "our position in X", "we remain long", "long-term position in X", "our fund holds X", "still have exposure to X".
+- RATING voice → ticker_call: "we rate X a hold", "we have a hold rating on X", "our rating is hold", "X is a hold here", "I have X at a hold".
+
+If unsure, ask: is the speaker describing their own portfolio (disclosure) or their recommendation to others (ticker_call neutral)?
+
 Rules:
 - MUST set derived_from: "disclosure".
 - MUST use PAST tense. Any future tense or conditional language → reject and let another prediction type handle it.
