@@ -129,6 +129,10 @@ export function toggleBinaryEventExtractionAdmin() {
   return api.post('/admin/toggle-binary-event-extraction', {}, { headers: authHeaders() }).then(r => r.data);
 }
 
+export function toggleMetricForecastExtractionAdmin() {
+  return api.post('/admin/toggle-metric-forecast-extraction', {}, { headers: authHeaders() }).then(r => r.data);
+}
+
 // ——— Macro Concepts CRUD (admin) ———
 
 export function getMacroConcepts() {

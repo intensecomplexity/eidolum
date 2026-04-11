@@ -367,6 +367,182 @@ function BinaryEventCard({ prediction: p, forecaster: fc, showForecaster, compac
   );
 }
 
+// Format a metric_target / metric_actual value for display. The
+// heuristic picks a representation based on metric_type since the
+// storage unit varies (decimal dollars for EPS, absolute dollars for
+// revenue, decimal rate for CPI, absolute count for payrolls).
+const _METRIC_PP_SET = new Set([
+  'cpi', 'core_cpi', 'pce', 'gdp_growth', 'unemployment', 'retail_sales',
+]);
+const _METRIC_RATE_SET = new Set([
+  'same_store_sales', 'margin', 'growth_yoy',
+]);
+const _METRIC_BIG_DOLLARS_SET = new Set([
+  'revenue', 'guidance_revenue', 'free_cash_flow',
+]);
+const _METRIC_EPS_SET = new Set(['eps', 'guidance_eps']);
+const _METRIC_COUNT_SET = new Set([
+  'subscribers', 'users', 'nonfarm_payrolls', 'jolts', 'housing_starts',
+]);
+const _METRIC_INDEX_SET = new Set([
+  'pmi_manufacturing', 'pmi_services', 'ism_manufacturing',
+]);
+
+function formatMetricValue(metricType, value) {
+  if (value == null) return '—';
+  const n = Number(value);
+  if (Number.isNaN(n)) return '—';
+  const mt = (metricType || '').toLowerCase();
+  if (_METRIC_EPS_SET.has(mt)) return `$${n.toFixed(2)}`;
+  if (_METRIC_BIG_DOLLARS_SET.has(mt)) {
+    if (Math.abs(n) >= 1e9) return `$${(n / 1e9).toFixed(2)}B`;
+    if (Math.abs(n) >= 1e6) return `$${(n / 1e6).toFixed(2)}M`;
+    return `$${n.toFixed(0)}`;
+  }
+  if (_METRIC_PP_SET.has(mt) || _METRIC_RATE_SET.has(mt)) {
+    return `${(n * 100).toFixed(1)}%`;
+  }
+  if (_METRIC_COUNT_SET.has(mt)) {
+    if (Math.abs(n) >= 1e6) return `${(n / 1e6).toFixed(1)}M`;
+    if (Math.abs(n) >= 1e3) return `${(n / 1e3).toFixed(0)}K`;
+    return `${n.toFixed(0)}`;
+  }
+  if (_METRIC_INDEX_SET.has(mt)) return n.toFixed(1);
+  return n.toString();
+}
+
+function MetricForecastCard({ prediction: p, forecaster: fc, showForecaster, compact }) {
+  // Dedicated layout for prediction_category === 'metric_forecast_call'.
+  // Numerical metric predictions scored against actual released values.
+  // Shows TARGET / ACTUAL (when scored) / ERROR with a hit/near/miss
+  // badge; formatted according to the metric_type's natural unit.
+  const predId = p.id || p.prediction_id;
+  const isPending = !p.outcome || p.outcome === 'pending';
+  const metricType = (p.metric_type || '').toLowerCase();
+  const metricLabel = metricType.replace(/_/g, ' ');
+  const targetStr = formatMetricValue(metricType, p.metric_target);
+  const actualStr = p.metric_actual != null ? formatMetricValue(metricType, p.metric_actual) : null;
+  const errorStr = p.metric_error_pct != null ? `${Number(p.metric_error_pct).toFixed(2)}%` : null;
+  const tickerIsSentinel = !p.ticker || /^(macro|__metric__|metric)/i.test(p.ticker);
+  return (
+    <div className={`bg-surface border rounded-xl p-4 overflow-hidden ${
+      isPending ? 'border-warning/30' : 'border-border'
+    }`} style={{ wordBreak: 'break-word' }}>
+      {(showForecaster || fc) && fc && (
+        <div className="flex items-center gap-1.5 mb-2 flex-wrap">
+          <PlatformBadge platform={getSourceBadgeKey(p, fc)} size={14} />
+          <Link to={`/forecaster/${fc.id}`} className="text-sm font-medium text-text-primary hover:text-accent transition-colors">
+            {fc.name}
+          </Link>
+          {fc.firm && <span className="text-[10px] text-muted">at {fc.firm}</span>}
+          <CredibilityBadge
+            userId={fc.id}
+            username={fc.name}
+            accuracy={fc.accuracy_rate}
+            scored={fc.total_predictions || 0}
+            isInstitutional={['institutional', 'congress'].includes(fc.platform)}
+            linkToProfile={false}
+          />
+        </div>
+      )}
+
+      {/* Header: ticker (if real) + METRIC tag + outcome badge */}
+      <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
+        <div className="flex items-center gap-2 flex-wrap min-w-0">
+          {!tickerIsSentinel && (
+            <>
+              <TickerLogo ticker={p.ticker} logoUrl={p.logo_url} size={20} />
+              <Link to={`/asset/${p.ticker}`} className="font-mono text-accent text-base font-bold hover:underline shrink-0">
+                {p.ticker}
+              </Link>
+            </>
+          )}
+          <span
+            className="text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full font-semibold"
+            style={{ background: 'rgba(90,180,180,0.15)', color: 'rgb(130,210,210)' }}
+          >
+            metric · {metricLabel}
+          </span>
+        </div>
+        <div className="flex items-center gap-1.5 shrink-0">
+          {predId && !compact && <BookmarkButton predictionId={predId} />}
+          {p.outcome && p.outcome !== 'pending' && p.outcome !== 'no_data' && (
+            <span className="text-[9px] text-muted italic">The verdict:</span>
+          )}
+          <PredictionBadge outcome={p.outcome} />
+        </div>
+      </div>
+
+      {/* Target / Actual / Error block */}
+      <div className="mb-2 pl-2 border-l-2 border-accent/30">
+        <div className="flex items-center gap-2 flex-wrap text-xs font-mono">
+          <span className="text-[9px] uppercase tracking-wider text-muted font-semibold">Target:</span>
+          <span className="text-text-primary font-semibold">{targetStr}</span>
+          {actualStr != null && (
+            <>
+              <span className="text-muted">|</span>
+              <span className="text-[9px] uppercase tracking-wider text-muted font-semibold">Actual:</span>
+              <span className="text-text-primary font-semibold">{actualStr}</span>
+            </>
+          )}
+          {errorStr != null && (
+            <>
+              <span className="text-muted">|</span>
+              <span className="text-[9px] uppercase tracking-wider text-muted font-semibold">Error:</span>
+              <span className={`font-semibold ${p.outcome === 'hit' ? 'text-positive' : p.outcome === 'near' ? 'text-warning' : 'text-negative'}`}>
+                {errorStr}
+              </span>
+            </>
+          )}
+        </div>
+      </div>
+
+      {/* Period + Release date */}
+      <div className="flex items-center gap-2 text-xs font-mono mb-2 flex-wrap">
+        {p.metric_period && (
+          <>
+            <span className="text-[9px] uppercase tracking-wider text-muted font-semibold">Period:</span>
+            <span className="text-text-secondary">{p.metric_period.replace(/_/g, ' ')}</span>
+            <span className="text-muted">|</span>
+          </>
+        )}
+        <span className="text-[9px] uppercase tracking-wider text-muted font-semibold">Release:</span>
+        <span className="text-text-secondary">{formatDate(p.metric_release_date) || '—'}</span>
+      </div>
+
+      {!compact && p.exact_quote && p.exact_quote !== p.context && (
+        <p className="text-xs text-text-secondary italic leading-relaxed mb-2 break-words">
+          {p.exact_quote}
+        </p>
+      )}
+
+      {p.evaluation_summary && (
+        <p className={`text-xs italic leading-relaxed mb-2 ${
+          p.outcome === 'hit' ? 'text-positive/80' :
+          p.outcome === 'near' ? 'text-warning/80' : 'text-negative/80'
+        }`}>
+          {p.evaluation_summary}
+        </p>
+      )}
+
+      <div className="flex items-center gap-2 text-[10px] text-muted flex-wrap">
+        <SourceBadge verifiedBy={p.verified_by} />
+        <LockedDate dateStr={p.prediction_date} />
+      </div>
+      <ProofLinks p={p} />
+
+      {!compact && predId && (
+        <CommentSection predictionId={predId} source={fc ? 'analyst' : 'user'} />
+      )}
+      {!compact && (
+        <p className="text-muted/50 text-[9px] italic mt-2 pt-1.5 border-t border-border/20 leading-relaxed">
+          Metric forecast — scored on target vs actual at release. Not investment advice.
+        </p>
+      )}
+    </div>
+  );
+}
+
 export default function PredictionCard({ prediction: p, showForecaster = false, forecaster = null, compact = false }) {
   const predId = p.id || p.prediction_id;
   const evalDate = p.evaluation_date || p.resolution_date;
@@ -388,6 +564,17 @@ export default function PredictionCard({ prediction: p, showForecaster = false, 
   if ((p.prediction_category || '').toLowerCase() === 'binary_event_call') {
     return (
       <BinaryEventCard
+        prediction={p}
+        forecaster={fc}
+        showForecaster={showForecaster}
+        compact={compact}
+      />
+    );
+  }
+
+  if ((p.prediction_category || '').toLowerCase() === 'metric_forecast_call') {
+    return (
+      <MetricForecastCard
         prediction={p}
         forecaster={fc}
         showForecaster={showForecaster}
