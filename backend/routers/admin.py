@@ -1316,3 +1316,254 @@ async def set_sector_traffic(
         "status": "updated",
         "youtube_sector_traffic_pct": pct,
     }
+
+
+# ── YouTube Monitor Runs Inspector ─────────────────────────────────────────
+#
+# Read-only drill-down into recent scraper_runs rows for the YouTube
+# channel monitor. Backs the AdminDashboard "YouTube Runs" tab.
+# Correlates rejection rows by timestamp window because
+# youtube_scraper_rejections doesn't carry a run_id column.
+#
+# Note: the monitor writes source='youtube' (confirmed by reading
+# backend/jobs/youtube_channel_monitor.py line 339) — NOT
+# 'youtube_monitor'. Every query here filters on 'youtube'.
+
+
+def _compute_run_status(started_at, finished_at) -> str:
+    """Derive a status label from the lifecycle timestamps.
+    running = started_at set, finished_at null, started within 1h.
+    failed  = started_at set, finished_at null, started > 1h ago.
+    completed = finished_at is set.
+    """
+    if finished_at is not None:
+        return "completed"
+    if started_at is None:
+        return "unknown"
+    age = datetime.datetime.utcnow() - started_at
+    if age.total_seconds() < 3600:
+        return "running"
+    return "failed"
+
+
+def _serialize_run_row(r) -> dict:
+    """Shape a scraper_runs row for the inspector frontend. Accepts the
+    tuple returned by list_youtube_runs's SELECT below."""
+    (
+        rid, started_at, finished_at, source,
+        items_fetched, items_processed, items_llm_sent,
+        items_inserted, items_rejected, estimated_cost_usd,
+        total_input_tokens, total_output_tokens,
+        total_cache_read_tokens, total_cache_create_tokens,
+        haiku_retries_count, sector_calls_extracted,
+    ) = r
+    duration = None
+    if started_at and finished_at:
+        duration = int((finished_at - started_at).total_seconds())
+    items_fetched_i = int(items_fetched or 0)
+    items_inserted_i = int(items_inserted or 0)
+    funnel_yield_pct = (
+        round(items_inserted_i / items_fetched_i * 100, 2)
+        if items_fetched_i > 0 else 0.0
+    )
+    return {
+        "id": int(rid),
+        "started_at": started_at.isoformat() if started_at else None,
+        "finished_at": finished_at.isoformat() if finished_at else None,
+        "duration_seconds": duration,
+        "status": _compute_run_status(started_at, finished_at),
+        "source": source,
+        "items_fetched": items_fetched_i,
+        "items_processed": int(items_processed or 0),
+        "items_llm_sent": int(items_llm_sent or 0),
+        "items_inserted": items_inserted_i,
+        "items_rejected": int(items_rejected or 0),
+        "estimated_cost_usd": float(estimated_cost_usd) if estimated_cost_usd is not None else 0.0,
+        "total_input_tokens": int(total_input_tokens or 0),
+        "total_output_tokens": int(total_output_tokens or 0),
+        "total_tokens": int((total_input_tokens or 0) + (total_output_tokens or 0)),
+        "cache_read_tokens": int(total_cache_read_tokens or 0),
+        "cache_create_tokens": int(total_cache_create_tokens or 0),
+        "haiku_retries_count": int(haiku_retries_count or 0),
+        "sector_calls_extracted": int(sector_calls_extracted or 0),
+        "funnel_yield_pct": funnel_yield_pct,
+    }
+
+
+@router.get("/admin/youtube-runs")
+@limiter.limit("30/minute")
+def list_youtube_runs(
+    request: Request,
+    admin: bool = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    """Return the last 50 YouTube monitor runs with summary funnel data."""
+    rows = db.execute(sql_text("""
+        SELECT id, started_at, finished_at, source,
+               items_fetched, items_processed, items_llm_sent,
+               items_inserted, items_rejected,
+               estimated_cost_usd,
+               total_input_tokens, total_output_tokens,
+               total_cache_read_tokens, total_cache_create_tokens,
+               haiku_retries_count, sector_calls_extracted
+        FROM scraper_runs
+        WHERE source = 'youtube'
+        ORDER BY started_at DESC
+        LIMIT 50
+    """)).fetchall()
+    runs = [_serialize_run_row(r) for r in rows]
+    # Summary totals for the frontend header cards
+    most_recent = runs[0]["started_at"] if runs else None
+    now = datetime.datetime.utcnow()
+    cutoff_24h = now - datetime.timedelta(hours=24)
+    runs_24h = [
+        r for r in runs
+        if r["started_at"] and datetime.datetime.fromisoformat(r["started_at"]) > cutoff_24h
+    ]
+    total_inserted_24h = sum(r["items_inserted"] for r in runs_24h)
+    total_cost_24h = round(sum(r["estimated_cost_usd"] for r in runs_24h), 4)
+    avg_yield = 0.0
+    if runs_24h:
+        yields = [r["funnel_yield_pct"] for r in runs_24h if r["items_fetched"] > 0]
+        avg_yield = round(sum(yields) / len(yields), 2) if yields else 0.0
+    return {
+        "runs": runs,
+        "summary": {
+            "most_recent_run": most_recent,
+            "runs_24h": len(runs_24h),
+            "total_inserted_24h": total_inserted_24h,
+            "total_cost_24h_usd": total_cost_24h,
+            "avg_yield_pct": avg_yield,
+        },
+    }
+
+
+@router.get("/admin/youtube-runs/{run_id}/details")
+@limiter.limit("30/minute")
+def youtube_run_details(
+    request: Request,
+    run_id: int,
+    admin: bool = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    """Per-run drill-down: predictions inserted during the run's window
+    plus rejections grouped by reason code. Rejections are correlated by
+    rejected_at BETWEEN started_at AND COALESCE(finished_at, NOW())
+    because youtube_scraper_rejections has no run_id column."""
+    row = db.execute(sql_text("""
+        SELECT id, started_at, finished_at, source,
+               items_fetched, items_processed, items_llm_sent,
+               items_inserted, items_rejected,
+               estimated_cost_usd,
+               total_input_tokens, total_output_tokens,
+               total_cache_read_tokens, total_cache_create_tokens,
+               haiku_retries_count, sector_calls_extracted
+        FROM scraper_runs
+        WHERE id = :rid AND source = 'youtube'
+        LIMIT 1
+    """), {"rid": run_id}).first()
+    if not row:
+        raise HTTPException(status_code=404, detail="run not found")
+    run = _serialize_run_row(row)
+
+    started_at = row[1]
+    finished_at = row[2]
+    # Use NOW() for still-running runs so the window stays open
+    window_end_sql = "COALESCE(:finished, NOW())"
+
+    # Predictions inserted during the run's window
+    pred_rows = db.execute(sql_text(f"""
+        SELECT p.id, p.ticker, f.name AS forecaster_name,
+               p.direction, p.target_price, p.context, p.source_url,
+               p.source_platform_id, p.created_at, p.prediction_category,
+               p.outcome
+        FROM predictions p
+        LEFT JOIN forecasters f ON f.id = p.forecaster_id
+        WHERE p.source_type = 'youtube'
+          AND p.verified_by = 'youtube_haiku_v1'
+          AND p.created_at >= :started
+          AND p.created_at <= {window_end_sql}
+        ORDER BY p.created_at DESC
+        LIMIT 200
+    """), {"started": started_at, "finished": finished_at}).fetchall()
+    predictions = []
+    by_category = {"ticker_call": 0, "sector_call": 0}
+    for p in pred_rows:
+        # Extract video_id from source_platform_id (format: yt_<vid>_<ticker>)
+        spid = p[7] or ""
+        vid = None
+        if spid.startswith("yt_"):
+            rest = spid[3:]
+            parts = rest.rsplit("_", 1)
+            if len(parts) == 2:
+                vid = parts[0]
+        cat = p[9] or "ticker_call"
+        if cat in by_category:
+            by_category[cat] += 1
+        predictions.append({
+            "id": int(p[0]),
+            "ticker": p[1],
+            "forecaster_name": p[2],
+            "direction": p[3],
+            "target_price": float(p[4]) if p[4] is not None else None,
+            "context": p[5],
+            "source_url": p[6],
+            "video_id": vid,
+            "created_at": p[8].isoformat() if p[8] else None,
+            "prediction_category": cat,
+            "outcome": p[10],
+        })
+
+    # Rejections grouped by reason within the same window
+    rej_group_rows = db.execute(sql_text(f"""
+        SELECT rejection_reason, COUNT(*) AS c
+        FROM youtube_scraper_rejections
+        WHERE rejected_at >= :started
+          AND rejected_at <= {window_end_sql}
+        GROUP BY rejection_reason
+        ORDER BY c DESC
+    """), {"started": started_at, "finished": finished_at}).fetchall()
+    rejections_by_reason = []
+    total_rejections = 0
+    for rg in rej_group_rows:
+        reason = rg[0]
+        count = int(rg[1] or 0)
+        total_rejections += count
+        sample_rows = db.execute(sql_text(f"""
+            SELECT video_id, channel_name, video_title, haiku_reason, rejected_at
+            FROM youtube_scraper_rejections
+            WHERE rejection_reason = :reason
+              AND rejected_at >= :started
+              AND rejected_at <= {window_end_sql}
+            ORDER BY rejected_at DESC
+            LIMIT 10
+        """), {
+            "reason": reason,
+            "started": started_at,
+            "finished": finished_at,
+        }).fetchall()
+        rejections_by_reason.append({
+            "reason": reason,
+            "count": count,
+            "samples": [
+                {
+                    "video_id": s[0],
+                    "channel": s[1],
+                    "video_title": s[2],
+                    "details": s[3],
+                    "rejected_at": s[4].isoformat() if s[4] else None,
+                }
+                for s in sample_rows
+            ],
+        })
+
+    return {
+        "run": run,
+        "predictions": predictions,
+        "rejections_by_reason": rejections_by_reason,
+        "totals": {
+            "predictions_count": len(predictions),
+            "rejections_count": total_rejections,
+            "by_category": by_category,
+        },
+    }
