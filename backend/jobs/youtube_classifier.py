@@ -1452,6 +1452,12 @@ def insert_youtube_prediction(
     except Exception:
         sector = None
 
+    # Event metadata: for earnings_call predictions, stamp event_type
+    # and event_date so the evaluator can route them to the earnings-
+    # reaction scoring path. For plain ticker_call rows both stay NULL.
+    event_type_val = pred.get("_event_type")
+    event_date_val = pred.get("_event_date")
+
     db.add(
         Prediction(
             forecaster_id=forecaster.id,
@@ -1477,18 +1483,24 @@ def insert_youtube_prediction(
             list_id=list_id_val,
             list_rank=list_rank_val,
             revision_of=revision_of_val,
+            event_type=event_type_val,
+            event_date=event_date_val,
         )
     )
     db.flush()
-    # Options-position counter: if Haiku marked this prediction as
-    # derived from options vocabulary, bump the per-run counter so
-    # scraper_runs.options_positions_extracted reflects how much of
-    # the run's ticker_call yield came from the options prompt block.
-    # The marker is NOT stored in the Prediction row — we just drop it
-    # here after reading.
-    if pred.get("_derived_from") == "options_position" and stats is not None:
+    # Per-run sub-type counters. Options and earnings both land as
+    # prediction_category='ticker_call' rows — these counters expose
+    # how much of a run's yield came from each specialized prompt block
+    # without introducing new categories. Markers are NOT stored in the
+    # Prediction row, only read here.
+    _derived = pred.get("_derived_from")
+    if _derived == "options_position" and stats is not None:
         stats["options_positions_extracted"] = int(
             stats.get("options_positions_extracted", 0)
+        ) + 1
+    elif _derived == "earnings_call" and stats is not None:
+        stats["earnings_calls_extracted"] = int(
+            stats.get("earnings_calls_extracted", 0)
         ) + 1
     return True
 
