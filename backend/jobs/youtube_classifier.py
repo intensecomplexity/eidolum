@@ -1011,6 +1011,107 @@ Rules:
 Output JSON only. Be concise."""
 
 
+# Conditional-call instructions. Appended to the active prompt when
+# ENABLE_CONDITIONAL_CALL_EXTRACTION is flipped on. Teaches Haiku to
+# recognize "IF trigger THEN outcome" language and emit predictions
+# with both the trigger and the outcome parts. The insert path
+# writes these as a new prediction_category='conditional_call' row
+# with trigger_* columns populated. The evaluator scores them in two
+# phases: phase 1 checks whether the trigger fires inside
+# trigger_deadline, phase 2 scores the outcome window starting from
+# trigger_fired_at.
+#
+# NEW outcome value: 'unresolved' — written when the trigger
+# deadline passes without firing. Excluded from accuracy denominators.
+YOUTUBE_HAIKU_CONDITIONAL_INSTRUCTIONS = """CONDITIONAL CALLS:
+If the speaker makes an "IF trigger THEN outcome" prediction — where the forecast is contingent on a separate event happening first — emit it as a conditional_call with both parts. The trigger is the precondition; the outcome is the directional forecast that only matters once the trigger has fired.
+
+Signals that indicate a conditional:
+- "if X happens, then Y"
+- "should X happen, Y will"
+- "X is the key — if it breaks, then Y"
+- "in the event of X"
+- "provided X holds"
+- "if X crosses above/below Y, I expect Z"
+- "when X reaches Y, Z follows"
+- "assuming X, then Y"
+
+Trigger types (required — pick one from this list):
+- price_hold: "if NVDA holds $180 support" — ticker stays at/above threshold
+- price_break: "if AAPL breaks $170 to the downside" — ticker crosses threshold in stated direction
+- economic_data: "if CPI comes in below 3%" — economic release
+- fed_decision: "if the Fed cuts 50bps" — FOMC action
+- market_event: "if recession is declared", "if VIX spikes above 40" — general market state
+- corporate_action: "if Apple announces a stock split" — corporate event
+- other: any trigger that doesn't fit above — rare, use sparingly
+
+For price_hold and price_break triggers (the only types auto-resolved in this ship), you MUST extract:
+- trigger_ticker: the symbol being watched (may differ from the outcome's ticker)
+- trigger_price: the numeric threshold
+- trigger_type: "price_hold" or "price_break"
+
+For all other trigger types, the insert path accepts trigger_condition as free text and the evaluator will eventually mark the row 'unresolved' when the deadline passes.
+
+Output format for conditional-call predictions:
+{
+  "derived_from": "conditional_call",
+  "trigger_condition": "Fed cuts rates by 50bps",
+  "trigger_type": "fed_decision",
+  "trigger_ticker": null,
+  "trigger_price": null,
+  "trigger_deadline": "2026-07-11",
+  "ticker": "IWM",
+  "direction": "bullish",
+  "price_target": 250,
+  "timeframe": "2026-10-11",
+  "context_quote": "If the Fed cuts 50bps, small caps rip 20 percent"
+}
+
+The "outcome" side uses the normal ticker_call fields: ticker, direction, target_price (if stated), timeframe. The "trigger" side adds the trigger_* fields. If trigger_deadline is not explicitly stated, omit it — the insert path will default to 90 days from the video publish date.
+
+Examples:
+
+Input: "If NVDA holds $180 support, it runs to $220 by summer"
+Output: {"derived_from": "conditional_call", "trigger_condition": "NVDA holds $180 support", "trigger_type": "price_hold", "trigger_ticker": "NVDA", "trigger_price": 180, "ticker": "NVDA", "direction": "bullish", "price_target": 220, "timeframe": "2026-08-01", "context_quote": "if NVDA holds 180, runs to 220 by summer"}
+
+Input: "If AAPL breaks $170 I'm out — expect a drop to 150"
+Output: {"derived_from": "conditional_call", "trigger_condition": "AAPL closes below $170", "trigger_type": "price_break", "trigger_ticker": "AAPL", "trigger_price": 170, "ticker": "AAPL", "direction": "bearish", "price_target": 150, "timeframe": "2026-10-11", "context_quote": "if AAPL breaks 170, drop to 150"}
+
+Input: "Should the Fed cut 50bps, small caps rip 20 percent"
+Output: {"derived_from": "conditional_call", "trigger_condition": "Fed cuts benchmark rate by 50bps in a single meeting", "trigger_type": "fed_decision", "trigger_ticker": null, "trigger_price": null, "ticker": "IWM", "direction": "bullish", "price_target": 250, "timeframe": "2026-10-11", "context_quote": "if Fed cuts 50bps, small caps rip 20 percent"}
+
+Input: "If CPI comes in below 3%, bonds will rally hard"
+Output: {"derived_from": "conditional_call", "trigger_condition": "CPI print below 3% YoY", "trigger_type": "economic_data", "trigger_ticker": null, "trigger_price": null, "ticker": "TLT", "direction": "bullish", "timeframe": "2026-07-11", "context_quote": "if CPI below 3 percent, bonds rally hard"}
+
+Input: "If recession is declared by Q2, gold spikes to $3000"
+Output: {"derived_from": "conditional_call", "trigger_condition": "US recession declared by end of Q2 2026", "trigger_type": "market_event", "trigger_ticker": null, "trigger_price": null, "trigger_deadline": "2026-06-30", "ticker": "GLD", "direction": "bullish", "price_target": 300, "timeframe": "2026-09-30", "context_quote": "if recession by Q2, gold to 3000"}
+
+Input: "Provided SPY stays above 450, I'm bullish on semis through year-end"
+Output: {"derived_from": "conditional_call", "trigger_condition": "SPY holds 450 support", "trigger_type": "price_hold", "trigger_ticker": "SPY", "trigger_price": 450, "ticker": "SOXX", "direction": "bullish", "timeframe": "2026-12-31", "context_quote": "provided SPY above 450, bullish semis through year-end"}
+
+Input: "If VIX spikes above 40, equities are in for a rough few weeks"
+Output: {"derived_from": "conditional_call", "trigger_condition": "VIX daily close above 40", "trigger_type": "price_break", "trigger_ticker": "VIX", "trigger_price": 40, "ticker": "SPY", "direction": "bearish", "timeframe": "2026-05-11", "context_quote": "if VIX above 40, equities rough weeks"}
+
+Input: "The market feels toppy — if things go south, it won't be pretty"
+Output: (do NOT extract — trigger "things go south" is not testable, and outcome "won't be pretty" isn't a directional call on a specific ticker)
+
+Input: "I'd like to see NVDA consolidate here before taking a position"
+Output: (do NOT extract — this is a plan, not a conditional prediction; no trigger with a clear outcome)
+
+Rules:
+- MUST set derived_from: "conditional_call".
+- MUST include both trigger_condition (free text) AND trigger_type (from the enum list).
+- For price_hold / price_break: trigger_ticker and trigger_price are REQUIRED.
+- For other trigger types: trigger_ticker and trigger_price should be null.
+- The outcome side uses the normal ticker / direction / price_target / timeframe fields — it's a scoreable directional forecast, not a vague mood.
+- REJECT conditionals where the trigger isn't testable (e.g. "if things go well", "if the vibes are good").
+- REJECT conditionals where the outcome isn't a specific direction on a ticker/concept.
+- Do NOT extract a conditional if the speaker is actually making TWO separate standalone predictions that happen to be adjacent.
+- trigger_deadline is OPTIONAL. Omit if not stated. Default handling is 90 days from publish date.
+
+Output JSON only. Be concise."""
+
+
 # ── Transcript fetching ─────────────────────────────────────────────────────
 
 def _build_transcript_api():
@@ -1250,6 +1351,7 @@ def classify_video(channel_name: str, title: str, publish_date: str,
     use_pair = False
     use_binary_event = False
     use_metric_forecast = False
+    use_conditional = False
     if db is not None and video_id:
         try:
             from feature_flags import should_use_sector_prompt
@@ -1306,6 +1408,12 @@ def classify_video(channel_name: str, title: str, publish_date: str,
         except Exception as _e:
             log.warning("[YT-CLF] metric forecast flag check failed: %s", _e)
             use_metric_forecast = False
+        try:
+            from feature_flags import is_conditional_extraction_enabled
+            use_conditional = is_conditional_extraction_enabled(db)
+        except Exception as _e:
+            log.warning("[YT-CLF] conditional flag check failed: %s", _e)
+            use_conditional = False
     base_system = YOUTUBE_HAIKU_SECTOR_SYSTEM if use_sector_prompt else HAIKU_SYSTEM
     # Append optional instruction blocks ONLY when each flag is on. When
     # every flag is off (the default), base_system is sent byte-for-byte
@@ -1329,6 +1437,8 @@ def classify_video(channel_name: str, title: str, publish_date: str,
         active_system = active_system + "\n\n" + YOUTUBE_HAIKU_MACRO_INSTRUCTIONS
     if use_pair:
         active_system = active_system + "\n\n" + YOUTUBE_HAIKU_PAIR_INSTRUCTIONS
+    if use_conditional:
+        active_system = active_system + "\n\n" + YOUTUBE_HAIKU_CONDITIONAL_INSTRUCTIONS
     if use_binary_event:
         active_system = active_system + "\n\n" + YOUTUBE_HAIKU_BINARY_EVENT_INSTRUCTIONS
     if use_metric_forecast:
@@ -1342,6 +1452,7 @@ def classify_video(channel_name: str, title: str, publish_date: str,
     telemetry["pair_enabled"] = bool(use_pair)
     telemetry["binary_event_enabled"] = bool(use_binary_event)
     telemetry["metric_forecast_enabled"] = bool(use_metric_forecast)
+    telemetry["conditional_enabled"] = bool(use_conditional)
     print(
         f"[YOUTUBE-HAIKU] video={video_id or '?'} channel={channel_name} "
         f"prompt_variant={telemetry['prompt_variant']} "
@@ -1352,7 +1463,8 @@ def classify_video(channel_name: str, title: str, publish_date: str,
         f"macro={'on' if use_macro else 'off'} "
         f"pair={'on' if use_pair else 'off'} "
         f"binary_event={'on' if use_binary_event else 'off'} "
-        f"metric_forecast={'on' if use_metric_forecast else 'off'}",
+        f"metric_forecast={'on' if use_metric_forecast else 'off'} "
+        f"conditional={'on' if use_conditional else 'off'}",
         flush=True,
     )
 
@@ -1552,6 +1664,7 @@ def _validate_and_dedupe_predictions(raw: list) -> list[dict]:
     seen_pairs: set[tuple[str, str]] = set()
     seen_binary_events: set[tuple[str, str]] = set()
     seen_metrics: set[tuple[str, str, str]] = set()
+    seen_conditionals: set[tuple[str, str, str]] = set()
     out: list[dict] = []
     for p in raw:
         if not isinstance(p, dict):
@@ -1723,6 +1836,76 @@ def _validate_and_dedupe_predictions(raw: list) -> list[dict]:
             out.append(p)
             continue
 
+        # Conditional call branch: derived_from='conditional_call' with
+        # trigger_condition + trigger_type required. The "outcome" side
+        # uses normal ticker/direction/target_price/timeframe fields,
+        # so this branch does extra validation on the trigger side
+        # and stamps _trigger_* keys for the insert path. Dedup key is
+        # (ticker_upper, trigger_condition_lower, direction) since the
+        # same ticker can appear in two conditionals with different
+        # triggers (e.g. "if SPY holds 450 → AAPL bullish" vs "if Fed
+        # cuts → AAPL bullish") and both are legitimately distinct
+        # predictions.
+        if str(p.get("derived_from") or "").strip().lower() == "conditional_call":
+            ticker_val = (p.get("ticker") or "").upper().strip().lstrip("$")
+            ticker_val = re.sub(r"[^A-Z0-9]", "", ticker_val)
+            direction = (p.get("direction") or "").strip().lower()
+            trig_cond = (p.get("trigger_condition") or "").strip()
+            trig_type = (p.get("trigger_type") or "").strip().lower()
+            if not ticker_val or len(ticker_val) > 5:
+                continue
+            if direction not in _VALID_DIRECTIONS:
+                continue
+            if not trig_cond or not trig_type:
+                continue
+            if trig_type not in (
+                "price_hold", "price_break", "economic_data",
+                "fed_decision", "market_event", "corporate_action", "other",
+            ):
+                continue
+            trig_ticker = None
+            trig_price = None
+            if trig_type in ("price_hold", "price_break"):
+                raw_tt = (p.get("trigger_ticker") or "").upper().strip().lstrip("$")
+                raw_tt = re.sub(r"[^A-Z0-9]", "", raw_tt)
+                if not raw_tt or len(raw_tt) > 5:
+                    continue  # price triggers require a ticker
+                trig_ticker = raw_tt
+                raw_tp = p.get("trigger_price")
+                try:
+                    trig_price = float(raw_tp) if raw_tp is not None else None
+                    if trig_price is None or trig_price <= 0:
+                        continue  # price triggers require a positive threshold
+                except (TypeError, ValueError):
+                    continue
+            # Dedup by (ticker, trigger_condition.lower(), direction)
+            key = (ticker_val, trig_cond.strip().lower()[:200], direction)
+            if key in seen_conditionals:
+                continue
+            seen_conditionals.add(key)
+            # Parse optional trigger_deadline as ISO date → datetime.date
+            raw_dl = p.get("trigger_deadline")
+            trig_deadline = None
+            if raw_dl:
+                try:
+                    from datetime import datetime as _dt
+                    trig_deadline = _dt.strptime(
+                        str(raw_dl)[:10], "%Y-%m-%d"
+                    ).date()
+                except (TypeError, ValueError):
+                    trig_deadline = None
+            p["ticker"] = ticker_val
+            p["direction"] = direction
+            p["_kind"] = "conditional_call"
+            p["_derived_from"] = "conditional_call"
+            p["_trigger_condition"] = trig_cond[:500]
+            p["_trigger_type"] = trig_type
+            p["_trigger_ticker"] = trig_ticker
+            p["_trigger_price"] = trig_price
+            p["_trigger_deadline"] = trig_deadline
+            out.append(p)
+            continue
+
         # Macro call branch: derived_from='macro_call' with a `concept`
         # field. The `ticker` field may be missing — the insert path
         # resolves the concept to a tradeable ETF via macro_concept_aliases.
@@ -1822,10 +2005,11 @@ def _validate_and_dedupe_predictions(raw: list) -> list[dict]:
         # by the insert path to route the row and increment the per-run
         # counter for the matching sub-type. Canonical values:
         # 'options_position', 'earnings_call', 'macro_call', 'pair_call',
-        # 'binary_event_call', 'metric_forecast_call'. pair_call,
-        # binary_event_call, and metric_forecast_call rows never reach
-        # this branch (they're handled above and skipped via `continue`)
-        # but we keep those values in the accepted set for symmetry.
+        # 'binary_event_call', 'metric_forecast_call', 'conditional_call'.
+        # pair_call, binary_event_call, metric_forecast_call, and
+        # conditional_call rows never reach this branch (they're handled
+        # above and skipped via `continue`) but we keep those values in
+        # the accepted set for symmetry with future refactors.
         raw_derived = p.get("derived_from")
         derived_from = None
         if raw_derived is not None:
@@ -1833,6 +2017,7 @@ def _validate_and_dedupe_predictions(raw: list) -> list[dict]:
             if _rd in (
                 "options_position", "earnings_call", "macro_call",
                 "pair_call", "binary_event_call", "metric_forecast_call",
+                "conditional_call",
             ):
                 derived_from = _rd
 
