@@ -19,24 +19,28 @@
 Matching ORM columns added to `backend/models.py` on `Prediction` and
 `Disclosure`.
 
-## Audit counts (rule_version v12.1)
+## Audit counts (rule_version v12.1, run 2026-04-11 15:55 UTC against 558,100 rows)
 
-| reason                  | count   |
-| ----------------------- | ------- |
-| disclosure_misroute     | PENDING |
-| invented_timeframe      | PENDING |
-| unresolvable_reference  | PENDING |
-| basket_shoehorn         | PENDING |
-| duplicate_source        | PENDING |
-| **TOTAL FLAGGED**       | PENDING |
+| reason                  | count   | status                               |
+| ----------------------- | ------: | ------------------------------------ |
+| disclosure_misroute     | 12      | APPLIED (16:10:48 UTC)               |
+| invented_timeframe      | 351,836 | DEFERRED — Ship #12.1 (filter false-positive) |
+| unresolvable_reference  | 0       | DEFERRED — Ship #12.2 (filter no-op)  |
+| basket_shoehorn         | 8       | DEFERRED — Ship #12.3 (filter false-positive) |
+| duplicate_source        | 3,596   | APPLIED (16:12:21 UTC)               |
+| **TOTAL FLAGGED**       | 3,608   | (disclosure_misroute + duplicate_source) |
 
-Audit has NOT been run against production. The migration hasn't been
-applied yet, and no prod DB access is available from the session the
-ship was written in. Run from your shell after applying the migration.
+**Apply run:** PARTIAL — duplicate_source + disclosure_misroute only.
+Three reasons deferred after sample-row review revealed filter
+calibration problems. See `SHIP_12_REPORT.md` earlier sections for
+the filter-tuning notes per deferred reason.
 
-**Apply run:** NOT YET RUN (awaiting operator)
-**Reroute dry-run:** NOT YET RUN — output path will be
-`backend/scripts/ship_12_reroute_dryrun.csv`
+**Reroute dry-run:** RAN 2026-04-11 — output at
+`backend/scripts/ship_12_reroute_dryrun.csv`. Six of the 12
+disclosure_misroute rows scored ≥ 4 and are eligible to insert into
+`disclosures`: COST, GOOGL, PL, SKYT, ACMR, ANET. The other six
+scored below threshold and stay flagged-but-not-migrated.
+**Reroute --apply is still pending human review of the CSV.**
 
 ## Admin UI
 Live at **/admin → Training Exclusions tab** (new tab appended after
@@ -157,6 +161,18 @@ in the pre-ship Q&A, approved by you in the follow-up message:
    landmine memory, all JWT-backed admin code goes in one place.
 
 ## Pending operator steps
+Status as of 2026-04-11:
+- [x] Migration applied (via psycopg2 — SQLAlchemy create_all had already created every object at API restart, so the migration was a no-op with NOTICES)
+- [x] Read-only audit run (rule_version v12.1, 355,452 naive / 352,390 distinct)
+- [x] **duplicate_source apply** — 3,596 rows flagged
+- [x] **disclosure_misroute apply** — 12 rows flagged
+- [x] **reroute dry-run** — CSV at `backend/scripts/ship_12_reroute_dryrun.csv`, 6/12 eligible
+- [ ] reroute `--apply` — pending human review of the CSV
+- [ ] `invented_timeframe` — deferred to Ship #12.1 (needs `source_type IN ('youtube','x')` restriction; current filter would flag 63% of the table)
+- [ ] `unresolvable_reference` — deferred to Ship #12.2 (current filter is a no-op; extractor prefix always breaks the pronoun-opener check)
+- [ ] `basket_shoehorn` — deferred to Ship #12.3 (current filter has ~100% false-positive rate on industry terms like "semiconductors" and "banks")
+- [ ] `timeframe_source` backfill — NEW FINDING: `timeframe_source` is NULL on all 558,100 rows. The Ship #8/#9 metadata-enrichment stack added the column but never backfilled historical rows, which is why Ship #12's `invented_timeframe` filter collapsed to "any 90-day row". A dedicated backfill ship should populate this column from the insert path's decision trail before any filter can rely on it.
+
 Run these from your shell (the CLI session that wrote this ship has
 no prod DB access):
 
