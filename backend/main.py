@@ -3870,6 +3870,8 @@ from routers import weekly_challenge as weekly_challenge_router
 app.include_router(weekly_challenge_router.router, prefix="/api")
 from routers import xp_router
 app.include_router(xp_router.router, prefix="/api")
+from routers import disclosures as disclosures_router
+app.include_router(disclosures_router.router, prefix="/api")
 app.include_router(admin_panel_router)  # /admin HTML + /api/admin/* endpoints
 app.include_router(admin_v2_router, prefix="/api")  # JWT-based admin panel
 from routers.og_image import router as og_image_router
