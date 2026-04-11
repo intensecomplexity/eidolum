@@ -1238,6 +1238,20 @@ def main():
     except Exception as e:
         log.warning(f"[Worker] scraper_runs sector_calls migration: {e}")
 
+    # scraper_runs.options_positions_extracted — per-run counter for the
+    # options-derived ticker_call path. Stays at 0 until the
+    # ENABLE_OPTIONS_POSITION_EXTRACTION flag is flipped on.
+    try:
+        with engine.connect() as conn:
+            conn.execute(sql_text(
+                "ALTER TABLE scraper_runs ADD COLUMN IF NOT EXISTS "
+                "options_positions_extracted INTEGER NOT NULL DEFAULT 0"
+            ))
+            conn.commit()
+        log.info("[Worker] scraper_runs.options_positions_extracted ready")
+    except Exception as e:
+        log.warning(f"[Worker] scraper_runs options_positions migration: {e}")
+
     # predictions.list_id + list_rank — ranked list extraction metadata.
     # Partial index keeps the index small because most rows won't be in
     # lists. No backfill: historical predictions have no ranking data.

@@ -2344,6 +2344,24 @@ async def lifespan(app):
         except Exception as _sre:
             print(f"[Startup] scraper_runs sector_calls migration error: {_sre}")
 
+        # ── scraper_runs.options_positions_extracted ───────────────────
+        # Per-run counter for the options-derived ticker_call path.
+        # Incremented when Haiku marks a prediction with
+        # derived_from='options_position' (options vocabulary → mapped
+        # direction). Stays at 0 until the ENABLE_OPTIONS_POSITION_EXTRACTION
+        # flag is flipped on. No new prediction_category — options-
+        # derived rows still insert as ticker_call.
+        try:
+            with engine.connect() as _op_c:
+                _op_c.execute(sql_text(
+                    "ALTER TABLE scraper_runs ADD COLUMN IF NOT EXISTS "
+                    "options_positions_extracted INTEGER NOT NULL DEFAULT 0"
+                ))
+                _op_c.commit()
+                print("[Startup] scraper_runs.options_positions_extracted ready")
+        except Exception as _ope:
+            print(f"[Startup] scraper_runs options_positions migration error: {_ope}")
+
         # ── predictions.list_id + list_rank (ranked list extraction) ────
         # Stores speaker-declared rank position within a ranked list
         # ("my top 5 stocks: NVDA, AMD, TSM, AAPL, MSFT"). Both columns

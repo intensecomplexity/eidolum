@@ -762,6 +762,17 @@ class ScraperRun(Base):
     # from the admin panel.
     sector_calls_extracted = Column(Integer, nullable=False, default=0,
                                      server_default="0")
+    # Count of options-derived ticker_call predictions extracted in
+    # this run. Incremented when Haiku marks a prediction with
+    # derived_from='options_position' under the
+    # ENABLE_OPTIONS_POSITION_EXTRACTION flag — options vocabulary
+    # ("buying calls", "selling puts", "iron condor", ...) gets
+    # mapped to an equivalent ticker_call direction and stored as
+    # prediction_category='ticker_call'. This counter tracks how many
+    # of those ticker_call rows came from options language, without
+    # introducing a new prediction_category value.
+    options_positions_extracted = Column(Integer, nullable=False, default=0,
+                                          server_default="0")
 
 
 class YouTubeScraperRejection(Base):
