@@ -2068,6 +2068,7 @@ def classify_video(channel_name: str, title: str, publish_date: str,
     use_disclosure = False
     use_regime = False
     use_source_timestamps = False
+    use_metadata_enrichment = False
     if db is not None and video_id:
         try:
             from feature_flags import should_use_sector_prompt
@@ -2148,6 +2149,12 @@ def classify_video(channel_name: str, title: str, publish_date: str,
         except Exception as _e:
             log.warning("[YT-CLF] source_timestamps flag check failed: %s", _e)
             use_source_timestamps = False
+        try:
+            from feature_flags import is_prediction_metadata_enrichment_enabled
+            use_metadata_enrichment = is_prediction_metadata_enrichment_enabled(db)
+        except Exception as _e:
+            log.warning("[YT-CLF] metadata_enrichment flag check failed: %s", _e)
+            use_metadata_enrichment = False
     base_system = YOUTUBE_HAIKU_SECTOR_SYSTEM if use_sector_prompt else HAIKU_SYSTEM
     # Append optional instruction blocks ONLY when each flag is on. When
     # every flag is off (the default), base_system is sent byte-for-byte
@@ -2181,14 +2188,17 @@ def classify_video(channel_name: str, title: str, publish_date: str,
         active_system = active_system + "\n\n" + YOUTUBE_HAIKU_DISCLOSURE_INSTRUCTIONS
     if use_regime:
         active_system = active_system + "\n\n" + YOUTUBE_HAIKU_REGIME_INSTRUCTIONS
-    # The SOURCE_TIMESTAMP block is ALWAYS the last layer. It asks
-    # Haiku to add a verbatim_quote field to every prediction emitted
-    # by ANY of the previous blocks (regime_call included), so it must
-    # be appended after the category-specific instructions. Placing it
-    # earlier would still work functionally but would break the stable
-    # cache order and shift every extended-prompt cache entry.
+    # The SOURCE_TIMESTAMP block asks Haiku to add a verbatim_quote
+    # field to every prediction emitted by ANY of the previous blocks
+    # (regime_call included), so it must be appended after the
+    # category-specific instructions. METADATA_ENRICHMENT (ship #9
+    # rescoped) is the 14th and current-last layer — it runs AFTER
+    # source_timestamp so extended-prompt cache entries stay stable
+    # for users with timestamps=on and metadata=off.
     if use_source_timestamps:
         active_system = active_system + "\n\n" + YOUTUBE_HAIKU_SOURCE_TIMESTAMP_INSTRUCTIONS
+    if use_metadata_enrichment:
+        active_system = active_system + "\n\n" + YOUTUBE_HAIKU_METADATA_ENRICHMENT_INSTRUCTIONS
     telemetry["prompt_variant"] = "sector" if use_sector_prompt else "standard"
     telemetry["ranked_list_enabled"] = bool(use_ranked_list)
     telemetry["revisions_enabled"] = bool(use_revisions)
@@ -2202,6 +2212,7 @@ def classify_video(channel_name: str, title: str, publish_date: str,
     telemetry["disclosure_enabled"] = bool(use_disclosure)
     telemetry["regime_enabled"] = bool(use_regime)
     telemetry["source_timestamps_enabled"] = bool(use_source_timestamps)
+    telemetry["metadata_enrichment_enabled"] = bool(use_metadata_enrichment)
     print(
         f"[YOUTUBE-HAIKU] video={video_id or '?'} channel={channel_name} "
         f"prompt_variant={telemetry['prompt_variant']} "
@@ -2216,7 +2227,8 @@ def classify_video(channel_name: str, title: str, publish_date: str,
         f"conditional={'on' if use_conditional else 'off'} "
         f"disclosure={'on' if use_disclosure else 'off'} "
         f"regime={'on' if use_regime else 'off'} "
-        f"timestamps={'on' if use_source_timestamps else 'off'}",
+        f"timestamps={'on' if use_source_timestamps else 'off'} "
+        f"metadata={'on' if use_metadata_enrichment else 'off'}",
         flush=True,
     )
 
