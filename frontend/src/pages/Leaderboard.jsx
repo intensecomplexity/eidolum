@@ -18,7 +18,13 @@ import LeaderboardHoverPreview from '../components/LeaderboardHoverPreview';
 import { usePublicFlag } from '../hooks/usePublicFlag';
 import { getLeaderboard, getAvailableTimeframes } from '../api';
 
-const SECTORS = ['All', 'Technology', 'Healthcare', 'Financial Services', 'Consumer Cyclical', 'Consumer Defensive', 'Energy', 'Industrials', 'Communication Services', 'Crypto'];
+// Ship #13B Bug 13: all 11 Morningstar sectors. Real Estate /
+// Utilities / Basic Materials were missing before so there was no way
+// to filter the leaderboard down to forecasters strong in those
+// sectors even though the backend indexed them. "Crypto" stays as a
+// display bucket outside the Morningstar 11 because we still track
+// crypto-only calls.
+const SECTORS = ['All', 'Technology', 'Healthcare', 'Financial Services', 'Consumer Cyclical', 'Consumer Defensive', 'Energy', 'Industrials', 'Communication Services', 'Real Estate', 'Utilities', 'Basic Materials', 'Crypto'];
 const DIRECTIONS = ['All', 'bullish', 'bearish', 'neutral'];
 
 const SHORT_SECTOR = {
