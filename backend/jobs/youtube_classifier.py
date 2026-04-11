@@ -3751,3 +3751,172 @@ def insert_youtube_conditional_prediction(
             stats.get("conditional_calls_extracted", 0)
         ) + 1
     return True
+
+
+# ── Disclosure insertion (ship #8) ─────────────────────────────────────────
+#
+# Unlike every other ship in the series, disclosures do NOT land in
+# the predictions table. They live in their own `disclosures` table
+# with their own scoring concept (follow-through). The insert path
+# here is a clean split from insert_youtube_prediction so the type
+# separation is enforced at the boundary — if you're editing this
+# function and find yourself reaching for a predictions-table field,
+# stop and reconsider.
+
+
+def insert_youtube_disclosure(
+    pred: dict,
+    *,
+    channel_name: str,
+    channel_id: str | None,
+    video_id: str,
+    video_title: str,
+    publish_date: datetime,
+    db,
+    transcript_snippet: str | None = None,
+    stats: dict | None = None,
+) -> bool:
+    """Insert a disclosure row.
+
+    Writes to the `disclosures` table with the 7-value action enum
+    plus size (shares / pct / qualitative), entry_price, reasoning,
+    and disclosed_at. follow_through_* stays NULL until the daily
+    compute_disclosure_follow_through job fills it in.
+
+    Rejection paths (each logs to youtube_scraper_rejections and
+    returns False):
+      - missing or unknown action → 'disclosure_invalid_action'
+      - missing ticker → 'disclosure_missing_ticker'
+      - ticker not in ticker_sectors → 'invalid_ticker'
+      - dedup collision on source_platform_id → 'dedup_collision'
+      - forecaster create failure → 'forecaster_creation_failed'
+    """
+    from models import Disclosure
+
+    def _reject(reason: str, hr: str | None = None) -> bool:
+        log_youtube_rejection(
+            db,
+            video_id=video_id,
+            channel_id=channel_id,
+            channel_name=channel_name,
+            video_title=video_title,
+            video_published_at=publish_date,
+            reason=reason,
+            haiku_reason=hr,
+            haiku_raw=pred,
+            transcript_snippet=transcript_snippet,
+            stats=stats,
+        )
+        return False
+
+    ticker = (pred.get("ticker") or "").upper().strip().lstrip("$")
+    ticker = re.sub(r"[^A-Z0-9]", "", ticker)
+    action = (
+        pred.get("_disclosure_action")
+        or pred.get("action")
+        or ""
+    ).strip().lower()
+
+    if not ticker or len(ticker) > 5:
+        return _reject("disclosure_missing_ticker", hr=ticker or None)
+    if action not in ("buy", "sell", "add", "trim", "starter", "exit", "hold"):
+        return _reject("disclosure_invalid_action", hr=action or None)
+
+    # disclosed_at: prefer the validator-stamped date, fall back to
+    # parsing the raw field, final fallback to the video publish date.
+    disclosed_date = pred.get("_disclosed_at_date")
+    if not disclosed_date:
+        raw_date = pred.get("disclosed_at")
+        if raw_date:
+            try:
+                from datetime import datetime as _dt
+                disclosed_date = _dt.strptime(
+                    str(raw_date)[:10], "%Y-%m-%d"
+                ).date()
+            except (TypeError, ValueError):
+                disclosed_date = None
+    if not disclosed_date:
+        disclosed_date = publish_date.date() if publish_date else None
+    if not disclosed_date:
+        return _reject("disclosure_invalid_action", hr="no date")
+
+    from datetime import datetime as _dt
+    disclosed_at_dt = _dt.combine(disclosed_date, _dt.min.time())
+
+    # Dedup key: one row per (video, ticker, action, date). Two
+    # different days' disclosures on the same ticker+action survive
+    # because the date is in the key; the same disclosure mentioned
+    # twice in a single video collapses.
+    source_id = f"yt_{video_id}_{ticker}_{action}_{disclosed_date.isoformat()}"
+    if db.execute(
+        sql_text("SELECT 1 FROM disclosures WHERE source_platform_id = :sid LIMIT 1"),
+        {"sid": source_id},
+    ).first():
+        if stats is not None:
+            stats["items_deduped"] = int(stats.get("items_deduped", 0)) + 1
+        return _reject("dedup_collision", hr=f"{ticker}/{action}/{disclosed_date}")
+
+    if not validate_ticker_in_db(ticker, db):
+        return _reject("invalid_ticker", hr=ticker)
+
+    forecaster = find_or_create_youtube_forecaster(channel_name, channel_id, db)
+    if not forecaster:
+        return _reject("forecaster_creation_failed")
+
+    # Coerce size fields defensively — Haiku sometimes returns
+    # strings like "500" or "5%" for numeric slots.
+    def _to_num(v):
+        if v is None:
+            return None
+        try:
+            return float(str(v).replace("%", "").replace(",", "").strip())
+        except (TypeError, ValueError):
+            return None
+
+    size_shares = _to_num(pred.get("_size_shares") or pred.get("size_shares"))
+    size_pct = _to_num(pred.get("_size_pct") or pred.get("size_pct"))
+    # Interpret a size_pct > 1 as a percent-not-decimal ("5" → 0.05)
+    if size_pct is not None and size_pct > 1:
+        size_pct = size_pct / 100.0
+    size_qualitative = pred.get("_size_qualitative") or (
+        pred.get("size_qualitative") or None
+    )
+    if isinstance(size_qualitative, str):
+        size_qualitative = size_qualitative.strip().lower() or None
+    if size_qualitative not in (None, "small", "medium", "large", "full"):
+        size_qualitative = None
+    entry_price = _to_num(pred.get("_entry_price") or pred.get("entry_price"))
+    reasoning = (pred.get("_reasoning_text") or pred.get("reasoning_text") or "")
+    reasoning = reasoning.strip()[:2000] if reasoning else None
+
+    db.add(
+        Disclosure(
+            forecaster_id=forecaster.id,
+            ticker=ticker,
+            action=action,
+            size_shares=size_shares,
+            size_pct=size_pct,
+            size_qualitative=size_qualitative,
+            entry_price=entry_price,
+            reasoning_text=reasoning,
+            disclosed_at=disclosed_at_dt,
+            source_video_id=video_id,
+            source_platform_id=source_id,
+        )
+    )
+    # Bump the cached counter on the forecaster row. Average
+    # follow-through stays NULL until the daily job computes it —
+    # we intentionally don't touch it here.
+    db.execute(
+        sql_text(
+            "UPDATE forecasters SET disclosure_count = disclosure_count + 1 "
+            "WHERE id = :fid"
+        ),
+        {"fid": int(forecaster.id)},
+    )
+    db.flush()
+    if stats is not None:
+        stats["disclosures_extracted"] = int(
+            stats.get("disclosures_extracted", 0)
+        ) + 1
+    return True

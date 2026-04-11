@@ -47,6 +47,7 @@ from jobs.youtube_classifier import (
     insert_youtube_binary_event_prediction,
     insert_youtube_metric_forecast_prediction,
     insert_youtube_conditional_prediction,
+    insert_youtube_disclosure,
     log_youtube_rejection,
     transcript_proxy_status,
     PIPELINE_VERSION,
@@ -441,6 +442,12 @@ def _run_inner(db):
         # insert_youtube_conditional_prediction. Stays 0 when
         # ENABLE_CONDITIONAL_CALL_EXTRACTION is off.
         "conditional_calls_extracted": 0,
+        # Per-run disclosure counter — incremented inside
+        # insert_youtube_disclosure. Stays 0 when
+        # ENABLE_DISCLOSURE_EXTRACTION is off. Unlike every other
+        # counter in this dict, the rows counted here do NOT live
+        # in the predictions table — they live in `disclosures`.
+        "disclosures_extracted": 0,
     }
 
     for row in batch_rows:
@@ -668,7 +675,8 @@ def _run_inner(db):
                     pair_calls_extracted = :pair_calls,
                     binary_events_extracted = :binary_events,
                     metric_forecasts_extracted = :metric_forecasts,
-                    conditional_calls_extracted = :conditional_calls
+                    conditional_calls_extracted = :conditional_calls,
+                    disclosures_extracted = :disclosures
                 WHERE id = :id
             """), {
                 "id": run_id,
@@ -692,6 +700,7 @@ def _run_inner(db):
                 "binary_events": int(stats.get("binary_events_extracted", 0)),
                 "metric_forecasts": int(stats.get("metric_forecasts_extracted", 0)),
                 "conditional_calls": int(stats.get("conditional_calls_extracted", 0)),
+                "disclosures": int(stats.get("disclosures_extracted", 0)),
             })
             db.commit()
         except Exception as e:
@@ -918,6 +927,24 @@ def _process_one_video(db, channel_name, channel_id, video_id, title, publish_da
                 )
             elif kind == "conditional_call":
                 ok = insert_youtube_conditional_prediction(
+                    pred,
+                    channel_name=channel_name,
+                    channel_id=channel_id,
+                    video_id=video_id,
+                    video_title=title,
+                    publish_date=publish_dt,
+                    db=db,
+                    transcript_snippet=transcript_snippet,
+                    stats=stats,
+                )
+            elif kind == "disclosure":
+                # Disclosures land in the `disclosures` table, NOT
+                # predictions. The ok count still feeds `inserted`
+                # below so the scraper_runs counters are consistent,
+                # but the per-type counter is
+                # stats["disclosures_extracted"], not
+                # stats["predictions_inserted"].
+                ok = insert_youtube_disclosure(
                     pred,
                     channel_name=channel_name,
                     channel_id=channel_id,
