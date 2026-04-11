@@ -98,21 +98,36 @@ def get_forecaster(
     if not f:
         raise HTTPException(status_code=404, detail="Forecaster not found")
 
-    # Quick stats: earliest prediction date + sector count
+    # Quick stats: earliest prediction date + total rows. sector_count is
+    # now computed post-canonicalization (see the loop below) so the
+    # header "N sectors" number is capped at 11 Morningstar buckets
+    # instead of counting every raw SIC variant as a distinct sector.
     try:
         extra = db.execute(sql_text("""
-            SELECT MIN(prediction_date),
-                   COUNT(DISTINCT CASE WHEN sector IS NOT NULL AND sector != '' AND sector != 'Other' THEN sector END),
-                   COUNT(*)
+            SELECT MIN(prediction_date), COUNT(*)
             FROM predictions WHERE forecaster_id = :fid
         """), {"fid": forecaster_id}).first()
         first_pred_date = extra[0].isoformat() if extra and extra[0] else None
-        sector_count = extra[1] if extra else 0
-        total_all = extra[2] if extra else 0
+        total_all = extra[1] if extra else 0
     except Exception:
         first_pred_date = None
-        sector_count = 0
         total_all = f.total_predictions or 0
+
+    # Canonical sector_count — distinct Morningstar sectors across this
+    # forecaster's predictions (post-alias-mapping). Used as the "N sectors"
+    # display in the profile header.
+    sector_count = 0
+    try:
+        from utils.sector import canonical_sectors_distinct
+        raw_sector_rows = db.execute(sql_text("""
+            SELECT DISTINCT COALESCE(p.sector, ts.sector)
+            FROM predictions p
+            LEFT JOIN ticker_sectors ts ON ts.ticker = p.ticker
+            WHERE p.forecaster_id = :fid
+        """), {"fid": forecaster_id}).fetchall()
+        sector_count = len(canonical_sectors_distinct(r[0] for r in raw_sector_rows))
+    except Exception:
+        sector_count = 0
 
     # Primary source for this forecaster
     primary_source = None
@@ -427,13 +442,32 @@ def get_forecaster_sectors(request: Request, forecaster_id: int, db: Session = D
               AND COALESCE(p.sector, ts.sector) != ''
             GROUP BY sec ORDER BY total DESC
         """), {"fid": forecaster_id}).fetchall()
-        sectors = []
+        # Canonicalize the raw sector field into Morningstar sectors and
+        # re-aggregate, so Jefferies no longer ships 25 chips including
+        # "Professional Services" / "Packaging" / "Life Sciences Tools &
+        # Services" etc. alongside the proper Morningstar values.
+        from utils.sector import canonical_sector, UNKNOWN_SECTOR
+        by_canonical: dict = {}
         for r in sector_rows:
-            if r[0] == "Other" and len(sector_rows) > 1:
+            canon = canonical_sector(r[0])
+            if canon == UNKNOWN_SECTOR:
                 continue
-            scored = r[4] or 0
-            acc = round((r[2] + r[3] * 0.5) / scored * 100, 1) if scored > 0 else 0
-            sectors.append({"sector": r[0], "accuracy": acc, "count": r[1], "scored": scored})
+            bucket = by_canonical.setdefault(canon, {"total": 0, "hits": 0, "nears": 0, "scored": 0})
+            bucket["total"] += int(r[1] or 0)
+            bucket["hits"] += int(r[2] or 0)
+            bucket["nears"] += int(r[3] or 0)
+            bucket["scored"] += int(r[4] or 0)
+        sectors = []
+        for canon, agg in by_canonical.items():
+            scored = agg["scored"]
+            acc = round((agg["hits"] + agg["nears"] * 0.5) / scored * 100, 1) if scored > 0 else 0
+            sectors.append({
+                "sector": canon,
+                "accuracy": acc,
+                "count": agg["total"],
+                "scored": scored,
+            })
+        sectors.sort(key=lambda s: s["count"], reverse=True)
     except Exception:
         sectors = []
 

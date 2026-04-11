@@ -795,6 +795,11 @@ def get_all_consensus(
         except Exception:
             pass
 
+    # Ship #13 Bug H: canonicalize the sector chip on /consensus so NFLX
+    # stops rendering "SERVICES-VIDEO TAPE RENTAL" and TSLA/AMZN stop
+    # rendering no chip at all when their raw SIC is unmapped.
+    from utils.sector import canonical_sector, UNKNOWN_SECTOR
+
     results = []
     for r in rows:
         ticker, ticker_sector, total, bullish, bearish, neutral_count = r[0], r[1], r[2], r[3], r[4], r[5]
@@ -804,12 +809,13 @@ def get_all_consensus(
         company_name = name_by_ticker.get(ticker) or TICKER_INFO.get(ticker)
         logo_domain = domain_by_ticker.get(ticker) or get_domain(ticker)
         logo_url = logo_by_ticker.get(ticker) or f"https://financialmodelingprep.com/image-stock/{ticker}.png"
+        canon = canonical_sector(ticker_sector)
         results.append({
             "ticker": ticker,
             "company_name": company_name,
             "logo_domain": logo_domain,
             "logo_url": logo_url,
-            "sector": ticker_sector or "Other",
+            "sector": canon if canon != UNKNOWN_SECTOR else None,
             "total_predictions": total,
             "bullish_count": bullish,
             "bearish_count": bearish,

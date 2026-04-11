@@ -356,7 +356,12 @@ def get_asset_consensus(
             "SELECT sector, company_name, logo_url, description, logo_domain FROM ticker_sectors WHERE ticker = :t"
         ), {"t": ticker}).first()
         if _ts:
-            _sector = _ts[0]
+            # Ship #13 Bug H: canonicalize the sector so the asset page
+            # never renders a raw SIC string like
+            # "MOTOR VEHICLES & PASSENGER CAR BODIES" in the sector chip.
+            from utils.sector import canonical_sector, UNKNOWN_SECTOR
+            _canonical = canonical_sector(_ts[0])
+            _sector = _canonical if _canonical != UNKNOWN_SECTOR else None
             _company = _ts[1]
             _logo_url = _ts[2]
             _description = _ts[3]
