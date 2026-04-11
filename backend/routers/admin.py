@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func, text as sql_text
 from database import get_db
 from models import (
-    Forecaster, Prediction, TrackedXAccount, SuggestedXAccount,
+    Forecaster, Prediction, Disclosure, TrackedXAccount, SuggestedXAccount,
     XScraperRejection, YouTubeChannelMeta, SectorEtfAlias,
     MacroConceptAlias, Config,
 )
@@ -1717,3 +1717,141 @@ def delete_macro_concept(
     db.delete(row)
     db.commit()
     return {"deleted": True, "snapshot": snapshot}
+
+
+# --------------------------------------------------------------------------
+# Ship #12 — training-set exclusion admin
+#
+# Surfaces the exclusion flags written by backend/scripts/ship_12_apply.py
+# so a human can review, unflag, or mark rows for manual labeling. These
+# endpoints only read/write the exclusion_* columns — leaderboard,
+# consensus, activity, and evaluator queries are untouched.
+# --------------------------------------------------------------------------
+
+_SHIP12_REASONS = (
+    "disclosure_misroute",
+    "invented_timeframe",
+    "unresolvable_reference",
+    "basket_shoehorn",
+    "duplicate_source",
+    "manual_review",
+)
+
+
+def _serialize_exclusion_row(p: Prediction) -> dict:
+    ctx = p.context or ""
+    if len(ctx) > 240:
+        ctx = ctx[:240] + "…"
+    return {
+        "id": int(p.id),
+        "ticker": p.ticker,
+        "reason": p.exclusion_reason,
+        "rule_version": p.exclusion_rule_version,
+        "context": ctx,
+        "direction": p.direction,
+        "flagged_at": p.exclusion_flagged_at.isoformat() if p.exclusion_flagged_at else None,
+        "created_at": p.prediction_date.isoformat() if p.prediction_date else None,
+    }
+
+
+@router.get("/admin/training-exclusions")
+@limiter.limit("30/minute")
+def list_training_exclusions(
+    request: Request,
+    admin: bool = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    """Counts per reason + the 50 most recently-flagged prediction rows.
+
+    Powers the AdminDashboard "Training Exclusions" tab. Does NOT touch
+    the rows — this is a read endpoint."""
+    counts = {}
+    for reason in _SHIP12_REASONS:
+        counts[reason] = (
+            db.query(Prediction)
+            .filter(Prediction.excluded_from_training == True)  # noqa: E712
+            .filter(Prediction.exclusion_reason == reason)
+            .count()
+        )
+
+    total_flagged = (
+        db.query(Prediction)
+        .filter(Prediction.excluded_from_training == True)  # noqa: E712
+        .count()
+    )
+    total_disclosures_flagged = (
+        db.query(Disclosure)
+        .filter(Disclosure.excluded_from_training == True)  # noqa: E712
+        .count()
+    )
+
+    recent_rows = (
+        db.query(Prediction)
+        .filter(Prediction.excluded_from_training == True)  # noqa: E712
+        .order_by(Prediction.exclusion_flagged_at.desc().nullslast())
+        .limit(50)
+        .all()
+    )
+
+    return {
+        "counts": counts,
+        "total_flagged": total_flagged,
+        "total_disclosures_flagged": total_disclosures_flagged,
+        "recent": [_serialize_exclusion_row(r) for r in recent_rows],
+        "rule_version": "v12.1",
+        "reasons": list(_SHIP12_REASONS),
+    }
+
+
+@router.post("/admin/training-exclusions/{prediction_id}/unflag")
+@limiter.limit("60/minute")
+def unflag_training_exclusion(
+    request: Request,
+    prediction_id: int,
+    admin_id: int = Depends(require_admin_user),
+    db: Session = Depends(get_db),
+):
+    """Clear the exclusion flag on a single prediction. Used by the
+    AdminDashboard tab's per-row 'Unflag' button after human review
+    decides a row is actually training-safe."""
+    p = db.query(Prediction).filter(Prediction.id == prediction_id).first()
+    if not p:
+        raise HTTPException(status_code=404, detail="prediction not found")
+    if not p.excluded_from_training:
+        return {"ok": True, "changed": False, "id": prediction_id}
+    p.excluded_from_training = False
+    p.exclusion_reason = None
+    p.exclusion_flagged_at = None
+    p.exclusion_rule_version = None
+    db.commit()
+    return {"ok": True, "changed": True, "id": prediction_id}
+
+
+@router.post("/admin/training-exclusions/{prediction_id}/mark-review")
+@limiter.limit("60/minute")
+def mark_training_exclusion_for_review(
+    request: Request,
+    prediction_id: int,
+    admin_id: int = Depends(require_admin_user),
+    db: Session = Depends(get_db),
+):
+    """Tag a prediction with reason='manual_review'. Meant for rows
+    that aren't currently excluded — the human wants them set aside
+    for the labeling pass. No-op on rows already flagged with any
+    reason (never overwrite)."""
+    p = db.query(Prediction).filter(Prediction.id == prediction_id).first()
+    if not p:
+        raise HTTPException(status_code=404, detail="prediction not found")
+    if p.excluded_from_training:
+        return {
+            "ok": True,
+            "changed": False,
+            "id": prediction_id,
+            "current_reason": p.exclusion_reason,
+        }
+    p.excluded_from_training = True
+    p.exclusion_reason = "manual_review"
+    p.exclusion_flagged_at = datetime.datetime.utcnow()
+    p.exclusion_rule_version = "v12.1"
+    db.commit()
+    return {"ok": True, "changed": True, "id": prediction_id}

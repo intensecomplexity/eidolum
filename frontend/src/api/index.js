@@ -184,6 +184,20 @@ export function getMetadataEnrichmentDiagnostics() {
   return api.get('/admin/metadata-enrichment-diagnostics', { headers: authHeaders() }).then(r => r.data);
 }
 
+// ——— Ship #12 training exclusions (admin) ———
+
+export function getTrainingExclusions() {
+  return api.get('/admin/training-exclusions', { headers: authHeaders() }).then(r => r.data);
+}
+
+export function unflagTrainingExclusion(predictionId) {
+  return api.post(`/admin/training-exclusions/${predictionId}/unflag`, {}, { headers: authHeaders() }).then(r => r.data);
+}
+
+export function markTrainingExclusionForReview(predictionId) {
+  return api.post(`/admin/training-exclusions/${predictionId}/mark-review`, {}, { headers: authHeaders() }).then(r => r.data);
+}
+
 // ——— Macro Concepts CRUD (admin) ———
 
 export function getMacroConcepts() {

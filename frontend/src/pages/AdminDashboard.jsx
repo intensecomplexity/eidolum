@@ -19,10 +19,11 @@ import {
   getAdminUrlQuality, getSocialStats,
   getPrunedYouTubeChannels, reactivateYouTubeChannel,
   setYouTubeSectorTraffic,
+  getTrainingExclusions, unflagTrainingExclusion, markTrainingExclusionForReview,
 } from '../api';
 import YouTubeRunsInspector from '../components/admin/YouTubeRunsInspector';
 
-const TABS = ['Overview', 'Users', 'Forecasters', 'Predictions', 'Audit Log', 'YouTube Runs'];
+const TABS = ['Overview', 'Users', 'Forecasters', 'Predictions', 'Audit Log', 'YouTube Runs', 'Training Exclusions'];
 
 export default function AdminDashboard() {
   const navigate = useNavigate();
@@ -90,6 +91,7 @@ export default function AdminDashboard() {
       {tab === 'Predictions' && <PredictionsTab showToast={showToast} />}
       {tab === 'Audit Log' && <AuditTab />}
       {tab === 'YouTube Runs' && <YouTubeRunsInspector />}
+      {tab === 'Training Exclusions' && <TrainingExclusionsTab showToast={showToast} />}
 
       {toast && (
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[70] px-4 py-2.5 rounded-xl text-xs font-medium bg-surface border border-border shadow-lg">
@@ -1291,4 +1293,173 @@ function Paginator({ page, totalPages, setPage, total }) {
     </div>
   );
 }
+
+function TrainingExclusionsTab({ showToast }) {
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
+  const [reasonFilter, setReasonFilter] = useState('all');
+  const [busyId, setBusyId] = useState(null);
+
+  const load = useCallback(() => {
+    setLoading(true);
+    setError(false);
+    getTrainingExclusions()
+      .then(setData)
+      .catch(() => setError(true))
+      .finally(() => setLoading(false));
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  async function onUnflag(id) {
+    setBusyId(id);
+    try {
+      await unflagTrainingExclusion(id);
+      showToast(`Unflagged #${id}`);
+      load();
+    } catch {
+      showToast('Unflag failed');
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function onMarkReview(id) {
+    setBusyId(id);
+    try {
+      await markTrainingExclusionForReview(id);
+      showToast(`Marked #${id} for review`);
+      load();
+    } catch {
+      showToast('Mark-for-review failed');
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  if (loading) return (
+    <div className="flex items-center justify-center py-16"><LoadingSpinner size="lg" /></div>
+  );
+
+  if (error) return (
+    <div className="text-center py-16">
+      <p className="text-text-secondary">Failed to load training exclusions.</p>
+      <button onClick={load} className="text-accent text-sm mt-2">Retry</button>
+    </div>
+  );
+
+  const recent = (data?.recent || []).filter(r =>
+    reasonFilter === 'all' ? true : r.reason === reasonFilter
+  );
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-start justify-between flex-wrap gap-2">
+        <div>
+          <h2 className="text-sm font-semibold text-text-primary">Training Exclusions</h2>
+          <p className="text-xs text-muted mt-0.5">
+            Rows flagged by <code>ship_12_audit.py</code> (rule_version {data?.rule_version}).
+            Leaderboard queries are unaffected. Only the fine-tune loader honors these flags.
+          </p>
+        </div>
+        <button onClick={load} className="inline-flex items-center gap-1 text-xs text-accent border border-border rounded-lg px-2.5 py-1">
+          <RefreshCw className="w-3 h-3" /> Refresh
+        </button>
+      </div>
+
+      {/* Counts grid */}
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+        {(data?.reasons || []).map(reason => {
+          const n = data?.counts?.[reason] ?? 0;
+          const active = reasonFilter === reason;
+          return (
+            <button key={reason}
+              onClick={() => setReasonFilter(active ? 'all' : reason)}
+              className={`text-left rounded-xl border px-3 py-2 transition-colors ${
+                active
+                  ? 'border-accent/40 bg-accent/5'
+                  : 'border-border bg-surface hover:border-accent/20'
+              }`}>
+              <div className="text-[10px] uppercase tracking-wider text-muted">
+                {reason.replace(/_/g, ' ')}
+              </div>
+              <div className="text-lg font-semibold text-text-primary tabular-nums">{n.toLocaleString()}</div>
+            </button>
+          );
+        })}
+      </div>
+
+      <div className="flex items-center justify-between text-xs text-muted">
+        <div>
+          Total flagged predictions: <span className="text-text-primary font-semibold">{(data?.total_flagged || 0).toLocaleString()}</span>
+          &nbsp;·&nbsp;
+          Flagged disclosures: <span className="text-text-primary font-semibold">{(data?.total_disclosures_flagged || 0).toLocaleString()}</span>
+        </div>
+        {reasonFilter !== 'all' && (
+          <button onClick={() => setReasonFilter('all')} className="text-accent">
+            Clear filter
+          </button>
+        )}
+      </div>
+
+      {/* Recent table */}
+      <div className="bg-surface border border-border rounded-xl overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="text-left text-muted text-[10px] uppercase tracking-wider border-b border-border">
+              <th className="px-3 py-2">ID</th>
+              <th className="px-3 py-2">Ticker</th>
+              <th className="px-3 py-2">Reason</th>
+              <th className="px-3 py-2">Direction</th>
+              <th className="px-3 py-2">Context preview</th>
+              <th className="px-3 py-2">Flagged at</th>
+              <th className="px-3 py-2 text-right">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {recent.map(r => (
+              <tr key={r.id} className="border-b border-border/30 align-top">
+                <td className="px-3 py-2 text-xs font-mono text-muted">{r.id}</td>
+                <td className="px-3 py-2 text-xs font-semibold">{r.ticker}</td>
+                <td className="px-3 py-2 text-xs">
+                  <span className="inline-block px-1.5 py-0.5 rounded bg-accent/10 text-accent text-[10px]">
+                    {r.reason}
+                  </span>
+                </td>
+                <td className="px-3 py-2 text-xs text-muted">{r.direction || '—'}</td>
+                <td className="px-3 py-2 text-xs text-text-secondary max-w-[420px]">{r.context}</td>
+                <td className="px-3 py-2 text-xs font-mono text-muted whitespace-nowrap">
+                  {r.flagged_at ? r.flagged_at.slice(0, 16) : '—'}
+                </td>
+                <td className="px-3 py-2 text-right whitespace-nowrap">
+                  <button
+                    disabled={busyId === r.id}
+                    onClick={() => onUnflag(r.id)}
+                    className="text-[11px] text-accent border border-border rounded px-2 py-0.5 mr-1 disabled:opacity-50">
+                    Unflag
+                  </button>
+                  <button
+                    disabled={busyId === r.id}
+                    onClick={() => onMarkReview(r.id)}
+                    className="text-[11px] text-text-secondary border border-border rounded px-2 py-0.5 disabled:opacity-50">
+                    Review
+                  </button>
+                </td>
+              </tr>
+            ))}
+            {recent.length === 0 && (
+              <tr>
+                <td colSpan={7} className="px-3 py-10 text-center text-xs text-muted">
+                  No flagged rows {reasonFilter !== 'all' ? `for "${reasonFilter}"` : 'yet'}.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
 // force rebuild 1775826759
