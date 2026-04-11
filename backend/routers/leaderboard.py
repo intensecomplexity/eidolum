@@ -20,36 +20,48 @@ INTEGRITY_CHECK_TTL = 600
 _last_forecaster_count: int = 0
 
 
-def _apply_dormancy(db: Session, results: list, include_dormant: bool, top_n: int = 100) -> list:
-    """Annotate each result row with is_dormant + last_prediction_at, then
-    filter out dormant rows unless include_dormant=True.
+def _fetch_dormancy(db: Session, fids: list) -> dict:
+    """Return {forecaster_id: (is_dormant, last_prediction_at)}.
 
-    Upstream queries intentionally over-fetch (LIMIT 200) so that after
-    dormant forecasters are removed we still have enough entries to fill
-    the Eidolum 100 without gaps. This function trims the post-filter list
-    to ``top_n`` and re-assigns sequential ranks starting at 1 so the
-    displayed leaderboard never skips a rank number.
-
-    Works on any list of result dicts that have an "id" field. Returns
-    deep-copied result dicts for the slice being returned so that mutating
-    the rank doesn't poison shared cache entries across calls that differ
-    only in ``include_dormant``.
+    Isolated so callers can probe dormancy during top-up loops without
+    mutating the row list. Gracefully degrades to empty if the column
+    doesn't exist yet on a fresh deploy.
     """
-    if not results:
-        return results
-    fids = [r["id"] for r in results if r.get("id")]
     if not fids:
-        return results
+        return {}
     try:
         rows = db.execute(sql_text("""
             SELECT id, is_dormant, last_prediction_at
             FROM forecasters
             WHERE id = ANY(:fids)
         """), {"fids": fids}).fetchall()
-        dormancy = {r[0]: (bool(r[1]), r[2]) for r in rows}
+        return {r[0]: (bool(r[1]), r[2]) for r in rows}
     except Exception:
-        # Column may not exist yet on first deploy; gracefully degrade.
-        dormancy = {}
+        return {}
+
+
+def _count_non_dormant(results: list, dormancy: dict) -> int:
+    return sum(1 for r in results if not dormancy.get(r.get("id"), (False, None))[0])
+
+
+def _apply_dormancy(db: Session, results: list, include_dormant: bool, top_n: int = 100) -> list:
+    """Annotate each result row with is_dormant + last_prediction_at, then
+    filter out dormant rows unless include_dormant=True.
+
+    Upstream queries top-up-fetch in batches so that after dormant
+    forecasters are removed we still have enough entries to fill the
+    Eidolum 100 without gaps. This function trims the post-filter list to
+    ``top_n`` and re-assigns sequential ranks starting at 1 so the
+    displayed leaderboard never skips a rank number.
+
+    Idempotent: safe to call repeatedly on the same cached list — it only
+    mutates is_dormant/last_prediction_at on the input rows and returns a
+    freshly-ranked deep-copied slice.
+    """
+    if not results:
+        return results
+    fids = [r["id"] for r in results if r.get("id")]
+    dormancy = _fetch_dormancy(db, fids)
     for r in results:
         is_d, last_at = dormancy.get(r.get("id"), (False, None))
         r["is_dormant"] = is_d
@@ -58,8 +70,6 @@ def _apply_dormancy(db: Session, results: list, include_dormant: bool, top_n: in
         filtered = results
     else:
         filtered = [r for r in results if not r.get("is_dormant")]
-    # Trim to top_n and re-rank so dormant removal never leaves gaps like
-    # 1, 2, 4, 5, ... — the Eidolum 100 must always be a dense 1..100.
     filtered = filtered[:top_n]
     out = []
     for i, r in enumerate(filtered):
@@ -423,27 +433,49 @@ def _refresh_leaderboard(db: Session) -> list | dict:
 
     # No manual statement_timeout — rely on RequestTimeoutMiddleware (8s)
 
-    # Try descending thresholds so the leaderboard is NEVER empty without explanation
-    for min_preds in [35, 20, 10, 5, 1]:
-        rows = db.execute(sql_text("""
-            SELECT
-                f.id, f.name, f.handle, f.platform, f.channel_url,
-                f.subscriber_count, f.profile_image_url, f.streak,
-                f.total_predictions, f.correct_predictions, f.accuracy_score,
-                COALESCE(f.alpha, 0) as alpha,
-                COALESCE(f.avg_return, 0) as avg_return,
-                COALESCE(f.disclosure_count, 0) as disclosure_count,
-                f.avg_follow_through_3m
-            FROM forecasters f
-            WHERE COALESCE(f.total_predictions, 0) >= :min_preds
-              AND COALESCE(f.accuracy_score, 0) > 0
-            ORDER BY f.accuracy_score DESC, f.total_predictions DESC
-            LIMIT 200
-        """), {"min_preds": min_preds}).fetchall()
+    # Top-up loop so dormant filtering never under-fills the Eidolum 100.
+    # We fetch in BATCH_SIZE pages until we have ≥ TARGET_NON_DORMANT live
+    # forecasters in the collected pool, or the source runs out, or we hit
+    # the iteration cap. The cache stores the FULL pool (including dormant)
+    # so include_dormant=True callers still see the natural top-100 by rank.
+    BATCH_SIZE = 200
+    MAX_ITER = 5
+    TARGET_NON_DORMANT = 100
 
-        if rows:
+    rows = []
+    for min_preds in [35, 20, 10, 5, 1]:
+        collected = []
+        offset = 0
+        for _ in range(MAX_ITER):
+            batch = db.execute(sql_text("""
+                SELECT
+                    f.id, f.name, f.handle, f.platform, f.channel_url,
+                    f.subscriber_count, f.profile_image_url, f.streak,
+                    f.total_predictions, f.correct_predictions, f.accuracy_score,
+                    COALESCE(f.alpha, 0) as alpha,
+                    COALESCE(f.avg_return, 0) as avg_return,
+                    COALESCE(f.disclosure_count, 0) as disclosure_count,
+                    f.avg_follow_through_3m
+                FROM forecasters f
+                WHERE COALESCE(f.total_predictions, 0) >= :min_preds
+                  AND COALESCE(f.accuracy_score, 0) > 0
+                ORDER BY f.accuracy_score DESC, f.total_predictions DESC
+                LIMIT :lim OFFSET :off
+            """), {"min_preds": min_preds, "lim": BATCH_SIZE, "off": offset}).fetchall()
+            if not batch:
+                break
+            collected.extend(batch)
+            fids_so_far = [r[0] for r in collected]
+            dormancy = _fetch_dormancy(db, fids_so_far)
+            non_dormant = sum(1 for fid in fids_so_far if not dormancy.get(fid, (False, None))[0])
+            if non_dormant >= TARGET_NON_DORMANT:
+                break
+            offset += BATCH_SIZE
+
+        if collected:
             if min_preds < 35:
-                print(f"[Leaderboard] WARNING: fell back to {min_preds}+ threshold ({len(rows)} results)")
+                print(f"[Leaderboard] WARNING: fell back to {min_preds}+ threshold ({len(collected)} results)")
+            rows = collected
             break
 
     if not rows:
@@ -805,9 +837,6 @@ def _build_filtered_leaderboard(db: Session, sector=None, call_type=None, sort="
 
     where_sql = " AND ".join(where_clauses)
     params["min_preds"] = min_predictions
-    # Over-fetch 2x so _apply_dormancy has headroom to filter dormant
-    # forecasters without leaving gaps or fewer than `limit` entries.
-    params["lim"] = min(limit, 100) * 2
 
     # Sort order
     if sort == "volume":
@@ -825,25 +854,43 @@ def _build_filtered_leaderboard(db: Session, sector=None, call_type=None, sort="
     else:
         order_sql = "accuracy DESC, total DESC"
 
-    rows = db.execute(sql_text(f"""
-        SELECT f.id, f.name, f.handle, f.platform, f.channel_url,
-               f.profile_image_url, f.streak, f.firm,
-               COUNT(*) as total,
-               SUM(CASE WHEN p.outcome IN ('hit','correct') THEN 1 ELSE 0 END) as hits,
-               ROUND((SUM(CASE WHEN p.outcome IN ('hit','correct') THEN 1.0 ELSE 0 END)
-                     + SUM(CASE WHEN p.outcome = 'near' THEN 0.5 ELSE 0 END))
-                     / NULLIF(COUNT(*), 0) * 100, 1) as accuracy,
-               COALESCE(AVG(p.alpha), 0) as avg_alpha,
-               COALESCE(AVG(p.actual_return), 0) as avg_return
-        FROM predictions p
-        JOIN forecasters f ON f.id = p.forecaster_id
-        WHERE {where_sql}
-        GROUP BY f.id, f.name, f.handle, f.platform, f.channel_url,
-                 f.profile_image_url, f.streak, f.firm
-        HAVING COUNT(*) >= :min_preds
-        ORDER BY {order_sql}
-        LIMIT :lim
-    """), params).fetchall()
+    # Top-up loop: fetch batches until we've accumulated enough non-dormant
+    # forecasters to satisfy `limit`, the source runs dry, or we hit the cap.
+    BATCH_SIZE = 200
+    MAX_ITER = 5
+    target_non_dormant = min(limit, 100)
+
+    rows = []
+    offset = 0
+    for _ in range(MAX_ITER):
+        batch = db.execute(sql_text(f"""
+            SELECT f.id, f.name, f.handle, f.platform, f.channel_url,
+                   f.profile_image_url, f.streak, f.firm,
+                   COUNT(*) as total,
+                   SUM(CASE WHEN p.outcome IN ('hit','correct') THEN 1 ELSE 0 END) as hits,
+                   ROUND((SUM(CASE WHEN p.outcome IN ('hit','correct') THEN 1.0 ELSE 0 END)
+                         + SUM(CASE WHEN p.outcome = 'near' THEN 0.5 ELSE 0 END))
+                         / NULLIF(COUNT(*), 0) * 100, 1) as accuracy,
+                   COALESCE(AVG(p.alpha), 0) as avg_alpha,
+                   COALESCE(AVG(p.actual_return), 0) as avg_return
+            FROM predictions p
+            JOIN forecasters f ON f.id = p.forecaster_id
+            WHERE {where_sql}
+            GROUP BY f.id, f.name, f.handle, f.platform, f.channel_url,
+                     f.profile_image_url, f.streak, f.firm
+            HAVING COUNT(*) >= :min_preds
+            ORDER BY {order_sql}
+            LIMIT :lim OFFSET :off
+        """), {**params, "lim": BATCH_SIZE, "off": offset}).fetchall()
+        if not batch:
+            break
+        rows.extend(batch)
+        fids_so_far = [r[0] for r in rows]
+        dormancy = _fetch_dormancy(db, fids_so_far)
+        non_dormant = sum(1 for fid in fids_so_far if not dormancy.get(fid, (False, None))[0])
+        if non_dormant >= target_non_dormant:
+            break
+        offset += BATCH_SIZE
 
     results = []
     for i, r in enumerate(rows):
