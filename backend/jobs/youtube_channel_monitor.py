@@ -46,6 +46,7 @@ from jobs.youtube_classifier import (
     insert_youtube_pair_prediction,
     insert_youtube_binary_event_prediction,
     insert_youtube_metric_forecast_prediction,
+    insert_youtube_conditional_prediction,
     log_youtube_rejection,
     transcript_proxy_status,
     PIPELINE_VERSION,
@@ -436,6 +437,10 @@ def _run_inner(db):
         # is off. Company metrics resolve via earnings_history (FMP);
         # macro metrics stay pending until follow-up data-source work.
         "metric_forecasts_extracted": 0,
+        # Per-run conditional_call counter — incremented inside
+        # insert_youtube_conditional_prediction. Stays 0 when
+        # ENABLE_CONDITIONAL_CALL_EXTRACTION is off.
+        "conditional_calls_extracted": 0,
     }
 
     for row in batch_rows:
@@ -662,7 +667,8 @@ def _run_inner(db):
                     macro_calls_extracted = :macro_calls,
                     pair_calls_extracted = :pair_calls,
                     binary_events_extracted = :binary_events,
-                    metric_forecasts_extracted = :metric_forecasts
+                    metric_forecasts_extracted = :metric_forecasts,
+                    conditional_calls_extracted = :conditional_calls
                 WHERE id = :id
             """), {
                 "id": run_id,
@@ -685,6 +691,7 @@ def _run_inner(db):
                 "pair_calls": int(stats.get("pair_calls_extracted", 0)),
                 "binary_events": int(stats.get("binary_events_extracted", 0)),
                 "metric_forecasts": int(stats.get("metric_forecasts_extracted", 0)),
+                "conditional_calls": int(stats.get("conditional_calls_extracted", 0)),
             })
             db.commit()
         except Exception as e:
@@ -899,6 +906,18 @@ def _process_one_video(db, channel_name, channel_id, video_id, title, publish_da
                 )
             elif kind == "metric_forecast_call":
                 ok = insert_youtube_metric_forecast_prediction(
+                    pred,
+                    channel_name=channel_name,
+                    channel_id=channel_id,
+                    video_id=video_id,
+                    video_title=title,
+                    publish_date=publish_dt,
+                    db=db,
+                    transcript_snippet=transcript_snippet,
+                    stats=stats,
+                )
+            elif kind == "conditional_call":
+                ok = insert_youtube_conditional_prediction(
                     pred,
                     channel_name=channel_name,
                     channel_id=channel_id,

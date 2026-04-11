@@ -3362,3 +3362,202 @@ def insert_youtube_metric_forecast_prediction(
             stats.get("metric_forecasts_extracted", 0)
         ) + 1
     return True
+
+
+# ── Conditional call insertion ──────────────────────────────────────────────
+#
+# Writes a prediction_category='conditional_call' row with the trigger_*
+# columns populated. The "outcome" side (ticker/direction/target_price/
+# window_days) is stored exactly like a normal ticker_call so the
+# existing scoring path can score it once Phase 1 (trigger check) has
+# marked trigger_fired_at. Default trigger_deadline is 90 days from
+# the prediction date.
+
+
+CONDITIONAL_DEFAULT_TRIGGER_DEADLINE_DAYS = 90
+CONDITIONAL_DEFAULT_OUTCOME_WINDOW_DAYS = 90
+
+
+def _conditional_source_id(video_id: str, ticker: str, trigger_condition: str) -> str:
+    """Per-video dedup key for conditional_call rows. Two conditionals
+    on the same ticker in the same video with different triggers are
+    legitimately distinct — we hash the trigger_condition text so they
+    each get their own source_platform_id."""
+    import hashlib as _hashlib
+    trig_hash = _hashlib.md5(
+        (trigger_condition or "").strip().lower().encode("utf-8")
+    ).hexdigest()[:10]
+    return f"yt_{video_id}_cond_{ticker}_{trig_hash}"
+
+
+def insert_youtube_conditional_prediction(
+    pred: dict,
+    *,
+    channel_name: str,
+    channel_id: str | None,
+    video_id: str,
+    video_title: str,
+    publish_date: datetime,
+    db,
+    transcript_snippet: str | None = None,
+    stats: dict | None = None,
+) -> bool:
+    """Insert a conditional_call prediction.
+
+    Writes prediction_category='conditional_call' with trigger_*
+    columns set from pred._trigger_*. Outcome columns (ticker,
+    direction, target_price, window_days) get the normal ticker_call
+    treatment. outcome='pending' until the evaluator completes
+    phase-based scoring.
+
+    Rejection paths (each logs to youtube_scraper_rejections and
+    returns False):
+      - missing trigger/outcome fields → 'conditional_missing_fields'
+      - invalid direction → 'neutral_or_no_direction'
+      - dedup collision → 'dedup_collision'
+      - forecaster create failure → 'forecaster_creation_failed'
+      - cross-scraper dupe → 'cross_scraper_dupe'
+    """
+    from models import Prediction
+    from jobs.prediction_validator import prediction_exists_cross_scraper
+
+    def _reject(reason: str, hr: str | None = None) -> bool:
+        log_youtube_rejection(
+            db,
+            video_id=video_id,
+            channel_id=channel_id,
+            channel_name=channel_name,
+            video_title=video_title,
+            video_published_at=publish_date,
+            reason=reason,
+            haiku_reason=hr,
+            haiku_raw=pred,
+            transcript_snippet=transcript_snippet,
+            stats=stats,
+        )
+        return False
+
+    ticker = (pred.get("ticker") or "").upper().strip().lstrip("$")
+    direction = (pred.get("direction") or "").strip().lower()
+    trig_cond = pred.get("_trigger_condition") or pred.get("trigger_condition") or ""
+    trig_type = pred.get("_trigger_type") or pred.get("trigger_type") or ""
+    trig_ticker = pred.get("_trigger_ticker")
+    trig_price = pred.get("_trigger_price")
+    trig_deadline = pred.get("_trigger_deadline")
+
+    if not ticker:
+        return _reject("conditional_missing_fields", hr="no ticker")
+    if direction not in _VALID_DIRECTIONS:
+        return _reject("neutral_or_no_direction", hr=direction or None)
+    if not trig_cond or not trig_type:
+        return _reject("conditional_missing_fields", hr="no trigger")
+
+    if trig_deadline is None:
+        trig_deadline_dt = publish_date + timedelta(
+            days=CONDITIONAL_DEFAULT_TRIGGER_DEADLINE_DAYS
+        )
+    else:
+        try:
+            trig_deadline_dt = datetime.combine(trig_deadline, datetime.min.time())
+        except TypeError:
+            trig_deadline_dt = publish_date + timedelta(
+                days=CONDITIONAL_DEFAULT_TRIGGER_DEADLINE_DAYS
+            )
+
+    source_id = _conditional_source_id(video_id, ticker, trig_cond)
+    if db.execute(
+        sql_text("SELECT 1 FROM predictions WHERE source_platform_id = :sid LIMIT 1"),
+        {"sid": source_id},
+    ).first():
+        if stats is not None:
+            stats["items_deduped"] = int(stats.get("items_deduped", 0)) + 1
+        return _reject("dedup_collision", hr=f"{ticker}/{trig_cond[:60]}")
+
+    if not validate_ticker_in_db(ticker, db):
+        return _reject("invalid_ticker", hr=ticker)
+
+    forecaster = find_or_create_youtube_forecaster(channel_name, channel_id, db)
+    if not forecaster:
+        return _reject("forecaster_creation_failed")
+
+    if prediction_exists_cross_scraper(
+        ticker, forecaster.id, direction, publish_date, db,
+    ):
+        if stats is not None:
+            stats["items_deduped"] = int(stats.get("items_deduped", 0)) + 1
+        return _reject("cross_scraper_dupe", hr=ticker)
+
+    eval_date, window_days = _parse_evaluation_date(
+        pred.get("timeframe"), publish_date,
+    )
+    outcome_window_days = int(window_days) if window_days else CONDITIONAL_DEFAULT_OUTCOME_WINDOW_DAYS
+
+    target_price = pred.get("price_target")
+    if target_price is not None:
+        try:
+            target_price = float(target_price)
+            if not (0.5 < target_price < 100_000):
+                target_price = None
+        except (ValueError, TypeError):
+            target_price = None
+
+    sector = None
+    try:
+        from jobs.sector_lookup import get_sector
+        sector = get_sector(ticker, db)
+    except Exception:
+        sector = None
+
+    quote = (pred.get("context_quote") or pred.get("quote") or "").strip()
+    parts = [
+        f"{channel_name}: IF {trig_cond[:120]} THEN "
+        f"{direction.capitalize()} {ticker}"
+    ]
+    if target_price is not None:
+        parts.append(f"target ${target_price:g}")
+    if quote:
+        parts.append(f'"{quote[:120]}"')
+    context_str = ". ".join(parts)[:500]
+
+    source_url = f"https://www.youtube.com/watch?v={video_id}"
+
+    if trig_ticker:
+        trig_ticker = str(trig_ticker).upper().strip().lstrip("$")
+
+    db.add(
+        Prediction(
+            forecaster_id=forecaster.id,
+            ticker=ticker,
+            direction=direction,
+            prediction_date=publish_date,
+            evaluation_date=eval_date,
+            window_days=window_days,
+            target_price=target_price,
+            entry_price=None,
+            source_url=source_url,
+            archive_url=source_url,
+            source_type="youtube",
+            source_title=(video_title or "")[:500],
+            source_platform_id=source_id,
+            sector=sector,
+            context=context_str,
+            exact_quote=(quote or context_str)[:500],
+            outcome="pending",
+            verified_by=VERIFIED_BY,
+            call_type="conditional_call",
+            prediction_category="conditional_call",
+            trigger_condition=trig_cond[:500],
+            trigger_type=trig_type,
+            trigger_ticker=trig_ticker,
+            trigger_price=trig_price,
+            trigger_deadline=trig_deadline_dt,
+            trigger_fired_at=None,
+            outcome_window_days=outcome_window_days,
+        )
+    )
+    db.flush()
+    if stats is not None:
+        stats["conditional_calls_extracted"] = int(
+            stats.get("conditional_calls_extracted", 0)
+        ) + 1
+    return True
