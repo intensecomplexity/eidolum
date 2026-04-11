@@ -290,6 +290,36 @@ class Prediction(Base):
     source_timestamp_method = Column(String(16), nullable=True)
     source_verbatim_quote = Column(Text, nullable=True)
     source_timestamp_confidence = Column(Numeric(4, 3), nullable=True)
+    # Prediction metadata enrichment (ship #9 rescoped). Captures
+    # extraction-time labels that the fine-tuning backfill depends on:
+    # category-aware timeframe inference and conviction classification.
+    # Populated by the Haiku classifier when
+    # ENABLE_PREDICTION_METADATA_ENRICHMENT is flipped on; stays NULL
+    # on every row extracted with the flag off.
+    #
+    #   inferred_timeframe_days  integer window the prediction targets,
+    #                            either explicitly stated by the speaker
+    #                            or inferred from the 11-category mapping
+    #                            (macro_thesis → 365, technical_chart → 30,
+    #                            swing_trade → 14, …)
+    #   timeframe_source         'explicit' when the speaker named a date
+    #                            or "in 30 days", 'category_default' when
+    #                            the window came from a category match.
+    #                            NULL predictions with an undeterminable
+    #                            timeframe are REJECTED not inserted.
+    #   timeframe_category       the category name that produced the
+    #                            default window — carried so admin
+    #                            diagnostics can show the distribution.
+    #   conviction_level         'strong' | 'moderate' | 'hedged' |
+    #                            'hypothetical' | 'unknown'. Captured but
+    #                            NOT scored yet — lives as label data for
+    #                            the fine-tune and shows as a subtle pill
+    #                            badge on the prediction card. Leaderboard
+    #                            accuracy math is unchanged by this field.
+    inferred_timeframe_days = Column(Integer, nullable=True)
+    timeframe_source = Column(String(32), nullable=True)
+    timeframe_category = Column(String(32), nullable=True)
+    conviction_level = Column(String(16), nullable=True)
     # Regime-call metadata for prediction_category='regime_call' rows
     # (ship #12 — structural market phase claims). Regime calls carry
     # NO price target — the claim is about a STRUCTURAL outcome for
@@ -1033,6 +1063,34 @@ class ScraperRun(Base):
     # ENABLE_REGIME_CALL_EXTRACTION is flipped on.
     regime_calls_extracted = Column(Integer, nullable=False, default=0,
                                      server_default="0")
+    # Prediction metadata enrichment telemetry — ship #9 (rescoped).
+    # When ENABLE_PREDICTION_METADATA_ENRICHMENT is on, every prediction
+    # emitted by the YouTube classifier carries a timeframe + conviction
+    # classification. These counters track the per-run distribution so
+    # admin diagnostics can surface drift (e.g. "most videos are getting
+    # bucketed as macro_thesis with hedged conviction" → likely a prompt
+    # issue worth investigating). Rejection counters track the two new
+    # Haiku rejection paths introduced by this ship: undeterminable
+    # timeframes and unresolvable pronoun references. All stay 0 when
+    # the flag is off or when no predictions were emitted.
+    timeframes_explicit = Column(Integer, nullable=False, default=0,
+                                  server_default="0")
+    timeframes_inferred = Column(Integer, nullable=False, default=0,
+                                  server_default="0")
+    timeframes_rejected = Column(Integer, nullable=False, default=0,
+                                  server_default="0")
+    reference_rejected = Column(Integer, nullable=False, default=0,
+                                 server_default="0")
+    conviction_strong = Column(Integer, nullable=False, default=0,
+                                server_default="0")
+    conviction_moderate = Column(Integer, nullable=False, default=0,
+                                  server_default="0")
+    conviction_hedged = Column(Integer, nullable=False, default=0,
+                                server_default="0")
+    conviction_hypothetical = Column(Integer, nullable=False, default=0,
+                                      server_default="0")
+    conviction_unknown = Column(Integer, nullable=False, default=0,
+                                 server_default="0")
 
 
 class Disclosure(Base):

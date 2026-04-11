@@ -2584,6 +2584,57 @@ async def lifespan(app):
         except Exception as _rce:
             print(f"[Startup] regime_call schema migration error: {_rce}")
 
+        # ── prediction metadata enrichment (ship #9) ───────────────────
+        # Four new columns on predictions capturing extraction-time
+        # metadata that downstream fine-tuning needs as labels:
+        #   inferred_timeframe_days  — category-inferred OR explicit window
+        #   timeframe_source         — 'explicit' | 'category_default'
+        #   timeframe_category       — which of 11 categories matched
+        #   conviction_level         — strong|moderate|hedged|hypothetical|unknown
+        # Populated from the Haiku output when ENABLE_PREDICTION_METADATA_
+        # ENRICHMENT is flipped on. Columns stay NULL on every row
+        # extracted with the flag off. Counters on scraper_runs track the
+        # per-run distribution so admin diagnostics can surface drift.
+        # Rejection counters (timeframes_rejected, reference_rejected)
+        # count predictions dropped by Haiku for undeterminable timeframes
+        # or unresolvable pronoun references — both of which are new
+        # rejection paths introduced by this ship.
+        try:
+            with engine.connect() as _me_c:
+                for _ddl in (
+                    "ALTER TABLE predictions ADD COLUMN IF NOT EXISTS inferred_timeframe_days INTEGER",
+                    "ALTER TABLE predictions ADD COLUMN IF NOT EXISTS timeframe_source VARCHAR(32)",
+                    "ALTER TABLE predictions ADD COLUMN IF NOT EXISTS timeframe_category VARCHAR(32)",
+                    "ALTER TABLE predictions ADD COLUMN IF NOT EXISTS conviction_level VARCHAR(16)",
+                ):
+                    _me_c.execute(sql_text(_ddl))
+                _me_c.execute(sql_text(
+                    "CREATE INDEX IF NOT EXISTS idx_predictions_conviction "
+                    "ON predictions(conviction_level) "
+                    "WHERE conviction_level IS NOT NULL"
+                ))
+                _me_c.execute(sql_text(
+                    "CREATE INDEX IF NOT EXISTS idx_predictions_timeframe_source "
+                    "ON predictions(timeframe_source) "
+                    "WHERE timeframe_source IS NOT NULL"
+                ))
+                for _ddl in (
+                    "ALTER TABLE scraper_runs ADD COLUMN IF NOT EXISTS timeframes_explicit INTEGER NOT NULL DEFAULT 0",
+                    "ALTER TABLE scraper_runs ADD COLUMN IF NOT EXISTS timeframes_inferred INTEGER NOT NULL DEFAULT 0",
+                    "ALTER TABLE scraper_runs ADD COLUMN IF NOT EXISTS timeframes_rejected INTEGER NOT NULL DEFAULT 0",
+                    "ALTER TABLE scraper_runs ADD COLUMN IF NOT EXISTS reference_rejected INTEGER NOT NULL DEFAULT 0",
+                    "ALTER TABLE scraper_runs ADD COLUMN IF NOT EXISTS conviction_strong INTEGER NOT NULL DEFAULT 0",
+                    "ALTER TABLE scraper_runs ADD COLUMN IF NOT EXISTS conviction_moderate INTEGER NOT NULL DEFAULT 0",
+                    "ALTER TABLE scraper_runs ADD COLUMN IF NOT EXISTS conviction_hedged INTEGER NOT NULL DEFAULT 0",
+                    "ALTER TABLE scraper_runs ADD COLUMN IF NOT EXISTS conviction_hypothetical INTEGER NOT NULL DEFAULT 0",
+                    "ALTER TABLE scraper_runs ADD COLUMN IF NOT EXISTS conviction_unknown INTEGER NOT NULL DEFAULT 0",
+                ):
+                    _me_c.execute(sql_text(_ddl))
+                _me_c.commit()
+                print("[Startup] prediction metadata enrichment columns + counters ready")
+        except Exception as _mee:
+            print(f"[Startup] metadata enrichment schema migration error: {_mee}")
+
         # ── macro_concept_aliases seed ───────────────────────────────
         # Canonical ~50 concepts covering currency, rates, inflation,
         # volatility, commodities, equity macro, international/EM,

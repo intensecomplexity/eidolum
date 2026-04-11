@@ -1606,6 +1606,40 @@ def main():
     except Exception as e:
         log.warning(f"[Worker] regime_call schema migration: {e}")
 
+    # prediction metadata enrichment (ship #9 rescoped) — timeframe +
+    # conviction columns on predictions plus per-run counters on
+    # scraper_runs. Columns stay NULL until
+    # ENABLE_PREDICTION_METADATA_ENRICHMENT is flipped on, so zero
+    # behavior change on deploy. Idempotent ADD COLUMN IF NOT EXISTS.
+    try:
+        with engine.connect() as conn:
+            for _ddl in (
+                "ALTER TABLE predictions ADD COLUMN IF NOT EXISTS inferred_timeframe_days INTEGER",
+                "ALTER TABLE predictions ADD COLUMN IF NOT EXISTS timeframe_source VARCHAR(32)",
+                "ALTER TABLE predictions ADD COLUMN IF NOT EXISTS timeframe_category VARCHAR(32)",
+                "ALTER TABLE predictions ADD COLUMN IF NOT EXISTS conviction_level VARCHAR(16)",
+                "CREATE INDEX IF NOT EXISTS idx_predictions_conviction "
+                "ON predictions(conviction_level) "
+                "WHERE conviction_level IS NOT NULL",
+                "CREATE INDEX IF NOT EXISTS idx_predictions_timeframe_source "
+                "ON predictions(timeframe_source) "
+                "WHERE timeframe_source IS NOT NULL",
+                "ALTER TABLE scraper_runs ADD COLUMN IF NOT EXISTS timeframes_explicit INTEGER NOT NULL DEFAULT 0",
+                "ALTER TABLE scraper_runs ADD COLUMN IF NOT EXISTS timeframes_inferred INTEGER NOT NULL DEFAULT 0",
+                "ALTER TABLE scraper_runs ADD COLUMN IF NOT EXISTS timeframes_rejected INTEGER NOT NULL DEFAULT 0",
+                "ALTER TABLE scraper_runs ADD COLUMN IF NOT EXISTS reference_rejected INTEGER NOT NULL DEFAULT 0",
+                "ALTER TABLE scraper_runs ADD COLUMN IF NOT EXISTS conviction_strong INTEGER NOT NULL DEFAULT 0",
+                "ALTER TABLE scraper_runs ADD COLUMN IF NOT EXISTS conviction_moderate INTEGER NOT NULL DEFAULT 0",
+                "ALTER TABLE scraper_runs ADD COLUMN IF NOT EXISTS conviction_hedged INTEGER NOT NULL DEFAULT 0",
+                "ALTER TABLE scraper_runs ADD COLUMN IF NOT EXISTS conviction_hypothetical INTEGER NOT NULL DEFAULT 0",
+                "ALTER TABLE scraper_runs ADD COLUMN IF NOT EXISTS conviction_unknown INTEGER NOT NULL DEFAULT 0",
+            ):
+                conn.execute(sql_text(_ddl))
+            conn.commit()
+        log.info("[Worker] prediction metadata enrichment columns + counters ready")
+    except Exception as e:
+        log.warning(f"[Worker] metadata enrichment schema migration: {e}")
+
     # predictions.list_id + list_rank — ranked list extraction metadata.
     # Partial index keeps the index small because most rows won't be in
     # lists. No backfill: historical predictions have no ranking data.
