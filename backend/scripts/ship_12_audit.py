@@ -37,7 +37,7 @@ import re
 import sys
 from typing import Dict, List, Sequence, Tuple
 
-RULE_VERSION = "v12.3"
+RULE_VERSION = "v12.4"
 
 # Hard-coded protection list. Even if a future rule rewrite would
 # otherwise flag these rows, the audit drops them silently.
