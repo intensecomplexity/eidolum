@@ -8,7 +8,9 @@ import TickerLink from '../components/TickerLink';
 import Footer from '../components/Footer';
 import PageHeader from '../components/PageHeader';
 import { getAllConsensus } from '../api';
+import { pluralize } from '../utils/pluralize';
 import useSEO from '../hooks/useSEO';
+import { usePublicFlag } from '../hooks/usePublicFlag';
 
 const SECTORS = [
   'All Sectors', 'Technology', 'Healthcare', 'Financial Services', 'Energy',
@@ -30,6 +32,7 @@ const TABS = [
 ];
 
 export default function Consensus() {
+  const heroEnabled = usePublicFlag('homepage_hero');
   useSEO({
     title: 'Stock Consensus — Bull vs Bear Analyst Ratings | Eidolum',
     description: 'Bull, bear, and hold consensus for every stock, scored against reality. 6,000+ analysts tracked. See what Wall Street predicts for any ticker.',
@@ -72,7 +75,13 @@ export default function Consensus() {
 
   return (
     <div>
-      <PageHeader title="Consensus" subtitle="What Wall Street thinks about every stock." />
+      <PageHeader
+        title={heroEnabled ? 'The Verdict' : 'Consensus'}
+        subtitle={heroEnabled
+          ? 'Bull, bear, hold — where the analyst community has landed on every ticker.'
+          : 'What Wall Street thinks about every stock.'}
+        watermark={heroEnabled}
+      />
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-6 sm:pb-10">
 
         {/* Filter row */}
@@ -134,8 +143,12 @@ export default function Consensus() {
         {/* Empty */}
         {!loading && display.length === 0 && (
           <div className="text-center py-16">
-            <p className="text-text-secondary">{search ? `No consensus data for "${search}"` : 'No tickers match this filter.'}</p>
-            <p className="text-muted text-sm mt-1">Tickers need at least 5 predictions to show consensus.</p>
+            <p className="text-text-secondary">
+              {search
+                ? `No verdict on "${search}" yet \u2014 the house hasn\u2019t spoken.`
+                : 'The house is quiet on this slice. Try widening the filter.'}
+            </p>
+            <p className="text-muted text-sm mt-1">Tickers need at least 5 predictions to render a consensus.</p>
           </div>
         )}
 
@@ -161,7 +174,7 @@ export default function Consensus() {
                       )}
                     </div>
                   </div>
-                  <span className="text-muted text-xs font-mono shrink-0 ml-2">{c.total_predictions} calls</span>
+                  <span className="text-muted text-xs font-mono shrink-0 ml-2">{pluralize(c.total_predictions, 'call')}</span>
                 </div>
                 <ConsensusBar bullish={c.bullish_count} bearish={c.bearish_count} neutral={c.neutral_count || 0} />
                 {c.top_caller && (

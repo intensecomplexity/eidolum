@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { Search } from 'lucide-react';
 import { searchForecasters, searchTickers } from '../api';
+import { pluralize } from '../utils/pluralize';
 
 export default function HeroSearch({ compact = false }) {
   const navigate = useNavigate();
@@ -79,7 +80,7 @@ export default function HeroSearch({ compact = false }) {
                     <span className={`font-mono text-xs font-semibold ${(f.accuracy_rate || 0) >= 60 ? 'text-positive' : 'text-negative'}`}>
                       {(f.accuracy_rate || 0).toFixed(1)}%
                     </span>
-                    <span className="text-[10px] text-muted font-mono">{f.total_predictions || 0} calls</span>
+                    <span className="text-[10px] text-muted font-mono">{pluralize(f.total_predictions || 0, 'call')}</span>
                   </div>
                 </button>
               ))}

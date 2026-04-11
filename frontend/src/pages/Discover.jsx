@@ -5,8 +5,10 @@ import { Search, TrendingUp, TrendingDown, Flame, AlertTriangle, Clock, BarChart
 import Footer from '../components/Footer';
 import PageHeader from '../components/PageHeader';
 import { useFeatures } from '../context/FeatureContext';
+import { usePublicFlag } from '../hooks/usePublicFlag';
 import TickerLogo from '../components/TickerLogo';
 import { searchTickers, getTrendingTickers, getSectors, getExpiringPredictions, getLeaderboard, getHomepageData } from '../api';
+import { pluralize } from '../utils/pluralize';
 
 function formatBullBear(bull, bear) {
   const total = bull + bear;
@@ -18,6 +20,7 @@ function formatBullBear(bull, bear) {
 export default function Discover() {
   const navigate = useNavigate();
   const features = useFeatures();
+  const heroEnabled = usePublicFlag('homepage_hero');
   const [query, setQuery] = useState('');
   const [results, setResults] = useState([]);
   const [searching, setSearching] = useState(false);
@@ -80,7 +83,13 @@ export default function Discover() {
 
   return (
     <div>
-      <PageHeader title="Discover" subtitle="Explore tickers, trending calls, and rising analysts." />
+      <PageHeader
+        title={heroEnabled ? 'The Edge' : 'Discover'}
+        subtitle={heroEnabled
+          ? 'Fresh tickers to watch, rising forecasters, and calls the market hasn\u2019t graded yet.'
+          : 'Explore tickers, trending calls, and rising analysts.'}
+        watermark={heroEnabled}
+      />
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-6 sm:pb-10">
 
         {/* ── SECTION 1: Search ─────────────────────────────────────── */}
@@ -107,7 +116,7 @@ export default function Discover() {
                   {r.sector && <span className="text-muted text-[10px] uppercase">{r.sector}</span>}
                 </div>
                 {r.prediction_count > 0 && (
-                  <span className="text-muted text-xs font-mono">{r.prediction_count} calls</span>
+                  <span className="text-muted text-xs font-mono">{pluralize(r.prediction_count, 'call')}</span>
                 )}
               </Link>
             ))}
@@ -132,7 +141,7 @@ export default function Discover() {
                       <span className="text-text-secondary text-sm">{t.name}</span>
                     </div>
                     <div className="text-right">
-                      <div className="text-xs font-mono text-text-secondary">{t.total} calls</div>
+                      <div className="text-xs font-mono text-text-secondary">{pluralize(t.total, 'call')}</div>
                       {bb && <div className={`text-[10px] font-mono ${bb.pct >= 50 ? 'text-positive' : 'text-negative'}`}>{bb.pct}% bull</div>}
                     </div>
                   </Link>
@@ -242,7 +251,7 @@ export default function Discover() {
                     <div className={`font-mono font-bold ${f.accuracy_rate >= 60 ? 'text-positive' : 'text-negative'}`}>
                       {f.accuracy_rate.toFixed(1)}%
                     </div>
-                    <div className="text-[10px] text-muted">{f.total_predictions} calls</div>
+                    <div className="text-[10px] text-muted">{pluralize(f.total_predictions, 'call')}</div>
                   </div>
                 </Link>
               ))}

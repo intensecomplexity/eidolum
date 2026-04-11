@@ -5,6 +5,7 @@ import { ArrowLeft, ChevronDown, ArrowUp, ArrowDown, Minus } from 'lucide-react'
 import PlatformBadge from '../components/PlatformBadge';
 import Footer from '../components/Footer';
 import { getReportCards } from '../api';
+import { pluralize } from '../utils/pluralize';
 
 const GRADE_COLORS = {
   'A+': 'text-positive', A: 'text-positive', 'A-': 'text-positive',
@@ -93,7 +94,7 @@ export default function ReportCards() {
                         {rc.accuracy_change > 0 ? '+' : ''}{rc.accuracy_change.toFixed(1)}%
                       </span>
                     )}
-                    <span className="text-muted">{rc.predictions_count} calls</span>
+                    <span className="text-muted">{pluralize(rc.predictions_count, 'call')}</span>
                   </div>
 
                   {expanded === rc.forecaster_id && (

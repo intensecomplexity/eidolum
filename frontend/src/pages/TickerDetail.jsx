@@ -14,6 +14,7 @@ import { ExplainerLine } from '../utils/predictionExplainer';
 import ScoringBreakdown from '../components/ScoringBreakdown';
 import { annotateContext } from '../utils/predictionExplainer';
 import { formatTimeRemaining } from '../utils/timeRemaining';
+import { pluralize } from '../utils/pluralize';
 import { getTickerDetail } from '../api';
 
 // ── Accuracy badge color helper ────────────────────────────────────────────
@@ -83,7 +84,7 @@ export default function TickerDetail() {
 
   if (error || !data) return (
     <div className="max-w-7xl mx-auto px-4 py-20 text-center">
-      <p className="text-text-secondary text-lg">{error ? `Could not load data for ${ticker}.` : `No data found for ${ticker}.`}</p>
+      <p className="text-text-secondary text-lg">{error ? `Could not load data for ${ticker}.` : `Nothing on file for ${ticker} \u2014 the book is empty here.`}</p>
       {error && <p className="text-muted text-sm mt-1">The request timed out or the server returned an error.</p>}
       <button onClick={fetchData} className="text-accent mt-4 inline-block hover:underline cursor-pointer">Try again</button>
       <span className="text-muted mx-2">or</span>
@@ -168,7 +169,7 @@ export default function TickerDetail() {
               <span className="font-mono text-positive">({(stats.top_forecaster.accuracy || stats.top_forecaster.ticker_accuracy).toFixed(1)}%)</span>
             )}
             {(stats.top_forecaster.predictions || stats.top_forecaster.ticker_predictions) > 0 && (
-              <span className="text-muted">{stats.top_forecaster.predictions || stats.top_forecaster.ticker_predictions} calls</span>
+              <span className="text-muted">{pluralize(stats.top_forecaster.predictions || stats.top_forecaster.ticker_predictions, 'call')}</span>
             )}
           </div>
         )}

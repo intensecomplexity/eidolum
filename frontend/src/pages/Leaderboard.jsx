@@ -8,11 +8,14 @@ import PageHeader from '../components/PageHeader';
 import MiniPieChart from '../components/MiniPieChart';
 import PlatformBadge from '../components/PlatformBadge';
 import { getSourceBadgeKey } from '../utils/getSourceBadgeKey';
+import { pluralize } from '../utils/pluralize';
 import RankBadge from '../components/RankBadge';
 import StreakBadge from '../components/StreakBadge';
 import LeaderboardCard from '../components/LeaderboardCard';
 import NotificationBanner from '../components/NotificationBanner';
 import FollowButton from '../components/FollowButton';
+import LeaderboardHoverPreview from '../components/LeaderboardHoverPreview';
+import { usePublicFlag } from '../hooks/usePublicFlag';
 import { getLeaderboard, getAvailableTimeframes } from '../api';
 
 const SECTORS = ['All', 'Technology', 'Healthcare', 'Financial Services', 'Consumer Cyclical', 'Consumer Defensive', 'Energy', 'Industrials', 'Communication Services', 'Crypto'];
@@ -85,6 +88,11 @@ function getMetricValue(f, metricKey) {
 export default function Leaderboard() {
   const [data, setData] = useState([]);
   const navigate = useNavigate();
+  // Ship #14 — hover preview of last scored call. Gated on the same
+  // hero flag as the other Ship #14 polish so it can ship behind one
+  // kill switch.
+  const heroEnabled = usePublicFlag('homepage_hero');
+  const [previewId, setPreviewId] = useState(null);
   const [weekData, setWeekData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('alltime');
@@ -173,8 +181,8 @@ export default function Leaderboard() {
           if (arr.length === 0) {
             const hasFilter = sector !== 'All' || direction !== 'All' || timeframe !== 'all' || source !== 'all' || minPreds > 10;
             setEmptyMessage(hasFilter
-              ? 'No forecasters have enough scored predictions with these filters yet. Try broadening your selection.'
-              : 'The leaderboard is loading. Predictions are being scored.');
+              ? "The market hasn\u2019t graded anyone in this category. Yet. Try broadening your selection."
+              : 'The leaderboard is still being written \u2014 the market is scoring calls as we speak.');
           } else {
             setEmptyMessage(null);
           }
@@ -222,7 +230,7 @@ export default function Leaderboard() {
   return (
     <div>
       <style>{`@keyframes leaderboardFadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }`}</style>
-      <PageHeader title="The Eidolum 100" subtitle="The top 100 financial forecasters, ranked by accuracy against real market data." />
+      <PageHeader title="The Eidolum 100" subtitle="The top 100 financial forecasters, ranked by accuracy against real market data." watermark />
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-6 sm:pb-10">
 
         {/* Tabs — horizontal scroll on mobile */}
@@ -429,7 +437,10 @@ export default function Leaderboard() {
                       <tbody key={metric}>
                         {data.map((f, idx) => (
                           <React.Fragment key={f.id}>
-                          <tr className="border-b border-border/50"
+                          <tr className="border-b border-border/50 transition-colors hover:bg-surface-2/30"
+                            onMouseEnter={heroEnabled ? () => setPreviewId(f.id) : undefined}
+                            onMouseLeave={heroEnabled ? () => setPreviewId(curr => (curr === f.id ? null : curr)) : undefined}
+                            data-testid="lb-row"
                             style={{ animation: `leaderboardFadeIn 0.3s ease-out ${idx * 0.02}s both` }}>
                             <td className="px-3 py-4"><RankBadge rank={f.rank} movement={f.rank_movement} /></td>
                             <td className="px-3 py-3">
@@ -493,7 +504,7 @@ export default function Leaderboard() {
                                   <span className={`font-mono text-sm ${f.sector_call_accuracy >= 60 ? 'text-positive' : 'text-negative'}`}>
                                     {f.sector_call_accuracy.toFixed(1)}%
                                   </span>
-                                  <span className="text-muted text-[10px] font-mono">{f.sector_call_total} calls</span>
+                                  <span className="text-muted text-[10px] font-mono">{pluralize(f.sector_call_total, 'call')}</span>
                                 </div>
                               ) : (
                                 <span className="font-mono text-muted">—</span>
@@ -505,7 +516,7 @@ export default function Leaderboard() {
                                   <span className={`font-mono text-sm ${f.pair_call_accuracy >= 60 ? 'text-positive' : 'text-negative'}`}>
                                     {f.pair_call_accuracy.toFixed(1)}%
                                   </span>
-                                  <span className="text-muted text-[10px] font-mono">{f.pair_call_total} calls</span>
+                                  <span className="text-muted text-[10px] font-mono">{pluralize(f.pair_call_total, 'call')}</span>
                                 </div>
                               ) : (
                                 <span className="font-mono text-muted">—</span>
@@ -586,6 +597,13 @@ export default function Leaderboard() {
                               <FollowButton forecaster={f} compact />
                             </td>
                           </tr>
+                          {heroEnabled && previewId === f.id && (
+                            <tr data-testid="lb-preview-row">
+                              <td colSpan={16} className="bg-surface-2/20 border-b border-border/40 p-0">
+                                <LeaderboardHoverPreview forecasterId={f.id} active={true} />
+                              </td>
+                            </tr>
+                          )}
                           {expandedId === f.id && (() => {
                             const hits = f.hits || f.correct_predictions || 0;
                             const nears = f.nears || 0;
@@ -666,8 +684,8 @@ function WeekView({ weekData, data }) {
         </h2>
         {scored.length === 0 ? (
           <div className="card text-center py-8">
-            <p className="text-text-secondary mb-1">No predictions resolved this week yet.</p>
-            <p className="text-muted text-xs">Short-term calls (1-14 days) get scored fastest.</p>
+            <p className="text-text-secondary mb-1 italic">No verdicts in yet this week. The market is still deliberating.</p>
+            <p className="text-muted text-xs">Short-term calls (1&ndash;14 days) get scored first.</p>
           </div>
         ) : (
           <div className="card overflow-hidden p-0">

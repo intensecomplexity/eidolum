@@ -6,6 +6,7 @@ import MiniPieChart from '../components/MiniPieChart';
 import PageHeader from '../components/PageHeader';
 import Footer from '../components/Footer';
 import { getFirm } from '../api';
+import { pluralize } from '../utils/pluralize';
 
 function OutcomeBadge({ outcome }) {
   if (!outcome) return null;
@@ -168,7 +169,7 @@ export default function FirmProfile() {
                     <span className={`font-mono text-sm font-semibold ${a.accuracy >= 60 ? 'text-positive' : 'text-negative'}`}>
                       {a.accuracy}%
                     </span>
-                  ) : <span className="text-muted text-xs font-mono">{a.total_predictions} calls</span>}
+                  ) : <span className="text-muted text-xs font-mono">{pluralize(a.total_predictions, 'call')}</span>}
                 </div>
               </div>
             ))}

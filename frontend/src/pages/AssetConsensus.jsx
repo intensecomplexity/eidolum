@@ -15,6 +15,7 @@ import StockPrice from '../components/StockPrice';
 import SourceBadge from '../components/SourceBadge';
 import Footer from '../components/Footer';
 import { getAssetConsensus } from '../api';
+import { pluralize } from '../utils/pluralize';
 
 export default function AssetConsensus() {
   const { ticker } = useParams();
@@ -91,9 +92,9 @@ export default function AssetConsensus() {
         {!data || data.total_predictions === 0 ? (
           <div className="card text-center py-12 sm:py-16">
             <p className="text-text-secondary text-base sm:text-lg mb-2">
-              No predictions found for <span className="font-mono text-accent">{ticker.toUpperCase()}</span>
+              No analyst has put a call on <span className="font-mono text-accent">{ticker.toUpperCase()}</span> yet.
             </p>
-            <p className="text-muted text-sm">Try AAPL, TSLA, or NVDA.</p>
+            <p className="text-muted text-sm italic">Try AAPL, TSLA, or NVDA \u2014 the loudest tickers in the book.</p>
           </div>
         ) : (
           <>
@@ -203,7 +204,7 @@ export default function AssetConsensus() {
                         <div className={`font-mono text-lg font-bold ${f.ticker_accuracy >= 60 ? 'text-positive' : 'text-negative'}`}>
                           {f.ticker_accuracy.toFixed(0)}%
                         </div>
-                        <div className="text-muted text-xs">{f.ticker_predictions} calls</div>
+                        <div className="text-muted text-xs">{pluralize(f.ticker_predictions, 'call')}</div>
                       </div>
                     </Link>
                   ))}
