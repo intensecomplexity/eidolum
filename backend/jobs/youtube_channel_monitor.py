@@ -44,6 +44,7 @@ from jobs.youtube_classifier import (
     insert_youtube_sector_prediction,
     insert_youtube_macro_prediction,
     insert_youtube_pair_prediction,
+    insert_youtube_binary_event_prediction,
     log_youtube_rejection,
     transcript_proxy_status,
     PIPELINE_VERSION,
@@ -422,6 +423,12 @@ def _run_inner(db):
         # the row inserts. Stays at 0 when ENABLE_PAIR_CALL_EXTRACTION
         # is off.
         "pair_calls_extracted": 0,
+        # Per-run binary_event_call counter — incremented inside
+        # insert_youtube_binary_event_prediction after the row inserts.
+        # Stays at 0 when ENABLE_BINARY_EVENT_EXTRACTION is off. Note
+        # that counted rows all stay outcome='pending' indefinitely
+        # until the follow-up ship plumbs in real data resolvers.
+        "binary_events_extracted": 0,
     }
 
     for row in batch_rows:
@@ -646,7 +653,8 @@ def _run_inner(db):
                     options_positions_extracted = :options_positions,
                     earnings_calls_extracted = :earnings_calls,
                     macro_calls_extracted = :macro_calls,
-                    pair_calls_extracted = :pair_calls
+                    pair_calls_extracted = :pair_calls,
+                    binary_events_extracted = :binary_events
                 WHERE id = :id
             """), {
                 "id": run_id,
@@ -667,6 +675,7 @@ def _run_inner(db):
                 "earnings_calls": int(stats.get("earnings_calls_extracted", 0)),
                 "macro_calls": int(stats.get("macro_calls_extracted", 0)),
                 "pair_calls": int(stats.get("pair_calls_extracted", 0)),
+                "binary_events": int(stats.get("binary_events_extracted", 0)),
             })
             db.commit()
         except Exception as e:
@@ -867,6 +876,18 @@ def _process_one_video(db, channel_name, channel_id, video_id, title, publish_da
                     transcript_snippet=transcript_snippet,
                     stats=stats,
                 )
+            elif kind == "binary_event_call":
+                ok = insert_youtube_binary_event_prediction(
+                    pred,
+                    channel_name=channel_name,
+                    channel_id=channel_id,
+                    video_id=video_id,
+                    video_title=title,
+                    publish_date=publish_dt,
+                    db=db,
+                    transcript_snippet=transcript_snippet,
+                    stats=stats,
+                )
             else:
                 ok = insert_youtube_prediction(
                     pred,
@@ -888,6 +909,10 @@ def _process_one_video(db, channel_name, channel_id, video_id, title, publish_da
                 or (
                     f"{pred.get('_pair_long')}/{pred.get('_pair_short')}"
                     if pred.get("_pair_long") else None
+                )
+                or (
+                    f"event:{pred.get('_event_type')}"
+                    if pred.get("_event_type") else None
                 )
                 or "?"
             )
