@@ -13,6 +13,7 @@ import {
   toggleMacroExtractionAdmin, togglePairExtractionAdmin,
   toggleBinaryEventExtractionAdmin, toggleMetricForecastExtractionAdmin,
   toggleConditionalExtractionAdmin, toggleDisclosureExtractionAdmin,
+  toggleSourceTimestampsAdmin, getTimestampDiagnostics,
   getAdminUrlQuality, getSocialStats,
   getPrunedYouTubeChannels, reactivateYouTubeChannel,
   setYouTubeSectorTraffic,
@@ -142,6 +143,7 @@ function FeatureToggles() {
         { key: 'metric_forecast_extraction', label: 'YouTube Metric Forecasts', fn: toggleMetricForecastExtractionAdmin },
         { key: 'conditional_call_extraction', label: 'YouTube Conditional Calls (IF/THEN)', fn: toggleConditionalExtractionAdmin },
         { key: 'disclosure_extraction', label: 'YouTube Disclosures (past-tense positions)', fn: toggleDisclosureExtractionAdmin },
+        { key: 'source_timestamps', label: 'YouTube Source Timestamps (?t=Ns anchors)', fn: toggleSourceTimestampsAdmin },
       ].map(f => (
         <div key={f.key} className="flex items-center justify-between py-1.5">
           <span className="text-sm text-text-secondary">{f.label}</span>
@@ -157,6 +159,71 @@ function FeatureToggles() {
           </button>
         </div>
       ))}
+    </div>
+  );
+}
+
+
+function TimestampDiagnostics() {
+  // Ship #9 admin surface. Shows the breakdown of source-timestamp
+  // match quality across all YouTube-derived predictions and flags
+  // videos where 100% of predictions failed to match (= either the
+  // transcript is broken, Haiku paraphrased every quote, or the
+  // matcher's thresholds are too tight for that channel's vocabulary).
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  useEffect(() => {
+    getTimestampDiagnostics()
+      .then(setData)
+      .catch(() => setData({ error: 'failed_to_load' }))
+      .finally(() => setLoading(false));
+  }, []);
+  if (loading) return null;
+  if (!data || data.error) return null;
+  const mb = data.method_breakdown || {};
+  return (
+    <div className="card mb-6">
+      <h3 className="text-sm font-semibold text-muted uppercase tracking-wider mb-3">
+        Source Timestamps — Match Quality (ship #9)
+      </h3>
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-3">
+        <StatCard label="Matched" value={(data.total_matched || 0).toLocaleString()} />
+        <StatCard label="Failed" value={(data.total_failed || 0).toLocaleString()} />
+        <StatCard label="Avg confidence" value={data.avg_confidence != null ? data.avg_confidence.toFixed(3) : '—'} />
+        <StatCard label="Methods" value={Object.keys(mb).length} />
+      </div>
+      <div className="text-xs text-text-secondary">
+        <div className="flex items-center gap-3 flex-wrap mb-2">
+          {['word_level', 'fuzzy_match', 'two_pass', 'unknown', 'unset'].map(method => (
+            <div key={method} className="flex items-center gap-1.5">
+              <span className="text-muted">{method}:</span>
+              <span className="font-mono text-text-primary">{(mb[method] || 0).toLocaleString()}</span>
+            </div>
+          ))}
+        </div>
+        {data.worst_videos?.length > 0 && (
+          <div className="mt-3 pt-3 border-t border-border/40">
+            <div className="text-[10px] uppercase tracking-wider text-muted font-semibold mb-1.5">
+              Videos where all predictions failed to match (top {data.worst_videos.length})
+            </div>
+            <div className="space-y-0.5 font-mono text-[11px]">
+              {data.worst_videos.map((v, i) => (
+                <div key={i} className="flex items-center gap-2">
+                  <a
+                    href={`https://www.youtube.com/watch?v=${v.video_id}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-accent hover:underline"
+                  >
+                    {v.video_id}
+                  </a>
+                  <span className="text-muted">— {v.total_preds} preds, 0 matched</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -794,6 +861,9 @@ function OverviewTab({ dashboard }) {
 
       {/* URL Quality */}
       <UrlQualitySection />
+
+      {/* Ship #9: source timestamps match quality */}
+      <TimestampDiagnostics />
 
       {/* Admins list */}
       {d.admins?.length > 0 && (

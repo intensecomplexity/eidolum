@@ -164,6 +164,14 @@ export function toggleDisclosureExtractionAdmin() {
   return api.post('/admin/toggle-disclosure-extraction', {}, { headers: authHeaders() }).then(r => r.data);
 }
 
+export function toggleSourceTimestampsAdmin() {
+  return api.post('/admin/toggle-source-timestamps', {}, { headers: authHeaders() }).then(r => r.data);
+}
+
+export function getTimestampDiagnostics() {
+  return api.get('/admin/timestamp-diagnostics', { headers: authHeaders() }).then(r => r.data);
+}
+
 // ——— Macro Concepts CRUD (admin) ———
 
 export function getMacroConcepts() {

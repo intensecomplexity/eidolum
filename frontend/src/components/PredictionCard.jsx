@@ -88,6 +88,60 @@ function LockedDate({ dateStr }) {
   );
 }
 
+// Ship #9 helper. Format an integer second count into "4:32" or
+// "1:24:15" depending on length. Returns null for falsy / non-numeric.
+function formatTimestamp(seconds) {
+  if (seconds == null) return null;
+  const n = Number(seconds);
+  if (!Number.isFinite(n) || n < 0) return null;
+  const totalSec = Math.floor(n);
+  const h = Math.floor(totalSec / 3600);
+  const m = Math.floor((totalSec % 3600) / 60);
+  const s = totalSec % 60;
+  if (h > 0) {
+    return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+  }
+  return `${m}:${String(s).padStart(2, '0')}`;
+}
+
+// Ship #9 helper. Append YouTube `&t=<N>s` anchor to a source URL when
+// we have a resolved source timestamp AND the URL is a YouTube link.
+// Preserves all other URLs unchanged.
+function withTimestampAnchor(url, seconds) {
+  if (!url || seconds == null) return url;
+  if (!(url.includes('youtube.com') || url.includes('youtu.be'))) return url;
+  const n = Math.floor(Number(seconds));
+  if (!Number.isFinite(n) || n < 0) return url;
+  const sep = url.includes('?') ? '&' : '?';
+  // Strip any existing t= param to avoid duplication on refetch.
+  const cleaned = url.replace(/([?&])t=\d+s?(&|$)/, (m, a, b) => (b ? a : ''));
+  return `${cleaned}${sep}t=${n}s`;
+}
+
+function VerbatimQuoteRow({ p }) {
+  // Ship #9 audit trail. Shows the exact words Haiku extracted as
+  // the source of the prediction — this is what gets matched to the
+  // timestamp. Only renders when we actually have a quote.
+  const quote = p.source_verbatim_quote;
+  if (!quote) return null;
+  const method = p.source_timestamp_method;
+  const conf = p.source_timestamp_confidence != null
+    ? Number(p.source_timestamp_confidence).toFixed(2)
+    : null;
+  return (
+    <div className="mt-1 text-[10px] text-muted/80 italic leading-snug border-l-2 border-accent/20 pl-2">
+      <span className="text-muted/60 not-italic">quote: </span>
+      "{quote}"
+      {method && method !== 'unknown' && (
+        <span className="text-muted/50 not-italic ml-1">
+          ({method}
+          {conf != null && ` · ${conf}`})
+        </span>
+      )}
+    </div>
+  );
+}
+
 function ProofLinks({ p }) {
   const source = p.source_url || '';
   // Hide source link for generic/none URLs — only show real articles
@@ -95,25 +149,32 @@ function ProofLinks({ p }) {
 
   const archive = isRealArchive(p.archive_url) ? p.archive_url : null;
   const isYT = source.includes('youtube.com') || source.includes('youtu.be');
-  const ts = p.video_timestamp_sec;
-  const timeStr = ts ? `${Math.floor(ts / 60)}:${String(ts % 60).padStart(2, '0')}` : null;
+  // Ship #9: prefer the hybrid-matched timestamp over the legacy
+  // video_timestamp_sec field. Falls through to the legacy field when
+  // the new ship's flag is off or the match returned NULL.
+  const ts = p.source_timestamp_seconds ?? p.video_timestamp_sec;
+  const timeStr = formatTimestamp(ts);
   const label = isYT && timeStr ? `YouTube at ${timeStr}` : getDomainLabel(source);
+  const href = isYT ? withTimestampAnchor(source, ts) : source;
   const dateStr = formatDate(p.prediction_date);
 
   return (
-    <div className="flex items-center gap-2 text-[10px] text-muted">
-      <a href={source} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()}
-        className="inline-flex items-center gap-1 hover:text-accent transition-colors">
-        <ExternalLink className="w-3 h-3" /> {label}
-      </a>
-      {archive && (
-        <a href={archive} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()}
+    <>
+      <div className="flex items-center gap-2 text-[10px] text-muted">
+        <a href={href} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()}
           className="inline-flex items-center gap-1 hover:text-accent transition-colors">
-          <Archive className="w-3 h-3" /> Archived
+          <ExternalLink className="w-3 h-3" /> {label}
         </a>
-      )}
-      {dateStr && <span className="ml-auto">{dateStr}</span>}
-    </div>
+        {archive && (
+          <a href={archive} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()}
+            className="inline-flex items-center gap-1 hover:text-accent transition-colors">
+            <Archive className="w-3 h-3" /> Archived
+          </a>
+        )}
+        {dateStr && <span className="ml-auto">{dateStr}</span>}
+      </div>
+      <VerbatimQuoteRow p={p} />
+    </>
   );
 }
 
