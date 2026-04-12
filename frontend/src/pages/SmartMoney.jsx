@@ -7,8 +7,9 @@ import TickerLogo from '../components/TickerLogo';
 import Footer from '../components/Footer';
 import PageHeader from '../components/PageHeader';
 import { getSmartMoney } from '../api';
+import { SECTOR_OPTIONS } from '../constants/sectors';
 
-const SECTORS = ['All Sectors', 'Technology', 'Healthcare', 'Financial Services', 'Energy', 'Consumer Cyclical', 'Consumer Defensive', 'Industrials', 'Communication Services'];
+const SECTORS = ['All Sectors', ...SECTOR_OPTIONS];
 const MIN_OPTIONS = [2, 3, 5];
 const SORTS = [
   { key: 'analysts_count', label: 'Most Analysts' },

@@ -57,7 +57,7 @@ export default function DisclosureCard({ disclosure, compact = false, showForeca
         <div className="text-[11px] text-text-secondary">
           by{' '}
           <Link
-            to={forecaster_slug ? `/forecaster/${forecaster_slug}` : '#'}
+            to={forecaster_slug ? `/analyst/${forecaster_slug}` : '#'}
             className="font-medium text-accent hover:underline"
           >
             {forecaster_name}

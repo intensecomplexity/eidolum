@@ -117,12 +117,13 @@ class TestSectorFilterIsStrictSubset(unittest.TestCase):
 
 class TestDropdownMatchesBackend(unittest.TestCase):
     def test_dropdown_sectors_are_morningstar_eleven(self):
-        # The Leaderboard.jsx dropdown + this test live at the same
-        # canonical list; if Bug 13's fix regresses (a sector drops
-        # out) this fails.
+        # Ship #14 extracted sector options into a shared constant file
+        # so both Leaderboard.jsx and SmartMoney.jsx use the same list.
+        # This test now reads the shared constant source instead of the
+        # Leaderboard page.
         path = os.path.join(
             os.path.dirname(__file__), "..", "..",
-            "frontend", "src", "pages", "Leaderboard.jsx",
+            "frontend", "src", "constants", "sectors.js",
         )
         with open(path) as f:
             src = f.read()
@@ -131,7 +132,7 @@ class TestDropdownMatchesBackend(unittest.TestCase):
                 self.assertIn(
                     f"'{sector}'",
                     src,
-                    f"{sector} missing from Leaderboard.jsx SECTORS",
+                    f"{sector} missing from constants/sectors.js",
                 )
 
 
