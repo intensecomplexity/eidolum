@@ -1985,7 +1985,7 @@ def main():
                 db.close()
         except Exception as e:
             log.error(f"[channel_monitor] {e}")
-    sched.add_job(_standalone("channel_monitor", _channel_monitor), "interval", hours=12, id="channel_monitor", next_run_time=t0 + timedelta(minutes=90), executor='default')
+    sched.add_job(_standalone("channel_monitor", _channel_monitor), "interval", hours=4, id="channel_monitor", next_run_time=t0 + timedelta(minutes=90), executor='default')
 
     # Disclosure follow-through (ship #8) — daily sweep that
     # computes 1/3/6/12-month stock returns for every disclosure
