@@ -23,10 +23,14 @@ export default function PredictionBadge({ direction, outcome, windowDays }) {
       </span>
     );
   }
+  // Ship #13.5 — glow values match the spec exactly: green-500 /
+  // yellow-500 / red-500 at 35% alpha. Soft, non-garish, reads in
+  // both themes. Fill colors stay the 400-shade they were in Ship
+  // #13 so the badge still reads as warm rather than neon.
   if (outcome === 'hit' || outcome === 'correct') {
     return (
       <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-mono font-bold"
-        style={{ backgroundColor: '#34d399', color: '#000', boxShadow: '0 0 12px rgba(52,211,153,0.35)' }}>
+        style={{ backgroundColor: '#34d399', color: '#000', boxShadow: '0 0 12px rgba(34, 197, 94, 0.35)' }}>
         HIT
       </span>
     );
@@ -34,7 +38,7 @@ export default function PredictionBadge({ direction, outcome, windowDays }) {
   if (outcome === 'near') {
     return (
       <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-mono font-bold"
-        style={{ backgroundColor: '#fbbf24', color: '#000', boxShadow: '0 0 12px rgba(251,191,36,0.35)' }}>
+        style={{ backgroundColor: '#fbbf24', color: '#000', boxShadow: '0 0 12px rgba(234, 179, 8, 0.35)' }}>
         NEAR
       </span>
     );
@@ -42,7 +46,7 @@ export default function PredictionBadge({ direction, outcome, windowDays }) {
   if (outcome === 'miss' || outcome === 'incorrect') {
     return (
       <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-mono font-bold"
-        style={{ backgroundColor: '#f87171', color: '#fff', boxShadow: '0 0 12px rgba(248,113,113,0.35)' }}>
+        style={{ backgroundColor: '#f87171', color: '#fff', boxShadow: '0 0 12px rgba(239, 68, 68, 0.35)' }}>
         MISS
       </span>
     );
