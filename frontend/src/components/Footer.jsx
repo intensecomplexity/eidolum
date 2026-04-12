@@ -2,37 +2,62 @@ import { Link } from 'react-router-dom';
 import EidolumLogo from './EidolumLogo';
 import { useAuth } from '../context/AuthContext';
 
+function FLink({ to, children }) {
+  return (
+    <Link to={to} className="text-xs text-text-secondary hover:text-accent transition-colors">
+      {children}
+    </Link>
+  );
+}
+
+function Column({ title, children }) {
+  return (
+    <div>
+      <div className="text-[10px] text-muted uppercase tracking-wider mb-3">{title}</div>
+      <div className="flex flex-col gap-1.5">{children}</div>
+    </div>
+  );
+}
+
 export default function Footer() {
   const { isAuthenticated } = useAuth();
 
   return (
     <footer className="border-t border-border mt-12 sm:mt-20">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-10">
-        <div className="flex flex-col items-center gap-4">
-          <div className="flex flex-col items-center">
-            <EidolumLogo size={28} />
-            <span className="font-serif text-lg text-accent mt-1.5">Eidolum</span>
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 md:gap-12">
+          {/* Eidolum */}
+          <div className="flex flex-col items-start gap-2">
+            <div className="flex items-center gap-2">
+              <EidolumLogo size={24} />
+              <span className="font-serif text-lg text-accent">Eidolum</span>
+            </div>
+            <p className="headline-serif italic text-sm text-accent mt-1">
+              Truth is the only currency.
+            </p>
           </div>
-          <nav className="flex items-center justify-center flex-wrap gap-x-1.5 gap-y-1 text-xs text-text-secondary">
-            <Link to="/" className="hover:text-accent transition-colors whitespace-nowrap">Home</Link>
-            <span className="text-muted opacity-30">&middot;</span>
-            <Link to="/leaderboard" className="hover:text-accent transition-colors whitespace-nowrap">Leaderboard</Link>
-            <span className="text-muted opacity-30">&middot;</span>
-            <Link to="/consensus" className="hover:text-accent transition-colors whitespace-nowrap">Consensus</Link>
-            <span className="text-muted opacity-30">&middot;</span>
-            <Link to="/how-it-works" className="hover:text-accent transition-colors whitespace-nowrap">How It Works</Link>
-            <span className="text-muted opacity-30">&middot;</span>
-            {isAuthenticated ? (
-              <>
-                <Link to="/submit" className="hover:text-accent transition-colors whitespace-nowrap">Submit</Link>
-                <span className="text-muted opacity-30">&middot;</span>
-                <Link to="/profile" className="hover:text-accent transition-colors whitespace-nowrap">Profile</Link>
-              </>
-            ) : (
-              <Link to="/login" className="hover:text-accent transition-colors whitespace-nowrap">Log In</Link>
-            )}
-          </nav>
-          <p className="headline-serif italic text-base text-accent">Truth is the only currency.</p>
+
+          {/* Explore */}
+          <Column title="Explore">
+            <FLink to="/">Home</FLink>
+            <FLink to="/leaderboard">Leaderboard</FLink>
+            <FLink to="/consensus">Consensus</FLink>
+            <FLink to="/activity">Activity</FLink>
+            <FLink to="/discover">Discover</FLink>
+            {isAuthenticated && <FLink to="/submit">Submit</FLink>}
+          </Column>
+
+          {/* Trust */}
+          <Column title="Trust">
+            <FLink to="/how-it-works">How It Works</FLink>
+            <FLink to="/how-it-works">Scoring Methodology</FLink>
+          </Column>
+        </div>
+
+        <div className="border-t border-border mt-8 pt-6 text-center">
+          <p className="text-[11px] text-muted">
+            &copy; 2025 Eidolum. All rights reserved.
+          </p>
         </div>
       </div>
     </footer>
