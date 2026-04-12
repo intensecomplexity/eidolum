@@ -4,6 +4,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { Search, TrendingUp, TrendingDown, Flame, AlertTriangle, Clock, BarChart3, Star } from 'lucide-react';
 import Footer from '../components/Footer';
 import PageHeader from '../components/PageHeader';
+import SectionHeader from '../components/SectionHeader';
 import { useFeatures } from '../context/FeatureContext';
 import { usePublicFlag } from '../hooks/usePublicFlag';
 import TickerLogo from '../components/TickerLogo';
@@ -126,9 +127,9 @@ export default function Discover() {
         {/* ── SECTION 2: Hot Right Now ─────────────────────────────── */}
         {trending.length > 0 && (
           <div className="mb-8">
-            <h2 className="text-sm font-semibold text-muted uppercase tracking-wider mb-3 flex items-center gap-1.5">
-              <Flame className="w-4 h-4 text-warning" /> Hot Right Now
-            </h2>
+            <SectionHeader>
+              <span className="inline-flex items-center gap-1.5"><Flame className="w-4 h-4 text-warning" /> Hot Right Now</span>
+            </SectionHeader>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {trending.slice(0, 10).map(t => {
                 const bb = formatBullBear(t.bullish, t.bearish);
@@ -154,9 +155,9 @@ export default function Discover() {
         {/* ── SECTION 3: Most Divided ──────────────────────────────── */}
         {divided.length > 0 && (
           <div className="mb-8">
-            <h2 className="text-sm font-semibold text-muted uppercase tracking-wider mb-3 flex items-center gap-1.5">
-              <AlertTriangle className="w-4 h-4 text-warning" /> Most Divided
-            </h2>
+            <SectionHeader>
+              <span className="inline-flex items-center gap-1.5"><AlertTriangle className="w-4 h-4 text-warning" /> Most Divided</span>
+            </SectionHeader>
             <div className="space-y-2">
               {divided.map(t => {
                 const bullPct = Math.round(t.bull_pct ?? 50);
@@ -183,10 +184,15 @@ export default function Discover() {
         {/* ── SECTION 4: Expiring This Week ────────────────────────── */}
         {expiring.length > 0 && (
           <div className="mb-8">
-            <h2 className="text-sm font-semibold text-muted uppercase tracking-wider mb-3 flex items-center gap-1.5">
-              <Clock className="w-4 h-4 text-warning" /> Expiring This Week
-              <Link to="/expiring" className="text-accent text-[10px] ml-auto font-normal">See all</Link>
-            </h2>
+            <div className="mb-4">
+              <div className="flex items-center justify-between gap-3">
+                <h2 className="text-sm font-bold text-text-primary uppercase flex items-center gap-1.5" style={{ letterSpacing: '0.08em' }}>
+                  <Clock className="w-4 h-4 text-warning" /> Expiring This Week
+                </h2>
+                <Link to="/expiring" className="text-accent text-[10px] font-normal shrink-0">See all</Link>
+              </div>
+              <hr className="border-0 border-t border-accent mt-2" aria-hidden="true" />
+            </div>
             <div className="space-y-2">
               {expiring.map((p, i) => (
                 <Link key={p.id || i} to={`/asset/${p.ticker}`}
@@ -210,9 +216,9 @@ export default function Discover() {
         {/* ── SECTION 5: Top by Sector ─────────────────────────────── */}
         {sectors.length > 0 && (
           <div className="mb-8">
-            <h2 className="text-sm font-semibold text-muted uppercase tracking-wider mb-3 flex items-center gap-1.5">
-              <BarChart3 className="w-4 h-4 text-accent" /> Top by Sector
-            </h2>
+            <SectionHeader>
+              <span className="inline-flex items-center gap-1.5"><BarChart3 className="w-4 h-4 text-accent" /> Top by Sector</span>
+            </SectionHeader>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
               {sectors.filter(s => (s.sector || s.name) !== 'Other').slice(0, 9).map(s => {
                 const name = s.sector || s.name;
@@ -235,10 +241,9 @@ export default function Discover() {
         {/* ── SECTION 6: Rising Stars ──────────────────────────────── */}
         {risingStar.length > 0 && (
           <div className="mb-8">
-            <h2 className="text-sm font-semibold text-muted uppercase tracking-wider mb-3 flex items-center gap-1.5">
-              <Star className="w-4 h-4 text-warning" /> Rising Stars
-            </h2>
-            <p className="text-muted text-xs mb-3">High accuracy with fewer than 20 predictions — analysts to watch.</p>
+            <SectionHeader subtitle="High accuracy with fewer than 20 predictions — analysts to watch.">
+              <span className="inline-flex items-center gap-1.5"><Star className="w-4 h-4 text-warning" /> Rising Stars</span>
+            </SectionHeader>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {risingStar.map(f => (
                 <Link key={f.id} to={`/forecaster/${f.id}`}

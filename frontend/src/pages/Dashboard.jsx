@@ -19,6 +19,7 @@ import HeroSearch from '../components/HeroSearch';
 import MiniPieChart from '../components/MiniPieChart';
 import HeroBand from '../components/home/HeroBand';
 import HowItWorks from '../components/home/HowItWorks';
+import SectionHeader from '../components/SectionHeader';
 import { usePublicFlag } from '../hooks/usePublicFlag';
 import { Info } from 'lucide-react';
 import {
@@ -154,7 +155,7 @@ export default function Dashboard() {
         <Divider />
         <div className="flex flex-col items-center gap-0.5 shrink-0">
           <div className="flex items-center gap-1">
-            <span className="font-mono text-xs text-accent font-bold">Lv.{profile.xp_level || 1}</span>
+            <span className="font-mono tnum text-xs text-accent font-bold">Lv.{profile.xp_level || 1}</span>
             <span className="text-[9px] text-muted">{profile.level_name || 'Newcomer'}</span>
           </div>
           <div className="w-16 h-1 bg-surface-2 rounded-full overflow-hidden">
@@ -195,18 +196,22 @@ export default function Dashboard() {
   const yourOpenCalls = pendingSorted.length > 0 && (
     <div className="mb-6">
       {coachCard}
-      <div className="flex items-center justify-between mb-2">
-        <div className="flex items-center gap-3">
-          <h2 className="font-semibold text-sm text-muted uppercase tracking-wider">Your Open Calls</h2>
-          {isFirstCall ? (
-            <span className="text-[10px] text-muted italic">Pending evaluation</span>
-          ) : overallPnl !== null && (
-            <span className={`font-mono text-xs font-bold ${overallPnl >= 0 ? 'text-positive' : 'text-negative'}`}>
-              {overallPnl >= 0 ? '+' : ''}{overallPnl.toFixed(1)}% avg
+      <div className="flex items-start justify-between gap-3 mb-4">
+        <div className="flex-1 min-w-0">
+          <SectionHeader className="mb-0">
+            <span className="inline-flex items-center gap-3">
+              Your Open Calls
+              {isFirstCall ? (
+                <span className="text-[10px] text-muted italic normal-case tracking-normal">Pending evaluation</span>
+              ) : overallPnl !== null && (
+                <span className={`font-mono tnum text-xs font-bold ${overallPnl >= 0 ? 'text-positive' : 'text-negative'}`}>
+                  {overallPnl >= 0 ? '+' : ''}{overallPnl.toFixed(1)}% avg
+                </span>
+              )}
             </span>
-          )}
+          </SectionHeader>
         </div>
-        {pending.length > 5 && <Link to="/my-calls" className="text-[10px] text-accent font-medium">See all {pending.length}</Link>}
+        {pending.length > 5 && <Link to="/my-calls" className="text-[10px] text-accent font-medium mt-1 shrink-0">See all {pending.length}</Link>}
       </div>
       <div className="space-y-1.5">
         {pendingSorted.slice(0, 5).map(p => (
@@ -229,20 +234,13 @@ export default function Dashboard() {
   );
 
   const biggestCallsBlock = biggestCalls.length > 0 && (
-    <div className="mb-6">
+    <div className={heroEnabled ? 'mt-0 mb-6' : 'mb-6'}>
       {heroEnabled ? (
-        <div className="mb-3">
-          <h2 className="font-bold text-sm uppercase text-text-primary" style={{ letterSpacing: '0.08em' }}>
-            Receipts
-          </h2>
-          <p className="text-xs text-muted mt-0.5">
-            Recently graded — locked when made, settled by reality.
-          </p>
-        </div>
+        <SectionHeader subtitle="Recently graded — locked when made, settled by reality.">
+          Receipts
+        </SectionHeader>
       ) : (
-        <h2 className="font-semibold text-sm text-muted uppercase tracking-wider mb-3">
-          Biggest Calls
-        </h2>
+        <SectionHeader>Biggest Calls</SectionHeader>
       )}
       <div className="space-y-2">
         {biggestCalls.map(p => (
@@ -254,7 +252,7 @@ export default function Dashboard() {
                 <span className="font-mono text-accent font-bold text-sm">{p.ticker}</span>
                 <PredictionBadge outcome={p.outcome} />
                 <span
-                  className={`font-mono text-sm font-bold cursor-help ${p.actual_return >= 0 ? 'text-positive' : 'text-negative'}`}
+                  className={`font-mono tnum text-sm font-bold cursor-help ${p.actual_return >= 0 ? 'text-positive' : 'text-negative'}`}
                   title={
                     heroEnabled
                       ? 'Capped return vs S&P 500 over the same window — see scoring rules.'
@@ -291,7 +289,7 @@ export default function Dashboard() {
 
   const top5Block = top5.length > 0 && (
     <div className="mb-6">
-      <h2 className="font-bold text-sm text-text-primary uppercase mb-3" style={{ letterSpacing: '0.08em' }}>Top Analysts Right Now</h2>
+      <SectionHeader>Top Analysts Right Now</SectionHeader>
       <div className="card overflow-hidden p-0 border-accent/10">
         <table className="w-full">
           <thead>
@@ -336,18 +334,18 @@ export default function Dashboard() {
                             <MiniPieChart bullish={bull} bearish={bear} neutral={neut} size={24} />
                           </div>
                         )}
-                        <span className={`font-mono text-sm font-semibold ${(f.accuracy_rate || 0) >= 60 ? 'text-positive' : 'text-negative'}`}>
+                        <span className={`font-mono tnum text-sm font-semibold ${(f.accuracy_rate || 0) >= 60 ? 'text-positive' : 'text-negative'}`}>
                           {(f.accuracy_rate || 0).toFixed(1)}%
                         </span>
                       </div>
                     </td>
                     <td className="px-4 py-2.5 text-right hidden sm:table-cell">
-                      <span className={`font-mono text-sm ${(f.avg_return || 0) >= 0 ? 'text-positive' : 'text-negative'}`}>
+                      <span className={`font-mono tnum text-sm ${(f.avg_return || 0) >= 0 ? 'text-positive' : 'text-negative'}`}>
                         {(f.avg_return || 0) >= 0 ? '+' : ''}{(f.avg_return || 0).toFixed(1)}%
                       </span>
                     </td>
                     <td className="px-4 py-2.5 text-right hidden sm:table-cell">
-                      <span className="font-mono text-text-secondary text-sm">{f.scored_count || f.evaluated_predictions || 0}</span>
+                      <span className="font-mono tnum text-text-secondary text-sm">{f.scored_count || f.evaluated_predictions || 0}</span>
                     </td>
                   </tr>
                   {expandedId === f.id && (
@@ -399,8 +397,7 @@ export default function Dashboard() {
 
   const mostDividedBlock = mostDivided.length > 0 && (
     <div className="mb-6">
-      <h2 className="font-bold text-sm text-text-primary uppercase mb-3" style={{ letterSpacing: '0.08em' }}>Most Divided</h2>
-      <p className="text-xs text-muted mb-3">Analysts can't agree on these stocks</p>
+      <SectionHeader subtitle="Analysts can't agree on these stocks.">Most Divided</SectionHeader>
       <div className="flex gap-3 overflow-x-auto pills-scroll pb-2">
         {mostDivided.map(t => (
           <Link key={t.ticker} to={`/asset/${t.ticker}`}
@@ -425,9 +422,9 @@ export default function Dashboard() {
 
   const watchlistBlock = watchlistFeed.length > 0 && (
     <div className="mb-6">
-      <div className="flex items-center justify-between mb-3">
-        <h2 className="font-semibold text-sm text-muted uppercase tracking-wider">Your Watchlist</h2>
-        <Link to="/watchlist" className="text-[10px] text-accent font-medium">Manage</Link>
+      <div className="flex items-start justify-between">
+        <SectionHeader className="flex-1 mb-3">Your Watchlist</SectionHeader>
+        <Link to="/watchlist" className="text-[10px] text-accent font-medium mt-1 ml-3 shrink-0">Manage</Link>
       </div>
       <div className="space-y-2">
         {watchlistFeed.slice(0, 5).map(p => (
@@ -449,8 +446,9 @@ export default function Dashboard() {
 
   const expiringBlock = expiring.length > 0 && (
     <div className="mb-6">
-      <h2 className="font-semibold text-sm text-muted uppercase tracking-wider mb-1">Expiring Soon</h2>
-      <p className="text-xs text-muted mb-3">These calls are about to be scored — check back for results.</p>
+      <SectionHeader subtitle="These calls are about to be scored — check back for results.">
+        Expiring Soon
+      </SectionHeader>
       <div className="space-y-2">
         {expiring.map(p => (
           <Link key={p.id} to={`/asset/${p.ticker}`}
@@ -465,7 +463,7 @@ export default function Dashboard() {
             </div>
             <div className="flex items-center gap-2">
               {p.pnl_percentage != null && (
-                <span className={`font-mono text-xs font-bold ${p.direction_winning ? 'text-positive' : 'text-negative'}`}>
+                <span className={`font-mono tnum text-xs font-bold ${p.direction_winning ? 'text-positive' : 'text-negative'}`}>
                   {p.pnl_percentage >= 0 ? '+' : ''}{p.pnl_percentage.toFixed(1)}%
                 </span>
               )}
@@ -499,12 +497,15 @@ export default function Dashboard() {
   );
 
   const firstCallCta = showFirstCallCta && (
-    <div className="mb-5 rounded-lg border border-accent/30 bg-accent/5 px-4 sm:px-6 py-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+    <div
+      className="mb-5 rounded-lg border border-accent/30 bg-accent/5 px-5 sm:px-8 py-6 sm:py-7 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4"
+      data-testid="first-call-cta"
+    >
       <div>
-        <div className="text-base sm:text-lg font-semibold text-text-primary">
+        <div className="headline-serif text-text-primary text-2xl sm:text-3xl leading-tight">
           Make your first call
         </div>
-        <div className="text-sm text-text-secondary mt-1">
+        <div className="text-sm sm:text-base text-text-secondary mt-1.5">
           Pick a ticker, set a target, lock it. The market will grade you.
         </div>
       </div>
@@ -562,7 +563,7 @@ export default function Dashboard() {
 function StatusItem({ label, value, color = 'text-text-primary' }) {
   return (
     <div className="flex-shrink-0 text-center">
-      <div className={`font-mono text-sm font-bold ${color}`}>{value}</div>
+      <div className={`font-mono tnum text-sm font-bold ${color}`}>{value}</div>
       <div className="text-[9px] text-muted uppercase tracking-wider">{label}</div>
     </div>
   );

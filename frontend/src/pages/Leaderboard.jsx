@@ -15,6 +15,7 @@ import LeaderboardCard from '../components/LeaderboardCard';
 import NotificationBanner from '../components/NotificationBanner';
 import FollowButton from '../components/FollowButton';
 import LeaderboardHoverPreview from '../components/LeaderboardHoverPreview';
+import SectionHeader from '../components/SectionHeader';
 import { usePublicFlag } from '../hooks/usePublicFlag';
 import { getLeaderboard, getAvailableTimeframes } from '../api';
 
@@ -498,7 +499,7 @@ export default function Leaderboard() {
                                     />
                                   </div>
                                 )}
-                                <span className={`font-mono font-medium ${f.total_predictions === 0 ? 'text-muted' : f.accuracy_rate >= 60 ? 'text-positive' : 'text-negative'}`} style={{ letterSpacing: '-0.01em' }}>
+                                <span className={`font-mono tnum font-medium ${f.total_predictions === 0 ? 'text-muted' : f.accuracy_rate >= 60 ? 'text-positive' : 'text-negative'}`} style={{ letterSpacing: '-0.01em' }}>
                                   {f.total_predictions === 0 ? '—' : `${f.accuracy_rate.toFixed(1)}%`}
                                 </span>
                               </div>
@@ -518,17 +519,17 @@ export default function Leaderboard() {
                               {(() => {
                                 if (f.total_predictions === 0) return <span className="font-mono text-muted">—</span>;
                                 const mv = getMetricValue(f, metric);
-                                return <span className={`font-mono ${metric === 'hit_rate' ? 'text-text-secondary' : mv.positive ? 'text-positive' : 'text-negative'}`}>{mv.text}</span>;
+                                return <span className={`font-mono tnum ${metric === 'hit_rate' ? 'text-text-secondary' : mv.positive ? 'text-positive' : 'text-negative'}`}>{mv.text}</span>;
                               })()}
                             </td>
                             <td className="px-3 py-3 text-right">
-                              <div className="font-mono text-text-secondary text-sm">{f.evaluated_predictions}</div>
+                              <div className="font-mono tnum text-text-secondary text-sm">{f.evaluated_predictions}</div>
                               <div className="text-muted text-[10px] font-mono">{f.total_predictions} total</div>
                             </td>
                             <td className="px-3 py-3 text-right hidden xl:table-cell">
                               {f.sector_call_total > 0 && f.sector_call_accuracy != null ? (
                                 <div className="flex flex-col items-end">
-                                  <span className={`font-mono text-sm ${f.sector_call_accuracy >= 60 ? 'text-positive' : 'text-negative'}`}>
+                                  <span className={`font-mono tnum text-sm ${f.sector_call_accuracy >= 60 ? 'text-positive' : 'text-negative'}`}>
                                     {f.sector_call_accuracy.toFixed(1)}%
                                   </span>
                                   <span className="text-muted text-[10px] font-mono">{pluralize(f.sector_call_total, 'call')}</span>
@@ -540,7 +541,7 @@ export default function Leaderboard() {
                             <td className="px-3 py-3 text-right hidden 2xl:table-cell">
                               {f.pair_call_total > 0 && f.pair_call_accuracy != null ? (
                                 <div className="flex flex-col items-end">
-                                  <span className={`font-mono text-sm ${f.pair_call_accuracy >= 60 ? 'text-positive' : 'text-negative'}`}>
+                                  <span className={`font-mono tnum text-sm ${f.pair_call_accuracy >= 60 ? 'text-positive' : 'text-negative'}`}>
                                     {f.pair_call_accuracy.toFixed(1)}%
                                   </span>
                                   <span className="text-muted text-[10px] font-mono">{pluralize(f.pair_call_total, 'call')}</span>
@@ -552,7 +553,7 @@ export default function Leaderboard() {
                             <td className="px-3 py-3 text-right hidden 2xl:table-cell">
                               {f.binary_event_total > 0 && f.binary_event_accuracy != null ? (
                                 <div className="flex flex-col items-end">
-                                  <span className={`font-mono text-sm ${f.binary_event_accuracy >= 60 ? 'text-positive' : 'text-negative'}`}>
+                                  <span className={`font-mono tnum text-sm ${f.binary_event_accuracy >= 60 ? 'text-positive' : 'text-negative'}`}>
                                     {f.binary_event_accuracy.toFixed(1)}%
                                   </span>
                                   <span className="text-muted text-[10px] font-mono">{f.binary_event_total} events</span>
@@ -564,7 +565,7 @@ export default function Leaderboard() {
                             <td className="px-3 py-3 text-right hidden 2xl:table-cell">
                               {f.metric_forecast_total > 0 && f.metric_forecast_accuracy != null ? (
                                 <div className="flex flex-col items-end">
-                                  <span className={`font-mono text-sm ${f.metric_forecast_accuracy >= 60 ? 'text-positive' : 'text-negative'}`}>
+                                  <span className={`font-mono tnum text-sm ${f.metric_forecast_accuracy >= 60 ? 'text-positive' : 'text-negative'}`}>
                                     {f.metric_forecast_accuracy.toFixed(1)}%
                                   </span>
                                   <span className="text-muted text-[10px] font-mono">{f.metric_forecast_total} forecasts</span>
@@ -577,7 +578,7 @@ export default function Leaderboard() {
                               title="Regime call accuracy — structural market-phase claims scored on drawdown / runup / new-high behavior, NOT final price vs target.">
                               {f.regime_call_total > 0 && f.regime_call_accuracy != null ? (
                                 <div className="flex flex-col items-end">
-                                  <span className={`font-mono text-sm ${f.regime_call_accuracy >= 60 ? 'text-positive' : 'text-negative'}`}>
+                                  <span className={`font-mono tnum text-sm ${f.regime_call_accuracy >= 60 ? 'text-positive' : 'text-negative'}`}>
                                     {f.regime_call_accuracy.toFixed(1)}%
                                   </span>
                                   <span className="text-muted text-[10px] font-mono">{f.regime_call_total} regime</span>
@@ -590,7 +591,7 @@ export default function Leaderboard() {
                               title="Average 3-month follow-through on disclosed positions — separate from prediction accuracy.">
                               {f.disclosure_count > 0 && f.avg_follow_through_3m != null ? (
                                 <div className="flex flex-col items-end">
-                                  <span className={`font-mono text-sm ${f.avg_follow_through_3m >= 0 ? 'text-positive' : 'text-negative'}`}>
+                                  <span className={`font-mono tnum text-sm ${f.avg_follow_through_3m >= 0 ? 'text-positive' : 'text-negative'}`}>
                                     {f.avg_follow_through_3m >= 0 ? '+' : ''}{(f.avg_follow_through_3m * 100).toFixed(1)}%
                                   </span>
                                   <span className="text-muted text-[10px] font-mono">{f.disclosure_count} disclosures</span>
@@ -603,7 +604,7 @@ export default function Leaderboard() {
                               {f.ranking_accuracy != null ? (
                                 <div className="flex flex-col items-end"
                                   title="Accuracy on ordering stocks within ranked lists. Higher = better at predicting which picks will outperform which.">
-                                  <span className={`font-mono text-sm ${f.ranking_accuracy >= 60 ? 'text-positive' : 'text-negative'}`}>
+                                  <span className={`font-mono tnum text-sm ${f.ranking_accuracy >= 60 ? 'text-positive' : 'text-negative'}`}>
                                     {f.ranking_accuracy.toFixed(1)}%
                                   </span>
                                   <span className="text-muted text-[10px] font-mono">
@@ -706,9 +707,7 @@ function WeekView({ weekData, data }) {
     <div>
       {/* Scored This Week */}
       <div className="mb-8">
-        <h2 className="text-sm font-semibold text-muted uppercase tracking-wider mb-3">
-          Results This Week
-        </h2>
+        <SectionHeader>Results This Week</SectionHeader>
         {scored.length === 0 ? (
           <div className="card text-center py-8">
             <p className="text-text-secondary mb-1 italic">No verdicts in yet this week. The market is still deliberating.</p>
@@ -738,13 +737,13 @@ function WeekView({ weekData, data }) {
                       <PlatformBadge platform={getSourceBadgeKey(f)} showLabel />
                     </td>
                     <td className="px-5 py-3 text-right">
-                      <span className={`font-mono font-semibold ${f.accuracy_rate >= 60 ? 'text-positive' : 'text-negative'}`}>
+                      <span className={`font-mono tnum font-semibold ${f.accuracy_rate >= 60 ? 'text-positive' : 'text-negative'}`}>
                         {f.accuracy_rate.toFixed(0)}%
                       </span>
                       <span className="text-muted text-xs ml-1">({f.correct_predictions}/{f.total_predictions})</span>
                     </td>
                     <td className="px-5 py-3 text-right hidden sm:table-cell">
-                      <span className="font-mono text-text-secondary text-sm">{(f.alltime_accuracy || 0).toFixed(0)}%</span>
+                      <span className="font-mono tnum text-text-secondary text-sm">{(f.alltime_accuracy || 0).toFixed(0)}%</span>
                     </td>
                   </tr>
                 ))}
@@ -757,9 +756,7 @@ function WeekView({ weekData, data }) {
       {/* New Calls This Week */}
       {newCalls.length > 0 && (
         <div>
-          <h2 className="text-sm font-semibold text-muted uppercase tracking-wider mb-3">
-            New Calls This Week
-          </h2>
+          <SectionHeader>New Calls This Week</SectionHeader>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
             {newCalls.map(f => (
               <Link key={`${f.source || 'analyst'}_${f.id}`} to={f.source === 'player' ? `/profile/${f.handle}` : `/forecaster/${f.id}`}
