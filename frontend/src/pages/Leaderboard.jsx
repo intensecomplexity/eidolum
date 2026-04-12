@@ -68,7 +68,7 @@ function SectorBadge({ sector, accuracy, count, onClick }) {
 }
 
 const TABS = [
-  { key: 'alltime', label: 'All Time', mobileLabel: 'All Time', icon: Trophy },
+  { key: 'alltime', label: 'Top Ranked', mobileLabel: 'Top', icon: Trophy },
   { key: 'week', label: 'New Calls', mobileLabel: 'New', icon: Flame },
   { key: 'recent', label: 'Recently Scored', mobileLabel: 'Recent', icon: Clock },
 ];
@@ -280,8 +280,10 @@ export default function Leaderboard() {
           ))}
         </div>
 
-        {/* Filters */}
-        <div className="flex items-center gap-2 mb-4 sm:mb-6 overflow-x-auto pills-scroll pb-1">
+        {/* Filters — horizontally scrollable with right-edge fade hint. */}
+        <div className="relative mb-4 sm:mb-6">
+        <div className="flex items-center gap-2 overflow-x-auto pb-1" style={{ scrollbarWidth: 'none' }}>
+          <style>{`.chip-scroll::-webkit-scrollbar{display:none}`}</style>
               <Filter className="w-4 h-4 text-muted shrink-0 hidden sm:block" />
 
               {/* Sector dropdown — always visible */}
@@ -344,14 +346,16 @@ export default function Leaderboard() {
                 </div>
               )}
 
-              {/* Timeframe filter — only show buttons with enough data */}
+              {/* Timeframe filter — labelled HORIZON to avoid collision
+                  with the "Top Ranked / New Calls / Recently Scored" pills. */}
               {activeTab !== 'week' && (
-                <div className="flex gap-1 shrink-0">
+                <div className="flex items-center gap-1 shrink-0">
+                  <span className="text-[10px] uppercase tracking-wider text-muted mr-1 hidden sm:inline">Horizon:</span>
                   {[
-                    { key: 'all', label: 'All Time', tip: 'All prediction timeframes' },
-                    { key: 'short', label: 'Short Term', tip: 'Predictions 90 days or less' },
-                    { key: 'medium', label: 'Mid Term', tip: 'Predictions between 91 and 365 days' },
-                    { key: 'long', label: 'Long Term', tip: 'Predictions over 1 year' },
+                    { key: 'all', label: 'All', tip: 'All prediction timeframes' },
+                    { key: 'short', label: 'Short', tip: 'Predictions 90 days or less' },
+                    { key: 'medium', label: 'Mid', tip: 'Predictions between 91 and 365 days' },
+                    { key: 'long', label: 'Long', tip: 'Predictions over 1 year' },
                   ].filter(tf => tf.key === 'all' || availableTf[tf.key]).map(tf => (
                     <button key={tf.key} onClick={() => setTimeframe(tf.key)} title={tf.tip}
                       className={`px-2.5 py-1 rounded text-[11px] font-semibold transition-colors ${
@@ -390,6 +394,14 @@ export default function Leaderboard() {
                 </span>
               )}
             </div>
+            {/* Right-edge fade — signals more chips to scroll. Uses an
+                absolute overlay so it doesn't affect layout. */}
+            <div
+              aria-hidden
+              className="hidden sm:block pointer-events-none absolute right-0 top-0 bottom-0 w-10"
+              style={{ background: 'linear-gradient(to right, transparent, var(--color-bg, #16140E))' }}
+            />
+          </div>
 
             {/* Loading */}
             {loading ? (
