@@ -130,6 +130,11 @@ def _call_haiku_for_quote(client, transcript_text: str, row) -> str | None:
             messages=[{"role": "user", "content": user_msg}],
         )
         text = resp.content[0].text.strip() if resp.content else ""
+        # Strip markdown code fences (```json ... ```) that Haiku often wraps.
+        if text.startswith("```"):
+            text = text.split("\n", 1)[-1]  # remove ```json line
+            if text.endswith("```"):
+                text = text[:-3].strip()
         # Track tokens for cost reporting.
         usage = resp.usage if hasattr(resp, "usage") else None
         in_tok = getattr(usage, "input_tokens", 0) if usage else 0
