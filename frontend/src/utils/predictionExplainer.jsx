@@ -133,12 +133,10 @@ export function simpleExplainer(prediction, currentPrice = null) {
     // Price math uses the live price when available; we only fall back to
     // entry to decide directional copy (bullish/bearish) — never to claim
     // it's the current price.
+    // The "(currently $X, +Y%)" parenthetical was redundant — the current
+    // price is already shown at the top of the ticker page. Removing it
+    // to keep explainer copy shorter and more scannable.
     let priceInfo = `Target $${target.toFixed(0)}`;
-    if (livePrice) {
-      const pctChange = ((target - livePrice) / livePrice * 100).toFixed(1);
-      const sign = target >= livePrice ? '+' : '';
-      priceInfo = `Target $${target.toFixed(0)} (currently $${livePrice.toFixed(2)}, ${sign}${pctChange}%)`;
-    }
     const targetAbove = livePrice ? target > livePrice : (entry && entry > 0 ? target > entry : true);
 
     // CASE 1: Downgrade but target ABOVE current (less optimistic, still sees upside)
