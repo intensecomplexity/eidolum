@@ -33,7 +33,8 @@ def recent_predictions(request: Request, db: Session = Depends(get_db)):
                p.created_at,
                f.id AS fid, f.name AS fname, f.accuracy_score,
                ts.company_name,
-               p.source_type, p.verified_by
+               p.source_type, p.verified_by,
+               p.source_verbatim_quote
         FROM predictions p
         JOIN forecasters f ON f.id = p.forecaster_id
         LEFT JOIN ticker_sectors ts ON ts.ticker = p.ticker
@@ -48,12 +49,13 @@ def recent_predictions(request: Request, db: Session = Depends(get_db)):
             "entry_price": float(r[4]) if r[4] else None,
             "prediction_date": r[5].isoformat() if r[5] else None,
             "window_days": r[6],
-            "context": (r[7] or r[8] or "")[:200],
+            "context": (r[16] or r[8] or r[7] or "")[:300],
             "created_at": r[9].isoformat() if r[9] else None,
             "forecaster_id": r[10], "forecaster_name": r[11],
             "accuracy": round(float(r[12]), 1) if r[12] else None,
             "company_name": r[13],
             "source_type": r[14], "verified_by": r[15],
+            "source_verbatim_quote": r[16],
             "type": "prediction",
         }
         for r in rows
@@ -73,7 +75,8 @@ def recently_scored(request: Request, db: Session = Depends(get_db)):
                p.context, p.exact_quote,
                f.id AS fid, f.name AS fname, f.accuracy_score,
                ts.company_name, p.evaluated_at,
-               p.source_type, p.verified_by
+               p.source_type, p.verified_by,
+               p.source_verbatim_quote
         FROM predictions p
         JOIN forecasters f ON f.id = p.forecaster_id
         LEFT JOIN ticker_sectors ts ON ts.ticker = p.ticker
@@ -93,7 +96,8 @@ def recently_scored(request: Request, db: Session = Depends(get_db)):
                    p.context, p.exact_quote,
                    f.id AS fid, f.name AS fname, f.accuracy_score,
                    ts.company_name, p.evaluated_at,
-                   p.source_type, p.verified_by
+                   p.source_type, p.verified_by,
+                   p.source_verbatim_quote
             FROM predictions p
             JOIN forecasters f ON f.id = p.forecaster_id
             LEFT JOIN ticker_sectors ts ON ts.ticker = p.ticker
@@ -113,12 +117,13 @@ def recently_scored(request: Request, db: Session = Depends(get_db)):
             "actual_return": round(float(r[6]), 1) if r[6] is not None else None,
             "evaluation_date": r[7].isoformat() if r[7] else None,
             "prediction_date": r[8].isoformat() if r[8] else None,
-            "context": (r[9] or r[10] or "")[:200],
+            "context": (r[18] or r[10] or r[9] or "")[:300],
             "forecaster_id": r[11], "forecaster_name": r[12],
             "accuracy": round(float(r[13]), 1) if r[13] else None,
             "company_name": r[14],
             "scored_at": r[15].isoformat() if r[15] else (r[7].isoformat() if r[7] else None),
             "source_type": r[16], "verified_by": r[17],
+            "source_verbatim_quote": r[18],
             "type": "scored",
         }
         for r in rows
@@ -138,7 +143,8 @@ def expiring_predictions(request: Request, db: Session = Depends(get_db)):
                p.context, p.exact_quote,
                f.id AS fid, f.name AS fname, f.accuracy_score,
                ts.company_name,
-               p.source_type, p.verified_by
+               p.source_type, p.verified_by,
+               p.source_verbatim_quote
         FROM predictions p
         JOIN forecasters f ON f.id = p.forecaster_id
         LEFT JOIN ticker_sectors ts ON ts.ticker = p.ticker
@@ -159,12 +165,13 @@ def expiring_predictions(request: Request, db: Session = Depends(get_db)):
             "evaluation_date": r[5].isoformat() if r[5] else None,
             "prediction_date": r[6].isoformat() if r[6] else None,
             "window_days": r[7],
-            "context": (r[8] or r[9] or "")[:200],
+            "context": (r[16] or r[9] or r[8] or "")[:300],
             "days_remaining": max(0, (r[5] - now).days) if r[5] else None,
             "forecaster_id": r[10], "forecaster_name": r[11],
             "accuracy": round(float(r[12]), 1) if r[12] else None,
             "company_name": r[13],
             "source_type": r[14], "verified_by": r[15],
+            "source_verbatim_quote": r[16],
             "type": "expiring",
         }
         for r in rows

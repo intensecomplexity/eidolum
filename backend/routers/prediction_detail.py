@@ -124,6 +124,7 @@ def get_prediction_detail(
             "rank": "Analyst",
             "source_url": pred.source_url,
             "exact_quote": pred.exact_quote,
+            "source_verbatim_quote": pred.source_verbatim_quote,
             "archive_url": pred.archive_url,
         }
     else:

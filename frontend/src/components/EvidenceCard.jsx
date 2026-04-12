@@ -54,7 +54,11 @@ export default function EvidenceCard({ prediction: p, forecaster = null, expanda
 
   if (!p) return null;
 
-  const hasQuote = p.exact_quote && p.exact_quote.length > 0 && p.exact_quote !== p.context;
+  // Prefer source_verbatim_quote (Ship #9 transcript-matched) over
+  // exact_quote (may be template-generated for YouTube predictions).
+  const displayQuote = p.source_verbatim_quote
+    || (p.exact_quote && p.exact_quote !== p.context ? p.exact_quote : '');
+  const hasQuote = displayQuote && displayQuote.length > 0;
   const hasSource = p.source_url && p.source_url.length > 0;
   const ytVideoId = extractYouTubeVideoId(p.source_platform_id);
   const hasRealVideo = !!ytVideoId;
@@ -78,7 +82,7 @@ export default function EvidenceCard({ prediction: p, forecaster = null, expanda
         {hasQuote && (
           <>
             <p className="text-text-secondary text-xs italic leading-relaxed truncate">
-              &ldquo;{annotateContext(p.exact_quote.slice(0, 100), p.ticker)}{p.exact_quote.length > 100 ? '...' : ''}&rdquo;
+              &ldquo;{annotateContext(displayQuote.slice(0, 100), p.ticker)}{displayQuote.length > 100 ? '...' : ''}&rdquo;
             </p>
             <ExplainerLine prediction={p} className="mt-0.5" />
           </>
@@ -131,13 +135,13 @@ export default function EvidenceCard({ prediction: p, forecaster = null, expanda
         <div className="mt-3 bg-warning/[0.06] border-l-[3px] border-warning/60 rounded-r-lg px-4 py-3 relative">
           <span className="absolute top-1 left-2 text-warning/30 text-3xl font-serif leading-none select-none">&ldquo;</span>
           <p className="text-text-primary text-sm italic leading-relaxed pl-4 font-serif">
-            {expanded ? annotateContext(p.exact_quote, p.ticker) : (
-              p.exact_quote.length > 140
-                ? <>{annotateContext(p.exact_quote.slice(0, 140), p.ticker)}...</>
-                : annotateContext(p.exact_quote, p.ticker)
+            {expanded ? annotateContext(displayQuote, p.ticker) : (
+              displayQuote.length > 300
+                ? <>{annotateContext(displayQuote.slice(0, 300), p.ticker)}...</>
+                : annotateContext(displayQuote, p.ticker)
             )}
           </p>
-          {expanded && p.exact_quote.length > 10 && (
+          {expanded && displayQuote.length > 10 && (
             <span className="absolute bottom-1 right-3 text-warning/30 text-3xl font-serif leading-none select-none">&rdquo;</span>
           )}
           <ExplainerLine prediction={p} className="mt-2 pl-4 not-italic" />

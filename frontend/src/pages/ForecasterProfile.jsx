@@ -1302,7 +1302,9 @@ function _regimeMissText(rt, instrument) {
 function PredictionRow({ p, forecaster: fc }) {
   const [expanded, setExpanded] = useState(false);
   const evalDate = p.evaluation_date || p.resolution_date;
-  const quoteText = p.exact_quote || p.context || p.statement || 'No quote available';
+  // Prefer source_verbatim_quote (Ship #9 transcript-matched real words) over
+  // exact_quote (may be template-generated for YouTube predictions).
+  const quoteText = p.source_verbatim_quote || p.exact_quote || p.context || p.statement || 'No quote available';
   const horizonLabel = HORIZON_LABELS[p.time_horizon] || `${p.window_days}d`;
 
   return (

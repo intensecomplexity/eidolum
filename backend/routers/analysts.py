@@ -298,6 +298,7 @@ def analyst_predictions(
                 "evaluation_date": p.evaluation_date.isoformat() if p.evaluation_date else None,
                 "source_url": p.source_url,
                 "exact_quote": p.exact_quote,
+                "source_verbatim_quote": p.source_verbatim_quote,
             }
             for p in preds
         ],

@@ -119,25 +119,18 @@ function withTimestampAnchor(url, seconds) {
 }
 
 function VerbatimQuoteRow({ p }) {
-  // Ship #9 audit trail. Shows the exact words Haiku extracted as
-  // the source of the prediction — this is what gets matched to the
-  // timestamp. Only renders when we actually have a quote.
-  const quote = p.source_verbatim_quote;
-  if (!quote) return null;
+  // Ship #9 audit trail — now just a compact method/confidence
+  // badge. The main quote block above already renders
+  // source_verbatim_quote, so re-displaying it here would
+  // duplicate the text. Only show the provenance tag.
   const method = p.source_timestamp_method;
+  if (!method || method === 'unknown') return null;
   const conf = p.source_timestamp_confidence != null
     ? Number(p.source_timestamp_confidence).toFixed(2)
     : null;
   return (
-    <div className="mt-1 text-[10px] text-muted/80 italic leading-snug border-l-2 border-accent/20 pl-2">
-      <span className="text-muted/60 not-italic">quote: </span>
-      "{quote}"
-      {method && method !== 'unknown' && (
-        <span className="text-muted/50 not-italic ml-1">
-          ({method}
-          {conf != null && ` · ${conf}`})
-        </span>
-      )}
+    <div className="mt-0.5 text-[9px] text-muted/50 italic">
+      matched via {method}{conf != null && ` · ${conf}`}
     </div>
   );
 }
@@ -309,9 +302,9 @@ function PairCallCard({ prediction: p, forecaster: fc, showForecaster, compact }
         )}
       </div>
 
-      {!compact && p.exact_quote && p.exact_quote !== p.context && (
+      {!compact && (p.source_verbatim_quote || (p.exact_quote && p.exact_quote !== p.context)) && (
         <p className="text-xs text-text-secondary italic leading-relaxed mb-2 break-words">
-          {annotateContext(p.exact_quote, longT)}
+          &ldquo;{annotateContext(p.source_verbatim_quote || p.exact_quote, longT)}&rdquo;
         </p>
       )}
 
@@ -440,9 +433,9 @@ function BinaryEventCard({ prediction: p, forecaster: fc, showForecaster, compac
         )}
       </div>
 
-      {!compact && p.exact_quote && p.exact_quote !== p.context && (
+      {!compact && (p.source_verbatim_quote || (p.exact_quote && p.exact_quote !== p.context)) && (
         <p className="text-xs text-text-secondary italic leading-relaxed mb-2 break-words">
-          {p.exact_quote}
+          &ldquo;{p.source_verbatim_quote || p.exact_quote}&rdquo;
         </p>
       )}
 
@@ -616,9 +609,9 @@ function MetricForecastCard({ prediction: p, forecaster: fc, showForecaster, com
         <span className="text-text-secondary">{formatDate(p.metric_release_date) || '—'}</span>
       </div>
 
-      {!compact && p.exact_quote && p.exact_quote !== p.context && (
+      {!compact && (p.source_verbatim_quote || (p.exact_quote && p.exact_quote !== p.context)) && (
         <p className="text-xs text-text-secondary italic leading-relaxed mb-2 break-words">
-          {p.exact_quote}
+          &ldquo;{p.source_verbatim_quote || p.exact_quote}&rdquo;
         </p>
       )}
 
@@ -808,10 +801,10 @@ export default function PredictionCard({ prediction: p, showForecaster = false, 
         return rc ? <p className="text-[10px] text-muted italic mb-1">{rc}</p> : null;
       })()}
 
-      {/* Summary — only show if exact_quote is a real quote (differs from context) */}
-      {!compact && p.exact_quote && p.exact_quote !== p.context && (
+      {/* Quote — prefer source_verbatim_quote (Ship #9 transcript-matched) over exact_quote (may be template). */}
+      {!compact && (p.source_verbatim_quote || (p.exact_quote && p.exact_quote !== p.context)) && (
         <p className="text-xs text-text-secondary italic leading-relaxed mb-2 break-words">
-          {annotateContext(p.exact_quote, p.ticker)}
+          &ldquo;{annotateContext(p.source_verbatim_quote || p.exact_quote, p.ticker)}&rdquo;
         </p>
       )}
 
