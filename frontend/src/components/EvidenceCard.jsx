@@ -53,7 +53,7 @@ export default function EvidenceCard({ prediction: p, forecaster = null, expanda
   const hasQuote = p.exact_quote && p.exact_quote.length > 0 && p.exact_quote !== p.context;
   const hasSource = p.source_url && p.source_url.length > 0;
   const hasRealVideo = isRealYouTubeId(p.source_platform_id);
-  const badge = getSourceBadge(p.source_type, p.verified_by, !!p.video_timestamp_sec);
+  const badge = getSourceBadge(p.source_type, p.verified_by, !!(p.source_timestamp_seconds ?? p.video_timestamp_sec));
 
   // Wayback Machine archive link (external archive_url or computed from source_url)
   const archiveLink = p.archive_url && p.archive_url.startsWith('https://web.archive.org')
@@ -110,7 +110,7 @@ export default function EvidenceCard({ prediction: p, forecaster = null, expanda
           </a>
         )}
         {showVideo && hasRealVideo && (
-          <InlinePlayer videoId={p.source_platform_id} timestamp={p.video_timestamp_sec} onClose={() => setShowVideo(false)} />
+          <InlinePlayer videoId={p.source_platform_id} timestamp={p.source_timestamp_seconds ?? p.video_timestamp_sec} onClose={() => setShowVideo(false)} />
         )}
       </div>
     );
@@ -212,7 +212,7 @@ export default function EvidenceCard({ prediction: p, forecaster = null, expanda
       {/* Inline video player */}
       {showVideo && hasRealVideo && (
         <div onClick={(e) => e.stopPropagation()}>
-          <InlinePlayer videoId={p.source_platform_id} timestamp={p.video_timestamp_sec} onClose={() => setShowVideo(false)} />
+          <InlinePlayer videoId={p.source_platform_id} timestamp={p.source_timestamp_seconds ?? p.video_timestamp_sec} onClose={() => setShowVideo(false)} />
         </div>
       )}
 

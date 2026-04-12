@@ -1049,8 +1049,12 @@ function ProofBlock({ p }) {
   const isTwitter = source.includes('x.com') || source.includes('twitter.com');
   const isReddit = source.includes('reddit.com');
 
-  const ts = p.video_timestamp_sec;
+  const ts = p.source_timestamp_seconds ?? p.video_timestamp_sec;
   const timeStr = ts ? `${Math.floor(ts / 60)}:${String(ts % 60).padStart(2, '0')}` : null;
+  // Append ?t=Ns anchor to YouTube URLs when we have a resolved timestamp.
+  const ytHref = isYT && ts
+    ? (() => { const n = Math.floor(Number(ts)); const sep = source.includes('?') ? '&' : '?'; return `${source}${sep}t=${n}s`; })()
+    : source;
 
   const label = isYT ? (timeStr ? `Watch at ${timeStr}` : 'Watch on YouTube')
     : isTwitter ? 'View on X' : isReddit ? 'View on Reddit' : 'View Source';
@@ -1079,7 +1083,7 @@ function ProofBlock({ p }) {
               border: '1px solid rgba(255,255,255,0.1)', cursor: 'pointer', display: 'block' }} />
         </a>
       )}
-      <a href={source} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()}
+      <a href={isYT ? ytHref : source} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()}
         style={{ display: 'inline-flex', alignItems: 'center', gap: '6px',
           padding: '6px 14px', borderRadius: '6px', background: bg, color: '#fff',
           fontSize: '0.85rem', fontWeight: 500, textDecoration: 'none' }}>
