@@ -32,7 +32,7 @@ export default function Footer() {
               <Link to="/login" className="hover:text-accent transition-colors whitespace-nowrap">Log In</Link>
             )}
           </nav>
-          <p className="italic text-sm text-accent">Truth is the only currency.</p>
+          <p className="headline-serif italic text-base text-accent">Truth is the only currency.</p>
         </div>
       </div>
     </footer>
