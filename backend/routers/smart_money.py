@@ -50,14 +50,11 @@ def get_smart_money(
     top_ids = [r[0] for r in top_analysts]
     analyst_info = {r[0]: {"name": r[1], "accuracy": round(float(r[2]), 1), "firm": r[3]} for r in top_analysts}
 
-    # Get pending predictions from top analysts. Exclude expired calls
-    # (expires_at passed) and stale "pending" rows that were published
-    # more than 18 months ago — those are predictions whose evaluation
-    # window has effectively already run and whose targets got blown
-    # past without the evaluator catching up. They should not feed the
-    # "who's currently betting on X" aggregate.
+    # Get pending predictions from top analysts. Exclude stale "pending"
+    # rows published more than 18 months ago — those are predictions
+    # whose evaluation window has effectively already run. They should
+    # not feed the "who's currently betting on X" aggregate.
     where = "AND p.direction IN ('bullish', 'bearish', 'neutral')"
-    where += " AND (p.expires_at IS NULL OR p.expires_at > NOW())"
     where += " AND (p.prediction_date IS NULL OR p.prediction_date >= NOW() - INTERVAL '18 months')"
     params = {"ids": top_ids}
     if sector:
