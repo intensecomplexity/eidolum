@@ -510,9 +510,39 @@ def run_evaluator(db: Session):
     _failed_tickers.clear()
 
     from feature_flags import is_x_evaluation_enabled
-    from sqlalchemy import or_
+    from sqlalchemy import or_, and_
     skip_x = not is_x_evaluation_enabled(db)
     _not_x = or_(Prediction.source_type.is_(None), Prediction.source_type != "x")
+
+    # YouTube eval auto-stop: once we have enough evaluated YouTube
+    # predictions for fine-tuning, skip YouTube evaluation to free up
+    # price-lookup API quota for Benzinga/FMP/X evaluation.
+    _yt_eval_target = 4000
+    try:
+        _cfg = db.execute(sql_text(
+            "SELECT value FROM config WHERE key = 'YOUTUBE_EVAL_TARGET'"
+        )).first()
+        if _cfg and _cfg[0]:
+            _yt_eval_target = int(str(_cfg[0]).strip())
+    except Exception:
+        pass
+
+    _yt_evaluated = int(db.execute(sql_text(
+        "SELECT COUNT(*) FROM predictions "
+        "WHERE source_type LIKE 'youtube%%' "
+        "AND outcome IS NOT NULL AND outcome NOT IN ('pending', 'no_data')"
+    )).scalar() or 0)
+
+    skip_youtube = _yt_evaluated >= _yt_eval_target
+    if skip_youtube:
+        print(f"[Evaluator] YouTube training data target reached "
+              f"({_yt_evaluated}/{_yt_eval_target}). Skipping YouTube "
+              f"evaluation. Benzinga/FMP/X evaluation continues.",
+              flush=True)
+    _not_youtube = or_(
+        Prediction.source_type.is_(None),
+        ~Prediction.source_type.like("youtube%"),
+    )
 
     now = datetime.utcnow()
 
@@ -524,6 +554,8 @@ def run_evaluator(db: Session):
     )
     if skip_x:
         base_q = base_q.filter(_not_x)
+    if skip_youtube:
+        base_q = base_q.filter(_not_youtube)
     overdue = base_q.all()
 
     if not overdue:
@@ -534,6 +566,8 @@ def run_evaluator(db: Session):
         )
         if skip_x:
             pending_q = pending_q.filter(_not_x)
+        if skip_youtube:
+            pending_q = pending_q.filter(_not_youtube)
         all_pending = pending_q.all()
         overdue = [
             p for p in all_pending
