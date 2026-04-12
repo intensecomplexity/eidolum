@@ -295,6 +295,22 @@ def run_channel_monitor(db=None):
     except Exception as e:
         print(f"[ChannelMonitor] Error: {e}")
         import traceback; traceback.print_exc()
+        # If _run_inner crashed before its finalize block, the scraper_runs
+        # row is stuck at 'running' forever. Mark any recent running row
+        # as 'error' so the dashboard reflects reality.
+        try:
+            db.execute(sql_text(
+                "UPDATE scraper_runs SET status = 'error', finished_at = NOW(), "
+                "error_message = :msg "
+                "WHERE source = 'youtube' AND status = 'running' "
+                "AND started_at > NOW() - INTERVAL '1 hour'"
+            ), {"msg": f"_run_inner crash: {str(e)[:400]}"})
+            db.commit()
+        except Exception:
+            try:
+                db.rollback()
+            except Exception:
+                pass
     finally:
         if own_db:
             db.close()
@@ -339,6 +355,27 @@ def _run_inner(db):
         db.commit()
     except Exception as e:
         print(f"[ChannelMonitor] rejection cleanup failed: {e}")
+        try:
+            db.rollback()
+        except Exception:
+            pass
+
+    # Auto-heal zombie scraper_runs rows left by prior crashes. A row
+    # stuck in 'running' for >30 minutes is certainly dead — _run_inner
+    # never takes that long on a healthy batch. Best-effort cleanup.
+    try:
+        zombies = db.execute(sql_text(
+            "UPDATE scraper_runs SET status = 'timeout', finished_at = NOW(), "
+            "error_message = 'Auto-healed zombie: running > 30 min' "
+            "WHERE source = 'youtube' AND status = 'running' "
+            "AND started_at < NOW() - INTERVAL '30 minutes' "
+            "RETURNING id"
+        )).fetchall()
+        if zombies:
+            db.commit()
+            print(f"[ChannelMonitor] Healed {len(zombies)} zombie scraper_runs "
+                  f"row(s): {[r[0] for r in zombies]}", flush=True)
+    except Exception:
         try:
             db.rollback()
         except Exception:
