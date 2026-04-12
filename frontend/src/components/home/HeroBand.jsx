@@ -4,14 +4,20 @@ import { getGlobalStats } from '../../api';
 // Ship #13. Hero band at the top of `/` when ENABLE_HOMEPAGE_HERO is on.
 // Stat numbers come from /api/stats/global (NOT hardcoded). Until the
 // fetch resolves we show subtle placeholders — render is never blocked.
+//
+// Ship #13.5 cleanup — stat tiles upgraded to Instrument Serif text-4xl
+// (was font-mono 2xl/3xl), manifesto upgraded to text-xl headline-serif
+// (was text-sm/base font-serif), bottom padding tightened so the hero
+// flows directly into the Receipts header below without a visible dead
+// zone.
 
 function StatTile({ value, label }) {
   return (
-    <div className="flex flex-col items-center gap-1 min-w-[7rem]">
-      <div className="font-mono text-2xl sm:text-3xl font-bold text-accent">
+    <div className="flex flex-col items-center gap-1 min-w-[8rem]">
+      <div className="headline-serif tnum text-4xl sm:text-5xl text-accent leading-none">
         {value}
       </div>
-      <div className="text-[10px] sm:text-xs uppercase tracking-wider text-muted text-center">
+      <div className="text-[10px] sm:text-xs uppercase tracking-wider text-muted text-center mt-1">
         {label}
       </div>
     </div>
@@ -55,7 +61,7 @@ export default function HeroBand() {
         aria-hidden
       />
 
-      <div className="relative max-w-4xl mx-auto px-4 sm:px-6 py-10 sm:py-16 text-center">
+      <div className="relative max-w-4xl mx-auto px-4 sm:px-6 pt-10 sm:pt-16 pb-8 sm:pb-12 text-center">
         <h1
           className="headline-serif text-accent mb-4 sm:mb-5"
           style={{ fontSize: 'clamp(2.2rem, 5.5vw, 3.8rem)', lineHeight: 1.08 }}
@@ -63,20 +69,20 @@ export default function HeroBand() {
           Who should you actually listen to?
         </h1>
 
-        <p className="text-text-secondary text-base sm:text-xl leading-relaxed max-w-xl mx-auto mb-3">
+        <p className="text-text-secondary text-base sm:text-lg leading-relaxed max-w-xl mx-auto mb-6">
           Every Wall Street analyst and fintwit forecaster on one leaderboard,
           scored against reality.
         </p>
 
-        <p className="italic font-serif text-accent text-sm sm:text-base mb-8 sm:mb-10">
-          Truth is the only currency.
-        </p>
-
-        <div className="flex flex-row items-center justify-center flex-wrap gap-6 sm:gap-10 mb-6 sm:mb-8">
+        <div className="flex flex-col sm:flex-row items-center justify-center gap-6 sm:gap-12 mt-6 mb-6 sm:mb-8">
           <StatTile value={formatPlus(predictions)} label="Predictions Tracked" />
           <StatTile value={formatPlus(forecasters)} label="Forecasters Watched" />
           <StatTile value={formatPlus(scored)} label="Calls Graded" />
         </div>
+
+        <p className="headline-serif italic text-accent text-base sm:text-xl mt-6 mb-8 whitespace-nowrap">
+          Truth is the only currency.
+        </p>
 
         <div className="inline-flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-xs sm:text-[13px] text-text-secondary">
           <LegendPill color="#34d399" label="HIT" />
