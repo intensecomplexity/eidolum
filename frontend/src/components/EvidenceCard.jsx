@@ -30,11 +30,15 @@ function SourceIcon({ type }) {
 }
 
 /** Check if a source_platform_id is a real YouTube video ID (11 alphanumeric chars, no underscores/spaces) */
-function isRealYouTubeId(id) {
-  if (!id || typeof id !== 'string') return false;
-  if (id.length !== 11) return false;
-  if (id.includes('_') || id.includes(' ')) return false;
-  return /^[a-zA-Z0-9\-]+$/.test(id);
+/** Extract the 11-char YouTube video ID from a source_platform_id.
+ *  Format is always "yt_{VIDEO_ID}_..." where video ID is exactly 11 chars.
+ *  Returns null if the format doesn't match. */
+function extractYouTubeVideoId(sourcePlatformId) {
+  if (!sourcePlatformId || typeof sourcePlatformId !== 'string') return null;
+  if (!sourcePlatformId.startsWith('yt_')) return null;
+  const vid = sourcePlatformId.slice(3, 14);
+  if (vid.length !== 11) return null;
+  return vid;
 }
 
 /** Build YouTube embed URL with optional timestamp */
@@ -52,7 +56,8 @@ export default function EvidenceCard({ prediction: p, forecaster = null, expanda
 
   const hasQuote = p.exact_quote && p.exact_quote.length > 0 && p.exact_quote !== p.context;
   const hasSource = p.source_url && p.source_url.length > 0;
-  const hasRealVideo = isRealYouTubeId(p.source_platform_id);
+  const ytVideoId = extractYouTubeVideoId(p.source_platform_id);
+  const hasRealVideo = !!ytVideoId;
   const badge = getSourceBadge(p.source_type, p.verified_by, !!(p.source_timestamp_seconds ?? p.video_timestamp_sec));
 
   // Wayback Machine archive link (external archive_url or computed from source_url)
@@ -110,7 +115,7 @@ export default function EvidenceCard({ prediction: p, forecaster = null, expanda
           </a>
         )}
         {showVideo && hasRealVideo && (
-          <InlinePlayer videoId={p.source_platform_id} timestamp={p.source_timestamp_seconds ?? p.video_timestamp_sec} onClose={() => setShowVideo(false)} />
+          <InlinePlayer videoId={ytVideoId} timestamp={p.source_timestamp_seconds ?? p.video_timestamp_sec} onClose={() => setShowVideo(false)} />
         )}
       </div>
     );
@@ -212,7 +217,7 @@ export default function EvidenceCard({ prediction: p, forecaster = null, expanda
       {/* Inline video player */}
       {showVideo && hasRealVideo && (
         <div onClick={(e) => e.stopPropagation()}>
-          <InlinePlayer videoId={p.source_platform_id} timestamp={p.source_timestamp_seconds ?? p.video_timestamp_sec} onClose={() => setShowVideo(false)} />
+          <InlinePlayer videoId={ytVideoId} timestamp={p.source_timestamp_seconds ?? p.video_timestamp_sec} onClose={() => setShowVideo(false)} />
         </div>
       )}
 
@@ -291,21 +296,21 @@ function InlinePlayer({ videoId, timestamp, onClose }) {
 // Mini version for activity feed
 export function MiniQuote({ quote, sourceUrl, sourceType, timestampDisplay, sourcePlatformId }) {
   if (!quote) return null;
-  const hasRealVideo = isRealYouTubeId(sourcePlatformId);
+  const ytVid = extractYouTubeVideoId(sourcePlatformId);
   return (
     <div className="mt-1">
       <p className="text-text-secondary text-xs italic truncate">
         &ldquo;{quote.slice(0, 80)}{quote.length > 80 ? '...' : ''}&rdquo;
       </p>
-      {hasRealVideo && sourceType === 'youtube' && (
-        <a href={`https://youtube.com/watch?v=${sourcePlatformId}`} target="_blank" rel="noopener noreferrer"
+      {ytVid && sourceType === 'youtube' && (
+        <a href={`https://youtube.com/watch?v=${ytVid}`} target="_blank" rel="noopener noreferrer"
            className="inline-flex items-center gap-1 text-[10px] text-accent active:underline mt-0.5"
            onClick={(e) => e.stopPropagation()}>
           <Play className="w-2.5 h-2.5" fill="currentColor" />
           {timestampDisplay ? `${timestampDisplay}` : 'Watch'}
         </a>
       )}
-      {sourceUrl && !hasRealVideo && sourceType !== 'youtube' && (
+      {sourceUrl && !ytVid && sourceType !== 'youtube' && (
         <a href={sourceUrl} target="_blank" rel="noopener noreferrer"
            className="inline-flex items-center gap-1 text-[10px] text-accent active:underline mt-0.5"
            onClick={(e) => e.stopPropagation()}>
