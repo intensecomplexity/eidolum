@@ -1737,6 +1737,53 @@ RULES RECAP
 Output JSON only. Be concise."""
 
 
+YOUTUBE_HAIKU_VAGUE_TIMEFRAME_INSTRUCTIONS = """VAGUE TIMEFRAME MAPPING (OVERRIDE):
+The METADATA_ENRICHMENT block above rejects predictions where the forecaster uses a vague time phrase like "long-term" because it could mean 1 year or 5 years. This block OVERRIDES that rejection for a specific set of conventional finance phrases by mapping them to standard evaluation buckets.
+
+IMPORTANT DISTINCTION:
+- Vague time phrase IS present ("long term", "near term", etc.) → MAP to a bucket using the table below. Set timeframe_source="inferred".
+- ZERO time signal (no time phrase at all, not even a vague one) → still REJECT with reason="no_timeframe_determinable". This override does NOT create a universal default.
+
+VAGUE PHRASE → BUCKET MAPPING:
+
+| Phrases                                              | inferred_timeframe_days |
+|------------------------------------------------------|------------------------:|
+| "short term", "near term", "coming weeks"            |                      30 |
+| "medium term", "intermediate"                        |                     180 |
+| "long term", "long run", "years ahead", "multi-year" |                     365 |
+| "very long term", "decade", "generational"           |                    1825 |
+
+When a forecaster uses one of these phrases (case-insensitive, hyphenated or not — "long-term" = "long term"):
+  → set inferred_timeframe_days to the mapped value from the table
+  → set timeframe_source="inferred"
+  → do NOT set timeframe_category (that field is only for category_default)
+  → do NOT reject the prediction
+
+EXAMPLES:
+
+Input: "I like AAPL long-term"
+→ ACCEPT. inferred_timeframe_days=365, timeframe_source="inferred". (Previously rejected — now mapped.)
+
+Input: "NVDA is a great short-term trade here"
+→ ACCEPT. inferred_timeframe_days=30, timeframe_source="inferred".
+
+Input: "Tesla is a generational wealth builder"
+→ ACCEPT. inferred_timeframe_days=1825, timeframe_source="inferred".
+
+Input: "I'm bullish medium term on AMD"
+→ ACCEPT. inferred_timeframe_days=180, timeframe_source="inferred".
+
+Input: "AAPL looks good" (NO time phrase at all)
+→ Still REJECT. No vague phrase present, no category match, no explicit window. reason="no_timeframe_determinable".
+
+Input: "TSLA is interesting" (NO time phrase at all)
+→ Still REJECT. Zero time signal.
+
+PRIORITY: This mapping is checked AFTER explicit timeframe resolution (step 1 in the METADATA_ENRICHMENT decision tree) and AFTER category matching (step 2), but BEFORE the final rejection (step 3). If a prediction already resolved via step 1 or step 2, this block does not apply.
+
+Output JSON only. Be concise."""
+
+
 # ── Transcript fetching ─────────────────────────────────────────────────────
 
 def _build_transcript_api():
@@ -2268,6 +2315,7 @@ def classify_video(channel_name: str, title: str, publish_date: str,
         active_system = active_system + "\n\n" + YOUTUBE_HAIKU_SOURCE_TIMESTAMP_INSTRUCTIONS
     if use_metadata_enrichment:
         active_system = active_system + "\n\n" + YOUTUBE_HAIKU_METADATA_ENRICHMENT_INSTRUCTIONS
+        active_system = active_system + "\n\n" + YOUTUBE_HAIKU_VAGUE_TIMEFRAME_INSTRUCTIONS
     telemetry["prompt_variant"] = "sector" if use_sector_prompt else "standard"
     telemetry["ranked_list_enabled"] = bool(use_ranked_list)
     telemetry["revisions_enabled"] = bool(use_revisions)
@@ -3262,7 +3310,7 @@ def _resolve_source_timestamp(
 _VALID_CONVICTION_LEVELS = {
     "strong", "moderate", "hedged", "hypothetical", "unknown",
 }
-_VALID_TIMEFRAME_SOURCES = {"explicit", "category_default"}
+_VALID_TIMEFRAME_SOURCES = {"explicit", "category_default", "inferred"}
 
 
 def _resolve_metadata_enrichment(
