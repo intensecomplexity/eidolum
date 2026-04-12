@@ -146,6 +146,8 @@ def _ensure_tables(db):
 def _resolve_channel_id(channel_name: str) -> str | None:
     """Look up YouTube channel ID by name. Costs 100 API units."""
     if not YOUTUBE_API_KEY:
+        print(f"[ChannelMonitor] resolve skipped for {channel_name!r}: "
+              f"no YOUTUBE_API_KEY")
         return None
     try:
         r = httpx.get(f"{YOUTUBE_API}/search", params={
@@ -153,12 +155,16 @@ def _resolve_channel_id(channel_name: str) -> str | None:
             "maxResults": 1, "key": YOUTUBE_API_KEY,
         }, timeout=10)
         if r.status_code != 200:
+            print(f"[ChannelMonitor] resolve failed for {channel_name!r}: "
+                  f"HTTP {r.status_code} {r.text[:200]}")
             return None
         items = r.json().get("items", [])
         if items:
             return items[0]["snippet"]["channelId"]
-    except Exception:
-        pass
+        print(f"[ChannelMonitor] resolve returned 0 results for "
+              f"{channel_name!r}")
+    except Exception as e:
+        print(f"[ChannelMonitor] resolve error for {channel_name!r}: {e}")
     return None
 
 
