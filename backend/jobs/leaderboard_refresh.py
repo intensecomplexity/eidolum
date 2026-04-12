@@ -12,8 +12,14 @@ def run_leaderboard_refresh(db: Session):
     print(f"[Leaderboard] Recalculating scores at {datetime.utcnow().isoformat()}")
 
     from feature_flags import is_x_evaluation_enabled
-    from sqlalchemy import or_
+    from sqlalchemy import and_, or_
     skip_x = not is_x_evaluation_enabled(db)
+
+    # Reusable filter: exclude unevaluated YouTube predictions.
+    _yt_unevaluated = and_(
+        Prediction.verified_by == "youtube_haiku_v1",
+        Prediction.outcome.in_(["pending", "no_data"]) | Prediction.outcome.is_(None),
+    )
 
     forecasters = db.query(Forecaster).all()
     rank_data = []
@@ -22,6 +28,7 @@ def run_leaderboard_refresh(db: Session):
         pred_q = db.query(Prediction).filter(
             Prediction.forecaster_id == f.id,
             Prediction.outcome.in_(["hit","near","miss","correct","incorrect"]),
+            ~_yt_unevaluated,
         )
         if skip_x:
             pred_q = pred_q.filter(or_(Prediction.source_type.is_(None), Prediction.source_type != "x"))
