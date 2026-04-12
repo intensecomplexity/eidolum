@@ -199,6 +199,10 @@ export function getMetadataEnrichmentDiagnostics() {
   return api.get('/admin/metadata-enrichment-diagnostics', { headers: authHeaders() }).then(r => r.data);
 }
 
+export function getYouTubeTrainingProgress() {
+  return api.get('/admin/youtube-training-progress', { headers: authHeaders() }).then(r => r.data);
+}
+
 // ——— Ship #12 training exclusions (admin) ———
 
 export function getTrainingExclusions() {

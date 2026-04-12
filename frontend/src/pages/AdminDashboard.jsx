@@ -21,6 +21,7 @@ import {
   getPrunedYouTubeChannels, reactivateYouTubeChannel,
   setYouTubeSectorTraffic,
   getTrainingExclusions, unflagTrainingExclusion, markTrainingExclusionForReview,
+  getYouTubeTrainingProgress,
 } from '../api';
 import YouTubeRunsInspector from '../components/admin/YouTubeRunsInspector';
 
@@ -109,6 +110,92 @@ function StatCard({ label, value }) {
     <div className="bg-surface border border-border rounded-lg p-4 text-center">
       <div className="font-mono text-2xl font-bold text-accent">{value ?? '--'}</div>
       <div className="text-muted text-xs mt-1">{label}</div>
+    </div>
+  );
+}
+
+
+function YouTubeTrainingProgress() {
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const load = useCallback(() => {
+    setLoading(true);
+    getYouTubeTrainingProgress()
+      .then(setData)
+      .catch(() => setData(null))
+      .finally(() => setLoading(false));
+  }, []);
+  useEffect(() => { load(); }, [load]);
+
+  if (loading && !data) return null;
+  if (!data) return null;
+
+  const { evaluated, target, daily_rate, estimated_days_remaining, auto_stop_active } = data;
+  const pct = Math.min(100, target > 0 ? (evaluated / target) * 100 : 0);
+  const reached = evaluated >= target;
+
+  // Color coding by progress tier.
+  let barColor, tierText;
+  if (reached) {
+    barColor = 'bg-positive';
+    tierText = 'text-positive';
+  } else if (pct >= 75) {
+    barColor = 'bg-positive';
+    tierText = 'text-positive';
+  } else if (pct >= 25) {
+    barColor = 'bg-warning';
+    tierText = 'text-warning';
+  } else {
+    barColor = 'bg-[#f97316]';
+    tierText = 'text-[#f97316]';
+  }
+
+  return (
+    <div className="card mb-6">
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="text-sm font-semibold text-muted uppercase tracking-wider flex items-center gap-2">
+          <Youtube className="w-4 h-4 text-[#ff0000]" />
+          YouTube Training Data
+        </h3>
+        <button onClick={load} className="text-muted hover:text-accent transition-colors" title="Refresh">
+          <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+        </button>
+      </div>
+
+      {/* Count + progress bar */}
+      <div className="mb-2">
+        <div className="flex items-baseline justify-between mb-1.5">
+          <span className={`font-mono text-xl font-bold ${tierText}`}>
+            {evaluated.toLocaleString()}
+            <span className="text-muted text-sm font-normal"> / {target.toLocaleString()}</span>
+          </span>
+          <span className="font-mono text-xs text-muted">{pct.toFixed(1)}%</span>
+        </div>
+        <div className="w-full h-2.5 bg-surface-2 rounded-full overflow-hidden">
+          <div
+            className={`h-full rounded-full ${barColor} transition-all duration-1000 ease-out`}
+            style={{ width: `${pct}%` }}
+          />
+        </div>
+      </div>
+
+      {/* Status line */}
+      <div className="flex items-center justify-between text-xs text-text-secondary">
+        {reached ? (
+          <span className="flex items-center gap-1 text-positive font-semibold">
+            <span>&#10003;</span> Target reached{auto_stop_active ? ' — evaluator auto-stopped' : ''}
+          </span>
+        ) : (
+          <span>
+            {estimated_days_remaining != null
+              ? `~${estimated_days_remaining} day${estimated_days_remaining !== 1 ? 's' : ''} remaining`
+              : 'Estimating pace\u2026'}
+          </span>
+        )}
+        <span className="text-muted">
+          {daily_rate > 0 ? `${daily_rate}/day (7d avg)` : 'no recent evals'}
+        </span>
+      </div>
     </div>
   );
 }
@@ -942,6 +1029,8 @@ function OverviewTab({ dashboard }) {
         <StatCard label="Evaluated" value={d.evaluated_predictions?.toLocaleString()} />
         <StatCard label="User Predictions" value={d.total_user_predictions?.toLocaleString()} />
       </div>
+
+      <YouTubeTrainingProgress />
 
       {/* Outcome breakdown */}
       {d.outcome_breakdown && (
