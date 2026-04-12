@@ -435,6 +435,16 @@ html[data-theme="light"] {
   font-weight: 600;
 }
 
+/* Ship #13.5 — explicit tabular-nums utility for non-mono numeric
+   columns (leaderboard percentages, hero stat tiles, footer counters).
+   The existing .font-mono rule also sets font-weight; .tnum is
+   weight-agnostic so headline-serif numbers stay at their natural
+   weight while still aligning digit columns. */
+.tnum {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+}
+
 /* Table styling — subtle hover, refined borders */
 tbody tr { border-bottom: 1px solid rgba(255,255,255,0.08); }
 
