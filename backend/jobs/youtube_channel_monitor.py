@@ -60,7 +60,9 @@ YOUTUBE_API_KEY = os.getenv("YOUTUBE_API_KEY", "").strip()
 ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "").strip()
 YOUTUBE_API = "https://www.googleapis.com/youtube/v3"
 
-CHANNELS_PER_RUN = 10
+CHANNELS_PER_RUN = 999  # Process all active channels each cycle (was 10)
+MAX_VIDEOS_PER_CHANNEL = int(os.getenv("YOUTUBE_MAX_VIDEOS_PER_CHANNEL", "50"))
+DAILY_QUOTA_LIMIT = 10_000  # YouTube Data API v3 free tier
 
 # Videos shorter than this are skipped before the transcript fetch.
 # YouTube Shorts are definitionally ≤60s; the 180s floor also catches
@@ -130,6 +132,7 @@ def _ensure_tables(db):
         for ddl in (
             "ALTER TABLE youtube_channels ADD COLUMN IF NOT EXISTS is_active BOOLEAN NOT NULL DEFAULT TRUE",
             "ALTER TABLE youtube_channels ADD COLUMN IF NOT EXISTS subscriber_count INTEGER",
+            "ALTER TABLE youtube_channels ADD COLUMN IF NOT EXISTS catalog_complete BOOLEAN NOT NULL DEFAULT FALSE",
             "ALTER TABLE youtube_videos ADD COLUMN IF NOT EXISTS pipeline_version TEXT",
             "ALTER TABLE youtube_videos ADD COLUMN IF NOT EXISTS transcript_status TEXT",
             "ALTER TABLE youtube_videos ADD COLUMN IF NOT EXISTS transcript_chars INTEGER",
@@ -248,6 +251,195 @@ def _fetch_video_durations(video_ids: list[str]) -> dict[str, int]:
     return out
 
 
+def _get_catalog_videos(
+    channel_id: str, channel_name: str, db,
+) -> tuple[list[dict], int, bool]:
+    """Fetch unseen videos from a channel's full uploads playlist.
+
+    Uses playlistItems.list (1 unit per page of 50 items) instead of
+    search.list (100 units per page of 10). Paginates through the
+    playlist until either MAX_VIDEOS_PER_CHANNEL unseen videos are
+    collected or the playlist is exhausted.
+
+    Returns (unseen_videos, api_units_used, catalog_exhausted).
+    catalog_exhausted is True when we reached the end of the playlist
+    and found fewer unseen videos than MAX_VIDEOS_PER_CHANNEL — meaning
+    every video in the channel has been processed.
+    """
+    if not YOUTUBE_API_KEY:
+        return [], 0, False
+
+    # Derive uploads playlist ID from channel ID (UC... → UU...)
+    uploads_playlist = "UU" + channel_id[2:]
+
+    # Pre-load already-processed video IDs for this channel
+    processed = {
+        r[0]
+        for r in db.execute(
+            sql_text(
+                "SELECT youtube_video_id FROM youtube_videos "
+                "WHERE channel_name = :name"
+            ),
+            {"name": channel_name},
+        ).fetchall()
+    }
+
+    unseen: list[dict] = []
+    page_token: str | None = None
+    api_units = 0
+    playlist_exhausted = False
+
+    while len(unseen) < MAX_VIDEOS_PER_CHANNEL:
+        params: dict = {
+            "part": "snippet,contentDetails",
+            "playlistId": uploads_playlist,
+            "maxResults": 50,
+            "key": YOUTUBE_API_KEY,
+        }
+        if page_token:
+            params["pageToken"] = page_token
+
+        try:
+            r = httpx.get(
+                f"{YOUTUBE_API}/playlistItems", params=params, timeout=15,
+            )
+        except Exception as e:
+            print(f"[ChannelMonitor] playlistItems error for "
+                  f"{channel_name}: {e}")
+            break
+
+        api_units += 1  # playlistItems.list costs 1 unit
+
+        if r.status_code == 403:
+            print(f"[ChannelMonitor] YouTube API quota exceeded during "
+                  f"catalog fetch for {channel_name}")
+            break
+        if r.status_code == 404:
+            print(f"[ChannelMonitor] uploads playlist not found for "
+                  f"{channel_name} ({uploads_playlist})")
+            break
+        if r.status_code != 200:
+            print(f"[ChannelMonitor] playlistItems HTTP {r.status_code} "
+                  f"for {channel_name}: {r.text[:200]}")
+            break
+
+        data = r.json()
+        items = data.get("items", [])
+
+        for item in items:
+            video_id = (item.get("contentDetails") or {}).get("videoId")
+            if not video_id:
+                continue
+            if video_id in processed:
+                continue
+            snippet = item.get("snippet", {})
+            unseen.append({
+                "video_id": video_id,
+                "title": snippet.get("title", ""),
+                "description": snippet.get("description", ""),
+                "published_at": (
+                    (item.get("contentDetails") or {}).get("videoPublishedAt")
+                    or snippet.get("publishedAt", "")
+                ),
+            })
+            if len(unseen) >= MAX_VIDEOS_PER_CHANNEL:
+                break
+
+        page_token = data.get("nextPageToken")
+        if not page_token:
+            playlist_exhausted = True
+            break
+
+    catalog_complete = playlist_exhausted and len(unseen) < MAX_VIDEOS_PER_CHANNEL
+    return unseen, api_units, catalog_complete
+
+
+_DISCOVERY_QUERIES = [
+    "stock market analysis", "stock picks 2026", "investment portfolio",
+    "dividend investing", "growth stocks analysis", "value investing stocks",
+]
+
+
+def _discover_new_channels(db, max_new: int = 5) -> int:
+    """Auto-discover finance channels when all active channels are
+    catalog_complete. Searches YouTube for finance-themed channels,
+    filters by subscriber count and activity, seeds the best matches.
+
+    Returns the number of newly seeded channels.
+    """
+    if not YOUTUBE_API_KEY:
+        return 0
+
+    existing_ids = {
+        r[0] for r in db.execute(sql_text(
+            "SELECT youtube_channel_id FROM youtube_channels "
+            "WHERE youtube_channel_id IS NOT NULL"
+        )).fetchall()
+    }
+
+    candidates: list[tuple[str, str, int]] = []  # (channel_id, name, subs)
+    for query in _DISCOVERY_QUERIES:
+        if len(candidates) >= max_new * 3:
+            break
+        try:
+            r = httpx.get(f"{YOUTUBE_API}/search", params={
+                "part": "snippet", "q": query, "type": "channel",
+                "maxResults": 10, "key": YOUTUBE_API_KEY,
+                "relevanceLanguage": "en",
+            }, timeout=10)
+            if r.status_code != 200:
+                continue
+            for item in r.json().get("items", []):
+                cid = item.get("snippet", {}).get("channelId")
+                cname = item.get("snippet", {}).get("title", "")
+                if cid and cid not in existing_ids:
+                    candidates.append((cid, cname, 0))
+                    existing_ids.add(cid)
+        except Exception:
+            continue
+
+    # Fetch stats for candidates to filter by subs + video count
+    seeded = 0
+    for cid, cname, _ in candidates[:max_new * 2]:
+        if seeded >= max_new:
+            break
+        try:
+            r = httpx.get(f"{YOUTUBE_API}/channels", params={
+                "part": "statistics,contentDetails", "id": cid,
+                "key": YOUTUBE_API_KEY,
+            }, timeout=10)
+            if r.status_code != 200:
+                continue
+            items = r.json().get("items", [])
+            if not items:
+                continue
+            stats_data = items[0].get("statistics", {})
+            subs = int(stats_data.get("subscriberCount", 0))
+            vids = int(stats_data.get("videoCount", 0))
+            if subs < 10_000 or vids < 50:
+                continue
+        except Exception:
+            continue
+
+        try:
+            db.execute(sql_text(
+                "INSERT INTO youtube_channels "
+                "(channel_name, youtube_channel_id, is_active, catalog_complete) "
+                "VALUES (:name, :cid, TRUE, FALSE) "
+                "ON CONFLICT DO NOTHING"
+            ), {"name": cname, "cid": cid})
+            db.commit()
+            seeded += 1
+            print(f"[ChannelMonitor] DISCOVERED: {cname} ({cid}) "
+                  f"subs={subs} videos={vids}", flush=True)
+        except Exception:
+            db.rollback()
+
+    if seeded:
+        print(f"[ChannelMonitor] DISCOVERED {seeded} new channels", flush=True)
+    return seeded
+
+
 def run_channel_monitor(db=None):
     """Main entry point. Runs every 12h via worker.py."""
     if not YOUTUBE_API_KEY:
@@ -343,6 +535,19 @@ def _seed_target_channels(db):
 
 def _run_inner(db):
     _seed_target_channels(db)
+
+    # Auto-discover new channels when all active channels have been
+    # fully processed. Uses YouTube search to find finance channels
+    # with >10K subs and >50 videos, then seeds up to 5 per cycle.
+    try:
+        _incomplete = int(db.execute(sql_text(
+            "SELECT COUNT(*) FROM youtube_channels "
+            "WHERE is_active = TRUE AND catalog_complete = FALSE"
+        )).scalar() or 0)
+        if _incomplete == 0:
+            _discover_new_channels(db)
+    except Exception:
+        pass
 
     # Prune the YouTube rejection log to last 7 days, mirroring the
     # x_scraper_rejections cleanup at the top of run_x_scraper. Best-effort:
@@ -550,69 +755,58 @@ def _run_inner(db):
                 db.commit()
                 continue
 
-        # Look back to last crawl, or 7 days for first run
-        if last_crawled:
-            since = last_crawled.strftime("%Y-%m-%dT%H:%M:%SZ")
-        else:
-            since = (datetime.utcnow() - timedelta(days=7)).strftime("%Y-%m-%dT%H:%M:%SZ")
+        # Full-catalog mode: paginate the channel's uploads playlist
+        # via playlistItems.list (1 unit/page) instead of search.list
+        # (100 units/page). Returns only unseen videos (pre-filtered
+        # against youtube_videos).
+        unseen, api_units, catalog_exhausted = _get_catalog_videos(
+            channel_id, channel_name, db,
+        )
+        stats["yt_api_units"] += api_units
 
-        videos = _get_recent_videos(channel_id, since)
-        stats["yt_api_units"] += 100
+        total_in_db = len({
+            r[0] for r in db.execute(sql_text(
+                "SELECT youtube_video_id FROM youtube_videos "
+                "WHERE channel_name = :name"
+            ), {"name": channel_name}).fetchall()
+        })
+        print(
+            f"[ChannelMonitor] channel={channel_name} "
+            f"total_processed={total_in_db} unseen={len(unseen)} "
+            f"catalog_complete={catalog_exhausted}",
+            flush=True,
+        )
 
-        if not videos:
+        if not unseen:
             db.execute(
                 sql_text("UPDATE youtube_channels SET last_crawled = :now WHERE channel_name = :name"),
                 {"now": datetime.utcnow(), "name": channel_name},
             )
+            if catalog_exhausted:
+                db.execute(sql_text(
+                    "UPDATE youtube_channels SET catalog_complete = TRUE "
+                    "WHERE channel_name = :name"
+                ), {"name": channel_name})
             db.commit()
             continue
 
-        # Batch-fetch durations for the page so the loop can skip
-        # Shorts before the transcript fetch. Missing video IDs stay
-        # at 0 and fall through to the title heuristic below.
-        _batch_vids = [
-            (v.get("id") or {}).get("videoId")
-            for v in videos
-            if (v.get("id") or {}).get("videoId")
-        ]
+        # Batch-fetch durations so the loop can skip Shorts before
+        # burning a transcript fetch + Haiku call.
+        _batch_vids = [v["video_id"] for v in unseen]
         video_durations = _fetch_video_durations(_batch_vids)
         if _batch_vids:
             stats["yt_api_units"] += 1
 
         channel_inserted = 0
         channel_videos = 0
-        for video in videos:
-            video_id = video.get("id", {}).get("videoId")
-            snippet = video.get("snippet", {})
-            title = snippet.get("title", "")
-            description = snippet.get("description", "")
-            publish_date_str = snippet.get("publishedAt", "")
+        for vinfo in unseen:
+            video_id = vinfo["video_id"]
+            title = vinfo["title"]
+            description = vinfo["description"]
+            publish_date_str = vinfo["published_at"]
             if not video_id or not title:
-                # No usable identifier — log so we can spot a YouTube API
-                # response shape change without grepping the worker logs.
-                log_youtube_rejection(
-                    db,
-                    video_id=video_id,
-                    channel_id=channel_id,
-                    channel_name=channel_name,
-                    video_title=title,
-                    video_published_at=_parse_publish_date(publish_date_str),
-                    reason="no_video_id",
-                    haiku_raw=video,
-                    stats=stats,
-                )
                 continue
             stats["videos_seen"] += 1
-
-            # Skip videos already processed by THIS pipeline version. V1
-            # rows (pipeline_version IS NULL) are eligible for re-processing.
-            already = db.execute(sql_text(
-                "SELECT 1 FROM youtube_videos WHERE youtube_video_id = :vid AND pipeline_version = :pv"
-            ), {"vid": video_id, "pv": PIPELINE_VERSION}).first()
-            if already:
-                stats["videos_skipped_already_processed"] += 1
-                stats["items_deduped"] += 1
-                continue
 
             # Skip videos under YOUTUBE_MIN_DURATION_SECONDS. Duration is
             # already batched via _fetch_video_durations above; 0 means
@@ -683,13 +877,15 @@ def _run_inner(db):
 
             time.sleep(0.5)
 
-        # Update channel state
+        # Update channel state + catalog_complete flag
         try:
-            db.execute(sql_text("""
+            _cat = "TRUE" if (catalog_exhausted and len(unseen) < MAX_VIDEOS_PER_CHANNEL) else "FALSE"
+            db.execute(sql_text(f"""
                 UPDATE youtube_channels
                 SET last_crawled = :now,
                     total_videos_processed = total_videos_processed + :v,
-                    total_predictions_extracted = total_predictions_extracted + :p
+                    total_predictions_extracted = total_predictions_extracted + :p,
+                    catalog_complete = {_cat}
                 WHERE channel_name = :name
             """), {"now": datetime.utcnow(), "v": channel_videos, "p": channel_inserted, "name": channel_name})
             db.commit()
@@ -849,6 +1045,12 @@ def _run_inner(db):
         f"Deduped: {stats['items_deduped']} | "
         f"Rejected: {stats['items_rejected']} | "
         f"Errors: {stats['classifier_errors']}",
+        flush=True,
+    )
+    _estimated_remaining = max(0, DAILY_QUOTA_LIMIT - stats["yt_api_units"])
+    print(
+        f"[ChannelMonitor] QUOTA: {stats['yt_api_units']} units this run, "
+        f"~{_estimated_remaining} estimated remaining today",
         flush=True,
     )
 
