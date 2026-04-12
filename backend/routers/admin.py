@@ -1855,3 +1855,66 @@ def mark_training_exclusion_for_review(
     p.exclusion_rule_version = "v12.1"
     db.commit()
     return {"ok": True, "changed": True, "id": prediction_id}
+
+
+# ── YouTube training-data progress (countdown widget) ─────────────────────
+
+_YT_TRAINING_TARGET_DEFAULT = 4000
+
+
+@router.get("/admin/youtube-training-progress")
+@limiter.limit("30/minute")
+def youtube_training_progress(
+    request: Request,
+    admin: bool = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    """Return YouTube evaluated-prediction count, target, and ETA for the
+    admin dashboard countdown widget."""
+    # Read target from config (set by Change 6) or use default.
+    target_row = db.query(Config).filter(Config.key == "YOUTUBE_EVAL_TARGET").first()
+    target = _YT_TRAINING_TARGET_DEFAULT
+    if target_row:
+        try:
+            target = int(target_row.value)
+        except (ValueError, TypeError):
+            pass
+
+    # Count evaluated YouTube predictions (not pending, not no_data).
+    evaluated = db.execute(sql_text("""
+        SELECT COUNT(*) FROM predictions
+        WHERE source_type = 'youtube'
+          AND outcome IS NOT NULL
+          AND outcome NOT IN ('pending', 'no_data')
+    """)).scalar() or 0
+
+    # 7-day rolling rate for ETA estimate.
+    last_7d = db.execute(sql_text("""
+        SELECT COUNT(*) FROM predictions
+        WHERE source_type = 'youtube'
+          AND outcome IS NOT NULL
+          AND outcome NOT IN ('pending', 'no_data')
+          AND updated_at > NOW() - INTERVAL '7 days'
+    """)).scalar() or 0
+
+    daily_rate = round(last_7d / 7.0, 1) if last_7d else 0.0
+    remaining = max(0, target - int(evaluated))
+    if daily_rate > 0 and remaining > 0:
+        est_days = int(remaining / daily_rate) + 1
+    else:
+        est_days = None
+
+    # Check if auto-stop is active (Change 6 config key).
+    auto_stop_row = db.query(Config).filter(
+        Config.key == "YOUTUBE_EVAL_AUTO_STOP"
+    ).first()
+    auto_stop = bool(auto_stop_row and auto_stop_row.value == "true")
+
+    return {
+        "evaluated": int(evaluated),
+        "target": target,
+        "last_7d_count": int(last_7d),
+        "daily_rate": daily_rate,
+        "estimated_days_remaining": est_days,
+        "auto_stop_active": auto_stop,
+    }
