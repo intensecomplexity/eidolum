@@ -49,12 +49,22 @@ export default function Navbar() {
     };
   }, [userDropdown]);
 
-  // Close dropdown + search on Escape
+  // Escape closes overlays. ⌘K / Ctrl+K opens search anywhere.
   useEffect(() => {
-    function handle(e) { if (e.key === 'Escape') { setUserDropdown(false); setSearchExpanded(false); } }
+    function handle(e) {
+      if (e.key === 'Escape') { setUserDropdown(false); setSearchExpanded(false); return; }
+      if (e.key === 'k' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); setSearchExpanded(true); return; }
+      if (e.key === '/') {
+        const tag = e.target?.tagName;
+        if (tag === 'INPUT' || tag === 'TEXTAREA' || e.target?.isContentEditable) return;
+        e.preventDefault(); setSearchExpanded(true);
+      }
+    }
     document.addEventListener('keydown', handle);
     return () => document.removeEventListener('keydown', handle);
   }, []);
+  const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPod|iPad/i.test(navigator.platform);
+  const shortcutHint = isMac ? '\u2318K' : 'Ctrl K';
 
   // Close search on outside click
   useEffect(() => {
@@ -111,11 +121,14 @@ export default function Navbar() {
 
             {/* ── RIGHT: Search + Help + Bell + User dropdown ─────── */}
             <div className="flex items-center gap-2">
-              {/* Desktop search — icon opens an absolute overlay */}
+              {/* Desktop: ⌘K search trigger with hint badge */}
               <div className="hidden sm:block" ref={searchRef}>
-                <button onClick={() => setSearchExpanded(true)}
-                  className="flex items-center justify-center w-9 h-9 rounded-lg text-text-secondary hover:text-accent transition-colors" title="Search">
+                <button type="button" onClick={() => setSearchExpanded(true)}
+                  aria-label={`Search (${shortcutHint})`}
+                  title={`Search · ${shortcutHint}`}
+                  className="flex items-center gap-1.5 h-9 px-2 rounded-lg text-text-secondary hover:text-accent transition-colors">
                   <Search className="w-4.5 h-4.5" />
+                  <span className="hidden md:inline-block text-[10px] font-mono px-1.5 py-0.5 rounded border border-border text-muted">{shortcutHint}</span>
                 </button>
               </div>
               {searchExpanded && (
@@ -132,22 +145,10 @@ export default function Navbar() {
                 </div>
               )}
 
-              {/* Help button */}
-              {/* Theme toggle */}
-              <button onClick={toggleTheme} className="flex items-center justify-center w-11 h-11 sm:w-9 sm:h-9 rounded-lg text-text-secondary hover:text-accent active:text-accent transition-colors" title={theme === 'dark' ? 'Light mode' : 'Dark mode'} style={{ WebkitTapHighlightColor: 'transparent' }}>
+              {/* Theme toggle — mobile only. Desktop moves it into avatar dropdown. */}
+              <button onClick={toggleTheme} className="sm:hidden flex items-center justify-center w-11 h-11 rounded-lg text-text-secondary hover:text-accent active:text-accent transition-colors" title={theme === 'dark' ? 'Light mode' : 'Dark mode'} aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'} style={{ WebkitTapHighlightColor: 'transparent' }}>
                 {theme === 'dark' ? <Sun className="w-[18px] h-[18px]" /> : <Moon className="w-[18px] h-[18px]" />}
               </button>
-
-              <button onClick={() => setShowHelp(true)} className="hidden sm:flex items-center justify-center w-9 h-9 rounded-lg text-text-secondary hover:text-accent transition-colors" title="How it works">
-                <HelpCircle className="w-4.5 h-4.5" />
-              </button>
-
-              {/* Admin gear icon */}
-              {user?.is_admin && (
-                <Link to="/admin/dashboard" className="hidden sm:flex items-center justify-center w-9 h-9 rounded-lg text-text-secondary hover:text-accent transition-colors" title="Admin Panel">
-                  <Settings className="w-4.5 h-4.5" />
-                </Link>
-              )}
 
               {/* Notification bell */}
               <NotificationBell />
@@ -191,6 +192,16 @@ export default function Navbar() {
                         <DropdownItem to="/watchlist" icon={BookmarkCheck} label="Watchlist" onClick={() => setUserDropdown(false)} />
                         <DropdownItem to="/profile" icon={CircleUser} label="Profile" onClick={() => setUserDropdown(false)} />
                         <DropdownItem to="/settings" icon={Settings} label="Settings" onClick={() => setUserDropdown(false)} />
+                        <button type="button" onClick={() => { setUserDropdown(false); setShowHelp(true); }}
+                          className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-text-secondary hover:text-accent transition-colors text-left min-h-[44px]">
+                          <HelpCircle className="w-4 h-4" /> Help
+                        </button>
+                        <button type="button" onClick={toggleTheme}
+                          className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-text-secondary hover:text-accent transition-colors text-left min-h-[44px]"
+                          aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}>
+                          {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+                          {theme === 'dark' ? 'Light mode' : 'Dark mode'}
+                        </button>
                         {user?.is_admin && (
                           <DropdownItem to="/admin/dashboard" icon={Wrench} label="Admin" onClick={() => setUserDropdown(false)} />
                         )}
