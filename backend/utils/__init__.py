@@ -124,13 +124,13 @@ def recalculate_forecaster_stats(forecaster_id: int, db: Session):
     )
     if not is_x_evaluation_enabled(db):
         eval_q = eval_q.filter(or_(Prediction.source_type.is_(None), Prediction.source_type != "x"))
-    # Exclude unevaluated YouTube predictions. The outcome whitelist above
-    # already covers this, but the explicit guard prevents drift if the
-    # whitelist is ever broadened.
+    # Exclude YouTube predictions without a resolved source timestamp.
+    # Once the backfill or live scraper populates source_timestamp_seconds,
+    # the prediction becomes eligible for leaderboard inclusion.
     eval_q = eval_q.filter(
         ~and_(
             Prediction.verified_by == "youtube_haiku_v1",
-            Prediction.outcome.in_(["pending", "no_data"]) | Prediction.outcome.is_(None),
+            Prediction.source_timestamp_seconds.is_(None),
         )
     )
     evaluated = eval_q.order_by(Prediction.prediction_date.desc()).all()

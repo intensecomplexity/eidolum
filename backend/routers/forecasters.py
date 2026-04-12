@@ -133,7 +133,7 @@ def get_forecaster(
     primary_source = None
     primary_verified_by = None
     try:
-        _yt_excl = "NOT (verified_by = 'youtube_haiku_v1' AND COALESCE(outcome, 'pending') IN ('pending', 'no_data'))"
+        _yt_excl = "NOT (verified_by = 'youtube_haiku_v1' AND source_timestamp_seconds IS NULL)"
         src_row = db.execute(sql_text(f"""
             SELECT source_type, COUNT(*) as cnt FROM predictions
             WHERE forecaster_id = :fid AND source_type IS NOT NULL

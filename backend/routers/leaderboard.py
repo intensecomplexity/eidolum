@@ -354,7 +354,7 @@ def _enrich_primary_source(results: list, db: Session):
     fids = [r["id"] for r in results]
     try:
         fid_placeholders = ",".join(str(int(f)) for f in fids)
-        _yt_excl = "NOT (verified_by = 'youtube_haiku_v1' AND COALESCE(outcome, 'pending') IN ('pending', 'no_data'))"
+        _yt_excl = "NOT (verified_by = 'youtube_haiku_v1' AND source_timestamp_seconds IS NULL)"
         rows = db.execute(sql_text(f"""
             SELECT forecaster_id,
                    (SELECT source_type FROM predictions p2
@@ -552,7 +552,7 @@ def _refresh_leaderboard(db: Session) -> list | dict:
                 SELECT forecaster_id, outcome, direction, COUNT(*) as cnt
                 FROM predictions
                 WHERE forecaster_id = ANY(:fids)
-                  AND NOT (verified_by = 'youtube_haiku_v1' AND COALESCE(outcome, 'pending') IN ('pending', 'no_data'))
+                  AND NOT (verified_by = 'youtube_haiku_v1' AND source_timestamp_seconds IS NULL)
                 GROUP BY forecaster_id, outcome, direction
             """), {"fids": fids}).fetchall()
 
@@ -607,7 +607,7 @@ def _check_stats_integrity(db: Session):
                    (SELECT COUNT(*) FROM predictions p
                     WHERE p.forecaster_id = f.id
                       AND p.outcome IN ('hit','near','miss','correct','incorrect')
-                      AND NOT (p.verified_by = 'youtube_haiku_v1' AND COALESCE(p.outcome, 'pending') IN ('pending', 'no_data'))
+                      AND NOT (p.verified_by = 'youtube_haiku_v1' AND p.source_timestamp_seconds IS NULL)
                    ) as actual
             FROM forecasters f
             WHERE f.total_predictions > 0
@@ -807,7 +807,7 @@ def _build_filtered_leaderboard(db: Session, sector=None, call_type=None, sort="
     """SQL-based filtered leaderboard. Returns ranked list."""
     where_clauses = [
         "p.outcome IN ('hit','near','miss','correct','incorrect')",
-        "NOT (p.verified_by = 'youtube_haiku_v1' AND COALESCE(p.outcome, 'pending') IN ('pending', 'no_data'))",
+        "NOT (p.verified_by = 'youtube_haiku_v1' AND p.source_timestamp_seconds IS NULL)",
     ]
     params = {}
 
@@ -940,7 +940,7 @@ def _build_filtered_leaderboard(db: Session, sector=None, call_type=None, sort="
                 SELECT forecaster_id, outcome, direction, COUNT(*) as cnt
                 FROM predictions
                 WHERE forecaster_id = ANY(:fids)
-                  AND NOT (verified_by = 'youtube_haiku_v1' AND COALESCE(outcome, 'pending') IN ('pending', 'no_data'))
+                  AND NOT (verified_by = 'youtube_haiku_v1' AND source_timestamp_seconds IS NULL)
                 GROUP BY forecaster_id, outcome, direction
             """), {"fids": fids}).fetchall()
             counts_by_fid = {}
@@ -1264,7 +1264,7 @@ def get_homepage_data(request: Request, db: Session = Depends(get_db)):
                         SUM(CASE WHEN outcome = 'pending' OR outcome IS NULL THEN 1 ELSE 0 END) as pending
                     FROM predictions p
                     WHERE p.forecaster_id = f.id
-                      AND NOT (p.verified_by = 'youtube_haiku_v1' AND COALESCE(p.outcome, 'pending') IN ('pending', 'no_data'))
+                      AND NOT (p.verified_by = 'youtube_haiku_v1' AND p.source_timestamp_seconds IS NULL)
                 ) s ON true
                 WHERE COALESCE(f.total_predictions, 0) >= :min
                   AND COALESCE(f.accuracy_score, 0) > 0
