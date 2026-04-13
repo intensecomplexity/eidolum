@@ -26,8 +26,13 @@ import argparse
 import json
 import os
 import sys
+import threading
 import time
-from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeout
+
+
+class FuturesTimeout(Exception):
+    """Raised by _run_with_timeout when the wrapped call exceeds timeout_sec."""
+    pass
 
 # Allow running as `python -m jobs.backfill_youtube_timestamps` from backend/.
 if __name__ == "__main__":
@@ -87,18 +92,31 @@ Rules:
 
 def _run_with_timeout(fn, *args, timeout_sec=None, **kwargs):
     """Run fn(*args, **kwargs) with a hard wall-clock timeout.
-    Returns the result on success, or raises FuturesTimeout if the
-    call does not complete within timeout_sec. The worker thread is
-    cancelled best-effort; if the underlying call is stuck in a
-    blocking C syscall, the thread is abandoned (daemon) but control
-    returns to the caller so the loop can make forward progress."""
-    with ThreadPoolExecutor(max_workers=1) as pool:
-        future = pool.submit(fn, *args, **kwargs)
+    Returns the result on success, raises FuturesTimeout on timeout,
+    or re-raises any exception thrown by fn.
+
+    Uses a plain daemon thread (NOT ThreadPoolExecutor) because
+    ThreadPoolExecutor.__exit__ calls shutdown(wait=True) which blocks
+    waiting for the stuck worker — defeating the timeout entirely.
+    Daemon threads don't hold up the process and aren't waited on,
+    so control reliably returns to the caller after timeout_sec."""
+    result = [None]
+    exc = [None]
+
+    def _target():
         try:
-            return future.result(timeout=timeout_sec)
-        except FuturesTimeout:
-            future.cancel()
-            raise
+            result[0] = fn(*args, **kwargs)
+        except BaseException as e:
+            exc[0] = e
+
+    t = threading.Thread(target=_target, daemon=True)
+    t.start()
+    t.join(timeout=timeout_sec)
+    if t.is_alive():
+        raise FuturesTimeout(f"{fn.__name__} did not complete within {timeout_sec}s")
+    if exc[0] is not None:
+        raise exc[0]
+    return result[0]
 
 
 def _fetch_with_timeout(video_id, timeout_sec=None):
