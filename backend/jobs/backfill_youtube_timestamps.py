@@ -273,6 +273,17 @@ def main(argv=None):
 
 def _run(db, *, apply: bool, limit: int,
          skip_to: int, fetch_delay: float) -> int:
+    # Disable statement timeout for this long-running session.
+    # BgSessionLocal's on-connect hook sets it to 30s which trips on
+    # slow WAN UPDATE round-trips from WSL to Railway. We don't need
+    # the safety rail here — the loop handles row-level failures
+    # gracefully and each UPDATE targets a single row by PK.
+    try:
+        db.execute(sql_text("SET statement_timeout = 0"))
+        db.commit()
+    except Exception as _e:
+        print(f"{TAG} WARNING: could not disable statement_timeout: {_e}", flush=True)
+
     # ── 1. Query candidates ───────────────────────────────────────────────
     rows = db.execute(sql_text("""
         SELECT id, source_platform_id, context, exact_quote, quote_context,
@@ -446,18 +457,36 @@ def _run(db, *, apply: bool, limit: int,
 
         # ── Commit after each video (incremental progress) ────────
         if apply and updates_this_video:
+            written_this_video = 0
             for u in updates_this_video:
-                db.execute(sql_text("""
-                    UPDATE predictions SET
-                        source_timestamp_seconds = :seconds,
-                        source_timestamp_method  = :method,
-                        source_verbatim_quote    = :quote,
-                        source_timestamp_confidence = :confidence
-                    WHERE id = :id
-                """), u)
-            db.commit()
-            stats["written"] += len(updates_this_video)
-            print(f"{TAG}   Committed {len(updates_this_video)} updates (total written: {stats['written']})", flush=True)
+                try:
+                    db.execute(sql_text("""
+                        UPDATE predictions SET
+                            source_timestamp_seconds = :seconds,
+                            source_timestamp_method  = :method,
+                            source_verbatim_quote    = :quote,
+                            source_timestamp_confidence = :confidence
+                        WHERE id = :id
+                    """), u)
+                    db.commit()
+                    written_this_video += 1
+                except Exception as _uerr:
+                    # Statement timeout, connection drop, deadlock, etc.
+                    # Rollback and continue — one failed UPDATE must not
+                    # kill the whole backfill. The prediction stays NULL
+                    # and will be re-picked up on the next run.
+                    print(f"{TAG}   UPDATE failed for id={u.get('id')}: "
+                          f"{type(_uerr).__name__}: {str(_uerr)[:150]}", flush=True)
+                    try:
+                        db.rollback()
+                    except Exception:
+                        pass
+                    stats["failed"] += 1
+                    stats["resolved"] -= 1  # we counted it as resolved earlier, now revert
+            stats["written"] += written_this_video
+            if written_this_video:
+                print(f"{TAG}   Committed {written_this_video} updates "
+                      f"(total written: {stats['written']})", flush=True)
 
         _save_progress(vid_idx)
 
