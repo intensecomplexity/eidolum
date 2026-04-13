@@ -25,9 +25,9 @@ ENABLE_SOURCE_TIMESTAMPS feature flag — that's the whole point.
 import argparse
 import json
 import os
-import signal
 import sys
 import time
+from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeout
 
 # Allow running as `python -m jobs.backfill_youtube_timestamps` from backend/.
 if __name__ == "__main__":
@@ -77,13 +77,37 @@ Rules:
 
 
 # ── Timeout helper ───────────────────────────────────────────────────────────
+#
+# signal.alarm() does NOT reliably interrupt urllib3 socket poll() — urllib3
+# catches EINTR internally and silently retries, so SIGALRM gets swallowed
+# and the process hangs forever. ThreadPoolExecutor.result(timeout=...)
+# returns control to the caller on timeout; the worker thread leaks (it's
+# still stuck in the poll, but the OS will eventually clean it up when the
+# socket times out at the kernel level or the main process exits).
 
-class _TranscriptTimeout(Exception):
-    pass
+def _run_with_timeout(fn, *args, timeout_sec=None, **kwargs):
+    """Run fn(*args, **kwargs) with a hard wall-clock timeout.
+    Returns the result on success, or raises FuturesTimeout if the
+    call does not complete within timeout_sec. The worker thread is
+    cancelled best-effort; if the underlying call is stuck in a
+    blocking C syscall, the thread is abandoned (daemon) but control
+    returns to the caller so the loop can make forward progress."""
+    with ThreadPoolExecutor(max_workers=1) as pool:
+        future = pool.submit(fn, *args, **kwargs)
+        try:
+            return future.result(timeout=timeout_sec)
+        except FuturesTimeout:
+            future.cancel()
+            raise
 
 
-def _alarm_handler(signum, frame):
-    raise _TranscriptTimeout()
+def _fetch_with_timeout(video_id, timeout_sec=None):
+    """Wrapper around fetch_transcript_with_timestamps with a timeout."""
+    from jobs.youtube_classifier import fetch_transcript_with_timestamps
+    return _run_with_timeout(
+        fetch_transcript_with_timestamps, video_id,
+        timeout_sec=timeout_sec or TRANSCRIPT_TIMEOUT,
+    )
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -142,12 +166,16 @@ def _call_haiku_for_quote(client, transcript_text: str, row) -> str | None:
     )
 
     try:
-        resp = client.messages.create(
+        # Haiku call wrapped in the same 30s wall-clock timeout so a
+        # hung Anthropic connection can't stall the loop.
+        resp = _run_with_timeout(
+            client.messages.create,
             model="claude-haiku-4-5-20251001",
             max_tokens=300,
             temperature=0,
             system=_PATHB_SYSTEM,
             messages=[{"role": "user", "content": user_msg}],
+            timeout_sec=TRANSCRIPT_TIMEOUT,
         )
         text = resp.content[0].text.strip() if resp.content else ""
         # Strip markdown code fences (```json ... ```) that Haiku often wraps.
@@ -298,7 +326,6 @@ def _run(db, *, apply: bool, limit: int, skip_path_b: bool,
         print(f"{TAG} --skip-path-b is set: Haiku calls disabled, Path A only")
 
     # ── Lazy imports ──────────────────────────────────────────────────────
-    from jobs.youtube_classifier import fetch_transcript_with_timestamps
     from jobs.timestamp_matcher import match_quote_to_timestamp
 
     # Anthropic client for Path B (lazy, only if needed).
@@ -333,154 +360,141 @@ def _run(db, *, apply: bool, limit: int, skip_path_b: bool,
     if limit:
         videos_to_process = videos_to_process[:skip_to + limit]
 
-    # Install alarm handler for transcript fetch timeout.
-    prev_handler = signal.signal(signal.SIGALRM, _alarm_handler)
+    for vid_idx, (video_id, preds) in enumerate(videos_to_process):
+        # Skip already-processed videos.
+        if vid_idx < skip_to:
+            continue
 
-    try:
-        for vid_idx, (video_id, preds) in enumerate(videos_to_process):
-            # Skip already-processed videos.
-            if vid_idx < skip_to:
-                continue
+        print(f"\n{TAG} [{vid_idx}/{len(videos_to_process)}] "
+              f"video={video_id}  predictions={len(preds)}", flush=True)
 
-            print(f"\n{TAG} [{vid_idx}/{len(videos_to_process)}] "
-                  f"video={video_id}  predictions={len(preds)}", flush=True)
+        # Fetch transcript with timing data + wall-clock timeout guard.
+        if vid_idx > skip_to:
+            time.sleep(fetch_delay)
 
-            # Fetch transcript with timing data + timeout guard.
-            if vid_idx > skip_to:
-                time.sleep(fetch_delay)
+        try:
+            transcript_data = _fetch_with_timeout(video_id, timeout_sec=TRANSCRIPT_TIMEOUT)
+        except FuturesTimeout:
+            print(f"{TAG}   Transcript TIMEOUT ({TRANSCRIPT_TIMEOUT}s). Skipping {len(preds)} predictions.", flush=True)
+            stats["videos_timed_out"] += 1
+            stats["failed"] += len(preds)
+            _save_progress(vid_idx)
+            continue
+        except Exception as e:
+            print(f"{TAG}   Transcript error: {type(e).__name__}: {e}. Skipping.", flush=True)
+            stats["videos_skipped_no_transcript"] += 1
+            stats["failed"] += len(preds)
+            _save_progress(vid_idx)
+            continue
 
-            signal.alarm(TRANSCRIPT_TIMEOUT)
-            try:
-                transcript_data = fetch_transcript_with_timestamps(video_id)
-            except _TranscriptTimeout:
-                signal.alarm(0)
-                print(f"{TAG}   Transcript TIMEOUT ({TRANSCRIPT_TIMEOUT}s). Skipping {len(preds)} predictions.")
-                stats["videos_timed_out"] += 1
-                stats["failed"] += len(preds)
-                _save_progress(vid_idx)
-                continue
-            except Exception as e:
-                signal.alarm(0)
-                print(f"{TAG}   Transcript error: {type(e).__name__}: {e}. Skipping.")
-                stats["videos_skipped_no_transcript"] += 1
-                stats["failed"] += len(preds)
-                _save_progress(vid_idx)
-                continue
-            signal.alarm(0)
+        status = transcript_data.get("status", "unknown")
+        text = transcript_data.get("text", "")
 
-            status = transcript_data.get("status", "unknown")
-            text = transcript_data.get("text", "")
+        if status != "ok" or not text:
+            print(f"{TAG}   Transcript failed: status={status}. Skipping {len(preds)} predictions.", flush=True)
+            stats["videos_skipped_no_transcript"] += 1
+            stats["failed"] += len(preds)
+            _save_progress(vid_idx)
+            continue
 
-            if status != "ok" or not text:
-                print(f"{TAG}   Transcript failed: status={status}. Skipping {len(preds)} predictions.")
-                stats["videos_skipped_no_transcript"] += 1
-                stats["failed"] += len(preds)
-                _save_progress(vid_idx)
-                continue
+        has_words = transcript_data.get("has_word_level", False)
+        seg_count = len(transcript_data.get("segments", []))
+        print(f"{TAG}   Transcript OK: {len(text)} chars, {seg_count} segments, "
+              f"word_level={'yes' if has_words else 'no'}", flush=True)
 
-            has_words = transcript_data.get("has_word_level", False)
-            seg_count = len(transcript_data.get("segments", []))
-            print(f"{TAG}   Transcript OK: {len(text)} chars, {seg_count} segments, "
-                  f"word_level={'yes' if has_words else 'no'}")
+        stats["videos_processed"] += 1
 
-            stats["videos_processed"] += 1
+        updates_this_video = []
+        for pred in preds:
+            pid = pred.id
+            ticker = pred.ticker or "?"
 
-            updates_this_video = []
-            for pred in preds:
-                pid = pred.id
-                ticker = pred.ticker or "?"
-
-                # ── Path A: try existing quote fields ─────────────────────
-                proxy = _build_proxy_quote(pred)
-                if proxy:
-                    seconds, method, confidence = match_quote_to_timestamp(
-                        proxy, transcript_data, enable_two_pass=False,
-                    )
-                    if seconds is not None and confidence >= PATH_A_MIN_CONFIDENCE:
-                        stats["path_a_resolved"] += 1
-                        updates_this_video.append({
-                            "id": pid,
-                            "seconds": int(seconds),
-                            "method": method,
-                            "quote": proxy[:2000],
-                            "confidence": float(confidence),
-                        })
-                        print(f"{TAG}   id={pid:>7d} {ticker:>6s} Path A  "
-                              f"method={method}  conf={confidence:.2f}  t={seconds}s")
-                        continue
-
-                # ── Path B: Haiku re-extraction ───────────────────────────
-                if skip_path_b:
-                    stats["failed"] += 1
-                    print(f"{TAG}   id={pid:>7d} {ticker:>6s} Path A failed, Path B skipped")
-                    continue
-
-                client = _get_client()
-                if client is None:
-                    stats["failed"] += 1
-                    print(f"{TAG}   id={pid:>7d} {ticker:>6s} Path B skipped (no API key)")
-                    continue
-
-                quote, in_tok, out_tok = _call_haiku_for_quote(client, text, pred)
-                stats["path_b_calls"] += 1
-                stats["path_b_input_tokens"] += in_tok
-                stats["path_b_output_tokens"] += out_tok
-
-                if not quote or not isinstance(quote, str) or len(quote.strip()) < 10:
-                    stats["failed"] += 1
-                    print(f"{TAG}   id={pid:>7d} {ticker:>6s} Path B  Haiku returned no quote")
-                    continue
-
-                # Run the extracted quote through the full matcher.
+            # ── Path A: try existing quote fields ─────────────────────
+            proxy = _build_proxy_quote(pred)
+            if proxy:
                 seconds, method, confidence = match_quote_to_timestamp(
-                    quote.strip(), transcript_data,
+                    proxy, transcript_data, enable_two_pass=False,
                 )
-
-                if seconds is not None:
-                    stats["path_b_resolved"] += 1
+                if seconds is not None and confidence >= PATH_A_MIN_CONFIDENCE:
+                    stats["path_a_resolved"] += 1
                     updates_this_video.append({
                         "id": pid,
                         "seconds": int(seconds),
                         "method": method,
-                        "quote": quote.strip()[:2000],
+                        "quote": proxy[:2000],
                         "confidence": float(confidence),
                     })
-                    print(f"{TAG}   id={pid:>7d} {ticker:>6s} Path B  "
-                          f"method={method}  conf={confidence:.2f}  t={seconds}s")
-                else:
-                    stats["failed"] += 1
-                    # Still store the quote even if timestamp resolution failed.
-                    updates_this_video.append({
-                        "id": pid,
-                        "seconds": None,
-                        "method": "unknown",
-                        "quote": quote.strip()[:2000],
-                        "confidence": 0.0,
-                    })
-                    print(f"{TAG}   id={pid:>7d} {ticker:>6s} Path B  "
-                          f"method=unknown (matcher failed)")
+                    print(f"{TAG}   id={pid:>7d} {ticker:>6s} Path A  "
+                          f"method={method}  conf={confidence:.2f}  t={seconds}s", flush=True)
+                    continue
 
-            # ── Commit after each video (incremental progress) ────────
-            if apply and updates_this_video:
-                for u in updates_this_video:
-                    db.execute(sql_text("""
-                        UPDATE predictions SET
-                            source_timestamp_seconds = :seconds,
-                            source_timestamp_method  = :method,
-                            source_verbatim_quote    = :quote,
-                            source_timestamp_confidence = :confidence
-                        WHERE id = :id
-                    """), u)
-                db.commit()
-                stats["written"] += len(updates_this_video)
-                print(f"{TAG}   Committed {len(updates_this_video)} updates (total written: {stats['written']})")
+            # ── Path B: Haiku re-extraction ───────────────────────────
+            if skip_path_b:
+                stats["failed"] += 1
+                print(f"{TAG}   id={pid:>7d} {ticker:>6s} Path A failed, Path B skipped", flush=True)
+                continue
 
-            _save_progress(vid_idx)
+            client = _get_client()
+            if client is None:
+                stats["failed"] += 1
+                print(f"{TAG}   id={pid:>7d} {ticker:>6s} Path B skipped (no API key)", flush=True)
+                continue
 
-    finally:
-        # Restore previous signal handler.
-        signal.signal(signal.SIGALRM, prev_handler)
-        signal.alarm(0)
+            quote, in_tok, out_tok = _call_haiku_for_quote(client, text, pred)
+            stats["path_b_calls"] += 1
+            stats["path_b_input_tokens"] += in_tok
+            stats["path_b_output_tokens"] += out_tok
+
+            if not quote or not isinstance(quote, str) or len(quote.strip()) < 10:
+                stats["failed"] += 1
+                print(f"{TAG}   id={pid:>7d} {ticker:>6s} Path B  Haiku returned no quote", flush=True)
+                continue
+
+            # Run the extracted quote through the full matcher.
+            seconds, method, confidence = match_quote_to_timestamp(
+                quote.strip(), transcript_data,
+            )
+
+            if seconds is not None:
+                stats["path_b_resolved"] += 1
+                updates_this_video.append({
+                    "id": pid,
+                    "seconds": int(seconds),
+                    "method": method,
+                    "quote": quote.strip()[:2000],
+                    "confidence": float(confidence),
+                })
+                print(f"{TAG}   id={pid:>7d} {ticker:>6s} Path B  "
+                      f"method={method}  conf={confidence:.2f}  t={seconds}s", flush=True)
+            else:
+                stats["failed"] += 1
+                # Still store the quote even if timestamp resolution failed.
+                updates_this_video.append({
+                    "id": pid,
+                    "seconds": None,
+                    "method": "unknown",
+                    "quote": quote.strip()[:2000],
+                    "confidence": 0.0,
+                })
+                print(f"{TAG}   id={pid:>7d} {ticker:>6s} Path B  "
+                      f"method=unknown (matcher failed)", flush=True)
+
+        # ── Commit after each video (incremental progress) ────────
+        if apply and updates_this_video:
+            for u in updates_this_video:
+                db.execute(sql_text("""
+                    UPDATE predictions SET
+                        source_timestamp_seconds = :seconds,
+                        source_timestamp_method  = :method,
+                        source_verbatim_quote    = :quote,
+                        source_timestamp_confidence = :confidence
+                    WHERE id = :id
+                """), u)
+            db.commit()
+            stats["written"] += len(updates_this_video)
+            print(f"{TAG}   Committed {len(updates_this_video)} updates (total written: {stats['written']})", flush=True)
+
+        _save_progress(vid_idx)
 
     # ── 3. Summary ────────────────────────────────────────────────────────
     resolved = stats["path_a_resolved"] + stats["path_b_resolved"]
