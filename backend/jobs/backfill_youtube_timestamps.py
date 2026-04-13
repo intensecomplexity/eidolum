@@ -11,12 +11,15 @@ Usage (from the backend/ directory):
     python -m jobs.backfill_youtube_timestamps --apply --skip-to 24  # skip first 24 videos
     python -m jobs.backfill_youtube_timestamps --apply --delay 5  # 5s between fetches
 
-Pipeline per prediction:
-  Path A (cheap): use existing exact_quote / context as a proxy verbatim
-         quote and run it through the 4-path timestamp matcher. Accept if
-         confidence >= 0.60.
-  Path B (expensive): call Haiku with a focused prompt to extract the
-         verbatim_quote from the transcript, then run the matcher.
+Pipeline per prediction (Path B only):
+  1. Fetch transcript with word-level timing for the video (30s timeout).
+  2. Send transcript + prediction details to Haiku — Haiku extracts the
+     exact verbatim quote from the transcript where the prediction was made.
+  3. Match Haiku's verbatim quote against the transcript via the 4-path
+     timestamp matcher to resolve a precise second offset.
+  4. Any failure (no transcript / no quote / no match) → skip the
+     prediction. NO Path A fallback — template text matching produces
+     low-quality timestamps that are useless for training data.
 
 Respects Webshare proxy config for transcript fetches (inherited from
 fetch_transcript_with_timestamps). Does NOT check the
@@ -48,9 +51,6 @@ TAG = "[yt-ts-backfill]"
 
 # YouTube video IDs are always exactly 11 characters (base64url).
 _YT_VIDEO_ID_LEN = 11
-
-# Path A acceptance threshold.
-PATH_A_MIN_CONFIDENCE = 0.60
 
 # Rate-limit: seconds between consecutive transcript fetches.
 TRANSCRIPT_FETCH_DELAY = 2.0
@@ -147,24 +147,6 @@ def _extract_video_id(source_platform_id: str) -> str | None:
     return candidate
 
 
-def _build_proxy_quote(row) -> str | None:
-    """Build a proxy verbatim quote from existing prediction fields."""
-    parts = []
-    eq = getattr(row, "exact_quote", None) or ""
-    qc = getattr(row, "quote_context", None) or ""
-    ctx = getattr(row, "context", None) or ""
-
-    if eq.strip():
-        parts.append(eq.strip())
-        if qc.strip():
-            parts.append(qc.strip())
-    elif ctx.strip():
-        parts.append(ctx.strip())
-
-    combined = " ".join(parts).strip()
-    return combined if combined else None
-
-
 def _call_haiku_for_quote(client, transcript_text: str, row) -> str | None:
     """Path B: focused Haiku call to extract verbatim quote for one prediction."""
     ticker = getattr(row, "ticker", "?")
@@ -247,10 +229,6 @@ def main(argv=None):
         help="Process only the first N unique videos (0 = all).",
     )
     parser.add_argument(
-        "--skip-path-b", action="store_true",
-        help="Skip Haiku Path B calls (only use Path A proxy matching).",
-    )
-    parser.add_argument(
         "--skip-to", type=int, default=0,
         help="Skip the first N videos (0-indexed). Use to resume after a crash.",
     )
@@ -287,14 +265,13 @@ def main(argv=None):
     try:
         return _run(
             db, apply=args.apply, limit=args.limit,
-            skip_path_b=args.skip_path_b, skip_to=skip_to,
-            fetch_delay=fetch_delay,
+            skip_to=skip_to, fetch_delay=fetch_delay,
         )
     finally:
         db.close()
 
 
-def _run(db, *, apply: bool, limit: int, skip_path_b: bool,
+def _run(db, *, apply: bool, limit: int,
          skip_to: int, fetch_delay: float) -> int:
     # ── 1. Query candidates ───────────────────────────────────────────────
     rows = db.execute(sql_text("""
@@ -330,18 +307,14 @@ def _run(db, *, apply: bool, limit: int, skip_path_b: bool,
     if skipped_bad_id:
         print(f"{TAG} Skipped {skipped_bad_id} rows with unparseable source_platform_id")
 
-    # ── Cost estimate (worst case: every prediction needs Path B) ─────────
+    # ── Cost estimate (one Haiku call per prediction) ─────────────────────
     avg_transcript_tokens = 8_000  # conservative average
     avg_output_tokens = 80
-    max_haiku_calls = total_preds
-    max_cost = max_haiku_calls * (
+    max_cost = total_preds * (
         (avg_transcript_tokens * HAIKU_PRICE_INPUT_PER_M / 1_000_000)
         + (avg_output_tokens * HAIKU_PRICE_OUTPUT_PER_M / 1_000_000)
     )
-    print(f"{TAG} Cost estimate (worst case, all Path B): ~${max_cost:.2f} "
-          f"for {max_haiku_calls} Haiku calls")
-    if skip_path_b:
-        print(f"{TAG} --skip-path-b is set: Haiku calls disabled, Path A only")
+    print(f"{TAG} Cost estimate: ~${max_cost:.2f} for {total_preds} Haiku calls")
 
     # ── Lazy imports ──────────────────────────────────────────────────────
     from jobs.timestamp_matcher import match_quote_to_timestamp
@@ -365,11 +338,11 @@ def _run(db, *, apply: bool, limit: int, skip_path_b: bool,
         "videos_processed": 0,
         "videos_skipped_no_transcript": 0,
         "videos_timed_out": 0,
-        "path_a_resolved": 0,
-        "path_b_resolved": 0,
-        "path_b_calls": 0,
-        "path_b_input_tokens": 0,
-        "path_b_output_tokens": 0,
+        "resolved": 0,
+        "haiku_calls": 0,
+        "haiku_timed_out": 0,
+        "haiku_input_tokens": 0,
+        "haiku_output_tokens": 0,
         "failed": 0,
         "written": 0,
     }
@@ -427,75 +400,49 @@ def _run(db, *, apply: bool, limit: int, skip_path_b: bool,
             pid = pred.id
             ticker = pred.ticker or "?"
 
-            # ── Path A: try existing quote fields ─────────────────────
-            proxy = _build_proxy_quote(pred)
-            if proxy:
-                seconds, method, confidence = match_quote_to_timestamp(
-                    proxy, transcript_data, enable_two_pass=False,
-                )
-                if seconds is not None and confidence >= PATH_A_MIN_CONFIDENCE:
-                    stats["path_a_resolved"] += 1
-                    updates_this_video.append({
-                        "id": pid,
-                        "seconds": int(seconds),
-                        "method": method,
-                        "quote": proxy[:2000],
-                        "confidence": float(confidence),
-                    })
-                    print(f"{TAG}   id={pid:>7d} {ticker:>6s} Path A  "
-                          f"method={method}  conf={confidence:.2f}  t={seconds}s", flush=True)
-                    continue
-
-            # ── Path B: Haiku re-extraction ───────────────────────────
-            if skip_path_b:
-                stats["failed"] += 1
-                print(f"{TAG}   id={pid:>7d} {ticker:>6s} Path A failed, Path B skipped", flush=True)
-                continue
-
             client = _get_client()
             if client is None:
                 stats["failed"] += 1
-                print(f"{TAG}   id={pid:>7d} {ticker:>6s} Path B skipped (no API key)", flush=True)
+                print(f"{TAG}   id={pid:>7d} {ticker:>6s} skipped (no API key)", flush=True)
                 continue
 
-            quote, in_tok, out_tok = _call_haiku_for_quote(client, text, pred)
-            stats["path_b_calls"] += 1
-            stats["path_b_input_tokens"] += in_tok
-            stats["path_b_output_tokens"] += out_tok
+            # Haiku extracts the verbatim quote from the transcript.
+            try:
+                quote, in_tok, out_tok = _call_haiku_for_quote(client, text, pred)
+            except FuturesTimeout:
+                stats["failed"] += 1
+                stats["haiku_timed_out"] += 1
+                print(f"{TAG}   id={pid:>7d} {ticker:>6s} Haiku TIMEOUT ({TRANSCRIPT_TIMEOUT}s)", flush=True)
+                continue
+            stats["haiku_calls"] += 1
+            stats["haiku_input_tokens"] += in_tok
+            stats["haiku_output_tokens"] += out_tok
 
             if not quote or not isinstance(quote, str) or len(quote.strip()) < 10:
                 stats["failed"] += 1
-                print(f"{TAG}   id={pid:>7d} {ticker:>6s} Path B  Haiku returned no quote", flush=True)
+                print(f"{TAG}   id={pid:>7d} {ticker:>6s} Haiku returned no quote", flush=True)
                 continue
 
-            # Run the extracted quote through the full matcher.
+            # Run the Haiku-extracted quote through the matcher.
             seconds, method, confidence = match_quote_to_timestamp(
                 quote.strip(), transcript_data,
             )
 
-            if seconds is not None:
-                stats["path_b_resolved"] += 1
-                updates_this_video.append({
-                    "id": pid,
-                    "seconds": int(seconds),
-                    "method": method,
-                    "quote": quote.strip()[:2000],
-                    "confidence": float(confidence),
-                })
-                print(f"{TAG}   id={pid:>7d} {ticker:>6s} Path B  "
-                      f"method={method}  conf={confidence:.2f}  t={seconds}s", flush=True)
-            else:
+            if seconds is None:
                 stats["failed"] += 1
-                # Still store the quote even if timestamp resolution failed.
-                updates_this_video.append({
-                    "id": pid,
-                    "seconds": None,
-                    "method": "unknown",
-                    "quote": quote.strip()[:2000],
-                    "confidence": 0.0,
-                })
-                print(f"{TAG}   id={pid:>7d} {ticker:>6s} Path B  "
-                      f"method=unknown (matcher failed)", flush=True)
+                print(f"{TAG}   id={pid:>7d} {ticker:>6s} matcher could not place quote", flush=True)
+                continue
+
+            stats["resolved"] += 1
+            updates_this_video.append({
+                "id": pid,
+                "seconds": int(seconds),
+                "method": method,
+                "quote": quote.strip()[:2000],
+                "confidence": float(confidence),
+            })
+            print(f"{TAG}   id={pid:>7d} {ticker:>6s} resolved  "
+                  f"method={method}  conf={confidence:.2f}  t={seconds}s", flush=True)
 
         # ── Commit after each video (incremental progress) ────────
         if apply and updates_this_video:
@@ -515,20 +462,19 @@ def _run(db, *, apply: bool, limit: int, skip_path_b: bool,
         _save_progress(vid_idx)
 
     # ── 3. Summary ────────────────────────────────────────────────────────
-    resolved = stats["path_a_resolved"] + stats["path_b_resolved"]
-    path_b_cost = (
-        (stats["path_b_input_tokens"] * HAIKU_PRICE_INPUT_PER_M / 1_000_000)
-        + (stats["path_b_output_tokens"] * HAIKU_PRICE_OUTPUT_PER_M / 1_000_000)
+    haiku_cost = (
+        (stats["haiku_input_tokens"] * HAIKU_PRICE_INPUT_PER_M / 1_000_000)
+        + (stats["haiku_output_tokens"] * HAIKU_PRICE_OUTPUT_PER_M / 1_000_000)
     )
 
     print(f"\n{TAG} ── Summary ──")
     print(f"{TAG}   Videos processed:     {stats['videos_processed']}")
     print(f"{TAG}   Videos no transcript: {stats['videos_skipped_no_transcript']}")
     print(f"{TAG}   Videos timed out:     {stats['videos_timed_out']}")
-    print(f"{TAG}   Path A resolved:      {stats['path_a_resolved']}")
-    print(f"{TAG}   Path B resolved:      {stats['path_b_resolved']}")
-    print(f"{TAG}   Path B calls:         {stats['path_b_calls']}")
-    print(f"{TAG}   Path B cost:          ${path_b_cost:.4f}")
+    print(f"{TAG}   Resolved (Path B):    {stats['resolved']}")
+    print(f"{TAG}   Haiku calls:          {stats['haiku_calls']}")
+    print(f"{TAG}   Haiku timeouts:       {stats['haiku_timed_out']}")
+    print(f"{TAG}   Haiku cost:           ${haiku_cost:.4f}")
     print(f"{TAG}   Failed (no timestamp):{stats['failed']}")
     print(f"{TAG}   Total written to DB:  {stats['written']}")
 
