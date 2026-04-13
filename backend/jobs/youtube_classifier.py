@@ -1561,7 +1561,13 @@ DECISION TREE (apply in order):
        a specific date like "March 15 2026".
      → set inferred_timeframe_days to the resolved integer day count
        from the video publish date to the named target, and set
-       timeframe_source="explicit". Do NOT set timeframe_category.
+       timeframe_source="explicit". ALSO set timeframe_category by
+       mapping the resolved day count to the closest bucket using the
+       BUCKET MAPPING table below. (This rule SUPERSEDES any earlier
+       instruction or other instruction block that said to leave
+       timeframe_category null on explicit-source predictions —
+       Ship #13 requires every accepted prediction to carry a
+       category for downstream training-data grouping.)
 
   2. Otherwise, does the statement match one of these 11 categories?
 
@@ -1591,10 +1597,31 @@ DECISION TREE (apply in order):
        The backend counts these under
        scraper_runs.timeframes_rejected.
 
+BUCKET MAPPING (for step 1 explicit timeframes — assign timeframe_category):
+
+When timeframe_source="explicit", map inferred_timeframe_days to a
+category using the table below and set timeframe_category to that name:
+
+| inferred_timeframe_days | timeframe_category    |
+|------------------------:|-----------------------|
+|                    <= 1 | day_trading           |
+|                    <= 7 | options_short         |
+|                   <= 21 | swing_trade           |
+|                   <= 30 | technical_chart       |
+|                   <= 90 | fundamental_quarterly |
+|                  <= 180 | cyclical_medium       |
+|                  <= 730 | macro_thesis          |
+|                   > 730 | long_term_fundamental |
+
+This mapping is purely numeric — pick the row whose upper bound is the
+smallest value >= inferred_timeframe_days. Step 2 still uses the signal-
+phrase table for category_default predictions; this bucket table only
+applies to the explicit branch from step 1.
+
 EXAMPLES (timeframe only):
 
 Input: "I think Apple hits 250 by end of year"
-→ inferred_timeframe_days resolved to days-until-December-31 from publish date, timeframe_source="explicit".
+→ inferred_timeframe_days resolved to days-until-December-31 from publish date, timeframe_source="explicit", timeframe_category mapped from days via the BUCKET MAPPING table (e.g. 270 days → "macro_thesis", 60 days → "fundamental_quarterly").
 
 Input: "I'm scalping TSLA into the close today"
 → inferred_timeframe_days=1, timeframe_source="category_default", timeframe_category="day_trading".
@@ -2574,6 +2601,27 @@ def _validate_and_dedupe_predictions(raw: list) -> list[dict]:
     out: list[dict] = []
     for p in raw:
         if not isinstance(p, dict):
+            continue
+
+        # Ship #13 — invented-timeframe gate. Drop predictions where
+        # Haiku emitted neither an explicit nor inferred timeframe
+        # signal (the rejection format leaked through as a degraded
+        # accepted prediction) AND drop multi-decade horizons that
+        # are almost certainly invented (no YouTube call has a real
+        # 10+ year window). The METADATA_ENRICHMENT prompt block tells
+        # Haiku to use the rejection format for these cases, but it
+        # occasionally emits them as normal predictions instead — this
+        # gate catches the leak server-side. Both checks key on the
+        # raw Haiku-emitted fields, BEFORE _resolve_metadata_enrichment
+        # gets a chance to fall back to the legacy 90-day default.
+        _ts_src = p.get("timeframe_source")
+        _inferred = p.get("inferred_timeframe_days")
+        if not _ts_src and not _inferred:
+            # Skip the rejection-shape sentinel — those are handled
+            # earlier in classify_video.
+            if not p.get("rejected"):
+                continue
+        if isinstance(_inferred, (int, float)) and float(_inferred) > 3650:
             continue
 
         # Ship #9 — source_timestamps. Normalize the verbatim_quote
