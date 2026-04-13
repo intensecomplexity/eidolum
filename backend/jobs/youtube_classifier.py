@@ -3698,6 +3698,7 @@ def insert_youtube_prediction(
             revision_of=revision_of_val,
             event_type=event_type_val,
             event_date=event_date_val,
+            transcript_video_id=(video_id or "")[:11] or None,
             **_ts_fields,
             **_meta_fields,
         )
@@ -3847,6 +3848,7 @@ def insert_youtube_sector_prediction(
             # leaderboard's separate-accuracy column.
             prediction_type="sector_call",
             prediction_category="sector_call",
+            transcript_video_id=(video_id or "")[:11] or None,
             **_ts_fields,
             **_meta_fields,
         )
@@ -4053,6 +4055,7 @@ def insert_youtube_macro_prediction(
             call_type="macro_call",
             prediction_category="macro_call",
             macro_concept=concept,
+            transcript_video_id=(video_id or "")[:11] or None,
             **_ts_fields,
             **_meta_fields,
         )
@@ -4242,6 +4245,7 @@ def insert_youtube_pair_prediction(
             prediction_category="pair_call",
             pair_long_ticker=long_ticker,
             pair_short_ticker=short_ticker,
+            transcript_video_id=(video_id or "")[:11] or None,
             **_ts_fields,
             **_meta_fields,
         )
@@ -4468,6 +4472,7 @@ def insert_youtube_binary_event_prediction(
             # event_resolved_at + event_resolution_source stay NULL
             # until the evaluator confirms the outcome (stubbed — see
             # _score_binary_event for the follow-up-ship TODO).
+            transcript_video_id=(video_id or "")[:11] or None,
             **_ts_fields,
             **_meta_fields,
         )
@@ -4692,6 +4697,7 @@ def insert_youtube_metric_forecast_prediction(
             metric_release_date=release,
             # metric_actual + metric_error_pct stay NULL until the
             # evaluator fetches the real value.
+            transcript_video_id=(video_id or "")[:11] or None,
             **_ts_fields,
             **_meta_fields,
         )
@@ -4904,6 +4910,7 @@ def insert_youtube_conditional_prediction(
             trigger_deadline=trig_deadline_dt,
             trigger_fired_at=None,
             outcome_window_days=outcome_window_days,
+            transcript_video_id=(video_id or "")[:11] or None,
             **_ts_fields,
             **_meta_fields,
         )
@@ -5068,6 +5075,7 @@ def insert_youtube_disclosure(
             disclosed_at=disclosed_at_dt,
             source_video_id=video_id,
             source_platform_id=source_id,
+            transcript_video_id=(video_id or "")[:11] or None,
             **_ts_fields,
         )
     )

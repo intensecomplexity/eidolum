@@ -161,3 +161,102 @@ def get_prediction_detail(
         result["others_on_ticker"] = [{"id": p.id, "username": u, "direction": p.direction, "price_target": p.price_target} for p, u in others]
 
     return result
+
+
+# ── Evidence endpoint (ship #13) ─────────────────────────────────────────────
+
+# In-memory cache for YouTube availability checks (24h TTL).
+_yt_availability_cache: dict[str, tuple[float, bool]] = {}
+_YT_AVAILABILITY_TTL = 24 * 3600  # 24 hours
+
+
+def _check_video_available(video_id: str) -> bool:
+    """HEAD-check YouTube oEmbed to see if the video still exists.
+    Cached for 24 hours. Returns True on 200, False on 404/error."""
+    import time as _time
+    import httpx
+    now = _time.time()
+    cached = _yt_availability_cache.get(video_id)
+    if cached and now - cached[0] < _YT_AVAILABILITY_TTL:
+        return cached[1]
+    url = f"https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v={video_id}&format=json"
+    try:
+        with httpx.Client(timeout=5.0, follow_redirects=True) as client:
+            r = client.head(url)
+            available = (r.status_code == 200)
+    except Exception:
+        available = False
+    _yt_availability_cache[video_id] = (now, available)
+    return available
+
+
+@router.get("/predictions/{prediction_id}/evidence")
+@limiter.limit("60/minute")
+def get_prediction_evidence(
+    request: Request,
+    prediction_id: int,
+    db: Session = Depends(get_db),
+):
+    """Return the evidence chain for a YouTube prediction: the verbatim
+    quote, the video timestamp, and the stored transcript excerpt with
+    its SHA256 hash at capture time. This is the proof that the
+    prediction was actually made on video — even if the forecaster
+    deletes the source video, the SHA256-locked transcript in our
+    video_transcripts table attests to what was said and when we
+    captured it.
+    """
+    from sqlalchemy import text as sql_text
+    from jobs.video_transcript_store import excerpt_around_quote
+
+    row = db.execute(sql_text("""
+        SELECT p.id, p.ticker, p.source_verbatim_quote,
+               p.source_timestamp_seconds, p.source_timestamp_method,
+               p.source_timestamp_confidence, p.source_url,
+               COALESCE(p.transcript_video_id,
+                        SUBSTRING(p.source_platform_id FROM 4 FOR 11)) as vid,
+               vt.transcript_text, vt.sha256_hash, vt.captured_at,
+               vt.video_title, vt.channel_name, vt.video_publish_date
+        FROM predictions p
+        LEFT JOIN video_transcripts vt ON vt.video_id =
+            COALESCE(p.transcript_video_id,
+                     SUBSTRING(p.source_platform_id FROM 4 FOR 11))
+        WHERE p.id = :pid
+    """), {"pid": prediction_id}).first()
+
+    if not row:
+        raise HTTPException(status_code=404, detail="prediction not found")
+
+    (pid, ticker, quote, secs, method, conf, source_url, video_id,
+     transcript_text, sha, captured_at, vtitle, channel, vpub) = row
+
+    if not video_id:
+        raise HTTPException(status_code=400, detail="not a YouTube prediction")
+
+    # Construct the YouTube URL with timestamp anchor.
+    if secs is not None:
+        vurl = f"https://www.youtube.com/watch?v={video_id}&t={int(secs)}s"
+    else:
+        vurl = f"https://www.youtube.com/watch?v={video_id}"
+
+    # Transcript excerpt — window around the verbatim quote.
+    excerpt = excerpt_around_quote(transcript_text or "", quote or "", window=250) if transcript_text else None
+
+    return {
+        "prediction_id": pid,
+        "ticker": ticker,
+        "source_verbatim_quote": quote,
+        "source_timestamp_seconds": int(secs) if secs is not None else None,
+        "source_timestamp_method": method,
+        "source_timestamp_confidence": float(conf) if conf is not None else None,
+        "video_id": video_id,
+        "video_url": vurl,
+        "video_title": vtitle,
+        "channel_name": channel,
+        "video_publish_date": vpub.isoformat() if vpub else None,
+        "transcript_captured": transcript_text is not None,
+        "transcript_sha256": sha,
+        "transcript_captured_at": captured_at.isoformat() if captured_at else None,
+        "transcript_excerpt": excerpt,
+        "transcript_char_count": len(transcript_text) if transcript_text else 0,
+        "video_available": _check_video_available(video_id),
+    }

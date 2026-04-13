@@ -404,6 +404,24 @@ def _run(db, *, apply: bool, limit: int,
         print(f"{TAG}   Transcript OK: {len(text)} chars, {seg_count} segments, "
               f"word_level={'yes' if has_words else 'no'}", flush=True)
 
+        # Evidence preservation (ship #13) — store full transcript with
+        # SHA256 hash. Uses the first prediction in the group for
+        # channel/title metadata (they're all from the same video).
+        try:
+            from jobs.video_transcript_store import capture_transcript
+            first = preds[0]
+            capture_transcript(
+                db,
+                video_id=video_id,
+                channel_name=None,
+                video_title=None,
+                video_publish_date=getattr(first, "prediction_date", None),
+                transcript_text=text,
+                transcript_format="json3",
+            )
+        except Exception as _e:
+            print(f"{TAG}   transcript capture failed: {_e}", flush=True)
+
         stats["videos_processed"] += 1
 
         updates_this_video = []
@@ -451,6 +469,7 @@ def _run(db, *, apply: bool, limit: int,
                 "method": method,
                 "quote": quote.strip()[:2000],
                 "confidence": float(confidence),
+                "tvid": video_id[:11],
             })
             print(f"{TAG}   id={pid:>7d} {ticker:>6s} resolved  "
                   f"method={method}  conf={confidence:.2f}  t={seconds}s", flush=True)
@@ -465,7 +484,8 @@ def _run(db, *, apply: bool, limit: int,
                             source_timestamp_seconds = :seconds,
                             source_timestamp_method  = :method,
                             source_verbatim_quote    = :quote,
-                            source_timestamp_confidence = :confidence
+                            source_timestamp_confidence = :confidence,
+                            transcript_video_id      = :tvid
                         WHERE id = :id
                     """), u)
                     db.commit()

@@ -290,6 +290,11 @@ class Prediction(Base):
     source_timestamp_method = Column(String(16), nullable=True)
     source_verbatim_quote = Column(Text, nullable=True)
     source_timestamp_confidence = Column(Numeric(4, 3), nullable=True)
+    # Evidence preservation — FK to video_transcripts. Populated for
+    # every YouTube prediction the pipeline captured a transcript for,
+    # so the verbatim quote can be verified against the SHA256-locked
+    # full transcript even if the forecaster deletes the video.
+    transcript_video_id = Column(String(11), nullable=True, index=True)
     # Prediction metadata enrichment (ship #9 rescoped). Captures
     # extraction-time labels that the fine-tuning backfill depends on:
     # category-aware timeframe inference and conviction classification.
@@ -1289,6 +1294,32 @@ class Config(Base):
     __tablename__ = "config"
     key = Column(String, primary_key=True)
     value = Column(String)
+
+
+class VideoTranscript(Base):
+    """Immutable evidence preservation for YouTube predictions.
+
+    One row per video_id (not per prediction). The SHA256 hash is
+    locked at capture time and never changes, so the verbatim quote
+    on any prediction can be re-verified against the stored transcript
+    even if the forecaster deletes the video from YouTube.
+    """
+    __tablename__ = "video_transcripts"
+
+    id = Column(Integer, primary_key=True)
+    video_id = Column(String(11), nullable=False, unique=True, index=True)
+    channel_name = Column(Text)
+    video_title = Column(Text)
+    video_publish_date = Column(DateTime(timezone=True))
+    transcript_text = Column(Text, nullable=False)
+    transcript_format = Column(String(20), default="json3")
+    sha256_hash = Column(String(64), nullable=False)
+    captured_at = Column(
+        DateTime(timezone=True), nullable=False, server_default=func.now(),
+    )
+    # video_url is a STORED generated column in Postgres; mark as read-only
+    # in the ORM so writes never touch it.
+    video_url = Column(Text)
 
 
 def get_youtube_timestamp_url(video_id, seconds):

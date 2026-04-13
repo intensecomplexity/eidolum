@@ -1103,6 +1103,25 @@ def _process_one_video(db, channel_name, channel_id, video_id, title, publish_da
     else:
         text, transcript_status = fetch_transcript(video_id)
 
+    # Evidence preservation (ship #13) — store the full transcript with
+    # a SHA256 hash at capture time. Safe to call every run: ON CONFLICT
+    # DO NOTHING means the first capture wins. Failure is swallowed so
+    # the prediction pipeline is never blocked by storage issues.
+    if text:
+        try:
+            from jobs.video_transcript_store import capture_transcript
+            capture_transcript(
+                db,
+                video_id=video_id,
+                channel_name=channel_name,
+                video_title=title,
+                video_publish_date=publish_dt,
+                transcript_text=text,
+                transcript_format="json3" if use_ts else "text",
+            )
+        except Exception as _e:
+            print(f"[ChannelMonitor] transcript capture failed for {video_id}: {_e}", flush=True)
+
     if not text:
         stats["videos_skipped_no_transcript"] += 1
         print(f"[ChannelMonitor] {channel_name}: no transcript for {video_id} ({transcript_status})")

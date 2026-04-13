@@ -1583,6 +1583,44 @@ def main():
     except Exception as e:
         log.warning(f"[Worker] source_timestamps schema migration: {e}")
 
+    # video_transcripts table + predictions.transcript_video_id FK —
+    # evidence preservation. Stores the full transcript at scrape time
+    # with a SHA256 hash locked in so predictions can be verified
+    # independently even if the source video is deleted from YouTube.
+    try:
+        with engine.connect() as conn:
+            conn.execute(sql_text("""
+                CREATE TABLE IF NOT EXISTS video_transcripts (
+                    id SERIAL PRIMARY KEY,
+                    video_id VARCHAR(11) NOT NULL UNIQUE,
+                    channel_name TEXT,
+                    video_title TEXT,
+                    video_publish_date TIMESTAMPTZ,
+                    transcript_text TEXT NOT NULL,
+                    transcript_format VARCHAR(20) DEFAULT 'json3',
+                    sha256_hash VARCHAR(64) NOT NULL,
+                    captured_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                    video_url TEXT GENERATED ALWAYS AS
+                        ('https://www.youtube.com/watch?v=' || video_id) STORED
+                )
+            """))
+            conn.execute(sql_text(
+                "CREATE INDEX IF NOT EXISTS idx_video_transcripts_video_id "
+                "ON video_transcripts(video_id)"
+            ))
+            conn.execute(sql_text(
+                "CREATE INDEX IF NOT EXISTS idx_video_transcripts_captured_at "
+                "ON video_transcripts(captured_at)"
+            ))
+            conn.execute(sql_text(
+                "ALTER TABLE predictions ADD COLUMN IF NOT EXISTS "
+                "transcript_video_id VARCHAR(11)"
+            ))
+            conn.commit()
+        log.info("[Worker] video_transcripts table + predictions.transcript_video_id ready")
+    except Exception as e:
+        log.warning(f"[Worker] video_transcripts schema migration: {e}")
+
     # predictions regime_* columns + scraper_runs.regime_calls_extracted
     # (ship #12). Structural market phase claims — no price target,
     # scored via drawdown/runup/new-high computation. All ALTERs are
