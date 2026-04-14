@@ -1394,7 +1394,8 @@ def _process_one_video(db, channel_name, channel_id, video_id, title, publish_da
         print(f"[ChannelMonitor] {channel_name}: \"{title[:80]}\" → {inserted} predictions ({url})")
         for p in preds[:5]:
             tgt = f", target=${p.get('price_target')}" if p.get('price_target') else ""
-            print(f"[ChannelMonitor]   → {p.get('ticker')}: {p.get('direction').upper()}{tgt}")
+            _dir = (p.get('direction') or '').upper() or '?'
+            print(f"[ChannelMonitor]   → {p.get('ticker')}: {_dir}{tgt}")
 
     return inserted, transcript_chars, "ok_inserted" if inserted > 0 else "ok_no_predictions"
 
