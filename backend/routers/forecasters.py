@@ -582,7 +582,8 @@ def _get_preds(fid, page, limit, filter_type, sector, db):
                    p.source_timestamp_seconds, p.source_timestamp_method,
                    p.source_verbatim_quote, p.source_timestamp_confidence,
                    p.inferred_timeframe_days, p.timeframe_source,
-                   p.timeframe_category, p.conviction_level
+                   p.timeframe_category, p.conviction_level,
+                   p.evaluation_deferred, p.evaluation_deferred_reason
             FROM predictions p
             LEFT JOIN ticker_sectors ts ON ts.ticker = p.ticker
             LEFT JOIN predictions prior ON prior.id = p.revision_of
@@ -608,7 +609,8 @@ def _get_preds(fid, page, limit, filter_type, sector, db):
                        NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
                        NULL, NULL, NULL, NULL, NULL, NULL,
                        NULL, NULL, NULL, NULL,
-                       NULL, NULL, NULL, NULL
+                       NULL, NULL, NULL, NULL,
+                       NULL, NULL
                 FROM predictions p
                 LEFT JOIN ticker_sectors ts ON ts.ticker = p.ticker
                 WHERE p.forecaster_id = :fid {where}
@@ -689,6 +691,9 @@ def _get_preds(fid, page, limit, filter_type, sector, db):
             "timeframe_source": p[49],
             "timeframe_category": p[50],
             "conviction_level": p[51],
+            # Evaluation deferral (long-horizon thesis gating)
+            "evaluation_deferred": p[52],
+            "evaluation_deferred_reason": p[53],
         })
     return results
 

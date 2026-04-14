@@ -125,6 +125,8 @@ def get_prediction_detail(
             "source_url": pred.source_url,
             "exact_quote": pred.exact_quote,
             "source_verbatim_quote": pred.source_verbatim_quote,
+            "evaluation_deferred": getattr(pred, "evaluation_deferred", None),
+            "evaluation_deferred_reason": getattr(pred, "evaluation_deferred_reason", None),
             "archive_url": pred.archive_url,
         }
     else:

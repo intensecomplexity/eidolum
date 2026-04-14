@@ -42,6 +42,8 @@ def _prediction_to_dict(p, f, save_record=None):
         "context": p.context,
         "exact_quote": p.exact_quote,
         "source_verbatim_quote": p.source_verbatim_quote,
+        "evaluation_deferred": getattr(p, "evaluation_deferred", None),
+        "evaluation_deferred_reason": getattr(p, "evaluation_deferred_reason", None),
         "source_url": p.source_url,
         "source_type": p.source_type,
         "source_title": p.source_title,

@@ -1122,7 +1122,8 @@ def get_pending_predictions(request: Request, db: Session = Depends(get_db)):
     rows = db.execute(sql_text("""
         SELECT p.id, p.ticker, p.direction, p.target_price, p.entry_price,
                p.prediction_date, p.evaluation_date, p.window_days, p.current_return,
-               p.context, p.sector, f.id, f.name, f.handle, f.platform
+               p.context, p.sector, f.id, f.name, f.handle, f.platform,
+               p.evaluation_deferred, p.evaluation_deferred_reason
         FROM predictions p
         JOIN forecasters f ON f.id = p.forecaster_id
         WHERE p.outcome = 'pending'
@@ -1147,6 +1148,8 @@ def get_pending_predictions(request: Request, db: Session = Depends(get_db)):
             "progress_pct": min(100, round(days_elapsed / window * 100, 1)) if window else 0,
             "current_return": r[8], "context": r[9], "sector": r[10],
             "forecaster": {"id": r[11], "name": r[12], "handle": r[13], "platform": r[14] or "youtube"},
+            "evaluation_deferred": r[15],
+            "evaluation_deferred_reason": r[16],
         })
     return results
 
@@ -1311,7 +1314,8 @@ def get_homepage_data(request: Request, db: Session = Depends(get_db)):
                    p.outcome, p.actual_return, p.prediction_date,
                    f.id AS fid, f.name AS fname, f.accuracy_score,
                    ts.logo_domain, ts.logo_url, ts.company_name,
-                   p.verified_by, p.source_type
+                   p.verified_by, p.source_type,
+                   p.evaluation_deferred, p.evaluation_deferred_reason
             FROM predictions p
             JOIN forecasters f ON f.id = p.forecaster_id
             LEFT JOIN ticker_sectors ts ON ts.ticker = p.ticker
@@ -1337,6 +1341,8 @@ def get_homepage_data(request: Request, db: Session = Depends(get_db)):
                 "accuracy": round(float(r[10]), 1) if r[10] else 0,
                 "logo_domain": r[11], "logo_url": r[12], "company_name": r[13],
                 "verified_by": r[14], "source_type": r[15],
+                "evaluation_deferred": r[16],
+                "evaluation_deferred_reason": r[17],
             })
     except Exception:
         pass
@@ -1382,7 +1388,8 @@ def get_homepage_data(request: Request, db: Session = Depends(get_db)):
     _FEAT_SELECT = """SELECT p.id, p.ticker, p.direction, p.target_price, p.entry_price,
                   p.outcome, p.actual_return, p.prediction_date, p.evaluation_date,
                   f.id AS fid, f.name AS fname, f.firm,
-                  ts.company_name, ts.logo_url, p.verified_by, p.source_type
+                  ts.company_name, ts.logo_url, p.verified_by, p.source_type,
+                  p.evaluation_deferred, p.evaluation_deferred_reason
            FROM predictions p
            JOIN forecasters f ON f.id = p.forecaster_id
            LEFT JOIN ticker_sectors ts ON ts.ticker = p.ticker"""
@@ -1429,6 +1436,8 @@ def get_homepage_data(request: Request, db: Session = Depends(get_db)):
                 "firm": feat_row[11],
                 "company_name": feat_row[12], "logo_url": feat_row[13],
                 "verified_by": feat_row[14], "source_type": feat_row[15],
+                "evaluation_deferred": feat_row[16],
+                "evaluation_deferred_reason": feat_row[17],
             }
     except Exception:
         pass

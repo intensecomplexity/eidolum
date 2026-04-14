@@ -195,6 +195,8 @@ def analyst_profile(request: Request, name: str, db: Session = Depends(get_db)):
                 "prediction_date": p.prediction_date.isoformat() if p.prediction_date else None,
                 "evaluation_date": p.evaluation_date.isoformat() if p.evaluation_date else None,
                 "source_url": p.source_url,
+                "evaluation_deferred": getattr(p, "evaluation_deferred", None),
+                "evaluation_deferred_reason": getattr(p, "evaluation_deferred_reason", None),
             }
             for p in recent
         ],
@@ -299,6 +301,8 @@ def analyst_predictions(
                 "source_url": p.source_url,
                 "exact_quote": p.exact_quote,
                 "source_verbatim_quote": p.source_verbatim_quote,
+                "evaluation_deferred": getattr(p, "evaluation_deferred", None),
+                "evaluation_deferred_reason": getattr(p, "evaluation_deferred_reason", None),
             }
             for p in preds
         ],

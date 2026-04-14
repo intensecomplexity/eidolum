@@ -34,7 +34,8 @@ def recent_predictions(request: Request, db: Session = Depends(get_db)):
                f.id AS fid, f.name AS fname, f.accuracy_score,
                ts.company_name,
                p.source_type, p.verified_by,
-               p.source_verbatim_quote
+               p.source_verbatim_quote,
+               p.evaluation_deferred, p.evaluation_deferred_reason
         FROM predictions p
         JOIN forecasters f ON f.id = p.forecaster_id
         LEFT JOIN ticker_sectors ts ON ts.ticker = p.ticker
@@ -56,6 +57,8 @@ def recent_predictions(request: Request, db: Session = Depends(get_db)):
             "company_name": r[13],
             "source_type": r[14], "verified_by": r[15],
             "source_verbatim_quote": r[16],
+            "evaluation_deferred": r[17],
+            "evaluation_deferred_reason": r[18],
             "type": "prediction",
         }
         for r in rows
@@ -76,7 +79,8 @@ def recently_scored(request: Request, db: Session = Depends(get_db)):
                f.id AS fid, f.name AS fname, f.accuracy_score,
                ts.company_name, p.evaluated_at,
                p.source_type, p.verified_by,
-               p.source_verbatim_quote
+               p.source_verbatim_quote,
+               p.evaluation_deferred, p.evaluation_deferred_reason
         FROM predictions p
         JOIN forecasters f ON f.id = p.forecaster_id
         LEFT JOIN ticker_sectors ts ON ts.ticker = p.ticker
@@ -97,7 +101,8 @@ def recently_scored(request: Request, db: Session = Depends(get_db)):
                    f.id AS fid, f.name AS fname, f.accuracy_score,
                    ts.company_name, p.evaluated_at,
                    p.source_type, p.verified_by,
-                   p.source_verbatim_quote
+                   p.source_verbatim_quote,
+                   p.evaluation_deferred, p.evaluation_deferred_reason
             FROM predictions p
             JOIN forecasters f ON f.id = p.forecaster_id
             LEFT JOIN ticker_sectors ts ON ts.ticker = p.ticker
@@ -124,6 +129,8 @@ def recently_scored(request: Request, db: Session = Depends(get_db)):
             "scored_at": r[15].isoformat() if r[15] else (r[7].isoformat() if r[7] else None),
             "source_type": r[16], "verified_by": r[17],
             "source_verbatim_quote": r[18],
+            "evaluation_deferred": r[19],
+            "evaluation_deferred_reason": r[20],
             "type": "scored",
         }
         for r in rows
@@ -144,7 +151,8 @@ def expiring_predictions(request: Request, db: Session = Depends(get_db)):
                f.id AS fid, f.name AS fname, f.accuracy_score,
                ts.company_name,
                p.source_type, p.verified_by,
-               p.source_verbatim_quote
+               p.source_verbatim_quote,
+               p.evaluation_deferred, p.evaluation_deferred_reason
         FROM predictions p
         JOIN forecasters f ON f.id = p.forecaster_id
         LEFT JOIN ticker_sectors ts ON ts.ticker = p.ticker
@@ -172,6 +180,8 @@ def expiring_predictions(request: Request, db: Session = Depends(get_db)):
             "company_name": r[13],
             "source_type": r[14], "verified_by": r[15],
             "source_verbatim_quote": r[16],
+            "evaluation_deferred": r[17],
+            "evaluation_deferred_reason": r[18],
             "type": "expiring",
         }
         for r in rows
