@@ -443,7 +443,7 @@ def _refresh_leaderboard(db: Session) -> list | dict:
     # the iteration cap. The cache stores the FULL pool (including dormant)
     # so include_dormant=True callers still see the natural top-100 by rank.
     BATCH_SIZE = 200
-    MAX_ITER = 5
+    MAX_ITER = 10
     TARGET_NON_DORMANT = 100
 
     rows = []
