@@ -57,7 +57,17 @@ function DirectionBadge({ direction }) {
   return <span title="Expects the stock to stay roughly flat" className="text-[10px] font-bold uppercase px-1.5 py-0.5 rounded text-muted bg-surface-2">HOLD</span>;
 }
 
-function OutcomeBadge({ outcome, actualReturn }) {
+function OutcomeBadge({ outcome, actualReturn, evaluationDeferred, evaluationDeferredReason }) {
+  if (evaluationDeferred) {
+    return (
+      <span
+        className="text-muted text-[10px] italic font-mono whitespace-nowrap"
+        title={evaluationDeferredReason || 'Evaluation deferred'}
+      >
+        Long-term thesis — eval pending
+      </span>
+    );
+  }
   const cfg = {
     hit: { label: 'HIT', cls: 'text-positive bg-positive/10', icon: Check, tip: 'Prediction was correct within tolerance' },
     correct: { label: 'HIT', cls: 'text-positive bg-positive/10', icon: Check, tip: 'Prediction was correct within tolerance' },
@@ -149,7 +159,7 @@ function ScoredCard({ item }) {
         <span className="text-[10px] text-muted flex-shrink-0">{timeAgo(item.scored_at || item.evaluation_date)}</span>
       </div>
       <div className="flex items-center gap-2 mt-1.5">
-        <OutcomeBadge outcome={item.outcome} actualReturn={item.actual_return} />
+        <OutcomeBadge outcome={item.outcome} actualReturn={item.actual_return} evaluationDeferred={item.evaluation_deferred} evaluationDeferredReason={item.evaluation_deferred_reason} />
         <DirectionBadge direction={item.direction} />
         {item.company_name && <span className="text-xs text-muted truncate hidden sm:inline">{item.company_name}</span>}
       </div>
@@ -197,7 +207,9 @@ function FriendCard({ item }) {
         <span className="text-[10px] text-muted flex-shrink-0">{timeAgo(item.created_at)}</span>
       </div>
       <div className="flex items-center gap-2 mt-1.5">
-        {item.outcome && item.outcome !== 'pending' ? (
+        {item.evaluation_deferred ? (
+          <OutcomeBadge outcome={item.outcome} evaluationDeferred={true} evaluationDeferredReason={item.evaluation_deferred_reason} />
+        ) : item.outcome && item.outcome !== 'pending' ? (
           <OutcomeBadge outcome={item.outcome} />
         ) : (
           <DirectionBadge direction={item.direction} />

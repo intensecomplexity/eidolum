@@ -8,7 +8,17 @@ import Footer from '../components/Footer';
 import { getFirm } from '../api';
 import { pluralize } from '../utils/pluralize';
 
-function OutcomeBadge({ outcome }) {
+function OutcomeBadge({ outcome, evaluationDeferred, evaluationDeferredReason }) {
+  if (evaluationDeferred) {
+    return (
+      <span
+        className="text-muted text-[10px] italic font-mono whitespace-nowrap"
+        title={evaluationDeferredReason || 'Evaluation deferred'}
+      >
+        Long-term thesis — eval pending
+      </span>
+    );
+  }
   if (!outcome) return null;
   const map = {
     hit: { label: 'HIT', cls: 'bg-positive/15 text-positive' },
@@ -212,7 +222,7 @@ export default function FirmProfile() {
                     <div className="flex items-center gap-2 text-sm">
                       <Link to={`/asset/${p.ticker}`} className="font-mono font-bold text-accent">{p.ticker}</Link>
                       {p.target_price && <span className="text-muted">target ${p.target_price.toFixed(0)}</span>}
-                      <OutcomeBadge outcome={p.outcome} />
+                      <OutcomeBadge outcome={p.outcome} evaluationDeferred={p.evaluation_deferred} evaluationDeferredReason={p.evaluation_deferred_reason} />
                     </div>
                     <div className="text-xs text-muted mt-0.5">
                       <Link to={p.forecaster_slug ? `/analyst/${p.forecaster_slug}` : `/forecaster/${p.forecaster_id}`}

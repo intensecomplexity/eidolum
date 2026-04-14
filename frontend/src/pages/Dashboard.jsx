@@ -250,7 +250,7 @@ export default function Dashboard() {
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2">
                 <span className="font-mono text-accent font-bold text-sm">{p.ticker}</span>
-                <PredictionBadge outcome={p.outcome} />
+                <PredictionBadge outcome={p.outcome} evaluationDeferred={p.evaluation_deferred} evaluationDeferredReason={p.evaluation_deferred_reason} />
                 <span
                   className={`font-mono tnum text-sm font-bold cursor-help ${p.actual_return >= 0 ? 'text-positive' : 'text-negative'}`}
                   title={

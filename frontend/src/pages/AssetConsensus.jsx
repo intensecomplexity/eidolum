@@ -288,7 +288,7 @@ function AssetPredictionRow({ p }) {
           <SourceBadge verifiedBy={p.verified_by} date={p.prediction_date} />
         </td>
         <td className="px-6 py-3 text-right font-mono text-sm text-text-secondary">{p.entry_price ? `$${p.entry_price.toFixed(2)}` : '-'}</td>
-        <td className="px-6 py-3 text-center"><PredictionBadge outcome={p.outcome} /></td>
+        <td className="px-6 py-3 text-center"><PredictionBadge outcome={p.outcome} evaluationDeferred={p.evaluation_deferred} evaluationDeferredReason={p.evaluation_deferred_reason} /></td>
         <td className="px-6 py-3 text-right font-mono text-sm">
           {p.actual_return !== null ? (
             <span className={p.actual_return >= 0 ? 'text-positive' : 'text-negative'}>{p.actual_return >= 0 ? '+' : ''}{p.actual_return.toFixed(1)}%</span>

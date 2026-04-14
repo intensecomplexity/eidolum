@@ -16,7 +16,17 @@ function DirectionBadge({ direction }) {
   return <span title="Expects the stock to stay roughly flat" className="text-[10px] font-bold uppercase px-1.5 py-0.5 rounded text-muted bg-surface-2">HOLD</span>;
 }
 
-function OutcomeBadge({ outcome, actualReturn }) {
+function OutcomeBadge({ outcome, actualReturn, evaluationDeferred, evaluationDeferredReason }) {
+  if (evaluationDeferred) {
+    return (
+      <span
+        className="text-muted text-[10px] italic font-mono whitespace-nowrap"
+        title={evaluationDeferredReason || 'Evaluation deferred'}
+      >
+        Long-term thesis — eval pending
+      </span>
+    );
+  }
   const cfg = {
     hit: { label: 'HIT', cls: 'text-positive bg-positive/10', icon: Check, tip: 'Prediction was correct within tolerance' },
     correct: { label: 'HIT', cls: 'text-positive bg-positive/10', icon: Check, tip: 'Prediction was correct within tolerance' },
@@ -136,7 +146,7 @@ export default function LandingPublic() {
                 </div>
               </div>
               <div className="flex flex-col items-end gap-1 shrink-0">
-                <OutcomeBadge outcome={featured.outcome} actualReturn={featured.actual_return} />
+                <OutcomeBadge outcome={featured.outcome} actualReturn={featured.actual_return} evaluationDeferred={featured.evaluation_deferred} evaluationDeferredReason={featured.evaluation_deferred_reason} />
                 <DirectionBadge direction={featured.direction} />
               </div>
             </div>

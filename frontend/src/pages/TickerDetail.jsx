@@ -385,7 +385,17 @@ export default function TickerDetail() {
 }
 
 
-function OutcomeBadge({ outcome }) {
+function OutcomeBadge({ outcome, evaluationDeferred, evaluationDeferredReason }) {
+  if (evaluationDeferred) {
+    return (
+      <span
+        className="text-muted text-[10px] italic font-mono whitespace-nowrap"
+        title={evaluationDeferredReason || 'Evaluation deferred'}
+      >
+        Long-term thesis — eval pending
+      </span>
+    );
+  }
   const cfg = {
     hit: { label: 'HIT', cls: 'text-positive bg-positive/10 border-positive/30', Icon: Check },
     correct: { label: 'HIT', cls: 'text-positive bg-positive/10 border-positive/30', Icon: Check },
@@ -463,7 +473,7 @@ function PredictionItem({ p, showOutcome = false }) {
         </div>
         <div className="flex items-center gap-2 flex-shrink-0">
           <PredictionBadge direction={p.direction} windowDays={p.window_days || p.evaluation_window_days} />
-          {isScored && <OutcomeBadge outcome={p.outcome} />}
+          {isScored && <OutcomeBadge outcome={p.outcome} evaluationDeferred={p.evaluation_deferred} evaluationDeferredReason={p.evaluation_deferred_reason} />}
           {isScored && p.actual_return != null && (
             <span className={`text-xs font-mono font-bold ${p.actual_return >= 0 ? 'text-positive' : 'text-negative'}`}>
               {p.actual_return >= 0 ? '+' : ''}{p.actual_return.toFixed(1)}%
@@ -525,7 +535,7 @@ function PredictionItem({ p, showOutcome = false }) {
                 <div className={`font-mono text-sm font-bold ${p.actual_return >= 0 ? 'text-positive' : 'text-negative'}`}>
                   {p.actual_return >= 0 ? '+' : ''}{p.actual_return.toFixed(1)}%
                 </div>
-                {isScored && <OutcomeBadge outcome={p.outcome} />}
+                {isScored && <OutcomeBadge outcome={p.outcome} evaluationDeferred={p.evaluation_deferred} evaluationDeferredReason={p.evaluation_deferred_reason} />}
               </div>
             )}
           </div>

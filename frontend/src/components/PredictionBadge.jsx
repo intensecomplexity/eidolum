@@ -10,7 +10,10 @@ function formatWindow(days) {
   return `${days}d`;
 }
 
-export default function PredictionBadge({ direction, outcome, windowDays }) {
+export default function PredictionBadge({
+  direction, outcome, windowDays,
+  evaluationDeferred, evaluationDeferredReason,
+}) {
   const windowLabel = formatWindow(windowDays);
 
   if (direction) {
@@ -20,6 +23,20 @@ export default function PredictionBadge({ direction, outcome, windowDays }) {
       <span className={cls}>
         {label}
         {windowLabel && <span className="opacity-70 ml-0.5 text-[10px]">{windowLabel}</span>}
+      </span>
+    );
+  }
+  // Long-horizon thesis: outcome evaluation is deliberately deferred
+  // (e.g. "Tesla hits $5000 by 2030"). Replace the outcome badge with
+  // a muted label so the card doesn't claim PENDING / N/A — both are
+  // misleading for predictions we won't score for years.
+  if (evaluationDeferred) {
+    return (
+      <span
+        className="text-muted text-[10px] italic font-mono whitespace-nowrap"
+        title={evaluationDeferredReason || 'Evaluation deferred'}
+      >
+        Long-term thesis — eval pending
       </span>
     );
   }

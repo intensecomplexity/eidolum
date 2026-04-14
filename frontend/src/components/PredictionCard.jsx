@@ -273,7 +273,7 @@ function PairCallCard({ prediction: p, forecaster: fc, showForecaster, compact }
           {p.outcome && p.outcome !== 'pending' && p.outcome !== 'no_data' && (
             <span className="text-[9px] text-muted italic">The verdict:</span>
           )}
-          <PredictionBadge outcome={p.outcome} />
+          <PredictionBadge outcome={p.outcome} evaluationDeferred={p.evaluation_deferred} evaluationDeferredReason={p.evaluation_deferred_reason} />
         </div>
       </div>
 
@@ -402,7 +402,7 @@ function BinaryEventCard({ prediction: p, forecaster: fc, showForecaster, compac
               {p.outcome !== 'no_data' && (
                 <span className="text-[9px] text-muted italic">The verdict:</span>
               )}
-              <PredictionBadge outcome={p.outcome} />
+              <PredictionBadge outcome={p.outcome} evaluationDeferred={p.evaluation_deferred} evaluationDeferredReason={p.evaluation_deferred_reason} />
             </>
           )}
         </div>
@@ -568,7 +568,7 @@ function MetricForecastCard({ prediction: p, forecaster: fc, showForecaster, com
           {p.outcome && p.outcome !== 'pending' && p.outcome !== 'no_data' && (
             <span className="text-[9px] text-muted italic">The verdict:</span>
           )}
-          <PredictionBadge outcome={p.outcome} />
+          <PredictionBadge outcome={p.outcome} evaluationDeferred={p.evaluation_deferred} evaluationDeferredReason={p.evaluation_deferred_reason} />
         </div>
       </div>
 
@@ -724,7 +724,7 @@ export default function PredictionCard({ prediction: p, showForecaster = false, 
           {p.outcome && p.outcome !== 'pending' && p.outcome !== 'no_data' && (
             <span className="text-[9px] text-muted italic">The verdict:</span>
           )}
-          <PredictionBadge outcome={p.outcome} />
+          <PredictionBadge outcome={p.outcome} evaluationDeferred={p.evaluation_deferred} evaluationDeferredReason={p.evaluation_deferred_reason} />
         </div>
       </div>
 
