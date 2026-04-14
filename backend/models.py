@@ -389,6 +389,16 @@ class Prediction(Base):
                                   server_default="false")
     evaluation_deferred_reason = Column(Text, nullable=True)
 
+    # Ship #15 — internal-only verification flag. Populated on insert:
+    # TRUE if the ticker symbol OR the company_name from ticker_sectors
+    # appears (case-insensitive substring) in the Haiku-emitted
+    # source_verbatim_quote, FALSE if neither does, NULL when the check
+    # cannot run (no ticker, no quote, or lookup failure — also the
+    # backfilled default for all pre-Ship-15 rows). Not serialized to
+    # any API response or rendered in any frontend component; used as a
+    # data-quality signal for classifier audits and training filtering.
+    ticker_verified_in_transcript = Column(Boolean, nullable=True)
+
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
 
     forecaster = relationship("Forecaster", back_populates="predictions")

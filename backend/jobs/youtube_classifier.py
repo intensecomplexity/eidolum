@@ -3394,6 +3394,7 @@ def _resolve_metadata_enrichment(
     *,
     publish_date: datetime | None = None,
     default_window_days: int = 90,
+    db=None,
 ) -> tuple[dict, int, datetime | None]:
     """Ship #9 (rescoped) — prediction metadata enrichment resolver.
 
@@ -3476,6 +3477,41 @@ def _resolve_metadata_enrichment(
             fields["evaluation_deferred_reason"] = (
                 pred.get("_evaluation_deferred_reason") or "long_horizon_thesis"
             )
+
+        # Ship #15 — internal-only ticker-verification flag. TRUE if
+        # the ticker symbol OR the ticker_sectors.company_name appears
+        # (case-insensitive substring) in Haiku's emitted verbatim
+        # quote; FALSE if neither does; leave NULL when the check is
+        # not applicable (no ticker, no quote, or lookup failure).
+        # Non-ticker prediction types (sector, macro, pair, regime)
+        # naturally fall through to NULL because pred["ticker"] is not
+        # populated for them. Disclosures write to a different table
+        # and never reach this code path. Not serialized anywhere.
+        ticker_raw = pred.get("ticker")
+        quote_raw = pred.get("_verbatim_quote") or pred.get("verbatim_quote")
+        if isinstance(ticker_raw, str) and ticker_raw.strip() \
+                and isinstance(quote_raw, str) and quote_raw.strip():
+            ticker_norm = ticker_raw.strip().upper().lstrip("$")
+            quote_lower = quote_raw.lower()
+            verified = ticker_norm.lower() in quote_lower
+            if not verified and db is not None:
+                try:
+                    row = db.execute(
+                        sql_text(
+                            "SELECT company_name FROM ticker_sectors "
+                            "WHERE ticker = :t LIMIT 1"
+                        ),
+                        {"t": ticker_norm},
+                    ).first()
+                    if row and isinstance(row[0], str) and row[0].strip():
+                        if row[0].strip().lower() in quote_lower:
+                            verified = True
+                except Exception:
+                    # Lookup failure is not fatal — leave verified as
+                    # False (we confirmed the ticker symbol wasn't in
+                    # the quote, which is already a meaningful signal).
+                    pass
+            fields["ticker_verified_in_transcript"] = bool(verified)
 
         return fields, window_days, eval_date
     except Exception as _e:
@@ -3707,6 +3743,7 @@ def insert_youtube_prediction(
     _meta_fields, window_days, eval_date = _resolve_metadata_enrichment(
         pred, stats,
         publish_date=publish_date, default_window_days=window_days,
+        db=db,
     )
 
     db.add(
@@ -3858,6 +3895,7 @@ def insert_youtube_sector_prediction(
     _meta_fields, window_days, eval_date = _resolve_metadata_enrichment(
         pred, stats,
         publish_date=publish_date, default_window_days=window_days,
+        db=db,
     )
 
     db.add(
@@ -4068,6 +4106,7 @@ def insert_youtube_macro_prediction(
     _meta_fields, window_days, eval_date = _resolve_metadata_enrichment(
         pred, stats,
         publish_date=publish_date, default_window_days=window_days,
+        db=db,
     )
 
     db.add(
@@ -4257,6 +4296,7 @@ def insert_youtube_pair_prediction(
     _meta_fields, window_days, eval_date = _resolve_metadata_enrichment(
         pred, stats,
         publish_date=publish_date, default_window_days=window_days,
+        db=db,
     )
 
     db.add(
@@ -4480,6 +4520,7 @@ def insert_youtube_binary_event_prediction(
     _meta_fields, _, _ = _resolve_metadata_enrichment(
         pred, stats,
         publish_date=publish_date, default_window_days=window_days,
+        db=db,
     )
 
     db.add(
@@ -4705,6 +4746,7 @@ def insert_youtube_metric_forecast_prediction(
     _meta_fields, _, _ = _resolve_metadata_enrichment(
         pred, stats,
         publish_date=publish_date, default_window_days=window_days,
+        db=db,
     )
 
     db.add(
@@ -4916,6 +4958,7 @@ def insert_youtube_conditional_prediction(
     _meta_fields, window_days, eval_date = _resolve_metadata_enrichment(
         pred, stats,
         publish_date=publish_date, default_window_days=window_days,
+        db=db,
     )
     outcome_window_days = int(window_days) if window_days else outcome_window_days
 
@@ -5330,6 +5373,7 @@ def insert_youtube_regime_prediction(
     _meta_fields, _, _ = _resolve_metadata_enrichment(
         pred, stats,
         publish_date=publish_date, default_window_days=window_days,
+        db=db,
     )
 
     db.add(
