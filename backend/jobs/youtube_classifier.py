@@ -2603,26 +2603,53 @@ def _validate_and_dedupe_predictions(raw: list) -> list[dict]:
         if not isinstance(p, dict):
             continue
 
-        # Ship #13 — invented-timeframe gate. Drop predictions where
-        # Haiku emitted neither an explicit nor inferred timeframe
-        # signal (the rejection format leaked through as a degraded
-        # accepted prediction) AND drop multi-decade horizons that
-        # are almost certainly invented (no YouTube call has a real
-        # 10+ year window). The METADATA_ENRICHMENT prompt block tells
-        # Haiku to use the rejection format for these cases, but it
-        # occasionally emits them as normal predictions instead — this
-        # gate catches the leak server-side. Both checks key on the
-        # raw Haiku-emitted fields, BEFORE _resolve_metadata_enrichment
-        # gets a chance to fall back to the legacy 90-day default.
+        # Ship #14 — long-horizon acceptance gate. Replaces the Ship #13
+        # blanket >3650-day rejection. The new rule:
+        #
+        #   - timeframe_source IS NULL → reject (Haiku leaked a
+        #     degraded prediction without using the rejection format;
+        #     happens to BTC-style hallucinations like id=608559 with
+        #     window=7669 / src=NULL).
+        #   - timeframe_source = 'category_default' AND days > 1825
+        #     → reject (category defaults max out at 365; anything past
+        #       1825 means the resolver dropped the wrong window onto a
+        #       category-tagged row — almost certainly invented).
+        #   - timeframe_source IN ('explicit', 'inferred') with ANY days
+        #     → ACCEPT. The speaker said it (or a vague-phrase mapping
+        #       like "generational" → 1825 fired). Multi-year valuation
+        #       theses ("Tesla $500 by 2030", "MSFT 5-10-15 year hold")
+        #       are legitimate training data and the leaderboard should
+        #       show them.
+        #
+        # For accepted predictions where days > 1825, mark them
+        # _evaluation_deferred so the resolver writes
+        # evaluation_deferred=TRUE on the Prediction row. The evaluator
+        # then skips them (they stay outcome='pending' until the window
+        # actually resolves) and the frontend renders a "Long-term
+        # thesis — evaluation pending" badge instead of HIT/NEAR/MISS.
         _ts_src = p.get("timeframe_source")
         _inferred = p.get("inferred_timeframe_days")
-        if not _ts_src and not _inferred:
-            # Skip the rejection-shape sentinel — those are handled
-            # earlier in classify_video.
+
+        # Reject NULL-source predictions. Rejection sentinels have
+        # no timeframe_source by design and are handled upstream in
+        # classify_video, but keep the escape defensively in case a
+        # sentinel leaks through this path.
+        if not _ts_src:
             if not p.get("rejected"):
                 continue
-        if isinstance(_inferred, (int, float)) and float(_inferred) > 3650:
+
+        # Reject category_default rows with extreme windows.
+        if (
+            _ts_src == "category_default"
+            and isinstance(_inferred, (int, float))
+            and float(_inferred) > 1825
+        ):
             continue
+
+        # Mark long-horizon accepted predictions for deferred evaluation.
+        if isinstance(_inferred, (int, float)) and float(_inferred) > 1825:
+            p["_evaluation_deferred"] = True
+            p["_evaluation_deferred_reason"] = "long_horizon_thesis"
 
         # Ship #9 — source_timestamps. Normalize the verbatim_quote
         # field on EVERY prediction dict BEFORE any branch takes it.
@@ -3438,6 +3465,17 @@ def _resolve_metadata_enrichment(
             if stats is not None:
                 key = f"conviction_{conviction}"
                 stats[key] = int(stats.get(key, 0)) + 1
+
+        # Ship #14 — long-horizon deferred-evaluation marker. The
+        # validator stamps _evaluation_deferred=True on accepted preds
+        # with explicit/inferred sources whose window is > 1825 days.
+        # Pipe it through to the Prediction row so the evaluator skips
+        # them and the frontend renders the deferred badge.
+        if pred.get("_evaluation_deferred"):
+            fields["evaluation_deferred"] = True
+            fields["evaluation_deferred_reason"] = (
+                pred.get("_evaluation_deferred_reason") or "long_horizon_thesis"
+            )
 
         return fields, window_days, eval_date
     except Exception as _e:
