@@ -214,36 +214,61 @@ def _run(db, *, apply, limit, skip_to, fetch_delay):
             _save_progress(vid_idx)
             continue
 
-        # Look up channel/title/publish_date from any prediction on this video.
-        meta = db.execute(sql_text("""
-            SELECT f.name, p.source_title, p.prediction_date
-            FROM predictions p
-            JOIN forecasters f ON f.id = p.forecaster_id
-            WHERE p.source_platform_id LIKE :prefix
-            LIMIT 1
-        """), {"prefix": f"yt_{video_id}_%"}).first()
-        channel_name = meta[0] if meta else None
-        video_title = meta[1] if meta else None
-        publish_date = meta[2] if meta else None
+        # Look up channel/title/publish_date from any prediction on this
+        # video. Wrapped in try/except because the LIKE 'yt_{vid}_%' scan
+        # can trip the 30s statement_timeout on slow WAN connections; a
+        # single metadata lookup failure must not kill the whole run.
+        channel_name = None
+        video_title = None
+        publish_date = None
+        try:
+            db.execute(sql_text("SET LOCAL statement_timeout = 0"))
+            meta = db.execute(sql_text("""
+                SELECT f.name, p.source_title, p.prediction_date
+                FROM predictions p
+                JOIN forecasters f ON f.id = p.forecaster_id
+                WHERE p.source_platform_id LIKE :prefix
+                LIMIT 1
+            """), {"prefix": f"yt_{video_id}_%"}).first()
+            if meta:
+                channel_name, video_title, publish_date = meta[0], meta[1], meta[2]
+            db.commit()
+        except Exception as _e:
+            print(f"{TAG}   metadata lookup failed (proceeding with NULLs): "
+                  f"{type(_e).__name__}: {str(_e)[:120]}", flush=True)
+            try:
+                db.rollback()
+            except Exception:
+                pass
 
-        ok = capture_transcript(
-            db,
-            video_id=video_id,
-            channel_name=channel_name,
-            video_title=video_title,
-            video_publish_date=publish_date,
-            transcript_text=text,
-            transcript_format="json3",
-        )
+        ok = False
+        try:
+            ok = capture_transcript(
+                db,
+                video_id=video_id,
+                channel_name=channel_name,
+                video_title=video_title,
+                video_publish_date=publish_date,
+                transcript_text=text,
+                transcript_format="json3",
+            )
+        except Exception as _e:
+            print(f"{TAG}   capture_transcript raised: {_e}", flush=True)
+            try:
+                db.rollback()
+            except Exception:
+                pass
+
         if ok:
             stats["stored"] += 1
             print(f"{TAG}   stored ({len(text)} chars)", flush=True)
         else:
             stats["already"] += 1
-            print(f"{TAG}   already present (no-op)", flush=True)
+            print(f"{TAG}   already present or store failed (no-op)", flush=True)
 
         # Back-fill the FK on all predictions from this video.
         try:
+            db.execute(sql_text("SET LOCAL statement_timeout = 0"))
             db.execute(sql_text("""
                 UPDATE predictions
                 SET transcript_video_id = :vid
@@ -252,7 +277,8 @@ def _run(db, *, apply, limit, skip_to, fetch_delay):
             """), {"vid": video_id, "prefix": f"yt_{video_id}_%"})
             db.commit()
         except Exception as _e:
-            print(f"{TAG}   FK backfill failed: {_e}", flush=True)
+            print(f"{TAG}   FK backfill failed: "
+                  f"{type(_e).__name__}: {str(_e)[:120]}", flush=True)
             try:
                 db.rollback()
             except Exception:
