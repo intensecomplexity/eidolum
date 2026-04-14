@@ -177,6 +177,7 @@ def evaluate_batch(max_tickers: int | None = None) -> dict:
               AND p.evaluation_date < :now
               AND (p.ticker ~ '^[A-Z]{1,5}$' OR p.ticker ~ '^[A-Z]{1,3}\.[A-Z]$')
               AND (p.event_type IS NULL OR p.event_type != 'earnings')
+              AND p.evaluation_deferred IS NOT TRUE
               """ + x_filter_p + r"""
             ORDER BY p.ticker
             LIMIT 5000
@@ -188,6 +189,7 @@ def evaluate_batch(max_tickers: int | None = None) -> dict:
               AND evaluation_date IS NOT NULL AND evaluation_date < :now
               AND (ticker ~ '^[A-Z]{1,5}$' OR ticker ~ '^[A-Z]{1,3}\.[A-Z]$')
               AND (event_type IS NULL OR event_type != 'earnings')
+              AND evaluation_deferred IS NOT TRUE
               """ + x_filter_bare + r"""
         """), {"now": now}).scalar() or 0
     finally:
@@ -1229,6 +1231,7 @@ def _process_conditional_calls(now: datetime) -> dict:
             WHERE prediction_category = 'conditional_call'
               AND (outcome = 'pending' OR outcome IS NULL OR outcome = '')
               AND (ticker ~ '^[A-Z]{1,5}$' OR ticker ~ '^[A-Z]{1,3}\\.[A-Z]$')
+              AND evaluation_deferred IS NOT TRUE
             LIMIT 1000
         """)).fetchall()
     except Exception as _e:
@@ -1593,6 +1596,7 @@ def _process_regime_calls(now: datetime) -> dict:
               AND (outcome = 'pending' OR outcome IS NULL OR outcome = '')
               AND regime_type IS NOT NULL
               AND regime_instrument IS NOT NULL
+              AND evaluation_deferred IS NOT TRUE
             LIMIT 1000
         """)).fetchall()
     except Exception as _e:
