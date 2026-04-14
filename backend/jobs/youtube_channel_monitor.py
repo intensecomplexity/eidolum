@@ -486,7 +486,9 @@ def run_channel_monitor(db=None):
         _run_inner(db)
     except Exception as e:
         print(f"[ChannelMonitor] Error: {e}")
-        import traceback; traceback.print_exc()
+        import traceback
+        _tb = traceback.format_exc()
+        print(_tb)
         # If _run_inner crashed before its finalize block, the scraper_runs
         # row is stuck at 'running' forever. Mark any recent running row
         # as 'error' so the dashboard reflects reality.
@@ -503,6 +505,22 @@ def run_channel_monitor(db=None):
                 db.rollback()
             except Exception:
                 pass
+        # Alert nimrod via Resend. Wrapped in try/except so a failed
+        # email can never mask the original crash or re-raise.
+        try:
+            import resend as _r
+            _r.api_key = os.getenv("RESEND_API_KEY", "")
+            if _r.api_key:
+                _ts = datetime.utcnow().isoformat() + "Z"
+                _r.Emails.send({
+                    "from": os.getenv("FROM_EMAIL", "alerts@eidolum.com"),
+                    "to": "nimrodryder@gmail.com",
+                    "subject": "YouTube Monitor CRASHED",
+                    "text": f"Timestamp: {_ts}\n\nError: {e}\n\nTraceback:\n{_tb}",
+                })
+                print(f"[ChannelMonitor] alert email sent to nimrodryder@gmail.com")
+        except Exception as _ae:
+            print(f"[ChannelMonitor] alert email failed: {_ae}")
     finally:
         if own_db:
             db.close()
