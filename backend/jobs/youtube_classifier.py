@@ -3424,6 +3424,7 @@ def _training_completeness_gaps(
     *,
     db,
     stats: dict | None,
+    direction: str | None = None,
 ) -> list[str]:
     """Return [] if the prediction is OK to insert, otherwise the list
     of required training fields that are missing. Increments stats
@@ -3446,6 +3447,15 @@ def _training_completeness_gaps(
         log.warning("[YT-CLF] training-completeness gate flag check failed: %s", _e)
         return []
     missing: list[str] = []
+    # Neutral (or empty) direction is not actionable for training — a
+    # prediction with no directional claim can't be scored against a
+    # price series, so it must not leak into the training population.
+    if not direction or str(direction).strip().lower() in ("", "neutral"):
+        missing.append("direction_not_actionable")
+        if stats is not None:
+            stats["neutral_direction_blocked"] = int(
+                stats.get("neutral_direction_blocked", 0)
+            ) + 1
     if ts_required:
         for f in _TRAINING_REQUIRED_TS_FIELDS:
             if not ts_fields.get(f):
@@ -3841,6 +3851,7 @@ def insert_youtube_prediction(
     # the upstream feature flags are off.
     _gaps = _training_completeness_gaps(
         _ts_fields, _meta_fields, transcript_data, db=db, stats=stats,
+        direction=direction,
     )
     if _gaps:
         return _reject("incomplete_training_fields", hr=",".join(_gaps))
@@ -4003,6 +4014,7 @@ def insert_youtube_sector_prediction(
     # the upstream feature flags are off.
     _gaps = _training_completeness_gaps(
         _ts_fields, _meta_fields, transcript_data, db=db, stats=stats,
+        direction=direction,
     )
     if _gaps:
         return _reject("incomplete_training_fields", hr=",".join(_gaps))
@@ -4224,6 +4236,7 @@ def insert_youtube_macro_prediction(
     # the upstream feature flags are off.
     _gaps = _training_completeness_gaps(
         _ts_fields, _meta_fields, transcript_data, db=db, stats=stats,
+        direction=direction,
     )
     if _gaps:
         return _reject("incomplete_training_fields", hr=",".join(_gaps))
@@ -4424,6 +4437,7 @@ def insert_youtube_pair_prediction(
     # the upstream feature flags are off.
     _gaps = _training_completeness_gaps(
         _ts_fields, _meta_fields, transcript_data, db=db, stats=stats,
+        direction="bullish",
     )
     if _gaps:
         return _reject("incomplete_training_fields", hr=",".join(_gaps))
@@ -4658,6 +4672,7 @@ def insert_youtube_binary_event_prediction(
     # the upstream feature flags are off.
     _gaps = _training_completeness_gaps(
         _ts_fields, _meta_fields, transcript_data, db=db, stats=stats,
+        direction="bullish",
     )
     if _gaps:
         return _reject("incomplete_training_fields", hr=",".join(_gaps))
@@ -4894,6 +4909,7 @@ def insert_youtube_metric_forecast_prediction(
     # the upstream feature flags are off.
     _gaps = _training_completeness_gaps(
         _ts_fields, _meta_fields, transcript_data, db=db, stats=stats,
+        direction=direction,
     )
     if _gaps:
         return _reject("incomplete_training_fields", hr=",".join(_gaps))
@@ -5117,6 +5133,7 @@ def insert_youtube_conditional_prediction(
     # the upstream feature flags are off.
     _gaps = _training_completeness_gaps(
         _ts_fields, _meta_fields, transcript_data, db=db, stats=stats,
+        direction=direction,
     )
     if _gaps:
         return _reject("incomplete_training_fields", hr=",".join(_gaps))
