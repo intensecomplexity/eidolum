@@ -3,15 +3,20 @@ X/Twitter Stock Prediction Scraper for Eidolum -- Tracked Accounts Model
 
 Scrapes tweets from a curated list of ~25 high-signal financial accounts
 stored in the tracked_x_accounts table. Classifies each tweet via Groq
-(llama-3.3-70b-versatile by default).
+(llama-3.3-70b-versatile by default), with a Claude Haiku fallback that
+only fires when Groq is rate-limited.
 
-Why Groq, not Haiku:
-  Apr 8 2026 outage: the Anthropic billing account ran out of credit and
-  every Haiku call returned HTTP 400 for 18 minutes, killing 377 tweets
-  before detection. The X scraper is now off Anthropic billing for
-  resilience and cost reasons. Haiku remains in use for OTHER pipelines
-  (e.g. anywhere ANTHROPIC_API_KEY is consumed) — only the X scraper has
-  migrated.
+Classifier routing:
+  1) Groq llama-3.3-70b-versatile — primary, zero marginal cost on the free tier.
+  2) Claude Haiku 4.5 — fallback, only when Groq returns 429 (TPM or TPD).
+
+  Groq's free tier enforces a 100K tokens-per-day ceiling that isn't reset
+  until UTC midnight. Once TPD is exhausted, a TPD circuit breaker flips
+  and routes every subsequent call to Haiku until the next scheduled run
+  (which re-checks Groq at startup). The original Apr 8 2026 rationale for
+  going Groq-only — an Anthropic credit outage that returned HTTP 400 for
+  18 minutes — still stands: Haiku is the fallback, not the default, so
+  normal runs burn zero Anthropic budget.
 
 Apify actor: apidojo~tweet-scraper (Twitter User Scraper mode)
   Cost: ~$0.40 per 1000 tweets fetched
@@ -20,7 +25,8 @@ Apify actor: apidojo~tweet-scraper (Twitter User Scraper mode)
 
 Schedule: every 6 hours (4 runs/day).
 Requires: APIFY_API_TOKEN, GROQ_API_KEY env vars.
-ANTHROPIC_API_KEY is NO LONGER read by this scraper.
+Optional: ANTHROPIC_API_KEY (enables the Haiku fallback — without it a
+rate-limited Groq will drop tweets into the classifier_unavailable bucket).
 """
 import os
 import re
@@ -58,6 +64,54 @@ try:
 except ValueError:
     GROQ_MAX_RPM = 3
 GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
+
+
+# ── TPD circuit breaker + Haiku fallback config ────────────────────────────
+# Groq's free tier enforces a 100K tokens-per-day ceiling that does NOT
+# reset until UTC midnight. When a 429 body mentions "tokens per day" we
+# flip this flag so subsequent calls short-circuit to the Haiku fallback
+# instead of burning wall-clock in a 3-retry backoff loop that cannot
+# possibly succeed. The flag is reset on every run_x_scraper() entry so a
+# later scheduled run that crosses UTC midnight retries Groq from scratch.
+_groq_tpd_exhausted_until: "datetime | None" = None
+_groq_tpd_lock = threading.Lock()
+
+
+def _mark_groq_tpd_exhausted(body_snippet: str) -> None:
+    """Record that Groq's daily token budget is blown until UTC midnight."""
+    global _groq_tpd_exhausted_until
+    now = datetime.utcnow()
+    tomorrow = (now + timedelta(days=1)).replace(
+        hour=0, minute=0, second=0, microsecond=0
+    )
+    with _groq_tpd_lock:
+        _groq_tpd_exhausted_until = tomorrow
+    print(
+        f"[X-SCRAPER] Groq TPD exhausted — routing to Haiku fallback until "
+        f"{tomorrow.isoformat()}Z. body={body_snippet[:200]}",
+        flush=True,
+    )
+
+
+def _is_groq_tpd_exhausted() -> bool:
+    with _groq_tpd_lock:
+        until = _groq_tpd_exhausted_until
+    return bool(until and datetime.utcnow() < until)
+
+
+def _reset_groq_tpd_breaker() -> None:
+    """Clear the TPD breaker. Called at the top of each scheduled run."""
+    global _groq_tpd_exhausted_until
+    with _groq_tpd_lock:
+        _groq_tpd_exhausted_until = None
+
+
+# Anthropic Haiku fallback — see module docstring for the routing rules.
+ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "").strip()
+HAIKU_FALLBACK_MODEL = os.getenv(
+    "X_HAIKU_FALLBACK_MODEL", "claude-haiku-4-5-20251001"
+).strip() or "claude-haiku-4-5-20251001"
+HAIKU_FALLBACK_URL = "https://api.anthropic.com/v1/messages"
 
 
 class _GroqRateLimiter:
@@ -750,13 +804,24 @@ def _classify_with_groq(tweet_text: str) -> dict:
     counter and our window drift apart.
 
     Retries on HTTP 429 with exponential backoff (2s, 4s). After 3
-    exhausted retries, returns error="groq_rate_limited". NEVER falls
-    back to Haiku — the X scraper has been deliberately decoupled from
-    Anthropic billing per the Apr 8 outage post-mortem.
+    exhausted retries, returns error="groq_rate_limited". A 429 body
+    containing "tokens per day" short-circuits the retry loop and flips
+    the TPD breaker, returning error="groq_tpd_exhausted" so the caller
+    can route to the Haiku fallback without burning 6s per tweet on
+    backoffs that can't succeed before UTC midnight.
     """
     if not GROQ_API_KEY:
         print("[X-SCRAPER] Groq NO_KEY — GROQ_API_KEY missing", flush=True)
         return {"_success": False, "error": "no_api_key", "is_prediction": False}
+
+    # TPD breaker: if we already saw a tokens-per-day 429 earlier in this
+    # process, skip Groq entirely. The caller will route to Haiku.
+    if _is_groq_tpd_exhausted():
+        return {
+            "_success": False,
+            "error": "groq_tpd_exhausted",
+            "is_prediction": False,
+        }
 
     # Reuse the Haiku-era sanitizer: it strips unicode control bytes and
     # zero-width joiners, which trip up any LLM JSON-mode parser, not
@@ -800,6 +865,18 @@ def _classify_with_groq(tweet_text: str) -> dict:
             last_body_snippet = (r.text or "")[:500]
 
             if r.status_code == 429:
+                # Detect daily (not per-minute) token exhaustion. The body
+                # literally contains "tokens per day (TPD)" on Groq's free
+                # tier. Flip the breaker and bail immediately so the caller
+                # can route to Haiku instead of sleeping 6s for nothing.
+                body_lower = last_body_snippet.lower()
+                if "tokens per day" in body_lower or "tpd" in body_lower:
+                    _mark_groq_tpd_exhausted(last_body_snippet)
+                    return {
+                        "_success": False,
+                        "error": "groq_tpd_exhausted",
+                        "is_prediction": False,
+                    }
                 if attempt < max_retries - 1:
                     delay = base_delay * (2 ** attempt)
                     print(
@@ -912,6 +989,169 @@ def _classify_with_groq(tweet_text: str) -> dict:
     # Should never reach here, but return a safe default just in case
     return {"_success": False, "error": "retry_loop_fallthrough",
             "is_prediction": False}
+
+
+def _classify_with_haiku(tweet_text: str) -> dict:
+    """Fallback classifier: claude-haiku-4-5-20251001 via Anthropic.
+
+    Fires only when Groq is known rate-limited (TPM or TPD). Same prompt
+    shape as Groq (reuses HAIKU_SYSTEM), same dict contract as
+    _classify_with_groq: success yields the parsed JSON with _success=True,
+    failure yields {"_success": False, "error": "anthropic_<tag>", ...}.
+
+    Notes:
+      - Anthropic credit exhaustion returns HTTP 400, not 402 — body will
+        say "credit balance is too low". Bucketed as anthropic_http_400 so
+        it surfaces clearly in x_scraper_rejections.haiku_reason.
+      - One-shot: no retries. The fallback already runs only after Groq
+        has retried 3x, and Anthropic 5xx is rare enough that re-running
+        on the next scheduled tick is cheaper than stretching this call.
+    """
+    if not ANTHROPIC_API_KEY:
+        return {
+            "_success": False,
+            "error": "anthropic_no_key",
+            "is_prediction": False,
+        }
+
+    sanitized = _sanitize_tweet_for_haiku(tweet_text)
+    if not sanitized:
+        return {
+            "_success": False,
+            "error": "empty_after_sanitize",
+            "is_prediction": False,
+        }
+
+    request_body = {
+        "model": HAIKU_FALLBACK_MODEL,
+        "max_tokens": 400,
+        "temperature": 0.1,
+        "system": HAIKU_SYSTEM,
+        "messages": [{"role": "user", "content": sanitized}],
+    }
+    headers = {
+        "x-api-key": ANTHROPIC_API_KEY,
+        "anthropic-version": "2023-06-01",
+        "content-type": "application/json",
+    }
+
+    try:
+        r = httpx.post(
+            HAIKU_FALLBACK_URL, headers=headers, json=request_body, timeout=30
+        )
+    except httpx.TimeoutException:
+        print("[X-SCRAPER] Haiku fallback TIMEOUT", flush=True)
+        return {
+            "_success": False,
+            "error": "anthropic_timeout",
+            "is_prediction": False,
+        }
+    except Exception as e:
+        print(
+            f"[X-SCRAPER] Haiku fallback EXCEPTION {type(e).__name__}: {e}",
+            flush=True,
+        )
+        return {
+            "_success": False,
+            "error": f"anthropic_{type(e).__name__}",
+            "is_prediction": False,
+        }
+
+    body_snippet = (r.text or "")[:500]
+    if r.status_code != 200:
+        # Log body FIRST, then theorize. Per memory: Anthropic credit
+        # errors return HTTP 400 with a clear body — don't mistake them
+        # for a prompt bug.
+        print(
+            f"[X-SCRAPER] Haiku fallback HTTP_{r.status_code} "
+            f"body={body_snippet}",
+            flush=True,
+        )
+        err_detail = body_snippet.replace("\n", " ")[:300]
+        return {
+            "_success": False,
+            "error": f"anthropic_http_{r.status_code}: {err_detail}",
+            "is_prediction": False,
+        }
+
+    try:
+        resp_json = r.json()
+    except Exception as e:
+        return {
+            "_success": False,
+            "error": f"anthropic_json_decode: {e}",
+            "is_prediction": False,
+        }
+
+    blocks = resp_json.get("content") or []
+    text_out = ""
+    for b in blocks:
+        if isinstance(b, dict) and b.get("type") == "text":
+            text_out = (b.get("text") or "").strip()
+            break
+    if not text_out:
+        return {
+            "_success": False,
+            "error": "anthropic_empty_content",
+            "is_prediction": False,
+        }
+
+    # Strip markdown code fences if Haiku wrapped the JSON (Groq's
+    # response_format=json_object guarantees none; Anthropic does not).
+    if text_out.startswith("```"):
+        parts = text_out.split("```")
+        if len(parts) >= 2:
+            text_out = parts[1]
+            if text_out.startswith("json"):
+                text_out = text_out[4:]
+            text_out = text_out.strip()
+
+    try:
+        parsed = json.loads(text_out)
+    except json.JSONDecodeError as pe:
+        raw_snippet = (text_out or "no content")[:200]
+        print(
+            f"[X-SCRAPER] Haiku fallback PARSE_ERROR: {pe} | "
+            f"raw={raw_snippet!r}",
+            flush=True,
+        )
+        return {
+            "_success": False,
+            "error": f"anthropic_parse_error: {raw_snippet}",
+            "is_prediction": False,
+        }
+
+    if not isinstance(parsed, dict):
+        return {
+            "_success": False,
+            "error": "anthropic_non_dict",
+            "is_prediction": False,
+        }
+
+    parsed["_success"] = True
+    parsed["_classifier"] = "haiku"
+    return parsed
+
+
+def _classify_tweet(tweet_text: str) -> dict:
+    """Route a tweet through Groq, falling back to Haiku on rate-limit.
+
+    Contract matches _classify_with_groq: always returns a dict with
+    either _success=True + parsed fields, or _success=False + error tag.
+    The fallback fires ONLY on rate-limit errors (groq_rate_limited or
+    groq_tpd_exhausted). All other Groq failures — parse errors, auth
+    errors, timeouts — return directly so we don't burn Anthropic
+    budget papering over bugs that should be fixed at the source.
+    """
+    result = _classify_with_groq(tweet_text)
+    if result.get("_success"):
+        return result
+
+    err = str(result.get("error") or "")
+    if err.startswith(("groq_tpd_exhausted", "groq_rate_limited")):
+        return _classify_with_haiku(tweet_text)
+
+    return result
 
 
 def _parse_ai_timeframe(tf_str: str) -> int:
@@ -1178,12 +1418,21 @@ def _record_mentioned_handles(text: str, tracked_handles: set, db):
 # ── Main entry point ─────────────────────────────────────────────────────────
 
 def run_x_scraper(db=None):
-    """Main entry point. Scrapes tracked X accounts and classifies tweets with Groq."""
+    """Main entry point. Scrapes tracked X accounts and classifies tweets.
+
+    Classifier chain: Groq llama-3.3-70b-versatile → (on 429) Claude Haiku 4.5.
+    """
     print("[X-SCRAPER] run_x_scraper() called", flush=True)
+    haiku_available = bool(ANTHROPIC_API_KEY)
     print(
-        f"[X-SCRAPER] classifier=groq model={GROQ_MODEL} max_rpm={GROQ_MAX_RPM}",
+        f"[X-SCRAPER] classifier=groq model={GROQ_MODEL} max_rpm={GROQ_MAX_RPM} "
+        f"haiku_fallback={'enabled' if haiku_available else 'disabled'}",
         flush=True,
     )
+
+    # A new scheduled run may cross the UTC midnight boundary where Groq's
+    # TPD budget resets. Clear the breaker so we re-try Groq from scratch.
+    _reset_groq_tpd_breaker()
 
     if not APIFY_API_TOKEN:
         print("[X-SCRAPER] APIFY_API_TOKEN not set, skipping", flush=True)
@@ -1191,6 +1440,30 @@ def run_x_scraper(db=None):
     if not GROQ_API_KEY:
         print("[X-SCRAPER] FATAL: GROQ_API_KEY not set. Cannot run without classifier.", flush=True)
         return
+
+    # Clean up zombie scraper_runs rows from previous crashes. Any 'x' row
+    # still in 'running' state with started_at older than 2h is abandoned —
+    # a normal run finishes in well under 2h on the current ~25-account
+    # seed list. This mirrors the YouTube scraper's zombie-clear pattern
+    # ("zombie cleared" on run #69). Best-effort: a failure here must not
+    # block the scrape.
+    try:
+        zombies = db.execute(sql_text(
+            "UPDATE scraper_runs SET status='zombie', finished_at=NOW() "
+            "WHERE source='x' AND status='running' "
+            "AND started_at < NOW() - INTERVAL '2 hours'"
+        )).rowcount
+        db.commit()
+        if zombies:
+            msg = f"[X-SCRAPER] Cleared {zombies} zombie run(s)"
+            log.info(msg)
+            print(msg, flush=True)
+    except Exception as e:
+        log.warning(f"[X-SCRAPER] zombie cleanup failed: {e}")
+        try:
+            db.rollback()
+        except Exception:
+            pass
 
     # Seed accounts if table is empty
     try:
@@ -1348,25 +1621,47 @@ def run_x_scraper(db=None):
                 total_stats["prefilter_pass"] += 1
                 total_stats["ai_sent"] += 1
 
-                # Classify with Groq (always returns a dict — see _classify_with_groq).
-                # The rate limiter inside _classify_with_groq paces calls to
-                # GROQ_MAX_RPM, so we no longer need a manual sleep here.
-                result = _classify_with_groq(body)
+                # Classify via Groq, with Haiku fallback on rate-limit.
+                # Always returns a dict — see _classify_tweet.
+                result = _classify_tweet(body)
+                if result.get("_classifier") == "haiku":
+                    total_stats["haiku_fallback_used"] = \
+                        total_stats.get("haiku_fallback_used", 0) + 1
 
                 # Classifier FAILURE (distinct from classifier REJECTION):
-                # if _success is False, Groq didn't give us a real verdict.
-                # Log with a specific rejection_reason so the distribution in
-                # x_scraper_rejections tells us exactly what went wrong.
-                # NOTE: rejection_reason stays "haiku_error" / "haiku_rejected"
-                # for now to keep the rejection-viewer filters working. The
-                # haiku_reason column gets the new groq error tag. Column
-                # rename is a separate follow-up migration.
+                # if _success is False, neither Groq nor the Haiku fallback
+                # produced a real verdict. Bucket the rejection so the
+                # distribution in x_scraper_rejections tells us exactly
+                # what went wrong and whether the fallback ever fired.
+                #
+                # Bucket naming (new rows only; historical 'haiku_error'
+                # rows stay as-is):
+                #   - classifier_unavailable: a rate-limit-class failure
+                #     that would have been fixed by the Haiku fallback if
+                #     it were reachable (no ANTHROPIC_API_KEY, Anthropic
+                #     4xx/5xx, credit exhausted, or Groq + Haiku both ran
+                #     out of budget).
+                #   - llm_error: a non-rate-limit Groq failure — parse
+                #     error, auth, timeout, malformed JSON. These are
+                #     actionable bugs, not budget problems.
                 classifier_failed = result.get("_success") is False
                 if classifier_failed:
                     err_tag = result.get("error", "unknown_failure")
-                    rej_key = f"groq_{err_tag.split(':')[0]}"
-                    rejection_reasons[rej_key] = rejection_reasons.get(rej_key, 0) + 1
-                    log_rejection(db, tweet, handle, "haiku_error", err_tag, result, None)
+                    if err_tag.startswith((
+                        "groq_tpd_exhausted",
+                        "groq_rate_limited",
+                        "anthropic_",
+                    )):
+                        rejection_bucket = "classifier_unavailable"
+                    else:
+                        rejection_bucket = "llm_error"
+                    rej_key = f"{rejection_bucket}:{err_tag.split(':')[0]}"
+                    rejection_reasons[rej_key] = \
+                        rejection_reasons.get(rej_key, 0) + 1
+                    log_rejection(
+                        db, tweet, handle, rejection_bucket, err_tag,
+                        result, None,
+                    )
                     continue
 
                 # Phase 5: unified strict validation (matches the Haiku prompt's 3 requirements)
