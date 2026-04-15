@@ -58,7 +58,12 @@ HAIKU_MODEL = "claude-haiku-4-5-20251001"
 HAIKU_MAX_TOKENS = 12
 
 _EXCLUSION_REASON = "ticker_quote_mismatch"
-_EXCLUSION_VERSION = "v16.4"
+# v16.4 was the first pass and hit ~75% false positives because the
+# prompt had no ETF/crypto wrapper cheat sheet — 214 bad exclusions
+# were reverted before the DB was polluted. v16.4a uses the expanded
+# prompt and biases uncertainty toward 'ambiguous' instead of
+# 'mismatch'. The version bump keeps history cleanly separable.
+_EXCLUSION_VERSION = "v16.4a"
 
 _ALLOWED_RESPONSES: frozenset[str] = frozenset({
     "match",
@@ -117,18 +122,94 @@ def _build_prompt(*, ticker: str, company_name: str | None, quote: str) -> str:
         if company_name and company_name.strip()
         else ""
     )
+    # The first pass of this job ran without the wrapper cheat sheet
+    # and hit a ~75% false-positive rate, because Haiku has no
+    # built-in knowledge that IBIT is an iShares Bitcoin ETF or that
+    # SH is an inverse S&P product. The explicit mapping table below
+    # is the fix. It's deliberately verbose — a few extra tokens per
+    # row is cheap; wrongly excluding 200+ crypto/ETF predictions is
+    # not. The final "when in doubt" rule biases uncertainty toward
+    # ambiguous so only unmistakable misalignments get excluded.
     return (
         f"Does this quote discuss the stock ticker {ticker}{company_bit}?\n\n"
-        "The quote might use the company name instead of the ticker "
-        "symbol (e.g., 'Apple' for AAPL, 'Tesla' for TSLA, 'Bitcoin' "
-        "for BTC). That counts as a match.\n\n"
+        "The quote may reference the company by name, by a common "
+        "nickname, or by the underlying asset the ticker tracks. ALL "
+        "of these count as a match:\n\n"
+        "EQUITIES — company name counts as the ticker:\n"
+        "  Apple=AAPL, Tesla=TSLA, Google/Alphabet=GOOGL/GOOG, "
+        "Amazon=AMZN, Microsoft=MSFT, Meta/Facebook=META, "
+        "Nvidia=NVDA, Netflix=NFLX, PayPal=PYPL, Uber=UBER, "
+        "Nike=NKE, Berkshire=BRK.A/BRK.B.\n\n"
+        "INDEX / BROAD-MARKET ETFs — 'the market', 'S&P', "
+        "'Nasdaq', etc. count as matches:\n"
+        "  SPY / VOO / IVV = S&P 500 ('the market', 'the S&P', "
+        "'stocks')\n"
+        "  QQQ / QQQM = Nasdaq-100 ('the Nasdaq', 'tech', 'the Qs')\n"
+        "  DIA = Dow Jones\n"
+        "  IWM = Russell 2000 ('small caps')\n"
+        "  VTI = total US market\n"
+        "  SH = INVERSE S&P (bearish S&P thesis IS a match — the "
+        "speaker is betting against the index via SH)\n"
+        "  SQQQ / PSQ = inverse / short Nasdaq\n"
+        "  SDS = -2x S&P\n\n"
+        "BONDS / RATES ETFs:\n"
+        "  TLT = 20+ year treasuries ('long bonds', 'duration', "
+        "'30-year')\n"
+        "  IEF = 7-10 year treasuries\n"
+        "  SHY = short-term treasuries\n"
+        "  TBT / TMV = inverse / short long-bond (bearish rates)\n"
+        "  TIP / SCHP = TIPS, inflation-linked treasuries "
+        "('inflation protection', 'real yields')\n"
+        "  HYG / JNK = high yield credit ('junk bonds', 'credit')\n"
+        "  LQD = investment grade credit\n\n"
+        "COMMODITIES / FX ETFs:\n"
+        "  GLD / IAU = gold ('gold', 'the yellow metal')\n"
+        "  SLV = silver\n"
+        "  USO = crude oil ('oil', 'WTI', 'crude')\n"
+        "  UNG = natural gas\n"
+        "  DBC = broad commodities\n"
+        "  UUP = US dollar ('the dollar', 'DXY')\n"
+        "  FXE = euro, FXY = yen\n\n"
+        "CRYPTO (native + ETF wrappers all count):\n"
+        "  BTC / IBIT / FBTC / GBTC = Bitcoin\n"
+        "  ETH / ETHA / ETHE / FETH = Ethereum\n"
+        "  SOL = Solana\n"
+        "  XRP = Ripple / XRP\n"
+        "  LINK = Chainlink\n"
+        "  LTC = Litecoin\n"
+        "  DOGE = Dogecoin\n"
+        "  ADA = Cardano\n"
+        "  AVAX = Avalanche\n"
+        "  DOT = Polkadot\n"
+        "  MATIC = Polygon\n\n"
+        "SECTOR ETFs — sector name counts:\n"
+        "  XLF = financials, XLE = energy, XLK = tech, "
+        "XLV = healthcare, XLI = industrials, XLY = consumer disc., "
+        "XLP = staples, XLU = utilities, XLRE = real estate, "
+        "XLB = materials, XLC = comms.\n"
+        "  SMH / SOXX = semiconductors ('semis', 'chips')\n"
+        "  KRE / KBE = regional / big banks\n"
+        "  XBI / IBB = biotech\n"
+        "  ARKK = ARK Innovation ('ARK', 'Cathie Wood')\n\n"
+        "VOLATILITY:\n"
+        "  VXX / UVXY = VIX / volatility ('the VIX', 'long vol')\n\n"
         f"Quote:\n\"{quote.strip()}\"\n\n"
+        f"Ticker under review: {ticker}{company_bit}\n\n"
         "Respond with ONLY one of:\n"
-        "- match (the quote is about this ticker/company)\n"
-        "- mismatch (the quote is NOT about this ticker/company — it "
-        "discusses a different company entirely)\n"
-        "- ambiguous (the quote mentions multiple companies and this "
-        "ticker could be one of them but isn't the primary subject)"
+        "- match (the quote is about this ticker / its underlying "
+        "asset / the concept it tracks, per the table above)\n"
+        "- mismatch (the quote is unmistakably about a DIFFERENT "
+        "and SPECIFIC company or asset — e.g. the quote discusses "
+        "VICI Properties but the ticker is LYV. Only use mismatch "
+        "when you are highly confident and a different specific "
+        "name is stated.)\n"
+        "- ambiguous (you're not sure, OR the ticker isn't in the "
+        "table above and the quote doesn't literally say its "
+        "symbol/name, OR the quote is generic commentary that could "
+        "apply)\n\n"
+        "When in doubt, prefer ambiguous over mismatch. Mismatch "
+        "should only fire when the quote clearly names a different "
+        "company or asset than the ticker represents."
     )
 
 
