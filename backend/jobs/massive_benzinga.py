@@ -55,6 +55,23 @@ def _massive_inner(db: Session):
         print("[MassiveBZ] No MASSIVE_API_KEY set, skipping")
         return
 
+    # Open a scraper_runs row so API/auth/crash failures are visible in the
+    # DB instead of only in stdout. Best-effort: a failed insert must not
+    # break the scrape. Finalized at the bottom with status + error_message.
+    run_id: int | None = None
+    try:
+        run_id = db.execute(text(
+            "INSERT INTO scraper_runs (source, started_at, status) "
+            "VALUES ('benzinga', NOW(), 'running') RETURNING id"
+        )).scalar()
+        db.commit()
+    except Exception as e:
+        print(f"[MassiveBZ] scraper_runs insert failed: {e}")
+        try:
+            db.rollback()
+        except Exception:
+            pass
+
     # Always incremental — backfill is done separately
     if not _LAST_UPDATED:
         _LAST_UPDATED = (datetime.utcnow() - timedelta(days=1)).strftime("%Y-%m-%d")
@@ -62,88 +79,141 @@ def _massive_inner(db: Session):
     print(f"[MassiveBZ] Incremental fetch since {_LAST_UPDATED}")
     max_pages = 5
 
+    fetched = 0
     added = 0
     skipped = 0
     page = 0
     next_url = None
+    run_status = "ok"
+    run_error: str | None = None
 
-    while True:
-        page += 1
+    try:
+        while True:
+            page += 1
 
-        # Build request
-        if next_url:
-            url = next_url
-            params = {}
-        else:
-            url = API_URL
-            params = {
-                "sort": "last_updated.desc",
-                "limit": 500,
-            }
-            if _LAST_UPDATED:
-                params["last_updated.gte"] = _LAST_UPDATED
+            # Build request
+            if next_url:
+                url = next_url
+                params = {}
+            else:
+                url = API_URL
+                params = {
+                    "sort": "last_updated.desc",
+                    "limit": 500,
+                }
+                if _LAST_UPDATED:
+                    params["last_updated.gte"] = _LAST_UPDATED
 
-        try:
-            r = httpx.get(url, params=params, headers=_AUTH_HEADERS, timeout=30)
-            if r.status_code != 200:
-                print(f"[MassiveBZ] HTTP {r.status_code}: {r.text[:300]}")
+            try:
+                r = httpx.get(url, params=params, headers=_AUTH_HEADERS, timeout=30)
+                if r.status_code != 200:
+                    # Log response body FIRST, then break. Capture for scraper_runs.
+                    body_preview = r.text[:300]
+                    print(f"[MassiveBZ] HTTP {r.status_code}: {body_preview}")
+                    run_status = "error"
+                    run_error = f"HTTP {r.status_code}: {body_preview}"
+                    break
+
+                data = r.json()
+            except Exception as e:
+                print(f"[MassiveBZ] Request error: {e}")
+                run_status = "error"
+                run_error = f"request_error: {e}"
                 break
 
-            data = r.json()
-        except Exception as e:
-            print(f"[MassiveBZ] Request error: {e}")
-            break
-
-        # Extract ratings list
-        if isinstance(data, list):
-            ratings = data
-            next_url = None
-        elif isinstance(data, dict):
-            ratings = data.get("ratings", data.get("results", data.get("data", [])))
-            next_url_raw = data.get("next_url") or data.get("next")
-            # Header auth: strip any apikey echoed back in next_url; the
-            # Authorization header carries the credential on every call.
-            next_url = _strip_apikey(next_url_raw) if next_url_raw else None
-        else:
-            ratings = []
-            next_url = None
-
-        if not ratings:
-            if page == 1:
-                print(f"[MassiveBZ] No ratings returned. Response: {str(data)[:300]}")
-            break
-
-        if page == 1:
-            print(f"[MassiveBZ] Page 1: {len(ratings)} ratings. Fields: {list(ratings[0].keys())}")
-            # Log URL field availability for first 5 ratings
-            url_stats = {"has_url_news": 0, "has_url_calendar": 0, "neither": 0}
-            for _r in ratings[:20]:
-                un = _r.get("url_news") or _r.get("benzinga_news_url") or ""
-                uc = _r.get("url_calendar") or _r.get("benzinga_calendar_url") or ""
-                if un and "://" in un:
-                    url_stats["has_url_news"] += 1
-                elif uc and "://" in uc:
-                    url_stats["has_url_calendar"] += 1
-                else:
-                    url_stats["neither"] += 1
-            print(f"[MassiveBZ] URL fields in first 20: {url_stats}")
-
-        for rating in ratings:
-            result = _process_rating(rating, db)
-            if result:
-                added += 1
+            # Extract ratings list
+            if isinstance(data, list):
+                ratings = data
+                next_url = None
+            elif isinstance(data, dict):
+                ratings = data.get("ratings", data.get("results", data.get("data", [])))
+                next_url_raw = data.get("next_url") or data.get("next")
+                # Header auth: strip any apikey echoed back in next_url; the
+                # Authorization header carries the credential on every call.
+                next_url = _strip_apikey(next_url_raw) if next_url_raw else None
             else:
-                skipped += 1
+                ratings = []
+                next_url = None
 
-        # Stop at max pages to avoid runaway pagination
-        if not next_url or page >= max_pages:
-            break
+            if not ratings:
+                if page == 1:
+                    print(f"[MassiveBZ] No ratings returned. Response: {str(data)[:300]}")
+                break
 
-    if added > 0:
-        db.commit()
+            fetched += len(ratings)
+
+            if page == 1:
+                print(f"[MassiveBZ] Page 1: {len(ratings)} ratings. Fields: {list(ratings[0].keys())}")
+                # Log URL field availability for first 5 ratings
+                url_stats = {"has_url_news": 0, "has_url_calendar": 0, "neither": 0}
+                for _r in ratings[:20]:
+                    un = _r.get("url_news") or _r.get("benzinga_news_url") or ""
+                    uc = _r.get("url_calendar") or _r.get("benzinga_calendar_url") or ""
+                    if un and "://" in un:
+                        url_stats["has_url_news"] += 1
+                    elif uc and "://" in uc:
+                        url_stats["has_url_calendar"] += 1
+                    else:
+                        url_stats["neither"] += 1
+                print(f"[MassiveBZ] URL fields in first 20: {url_stats}")
+
+            for rating in ratings:
+                result = _process_rating(rating, db)
+                if result:
+                    added += 1
+                else:
+                    skipped += 1
+
+            # Stop at max pages to avoid runaway pagination
+            if not next_url or page >= max_pages:
+                break
+
+        if added > 0:
+            db.commit()
+    except Exception as e:
+        # Any unexpected crash — still finalize scraper_runs below.
+        import traceback
+        run_status = "error"
+        run_error = f"crash: {e} | {traceback.format_exc()[:300]}"
+        print(f"[MassiveBZ] Unexpected error: {run_error}")
+        try:
+            db.rollback()
+        except Exception:
+            pass
 
     _LAST_UPDATED = datetime.utcnow().strftime("%Y-%m-%d")
-    print(f"[MassiveBZ] Done: {added} added, {skipped} skipped (pages: {page})")
+    print(f"[MassiveBZ] Done: {added} added, {skipped} skipped, fetched {fetched}, status={run_status} (pages: {page})")
+
+    # Finalize scraper_runs row. Best-effort: any failure here is logged and
+    # ignored. On error paths run_error holds the HTTP status + response body
+    # so the block is visible from `SELECT ... FROM scraper_runs WHERE source='benzinga'`.
+    if run_id is not None:
+        try:
+            db.execute(text("""
+                UPDATE scraper_runs
+                SET finished_at = NOW(),
+                    status = :status,
+                    items_fetched = :fetched,
+                    items_processed = :fetched,
+                    items_inserted = :inserted,
+                    items_rejected = :rejected,
+                    error_message = :err
+                WHERE id = :id
+            """), {
+                "id": run_id,
+                "status": run_status,
+                "fetched": int(fetched),
+                "inserted": int(added),
+                "rejected": int(skipped),
+                "err": run_error,
+            })
+            db.commit()
+        except Exception as e:
+            print(f"[MassiveBZ] scraper_runs finalize failed: {e}")
+            try:
+                db.rollback()
+            except Exception:
+                pass
 
 
 def _process_rating(rating: dict, db: Session) -> bool:
