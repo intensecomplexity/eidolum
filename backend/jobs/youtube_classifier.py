@@ -41,6 +41,37 @@ from sqlalchemy import text as sql_text
 log = logging.getLogger(__name__)
 
 
+# ── Auto-caption spelling fixes ─────────────────────────────────────────────
+#
+# YouTube's auto-captions consistently butcher a handful of ticker / company
+# names that show up often in stock-pick channels. The raw quote is still
+# used for timestamp matching and ticker verification (both paths search the
+# unmodified transcript), so this fix is applied only to the final value
+# written to predictions.source_verbatim_quote — AFTER matching has already
+# succeeded. Going forward the stored training data uses the correct names.
+
+_CAPTION_SPELLING_FIXES = {
+    'Salana': 'Solana',
+    'Invidia': 'Nvidia',
+    'Palanteer': 'Palantir',
+    'Pallantir': 'Palantir',
+    'Palenteer': 'Palantir',
+    'palunteer': 'Palantir',
+    'kryptos': 'crypto',
+    'fizer': 'Pfizer',
+    'Chewie': 'Chewy',
+}
+
+
+def _fix_caption_spelling(text: str) -> str:
+    """Fix known YouTube auto-caption misspellings in-place."""
+    if not text:
+        return text
+    for wrong, right in _CAPTION_SPELLING_FIXES.items():
+        text = re.sub(r'\b' + re.escape(wrong) + r'\b', right, text, flags=re.IGNORECASE)
+    return text
+
+
 # ── Rejection logging (mirror of x_scraper.log_rejection) ───────────────────
 
 def log_youtube_rejection(
@@ -1771,6 +1802,16 @@ RULES RECAP
 - MUST NOT treat conviction as affecting the prediction's scoring — it is label-only metadata captured for fine-tuning.
 - Rejections follow the same shape as the SOURCE_TIMESTAMP block's reference-resolution rejections: emit a single object with rejected=true, reason, and notes.
 
+PREDICTION VALIDITY CHECK (mandatory — apply to every candidate):
+Before accepting a prediction, verify it is a genuine forward-looking claim. REJECT the prediction (use the standard rejection format) if the quote is ANY of the following:
+- A position disclosure with no forward thesis ('I own this stock', 'this is my biggest holding', 'we decided to purchase')
+- A description of what already happened ('the stock dropped 12% yesterday', 'revenue was $12.1 billion')
+- A research note or watching statement ('I'm going to look into this more', 'keeping an eye on it', 'we'll see')
+- Reading data or metrics with no opinion ('intrinsic value is $133', 'PE ratio of 25')
+- Conversation filler with no actionable claim ('yeah interesting things happening', 'let's see what happens')
+
+A valid prediction MUST contain a forward-looking directional claim — the speaker expects the price to go up or down, recommends buying or selling, states a price target, or expresses a thesis about future performance with reasoning. If the quote is just commentary, disclosure, or observation without a forward claim, REJECT it.
+
 Output JSON only. Be concise."""
 
 
@@ -3369,7 +3410,7 @@ def _resolve_source_timestamp(
             return {
                 "source_timestamp_seconds": int(seconds),
                 "source_timestamp_method": method,
-                "source_verbatim_quote": verbatim[:2000],
+                "source_verbatim_quote": _fix_caption_spelling(verbatim)[:2000],
                 "source_timestamp_confidence": float(confidence),
             }
         # Match failed — still store the quote for audit, leave seconds NULL.
@@ -3380,7 +3421,7 @@ def _resolve_source_timestamp(
         return {
             "source_timestamp_seconds": None,
             "source_timestamp_method": "unknown",
-            "source_verbatim_quote": verbatim[:2000],
+            "source_verbatim_quote": _fix_caption_spelling(verbatim)[:2000],
             "source_timestamp_confidence": 0.0,
         }
     except Exception as _e:
