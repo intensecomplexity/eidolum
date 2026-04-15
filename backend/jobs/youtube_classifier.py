@@ -1604,7 +1604,7 @@ category using the table below and set timeframe_category to that name:
 
 | inferred_timeframe_days | timeframe_category    |
 |------------------------:|-----------------------|
-|                    <= 1 | day_trading           |
+|                    <= 1 | swing_trade           |
 |                    <= 7 | options_short         |
 |                   <= 21 | swing_trade           |
 |                   <= 30 | technical_chart       |
@@ -1617,6 +1617,16 @@ This mapping is purely numeric — pick the row whose upper bound is the
 smallest value >= inferred_timeframe_days. Step 2 still uses the signal-
 phrase table for category_default predictions; this bucket table only
 applies to the explicit branch from step 1.
+
+day_trading is intentionally NOT assigned by the BUCKET MAPPING table
+above. It can only come from Haiku explicitly selecting day_trading in
+step 2 (the signal-phrase table), which requires the speaker to
+explicitly describe an intraday trade with entry and exit within the
+same trading session. A numeric horizon of 1 day alone is not enough —
+YouTube analysts routinely say "this should bounce today" without
+meaning an intraday trade, and those calls belong in swing_trade, not
+day_trading. If you find yourself tempted to pick day_trading from the
+horizon number alone, pick swing_trade instead.
 
 EXAMPLES (timeframe only):
 
