@@ -617,6 +617,47 @@ def invalidate_prediction_metadata_enrichment_flag_cache() -> None:
     _PREDICTION_METADATA_ENRICHMENT_FLAG_CACHE["fetched_at"] = 0.0
 
 
+# ── Require complete predictions flag ─────────────────────────────────────
+#
+# When True, the YouTube classifier rejects any prediction whose inline
+# extraction left required training fields NULL. Required fields are:
+# source_timestamp_seconds + source_verbatim_quote (when
+# ENABLE_SOURCE_TIMESTAMPS is on) and timeframe_category +
+# inferred_timeframe_days + conviction_level (when
+# ENABLE_PREDICTION_METADATA_ENRICHMENT is on).
+#
+# Rejection is path-aware: the gate only fires when the live monitor
+# plumbed transcript_data through (i.e. inline extraction was attempted).
+# Backfill jobs that intentionally pass transcript_data=None and non-
+# YouTube scrapers are unaffected, regardless of this flag.
+#
+# Default True. Flip to false via the config table if the rejection
+# rate spikes and you'd rather accept incomplete rows than lose volume
+# while debugging the upstream extractor.
+
+_REQUIRE_COMPLETE_PREDICTIONS_FLAG_CACHE: dict = {"enabled": True, "fetched_at": 0.0}
+_REQUIRE_COMPLETE_PREDICTIONS_FLAG_TTL = 60  # seconds
+
+
+def is_require_complete_predictions_enabled(db) -> bool:
+    """Return True if REQUIRE_COMPLETE_PREDICTIONS is 'true' in the
+    config table. Default True. Cached 60s so tight classifier loops
+    don't hammer the config table."""
+    now = time.time()
+    if (now - _REQUIRE_COMPLETE_PREDICTIONS_FLAG_CACHE["fetched_at"]) < _REQUIRE_COMPLETE_PREDICTIONS_FLAG_TTL:
+        return bool(_REQUIRE_COMPLETE_PREDICTIONS_FLAG_CACHE["enabled"])
+    enabled = _read_bool(db, "REQUIRE_COMPLETE_PREDICTIONS", default=True)
+    _REQUIRE_COMPLETE_PREDICTIONS_FLAG_CACHE["enabled"] = enabled
+    _REQUIRE_COMPLETE_PREDICTIONS_FLAG_CACHE["fetched_at"] = now
+    return enabled
+
+
+def invalidate_require_complete_predictions_flag_cache() -> None:
+    """Reset the 60-second cache — called from the admin toggle endpoint
+    so changes take effect immediately instead of waiting for the TTL."""
+    _REQUIRE_COMPLETE_PREDICTIONS_FLAG_CACHE["fetched_at"] = 0.0
+
+
 # ── Homepage hero flag ─────────────────────────────────────────────────────
 #
 # Ship #13. Gates the new hero band, how-it-works strip, "Receipts" rename,
