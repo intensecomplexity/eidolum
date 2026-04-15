@@ -3382,6 +3382,85 @@ def _resolve_source_timestamp(
         return {}
 
 
+# ── Training completeness gate ────────────────────────────────────────────
+#
+# Returns the list of NULL required training fields when the inline
+# extraction path is active and the prediction would land incomplete.
+# Empty list means "OK to insert". Returns immediately (no flag read,
+# no work) when transcript_data is None — that path is reserved for
+# backfill jobs and non-YouTube scrapers and must never be gated.
+#
+# The gate is path-aware to the upstream feature flags: timestamp
+# fields are only required when ENABLE_SOURCE_TIMESTAMPS is on, and
+# metadata fields are only required when
+# ENABLE_PREDICTION_METADATA_ENRICHMENT is on. With both flags off the
+# gate is a no-op even with REQUIRE_COMPLETE_PREDICTIONS on.
+
+_TRAINING_REQUIRED_TS_FIELDS = (
+    "source_timestamp_seconds",
+    "source_verbatim_quote",
+)
+_TRAINING_REQUIRED_META_FIELDS = (
+    "timeframe_category",
+    "inferred_timeframe_days",
+    "conviction_level",
+)
+
+
+def _training_completeness_gaps(
+    ts_fields: dict,
+    meta_fields: dict,
+    transcript_data: dict | None,
+    *,
+    db,
+    stats: dict | None,
+) -> list[str]:
+    """Return [] if the prediction is OK to insert, otherwise the list
+    of required training fields that are missing. Increments stats
+    counters per missing field so admin diagnostics surface the dominant
+    rejection bucket. Never raises — any internal failure degrades to
+    a permissive [] return so the existing insert path is unaffected."""
+    if transcript_data is None:
+        return []
+    try:
+        from feature_flags import (
+            is_require_complete_predictions_enabled,
+            is_source_timestamps_enabled,
+            is_prediction_metadata_enrichment_enabled,
+        )
+        if not is_require_complete_predictions_enabled(db):
+            return []
+        ts_required = bool(is_source_timestamps_enabled(db))
+        meta_required = bool(is_prediction_metadata_enrichment_enabled(db))
+    except Exception as _e:
+        log.warning("[YT-CLF] training-completeness gate flag check failed: %s", _e)
+        return []
+    missing: list[str] = []
+    if ts_required:
+        for f in _TRAINING_REQUIRED_TS_FIELDS:
+            if not ts_fields.get(f):
+                missing.append(f)
+    if meta_required:
+        for f in _TRAINING_REQUIRED_META_FIELDS:
+            if not meta_fields.get(f):
+                missing.append(f)
+    if missing:
+        # Stdout-visible log so tail/grep can show which fields the
+        # classifier is dropping rows on. The full per-row context
+        # (ticker, video_id) lands in youtube_scraper_rejections via
+        # the caller's _reject(...) path, so a counter-style line here
+        # is sufficient for live monitoring.
+        log.info("[YT-CLF] gate skip — missing %s", ",".join(missing))
+        if stats is not None:
+            stats["incomplete_predictions_skipped"] = int(
+                stats.get("incomplete_predictions_skipped", 0)
+            ) + 1
+            for f in missing:
+                key = f"skipped_missing_{f}"
+                stats[key] = int(stats.get(key, 0)) + 1
+    return missing
+
+
 _VALID_CONVICTION_LEVELS = {
     "strong", "moderate", "hedged", "hypothetical", "unknown",
 }
@@ -3746,6 +3825,16 @@ def insert_youtube_prediction(
         db=db,
     )
 
+    # Training completeness gate — drop predictions whose inline
+    # extraction left required training fields NULL. No-op when
+    # transcript_data is None (backfill / non-YouTube path) or when
+    # the upstream feature flags are off.
+    _gaps = _training_completeness_gaps(
+        _ts_fields, _meta_fields, transcript_data, db=db, stats=stats,
+    )
+    if _gaps:
+        return _reject("incomplete_training_fields", hr=",".join(_gaps))
+
     db.add(
         Prediction(
             forecaster_id=forecaster.id,
@@ -3897,6 +3986,16 @@ def insert_youtube_sector_prediction(
         publish_date=publish_date, default_window_days=window_days,
         db=db,
     )
+
+    # Training completeness gate — drop predictions whose inline
+    # extraction left required training fields NULL. No-op when
+    # transcript_data is None (backfill / non-YouTube path) or when
+    # the upstream feature flags are off.
+    _gaps = _training_completeness_gaps(
+        _ts_fields, _meta_fields, transcript_data, db=db, stats=stats,
+    )
+    if _gaps:
+        return _reject("incomplete_training_fields", hr=",".join(_gaps))
 
     db.add(
         Prediction(
@@ -4109,6 +4208,16 @@ def insert_youtube_macro_prediction(
         db=db,
     )
 
+    # Training completeness gate — drop predictions whose inline
+    # extraction left required training fields NULL. No-op when
+    # transcript_data is None (backfill / non-YouTube path) or when
+    # the upstream feature flags are off.
+    _gaps = _training_completeness_gaps(
+        _ts_fields, _meta_fields, transcript_data, db=db, stats=stats,
+    )
+    if _gaps:
+        return _reject("incomplete_training_fields", hr=",".join(_gaps))
+
     db.add(
         Prediction(
             forecaster_id=forecaster.id,
@@ -4298,6 +4407,16 @@ def insert_youtube_pair_prediction(
         publish_date=publish_date, default_window_days=window_days,
         db=db,
     )
+
+    # Training completeness gate — drop predictions whose inline
+    # extraction left required training fields NULL. No-op when
+    # transcript_data is None (backfill / non-YouTube path) or when
+    # the upstream feature flags are off.
+    _gaps = _training_completeness_gaps(
+        _ts_fields, _meta_fields, transcript_data, db=db, stats=stats,
+    )
+    if _gaps:
+        return _reject("incomplete_training_fields", hr=",".join(_gaps))
 
     db.add(
         Prediction(
@@ -4522,6 +4641,16 @@ def insert_youtube_binary_event_prediction(
         publish_date=publish_date, default_window_days=window_days,
         db=db,
     )
+
+    # Training completeness gate — drop predictions whose inline
+    # extraction left required training fields NULL. No-op when
+    # transcript_data is None (backfill / non-YouTube path) or when
+    # the upstream feature flags are off.
+    _gaps = _training_completeness_gaps(
+        _ts_fields, _meta_fields, transcript_data, db=db, stats=stats,
+    )
+    if _gaps:
+        return _reject("incomplete_training_fields", hr=",".join(_gaps))
 
     db.add(
         Prediction(
@@ -4749,6 +4878,16 @@ def insert_youtube_metric_forecast_prediction(
         db=db,
     )
 
+    # Training completeness gate — drop predictions whose inline
+    # extraction left required training fields NULL. No-op when
+    # transcript_data is None (backfill / non-YouTube path) or when
+    # the upstream feature flags are off.
+    _gaps = _training_completeness_gaps(
+        _ts_fields, _meta_fields, transcript_data, db=db, stats=stats,
+    )
+    if _gaps:
+        return _reject("incomplete_training_fields", hr=",".join(_gaps))
+
     db.add(
         Prediction(
             forecaster_id=forecaster.id,
@@ -4961,6 +5100,16 @@ def insert_youtube_conditional_prediction(
         db=db,
     )
     outcome_window_days = int(window_days) if window_days else outcome_window_days
+
+    # Training completeness gate — drop predictions whose inline
+    # extraction left required training fields NULL. No-op when
+    # transcript_data is None (backfill / non-YouTube path) or when
+    # the upstream feature flags are off.
+    _gaps = _training_completeness_gaps(
+        _ts_fields, _meta_fields, transcript_data, db=db, stats=stats,
+    )
+    if _gaps:
+        return _reject("incomplete_training_fields", hr=",".join(_gaps))
 
     db.add(
         Prediction(
@@ -5375,6 +5524,12 @@ def insert_youtube_regime_prediction(
         publish_date=publish_date, default_window_days=window_days,
         db=db,
     )
+
+    # NOTE: regime predictions intentionally skip the training
+    # completeness gate — they don't go through inline source-timestamp
+    # extraction (no transcript_data plumbed into this signature) and
+    # have no verbatim_quote in their schema. Extending timestamps to
+    # regime is a separate ship that needs prompt verification.
 
     db.add(
         Prediction(
