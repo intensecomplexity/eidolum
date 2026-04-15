@@ -68,7 +68,7 @@ export default function PredictionBadge({
       </span>
     );
   }
-  if (outcome === 'no_data') {
+  if (outcome === 'no_data' || outcome === 'delisted') {
     return <span className="text-muted font-mono text-[10px]">N/A</span>;
   }
   return <span className="badge-pending">PENDING</span>;

@@ -276,6 +276,67 @@ def _fetch_fmp(ticker: str) -> dict:
         return {}
 
 
+# ── FMP stale-data purge threshold ────────────────────────────────────────
+# If FMP returns price history but the latest date is more than this many
+# days before a prediction's evaluation_date, the ticker went dark before
+# the eval window and no source will ever score it. We mark those rows
+# outcome='delisted' on the spot so they exit the no_data pool forever
+# instead of burning FMP + Tiingo + Polygon calls once per tick. 60 days
+# is intentionally conservative: a ticker that has had no fresh bars for
+# two months is either delisted, acquired, suspended, or an index symbol
+# FMP doesn't update — all terminal states for our purposes.
+FMP_STALE_THRESHOLD_DAYS = 60
+
+
+def _purge_stale_fmp(preds: list, prices: dict, db, now) -> tuple[list, int]:
+    """Split a ticker's predictions into (scorable, stale) based on FMP
+    max_date. Writes outcome='delisted' rows for the stale ones in place.
+
+    Returns (fresh_preds, stale_count). Called AFTER a successful FMP
+    fetch where prices is a populated dict keyed by YYYY-MM-DD. Safe to
+    call with an empty dict — returns (preds, 0).
+    """
+    if not prices or not preds:
+        return preds, 0
+    try:
+        fmp_max_str = max(prices.keys())
+        fmp_max = datetime.strptime(fmp_max_str, "%Y-%m-%d").date()
+    except (ValueError, TypeError):
+        return preds, 0
+
+    fresh: list = []
+    stale_count = 0
+    for p in preds:
+        ed = p.get("evaluation_date")
+        if ed is None:
+            fresh.append(p)
+            continue
+        ed_date = ed.date() if hasattr(ed, "date") else ed
+        gap = (ed_date - fmp_max).days
+        if gap > FMP_STALE_THRESHOLD_DAYS:
+            # WHERE clause guards against re-marking a row that was already
+            # moved out of no_data by a parallel worker / prior phase.
+            db.execute(sql_text("""
+                UPDATE predictions
+                SET outcome='delisted',
+                    evaluation_summary=:s,
+                    evaluated_at=:now
+                WHERE id=:id AND outcome='no_data'
+            """), {
+                "id": p["id"],
+                "s": (
+                    f"Delisted/inactive: FMP data ends {fmp_max_str}, "
+                    f"{gap}d before evaluation_date ({ed_date}). "
+                    f"Ticker stopped trading before the evaluation window."
+                ),
+                "now": now,
+            })
+            stale_count += 1
+        else:
+            fresh.append(p)
+    return fresh, stale_count
+
+
 def _closest_price(prices: dict, target_date) -> float | None:
     if not prices or not target_date:
         return None
@@ -666,6 +727,9 @@ def retry_no_data_batch(db, max_tickers: int | None = None):
     polygon_calls = 0
     fmp_calls = 0
     tiingo_empty = 0
+    # Rows that _purge_stale_fmp flipped to outcome='delisted' this run.
+    # Reported in the RUN COMPLETE summary.
+    fmp_delisted_stale = 0
 
     def _write_updates(updates):
         nonlocal total_scored, total_hits, total_nears, total_misses
@@ -714,10 +778,17 @@ def retry_no_data_batch(db, max_tickers: int | None = None):
             if not prices:
                 fmp_failed_tickers.append(ticker)
             else:
-                updates, nd = _score_predictions(preds, prices, now, ticker)
-                total_still_no_data += nd
-                if updates:
-                    _write_updates(updates)
+                # Purge predictions whose eval_date is > FMP_STALE_THRESHOLD_DAYS
+                # after FMP's latest bar. These are delisted/acquired/inactive
+                # tickers that no source will ever score — flip them to
+                # outcome='delisted' so they exit the retry pool forever.
+                preds, stale_n = _purge_stale_fmp(preds, prices, db, now)
+                fmp_delisted_stale += stale_n
+                if preds:
+                    updates, nd = _score_predictions(preds, prices, now, ticker)
+                    total_still_no_data += nd
+                    if updates:
+                        _write_updates(updates)
 
             if (i + 1) % 25 == 0:
                 db.commit()
@@ -904,10 +975,16 @@ def retry_no_data_batch(db, max_tickers: int | None = None):
             prices = _fetch_fmp(ticker)
             fmp_calls += 1
 
-            updates, nd = _score_predictions(preds, prices, now, ticker)
-            total_still_no_data += nd
-            if updates:
-                _write_updates(updates)
+            if prices:
+                # Same stale-data purge as the Ultimate path.
+                preds, stale_n = _purge_stale_fmp(preds, prices, db, now)
+                fmp_delisted_stale += stale_n
+
+            if preds:
+                updates, nd = _score_predictions(preds, prices, now, ticker)
+                total_still_no_data += nd
+                if updates:
+                    _write_updates(updates)
             if (i + 1) % 10 == 0:
                 db.commit()
             time.sleep(0.3)
@@ -940,6 +1017,7 @@ def retry_no_data_batch(db, max_tickers: int | None = None):
     print(f"  Predictions scored: {total_scored} (hit={total_hits}, near={total_nears}, miss={total_misses})")
     print(f"  Sources: Polygon={polygon_scored}, Tiingo={tiingo_scored}, FMP={fmp_scored}")
     print(f"  API calls: Polygon={polygon_calls}, Tiingo={tiingo_calls} ({tiingo_empty} empty), FMP={fmp_calls}")
+    print(f"  Delisted (FMP stale >{FMP_STALE_THRESHOLD_DAYS}d): {fmp_delisted_stale}")
     print(f"  Cache hits: {cache_hits}")
     print(f"  Remaining no_data: {remaining:,} (was {remaining_total:,})")
     print(f"  Est. days to clear: {est_days}")
