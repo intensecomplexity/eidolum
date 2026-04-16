@@ -1007,9 +1007,12 @@ def get_leaderboard(
     has_filter = sector or call_type or direction or timeframe or source or (sort and sort != "accuracy") or (min_predictions and min_predictions > 10)
     if has_filter:
         cache_key = f"{sector}|{call_type}|{sort}|{limit}|{min_predictions}|{direction}|{timeframe}|{source}"
+        # YouTube has too few forecasters to hide dormant ones — show all.
+        _include_dormant = include_dormant or source == "youtube"
+
         cached = _filtered_cache.get(cache_key)
         if cached and (_time.time() - cached[1]) < FILTERED_CACHE_TTL:
-            return _apply_dormancy(db, list(cached[0]), include_dormant)
+            return _apply_dormancy(db, list(cached[0]), _include_dormant)
 
         min_preds = min_predictions or (10 if sector or call_type or timeframe or source else 35)
         results = _build_filtered_leaderboard(
@@ -1025,7 +1028,7 @@ def get_leaderboard(
                 timeframe=timeframe, source=source,
             )
         _filtered_cache[cache_key] = (results, _time.time())
-        return _apply_dormancy(db, list(results), include_dormant)
+        return _apply_dormancy(db, list(results), _include_dormant)
 
     # Periodic stats integrity check
     _check_stats_integrity(db)
