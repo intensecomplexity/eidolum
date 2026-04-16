@@ -54,6 +54,7 @@ from jobs.youtube_classifier import (
     transcript_proxy_status,
     PIPELINE_VERSION,
     HAIKU_MODEL,
+    USE_FINETUNED_MODEL,
 )
 
 YOUTUBE_API_KEY = os.getenv("YOUTUBE_API_KEY", "").strip()
@@ -445,8 +446,8 @@ def run_channel_monitor(db=None):
     if not YOUTUBE_API_KEY:
         print("[ChannelMonitor] YOUTUBE_API_KEY not set — skipping")
         return
-    if not ANTHROPIC_API_KEY:
-        print("[ChannelMonitor] ANTHROPIC_API_KEY not set — skipping")
+    if not ANTHROPIC_API_KEY and not USE_FINETUNED_MODEL:
+        print("[ChannelMonitor] ANTHROPIC_API_KEY not set and USE_FINETUNED_MODEL=false — skipping")
         return
 
     # Surface every transcript-proxy-related env var the classifier checks,
@@ -470,8 +471,9 @@ def run_channel_monitor(db=None):
             flush=True,
         )
 
+    _clf = "Qwen-7B (RunPod) → Haiku fallback" if USE_FINETUNED_MODEL else HAIKU_MODEL
     print(
-        f"[ChannelMonitor] V2 (transcript-based) starting | classifier={HAIKU_MODEL} "
+        f"[ChannelMonitor] V2 (transcript-based) starting | classifier={_clf} "
         f"pipeline={PIPELINE_VERSION} proxy={transcript_proxy_status()}",
         flush=True,
     )
@@ -1053,8 +1055,9 @@ def _run_inner(db):
         f"{stats['videos_skipped_short']} shorts",
         flush=True,
     )
+    _clf_name = "Qwen-7B → Haiku" if USE_FINETUNED_MODEL else f"Haiku ({HAIKU_MODEL})"
     print(
-        f"  Haiku ({HAIKU_MODEL}): {stats['videos_classified']} sent, "
+        f"  Classifier ({_clf_name}): {stats['videos_classified']} sent, "
         f"{stats['predictions_extracted']} predictions extracted",
         flush=True,
     )
@@ -1741,7 +1744,7 @@ def fetch_channel_now(channel_id: str):
     """
     if not channel_id:
         return
-    if not YOUTUBE_API_KEY or not ANTHROPIC_API_KEY:
+    if not YOUTUBE_API_KEY or (not ANTHROPIC_API_KEY and not USE_FINETUNED_MODEL):
         print(f"[ChannelMonitor] fetch_channel_now skipped for "
               f"{channel_id}: missing API keys")
         return

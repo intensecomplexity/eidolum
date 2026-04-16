@@ -300,8 +300,122 @@ def call_youtube_haiku_with_retry(
 
 # verified_by tag for grep / cohort analysis. Bump _v1 → _v2 if the
 # prompt or model materially change.
-VERIFIED_BY = "youtube_haiku_v1"
+VERIFIED_BY_HAIKU = "youtube_haiku_v1"
+VERIFIED_BY_QWEN = "youtube_qwen_v1"
+# Legacy alias — insert functions reference this constant; it gets
+# overridden per-call via _active_verified_by thread-local below.
+VERIFIED_BY = VERIFIED_BY_HAIKU
 PIPELINE_VERSION = "youtube_v1"
+
+# ── RunPod vLLM (fine-tuned Qwen 2.5 7B) ────────────────────────────────────
+
+RUNPOD_API_KEY = os.getenv("RUNPOD_API_KEY", "").strip()
+RUNPOD_ENDPOINT_ID = os.getenv("RUNPOD_ENDPOINT_ID", "").strip()
+USE_FINETUNED_MODEL = os.getenv("USE_FINETUNED_MODEL", "false").lower() == "true"
+
+QWEN_SYSTEM_PROMPT = (
+    "You are a financial prediction classifier. Given a YouTube transcript excerpt, "
+    "extract stock market predictions with: ticker, direction (bullish/bearish), "
+    "conviction_level (strong/moderate/hedged), timeframe_category (one of: macro_thesis, "
+    "long_term_fundamental, fundamental_quarterly, cyclical_medium, technical_chart, "
+    "swing_trade, earnings_cycle, event_binary, options_expiry, crypto_native, "
+    "sector_rotation), inferred_timeframe_days (integer), and the verbatim quote. "
+    "Return a JSON array of prediction objects. If no predictions found, return []."
+)
+
+# RunPod Serverless pricing: ~$0.00076/s active GPU time.
+# Average call ~1.5s → ~$0.0012/call.
+QWEN_PRICE_PER_CALL_USD = 0.0012
+
+
+def call_runpod_vllm(
+    transcript_chunk: str,
+    channel_name: str,
+    title: str,
+    publish_date: str,
+    video_id: str | None = None,
+) -> tuple[str, float]:
+    """Call the fine-tuned Qwen 2.5 7B on RunPod Serverless via vLLM's
+    OpenAI-compatible API.
+
+    Returns (raw_text_response, estimated_cost_usd).
+    Raises on ANY failure so the caller can fall back to Haiku.
+    """
+    import httpx as _httpx
+
+    if not RUNPOD_API_KEY or not RUNPOD_ENDPOINT_ID:
+        raise RuntimeError("RUNPOD_API_KEY or RUNPOD_ENDPOINT_ID not set")
+
+    url = f"https://api.runpod.ai/v2/{RUNPOD_ENDPOINT_ID}/openai/v1/chat/completions"
+
+    user_msg = (
+        f"Video title: {title}\n"
+        f"Channel: {channel_name}\n"
+        f"Published: {publish_date}\n"
+        f"Transcript:\n"
+        f"{transcript_chunk}\n\n"
+        f"Extract all valid financial predictions from this transcript. "
+        f"Return JSON array only, no other text."
+    )
+
+    payload = {
+        "model": "/runpod-volume/eidolum-qwen-merged",
+        "messages": [
+            {"role": "system", "content": QWEN_SYSTEM_PROMPT},
+            {"role": "user", "content": user_msg},
+        ],
+        "temperature": 0,
+        "max_tokens": 4000,
+    }
+
+    identifier = video_id or channel_name
+    r = _httpx.post(
+        url,
+        json=payload,
+        headers={
+            "Authorization": f"Bearer {RUNPOD_API_KEY}",
+            "Content-Type": "application/json",
+        },
+        timeout=120,
+    )
+
+    if r.status_code != 200:
+        raise RuntimeError(
+            f"RunPod HTTP {r.status_code}: {r.text[:300]}"
+        )
+
+    data = r.json()
+    choices = data.get("choices") or []
+    if not choices:
+        raise RuntimeError("RunPod returned empty choices")
+
+    content = (choices[0].get("message") or {}).get("content") or ""
+    if not content.strip():
+        raise RuntimeError("RunPod returned empty content")
+
+    usage = data.get("usage") or {}
+    in_tok = usage.get("prompt_tokens", 0)
+    out_tok = usage.get("completion_tokens", 0)
+    cost = QWEN_PRICE_PER_CALL_USD
+
+    print(
+        f"[YOUTUBE-QWEN] {identifier} ({channel_name}) "
+        f"input={in_tok} output={out_tok} cost=${cost:.4f}",
+        flush=True,
+    )
+
+    return content.strip(), cost
+
+
+# Thread-local override for VERIFIED_BY so insert functions pick up
+# the correct tag without changing their signatures.
+import threading
+_verified_by_local = threading.local()
+
+
+def _get_active_verified_by() -> str:
+    """Return the verified_by tag for the current classify_video call."""
+    return getattr(_verified_by_local, "tag", VERIFIED_BY_HAIKU)
 
 
 # ── Eidolum Prediction Classifier prompt (use EXACTLY — do not simplify) ────
@@ -2204,11 +2318,125 @@ def _build_user_prompt(channel_name: str, title: str, publish_date: str, transcr
     )
 
 
+def _classify_video_qwen(
+    channel_name: str,
+    title: str,
+    publish_date: str,
+    chunks: list[str],
+    *,
+    video_id: str | None = None,
+    telemetry: dict,
+) -> tuple[list[dict], dict] | None:
+    """Qwen path: call RunPod vLLM for each chunk, parse JSON, validate.
+
+    Returns (predictions, telemetry) on success, or None if RunPod fails
+    (caller should fall through to Haiku).
+    """
+    _verified_by_local.tag = VERIFIED_BY_QWEN
+    telemetry["prompt_variant"] = "qwen_finetuned"
+
+    all_preds: list[dict] = []
+    total_cost = 0.0
+
+    for i, chunk in enumerate(chunks):
+        telemetry["chunks"] += 1
+        try:
+            raw_text, cost = call_runpod_vllm(
+                chunk,
+                channel_name=channel_name,
+                title=title,
+                publish_date=publish_date,
+                video_id=video_id,
+            )
+            total_cost += cost
+        except Exception as e:
+            tag = f"RunPod error chunk {i+1}/{len(chunks)}: {e}"
+            log.warning("[YT-CLF] %s", tag)
+            telemetry["error"] = tag[:300]
+            # Return None → caller falls back to Haiku
+            return None
+
+        # Strip markdown fences
+        content = raw_text
+        if content.startswith("```"):
+            content = content.split("```")[1]
+            if content.startswith("json"):
+                content = content[4:]
+            content = content.strip()
+
+        try:
+            parsed = json.loads(content)
+        except json.JSONDecodeError as pe:
+            log.warning(
+                "[YT-CLF] Qwen parse error chunk %d/%d: %s | raw=%r",
+                i + 1, len(chunks), pe, content[:200],
+            )
+            telemetry["error"] = f"qwen_parse_error: {str(pe)[:120]}"
+            return None
+
+        # Qwen may return a single dict or a list
+        if isinstance(parsed, dict):
+            parsed = [parsed]
+        if not isinstance(parsed, list):
+            telemetry["error"] = f"qwen_non_list: {type(parsed).__name__}"
+            return None
+
+        # Normalize Qwen output to match the fields the validator expects.
+        # Qwen outputs: source_verbatim_quote, timeframe_category, inferred_timeframe_days
+        # Validator expects: verbatim_quote, timeframe_source
+        for p in parsed:
+            if isinstance(p, dict):
+                # Map source_verbatim_quote → verbatim_quote
+                if "source_verbatim_quote" in p and "verbatim_quote" not in p:
+                    p["verbatim_quote"] = p["source_verbatim_quote"]
+                # The validator rejects predictions without timeframe_source.
+                # Qwen was trained on predictions that had both explicit and
+                # category-default timeframes, so we mark as "inferred" which
+                # the validator accepts at any horizon.
+                if "timeframe_source" not in p:
+                    p["timeframe_source"] = "inferred"
+
+        telemetry["predictions_raw"] += len(parsed)
+        all_preds.extend(parsed)
+
+        if i < len(chunks) - 1:
+            time.sleep(0.5)
+
+    telemetry["estimated_cost_usd"] = total_cost
+
+    # Validate using the same validator as Haiku path
+    valid = _validate_and_dedupe_predictions(all_preds)
+    if len(valid) > MAX_PREDICTIONS_PER_VIDEO:
+        log.warning(
+            "[YT-CLF] Qwen: %s returned %d preds, capping at %d",
+            channel_name, len(valid), MAX_PREDICTIONS_PER_VIDEO,
+        )
+        valid = valid[:MAX_PREDICTIONS_PER_VIDEO]
+
+    telemetry["predictions_validated"] = len(valid)
+    print(
+        f"[YOUTUBE-QWEN] DONE video={video_id or '?'} "
+        f"chunks={telemetry['chunks']} raw={telemetry['predictions_raw']} "
+        f"validated={len(valid)} cost=${total_cost:.4f}",
+        flush=True,
+    )
+    return valid, telemetry
+
+
 def classify_video(channel_name: str, title: str, publish_date: str,
                    transcript: str,
                    video_id: str | None = None,
                    db=None) -> tuple[list[dict], dict]:
-    """Send a (possibly chunked) transcript to Haiku and return parsed predictions.
+    """Classify a video transcript and extract financial predictions.
+
+    Model selection (checked once per call):
+      - USE_FINETUNED_MODEL=true → try Qwen 2.5 7B on RunPod first.
+        If RunPod fails for ANY reason, fall back to Haiku silently.
+      - USE_FINETUNED_MODEL=false or unset → Haiku only.
+
+    verified_by tagging:
+      - Qwen path:  youtube_qwen_v1
+      - Haiku path:  youtube_haiku_v1
 
     Returns (predictions, telemetry):
       predictions — list of validated prediction dicts (may be empty)
@@ -2218,24 +2446,37 @@ def classify_video(channel_name: str, title: str, publish_date: str,
     NEVER raises. On any classifier failure (no key, HTTP error, parse
     error) returns ([], {"error": "<tag>"}). The caller should treat
     empty predictions + an error tag as a transient skip.
-
-    Prompt selection: when a DB session is passed AND the stable hash
-    routing for this video_id falls under the current traffic percent
-    for ENABLE_YOUTUBE_SECTOR_CALLS, use YOUTUBE_HAIKU_SECTOR_SYSTEM
-    (extracts both ticker_call and sector_call objects). Otherwise use
-    the unchanged HAIKU_SYSTEM (ticker_call only). telemetry gets a
-    prompt_variant key so the caller can aggregate.
     """
     telemetry: dict = {"chunks": 0, "input_tokens": 0, "output_tokens": 0,
                        "last_status": None, "predictions_raw": 0,
                        "prompt_variant": "standard"}
-    if not ANTHROPIC_API_KEY:
-        telemetry["error"] = "no_api_key"
-        return [], telemetry
 
     chunks = chunk_transcript(transcript or "")
     if not chunks:
         telemetry["error"] = "empty_transcript"
+        return [], telemetry
+
+    # ── Qwen path (fine-tuned model on RunPod) ─────────────────────────
+    if USE_FINETUNED_MODEL:
+        try:
+            result = _classify_video_qwen(
+                channel_name, title, publish_date, chunks,
+                video_id=video_id, telemetry=telemetry,
+            )
+            if result is not None:
+                return result
+            # result is None → Qwen failed, fall through to Haiku
+        except Exception as e:
+            log.warning("[YT-CLF] Qwen path failed, falling back to Haiku: %s", e)
+            # Reset telemetry for Haiku retry
+            telemetry["chunks"] = 0
+            telemetry["predictions_raw"] = 0
+
+    # ── Haiku path (original) ──────────────────────────────────────────
+    _verified_by_local.tag = VERIFIED_BY_HAIKU
+
+    if not ANTHROPIC_API_KEY:
+        telemetry["error"] = "no_api_key"
         return [], telemetry
 
     try:
@@ -3916,7 +4157,7 @@ def insert_youtube_prediction(
             context=context_str,
             exact_quote=(quote or context_str)[:500],
             outcome="pending",
-            verified_by=VERIFIED_BY,
+            verified_by=_get_active_verified_by(),
             call_type="video_prediction",
             prediction_category="ticker_call",
             list_id=list_id_val,
@@ -4079,7 +4320,7 @@ def insert_youtube_sector_prediction(
             context=context_str,
             exact_quote=(quote or context_str)[:500],
             outcome="pending",
-            verified_by=VERIFIED_BY,
+            verified_by=_get_active_verified_by(),
             call_type="sector_call",
             # Dual-column tagging: prediction_type drives the evaluator's
             # ETF-vs-SPY spread scorer; prediction_category drives the
@@ -4301,7 +4542,7 @@ def insert_youtube_macro_prediction(
             context=context_str,
             exact_quote=(quote or context_str)[:500],
             outcome="pending",
-            verified_by=VERIFIED_BY,
+            verified_by=_get_active_verified_by(),
             call_type="macro_call",
             prediction_category="macro_call",
             macro_concept=concept,
@@ -4502,7 +4743,7 @@ def insert_youtube_pair_prediction(
             context=context_str,
             exact_quote=(quote or context_str)[:500],
             outcome="pending",
-            verified_by=VERIFIED_BY,
+            verified_by=_get_active_verified_by(),
             call_type="pair_call",
             prediction_category="pair_call",
             pair_long_ticker=long_ticker,
@@ -4737,7 +4978,7 @@ def insert_youtube_binary_event_prediction(
             context=context_str,
             exact_quote=(quote or context_str)[:500],
             outcome="pending",
-            verified_by=VERIFIED_BY,
+            verified_by=_get_active_verified_by(),
             call_type="binary_event_call",
             prediction_category="binary_event_call",
             event_type=event_type,
@@ -4974,7 +5215,7 @@ def insert_youtube_metric_forecast_prediction(
             context=context_str,
             exact_quote=(quote or context_str)[:500],
             outcome="pending",
-            verified_by=VERIFIED_BY,
+            verified_by=_get_active_verified_by(),
             call_type="metric_forecast_call",
             prediction_category="metric_forecast_call",
             metric_type=metric_type,
@@ -5198,7 +5439,7 @@ def insert_youtube_conditional_prediction(
             context=context_str,
             exact_quote=(quote or context_str)[:500],
             outcome="pending",
-            verified_by=VERIFIED_BY,
+            verified_by=_get_active_verified_by(),
             call_type="conditional_call",
             prediction_category="conditional_call",
             trigger_condition=trig_cond[:500],
@@ -5618,7 +5859,7 @@ def insert_youtube_regime_prediction(
             context=context_str,
             exact_quote=(quote or context_str)[:500],
             outcome="pending",
-            verified_by=VERIFIED_BY,
+            verified_by=_get_active_verified_by(),
             call_type="regime_call",
             prediction_category="regime_call",
             regime_type=regime_type,

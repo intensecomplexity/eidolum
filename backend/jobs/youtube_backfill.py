@@ -51,13 +51,14 @@ from jobs.youtube_classifier import (
     transcript_proxy_status,
     PIPELINE_VERSION,
     HAIKU_MODEL,
+    USE_FINETUNED_MODEL,
 )
 
 YOUTUBE_API_KEY = os.getenv("YOUTUBE_API_KEY", "").strip()
 ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "").strip()
 YOUTUBE_API = "https://www.googleapis.com/youtube/v3"
 
-VIDEOS_PER_CHANNEL_PER_RUN = 50
+VIDEOS_PER_CHANNEL_PER_RUN = int(os.getenv("YOUTUBE_BACKFILL_BATCH_SIZE", "50"))
 
 # Per-channel quota guard: enumeration of an extremely long upload
 # history (some channels have 5000+ videos) shouldn't be allowed to
@@ -77,12 +78,13 @@ def run_youtube_backfill(db=None):
     if not YOUTUBE_API_KEY:
         print("[YT-Backfill] YOUTUBE_API_KEY not set — skipping")
         return
-    if not ANTHROPIC_API_KEY:
-        print("[YT-Backfill] ANTHROPIC_API_KEY not set — skipping")
+    if not ANTHROPIC_API_KEY and not USE_FINETUNED_MODEL:
+        print("[YT-Backfill] ANTHROPIC_API_KEY not set and USE_FINETUNED_MODEL=false — skipping")
         return
 
+    _clf = "Qwen-7B (RunPod) → Haiku fallback" if USE_FINETUNED_MODEL else HAIKU_MODEL
     print(
-        f"[YT-Backfill] Starting | classifier={HAIKU_MODEL} pipeline={PIPELINE_VERSION} "
+        f"[YT-Backfill] Starting | classifier={_clf} pipeline={PIPELINE_VERSION} "
         f"proxy={transcript_proxy_status()}",
         flush=True,
     )
