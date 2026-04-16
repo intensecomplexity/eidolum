@@ -413,7 +413,7 @@ PIPELINE_VERSION = "youtube_v1"
 RUNPOD_API_KEY = os.getenv("RUNPOD_API_KEY", "").strip()
 RUNPOD_ENDPOINT_ID = os.getenv("RUNPOD_ENDPOINT_ID", "").strip()
 USE_FINETUNED_MODEL = os.getenv("USE_FINETUNED_MODEL", "false").lower() == "true"
-RUNPOD_TIMEOUT_SECONDS = 120
+RUNPOD_TIMEOUT_SECONDS = 300  # 5min — cold starts download 14.2GB model from HF
 RUNPOD_COLD_START_THRESHOLD = 30  # seconds — log a warning above this
 
 # ── YouTube pipeline stats (module-level, reset daily by watchdog) ───────────
