@@ -593,11 +593,11 @@ def _backfill_null_forecaster_ids(db):
     forecaster's channel_id.
 
     Guarded: only runs if NULL forecaster_id rows exist with
-    source = 'youtube'. Safe to call every cycle.
+    source_type = 'youtube'. Safe to call every cycle.
     """
     null_count = db.execute(sql_text(
         "SELECT COUNT(*) FROM predictions "
-        "WHERE source = 'youtube' AND forecaster_id IS NULL"
+        "WHERE source_type = 'youtube' AND forecaster_id IS NULL"
     )).scalar() or 0
     if null_count == 0:
         return
@@ -608,7 +608,7 @@ def _backfill_null_forecaster_ids(db):
         UPDATE predictions p
         SET forecaster_id = f.id
         FROM forecasters f
-        WHERE p.source = 'youtube'
+        WHERE p.source_type = 'youtube'
           AND p.forecaster_id IS NULL
           AND f.platform = 'youtube'
           AND f.channel_id IS NOT NULL
@@ -620,7 +620,7 @@ def _backfill_null_forecaster_ids(db):
 
     remaining = db.execute(sql_text(
         "SELECT COUNT(*) FROM predictions "
-        "WHERE source = 'youtube' AND forecaster_id IS NULL"
+        "WHERE source_type = 'youtube' AND forecaster_id IS NULL"
     )).scalar() or 0
     if remaining:
         print(f"[ChannelMonitor] {remaining} YouTube predictions still have NULL forecaster_id")
