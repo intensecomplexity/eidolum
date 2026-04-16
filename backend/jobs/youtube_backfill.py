@@ -52,6 +52,9 @@ from jobs.youtube_classifier import (
     PIPELINE_VERSION,
     HAIKU_MODEL,
     USE_FINETUNED_MODEL,
+    reset_circuit_breaker,
+    is_circuit_breaker_tripped,
+    yt_stats,
 )
 
 YOUTUBE_API_KEY = os.getenv("YOUTUBE_API_KEY", "").strip()
@@ -73,8 +76,15 @@ MAX_LIST_PAGES_PER_CHANNEL = 60  # 60 pages × 50 items = 3000 videos cap
 YOUTUBE_BACKFILL_MAX_AGE_DAYS = 1095  # 3 years
 
 
+BACKFILL_CYCLE_TIMEOUT_SECONDS = 30 * 60  # 30 minutes
+
+
 def run_youtube_backfill(db=None):
-    """Main entry point. Runs every 4h via worker.py."""
+    """Main entry point. Runs every 1h via worker.py.
+
+    Smart scheduling: checks if any channels still need backfilling.
+    If all are complete, exits immediately.
+    """
     if not YOUTUBE_API_KEY:
         print("[YT-Backfill] YOUTUBE_API_KEY not set — skipping")
         return
@@ -82,12 +92,7 @@ def run_youtube_backfill(db=None):
         print("[YT-Backfill] ANTHROPIC_API_KEY not set and USE_FINETUNED_MODEL=false — skipping")
         return
 
-    _clf = "Qwen-7B (RunPod) → Haiku fallback" if USE_FINETUNED_MODEL else HAIKU_MODEL
-    print(
-        f"[YT-Backfill] Starting | classifier={_clf} pipeline={PIPELINE_VERSION} "
-        f"proxy={transcript_proxy_status()}",
-        flush=True,
-    )
+    _clf = "Qwen-7B (RunPod)" if USE_FINETUNED_MODEL else HAIKU_MODEL
 
     from database import BgSessionLocal
     own_db = db is None
@@ -95,6 +100,27 @@ def run_youtube_backfill(db=None):
         db = BgSessionLocal()
 
     try:
+        # Check if any channels still need backfilling
+        _incomplete = db.execute(sql_text(
+            "SELECT COUNT(*) FROM youtube_channels "
+            "WHERE is_active = TRUE AND youtube_channel_id IS NOT NULL "
+            "AND (backfill_cursor IS NULL OR backfill_cursor NOT LIKE '%complete%')"
+        )).scalar() or 0
+
+        print(
+            f"[YT-Backfill] YouTube cycle starting: backfill, "
+            f"{_incomplete} channels remaining, classifier={_clf}",
+            flush=True,
+        )
+
+        if _incomplete == 0:
+            print("[YT-Backfill] All channels backfilled, skipping", flush=True)
+            if own_db:
+                db.close()
+            return
+
+        reset_circuit_breaker()
+        yt_stats.maybe_reset_daily()
         _run_inner(db)
     except Exception as e:
         print(f"[YT-Backfill] Error: {e}")
@@ -105,6 +131,8 @@ def run_youtube_backfill(db=None):
 
 
 def _run_inner(db):
+    _cycle_start = time.time()
+
     rows = db.execute(sql_text("""
         SELECT channel_name, youtube_channel_id, backfill_cursor
         FROM youtube_channels
@@ -176,6 +204,27 @@ def _run_inner(db):
 
         channel_inserted = 0
         for vid in batch:
+            # Cycle timeout
+            if time.time() - _cycle_start > BACKFILL_CYCLE_TIMEOUT_SECONDS:
+                print(
+                    f"[YT-Backfill] Cycle timeout after 30min, "
+                    f"{total_processed} videos processed, stopping",
+                    flush=True,
+                )
+                # Save cursor so we resume here next cycle
+                cursor["next_idx"] = next_idx + batch.index(vid)
+                _save_cursor(db, channel_name, cursor)
+                return
+            # Circuit breaker
+            if is_circuit_breaker_tripped():
+                print(
+                    f"[YT-Backfill] Circuit breaker tripped, stopping cycle",
+                    flush=True,
+                )
+                cursor["next_idx"] = next_idx + batch.index(vid)
+                _save_cursor(db, channel_name, cursor)
+                return
+
             m = meta.get(vid) or {}
             title = m.get("title") or ""
             publish_str = m.get("published_at") or ""
@@ -232,9 +281,12 @@ def _run_inner(db):
         print(f"[YT-Backfill] {channel_name}: batch done, {channel_inserted} predictions inserted "
               f"(progress {end_idx}/{len(videos)}, phase={cursor['phase']})")
 
+    _cycle_elapsed = time.time() - _cycle_start
     print(
-        f"[YT-Backfill] DONE: {total_processed} videos processed, "
-        f"{total_inserted} predictions inserted, ~{total_quota} YouTube API units used",
+        f"[YT-Backfill] YouTube cycle complete: "
+        f"{total_processed} videos classified, "
+        f"{total_inserted} predictions inserted, "
+        f"cycle took {_cycle_elapsed:.0f}s",
         flush=True,
     )
 

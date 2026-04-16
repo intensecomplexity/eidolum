@@ -262,9 +262,78 @@ def _weekly_digest():
         finally: db.close()
     except Exception: pass
 
+# ── YouTube pipeline dead-man's switch ─────────────────────────────────────
+_yt_watchdog_last_daily_summary = None
+
+
+def _youtube_pipeline_watchdog():
+    """Check if the YouTube pipeline is stalled. Runs every 5min via watchdog.
+
+    1. If no YouTube prediction in 6h despite monitor running → CRITICAL log
+    2. Once per day (midnight UTC) → daily summary log
+    """
+    global _yt_watchdog_last_daily_summary
+    try:
+        db = BgSessionLocal()
+        try:
+            # Last successful YouTube prediction
+            row = db.execute(sql_text(
+                "SELECT MAX(created_at) FROM predictions "
+                "WHERE verified_by LIKE 'youtube_%'"
+            )).first()
+            last_pred = row[0] if row else None
+
+            hours_ago = None
+            if last_pred:
+                hours_ago = (datetime.utcnow() - last_pred).total_seconds() / 3600
+
+            # Check if stalled: >6h since last prediction
+            if hours_ago is not None and hours_ago > 6:
+                log.critical(
+                    "[YOUTUBE-WATCHDOG] YOUTUBE PIPELINE STALLED — "
+                    "last prediction %.1fh ago despite monitor running",
+                    hours_ago,
+                )
+            elif hours_ago is None:
+                # No YouTube predictions at all — could be fresh deploy
+                pass
+
+            # Daily summary (once per day)
+            today = datetime.utcnow().date()
+            if _yt_watchdog_last_daily_summary != today:
+                _yt_watchdog_last_daily_summary = today
+                # Count last 24h
+                _count = db.execute(sql_text(
+                    "SELECT COUNT(*) FROM predictions "
+                    "WHERE verified_by LIKE 'youtube_%' "
+                    "AND created_at > NOW() - INTERVAL '24 hours'"
+                )).scalar() or 0
+                try:
+                    from jobs.youtube_classifier import yt_stats
+                    yt_stats.maybe_reset_daily()
+                    _avg_lat = yt_stats.avg_latency
+                    _errs = yt_stats.errors
+                    _trips = yt_stats.circuit_breaker_trips
+                except Exception:
+                    _avg_lat = 0.0
+                    _errs = 0
+                    _trips = 0
+                log.info(
+                    "[YOUTUBE-WATCHDOG] YouTube 24h stats: %d predictions, "
+                    "%d errors, avg Qwen latency %.1fs, "
+                    "circuit breaker trips: %d",
+                    _count, _errs, _avg_lat, _trips,
+                )
+        finally:
+            db.close()
+    except Exception as e:
+        log.warning("[YOUTUBE-WATCHDOG] check failed: %s", e)
+
+
 def _watchdog():
     watchdog_check()
     check_site_health_and_pause()
+    _youtube_pipeline_watchdog()
 
 
 # ── Main ────────────────────────────────────────────────────────────────────
@@ -2017,8 +2086,9 @@ def main():
     sched.add_job(_standalone("youtube_scraper", _youtube), "interval", hours=8, id="youtube_scraper", next_run_time=t0 + timedelta(minutes=55), executor='default')
     sched.add_job(_standalone("enrich_urls", _enrich), "interval", hours=1, id="enrich_urls", next_run_time=t0 + timedelta(minutes=35), executor='default')
 
-    # YouTube Channel Monitor — V2 transcript-based, Haiku-powered, every 12h.
-    # Inserts predictions into the predictions table via insert_youtube_prediction.
+    # YouTube Channel Monitor — V2 transcript-based, Qwen-powered, every 30min.
+    # Smart scheduling: lightweight YouTube API check first, only fires Qwen
+    # when new videos exist. 45 channels × 48 checks/day = 2,160 units (< 10K free).
     def _channel_monitor():
         try:
             from jobs.youtube_channel_monitor import run_channel_monitor
@@ -2029,7 +2099,7 @@ def main():
                 db.close()
         except Exception as e:
             log.error(f"[channel_monitor] {e}")
-    sched.add_job(_standalone("channel_monitor", _channel_monitor), "interval", hours=4, id="channel_monitor", next_run_time=t0 + timedelta(minutes=90), executor='default')
+    sched.add_job(_standalone("channel_monitor", _channel_monitor), "interval", minutes=30, id="channel_monitor", next_run_time=t0 + timedelta(minutes=5), executor='default')
 
     # Disclosure follow-through (ship #8) — daily sweep that
     # computes 1/3/6/12-month stock returns for every disclosure
@@ -2070,8 +2140,9 @@ def main():
         executor='default',
     )
 
-    # YouTube Historical Backfill — every 4h, walks each channel's full
+    # YouTube Historical Backfill — every 1h, walks each channel's full
     # upload history oldest-first via cursor in youtube_channels.backfill_cursor.
+    # Smart scheduling: skips if all channels fully backfilled.
     # Independent of the regular monitor; both share the youtube_videos
     # dedup table so neither one re-processes a video the other has done.
     def _youtube_backfill():
@@ -2084,7 +2155,7 @@ def main():
                 db.close()
         except Exception as e:
             log.error(f"[youtube_backfill] {e}")
-    sched.add_job(_standalone("youtube_backfill", _youtube_backfill), "interval", hours=4, id="youtube_backfill", next_run_time=t0 + timedelta(minutes=110), executor='default')
+    sched.add_job(_standalone("youtube_backfill", _youtube_backfill), "interval", hours=1, id="youtube_backfill", next_run_time=t0 + timedelta(minutes=10), executor='default')
 
     # X/Twitter scraper — Apify-powered, every 8h, inserts predictions
     def _x_scraper():

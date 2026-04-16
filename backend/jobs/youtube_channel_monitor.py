@@ -56,6 +56,9 @@ from jobs.youtube_classifier import (
     HAIKU_MODEL,
     USE_FINETUNED_MODEL,
     find_or_create_youtube_forecaster,
+    reset_circuit_breaker,
+    is_circuit_breaker_tripped,
+    yt_stats,
 )
 
 YOUTUBE_API_KEY = os.getenv("YOUTUBE_API_KEY", "").strip()
@@ -65,6 +68,7 @@ YOUTUBE_API = "https://www.googleapis.com/youtube/v3"
 CHANNELS_PER_RUN = 999  # Process all active channels each cycle (was 10)
 MAX_VIDEOS_PER_CHANNEL = int(os.getenv("YOUTUBE_MAX_VIDEOS_PER_CHANNEL", "50"))
 DAILY_QUOTA_LIMIT = 10_000  # YouTube Data API v3 free tier
+CYCLE_TIMEOUT_SECONDS = 30 * 60  # 30 minutes max per cycle
 
 # Videos shorter than this are skipped before the transcript fetch.
 # YouTube Shorts are definitionally ≤60s; the 180s floor also catches
@@ -92,6 +96,91 @@ TARGET_CHANNELS = [
     "The Patient Investor", "Rational Investing with Cameron Stewart",
     "The Compounding Investor",
 ]
+
+
+def _check_for_new_videos(db) -> list[tuple[str, str, str]]:
+    """Lightweight check: for each active channel with a resolved ID,
+    call playlistItems.list?maxResults=1 and compare the most recent
+    video's publishedAt against our last_crawled timestamp.
+
+    Returns list of (channel_name, channel_id, newest_video_id) tuples
+    for channels that have new content. Costs 1 YouTube API unit per
+    channel. If the API is unavailable, returns ALL channels (fail open
+    so we don't silently stop scraping).
+    """
+    if not YOUTUBE_API_KEY:
+        return []
+
+    rows = db.execute(sql_text("""
+        SELECT channel_name, youtube_channel_id, last_crawled
+        FROM youtube_channels
+        WHERE is_active = TRUE AND youtube_channel_id IS NOT NULL
+        ORDER BY last_crawled ASC NULLS FIRST
+    """)).fetchall()
+
+    channels_with_new: list[tuple[str, str, str]] = []
+    api_units = 0
+
+    for row in rows:
+        channel_name, channel_id, last_crawled = row[0], row[1], row[2]
+        uploads_playlist = "UU" + channel_id[2:]
+        try:
+            r = httpx.get(
+                f"{YOUTUBE_API}/playlistItems",
+                params={
+                    "part": "contentDetails",
+                    "playlistId": uploads_playlist,
+                    "maxResults": 1,
+                    "key": YOUTUBE_API_KEY,
+                },
+                timeout=10,
+            )
+            api_units += 1
+        except Exception as e:
+            print(f"[ChannelMonitor] lightweight check error for {channel_name}: {e}")
+            # Fail open — include this channel
+            channels_with_new.append((channel_name, channel_id, "unknown"))
+            continue
+
+        if r.status_code == 403:
+            print("[ChannelMonitor] YouTube API quota exceeded during lightweight check")
+            # Fail open — return all remaining channels
+            for remaining in rows[rows.index(row):]:
+                channels_with_new.append((remaining[0], remaining[1], "unknown"))
+            break
+
+        if r.status_code != 200:
+            channels_with_new.append((channel_name, channel_id, "unknown"))
+            continue
+
+        items = r.json().get("items", [])
+        if not items:
+            continue
+
+        newest_published = (items[0].get("contentDetails") or {}).get("videoPublishedAt") or ""
+        newest_vid = (items[0].get("contentDetails") or {}).get("videoId") or ""
+
+        if not last_crawled:
+            # Never crawled — definitely has new content
+            channels_with_new.append((channel_name, channel_id, newest_vid))
+            continue
+
+        # Compare: if the newest video was published after last_crawled, there's new content
+        try:
+            from datetime import datetime as _dt
+            pub_dt = _dt.strptime(newest_published[:19], "%Y-%m-%dT%H:%M:%S")
+            if pub_dt > last_crawled:
+                channels_with_new.append((channel_name, channel_id, newest_vid))
+        except (ValueError, TypeError):
+            # Can't parse — include to be safe
+            channels_with_new.append((channel_name, channel_id, newest_vid))
+
+    print(
+        f"[ChannelMonitor] Lightweight check: {len(channels_with_new)}/{len(rows)} "
+        f"channels have new videos ({api_units} API units used)",
+        flush=True,
+    )
+    return channels_with_new
 
 
 def _ensure_tables(db):
@@ -443,7 +532,12 @@ def _discover_new_channels(db, max_new: int = 5) -> int:
 
 
 def run_channel_monitor(db=None):
-    """Main entry point. Runs every 12h via worker.py."""
+    """Main entry point. Runs every 30min via worker.py.
+
+    Smart scheduling: does a lightweight YouTube API check first (1 unit
+    per channel). If no channels have new videos, exits immediately with
+    zero RunPod cost. Only processes channels that have new content.
+    """
     if not YOUTUBE_API_KEY:
         print("[ChannelMonitor] YOUTUBE_API_KEY not set — skipping")
         return
@@ -451,33 +545,7 @@ def run_channel_monitor(db=None):
         print("[ChannelMonitor] ANTHROPIC_API_KEY not set and USE_FINETUNED_MODEL=false — skipping")
         return
 
-    # Surface every transcript-proxy-related env var the classifier checks,
-    # presence-only and length-only (never the value). If the proxy banner
-    # below says proxy=none even though Webshare is "set" in Railway, the
-    # log lines here will tell you whether the env var name is misspelled
-    # vs. genuinely missing — that exact diagnosis is what shipped this
-    # debug block in the first place (the deployed worker turned out to
-    # have EBSHARE_PROXY_USERNAME, missing the leading W, and my code's
-    # os.getenv('WEBSHARE_PROXY_USERNAME') quietly returned empty).
-    _proxy_env_keys = [
-        "WEBSHARE_PROXY_USERNAME",
-        "WEBSHARE_PROXY_PASSWORD",
-        "YT_PROXY_HTTP",
-        "YT_PROXY_HTTPS",
-    ]
-    for k in _proxy_env_keys:
-        v = os.getenv(k, "")
-        print(
-            f"[ChannelMonitor] env {k}: present={bool(v)} length={len(v)}",
-            flush=True,
-        )
-
-    _clf = "Qwen-7B (RunPod) → Haiku fallback" if USE_FINETUNED_MODEL else HAIKU_MODEL
-    print(
-        f"[ChannelMonitor] V2 (transcript-based) starting | classifier={_clf} "
-        f"pipeline={PIPELINE_VERSION} proxy={transcript_proxy_status()}",
-        flush=True,
-    )
+    _clf = "Qwen-7B (RunPod)" if USE_FINETUNED_MODEL else HAIKU_MODEL
 
     from database import BgSessionLocal
     own_db = db is None
@@ -486,7 +554,36 @@ def run_channel_monitor(db=None):
 
     try:
         _ensure_tables(db)
-        _run_inner(db)
+        _seed_target_channels(db)
+
+        # Count active channels for the banner
+        _active_count = db.execute(sql_text(
+            "SELECT COUNT(*) FROM youtube_channels WHERE is_active = TRUE"
+        )).scalar() or 0
+
+        print(
+            f"[ChannelMonitor] YouTube cycle starting: monitor, "
+            f"{_active_count} channels to check, classifier={_clf}",
+            flush=True,
+        )
+
+        # Lightweight check: which channels have new videos?
+        channels_with_new = _check_for_new_videos(db)
+        if not channels_with_new:
+            print(
+                f"[ChannelMonitor] No new videos across {_active_count} channels, "
+                f"skipping classification",
+                flush=True,
+            )
+            if own_db:
+                db.close()
+            return
+
+        # Reset circuit breaker for this cycle
+        reset_circuit_breaker()
+        yt_stats.maybe_reset_daily()
+
+        _run_inner(db, channels_with_new=channels_with_new)
     except Exception as e:
         print(f"[ChannelMonitor] Error: {e}")
         import traceback
@@ -626,8 +723,8 @@ def _backfill_null_forecaster_ids(db):
         print(f"[ChannelMonitor] {remaining} YouTube predictions still have NULL forecaster_id")
 
 
-def _run_inner(db):
-    _seed_target_channels(db)
+def _run_inner(db, channels_with_new=None):
+    _cycle_start = time.time()
     _ensure_youtube_forecasters(db)
     _backfill_null_forecaster_ids(db)
 
@@ -697,21 +794,32 @@ def _run_inner(db):
         except Exception:
             pass
 
-    # Pick the 10 least recently crawled active channels.
-    # LEFT JOIN youtube_channel_meta so that channels the admin has manually
-    # deactivated via /admin/youtube-channels are skipped, and so that the
-    # iteration order respects tier (1=highest priority first). Channels
-    # without a meta row yet (e.g. newly seeded via TARGET_CHANNELS that
-    # haven't produced predictions yet) get tier=4 by default via COALESCE.
-    batch_rows = db.execute(sql_text("""
-        SELECT yc.channel_name, yc.youtube_channel_id, yc.last_crawled
-        FROM youtube_channels yc
-        LEFT JOIN youtube_channel_meta m ON m.channel_id = yc.youtube_channel_id
-        WHERE yc.is_active = TRUE
-          AND (m.active IS NULL OR m.active = TRUE)
-        ORDER BY COALESCE(m.tier, 4) ASC, yc.last_crawled ASC NULLS FIRST
-        LIMIT :lim
-    """), {"lim": CHANNELS_PER_RUN}).fetchall()
+    # Pick channels to process. If channels_with_new was passed from the
+    # lightweight check, only process those (smart scheduling). Otherwise
+    # fall back to the original full query (used by fetch_channel_now and
+    # any caller that doesn't do the lightweight check).
+    if channels_with_new:
+        # channels_with_new is [(name, channel_id, newest_vid), ...]
+        _new_ids = {cid for _, cid, _ in channels_with_new if cid}
+        batch_rows = db.execute(sql_text("""
+            SELECT yc.channel_name, yc.youtube_channel_id, yc.last_crawled
+            FROM youtube_channels yc
+            LEFT JOIN youtube_channel_meta m ON m.channel_id = yc.youtube_channel_id
+            WHERE yc.is_active = TRUE
+              AND (m.active IS NULL OR m.active = TRUE)
+              AND yc.youtube_channel_id = ANY(:ids)
+            ORDER BY COALESCE(m.tier, 4) ASC, yc.last_crawled ASC NULLS FIRST
+        """), {"ids": list(_new_ids)}).fetchall()
+    else:
+        batch_rows = db.execute(sql_text("""
+            SELECT yc.channel_name, yc.youtube_channel_id, yc.last_crawled
+            FROM youtube_channels yc
+            LEFT JOIN youtube_channel_meta m ON m.channel_id = yc.youtube_channel_id
+            WHERE yc.is_active = TRUE
+              AND (m.active IS NULL OR m.active = TRUE)
+            ORDER BY COALESCE(m.tier, 4) ASC, yc.last_crawled ASC NULLS FIRST
+            LIMIT :lim
+        """), {"lim": CHANNELS_PER_RUN}).fetchall()
 
     print(f"[ChannelMonitor] Processing {len(batch_rows)} channels")
 
@@ -895,6 +1003,27 @@ def _run_inner(db):
         channel_inserted = 0
         channel_videos = 0
         for vinfo in unseen:
+            # Cycle timeout check
+            _elapsed = time.time() - _cycle_start
+            if _elapsed > CYCLE_TIMEOUT_SECONDS:
+                print(
+                    f"[ChannelMonitor] Cycle timeout after {_elapsed/60:.0f}min, "
+                    f"{stats['videos_classified']}/{stats['videos_seen']} videos "
+                    f"processed, stopping",
+                    flush=True,
+                )
+                break
+
+            # Circuit breaker check
+            if is_circuit_breaker_tripped():
+                _remaining = len(unseen) - unseen.index(vinfo)
+                print(
+                    f"[ChannelMonitor] RunPod circuit breaker tripped — "
+                    f"skipping remaining {_remaining} videos this cycle",
+                    flush=True,
+                )
+                break
+
             video_id = vinfo["video_id"]
             title = vinfo["title"]
             description = vinfo["description"]
@@ -1100,6 +1229,19 @@ def _run_inner(db):
                 db.rollback()
             except Exception:
                 pass
+
+    # ── New cycle-complete summary ──────────────────────────────────────
+    _cycle_elapsed = time.time() - _cycle_start
+    _avg_lat = yt_stats.avg_latency
+    print(
+        f"[ChannelMonitor] YouTube cycle complete: "
+        f"{stats['videos_classified']} videos classified, "
+        f"{stats['predictions_inserted']} predictions inserted, "
+        f"{stats['classifier_errors']} errors, "
+        f"avg latency {_avg_lat:.1f}s, "
+        f"cycle took {_cycle_elapsed:.0f}s",
+        flush=True,
+    )
 
     # Legacy DONE summary (kept for backwards compat with anything grepping
     # the worker logs).

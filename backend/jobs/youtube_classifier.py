@@ -413,6 +413,50 @@ PIPELINE_VERSION = "youtube_v1"
 RUNPOD_API_KEY = os.getenv("RUNPOD_API_KEY", "").strip()
 RUNPOD_ENDPOINT_ID = os.getenv("RUNPOD_ENDPOINT_ID", "").strip()
 USE_FINETUNED_MODEL = os.getenv("USE_FINETUNED_MODEL", "false").lower() == "true"
+RUNPOD_TIMEOUT_SECONDS = 120
+RUNPOD_COLD_START_THRESHOLD = 30  # seconds — log a warning above this
+
+# ── YouTube pipeline stats (module-level, reset daily by watchdog) ───────────
+
+class _YTStats:
+    """Simple in-memory counters for the daily summary. Reset once per day."""
+    __slots__ = (
+        "predictions", "errors", "circuit_breaker_trips",
+        "total_latency", "classifications", "last_reset_day",
+    )
+    def __init__(self):
+        self.reset()
+    def reset(self):
+        self.predictions = 0
+        self.errors = 0
+        self.circuit_breaker_trips = 0
+        self.total_latency = 0.0
+        self.classifications = 0
+        self.last_reset_day = datetime.utcnow().date()
+    def maybe_reset_daily(self):
+        today = datetime.utcnow().date()
+        if today != self.last_reset_day:
+            self.reset()
+    @property
+    def avg_latency(self) -> float:
+        return self.total_latency / self.classifications if self.classifications else 0.0
+
+yt_stats = _YTStats()
+
+# Circuit breaker: stop calling RunPod after N consecutive failures in one cycle
+RUNPOD_CIRCUIT_BREAKER_THRESHOLD = 3
+_runpod_consecutive_failures = 0
+
+
+def reset_circuit_breaker():
+    """Call at the start of each monitor/backfill cycle."""
+    global _runpod_consecutive_failures
+    _runpod_consecutive_failures = 0
+
+
+def is_circuit_breaker_tripped() -> bool:
+    return _runpod_consecutive_failures >= RUNPOD_CIRCUIT_BREAKER_THRESHOLD
+
 
 QWEN_SYSTEM_PROMPT = (
     "You are a financial prediction classifier. Given a YouTube transcript excerpt, "
@@ -435,13 +479,15 @@ def call_runpod_vllm(
     title: str,
     publish_date: str,
     video_id: str | None = None,
-) -> tuple[str, float]:
+) -> tuple[str, float, float]:
     """Call the fine-tuned Qwen 2.5 7B on RunPod Serverless via vLLM's
     OpenAI-compatible API.
 
-    Returns (raw_text_response, estimated_cost_usd).
-    Raises on ANY failure so the caller can fall back to Haiku.
+    Returns (raw_text_response, estimated_cost_usd, latency_seconds).
+    Raises on ANY failure (timeout, HTTP error, empty response).
+    Updates circuit breaker state on success/failure.
     """
+    global _runpod_consecutive_failures
     import httpx as _httpx
 
     if not RUNPOD_API_KEY or not RUNPOD_ENDPOINT_ID:
@@ -470,17 +516,33 @@ def call_runpod_vllm(
     }
 
     identifier = video_id or channel_name
-    r = _httpx.post(
-        url,
-        json=payload,
-        headers={
-            "Authorization": f"Bearer {RUNPOD_API_KEY}",
-            "Content-Type": "application/json",
-        },
-        timeout=120,
-    )
+    t0 = time.time()
+    try:
+        r = _httpx.post(
+            url,
+            json=payload,
+            headers={
+                "Authorization": f"Bearer {RUNPOD_API_KEY}",
+                "Content-Type": "application/json",
+            },
+            timeout=RUNPOD_TIMEOUT_SECONDS,
+        )
+    except _httpx.TimeoutException:
+        _runpod_consecutive_failures += 1
+        yt_stats.errors += 1
+        raise RuntimeError(
+            f"RunPod timeout after {RUNPOD_TIMEOUT_SECONDS}s for {identifier}"
+        )
+    except Exception:
+        _runpod_consecutive_failures += 1
+        yt_stats.errors += 1
+        raise
+
+    latency = time.time() - t0
 
     if r.status_code != 200:
+        _runpod_consecutive_failures += 1
+        yt_stats.errors += 1
         raise RuntimeError(
             f"RunPod HTTP {r.status_code}: {r.text[:300]}"
         )
@@ -488,24 +550,45 @@ def call_runpod_vllm(
     data = r.json()
     choices = data.get("choices") or []
     if not choices:
+        _runpod_consecutive_failures += 1
+        yt_stats.errors += 1
         raise RuntimeError("RunPod returned empty choices")
 
     content = (choices[0].get("message") or {}).get("content") or ""
     if not content.strip():
+        _runpod_consecutive_failures += 1
+        yt_stats.errors += 1
         raise RuntimeError("RunPod returned empty content")
+
+    # Success — reset consecutive failure counter
+    _runpod_consecutive_failures = 0
 
     usage = data.get("usage") or {}
     in_tok = usage.get("prompt_tokens", 0)
     out_tok = usage.get("completion_tokens", 0)
     cost = QWEN_PRICE_PER_CALL_USD
 
+    # Cold start detection
+    cold_tag = ""
+    if latency > RUNPOD_COLD_START_THRESHOLD:
+        cold_tag = f" COLD_START={latency:.1f}s"
+        print(
+            f"[YOUTUBE-QWEN] RunPod cold start detected: {latency:.1f}s "
+            f"for {identifier}",
+            flush=True,
+        )
+
     print(
         f"[YOUTUBE-QWEN] {identifier} ({channel_name}) "
-        f"input={in_tok} output={out_tok} cost=${cost:.4f}",
+        f"input={in_tok} output={out_tok} latency={latency:.1f}s "
+        f"cost=${cost:.4f}{cold_tag}",
         flush=True,
     )
 
-    return content.strip(), cost
+    yt_stats.total_latency += latency
+    yt_stats.classifications += 1
+
+    return content.strip(), cost, latency
 
 
 # Thread-local override for VERIFIED_BY so insert functions pick up
@@ -2439,11 +2522,25 @@ def _classify_video_qwen(
 
     all_preds: list[dict] = []
     total_cost = 0.0
+    total_latency = 0.0
 
     for i, chunk in enumerate(chunks):
         telemetry["chunks"] += 1
+
+        # Circuit breaker check
+        if is_circuit_breaker_tripped():
+            tag = (
+                f"RunPod circuit breaker tripped — "
+                f"{RUNPOD_CIRCUIT_BREAKER_THRESHOLD} consecutive failures, "
+                f"skipping chunk {i+1}/{len(chunks)}"
+            )
+            print(f"[YOUTUBE-QWEN] {tag}", flush=True)
+            telemetry["error"] = tag[:300]
+            yt_stats.circuit_breaker_trips += 1
+            return None
+
         try:
-            raw_text, cost = call_runpod_vllm(
+            raw_text, cost, latency = call_runpod_vllm(
                 chunk,
                 channel_name=channel_name,
                 title=title,
@@ -2451,11 +2548,17 @@ def _classify_video_qwen(
                 video_id=video_id,
             )
             total_cost += cost
+            total_latency += latency
         except Exception as e:
             tag = f"RunPod error chunk {i+1}/{len(chunks)}: {e}"
             log.warning("[YT-CLF] %s", tag)
             telemetry["error"] = tag[:300]
-            # Return None → caller falls back to Haiku
+            print(
+                f"[YOUTUBE-QWEN] Classification FAILED video {video_id or '?'}: "
+                f"{type(e).__name__}, skipping",
+                flush=True,
+            )
+            # Return None → caller falls back to Haiku (or skips if credits empty)
             return None
 
         # Strip markdown fences
@@ -2516,12 +2619,15 @@ def _classify_video_qwen(
         valid = valid[:MAX_PREDICTIONS_PER_VIDEO]
 
     telemetry["predictions_validated"] = len(valid)
+    telemetry["latency"] = total_latency
+    vby = _get_active_verified_by()
     print(
-        f"[YOUTUBE-QWEN] DONE video={video_id or '?'} "
-        f"chunks={telemetry['chunks']} raw={telemetry['predictions_raw']} "
-        f"validated={len(valid)} cost=${total_cost:.4f}",
+        f"[YOUTUBE-QWEN] Classified video {video_id or '?'}: "
+        f"{len(valid)} predictions extracted, classifier={vby}, "
+        f"latency={total_latency:.1f}s, cost=${total_cost:.4f}",
         flush=True,
     )
+    yt_stats.predictions += len(valid)
     return valid, telemetry
 
 
