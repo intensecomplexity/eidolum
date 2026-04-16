@@ -59,6 +59,7 @@ from jobs.youtube_classifier import (
     reset_circuit_breaker,
     is_circuit_breaker_tripped,
     yt_stats,
+    _get_active_verified_by,
 )
 
 YOUTUBE_API_KEY = os.getenv("YOUTUBE_API_KEY", "").strip()
@@ -1383,13 +1384,24 @@ def _process_one_video(db, channel_name, channel_id, video_id, title, publish_da
     if not publish_dt:
         publish_dt = datetime.utcnow()
 
+    _clf_start = time.time()
     preds, telem = classify_video(
         channel_name, title,
         publish_date_str[:10] if publish_date_str else "",
         text, video_id=video_id, db=db,
     )
+    _clf_elapsed = time.time() - _clf_start
     stats["videos_classified"] += 1
     stats["predictions_extracted"] += telem.get("predictions_validated", 0)
+
+    _n_preds = telem.get("predictions_validated", 0)
+    _vby = _get_active_verified_by()
+    print(
+        f"[ChannelMonitor] Classified video {video_id}: "
+        f"{_n_preds} predictions extracted, "
+        f"classifier={_vby}, latency={_clf_elapsed:.1f}s",
+        flush=True,
+    )
 
     # Ship #9 (rescoped) — drain Haiku's explicit rejection entries.
     # The metadata_enrichment prompt block teaches Haiku to emit

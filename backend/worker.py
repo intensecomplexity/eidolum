@@ -308,6 +308,11 @@ def _youtube_pipeline_watchdog():
                     "WHERE verified_by LIKE 'youtube_%' "
                     "AND created_at > NOW() - INTERVAL '24 hours'"
                 )).scalar() or 0
+                _haiku_fallbacks = db.execute(sql_text(
+                    "SELECT COUNT(*) FROM predictions "
+                    "WHERE verified_by = 'youtube_haiku_v1' "
+                    "AND created_at > NOW() - INTERVAL '24 hours'"
+                )).scalar() or 0
                 try:
                     from jobs.youtube_classifier import yt_stats
                     yt_stats.maybe_reset_daily()
@@ -321,8 +326,8 @@ def _youtube_pipeline_watchdog():
                 log.info(
                     "[YOUTUBE-WATCHDOG] YouTube 24h stats: %d predictions, "
                     "%d errors, avg Qwen latency %.1fs, "
-                    "circuit breaker trips: %d",
-                    _count, _errs, _avg_lat, _trips,
+                    "circuit breaker trips: %d, Haiku fallbacks: %d",
+                    _count, _errs, _avg_lat, _trips, _haiku_fallbacks,
                 )
         finally:
             db.close()

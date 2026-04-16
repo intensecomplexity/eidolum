@@ -157,7 +157,7 @@ ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "").strip()
 USE_FINETUNED_MODEL = os.getenv("USE_FINETUNED_MODEL", "false").strip().lower() == "true"
 RUNPOD_API_KEY = os.getenv("RUNPOD_API_KEY", "").strip()
 RUNPOD_ENDPOINT_ID = os.getenv("RUNPOD_ENDPOINT_ID", "").strip()
-RUNPOD_MODEL_NAME = os.getenv("RUNPOD_MODEL_NAME", "/runpod-volume/eidolum-qwen-merged")
+RUNPOD_MODEL_NAME = os.getenv("RUNPOD_MODEL_NAME", "OENO/eidolum-qwen-merged")
 
 # Current Haiku model. The spec called for claude-haiku-4-5-20250514 but
 # that model ID doesn't exist on the Anthropic API; the actual current
@@ -444,18 +444,20 @@ class _YTStats:
 yt_stats = _YTStats()
 
 # Circuit breaker: stop calling RunPod after N consecutive failures in one cycle
-RUNPOD_CIRCUIT_BREAKER_THRESHOLD = 3
+RUNPOD_CIRCUIT_BREAKER_THRESHOLD = 5
 _runpod_consecutive_failures = 0
+_runpod_circuit_open = False
 
 
 def reset_circuit_breaker():
     """Call at the start of each monitor/backfill cycle."""
-    global _runpod_consecutive_failures
+    global _runpod_consecutive_failures, _runpod_circuit_open
     _runpod_consecutive_failures = 0
+    _runpod_circuit_open = False
 
 
 def is_circuit_breaker_tripped() -> bool:
-    return _runpod_consecutive_failures >= RUNPOD_CIRCUIT_BREAKER_THRESHOLD
+    return _runpod_circuit_open
 
 
 QWEN_SYSTEM_PROMPT = (
@@ -487,8 +489,21 @@ def call_runpod_vllm(
     Raises on ANY failure (timeout, HTTP error, empty response).
     Updates circuit breaker state on success/failure.
     """
-    global _runpod_consecutive_failures
+    global _runpod_consecutive_failures, _runpod_circuit_open
     import httpx as _httpx
+
+    def _record_failure():
+        global _runpod_consecutive_failures, _runpod_circuit_open
+        _runpod_consecutive_failures += 1
+        yt_stats.errors += 1
+        if _runpod_consecutive_failures >= RUNPOD_CIRCUIT_BREAKER_THRESHOLD:
+            _runpod_circuit_open = True
+            print(
+                f"[YOUTUBE-QWEN] RunPod circuit breaker open — "
+                f"{RUNPOD_CIRCUIT_BREAKER_THRESHOLD} consecutive failures, "
+                f"using Haiku for remaining videos this cycle",
+                flush=True,
+            )
 
     if not RUNPOD_API_KEY or not RUNPOD_ENDPOINT_ID:
         raise RuntimeError("RUNPOD_API_KEY or RUNPOD_ENDPOINT_ID not set")
@@ -528,21 +543,18 @@ def call_runpod_vllm(
             timeout=RUNPOD_TIMEOUT_SECONDS,
         )
     except _httpx.TimeoutException:
-        _runpod_consecutive_failures += 1
-        yt_stats.errors += 1
+        _record_failure()
         raise RuntimeError(
             f"RunPod timeout after {RUNPOD_TIMEOUT_SECONDS}s for {identifier}"
         )
     except Exception:
-        _runpod_consecutive_failures += 1
-        yt_stats.errors += 1
+        _record_failure()
         raise
 
     latency = time.time() - t0
 
     if r.status_code != 200:
-        _runpod_consecutive_failures += 1
-        yt_stats.errors += 1
+        _record_failure()
         raise RuntimeError(
             f"RunPod HTTP {r.status_code}: {r.text[:300]}"
         )
@@ -550,14 +562,12 @@ def call_runpod_vllm(
     data = r.json()
     choices = data.get("choices") or []
     if not choices:
-        _runpod_consecutive_failures += 1
-        yt_stats.errors += 1
+        _record_failure()
         raise RuntimeError("RunPod returned empty choices")
 
     content = (choices[0].get("message") or {}).get("content") or ""
     if not content.strip():
-        _runpod_consecutive_failures += 1
-        yt_stats.errors += 1
+        _record_failure()
         raise RuntimeError("RunPod returned empty content")
 
     # Success — reset consecutive failure counter
@@ -2664,7 +2674,7 @@ def classify_video(channel_name: str, title: str, publish_date: str,
         return [], telemetry
 
     # ── Qwen path (fine-tuned model on RunPod) ─────────────────────────
-    if USE_FINETUNED_MODEL:
+    if USE_FINETUNED_MODEL and not _runpod_circuit_open:
         try:
             result = _classify_video_qwen(
                 channel_name, title, publish_date, chunks,
