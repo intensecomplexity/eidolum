@@ -149,6 +149,16 @@ def log_youtube_rejection(
 
 ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "").strip()
 
+# ââ Fine-tuned model (Qwen 2.5 7B) on RunPod Serverless ââââââââââââââââââ
+# When USE_FINETUNED_MODEL is "true", classify_video calls our self-hosted
+# Qwen 2.5 7B LoRA-merged model via RunPod's OpenAI-compatible endpoint
+# instead of Anthropic Haiku. Haiku is kept as automatic fallback if the
+# RunPod call fails. Cost: ~$0.00019/s on 24GB GPU vs ~$36/mo Haiku.
+USE_FINETUNED_MODEL = os.getenv("USE_FINETUNED_MODEL", "false").strip().lower() == "true"
+RUNPOD_API_KEY = os.getenv("RUNPOD_API_KEY", "").strip()
+RUNPOD_ENDPOINT_ID = os.getenv("RUNPOD_ENDPOINT_ID", "").strip()
+RUNPOD_MODEL_NAME = "/runpod-volume/eidolum-qwen-merged"
+
 # Current Haiku model. The spec called for claude-haiku-4-5-20250514 but
 # that model ID doesn't exist on the Anthropic API; the actual current
 # Haiku 4.5 ID is claude-haiku-4-5-20251001 (verified against the system
@@ -298,7 +308,98 @@ def call_youtube_haiku_with_retry(
         )
     return resp, True
 
-# verified_by tag for grep / cohort analysis. Bump _v1 → _v2 if the
+# ââ RunPod Serverless vLLM call (fine-tuned Qwen 2.5 7B) âââââââââââââââââ
+
+# RunPod pricing for 24GB GPU serverless ($0.00019/s). Rough estimate
+# based on typical 3-8 second inference time per video.
+RUNPOD_ESTIMATED_COST_PER_CALL = 0.0012  # ~6.3s average * $0.00019/s
+
+def call_runpod_vllm(
+    *,
+    system_text: str,
+    user_text: str,
+    video_id: str | None,
+    channel_name: str,
+    telemetry: dict,
+    max_tokens: int = 4096,
+) -> str | None:
+    """Call the fine-tuned Qwen 2.5 7B model via RunPod Serverless
+    OpenAI-compatible endpoint. Returns the raw response text (JSON
+    string) or None on failure.
+
+    Uses httpx (already in requirements.txt) with a 120s timeout â
+    RunPod Serverless may cold-start a worker if none are active.
+    The /openai/v1/chat/completions path returns standard OpenAI
+    format so we can extract content directly.
+    """
+    import httpx
+
+    if not RUNPOD_API_KEY or not RUNPOD_ENDPOINT_ID:
+        print("[YT-RUNPOD] Missing RUNPOD_API_KEY or RUNPOD_ENDPOINT_ID", flush=True)
+        return None
+
+    url = f"https://api.runpod.ai/v2/{RUNPOD_ENDPOINT_ID}/openai/v1/chat/completions"
+    headers = {
+        "Authorization": f"Bearer {RUNPOD_API_KEY}",
+        "Content-Type": "application/json",
+    }
+    payload = {
+        "model": RUNPOD_MODEL_NAME,
+        "messages": [
+            {"role": "system", "content": system_text},
+            {"role": "user", "content": user_text},
+        ],
+        "max_tokens": max_tokens,
+        "temperature": 0,
+    }
+
+    identifier = video_id or channel_name
+    t0 = time.time()
+    try:
+        with httpx.Client(timeout=120.0) as http:
+            r = http.post(url, json=payload, headers=headers)
+        elapsed = time.time() - t0
+
+        if r.status_code != 200:
+            print(
+                f"[YT-RUNPOD] HTTP {r.status_code} for {identifier} "
+                f"({elapsed:.1f}s): {r.text[:300]}",
+                flush=True,
+            )
+            telemetry["runpod_error"] = f"http_{r.status_code}"
+            return None
+
+        data = r.json()
+        content = data["choices"][0]["message"]["content"].strip()
+        usage = data.get("usage", {})
+        in_tok = usage.get("prompt_tokens", 0)
+        out_tok = usage.get("completion_tokens", 0)
+
+        telemetry["input_tokens"] = int(telemetry.get("input_tokens", 0)) + in_tok
+        telemetry["output_tokens"] = int(telemetry.get("output_tokens", 0)) + out_tok
+        telemetry["estimated_cost_usd"] = (
+            float(telemetry.get("estimated_cost_usd", 0.0)) + RUNPOD_ESTIMATED_COST_PER_CALL
+        )
+
+        print(
+            f"[YT-RUNPOD] {identifier} input={in_tok} output={out_tok} "
+            f"elapsed={elapsed:.1f}s est_cost=${RUNPOD_ESTIMATED_COST_PER_CALL:.4f}",
+            flush=True,
+        )
+        return content
+
+    except Exception as e:
+        elapsed = time.time() - t0
+        tag = f"{type(e).__name__}: {str(e)[:200]}"
+        print(
+            f"[YT-RUNPOD] Error for {identifier} ({elapsed:.1f}s): {tag}",
+            flush=True,
+        )
+        telemetry["runpod_error"] = tag[:300]
+        return None
+
+
+# verified_by tag for grep / cohort analysis. Bump _v1 â _v2 if the
 # prompt or model materially change.
 VERIFIED_BY_HAIKU = "youtube_haiku_v1"
 VERIFIED_BY_QWEN = "youtube_qwen_v1"
@@ -416,6 +517,7 @@ _verified_by_local = threading.local()
 def _get_active_verified_by() -> str:
     """Return the verified_by tag for the current classify_video call."""
     return getattr(_verified_by_local, "tag", VERIFIED_BY_HAIKU)
+
 
 
 # ── Eidolum Prediction Classifier prompt (use EXACTLY — do not simplify) ────
@@ -2450,7 +2552,6 @@ def classify_video(channel_name: str, title: str, publish_date: str,
     telemetry: dict = {"chunks": 0, "input_tokens": 0, "output_tokens": 0,
                        "last_status": None, "predictions_raw": 0,
                        "prompt_variant": "standard"}
-
     chunks = chunk_transcript(transcript or "")
     if not chunks:
         telemetry["error"] = "empty_transcript"
@@ -2486,6 +2587,7 @@ def classify_video(channel_name: str, title: str, publish_date: str,
         return [], telemetry
 
     client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
+
 
     # Decide which system prompt this video gets. Stable hash routing
     # guarantees retries see the same prompt, and the cached flag read
@@ -2698,15 +2800,9 @@ def classify_video(channel_name: str, title: str, publish_date: str,
                 telemetry=telemetry,
             )
         except Exception as e:
-            # Anthropic SDK raises typed exceptions for 4xx/5xx — we don't
-            # try to discriminate. The spec says: "If Anthropic returns a
-            # 400/401/402/429 error, log it and skip the video (do NOT
-            # retry in a loop — the next scheduled run will pick it up)."
-            # Per the read-body-first feedback, log the full string before
-            # theorizing.
             tag = f"{type(e).__name__}: {str(e)[:200]}"
             print(f"[YT-CLF] Haiku error on chunk {i+1}/{len(chunks)} for "
-                  f"\"{title[:60]}\": {tag}", flush=True)
+                  f"\"\"{title[:60]}\": {tag}", flush=True)
             telemetry["error"] = tag[:300]
             telemetry["last_status"] = "exception"
             return [], telemetry
