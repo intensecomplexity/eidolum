@@ -55,6 +55,7 @@ from jobs.youtube_classifier import (
     PIPELINE_VERSION,
     HAIKU_MODEL,
     USE_FINETUNED_MODEL,
+    find_or_create_youtube_forecaster,
 )
 
 YOUTUBE_API_KEY = os.getenv("YOUTUBE_API_KEY", "").strip()
@@ -553,8 +554,82 @@ def _seed_target_channels(db):
         print(f"[ChannelMonitor] Seeded {inserted} new channels")
 
 
+def _ensure_youtube_forecasters(db):
+    """Ensure every active YouTube channel in youtube_channels has a
+    corresponding row in the forecasters table so it appears on the
+    Forecasters page and is eligible for the Leaderboard.
+
+    Uses find_or_create_youtube_forecaster which handles handle
+    uniqueness, slug generation, and channel_url backfill.
+
+    Runs at the top of every monitor cycle. Idempotent: existing
+    forecasters are left alone; only missing ones are created.
+    """
+    rows = db.execute(sql_text(
+        "SELECT channel_name, youtube_channel_id FROM youtube_channels "
+        "WHERE is_active = TRUE"
+    )).fetchall()
+    created = 0
+    for r in rows:
+        name, cid = r[0], r[1]
+        if not name:
+            continue
+        try:
+            f = find_or_create_youtube_forecaster(name, cid, db)
+            if f:
+                db.commit()
+                if f.total_predictions is None:
+                    created += 1
+        except Exception as e:
+            print(f"[ChannelMonitor] forecaster ensure failed for {name}: {e}")
+            db.rollback()
+    if created:
+        print(f"[ChannelMonitor] Created {created} new forecaster rows for YouTube channels")
+
+
+def _backfill_null_forecaster_ids(db):
+    """Fix YouTube predictions with NULL forecaster_id by matching on
+    source_platform_id (pattern: yt_<channel_id>_<video_id>) to the
+    forecaster's channel_id.
+
+    Guarded: only runs if NULL forecaster_id rows exist with
+    source = 'youtube'. Safe to call every cycle.
+    """
+    null_count = db.execute(sql_text(
+        "SELECT COUNT(*) FROM predictions "
+        "WHERE source = 'youtube' AND forecaster_id IS NULL"
+    )).scalar() or 0
+    if null_count == 0:
+        return
+
+    print(f"[ChannelMonitor] Backfilling {null_count} YouTube predictions with NULL forecaster_id")
+
+    updated = db.execute(sql_text("""
+        UPDATE predictions p
+        SET forecaster_id = f.id
+        FROM forecasters f
+        WHERE p.source = 'youtube'
+          AND p.forecaster_id IS NULL
+          AND f.platform = 'youtube'
+          AND f.channel_id IS NOT NULL
+          AND p.source_platform_id LIKE 'yt_' || f.channel_id || '_%'
+    """)).rowcount
+    db.commit()
+    if updated:
+        print(f"[ChannelMonitor] Backfilled {updated} predictions via channel_id match")
+
+    remaining = db.execute(sql_text(
+        "SELECT COUNT(*) FROM predictions "
+        "WHERE source = 'youtube' AND forecaster_id IS NULL"
+    )).scalar() or 0
+    if remaining:
+        print(f"[ChannelMonitor] {remaining} YouTube predictions still have NULL forecaster_id")
+
+
 def _run_inner(db):
     _seed_target_channels(db)
+    _ensure_youtube_forecasters(db)
+    _backfill_null_forecaster_ids(db)
 
     # Auto-discover new channels when all active channels have been
     # fully processed. Uses YouTube search to find finance channels

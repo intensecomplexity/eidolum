@@ -4,7 +4,7 @@ import time as _time
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
-from sqlalchemy import text as sql_text
+from sqlalchemy import func, text as sql_text
 from database import get_db
 from models import Forecaster, Prediction, format_timestamp, get_youtube_timestamp_url
 from rate_limit import limiter
@@ -73,6 +73,52 @@ def list_forecasters(request: Request, limit: int = Query(50, ge=1, le=200), db:
     forecasters = db.query(Forecaster).filter(Forecaster.total_predictions > 0).order_by(Forecaster.name).limit(limit).all()
     return [{"id": f.id, "name": f.name, "handle": f.handle, "channel_url": f.channel_url,
              "subscriber_count": f.subscriber_count, "profile_image_url": f.profile_image_url} for f in forecasters]
+
+
+@router.get("/forecasters/all")
+@limiter.limit("60/minute")
+def list_all_forecasters(
+    request: Request,
+    letter: str = Query(None),
+    search: str = Query(None),
+    q: str = Query(None),
+    limit: int = Query(500, ge=1, le=1000),
+    db: Session = Depends(get_db),
+):
+    """Full forecaster list for the Forecasters page. Supports alphabetical
+    and search filtering. Returns all forecasters that have at least one
+    prediction (any outcome), including YouTube channel forecasters."""
+    query = db.query(Forecaster)
+
+    search_term = search or q
+    if search_term and search_term.strip():
+        pattern = f"%{search_term.strip().lower()}%"
+        query = query.filter(func.lower(Forecaster.name).like(pattern))
+    elif letter and len(letter) == 1 and letter.isalpha():
+        query = query.filter(Forecaster.name.ilike(f"{letter}%"))
+
+    forecasters = query.order_by(Forecaster.name).limit(limit).all()
+
+    results = []
+    for f in forecasters:
+        total = f.total_predictions or 0
+        scored = total
+        accuracy = float(f.accuracy_score or 0)
+        is_ranked = total >= 10 and accuracy > 0
+        results.append({
+            "id": f.id,
+            "name": f.name,
+            "handle": f.handle,
+            "platform": f.platform or "youtube",
+            "channel_url": f.channel_url,
+            "subscriber_count": f.subscriber_count,
+            "profile_image_url": f.profile_image_url,
+            "total_predictions": total,
+            "scored_predictions": scored,
+            "accuracy": accuracy if scored > 0 else None,
+            "is_ranked": is_ranked,
+        })
+    return results
 
 
 @router.get("/forecaster/{forecaster_id}")
