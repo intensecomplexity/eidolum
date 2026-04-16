@@ -61,9 +61,17 @@ COMMIT_BATCH = 50
 # Transcript fetch timeout (seconds). Kills hung proxy connections.
 TRANSCRIPT_TIMEOUT = 30
 
-# Haiku pricing (mirror of youtube_classifier.py constants).
+# Haiku pricing (fallback path).
 HAIKU_PRICE_INPUT_PER_M = 1.00
 HAIKU_PRICE_OUTPUT_PER_M = 5.00
+
+# Qwen on RunPod Serverless (primary path). Same endpoint as the main
+# classifier in youtube_classifier.py. ~$0.0012/call vs ~$0.008 Haiku.
+RUNPOD_API_KEY = os.getenv("RUNPOD_API_KEY", "").strip()
+RUNPOD_ENDPOINT_ID = os.getenv("RUNPOD_ENDPOINT_ID", "").strip()
+QWEN_MODEL_PATH = "/runpod-volume/eidolum-qwen-merged"
+QWEN_PRICE_PER_CALL_USD = 0.0012
+RUNPOD_TIMEOUT_SECONDS = 60
 
 # Progress file for --resume.
 _PROGRESS_FILE = os.path.join(os.path.dirname(__file__), ".backfill_ts_progress.json")
@@ -147,14 +155,14 @@ def _extract_video_id(source_platform_id: str) -> str | None:
     return candidate
 
 
-def _call_haiku_for_quote(client, transcript_text: str, row) -> str | None:
-    """Path B: focused Haiku call to extract verbatim quote for one prediction."""
+def _build_quote_user_msg(transcript_text: str, row) -> str:
+    """Build the user message for quote extraction (shared by Qwen and Haiku)."""
     ticker = getattr(row, "ticker", "?")
     direction = getattr(row, "direction", "?")
     context = getattr(row, "context", "") or ""
     exact_quote = getattr(row, "exact_quote", "") or ""
 
-    user_msg = (
+    return (
         f"Prediction details:\n"
         f"  Ticker: {ticker}\n"
         f"  Direction: {direction}\n"
@@ -165,35 +173,120 @@ def _call_haiku_for_quote(client, transcript_text: str, row) -> str | None:
         f"prediction was made. Return JSON only."
     )
 
-    try:
-        # Haiku call wrapped in the same 30s wall-clock timeout so a
-        # hung Anthropic connection can't stall the loop.
-        resp = _run_with_timeout(
-            client.messages.create,
-            model="claude-haiku-4-5-20251001",
-            max_tokens=300,
-            temperature=0,
-            system=_PATHB_SYSTEM,
-            messages=[{"role": "user", "content": user_msg}],
-            timeout_sec=TRANSCRIPT_TIMEOUT,
-        )
-        text = resp.content[0].text.strip() if resp.content else ""
-        # Strip markdown code fences (```json ... ```) that Haiku often wraps.
-        if text.startswith("```"):
-            text = text.split("\n", 1)[-1]  # remove ```json line
-            if text.endswith("```"):
-                text = text[:-3].strip()
-        # Track tokens for cost reporting.
-        usage = resp.usage if hasattr(resp, "usage") else None
-        in_tok = getattr(usage, "input_tokens", 0) if usage else 0
-        out_tok = getattr(usage, "output_tokens", 0) if usage else 0
 
-        parsed = json.loads(text)
-        quote = parsed.get("verbatim_quote")
-        return quote, in_tok, out_tok
+def _parse_llm_response(raw_text: str) -> str | None:
+    """Parse verbatim_quote from an LLM response. Handles markdown fences."""
+    text = raw_text.strip()
+    if text.startswith("```"):
+        text = text.split("\n", 1)[-1]
+        if text.endswith("```"):
+            text = text[:-3].strip()
+    parsed = json.loads(text)
+    return parsed.get("verbatim_quote")
+
+
+def _call_qwen_for_quote(transcript_text: str, row) -> tuple[str | None, float]:
+    """Call the fine-tuned Qwen 2.5 7B on RunPod Serverless for quote extraction.
+
+    Returns (quote, cost_usd). Raises on any failure so the caller can
+    fall back to Haiku.
+    """
+    import httpx as _httpx
+
+    if not RUNPOD_API_KEY or not RUNPOD_ENDPOINT_ID:
+        raise RuntimeError("RUNPOD_API_KEY or RUNPOD_ENDPOINT_ID not set")
+
+    url = f"https://api.runpod.ai/v2/{RUNPOD_ENDPOINT_ID}/openai/v1/chat/completions"
+    user_msg = _build_quote_user_msg(transcript_text, row)
+
+    payload = {
+        "model": QWEN_MODEL_PATH,
+        "messages": [
+            {"role": "system", "content": _PATHB_SYSTEM},
+            {"role": "user", "content": user_msg},
+        ],
+        "temperature": 0,
+        "max_tokens": 300,
+    }
+
+    r = _httpx.post(
+        url,
+        json=payload,
+        headers={
+            "Authorization": f"Bearer {RUNPOD_API_KEY}",
+            "Content-Type": "application/json",
+        },
+        timeout=RUNPOD_TIMEOUT_SECONDS,
+    )
+
+    if r.status_code != 200:
+        raise RuntimeError(f"RunPod HTTP {r.status_code}: {r.text[:300]}")
+
+    data = r.json()
+    choices = data.get("choices") or []
+    if not choices:
+        raise RuntimeError("RunPod returned empty choices")
+
+    content = (choices[0].get("message") or {}).get("content") or ""
+    if not content.strip():
+        raise RuntimeError("RunPod returned empty content")
+
+    quote = _parse_llm_response(content)
+    return quote, QWEN_PRICE_PER_CALL_USD
+
+
+def _call_haiku_for_quote(client, transcript_text: str, row):
+    """Haiku fallback for quote extraction. Returns (quote, in_tok, out_tok)."""
+    user_msg = _build_quote_user_msg(transcript_text, row)
+
+    resp = _run_with_timeout(
+        client.messages.create,
+        model="claude-haiku-4-5-20251001",
+        max_tokens=300,
+        temperature=0,
+        system=_PATHB_SYSTEM,
+        messages=[{"role": "user", "content": user_msg}],
+        timeout_sec=TRANSCRIPT_TIMEOUT,
+    )
+    text = resp.content[0].text.strip() if resp.content else ""
+    usage = resp.usage if hasattr(resp, "usage") else None
+    in_tok = getattr(usage, "input_tokens", 0) if usage else 0
+    out_tok = getattr(usage, "output_tokens", 0) if usage else 0
+
+    quote = _parse_llm_response(text)
+    return quote, in_tok, out_tok
+
+
+def _call_llm_for_quote(transcript_text: str, row, haiku_client, stats: dict):
+    """Try Qwen first, fall back to Haiku. Returns (quote, provider).
+
+    Updates stats dict with call counts and costs for whichever path ran.
+    """
+    # ── Qwen (primary) ───────────────────────────────────────────────
+    try:
+        quote, cost = _call_qwen_for_quote(transcript_text, row)
+        stats["qwen_calls"] += 1
+        stats["qwen_cost"] += cost
+        return quote, "qwen"
     except Exception as e:
-        print(f"{TAG}   Path B Haiku error: {type(e).__name__}: {e}")
-        return None, 0, 0
+        pid = getattr(row, "id", "?")
+        print(f"{TAG}   id={pid} Qwen failed ({type(e).__name__}: {e}), falling back to Haiku", flush=True)
+        stats["qwen_failures"] += 1
+
+    # ── Haiku (fallback) ─────────────────────────────────────────────
+    if haiku_client is None:
+        return None, "none"
+
+    try:
+        quote, in_tok, out_tok = _call_haiku_for_quote(haiku_client, transcript_text, row)
+        stats["haiku_calls"] += 1
+        stats["haiku_input_tokens"] += in_tok
+        stats["haiku_output_tokens"] += out_tok
+        return quote, "haiku"
+    except Exception as e:
+        print(f"{TAG}   Haiku fallback error: {type(e).__name__}: {e}")
+        stats["haiku_calls"] += 1
+        return None, "haiku"
 
 
 def _save_progress(index: int):
@@ -318,28 +411,25 @@ def _run(db, *, apply: bool, limit: int,
     if skipped_bad_id:
         print(f"{TAG} Skipped {skipped_bad_id} rows with unparseable source_platform_id")
 
-    # ── Cost estimate (one Haiku call per prediction) ─────────────────────
-    avg_transcript_tokens = 8_000  # conservative average
-    avg_output_tokens = 80
-    max_cost = total_preds * (
-        (avg_transcript_tokens * HAIKU_PRICE_INPUT_PER_M / 1_000_000)
-        + (avg_output_tokens * HAIKU_PRICE_OUTPUT_PER_M / 1_000_000)
-    )
-    print(f"{TAG} Cost estimate: ~${max_cost:.2f} for {total_preds} Haiku calls")
+    # ── Cost estimate ──────────────────────────────────────────────────────
+    # Primary path: Qwen on RunPod (~$0.0012/call).
+    # Fallback: Haiku (~$0.008/call). Estimate assumes 100% Qwen success.
+    qwen_cost_est = total_preds * QWEN_PRICE_PER_CALL_USD
+    print(f"{TAG} Cost estimate: ~${qwen_cost_est:.2f} for {total_preds} calls (Qwen primary, Haiku fallback)")
 
     # ── Lazy imports ──────────────────────────────────────────────────────
     from jobs.timestamp_matcher import match_quote_to_timestamp
 
-    # Anthropic client for Path B (lazy, only if needed).
+    # Anthropic client for Haiku fallback (lazy, only created if Qwen fails).
     _anthropic_client = None
 
-    def _get_client():
+    def _get_haiku_client():
         nonlocal _anthropic_client
         if _anthropic_client is None:
             import anthropic
             api_key = os.getenv("ANTHROPIC_API_KEY", "").strip()
             if not api_key:
-                print(f"{TAG} WARNING: ANTHROPIC_API_KEY not set. Path B disabled.")
+                print(f"{TAG} WARNING: ANTHROPIC_API_KEY not set. Haiku fallback disabled.")
                 return None
             _anthropic_client = anthropic.Anthropic(api_key=api_key)
         return _anthropic_client
@@ -350,8 +440,10 @@ def _run(db, *, apply: bool, limit: int,
         "videos_skipped_no_transcript": 0,
         "videos_timed_out": 0,
         "resolved": 0,
+        "qwen_calls": 0,
+        "qwen_cost": 0.0,
+        "qwen_failures": 0,
         "haiku_calls": 0,
-        "haiku_timed_out": 0,
         "haiku_input_tokens": 0,
         "haiku_output_tokens": 0,
         "failed": 0,
@@ -424,35 +516,21 @@ def _run(db, *, apply: bool, limit: int,
 
         stats["videos_processed"] += 1
 
+        haiku_client = _get_haiku_client()
+
         updates_this_video = []
         for pred in preds:
             pid = pred.id
             ticker = pred.ticker or "?"
 
-            client = _get_client()
-            if client is None:
-                stats["failed"] += 1
-                print(f"{TAG}   id={pid:>7d} {ticker:>6s} skipped (no API key)", flush=True)
-                continue
-
-            # Haiku extracts the verbatim quote from the transcript.
-            try:
-                quote, in_tok, out_tok = _call_haiku_for_quote(client, text, pred)
-            except FuturesTimeout:
-                stats["failed"] += 1
-                stats["haiku_timed_out"] += 1
-                print(f"{TAG}   id={pid:>7d} {ticker:>6s} Haiku TIMEOUT ({TRANSCRIPT_TIMEOUT}s)", flush=True)
-                continue
-            stats["haiku_calls"] += 1
-            stats["haiku_input_tokens"] += in_tok
-            stats["haiku_output_tokens"] += out_tok
+            quote, provider = _call_llm_for_quote(text, pred, haiku_client, stats)
 
             if not quote or not isinstance(quote, str) or len(quote.strip()) < 10:
                 stats["failed"] += 1
-                print(f"{TAG}   id={pid:>7d} {ticker:>6s} Haiku returned no quote", flush=True)
+                print(f"{TAG}   id={pid:>7d} {ticker:>6s} {provider} returned no quote", flush=True)
                 continue
 
-            # Run the Haiku-extracted quote through the matcher.
+            # Run the LLM-extracted quote through the matcher.
             seconds, method, confidence = match_quote_to_timestamp(
                 quote.strip(), transcript_data,
             )
@@ -471,7 +549,7 @@ def _run(db, *, apply: bool, limit: int,
                 "confidence": float(confidence),
                 "tvid": video_id[:11],
             })
-            print(f"{TAG}   id={pid:>7d} {ticker:>6s} resolved  "
+            print(f"{TAG}   id={pid:>7d} {ticker:>6s} resolved [{provider}] "
                   f"method={method}  conf={confidence:.2f}  t={seconds}s", flush=True)
 
         # ── Commit after each video (incremental progress) ────────
@@ -515,15 +593,17 @@ def _run(db, *, apply: bool, limit: int,
         (stats["haiku_input_tokens"] * HAIKU_PRICE_INPUT_PER_M / 1_000_000)
         + (stats["haiku_output_tokens"] * HAIKU_PRICE_OUTPUT_PER_M / 1_000_000)
     )
+    total_cost = stats["qwen_cost"] + haiku_cost
 
     print(f"\n{TAG} ── Summary ──")
     print(f"{TAG}   Videos processed:     {stats['videos_processed']}")
     print(f"{TAG}   Videos no transcript: {stats['videos_skipped_no_transcript']}")
     print(f"{TAG}   Videos timed out:     {stats['videos_timed_out']}")
-    print(f"{TAG}   Resolved (Path B):    {stats['resolved']}")
-    print(f"{TAG}   Haiku calls:          {stats['haiku_calls']}")
-    print(f"{TAG}   Haiku timeouts:       {stats['haiku_timed_out']}")
-    print(f"{TAG}   Haiku cost:           ${haiku_cost:.4f}")
+    print(f"{TAG}   Resolved:             {stats['resolved']}")
+    print(f"{TAG}   Qwen calls:           {stats['qwen_calls']} (${stats['qwen_cost']:.4f})")
+    print(f"{TAG}   Qwen failures:        {stats['qwen_failures']}")
+    print(f"{TAG}   Haiku fallback calls: {stats['haiku_calls']} (${haiku_cost:.4f})")
+    print(f"{TAG}   Total cost:           ${total_cost:.4f}")
     print(f"{TAG}   Failed (no timestamp):{stats['failed']}")
     print(f"{TAG}   Total written to DB:  {stats['written']}")
 
