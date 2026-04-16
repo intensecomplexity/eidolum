@@ -93,12 +93,18 @@ def _massive_benzinga(db):
     scrape_massive_ratings(db)
 
 def _evaluator():
+    if os.getenv("ENABLE_EVALUATOR", "true").lower() != "true":
+        log.info("⏸️  Evaluator paused (ENABLE_EVALUATOR != true)")
+        return
     from jobs.historical_evaluator import evaluate_batch, refresh_all_forecaster_stats
     # max_tickers=None → plan-aware default (5000 on Ultimate, 500 on Starter)
     r = evaluate_batch()
     if r.get("predictions_scored", 0) > 0: refresh_all_forecaster_stats()
 
 def _refresh_stats():
+    if os.getenv("ENABLE_EVALUATOR", "true").lower() != "true":
+        log.info("⏸️  refresh_stats paused (ENABLE_EVALUATOR != true)")
+        return
     from jobs.historical_evaluator import refresh_all_forecaster_stats
     refresh_all_forecaster_stats()
 
