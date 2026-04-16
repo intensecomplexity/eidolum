@@ -69,7 +69,7 @@ HAIKU_PRICE_OUTPUT_PER_M = 5.00
 # classifier in youtube_classifier.py. ~$0.0012/call vs ~$0.008 Haiku.
 RUNPOD_API_KEY = os.getenv("RUNPOD_API_KEY", "").strip()
 RUNPOD_ENDPOINT_ID = os.getenv("RUNPOD_ENDPOINT_ID", "").strip()
-QWEN_MODEL_PATH = "/runpod-volume/eidolum-qwen-merged"
+QWEN_MODEL_PATH = os.getenv("RUNPOD_MODEL_NAME", "/runpod-volume/eidolum-qwen-merged")
 QWEN_PRICE_PER_CALL_USD = 0.0012
 RUNPOD_TIMEOUT_SECONDS = 60
 

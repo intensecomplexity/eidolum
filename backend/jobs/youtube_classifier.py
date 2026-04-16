@@ -157,7 +157,7 @@ ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "").strip()
 USE_FINETUNED_MODEL = os.getenv("USE_FINETUNED_MODEL", "false").strip().lower() == "true"
 RUNPOD_API_KEY = os.getenv("RUNPOD_API_KEY", "").strip()
 RUNPOD_ENDPOINT_ID = os.getenv("RUNPOD_ENDPOINT_ID", "").strip()
-RUNPOD_MODEL_NAME = "/runpod-volume/eidolum-qwen-merged"
+RUNPOD_MODEL_NAME = os.getenv("RUNPOD_MODEL_NAME", "/runpod-volume/eidolum-qwen-merged")
 
 # Current Haiku model. The spec called for claude-haiku-4-5-20250514 but
 # that model ID doesn't exist on the Anthropic API; the actual current
@@ -506,7 +506,7 @@ def call_runpod_vllm(
     )
 
     payload = {
-        "model": "/runpod-volume/eidolum-qwen-merged",
+        "model": RUNPOD_MODEL_NAME,
         "messages": [
             {"role": "system", "content": QWEN_SYSTEM_PROMPT},
             {"role": "user", "content": user_msg},
