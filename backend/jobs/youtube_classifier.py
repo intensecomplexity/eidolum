@@ -3905,6 +3905,41 @@ def _resolve_source_timestamp(
         return {}
 
 
+def _timestamp_hard_gate_fails(
+    ts_fields: dict,
+    pred: dict,
+    *,
+    video_id: str,
+    channel_name: str,
+    stats: dict | None = None,
+) -> bool:
+    """HARD GATE: every YouTube prediction must land with a resolved
+    source_timestamp_seconds. Returns True when the caller should
+    _reject the row. Runs independently of ENABLE_SOURCE_TIMESTAMPS /
+    REQUIRE_COMPLETE_PREDICTIONS so a flag flip can't re-introduce
+    timestamp-less YouTube rows.
+
+    Gate fires whenever ts_fields is empty OR carries a NULL/zero
+    source_timestamp_seconds — which covers both the "no transcript
+    fetched" and "matcher couldn't find the quote" paths.
+    """
+    seconds = ts_fields.get("source_timestamp_seconds") if ts_fields else None
+    if seconds:
+        return False
+    log.warning(
+        "[YT-CLF] SKIP — no source_timestamp_seconds for %s by %s (vid=%s). "
+        "Will not insert incomplete YouTube prediction.",
+        (pred.get("ticker") or pred.get("sector") or pred.get("concept")
+         or pred.get("regime_instrument") or "?"),
+        channel_name, video_id,
+    )
+    if stats is not None:
+        stats["skipped_missing_source_timestamp"] = int(
+            stats.get("skipped_missing_source_timestamp", 0)
+        ) + 1
+    return True
+
+
 # ── Training completeness gate ────────────────────────────────────────────
 #
 # Returns the list of NULL required training fields when the inline
@@ -4348,6 +4383,13 @@ def insert_youtube_prediction(
     # No-ops silently when transcript_data is None (flag off or
     # non-monitor caller).
     _ts_fields = _resolve_source_timestamp(pred, transcript_data, stats)
+    # HARD GATE: YouTube predictions must land with a resolved
+    # source_timestamp_seconds so the frontend deep-link renders.
+    if _timestamp_hard_gate_fails(
+        _ts_fields, pred,
+        video_id=video_id, channel_name=channel_name, stats=stats,
+    ):
+        return _reject("missing_source_timestamp")
     # Ship #9 rescoped: metadata enrichment — category-inferred
     # window + conviction level. Overrides window_days / eval_date
     # when Haiku emits inferred_timeframe_days; no-ops silently when
@@ -4515,6 +4557,11 @@ def insert_youtube_sector_prediction(
     source_url = f"https://www.youtube.com/watch?v={video_id}"
 
     _ts_fields = _resolve_source_timestamp(pred, transcript_data, stats)
+    if _timestamp_hard_gate_fails(
+        _ts_fields, pred,
+        video_id=video_id, channel_name=channel_name, stats=stats,
+    ):
+        return _reject("missing_source_timestamp")
     _meta_fields, window_days, eval_date = _resolve_metadata_enrichment(
         pred, stats,
         publish_date=publish_date, default_window_days=window_days,
@@ -4737,6 +4784,11 @@ def insert_youtube_macro_prediction(
     source_url = f"https://www.youtube.com/watch?v={video_id}"
 
     _ts_fields = _resolve_source_timestamp(pred, transcript_data, stats)
+    if _timestamp_hard_gate_fails(
+        _ts_fields, pred,
+        video_id=video_id, channel_name=channel_name, stats=stats,
+    ):
+        return _reject("missing_source_timestamp")
     _meta_fields, window_days, eval_date = _resolve_metadata_enrichment(
         pred, stats,
         publish_date=publish_date, default_window_days=window_days,
@@ -4938,6 +4990,11 @@ def insert_youtube_pair_prediction(
     source_url = f"https://www.youtube.com/watch?v={video_id}"
 
     _ts_fields = _resolve_source_timestamp(pred, transcript_data, stats)
+    if _timestamp_hard_gate_fails(
+        _ts_fields, pred,
+        video_id=video_id, channel_name=channel_name, stats=stats,
+    ):
+        return _reject("missing_source_timestamp")
     _meta_fields, window_days, eval_date = _resolve_metadata_enrichment(
         pred, stats,
         publish_date=publish_date, default_window_days=window_days,
@@ -5168,6 +5225,11 @@ def insert_youtube_binary_event_prediction(
     source_url = f"https://www.youtube.com/watch?v={video_id}"
 
     _ts_fields = _resolve_source_timestamp(pred, transcript_data, stats)
+    if _timestamp_hard_gate_fails(
+        _ts_fields, pred,
+        video_id=video_id, channel_name=channel_name, stats=stats,
+    ):
+        return _reject("missing_source_timestamp")
     # Binary events: window_days is driven by the event deadline, not by
     # Haiku's inferred_timeframe_days. Use tuple throwaway so the helper
     # still populates conviction + inferred_timeframe_days + timeframe_*
@@ -5407,6 +5469,11 @@ def insert_youtube_metric_forecast_prediction(
     source_url = f"https://www.youtube.com/watch?v={video_id}"
 
     _ts_fields = _resolve_source_timestamp(pred, transcript_data, stats)
+    if _timestamp_hard_gate_fails(
+        _ts_fields, pred,
+        video_id=video_id, channel_name=channel_name, stats=stats,
+    ):
+        return _reject("missing_source_timestamp")
     # Metric forecasts: window_days is driven by the release date, not
     # by Haiku's inferred_timeframe_days. Throw away the helper's
     # window override but keep the metadata columns.
@@ -5630,6 +5697,11 @@ def insert_youtube_conditional_prediction(
         trig_ticker = str(trig_ticker).upper().strip().lstrip("$")
 
     _ts_fields = _resolve_source_timestamp(pred, transcript_data, stats)
+    if _timestamp_hard_gate_fails(
+        _ts_fields, pred,
+        video_id=video_id, channel_name=channel_name, stats=stats,
+    ):
+        return _reject("missing_source_timestamp")
     # Conditional calls: the outcome window is overridable by Haiku's
     # inferred_timeframe_days — it's the Phase 2 scoring window after
     # trigger fire, same semantics as ticker_call.
