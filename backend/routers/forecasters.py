@@ -398,16 +398,37 @@ def get_forecaster(
     except Exception:
         pass
 
-    # Dormancy fields. Use getattr for graceful degradation if the migration
-    # hasn't run yet on a fresh DB.
-    is_dormant = bool(getattr(f, "is_dormant", False))
+    # Dormancy fields. Computed LIVE from the predictions table so a
+    # forecaster that just inserted a new prediction stops showing the
+    # stale "dormant" banner immediately — the cached last_prediction_at
+    # on the forecasters row only refreshes every 2h via
+    # refresh_all_forecaster_stats, which caused user-visible stale
+    # "dormant 812 days" banners between refresh windows.
     last_pred_at = getattr(f, "last_prediction_at", None)
+    try:
+        live_last = db.execute(
+            sql_text(
+                "SELECT MAX(prediction_date) FROM predictions "
+                "WHERE forecaster_id = :fid"
+            ),
+            {"fid": forecaster_id},
+        ).scalar()
+        if live_last is not None:
+            last_pred_at = live_last
+    except Exception:
+        # Fall back to the cached column if the live query fails.
+        pass
     days_since_last = None
     if last_pred_at:
         try:
             days_since_last = (datetime.datetime.utcnow() - last_pred_at).days
         except Exception:
             days_since_last = None
+    # Dormancy threshold mirrors refresh_all_forecaster_stats: 30 days.
+    is_dormant = (
+        last_pred_at is None
+        or (days_since_last is not None and days_since_last >= 30)
+    )
 
     result = {
         "id": f.id, "name": f.name, "handle": f.handle,
