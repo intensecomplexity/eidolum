@@ -2058,9 +2058,13 @@ def main():
     # Scheduler with separate executor for maintenance jobs.
     # default: scrapers + evaluator (must never be blocked)
     # maintenance: logos, backfills, harvests (one at a time, isolated, time-budgeted)
+    # ts_backfill: legacy YouTube timestamp backfill — its own thread so
+    #   long Qwen calls can never contend with the channel monitor or
+    #   video backfill running on the default pool.
     executors = {
         'default': APThreadPool(max_workers=3),
         'maintenance': APThreadPool(max_workers=1),
+        'ts_backfill': APThreadPool(max_workers=1),
     }
     job_defaults = {
         'coalesce': True,        # if a job missed multiple runs, just run once
@@ -2161,6 +2165,28 @@ def main():
         except Exception as e:
             log.error(f"[youtube_backfill] {e}")
     sched.add_job(_standalone("youtube_backfill", _youtube_backfill), "interval", hours=1, id="youtube_backfill", next_run_time=t0 + timedelta(minutes=10), executor='default')
+
+    # YouTube Timestamp Backfill — every 15 min, processes 20 legacy
+    # NULL-timestamp predictions per run via Qwen. Own executor so a
+    # long Qwen/transcript run can't block the channel_monitor or
+    # youtube_backfill sharing the default pool. Independent cursor
+    # (selects newest-first from predictions WHERE ts IS NULL), so
+    # never races or shares state with either existing YouTube job.
+    def _yt_timestamp_backfill():
+        try:
+            from jobs.youtube_timestamp_backfill import run_timestamp_backfill
+            run_timestamp_backfill(batch_size=20, rate_limit_sec=1.0)
+        except Exception as e:
+            log.error(f"[yt_timestamp_backfill] {e}")
+    sched.add_job(
+        _standalone("yt_timestamp_backfill", _yt_timestamp_backfill),
+        "interval", minutes=15,
+        id="yt_timestamp_backfill",
+        next_run_time=t0 + timedelta(minutes=3),
+        max_instances=1,
+        coalesce=True,
+        executor='ts_backfill',
+    )
 
     # X/Twitter scraper — Apify-powered, every 8h, inserts predictions
     def _x_scraper():
