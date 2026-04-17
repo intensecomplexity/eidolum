@@ -39,7 +39,10 @@ log = logging.getLogger(__name__)
 # admin /api/admin/timestamp-diagnostics endpoint for empirical numbers
 # once the flag is flipped on.
 _WORD_LEVEL_THRESHOLD = 0.70   # Jaccard on normalized word tokens
-_FUZZY_SEGMENT_THRESHOLD = 0.60  # SequenceMatcher ratio on segment text
+_FUZZY_SEGMENT_THRESHOLD = 0.70  # SequenceMatcher ratio on segment text
+# Trust-product floor: every method below must return confidence >= this
+# value, or None. Keeps UI deep-links honest — no "probably-right" rows.
+_UNIFIED_CONFIDENCE_FLOOR = 0.70
 
 # Two-pass Haiku settings. Cheap enough that we can afford to fire per
 # fallback; the prompt is tiny and the response is a single integer or
@@ -305,7 +308,7 @@ def _match_segment_overlap(
     quote_tokens: list[str],
     segments: list[dict],
     *,
-    threshold: float = 0.50,
+    threshold: float = _UNIFIED_CONFIDENCE_FLOOR,
 ) -> Optional[Tuple[int, float]]:
     """Dynamic multi-segment overlap matcher. For each start segment,
     incrementally combine adjacent segments (up to a span width scaled
@@ -392,7 +395,9 @@ def _match_key_phrase_anchor(
     ones that contain BOTH at least one ticker AND at least one
     numeric anchor from the quote (case-insensitive, comma-insensitive).
     Returns the segment with the highest anchor overlap count with
-    confidence 0.55-0.80 scaled by overlap size.
+    confidence 0.70-0.80 scaled by overlap size. Matches below the
+    unified 0.70 floor (1 ticker + 1 number, or 2+1, or 1+2) are
+    rejected as not confident enough to deep-link.
 
     Returns None when the quote carries no anchors (common case — a
     qualitative regime call with no ticker or dollar amount) or no
@@ -449,9 +454,12 @@ def _match_key_phrase_anchor(
     if best_ms is None:
         return None
     # Confidence scales with anchor density but never exceeds 0.80.
-    # A quote that shares 1 ticker + 1 number with a segment earns 0.60;
-    # 2+2 earns 0.72; 3+3 earns 0.80.
+    # Formula: min(0.80, 0.50 + 0.05 * anchor_overlap_count). So 4+
+    # anchor overlaps are required to clear the 0.70 unified floor;
+    # weaker matches (1 ticker + 1 number, etc.) are rejected below.
     confidence = min(0.80, 0.50 + 0.05 * best_score)
+    if confidence < _UNIFIED_CONFIDENCE_FLOOR:
+        return None
     return (int(round(best_ms / 1000)), float(confidence))
 
 
@@ -541,6 +549,8 @@ def _match_two_pass(
     # the full segment text.
     base = float(candidates[idx - 1][0])
     confidence = max(0.60, min(0.95, base + 0.10))
+    if confidence < _UNIFIED_CONFIDENCE_FLOOR:
+        return None
     return (int(round(start_ms / 1000)), confidence)
 
 
@@ -635,7 +645,8 @@ def match_quote_to_timestamp(
         # picks the best segment.
         if segments:
             a3_result = _match_segment_overlap(
-                quote_tokens_agg, segments, threshold=0.55,
+                quote_tokens_agg, segments,
+                threshold=_UNIFIED_CONFIDENCE_FLOOR,
             )
             if a3_result is not None:
                 seconds, sim = a3_result
