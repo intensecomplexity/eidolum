@@ -225,21 +225,32 @@ export default function EvidenceCard({ prediction: p, forecaster = null, expanda
         </div>
       )}
 
-      {/* Expanded: full video link */}
-      {expanded && hasRealVideo && p.source_type === 'youtube' && !showVideo && (
-        <div className="mt-2 flex items-center gap-2 flex-wrap">
-          <a
-            href={`https://youtube.com/watch?v=${p.source_platform_id}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            onClick={(e) => e.stopPropagation()}
-            className="inline-flex items-center gap-1 text-xs text-muted active:text-text-primary min-h-[28px]"
-          >
-            <ExternalLink className="w-3 h-3" />
-            Open on YouTube
-          </a>
-        </div>
-      )}
+      {/* Expanded: full video link. Uses the extracted 11-char video_id
+          (not the full yt_{id}_{ticker} source_platform_id, which is a
+          dedup key — not a valid YouTube URL) and appends &t=Ns when a
+          matched source_timestamp_seconds is available so the browser
+          jumps straight to the claim. */}
+      {expanded && hasRealVideo && p.source_type === 'youtube' && !showVideo && (() => {
+        const ts = p.source_timestamp_seconds ?? p.video_timestamp_sec;
+        const n = ts != null ? Math.floor(Number(ts)) : null;
+        const href = (n != null && Number.isFinite(n) && n >= 0)
+          ? `https://www.youtube.com/watch?v=${ytVideoId}&t=${n}s`
+          : `https://www.youtube.com/watch?v=${ytVideoId}`;
+        return (
+          <div className="mt-2 flex items-center gap-2 flex-wrap">
+            <a
+              href={href}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={(e) => e.stopPropagation()}
+              className="inline-flex items-center gap-1 text-xs text-muted active:text-text-primary min-h-[28px]"
+            >
+              <ExternalLink className="w-3 h-3" />
+              Open on YouTube
+            </a>
+          </div>
+        );
+      })()}
 
       {/* Resolution info when expanded */}
       {expanded && p.outcome && p.outcome !== 'pending' && (
@@ -298,16 +309,22 @@ function InlinePlayer({ videoId, timestamp, onClose }) {
 }
 
 // Mini version for activity feed
-export function MiniQuote({ quote, sourceUrl, sourceType, timestampDisplay, sourcePlatformId }) {
+export function MiniQuote({ quote, sourceUrl, sourceType, timestampDisplay, sourcePlatformId, timestampSeconds }) {
   if (!quote) return null;
   const ytVid = extractYouTubeVideoId(sourcePlatformId);
+  const tsN = timestampSeconds != null ? Math.floor(Number(timestampSeconds)) : null;
+  const ytHref = ytVid
+    ? (tsN != null && Number.isFinite(tsN) && tsN >= 0
+        ? `https://www.youtube.com/watch?v=${ytVid}&t=${tsN}s`
+        : `https://www.youtube.com/watch?v=${ytVid}`)
+    : null;
   return (
     <div className="mt-1">
       <p className="text-text-secondary text-xs italic truncate">
         &ldquo;{quote.slice(0, 80)}{quote.length > 80 ? '...' : ''}&rdquo;
       </p>
-      {ytVid && sourceType === 'youtube' && (
-        <a href={`https://youtube.com/watch?v=${ytVid}`} target="_blank" rel="noopener noreferrer"
+      {ytHref && sourceType === 'youtube' && (
+        <a href={ytHref} target="_blank" rel="noopener noreferrer"
            className="inline-flex items-center gap-1 text-[10px] text-accent active:underline mt-0.5"
            onClick={(e) => e.stopPropagation()}>
           <Play className="w-2.5 h-2.5" fill="currentColor" />
