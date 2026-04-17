@@ -58,6 +58,19 @@ DEFAULT_BATCH_SIZE = 20
 DEFAULT_RATE_LIMIT_SEC = 1.0
 UNRECOVERABLE_RETRY_DAYS = 30
 
+# Transcript-fetch statuses that are TRULY terminal — the captions will
+# never come back, so it's safe to stamp youtube_backfill_unrecoverable
+# and skip the video for UNRECOVERABLE_RETRY_DAYS.
+# Everything else (network ReadTimeout, FuturesTimeout, "error: ...",
+# "library_missing", "no_video_id") is treated as transient: log, skip
+# this cycle, leave the row NULL so the next cycle re-picks it up.
+TERMINAL_TRANSCRIPT_STATUSES = frozenset({
+    "no_transcript",
+    "transcripts_disabled",
+    "video_unavailable",
+    "empty_transcript",
+})
+
 
 def ensure_unrecoverable_table(db) -> None:
     """Idempotent DDL. Records video_ids whose transcripts are
@@ -218,21 +231,30 @@ def backfill_one_video(db, video_id: str, *, dry_run: bool = False) -> dict:
         return stats
 
     # ── Transcript fetch (same helper as the channel monitor) ──
+    # Only TERMINAL statuses (see TERMINAL_TRANSCRIPT_STATUSES) stamp the
+    # unrecoverable table. Network / timeout / transient library errors
+    # leave the row NULL — the next cycle will re-pick it up.
     try:
         transcript = _fetch_with_timeout(video_id)
     except Exception as e:
         reason = f"fetch_exception:{type(e).__name__}"
-        _mark_unrecoverable(db, video_id, reason)
-        stats["unrecoverable"] = True
+        log.info("%s %s transient fetch error, will retry: %s",
+                 TAG, video_id, reason)
         stats["error"] = reason
         return stats
 
     status = (transcript or {}).get("status") or ""
     text = (transcript or {}).get("text") or ""
-    if status != "ok" or not text.strip():
-        _mark_unrecoverable(db, video_id, status or "empty")
+    if status in TERMINAL_TRANSCRIPT_STATUSES or (status == "ok" and not text.strip()):
+        terminal_reason = status or "empty"
+        _mark_unrecoverable(db, video_id, terminal_reason)
         stats["unrecoverable"] = True
-        stats["error"] = status or "empty"
+        stats["error"] = terminal_reason
+        return stats
+    if status != "ok":
+        log.info("%s %s transient transcript status, will retry: %s",
+                 TAG, video_id, status)
+        stats["error"] = status
         return stats
 
     # ── Per-prediction quote extraction + timestamp match ──

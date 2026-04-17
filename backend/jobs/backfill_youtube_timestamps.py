@@ -71,7 +71,7 @@ RUNPOD_API_KEY = os.getenv("RUNPOD_API_KEY", "").strip()
 RUNPOD_ENDPOINT_ID = os.getenv("RUNPOD_ENDPOINT_ID", "").strip()
 QWEN_MODEL_PATH = os.getenv("RUNPOD_MODEL_NAME", "/runpod-volume/eidolum-qwen-merged")
 QWEN_PRICE_PER_CALL_USD = 0.0012
-RUNPOD_TIMEOUT_SECONDS = 60
+RUNPOD_TIMEOUT_SECONDS = 300  # 5min — cold starts download 14.2GB model from HF
 
 # Progress file for --resume.
 _PROGRESS_FILE = os.path.join(os.path.dirname(__file__), ".backfill_ts_progress.json")
