@@ -46,6 +46,7 @@ from sqlalchemy import text as sql_text
 
 from jobs.youtube_classifier import (
     fetch_transcript,
+    fetch_transcript_with_timestamps,
     classify_video,
     insert_youtube_prediction,
     transcript_proxy_status,
@@ -425,7 +426,30 @@ def _process_one_video(db, channel_name, channel_id, video_id, title, publish_st
     """Identical control flow to channel_monitor._process_one_video,
     but inlined here so the backfill doesn't import the monitor (avoids
     circular import + lets each job evolve independently)."""
-    text, transcript_status = fetch_transcript(video_id)
+    # ── Rich transcript fetch (mirrors ChannelMonitor) ─────────
+    # When ENABLE_SOURCE_TIMESTAMPS is on, use the rich fetcher so
+    # _resolve_source_timestamp can match verbatim quotes to video
+    # timecodes and produce deep-link timestamps.
+    use_ts = False
+    try:
+        from feature_flags import is_source_timestamps_enabled
+        use_ts = is_source_timestamps_enabled(db)
+    except Exception:
+        use_ts = False
+
+    transcript_data: dict | None = None
+    if use_ts:
+        rich = fetch_transcript_with_timestamps(video_id)
+        if rich.get("status") == "ok" and rich.get("text"):
+            transcript_data = rich
+            text = rich["text"]
+            transcript_status = rich.get("lang") or "ok"
+        else:
+            text = None
+            transcript_status = rich.get("status") or "no_transcript"
+    else:
+        text, transcript_status = fetch_transcript(video_id)
+
     if not text:
         return 0, 0, transcript_status or "no_transcript"
     transcript_chars = len(text)
@@ -455,6 +479,7 @@ def _process_one_video(db, channel_name, channel_id, video_id, title, publish_st
                 video_title=title,
                 publish_date=publish_dt,
                 db=db,
+                transcript_data=transcript_data,
             )
             if ok:
                 inserted += 1
