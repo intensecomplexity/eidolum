@@ -2597,13 +2597,32 @@ def _classify_video_qwen(
             return None
 
         # Normalize Qwen output to match the fields the validator expects.
-        # Qwen outputs: source_verbatim_quote, timeframe_category, inferred_timeframe_days
-        # Validator expects: verbatim_quote, timeframe_source
+        # The fine-tuned Qwen model may use shorter field names than the
+        # Haiku prompt specifies.  Map every known variant so that
+        # _resolve_metadata_enrichment / _resolve_source_timestamp and
+        # the training-completeness gate see canonical names.
+        #
+        # Qwen variant          → canonical (gate / enrichment key)
+        # ─────────────────────   ──────────────────────────────────
+        # reasoning_quote        → verbatim_quote
+        # source_verbatim_quote  → verbatim_quote
+        # quote                  → verbatim_quote
+        # conviction             → conviction_level
+        # timeframe              → timeframe_category
+        # timeframe_days         → inferred_timeframe_days
+        _QWEN_FIELD_MAP = {
+            "reasoning_quote":      "verbatim_quote",
+            "source_verbatim_quote": "verbatim_quote",
+            "quote":                "verbatim_quote",
+            "conviction":           "conviction_level",
+            "timeframe":            "timeframe_category",
+            "timeframe_days":       "inferred_timeframe_days",
+        }
         for p in parsed:
             if isinstance(p, dict):
-                # Map source_verbatim_quote → verbatim_quote
-                if "source_verbatim_quote" in p and "verbatim_quote" not in p:
-                    p["verbatim_quote"] = p["source_verbatim_quote"]
+                for src_key, dst_key in _QWEN_FIELD_MAP.items():
+                    if src_key in p and dst_key not in p:
+                        p[dst_key] = p[src_key]
                 # The validator rejects predictions without timeframe_source.
                 # Qwen was trained on predictions that had both explicit and
                 # category-default timeframes, so we mark as "inferred" which
