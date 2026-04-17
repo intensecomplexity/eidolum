@@ -12,6 +12,9 @@ from typing import Optional
 from database import get_db
 from rate_limit import limiter
 from auth import get_current_user as _decode_token
+from services.prediction_visibility import yt_visible_filter
+
+_YT_VIS_P = yt_visible_filter("p")
 
 router = APIRouter()
 _optional_bearer = HTTPBearer(auto_error=False)
@@ -27,7 +30,7 @@ def recent_predictions(request: Request, db: Session = Depends(get_db)):
     publish-time (prediction_date), not ingest-time (created_at),
     so a Jan 2024 prediction backfilled today doesn't dominate the
     top of the feed with a "3h ago" label."""
-    rows = db.execute(sql_text("""
+    rows = db.execute(sql_text(f"""
         SELECT p.id, p.ticker, p.direction, p.target_price, p.entry_price,
                p.prediction_date, p.window_days, p.context, p.exact_quote,
                p.created_at,
@@ -39,6 +42,7 @@ def recent_predictions(request: Request, db: Session = Depends(get_db)):
         FROM predictions p
         JOIN forecasters f ON f.id = p.forecaster_id
         LEFT JOIN ticker_sectors ts ON ts.ticker = p.ticker
+        WHERE {_YT_VIS_P}
         ORDER BY COALESCE(p.prediction_date, p.created_at) DESC
         LIMIT 20
     """)).fetchall()
@@ -72,7 +76,7 @@ def recent_predictions(request: Request, db: Session = Depends(get_db)):
 @limiter.limit("60/minute")
 def recently_scored(request: Request, db: Session = Depends(get_db)):
     """Recently evaluated predictions — scored within the last 30 days, with real return data."""
-    rows = db.execute(sql_text("""
+    rows = db.execute(sql_text(f"""
         SELECT p.id, p.ticker, p.direction, p.target_price, p.entry_price,
                p.outcome, p.actual_return, p.evaluation_date, p.prediction_date,
                p.context, p.exact_quote,
@@ -88,13 +92,14 @@ def recently_scored(request: Request, db: Session = Depends(get_db)):
           AND p.actual_return IS NOT NULL
           AND p.actual_return != 0
           AND COALESCE(p.evaluated_at, p.evaluation_date) > NOW() - INTERVAL '30 days'
+          AND {_YT_VIS_P}
         ORDER BY COALESCE(p.evaluated_at, p.evaluation_date) DESC NULLS LAST
         LIMIT 30
     """)).fetchall()
 
     # Fallback: if nothing scored recently with real returns, show top scored predictions
     if not rows:
-        rows = db.execute(sql_text("""
+        rows = db.execute(sql_text(f"""
             SELECT p.id, p.ticker, p.direction, p.target_price, p.entry_price,
                    p.outcome, p.actual_return, p.evaluation_date, p.prediction_date,
                    p.context, p.exact_quote,
@@ -109,6 +114,7 @@ def recently_scored(request: Request, db: Session = Depends(get_db)):
             WHERE p.outcome IN ('hit', 'near', 'miss', 'correct', 'incorrect')
               AND p.actual_return IS NOT NULL
               AND p.actual_return != 0
+              AND {_YT_VIS_P}
             ORDER BY COALESCE(p.evaluated_at, p.evaluation_date) DESC NULLS LAST
             LIMIT 30
         """)).fetchall()
@@ -144,7 +150,7 @@ def recently_scored(request: Request, db: Session = Depends(get_db)):
 @limiter.limit("60/minute")
 def expiring_predictions(request: Request, db: Session = Depends(get_db)):
     """Analyst predictions expiring soonest (within next 60 days)."""
-    rows = db.execute(sql_text("""
+    rows = db.execute(sql_text(f"""
         SELECT p.id, p.ticker, p.direction, p.target_price, p.entry_price,
                p.evaluation_date, p.prediction_date, p.window_days,
                p.context, p.exact_quote,
@@ -160,6 +166,7 @@ def expiring_predictions(request: Request, db: Session = Depends(get_db)):
           AND p.evaluation_date IS NOT NULL
           AND p.evaluation_date > NOW()
           AND p.evaluation_date < NOW() + INTERVAL '60 days'
+          AND {_YT_VIS_P}
         ORDER BY p.evaluation_date ASC
         LIMIT 30
     """)).fetchall()

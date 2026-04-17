@@ -6,6 +6,14 @@ from sqlalchemy import func, text as sql_text
 from database import get_db
 from models import Forecaster, Prediction
 from rate_limit import limiter
+from services.prediction_visibility import yt_visible_filter, YT_VISIBLE_FILTER_SQL
+
+# Legacy YouTube predictions with NULL source_timestamp_seconds are
+# hidden across the leaderboard until the youtube_timestamp_backfill
+# worker populates the field. Two fragments cover aliased / unaliased
+# queries in this file.
+_YT_VIS_BARE = YT_VISIBLE_FILTER_SQL
+_YT_VIS_P = yt_visible_filter("p")
 
 router = APIRouter()
 
@@ -136,7 +144,7 @@ def _enrich_category_stats(results: list, db: Session):
     if not fids:
         return
     try:
-        rows = db.execute(sql_text("""
+        rows = db.execute(sql_text(f"""
             SELECT p.forecaster_id,
                    COALESCE(p.prediction_category, 'ticker_call') as cat,
                    COUNT(*) FILTER (WHERE p.outcome IN ('hit','near','miss','correct','incorrect')) as evaluated,
@@ -145,6 +153,7 @@ def _enrich_category_stats(results: list, db: Session):
                    COUNT(*) FILTER (WHERE p.outcome = 'unresolved') as unresolved
             FROM predictions p
             WHERE p.forecaster_id = ANY(:fids)
+              AND {_YT_VIS_P}
             GROUP BY p.forecaster_id, COALESCE(p.prediction_category, 'ticker_call')
         """), {"fids": fids}).fetchall()
     except Exception as _e:
@@ -273,12 +282,13 @@ def _enrich_ranking_stats(results: list, db: Session):
     if not fids:
         return
     try:
-        rows = db.execute(sql_text("""
+        rows = db.execute(sql_text(f"""
             SELECT forecaster_id, list_id, list_rank, actual_return, outcome
             FROM predictions
             WHERE forecaster_id = ANY(:fids)
               AND list_id IS NOT NULL
               AND list_rank IS NOT NULL
+              AND {_YT_VIS_BARE}
         """), {"fids": fids}).fetchall()
     except Exception:
         return
@@ -354,7 +364,9 @@ def _enrich_primary_source(results: list, db: Session):
     fids = [r["id"] for r in results]
     try:
         fid_placeholders = ",".join(str(int(f)) for f in fids)
-        _yt_excl = "NOT (verified_by = 'youtube_haiku_v1' AND source_timestamp_seconds IS NULL)"
+        # Broader than the old Haiku-only filter — hides every YouTube
+        # row with NULL source_timestamp_seconds regardless of classifier.
+        _yt_excl = _YT_VIS_BARE
         rows = db.execute(sql_text(f"""
             SELECT forecaster_id,
                    (SELECT source_type FROM predictions p2
@@ -406,6 +418,7 @@ def _enrich_sector_strengths(results: list, db: Session):
             WHERE p.forecaster_id IN ({fid_placeholders})
               AND p.outcome IN ('hit','near','miss','correct','incorrect')
               AND ts.sector IS NOT NULL AND ts.sector != '' AND ts.sector != 'Other'
+              AND {_YT_VIS_P}
             GROUP BY p.forecaster_id, ts.sector
             HAVING COUNT(*) >= 3
             ORDER BY p.forecaster_id, score DESC
@@ -552,7 +565,7 @@ def _refresh_leaderboard(db: Session) -> list | dict:
                 SELECT forecaster_id, outcome, direction, COUNT(*) as cnt
                 FROM predictions
                 WHERE forecaster_id = ANY(:fids)
-                  AND NOT (verified_by = 'youtube_haiku_v1' AND source_timestamp_seconds IS NULL)
+                  AND NOT (source_type = 'youtube' AND source_timestamp_seconds IS NULL)
                 GROUP BY forecaster_id, outcome, direction
             """), {"fids": fids}).fetchall()
 
@@ -607,7 +620,7 @@ def _check_stats_integrity(db: Session):
                    (SELECT COUNT(*) FROM predictions p
                     WHERE p.forecaster_id = f.id
                       AND p.outcome IN ('hit','near','miss','correct','incorrect')
-                      AND NOT (p.verified_by = 'youtube_haiku_v1' AND p.source_timestamp_seconds IS NULL)
+                      AND NOT (p.source_type = 'youtube' AND p.source_timestamp_seconds IS NULL)
                    ) as actual
             FROM forecasters f
             WHERE f.total_predictions > 0
@@ -651,7 +664,7 @@ def _week_leaderboard_impl(db: Session) -> dict:
     # before the evaluated_at column was backfilled.
 
     # 1) Analyst predictions scored this week
-    analyst_scored = db.execute(sql_text("""
+    analyst_scored = db.execute(sql_text(f"""
         SELECT 'analyst' as source, f.id as fid, f.name, f.handle, f.platform,
                f.accuracy_score as alltime_acc, p.outcome
         FROM predictions p
@@ -659,6 +672,7 @@ def _week_leaderboard_impl(db: Session) -> dict:
         WHERE p.outcome IN ('hit','near','miss','correct','incorrect')
           AND COALESCE(p.evaluated_at, p.evaluation_date) >= NOW() - INTERVAL '7 days'
           AND COALESCE(p.evaluated_at, p.evaluation_date) <= NOW()
+          AND {_YT_VIS_P}
     """)).fetchall()
 
     # 2) Community player predictions scored this week
@@ -736,12 +750,13 @@ def _week_leaderboard_impl(db: Session) -> dict:
 
     # ── New Calls This Week ──
     # Analyst predictions submitted this week
-    new_analyst = db.execute(sql_text("""
+    new_analyst = db.execute(sql_text(f"""
         SELECT 'analyst' as source, f.id, f.name, f.handle, f.platform,
                f.accuracy_score, COUNT(*) as cnt
         FROM predictions p
         JOIN forecasters f ON f.id = p.forecaster_id
         WHERE p.prediction_date >= NOW() - INTERVAL '7 days'
+          AND {_YT_VIS_P}
         GROUP BY f.id, f.name, f.handle, f.platform, f.accuracy_score
         ORDER BY cnt DESC
         LIMIT 100
@@ -807,7 +822,7 @@ def _build_filtered_leaderboard(db: Session, sector=None, call_type=None, sort="
     """SQL-based filtered leaderboard. Returns ranked list."""
     where_clauses = [
         "p.outcome IN ('hit','near','miss','correct','incorrect')",
-        "NOT (p.verified_by = 'youtube_haiku_v1' AND p.source_timestamp_seconds IS NULL)",
+        "NOT (p.source_type = 'youtube' AND p.source_timestamp_seconds IS NULL)",
     ]
     params = {}
 
@@ -940,7 +955,7 @@ def _build_filtered_leaderboard(db: Session, sector=None, call_type=None, sort="
                 SELECT forecaster_id, outcome, direction, COUNT(*) as cnt
                 FROM predictions
                 WHERE forecaster_id = ANY(:fids)
-                  AND NOT (verified_by = 'youtube_haiku_v1' AND source_timestamp_seconds IS NULL)
+                  AND NOT (source_type = 'youtube' AND source_timestamp_seconds IS NULL)
                 GROUP BY forecaster_id, outcome, direction
             """), {"fids": fids}).fetchall()
             counts_by_fid = {}
@@ -1052,7 +1067,7 @@ def get_leaderboard(
 @limiter.limit("30/minute")
 def get_sectors(request: Request, db: Session = Depends(get_db)):
     """Return a summary of all sectors for the 'By Sector' tab."""
-    sector_rows = db.execute(sql_text("""
+    sector_rows = db.execute(sql_text(f"""
         SELECT ts.sector, COUNT(*) as total,
                SUM(CASE WHEN p.outcome IN ('hit','correct') THEN 1.0
                         WHEN p.outcome = 'near' THEN 0.5 ELSE 0 END) as score,
@@ -1061,6 +1076,7 @@ def get_sectors(request: Request, db: Session = Depends(get_db)):
         JOIN ticker_sectors ts ON ts.ticker = p.ticker
         WHERE ts.sector IS NOT NULL AND ts.sector != '' AND ts.sector != 'Other'
           AND p.outcome IN ('hit','near','miss','correct','incorrect')
+          AND {_YT_VIS_P}
         GROUP BY ts.sector
         HAVING SUM(CASE WHEN p.outcome IN ('hit','near','miss','correct','incorrect') THEN 1 ELSE 0 END) >= 5
         ORDER BY total DESC
@@ -1082,7 +1098,7 @@ def get_sectors(request: Request, db: Session = Depends(get_db)):
 
     # Fetch top forecasters per sector in a single query
     if sector_names:
-        forecaster_rows = db.execute(sql_text("""
+        forecaster_rows = db.execute(sql_text(f"""
             SELECT ts.sector, f.id, f.name,
                    SUM(CASE WHEN p.outcome IN ('hit','correct') THEN 1.0
                             WHEN p.outcome = 'near' THEN 0.5 ELSE 0 END) as score,
@@ -1092,6 +1108,7 @@ def get_sectors(request: Request, db: Session = Depends(get_db)):
             JOIN ticker_sectors ts ON ts.ticker = p.ticker
             WHERE ts.sector = ANY(:sectors)
               AND p.outcome IN ('hit','near','miss','correct','incorrect')
+              AND {_YT_VIS_P}
             GROUP BY ts.sector, f.id, f.name
             HAVING COUNT(*) >= 3
             ORDER BY ts.sector, score DESC, evaluated DESC
@@ -1122,7 +1139,7 @@ def get_sectors(request: Request, db: Session = Depends(get_db)):
 @limiter.limit("60/minute")
 def get_pending_predictions(request: Request, db: Session = Depends(get_db)):
     now = datetime.datetime.utcnow()
-    rows = db.execute(sql_text("""
+    rows = db.execute(sql_text(f"""
         SELECT p.id, p.ticker, p.direction, p.target_price, p.entry_price,
                p.prediction_date, p.evaluation_date, p.window_days, p.current_return,
                p.context, p.sector, f.id, f.name, f.handle, f.platform,
@@ -1130,6 +1147,7 @@ def get_pending_predictions(request: Request, db: Session = Depends(get_db)):
         FROM predictions p
         JOIN forecasters f ON f.id = p.forecaster_id
         WHERE p.outcome = 'pending'
+          AND {_YT_VIS_P}
         ORDER BY p.prediction_date DESC
         LIMIT 100
     """)).fetchall()
@@ -1270,7 +1288,7 @@ def get_homepage_data(request: Request, db: Session = Depends(get_db)):
                         SUM(CASE WHEN outcome = 'pending' OR outcome IS NULL THEN 1 ELSE 0 END) as pending
                     FROM predictions p
                     WHERE p.forecaster_id = f.id
-                      AND NOT (p.verified_by = 'youtube_haiku_v1' AND p.source_timestamp_seconds IS NULL)
+                      AND NOT (p.source_type = 'youtube' AND p.source_timestamp_seconds IS NULL)
                 ) s ON true
                 WHERE COALESCE(f.total_predictions, 0) >= :min
                   AND COALESCE(f.accuracy_score, 0) > 0
@@ -1312,7 +1330,7 @@ def get_homepage_data(request: Request, db: Session = Depends(get_db)):
     #     picks the same five rows every request
     biggest_calls = []
     try:
-        bc_rows = db.execute(sql_text("""
+        bc_rows = db.execute(sql_text(f"""
             SELECT p.id, p.ticker, p.direction, p.target_price, p.entry_price,
                    p.outcome, p.actual_return, p.prediction_date,
                    f.id AS fid, f.name AS fname, f.accuracy_score,
@@ -1327,6 +1345,7 @@ def get_homepage_data(request: Request, db: Session = Depends(get_db)):
               AND ABS(p.actual_return) >= 5
               AND p.target_price IS NOT NULL AND p.target_price > 0
               AND p.entry_price IS NOT NULL AND p.entry_price > 0
+              AND {_YT_VIS_P}
               AND p.ticker IN (
                   SELECT ticker FROM predictions GROUP BY ticker HAVING COUNT(*) >= 20
               )

@@ -11,6 +11,9 @@ from database import get_db
 from models import User, UserPrediction
 from rate_limit import limiter
 from ticker_lookup import TICKER_INFO
+from services.prediction_visibility import yt_visible_filter
+
+_YT_VIS_P = yt_visible_filter("p")
 
 router = APIRouter()
 
@@ -426,7 +429,7 @@ def get_ticker_chart(
         else:
             start_date = "2020-01-01"
 
-        rows = db.execute(_t("""
+        rows = db.execute(_t(f"""
             SELECT p.prediction_date, p.entry_price, p.target_price,
                    p.direction, p.outcome, p.actual_return,
                    f.name as forecaster_name, f.id as forecaster_id,
@@ -434,6 +437,7 @@ def get_ticker_chart(
             FROM predictions p
             JOIN forecasters f ON f.id = p.forecaster_id
             WHERE p.ticker = :t AND p.prediction_date >= :start
+              AND {_YT_VIS_P}
             ORDER BY p.prediction_date ASC
             LIMIT 100
         """), {"t": ticker, "start": start_date}).fetchall()

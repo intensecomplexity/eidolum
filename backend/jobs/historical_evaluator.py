@@ -1004,16 +1004,24 @@ def refresh_all_forecaster_stats():
     Zeros out forecasters with 0 scored predictions so they don't appear on leaderboard."""
     from database import BgSessionLocal as SessionLocal
     from feature_flags import x_filter_sql
+    from services.prediction_visibility import YT_VISIBLE_FILTER_SQL
     db = SessionLocal()
     updated = 0
     zeroed = 0
     try:
         x_filter = x_filter_sql(db)
+        # Cached leaderboard stats must not count YouTube rows whose
+        # source_timestamp_seconds is still NULL — those rows are
+        # hidden from every user-facing surface until the
+        # youtube_timestamp_backfill worker populates the timestamp.
+        # Appending to the bare WHERE because neither aggregate query
+        # uses a table alias.
+        yt_visible = f"AND {YT_VISIBLE_FILTER_SQL}"
         # Step 1: Zero out ALL forecasters first (removes stale scores from unscored forecasters)
         db.execute(sql_text(
             "UPDATE forecasters SET total_predictions=0, correct_predictions=0, accuracy_score=0, alpha=0, avg_return=0 "
             "WHERE total_predictions > 0 AND id NOT IN "
-            f"(SELECT DISTINCT forecaster_id FROM predictions WHERE outcome IN {_SCORED_OUTCOMES} AND actual_return IS NOT NULL{x_filter})"
+            f"(SELECT DISTINCT forecaster_id FROM predictions WHERE outcome IN {_SCORED_OUTCOMES} AND actual_return IS NOT NULL{x_filter} {yt_visible})"
         ))
         zeroed = db.execute(sql_text(
             "SELECT changes()"  # SQLite
@@ -1022,7 +1030,7 @@ def refresh_all_forecaster_stats():
 
         # Step 2: Recalculate stats for forecasters WITH scored predictions
         fids = [r[0] for r in db.execute(sql_text(
-            f"SELECT DISTINCT forecaster_id FROM predictions WHERE outcome IN {_SCORED_OUTCOMES} AND actual_return IS NOT NULL{x_filter}"
+            f"SELECT DISTINCT forecaster_id FROM predictions WHERE outcome IN {_SCORED_OUTCOMES} AND actual_return IS NOT NULL{x_filter} {yt_visible}"
         )).fetchall()]
         print(f"[StatsRefresh] Refreshing {len(fids)} forecasters with scored predictions (x_filter={'on' if x_filter else 'off'})")
         for fid in fids:
@@ -1036,6 +1044,7 @@ def refresh_all_forecaster_stats():
                 WHERE forecaster_id = :f AND outcome IN {_SCORED_OUTCOMES}
                   AND actual_return IS NOT NULL
                   {x_filter}
+                  {yt_visible}
             """), {"f": fid}).first()
             total = row[0] or 0
             hits = row[1] or 0

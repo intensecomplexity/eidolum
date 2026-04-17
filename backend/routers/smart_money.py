@@ -9,6 +9,9 @@ from sqlalchemy import text as sql_text
 
 from database import get_db
 from rate_limit import limiter
+from services.prediction_visibility import yt_visible_filter
+
+_YT_VIS_P = yt_visible_filter("p")
 
 router = APIRouter()
 
@@ -68,6 +71,7 @@ def get_smart_money(
         LEFT JOIN ticker_sectors ts ON ts.ticker = p.ticker
         WHERE p.outcome = 'pending'
           AND p.forecaster_id = ANY(:ids)
+          AND {_YT_VIS_P}
           {where}
     """), params).fetchall()
 
