@@ -1332,29 +1332,17 @@ def _process_one_video(db, channel_name, channel_id, video_id, title, publish_da
     """Fetch transcript → classify → insert. Returns (inserted, transcript_chars, status)."""
     publish_dt = _parse_publish_date(publish_date_str)
 
-    # Ship #9: check the source-timestamps flag once per video. When
-    # on, fetch with the rich path so transcript_data (segments + words
-    # + has_word_level) stays in scope through classify → insert. When
-    # off, use the legacy text-only fetcher to stay byte-for-byte
-    # identical to pre-ship behavior.
-    use_ts = False
-    try:
-        from feature_flags import is_source_timestamps_enabled
-        use_ts = is_source_timestamps_enabled(db)
-    except Exception:
-        use_ts = False
-
+    # Ship #9: check the rich transcript for timestamp deep-links. Always use the rich
+    # path so transcript_data (segments + words + has_word_level) stays
+    # in scope through classify → insert.
     transcript_data: dict | None = None
-    if use_ts:
-        rich = fetch_transcript_with_timestamps(video_id)
-        if rich.get("status") == "ok" and rich.get("text"):
-            transcript_data = rich
-            text = rich["text"]
-            transcript_status = rich.get("lang") or "ok"
-        else:
-            text = None
-            transcript_status = rich.get("status") or "no_transcript"
+    rich = fetch_transcript_with_timestamps(video_id)
+    if rich.get("status") == "ok" and rich.get("text"):
+        transcript_data = rich
+        text = rich["text"]
+        transcript_status = rich.get("lang") or "ok"
     else:
+        # Fallback to plain fetch if rich fails
         text, transcript_status = fetch_transcript(video_id)
 
     # Evidence preservation (ship #13) — store the full transcript with
