@@ -6,7 +6,10 @@ from sqlalchemy import func, text as sql_text
 from database import get_db
 from models import Forecaster, Prediction
 from rate_limit import limiter
-from services.prediction_visibility import yt_visible_filter, YT_VISIBLE_FILTER_SQL
+from services.prediction_visibility import (
+    yt_visible_filter, YT_VISIBLE_FILTER_SQL,
+    non_qwen_filter, NON_QWEN_FILTER_SQL,
+)
 
 # Legacy YouTube predictions with NULL source_timestamp_seconds are
 # hidden across the leaderboard until the youtube_timestamp_backfill
@@ -14,6 +17,10 @@ from services.prediction_visibility import yt_visible_filter, YT_VISIBLE_FILTER_
 # queries in this file.
 _YT_VIS_BARE = YT_VISIBLE_FILTER_SQL
 _YT_VIS_P = yt_visible_filter("p")
+# Qwen LoRA predictions hidden from display during the Haiku-vs-Qwen
+# audit phase (2026-04-19). Rows remain in DB.
+_NON_QWEN_BARE = NON_QWEN_FILTER_SQL
+_NON_QWEN_P = non_qwen_filter("p")
 
 router = APIRouter()
 
@@ -154,6 +161,8 @@ def _enrich_category_stats(results: list, db: Session):
             FROM predictions p
             WHERE p.forecaster_id = ANY(:fids)
               AND {_YT_VIS_P}
+          AND {_NON_QWEN_P}
+              AND {_NON_QWEN_P}
             GROUP BY p.forecaster_id, COALESCE(p.prediction_category, 'ticker_call')
         """), {"fids": fids}).fetchall()
     except Exception as _e:
@@ -289,6 +298,7 @@ def _enrich_ranking_stats(results: list, db: Session):
               AND list_id IS NOT NULL
               AND list_rank IS NOT NULL
               AND {_YT_VIS_BARE}
+              AND {_NON_QWEN_BARE}
         """), {"fids": fids}).fetchall()
     except Exception:
         return
@@ -366,7 +376,8 @@ def _enrich_primary_source(results: list, db: Session):
         fid_placeholders = ",".join(str(int(f)) for f in fids)
         # Broader than the old Haiku-only filter — hides every YouTube
         # row with NULL source_timestamp_seconds regardless of classifier.
-        _yt_excl = _YT_VIS_BARE
+        # Qwen-LoRA rows also hidden via NON_QWEN_BARE.
+        _yt_excl = f"({_YT_VIS_BARE}) AND ({_NON_QWEN_BARE})"
         rows = db.execute(sql_text(f"""
             SELECT forecaster_id,
                    (SELECT source_type FROM predictions p2
@@ -419,6 +430,8 @@ def _enrich_sector_strengths(results: list, db: Session):
               AND p.outcome IN ('hit','near','miss','correct','incorrect')
               AND ts.sector IS NOT NULL AND ts.sector != '' AND ts.sector != 'Other'
               AND {_YT_VIS_P}
+          AND {_NON_QWEN_P}
+              AND {_NON_QWEN_P}
             GROUP BY p.forecaster_id, ts.sector
             HAVING COUNT(*) >= 3
             ORDER BY p.forecaster_id, score DESC
@@ -673,6 +686,7 @@ def _week_leaderboard_impl(db: Session) -> dict:
           AND COALESCE(p.evaluated_at, p.evaluation_date) >= NOW() - INTERVAL '7 days'
           AND COALESCE(p.evaluated_at, p.evaluation_date) <= NOW()
           AND {_YT_VIS_P}
+          AND {_NON_QWEN_P}
     """)).fetchall()
 
     # 2) Community player predictions scored this week
@@ -757,6 +771,7 @@ def _week_leaderboard_impl(db: Session) -> dict:
         JOIN forecasters f ON f.id = p.forecaster_id
         WHERE p.prediction_date >= NOW() - INTERVAL '7 days'
           AND {_YT_VIS_P}
+          AND {_NON_QWEN_P}
         GROUP BY f.id, f.name, f.handle, f.platform, f.accuracy_score
         ORDER BY cnt DESC
         LIMIT 100
@@ -1077,6 +1092,7 @@ def get_sectors(request: Request, db: Session = Depends(get_db)):
         WHERE ts.sector IS NOT NULL AND ts.sector != '' AND ts.sector != 'Other'
           AND p.outcome IN ('hit','near','miss','correct','incorrect')
           AND {_YT_VIS_P}
+          AND {_NON_QWEN_P}
         GROUP BY ts.sector
         HAVING SUM(CASE WHEN p.outcome IN ('hit','near','miss','correct','incorrect') THEN 1 ELSE 0 END) >= 5
         ORDER BY total DESC
@@ -1109,6 +1125,8 @@ def get_sectors(request: Request, db: Session = Depends(get_db)):
             WHERE ts.sector = ANY(:sectors)
               AND p.outcome IN ('hit','near','miss','correct','incorrect')
               AND {_YT_VIS_P}
+          AND {_NON_QWEN_P}
+              AND {_NON_QWEN_P}
             GROUP BY ts.sector, f.id, f.name
             HAVING COUNT(*) >= 3
             ORDER BY ts.sector, score DESC, evaluated DESC
@@ -1148,6 +1166,7 @@ def get_pending_predictions(request: Request, db: Session = Depends(get_db)):
         JOIN forecasters f ON f.id = p.forecaster_id
         WHERE p.outcome = 'pending'
           AND {_YT_VIS_P}
+          AND {_NON_QWEN_P}
         ORDER BY p.prediction_date DESC
         LIMIT 100
     """)).fetchall()
@@ -1346,6 +1365,8 @@ def get_homepage_data(request: Request, db: Session = Depends(get_db)):
               AND p.target_price IS NOT NULL AND p.target_price > 0
               AND p.entry_price IS NOT NULL AND p.entry_price > 0
               AND {_YT_VIS_P}
+          AND {_NON_QWEN_P}
+              AND {_NON_QWEN_P}
               AND p.ticker IN (
                   SELECT ticker FROM predictions GROUP BY ticker HAVING COUNT(*) >= 20
               )

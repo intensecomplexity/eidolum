@@ -9,14 +9,21 @@ from database import get_db
 from models import Forecaster, Prediction, format_timestamp, get_youtube_timestamp_url
 from rate_limit import limiter
 from firm_urls import get_firm_url
-from services.prediction_visibility import yt_visible_filter, YT_VISIBLE_FILTER_SQL
+from services.prediction_visibility import (
+    yt_visible_filter, YT_VISIBLE_FILTER_SQL,
+    non_qwen_filter, NON_QWEN_FILTER_SQL,
+)
 
-# Shared SQL fragments. Legacy YouTube predictions whose
-# source_timestamp_seconds is still NULL are hidden from every
-# user-facing query (leaderboard, profile, ticker, activity, stats).
-# Two forms because this file mixes aliased and un-aliased queries.
+# Shared SQL fragments. Two filters now compose:
+#   yt_visible       — legacy YouTube rows missing source_timestamp_seconds
+#   non_qwen         — Qwen LoRA predictions hidden during audit phase
+# Both apply to every user-facing query (leaderboard, profile, ticker,
+# activity, stats). Two forms because this file mixes aliased and
+# un-aliased queries.
 _YT_VIS_BARE = YT_VISIBLE_FILTER_SQL                 # no alias
 _YT_VIS_P = yt_visible_filter("p")                   # table alias "p"
+_NON_QWEN_BARE = NON_QWEN_FILTER_SQL
+_NON_QWEN_P = non_qwen_filter("p")
 
 router = APIRouter()
 
@@ -41,7 +48,7 @@ def _build_accuracy_trend(forecaster_id: int, db: Session, sector: str = None) -
             "WHERE forecaster_id = :fid AND outcome IN "
             "('hit','near','miss','correct','incorrect') "
             "AND actual_return IS NOT NULL "
-            f"AND {_YT_VIS_BARE}"
+            f"AND {_YT_VIS_BARE} AND {_NON_QWEN_BARE}"
         )
         params = {"fid": forecaster_id}
         if sector and sector != "All":
@@ -166,6 +173,7 @@ def get_forecaster(
             SELECT MIN(prediction_date), COUNT(*)
             FROM predictions WHERE forecaster_id = :fid
               AND {_YT_VIS_BARE}
+              AND {_NON_QWEN_BARE}
         """), {"fid": forecaster_id}).first()
         first_pred_date = extra[0].isoformat() if extra and extra[0] else None
         total_all = extra[1] if extra else 0
@@ -185,6 +193,7 @@ def get_forecaster(
             LEFT JOIN ticker_sectors ts ON ts.ticker = p.ticker
             WHERE p.forecaster_id = :fid
               AND {_YT_VIS_P}
+              AND {_NON_QWEN_P}
         """), {"fid": forecaster_id}).fetchall()
         sector_count = len(canonical_sectors_distinct(r[0] for r in raw_sector_rows))
     except Exception:
@@ -201,6 +210,7 @@ def get_forecaster(
             SELECT source_type, COUNT(*) as cnt FROM predictions
             WHERE forecaster_id = :fid AND source_type IS NOT NULL
               AND {_YT_VIS_BARE}
+              AND {_NON_QWEN_BARE}
             GROUP BY source_type ORDER BY cnt DESC LIMIT 1
         """), {"fid": forecaster_id}).first()
         if src_row:
@@ -209,6 +219,7 @@ def get_forecaster(
             SELECT verified_by, COUNT(*) as cnt FROM predictions
             WHERE forecaster_id = :fid AND verified_by IS NOT NULL
               AND {_YT_VIS_BARE}
+              AND {_NON_QWEN_BARE}
             GROUP BY verified_by ORDER BY cnt DESC LIMIT 1
         """), {"fid": forecaster_id}).first()
         if vb_row:
@@ -223,6 +234,7 @@ def get_forecaster(
             SELECT outcome, direction, COUNT(*) FROM predictions
             WHERE forecaster_id = :fid
               AND {_YT_VIS_BARE}
+              AND {_NON_QWEN_BARE}
             GROUP BY outcome, direction
         """), {"fid": forecaster_id}).fetchall()
         for r in count_rows:
@@ -272,6 +284,7 @@ def get_forecaster(
             SELECT COUNT(*) FROM predictions
             WHERE forecaster_id = :fid AND revision_of IS NOT NULL
               AND {_YT_VIS_BARE}
+              AND {_NON_QWEN_BARE}
         """), {"fid": forecaster_id}).scalar() or 0)
     except Exception:
         revisions_made = 0
@@ -294,6 +307,7 @@ def get_forecaster(
               AND list_id IS NOT NULL
               AND list_rank IS NOT NULL
               AND {_YT_VIS_BARE}
+              AND {_NON_QWEN_BARE}
             ORDER BY prediction_date DESC, list_id, list_rank
         """), {"fid": forecaster_id}).fetchall()
         by_list_id: dict = {}
@@ -387,6 +401,7 @@ def get_forecaster(
                    COUNT(*) FILTER (WHERE outcome = 'unresolved') as unresolved
             FROM predictions WHERE forecaster_id = :fid
               AND {_YT_VIS_BARE}
+              AND {_NON_QWEN_BARE}
             GROUP BY COALESCE(prediction_category, 'ticker_call')
         """), {"fid": forecaster_id}).fetchall()
         for row in cat_rows:
@@ -432,7 +447,7 @@ def get_forecaster(
             sql_text(
                 "SELECT MAX(prediction_date) FROM predictions "
                 "WHERE forecaster_id = :fid "
-                f"AND {_YT_VIS_BARE}"
+                f"AND {_YT_VIS_BARE} AND {_NON_QWEN_BARE}"
             ),
             {"fid": forecaster_id},
         ).scalar()
@@ -534,6 +549,7 @@ def get_forecaster_sectors(request: Request, forecaster_id: int, db: Session = D
               AND COALESCE(p.sector, ts.sector) IS NOT NULL
               AND COALESCE(p.sector, ts.sector) != ''
               AND {_YT_VIS_P}
+              AND {_NON_QWEN_P}
             GROUP BY sec ORDER BY total DESC
         """), {"fid": forecaster_id}).fetchall()
         # Canonicalize the raw sector field into Morningstar sectors and
@@ -570,6 +586,7 @@ def get_forecaster_sectors(request: Request, forecaster_id: int, db: Session = D
             SELECT outcome, COUNT(*) FROM predictions
             WHERE forecaster_id = :fid
               AND {_YT_VIS_BARE}
+              AND {_NON_QWEN_BARE}
             GROUP BY outcome
         """), {"fid": forecaster_id}).fetchall()
         counts = {r[0]: r[1] for r in count_rows}
@@ -583,6 +600,7 @@ def get_forecaster_sectors(request: Request, forecaster_id: int, db: Session = D
             SELECT direction, COUNT(*) FROM predictions
             WHERE forecaster_id = :fid AND direction IS NOT NULL
               AND {_YT_VIS_BARE}
+              AND {_NON_QWEN_BARE}
             GROUP BY direction
         """), {"fid": forecaster_id}).fetchall()
         for r in dir_rows:
@@ -639,8 +657,9 @@ def _get_preds(fid, page, limit, filter_type, sector, db):
     # Always hide legacy YouTube rows missing source_timestamp_seconds
     # — they're not countable until the backfill worker fills the
     # timestamp. The helper writes p.-aliased since the main query
-    # uses "FROM predictions p".
-    where = f" AND {_YT_VIS_P}"
+    # uses "FROM predictions p". Qwen LoRA rows also hidden via
+    # NON_QWEN_P during the audit phase.
+    where = f" AND {_YT_VIS_P} AND {_NON_QWEN_P}"
     params = {"fid": fid, "lim": limit, "off": offset}
     if filter_type == "evaluated":
         where += " AND outcome IN ('hit','near','miss','correct','incorrect')"

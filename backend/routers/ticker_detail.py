@@ -11,9 +11,10 @@ from database import get_db
 from models import User, UserPrediction
 from rate_limit import limiter
 from ticker_lookup import TICKER_INFO
-from services.prediction_visibility import yt_visible_filter
+from services.prediction_visibility import yt_visible_filter, non_qwen_filter
 
 _YT_VIS_P = yt_visible_filter("p")
+_NON_QWEN_P = non_qwen_filter("p")
 
 router = APIRouter()
 
@@ -438,6 +439,7 @@ def get_ticker_chart(
             JOIN forecasters f ON f.id = p.forecaster_id
             WHERE p.ticker = :t AND p.prediction_date >= :start
               AND {_YT_VIS_P}
+              AND {_NON_QWEN_P}
             ORDER BY p.prediction_date ASC
             LIMIT 100
         """), {"t": ticker, "start": start_date}).fetchall()

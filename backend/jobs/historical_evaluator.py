@@ -1004,19 +1004,19 @@ def refresh_all_forecaster_stats():
     Zeros out forecasters with 0 scored predictions so they don't appear on leaderboard."""
     from database import BgSessionLocal as SessionLocal
     from feature_flags import x_filter_sql
-    from services.prediction_visibility import YT_VISIBLE_FILTER_SQL
+    from services.prediction_visibility import (
+        YT_VISIBLE_FILTER_SQL, NON_QWEN_FILTER_SQL,
+    )
     db = SessionLocal()
     updated = 0
     zeroed = 0
     try:
         x_filter = x_filter_sql(db)
-        # Cached leaderboard stats must not count YouTube rows whose
-        # source_timestamp_seconds is still NULL — those rows are
-        # hidden from every user-facing surface until the
-        # youtube_timestamp_backfill worker populates the timestamp.
-        # Appending to the bare WHERE because neither aggregate query
-        # uses a table alias.
-        yt_visible = f"AND {YT_VISIBLE_FILTER_SQL}"
+        # Cached leaderboard stats must not count hidden rows. Two
+        # filters compose: yt_visible (rows missing timestamp) and
+        # non_qwen (Qwen LoRA rows hidden during audit phase). Both
+        # appended because neither aggregate query uses a table alias.
+        yt_visible = f"AND {YT_VISIBLE_FILTER_SQL} AND {NON_QWEN_FILTER_SQL}"
         # Step 1: Zero out ALL forecasters first (removes stale scores from unscored forecasters)
         db.execute(sql_text(
             "UPDATE forecasters SET total_predictions=0, correct_predictions=0, accuracy_score=0, alpha=0, avg_return=0 "
