@@ -34,9 +34,11 @@ from __future__ import annotations
 import argparse
 import csv
 import hashlib
+import json
 import logging
 import os
 import re
+import subprocess
 import sys
 import threading
 import time
@@ -52,6 +54,7 @@ if __name__ == "__main__":
     sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 import psycopg2  # noqa: E402
+import psycopg2.pool  # noqa: E402
 
 from classifiers.grounding import (  # noqa: E402
     classify,
@@ -131,43 +134,47 @@ def _extract_video_id(spid: str | None) -> str | None:
     return cand if len(cand) == 11 else None
 
 
+_FETCH_HELPER = os.path.join(
+    os.path.dirname(os.path.abspath(__file__)), "_sweep_fetch_one.py"
+)
+
+
 def _fetch_with_timeout(video_id: str, timeout_sec: float) -> dict:
-    """fetch_transcript_with_timestamps guarded by a per-call
-    concurrent.futures.ThreadPoolExecutor timeout.
+    """Run the transcript fetch in a subprocess so SIGKILL on timeout
+    actually releases the sockets and kernel resources.
 
-    Previous approach used backfill_youtube_timestamps._run_with_timeout
-    — a daemon-thread wrapper that DID NOT interrupt C-level SSL hangs
-    inside CPython. When OpenSSL's recv() blocked, the daemon thread
-    sat in wait_woken and thread.join(timeout=X) simply returned "still
-    alive" but kept running, so the outer timeout never fired and the
-    sweep froze (see PID 23334 stuck on 7kCrnqMEf20 for 15 min).
+    Thread-based timeouts could not interrupt C-level SSL recv in
+    CPython — see the PID 23334 / PID 25381 post-mortems. Every
+    timeout left a thread alive in wait_woken with an open Webshare
+    socket; 14 of those accumulated in the last run before the whole
+    8-worker pool wedged.
 
-    The inner executor is constructed without a `with` block so
-    shutdown(wait=False) cannot be blocked by the stuck worker thread.
-    The worker leaks — Python can't cancel a thread mid-recv — but the
-    executor object is released and the outer iteration proceeds.
-    Leaked threads die either when SSL eventually errors or when the
-    process exits.
+    subprocess.run(timeout=...) raises TimeoutExpired and SIGKILLs
+    the child. The OS reclaims the process and its sockets. No leaks.
+    Spawn overhead is ~100-200 ms on Linux — negligible next to the
+    multi-second transcript fetch it guards.
     """
-    from jobs.youtube_classifier import fetch_transcript_with_timestamps
-    inner = ThreadPoolExecutor(max_workers=1,
-                               thread_name_prefix=f"fetch-{video_id[:6]}")
-    fut = inner.submit(fetch_transcript_with_timestamps, video_id)
     try:
-        r = fut.result(timeout=timeout_sec)
-    except FuturesTimeoutError:
-        r = {"status": "timeout", "text": "", "segments": []}
+        r = subprocess.run(
+            [sys.executable, _FETCH_HELPER, video_id],
+            capture_output=True,
+            text=True,
+            timeout=timeout_sec,
+            env=os.environ,
+        )
+    except subprocess.TimeoutExpired:
+        return {"status": "timeout", "text": "", "segments": []}
     except Exception as e:
-        r = {"status": f"exception:{type(e).__name__}",
-             "text": "", "segments": []}
-    finally:
-        # wait=False + cancel_futures=True (Python 3.9+). Critical:
-        # the stuck worker thread is abandoned, not joined.
-        try:
-            inner.shutdown(wait=False, cancel_futures=True)
-        except TypeError:
-            inner.shutdown(wait=False)
-    return r
+        return {"status": f"spawn_error:{type(e).__name__}",
+                "text": "", "segments": []}
+    if r.returncode != 0:
+        return {"status": f"helper_exit:{r.returncode}",
+                "text": "", "segments": []}
+    try:
+        return json.loads(r.stdout)
+    except Exception as e:
+        return {"status": f"json_decode:{type(e).__name__}",
+                "text": "", "segments": []}
 
 
 def _window_text(segments: list, ts: int, window_sec: int) -> str:
@@ -234,24 +241,40 @@ def load_unrecoverable(cur) -> set[str]:
         return set()
 
 
-def mark_unrecoverable(cur, conn, video_id: str, reason: str) -> None:
+def mark_unrecoverable_pooled(pool, video_id: str, reason: str) -> None:
+    """Per-call DB write using a pooled connection. Each call checks
+    out its own connection, commits, and returns it — no shared cursor
+    state, no cross-thread transaction coupling, so one thread's
+    error cannot deadlock a shared lock for everyone else (the
+    failure mode on PID 25381).
+    """
+    conn = None
     try:
-        cur.execute("""
-            INSERT INTO youtube_backfill_unrecoverable
-              (video_id, reason, last_attempted_at, attempt_count)
-            VALUES (%s, %s, NOW(), 1)
-            ON CONFLICT (video_id) DO UPDATE SET
-              reason = EXCLUDED.reason,
-              last_attempted_at = NOW(),
-              attempt_count = youtube_backfill_unrecoverable.attempt_count + 1
-        """, (video_id, (reason or "unknown")[:200]))
+        conn = pool.getconn()
+        with conn.cursor() as c:
+            c.execute("""
+                INSERT INTO youtube_backfill_unrecoverable
+                  (video_id, reason, last_attempted_at, attempt_count)
+                VALUES (%s, %s, NOW(), 1)
+                ON CONFLICT (video_id) DO UPDATE SET
+                  reason = EXCLUDED.reason,
+                  last_attempted_at = NOW(),
+                  attempt_count = youtube_backfill_unrecoverable.attempt_count + 1
+            """, (video_id, (reason or "unknown")[:200]))
         conn.commit()
     except Exception as e:
         log.warning("%s mark_unrecoverable(%s): %s", TAG, video_id, e)
-        try:
-            conn.rollback()
-        except Exception:
-            pass
+        if conn is not None:
+            try:
+                conn.rollback()
+            except Exception:
+                pass
+    finally:
+        if conn is not None:
+            try:
+                pool.putconn(conn)
+            except Exception:
+                pass
 
 
 # ─── Core sweep ────────────────────────────────────────────────────────────
@@ -270,8 +293,21 @@ def run(
     pre_fp = haiku_fingerprints()
     print(f"{TAG} haiku_fingerprints count={len(pre_fp)}")
 
+    # Main-thread connection for the startup read queries. Workers do
+    # NOT share this — they use the pool below.
     conn = psycopg2.connect(os.environ["DATABASE_URL"])
     cur = conn.cursor()
+
+    # Thread-safe connection pool for worker-side writes
+    # (mark_unrecoverable). One connection per worker + a small
+    # margin; each checkout is a full commit cycle so conns get
+    # returned quickly. Replaces the shared-cursor + threading.Lock
+    # pattern that deadlocked PID 25381.
+    db_pool = psycopg2.pool.ThreadedConnectionPool(
+        minconn=1,
+        maxconn=max_workers + 2,
+        dsn=os.environ["DATABASE_URL"],
+    )
     try:
         alias_map = build_alias_map(cur)
         total_aliases = sum(len(v) for v in alias_map.values())
@@ -330,27 +366,69 @@ def run(
         print(f"{TAG} unique videos to fetch: {len(by_video):,} "
               f"(bad_spid={len(bad_spid)})")
 
+        # ── CSV resume: collect ids already present ──────────────
+        # Rows stream in with flush() after each write, so a killed
+        # run leaves a valid partial CSV. Resume reads that CSV, drops
+        # its ids from the by_video map, and appends instead of
+        # truncating. Header is NOT re-written on append.
+        REPORT_DIR.mkdir(exist_ok=True)
+        done_ids: set[int] = set()
+        csv_exists = CSV_PATH.exists() and CSV_PATH.stat().st_size > 0
+        if csv_exists:
+            try:
+                with CSV_PATH.open() as _f:
+                    for _row in csv.DictReader(_f):
+                        try:
+                            done_ids.add(int(_row.get("id") or 0))
+                        except (ValueError, TypeError):
+                            pass
+                print(f"{TAG} resume: {len(done_ids):,} ids already "
+                      f"in {CSV_PATH}, appending (no truncate)")
+            except Exception as _e:
+                log.warning("%s CSV resume-read failed: %s — truncating",
+                            TAG, _e)
+                done_ids = set()
+                csv_exists = False
+
+        # Filter by_video: drop pids already done. Drop videos where
+        # every pid is done. This happens BEFORE --video-limit so
+        # --video-limit N always means "N more videos this run".
+        _skipped_videos = 0
+        _skipped_pids_in_video = 0
+        _by_video_filtered: dict[str, list[int]] = {}
+        for _vid, _pids in by_video.items():
+            _remaining = [p for p in _pids if p not in done_ids]
+            if not _remaining:
+                _skipped_videos += 1
+                continue
+            if len(_remaining) < len(_pids):
+                _skipped_pids_in_video += (len(_pids) - len(_remaining))
+            _by_video_filtered[_vid] = _remaining
+        if _skipped_videos or _skipped_pids_in_video:
+            print(f"{TAG} resume: {_skipped_videos:,} videos fully done "
+                  f"(skipped), {_skipped_pids_in_video:,} pids partially "
+                  f"done inside other videos")
+        by_video = _by_video_filtered
+
         if video_limit is not None:
             keys = sorted(by_video.keys())[:video_limit]
             by_video = {k: by_video[k] for k in keys}
             print(f"{TAG} --video-limit={video_limit} → processing {len(by_video)} videos")
 
-        # ── CSV setup (incremental writes) ─────────────────────────
-        # Open the CSV at the top of the run. Every classified row
-        # is flushed immediately so a kill loses at most one video's
-        # work. Non-inferred rows are written up-front single-threaded;
-        # inferred rows stream in from the worker pool below.
-        REPORT_DIR.mkdir(exist_ok=True)
-        csv_f = CSV_PATH.open("w", newline="")
+        # Open CSV for append or truncate.
+        mode = "a" if csv_exists else "w"
+        csv_f = CSV_PATH.open(mode, newline="")
         csv_w = csv.writer(csv_f)
-        csv_w.writerow([
-            "id", "ticker", "stored_ts", "spid",
-            "current_grounding_type",
-            "narrow_type", "narrow_term",
-            "final_type", "final_term",
-            "wide_status", "wide_len",
-            "narrow_len",
-        ])
+        if not csv_exists:
+            csv_w.writerow([
+                "id", "ticker", "stored_ts", "spid",
+                "current_grounding_type",
+                "narrow_type", "narrow_term",
+                "final_type", "final_term",
+                "wide_status", "wide_len",
+                "narrow_len",
+            ])
+            csv_f.flush()
         csv_lock = threading.Lock()
 
         def _csv_append(pid, n, final_gt, final_tm, wide_status, wide_len):
@@ -367,11 +445,20 @@ def run(
 
         # Write non-inferred rows immediately — their final
         # classification equals their narrow classification.
+        # Resume: skip rows already present in the existing CSV.
+        _skipped_nonresume = 0
         for pid, n in narrow.items():
-            if n["narrow_type"] != GROUNDING_INFERRED:
-                _csv_append(pid, n,
-                            n["narrow_type"], n["narrow_term"],
-                            "", 0)
+            if n["narrow_type"] == GROUNDING_INFERRED:
+                continue
+            if pid in done_ids:
+                _skipped_nonresume += 1
+                continue
+            _csv_append(pid, n,
+                        n["narrow_type"], n["narrow_term"],
+                        "", 0)
+        if _skipped_nonresume:
+            print(f"{TAG} resume: skipped {_skipped_nonresume:,} "
+                  f"non-inferred rows already in CSV")
 
         # ── Fetch transcripts + wide-window re-classify (parallel) ─
         wide = {}  # pid → {wide_type, wide_term, wide_len, wide_status}
@@ -381,12 +468,16 @@ def run(
         total_videos = len(by_video)
         progress_lock = threading.Lock()
         processed = [0]  # mutable cell for the counter_lock-protected counter
-        db_lock = threading.Lock()  # serialize mark_unrecoverable writes
 
         def _process_video(vid: str, pids: list[int]) -> tuple[str, dict, str]:
             """Fetch + classify one video. Returns (vid, per_pid_results,
-            outcome_tag). No DB writes except mark_unrecoverable which
-            uses db_lock. Safe to run from worker threads."""
+            outcome_tag).
+
+            DB writes go through mark_unrecoverable_pooled which
+            checks out its own connection from db_pool — no shared
+            cursor, no cross-thread transaction coupling, so a bad
+            state on one worker can never wedge the others
+            (the PID 25381 failure mode)."""
             out: dict[int, dict] = {}
             if vid in unrecoverable:
                 for pid in pids:
@@ -402,8 +493,7 @@ def run(
             status = (r or {}).get("status") or "unknown"
             segments = (r or {}).get("segments") or []
             if status != "ok" or not segments:
-                with db_lock:
-                    mark_unrecoverable(cur, conn, vid, status)
+                mark_unrecoverable_pooled(db_pool, vid, status)
                 for pid in pids:
                     out[pid] = {
                         "wide_type": narrow[pid]["narrow_type"],
@@ -667,6 +757,10 @@ def run(
             pass
         try:
             conn.close()
+        except Exception:
+            pass
+        try:
+            db_pool.closeall()
         except Exception:
             pass
 
