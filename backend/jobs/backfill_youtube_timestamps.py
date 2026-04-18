@@ -27,7 +27,9 @@ ENABLE_SOURCE_TIMESTAMPS feature flag — that's the whole point.
 """
 import argparse
 import json
+import logging
 import os
+import re
 import sys
 import threading
 import time
@@ -48,6 +50,13 @@ from database import BgSessionLocal
 # ── Constants ─────────────────────────────────────────────────────────────────
 
 TAG = "[yt-ts-backfill]"
+
+log = logging.getLogger(__name__)
+
+# Matches the outermost {...} in a string, allowing one level of nested
+# braces (sufficient for the {"verbatim_quote": "...", "reason": "..."}
+# schema this module exchanges with the LLM).
+_JSON_OBJECT_RE = re.compile(r"\{(?:[^{}]|\{[^{}]*\})*\}", re.DOTALL)
 
 # YouTube video IDs are always exactly 11 characters (base64url).
 _YT_VIDEO_ID_LEN = 11
@@ -191,13 +200,27 @@ def _build_quote_user_msg(transcript_text: str, row) -> str:
 
 def _parse_llm_response_full(raw_text: str) -> tuple[str | None, str | None]:
     """Parse verbatim_quote + reason from an LLM response.
-    Handles markdown fences. Returns (quote, reason). Either may be None."""
+    Handles markdown fences and prose wrappers around the JSON object.
+    Returns (quote, reason). Either may be None."""
     text = raw_text.strip()
     if text.startswith("```"):
         text = text.split("\n", 1)[-1]
         if text.endswith("```"):
             text = text[:-3].strip()
-    parsed = json.loads(text)
+    try:
+        parsed = json.loads(text)
+    except json.JSONDecodeError as original_err:
+        # Qwen sometimes wraps the JSON in prose ("Here is the JSON: {...}
+        # Hope this helps."). Pull the outermost balanced object and retry.
+        m = _JSON_OBJECT_RE.search(text)
+        if not m:
+            raise
+        try:
+            parsed = json.loads(m.group(0))
+        except json.JSONDecodeError:
+            raise original_err
+        log.debug("%s parser_fallback_extracted_json len=%s",
+                  TAG, len(m.group(0)))
     q = parsed.get("verbatim_quote")
     r = parsed.get("reason")
     return q, r
