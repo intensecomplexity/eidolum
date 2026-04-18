@@ -38,8 +38,14 @@ import logging
 import os
 import re
 import sys
+import threading
 import time
 from collections import Counter, defaultdict
+from concurrent.futures import (
+    ThreadPoolExecutor,
+    TimeoutError as FuturesTimeoutError,
+    as_completed,
+)
 from pathlib import Path
 
 if __name__ == "__main__":
@@ -59,9 +65,10 @@ log = logging.getLogger(__name__)
 TAG = "[grounding-sweep]"
 
 DEFAULT_WINDOW_SEC = 60
-DEFAULT_FETCH_DELAY = 0.4
+DEFAULT_FETCH_DELAY = 0.0   # per-video pacing no longer needed; the pool throttles
 DEFAULT_FETCH_TIMEOUT = 20.0
 DEFAULT_APPLY_BATCH = 500
+DEFAULT_MAX_WORKERS = 8
 MAX_BACKOFF_SEC = 30.0
 UNRECOVERABLE_RETRY_DAYS = 30
 
@@ -124,44 +131,43 @@ def _extract_video_id(spid: str | None) -> str | None:
     return cand if len(cand) == 11 else None
 
 
-def _fetch_with_backoff(video_id: str, delay: float,
-                        timeout_sec: float) -> dict:
-    """fetch_transcript_with_timestamps with (a) a hard wall-clock
-    thread-based timeout so urllib3's internal 9-retry loop can't
-    stall us on a flaky Webshare SSL handshake, and (b) an outer
-    exponential backoff on rate-limit-shaped errors.
+def _fetch_with_timeout(video_id: str, timeout_sec: float) -> dict:
+    """fetch_transcript_with_timestamps guarded by a per-call
+    concurrent.futures.ThreadPoolExecutor timeout.
 
-    The library has no exposed timeout; wrapping the whole call in a
-    daemon-thread timeout is the only reliable way — ThreadPoolExecutor
-    blocks on shutdown, signal.alarm is swallowed by urllib3's EINTR
-    handling. Same pattern used in backfill_youtube_timestamps.py.
+    Previous approach used backfill_youtube_timestamps._run_with_timeout
+    — a daemon-thread wrapper that DID NOT interrupt C-level SSL hangs
+    inside CPython. When OpenSSL's recv() blocked, the daemon thread
+    sat in wait_woken and thread.join(timeout=X) simply returned "still
+    alive" but kept running, so the outer timeout never fired and the
+    sweep froze (see PID 23334 stuck on 7kCrnqMEf20 for 15 min).
+
+    The inner executor is constructed without a `with` block so
+    shutdown(wait=False) cannot be blocked by the stuck worker thread.
+    The worker leaks — Python can't cancel a thread mid-recv — but the
+    executor object is released and the outer iteration proceeds.
+    Leaked threads die either when SSL eventually errors or when the
+    process exits.
     """
-    from jobs.backfill_youtube_timestamps import (
-        _run_with_timeout, FuturesTimeout,
-    )
     from jobs.youtube_classifier import fetch_transcript_with_timestamps
-    backoff = delay
-    while True:
+    inner = ThreadPoolExecutor(max_workers=1,
+                               thread_name_prefix=f"fetch-{video_id[:6]}")
+    fut = inner.submit(fetch_transcript_with_timestamps, video_id)
+    try:
+        r = fut.result(timeout=timeout_sec)
+    except FuturesTimeoutError:
+        r = {"status": "timeout", "text": "", "segments": []}
+    except Exception as e:
+        r = {"status": f"exception:{type(e).__name__}",
+             "text": "", "segments": []}
+    finally:
+        # wait=False + cancel_futures=True (Python 3.9+). Critical:
+        # the stuck worker thread is abandoned, not joined.
         try:
-            r = _run_with_timeout(
-                fetch_transcript_with_timestamps, video_id,
-                timeout_sec=timeout_sec,
-            )
-        except FuturesTimeout:
-            r = {"status": "timeout", "text": "", "segments": []}
-        except Exception as e:
-            r = {"status": f"exception:{type(e).__name__}",
-                 "text": "", "segments": []}
-        status = (r or {}).get("status") or ""
-        if status == "ok":
-            return r
-        if "429" in status or "rate" in status.lower():
-            if backoff > MAX_BACKOFF_SEC:
-                return r
-            time.sleep(backoff)
-            backoff *= 2
-            continue
-        return r
+            inner.shutdown(wait=False, cancel_futures=True)
+        except TypeError:
+            inner.shutdown(wait=False)
+    return r
 
 
 def _window_text(segments: list, ts: int, window_sec: int) -> str:
@@ -258,6 +264,7 @@ def run(
     video_limit: int | None,
     apply_mode: bool,
     apply_batch: int,
+    max_workers: int,
 ) -> int:
     assert_webshare_env()
     pre_fp = haiku_fingerprints()
@@ -328,54 +335,90 @@ def run(
             by_video = {k: by_video[k] for k in keys}
             print(f"{TAG} --video-limit={video_limit} → processing {len(by_video)} videos")
 
-        # ── Fetch transcripts + wide-window re-classify ───────────
+        # ── CSV setup (incremental writes) ─────────────────────────
+        # Open the CSV at the top of the run. Every classified row
+        # is flushed immediately so a kill loses at most one video's
+        # work. Non-inferred rows are written up-front single-threaded;
+        # inferred rows stream in from the worker pool below.
+        REPORT_DIR.mkdir(exist_ok=True)
+        csv_f = CSV_PATH.open("w", newline="")
+        csv_w = csv.writer(csv_f)
+        csv_w.writerow([
+            "id", "ticker", "stored_ts", "spid",
+            "current_grounding_type",
+            "narrow_type", "narrow_term",
+            "final_type", "final_term",
+            "wide_status", "wide_len",
+            "narrow_len",
+        ])
+        csv_lock = threading.Lock()
+
+        def _csv_append(pid, n, final_gt, final_tm, wide_status, wide_len):
+            with csv_lock:
+                csv_w.writerow([
+                    pid, n["ticker"], n["ts"], n["spid"],
+                    n["current_grounding"] or "",
+                    n["narrow_type"], n["narrow_term"] or "",
+                    final_gt, final_tm or "",
+                    wide_status or "", wide_len or 0,
+                    len(n["vq"] or ""),
+                ])
+                csv_f.flush()
+
+        # Write non-inferred rows immediately — their final
+        # classification equals their narrow classification.
+        for pid, n in narrow.items():
+            if n["narrow_type"] != GROUNDING_INFERRED:
+                _csv_append(pid, n,
+                            n["narrow_type"], n["narrow_term"],
+                            "", 0)
+
+        # ── Fetch transcripts + wide-window re-classify (parallel) ─
         wide = {}  # pid → {wide_type, wide_term, wide_len, wide_status}
         stats = Counter()
         stats["videos_total"] = len(by_video)
 
         total_videos = len(by_video)
-        for i, (vid, pids) in enumerate(sorted(by_video.items()), 1):
-            # Per-video line: timestamp + index + video_id + preds.
-            # Format matches the sweep_status_probe parser:
-            #   [HH:MM:SS] [i/total] vid=<video_id> preds=<N>
-            ts_tag = time.strftime("%H:%M:%S")
-            print(f"{TAG} [{ts_tag}] [{i}/{total_videos}] vid={vid} "
-                  f"preds={len(pids)}", flush=True)
+        progress_lock = threading.Lock()
+        processed = [0]  # mutable cell for the counter_lock-protected counter
+        db_lock = threading.Lock()  # serialize mark_unrecoverable writes
 
+        def _process_video(vid: str, pids: list[int]) -> tuple[str, dict, str]:
+            """Fetch + classify one video. Returns (vid, per_pid_results,
+            outcome_tag). No DB writes except mark_unrecoverable which
+            uses db_lock. Safe to run from worker threads."""
+            out: dict[int, dict] = {}
             if vid in unrecoverable:
-                stats["videos_skipped_unrecoverable"] += 1
                 for pid in pids:
-                    wide[pid] = {
+                    out[pid] = {
                         "wide_type": narrow[pid]["narrow_type"],
                         "wide_term": narrow[pid]["narrow_term"],
                         "wide_len": 0,
                         "wide_status": "skipped_unrecoverable",
                     }
-                continue
+                return vid, out, "skipped_unrecoverable"
 
-            r = _fetch_with_backoff(vid, fetch_delay, fetch_timeout)
+            r = _fetch_with_timeout(vid, fetch_timeout)
             status = (r or {}).get("status") or "unknown"
             segments = (r or {}).get("segments") or []
             if status != "ok" or not segments:
-                stats["videos_transcript_failed"] += 1
-                mark_unrecoverable(cur, conn, vid, status)
+                with db_lock:
+                    mark_unrecoverable(cur, conn, vid, status)
                 for pid in pids:
-                    wide[pid] = {
+                    out[pid] = {
                         "wide_type": narrow[pid]["narrow_type"],
                         "wide_term": narrow[pid]["narrow_term"],
                         "wide_len": 0,
                         "wide_status": f"fetch:{status}",
                     }
-                time.sleep(fetch_delay)
-                continue
+                return vid, out, f"fetch:{status}"
 
-            stats["videos_fetched_ok"] += 1
             for pid in pids:
                 ts = int(narrow[pid]["ts"] or 0)
                 wtext = _window_text(segments, ts, window_sec)
                 wt_len = len(wtext)
                 if not wtext:
-                    wide[pid] = {
+                    out[pid] = {
                         "wide_type": narrow[pid]["narrow_type"],
                         "wide_term": narrow[pid]["narrow_term"],
                         "wide_len": 0,
@@ -384,11 +427,66 @@ def run(
                     continue
                 ticker = narrow[pid]["ticker"]
                 gt, term = classify(ticker, wtext, alias_map)
-                wide[pid] = {
+                out[pid] = {
                     "wide_type": gt, "wide_term": term,
                     "wide_len": wt_len, "wide_status": "ok",
                 }
-            time.sleep(fetch_delay)
+            return vid, out, "ok"
+
+        # Submit all videos at once; as_completed yields each when its
+        # worker finishes. The nested executor inside _fetch_with_timeout
+        # enforces per-fetch wall-clock bounds so one hang never
+        # starves the pool.
+        with ThreadPoolExecutor(max_workers=max_workers,
+                                thread_name_prefix="sweep") as pool:
+            futures = {
+                pool.submit(_process_video, vid, pids): (vid, pids)
+                for vid, pids in sorted(by_video.items())
+            }
+            for fut in as_completed(futures):
+                vid_key, expected_pids = futures[fut]
+                try:
+                    vid, results, outcome = fut.result()
+                except Exception as e:
+                    log.error("%s task for %s raised: %s",
+                              TAG, vid_key, e)
+                    continue
+
+                # Stats: only successful fetches count toward
+                # videos_fetched_ok. Skipped / failed go elsewhere.
+                if outcome == "ok":
+                    stats["videos_fetched_ok"] += 1
+                elif outcome == "skipped_unrecoverable":
+                    stats["videos_skipped_unrecoverable"] += 1
+                else:
+                    stats["videos_transcript_failed"] += 1
+
+                # Record wide-result + stream CSV
+                for pid, r in results.items():
+                    wide[pid] = r
+                    _csv_append(
+                        pid, narrow[pid],
+                        r["wide_type"], r["wide_term"],
+                        r["wide_status"], r["wide_len"],
+                    )
+
+                with progress_lock:
+                    processed[0] += 1
+                    ts_tag = time.strftime("%H:%M:%S")
+                    print(
+                        f"{TAG} [{ts_tag}] [{processed[0]}/{total_videos}] "
+                        f"vid={vid} preds={len(expected_pids)} "
+                        f"outcome={outcome}",
+                        flush=True,
+                    )
+
+                # Legacy per-video pacing respected only if caller
+                # explicitly set a delay; pool parallelism usually
+                # obviates this.
+                if fetch_delay > 0:
+                    time.sleep(fetch_delay)
+
+        csv_f.close()
 
         # ── Aggregate: final proposed grounding_type per row ──────
         final_type: dict[int, str] = {}
@@ -467,29 +565,8 @@ def run(
         for tk, cnt in ticker_stuck.most_common(15):
             print(f"    {tk:<10} {cnt:>5,}")
 
-        # ── Write CSV ─────────────────────────────────────────────
-        REPORT_DIR.mkdir(exist_ok=True)
-        with CSV_PATH.open("w", newline="") as f:
-            w = csv.writer(f)
-            w.writerow([
-                "id", "ticker", "stored_ts", "spid",
-                "current_grounding_type",
-                "narrow_type", "narrow_term",
-                "final_type", "final_term",
-                "wide_status", "wide_len",
-                "narrow_len",
-            ])
-            for pid, n in narrow.items():
-                ww = wide.get(pid) or {}
-                w.writerow([
-                    pid, n["ticker"], n["ts"], n["spid"],
-                    n["current_grounding"] or "",
-                    n["narrow_type"], n["narrow_term"] or "",
-                    final_type[pid], final_term[pid] or "",
-                    ww.get("wide_status") or "",
-                    ww.get("wide_len") or 0,
-                    len(n["vq"] or ""),
-                ])
+        # CSV was written incrementally above (one row per video as
+        # its worker finished). The file is already closed.
         print()
         print(f"  csv → {CSV_PATH} ({CSV_PATH.stat().st_size:,} bytes)")
 
@@ -626,6 +703,10 @@ def main(argv=None):
                         default=DEFAULT_FETCH_TIMEOUT,
                         help="wall-clock timeout per fetch (s); "
                              "failed fetches get stamped unrecoverable")
+    parser.add_argument("--max-workers", type=int,
+                        default=DEFAULT_MAX_WORKERS,
+                        help="concurrent transcript fetches "
+                             "(Webshare flat-rate, safe to push)")
     parser.add_argument("--video-limit", type=int, default=None,
                         help="process only the first N videos (debug)")
     parser.add_argument("--apply", action="store_true",
@@ -645,6 +726,7 @@ def main(argv=None):
         video_limit=args.video_limit,
         apply_mode=args.apply,
         apply_batch=args.apply_batch,
+        max_workers=args.max_workers,
     )
 
 
