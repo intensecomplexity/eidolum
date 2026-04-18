@@ -78,15 +78,30 @@ _PROGRESS_FILE = os.path.join(os.path.dirname(__file__), ".backfill_ts_progress.
 
 # Focused prompt for Path B. Much cheaper than the full classifier — we
 # only need the verbatim quote for ONE prediction, not full extraction.
-_PATHB_SYSTEM = """You are a quote-extraction assistant. You will be given a YouTube transcript and a specific financial prediction that was previously extracted from it. Your job is to find the EXACT verbatim quote from the transcript where the prediction was made.
+_PATHB_SYSTEM = """You are a quote-extraction assistant. You will be given a YouTube transcript and a financial prediction previously extracted from it. Your job is to find the EXACT verbatim quote from the transcript where the speaker made the prediction.
+
+IMPORTANT: The "Extracted quote" field in the user message is UNRELIABLE. Legacy classifier runs stored synthetic tags there (patterns like "<Forecaster>: Bullish on X", "<Forecaster>: Bearish on X", "<Forecaster>: Neutral on X", or any label-shaped string that is not spoken prose). If the Extracted quote matches this pattern, IGNORE IT. Do not echo it. Search the transcript from scratch for a real quote where the speaker expresses the given direction on the given ticker.
 
 Rules:
-1. COPY the exact words from the transcript — no paraphrasing, no cleanup.
+1. COPY the exact words from the transcript — no paraphrasing, no cleanup, no labels.
 2. Include 1-2 sentences BEFORE the prediction sentence for context (20-60 words total).
 3. Every pronoun in the quote must have a resolvable antecedent within the quote.
-4. Return ONLY a JSON object: {"verbatim_quote": "..."}
-5. If you cannot find the prediction in the transcript, return: {"verbatim_quote": null}
-6. Output JSON only. No other text."""
+4. If no real transcript quote supports the (ticker, direction) claim, return:
+     {"verbatim_quote": null, "reason": "no_real_quote_in_transcript"}
+   Do NOT fabricate, paraphrase, or echo the Extracted quote. A null return is the correct answer when the transcript lacks a supporting quote.
+5. Return ONLY a JSON object. Either {"verbatim_quote": "<copied from transcript>"} or the null shape above. No other text.
+
+Examples:
+
+POSITIVE (real quote in transcript):
+  Extracted quote: "Everything Money: Bullish on RCL"
+  Transcript excerpt: "... and honestly I think Royal Caribbean is going to rip this year, my RCL target is 180 by Q4 ..."
+  Output: {"verbatim_quote": "I think Royal Caribbean is going to rip this year, my RCL target is 180 by Q4"}
+
+NEGATIVE (Extracted quote is a synthetic tag and no supporting prose exists):
+  Extracted quote: "Everything Money: Bullish on RCL"
+  Transcript excerpt: "... consumer-discretionary names, stocks like RCL and CCL and NCLH, nothing standout today ..."
+  Output: {"verbatim_quote": null, "reason": "no_real_quote_in_transcript"}"""
 
 
 # ── Timeout helper ───────────────────────────────────────────────────────────
@@ -174,22 +189,33 @@ def _build_quote_user_msg(transcript_text: str, row) -> str:
     )
 
 
-def _parse_llm_response(raw_text: str) -> str | None:
-    """Parse verbatim_quote from an LLM response. Handles markdown fences."""
+def _parse_llm_response_full(raw_text: str) -> tuple[str | None, str | None]:
+    """Parse verbatim_quote + reason from an LLM response.
+    Handles markdown fences. Returns (quote, reason). Either may be None."""
     text = raw_text.strip()
     if text.startswith("```"):
         text = text.split("\n", 1)[-1]
         if text.endswith("```"):
             text = text[:-3].strip()
     parsed = json.loads(text)
-    return parsed.get("verbatim_quote")
+    q = parsed.get("verbatim_quote")
+    r = parsed.get("reason")
+    return q, r
 
 
-def _call_qwen_for_quote(transcript_text: str, row) -> tuple[str | None, float]:
+def _parse_llm_response(raw_text: str) -> str | None:
+    """Back-compat shim: returns just the verbatim_quote."""
+    q, _ = _parse_llm_response_full(raw_text)
+    return q
+
+
+def _call_qwen_for_quote(transcript_text: str, row) -> tuple[str | None, str | None, float]:
     """Call the fine-tuned Qwen 2.5 7B on RunPod Serverless for quote extraction.
 
-    Returns (quote, cost_usd). Raises on any failure so the caller can
-    fall back to Haiku.
+    Returns (quote, reason, cost_usd). `reason` is the optional
+    model-supplied explanation for a null quote (e.g.
+    "no_real_quote_in_transcript"). Raises on any failure so the caller
+    can fall back to Haiku.
     """
     import httpx as _httpx
 
@@ -231,8 +257,8 @@ def _call_qwen_for_quote(transcript_text: str, row) -> tuple[str | None, float]:
     if not content.strip():
         raise RuntimeError("RunPod returned empty content")
 
-    quote = _parse_llm_response(content)
-    return quote, QWEN_PRICE_PER_CALL_USD
+    quote, reason = _parse_llm_response_full(content)
+    return quote, reason, QWEN_PRICE_PER_CALL_USD
 
 
 def _call_haiku_for_quote(client, transcript_text: str, row):
@@ -264,7 +290,7 @@ def _call_llm_for_quote(transcript_text: str, row, haiku_client, stats: dict):
     """
     # ── Qwen (primary) ───────────────────────────────────────────────
     try:
-        quote, cost = _call_qwen_for_quote(transcript_text, row)
+        quote, _reason, cost = _call_qwen_for_quote(transcript_text, row)
         stats["qwen_calls"] += 1
         stats["qwen_cost"] += cost
         return quote, "qwen"

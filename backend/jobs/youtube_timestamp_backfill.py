@@ -263,7 +263,7 @@ def backfill_one_video(db, video_id: str, *, dry_run: bool = False) -> dict:
     # and auto-scales, so per-prediction calls are safe.
     for row in preds:
         try:
-            quote, _cost = _call_qwen_for_quote(text, row)
+            quote, reason, _cost = _call_qwen_for_quote(text, row)
         except Exception as e:
             log.info("%s id=%s Qwen quote call failed: %s",
                      TAG, row.id, type(e).__name__)
@@ -271,6 +271,11 @@ def backfill_one_video(db, video_id: str, *, dry_run: bool = False) -> dict:
             continue
 
         if not quote or not isinstance(quote, str):
+            log.info(
+                "%s qwen_null pred_id=%s video=%s ticker=%s reason=%s",
+                TAG, row.id, video_id, row.ticker,
+                reason or "qwen_returned_null",
+            )
             stats["no_quote"] += 1
             continue
 
