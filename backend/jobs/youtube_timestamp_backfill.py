@@ -308,6 +308,14 @@ def run_timestamp_backfill(
     single_video: str | None = None,
 ) -> dict:
     """Entry point used by the APScheduler job and CLI."""
+    # Kill-switch for emergency pauses (e.g. Qwen hallucination incidents).
+    # Default on — explicit "false"/"0"/"no"/"off" disables. Flip via
+    # `railway variables --set ENABLE_YT_TIMESTAMP_BACKFILL=false`.
+    _enabled = os.getenv("ENABLE_YT_TIMESTAMP_BACKFILL", "true").strip().lower()
+    if _enabled in ("false", "0", "no", "off"):
+        log.info("%s paused via ENABLE_YT_TIMESTAMP_BACKFILL=%s — skipping cycle",
+                 TAG, _enabled)
+        return {"videos_scanned": 0, "paused": True}
     from database import BgSessionLocal
     db = BgSessionLocal()
     try:
