@@ -60,6 +60,7 @@ TAG = "[grounding-sweep]"
 
 DEFAULT_WINDOW_SEC = 60
 DEFAULT_FETCH_DELAY = 0.4
+DEFAULT_FETCH_TIMEOUT = 20.0
 DEFAULT_APPLY_BATCH = 500
 MAX_BACKOFF_SEC = 30.0
 UNRECOVERABLE_RETRY_DAYS = 30
@@ -123,14 +124,31 @@ def _extract_video_id(spid: str | None) -> str | None:
     return cand if len(cand) == 11 else None
 
 
-def _fetch_with_backoff(video_id: str, delay: float) -> dict:
-    """fetch_transcript_with_timestamps with an exponential backoff on
-    rate-limit-shaped errors. Returns the helper's dict verbatim."""
+def _fetch_with_backoff(video_id: str, delay: float,
+                        timeout_sec: float) -> dict:
+    """fetch_transcript_with_timestamps with (a) a hard wall-clock
+    thread-based timeout so urllib3's internal 9-retry loop can't
+    stall us on a flaky Webshare SSL handshake, and (b) an outer
+    exponential backoff on rate-limit-shaped errors.
+
+    The library has no exposed timeout; wrapping the whole call in a
+    daemon-thread timeout is the only reliable way — ThreadPoolExecutor
+    blocks on shutdown, signal.alarm is swallowed by urllib3's EINTR
+    handling. Same pattern used in backfill_youtube_timestamps.py.
+    """
+    from jobs.backfill_youtube_timestamps import (
+        _run_with_timeout, FuturesTimeout,
+    )
     from jobs.youtube_classifier import fetch_transcript_with_timestamps
     backoff = delay
     while True:
         try:
-            r = fetch_transcript_with_timestamps(video_id)
+            r = _run_with_timeout(
+                fetch_transcript_with_timestamps, video_id,
+                timeout_sec=timeout_sec,
+            )
+        except FuturesTimeout:
+            r = {"status": "timeout", "text": "", "segments": []}
         except Exception as e:
             r = {"status": f"exception:{type(e).__name__}",
                  "text": "", "segments": []}
@@ -236,6 +254,7 @@ def run(
     *,
     window_sec: int,
     fetch_delay: float,
+    fetch_timeout: float,
     video_limit: int | None,
     apply_mode: bool,
     apply_batch: int,
@@ -329,7 +348,7 @@ def run(
             if i % 50 == 0 or i == 1:
                 print(f"{TAG}   [{i}/{len(by_video)}] {vid} "
                       f"(preds={len(pids)})")
-            r = _fetch_with_backoff(vid, fetch_delay)
+            r = _fetch_with_backoff(vid, fetch_delay, fetch_timeout)
             status = (r or {}).get("status") or "unknown"
             segments = (r or {}).get("segments") or []
             if status != "ok" or not segments:
@@ -598,6 +617,10 @@ def main(argv=None):
     parser.add_argument("--window-sec", type=int, default=DEFAULT_WINDOW_SEC)
     parser.add_argument("--delay", type=float, default=DEFAULT_FETCH_DELAY,
                         help="seconds between transcript fetches")
+    parser.add_argument("--fetch-timeout", type=float,
+                        default=DEFAULT_FETCH_TIMEOUT,
+                        help="wall-clock timeout per fetch (s); "
+                             "failed fetches get stamped unrecoverable")
     parser.add_argument("--video-limit", type=int, default=None,
                         help="process only the first N videos (debug)")
     parser.add_argument("--apply", action="store_true",
@@ -613,6 +636,7 @@ def main(argv=None):
     return run(
         window_sec=args.window_sec,
         fetch_delay=args.delay,
+        fetch_timeout=args.fetch_timeout,
         video_limit=args.video_limit,
         apply_mode=args.apply,
         apply_batch=args.apply_batch,
