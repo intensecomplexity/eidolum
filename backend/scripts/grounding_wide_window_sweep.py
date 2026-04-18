@@ -333,7 +333,15 @@ def run(
         stats = Counter()
         stats["videos_total"] = len(by_video)
 
+        total_videos = len(by_video)
         for i, (vid, pids) in enumerate(sorted(by_video.items()), 1):
+            # Per-video line: timestamp + index + video_id + preds.
+            # Format matches the sweep_status_probe parser:
+            #   [HH:MM:SS] [i/total] vid=<video_id> preds=<N>
+            ts_tag = time.strftime("%H:%M:%S")
+            print(f"{TAG} [{ts_tag}] [{i}/{total_videos}] vid={vid} "
+                  f"preds={len(pids)}", flush=True)
+
             if vid in unrecoverable:
                 stats["videos_skipped_unrecoverable"] += 1
                 for pid in pids:
@@ -345,9 +353,6 @@ def run(
                     }
                 continue
 
-            if i % 50 == 0 or i == 1:
-                print(f"{TAG}   [{i}/{len(by_video)}] {vid} "
-                      f"(preds={len(pids)})")
             r = _fetch_with_backoff(vid, fetch_delay, fetch_timeout)
             status = (r or {}).get("status") or "unknown"
             segments = (r or {}).get("segments") or []
