@@ -255,7 +255,11 @@ def _call_qwen_for_quote(transcript_text: str, row) -> tuple[str | None, str | N
             {"role": "user", "content": user_msg},
         ],
         "temperature": 0,
-        "max_tokens": 300,
+        # 500 tokens ≈ 350 words — comfortably above the 60-word quote rule
+        # plus JSON overhead. 300 was truncating verbatim quotes mid-string
+        # on rows where the fine-tune ignores the word cap, producing
+        # unterminated JSON and a JSONDecodeError in the parser.
+        "max_tokens": 500,
     }
 
     r = _httpx.post(
@@ -280,7 +284,15 @@ def _call_qwen_for_quote(transcript_text: str, row) -> tuple[str | None, str | N
     if not content.strip():
         raise RuntimeError("RunPod returned empty content")
 
-    quote, reason = _parse_llm_response_full(content)
+    try:
+        quote, reason = _parse_llm_response_full(content)
+    except json.JSONDecodeError as e:
+        # Surface the first 200 chars so the cause (truncated string,
+        # prose-only response, malformed schema) is diagnosable from logs
+        # without having to re-run the call manually.
+        log.info("%s parse_failed err=%s content_len=%d preview=%r",
+                 TAG, type(e).__name__, len(content), content[:200])
+        raise
     return quote, reason, QWEN_PRICE_PER_CALL_USD
 
 
@@ -291,7 +303,7 @@ def _call_haiku_for_quote(client, transcript_text: str, row):
     resp = _run_with_timeout(
         client.messages.create,
         model="claude-haiku-4-5-20251001",
-        max_tokens=300,
+        max_tokens=500,
         temperature=0,
         system=_PATHB_SYSTEM,
         messages=[{"role": "user", "content": user_msg}],
