@@ -12,10 +12,13 @@ from typing import Optional
 from database import get_db
 from rate_limit import limiter
 from auth import get_current_user as _decode_token
-from services.prediction_visibility import yt_visible_filter, non_qwen_filter
+from services.prediction_visibility import (
+    yt_visible_filter, non_qwen_filter, not_excluded_filter,
+)
 
 _YT_VIS_P = yt_visible_filter("p")
 _NON_QWEN_P = non_qwen_filter("p")
+_NOT_EXCL_P = not_excluded_filter("p")
 
 router = APIRouter()
 _optional_bearer = HTTPBearer(auto_error=False)
@@ -45,6 +48,7 @@ def recent_predictions(request: Request, db: Session = Depends(get_db)):
         LEFT JOIN ticker_sectors ts ON ts.ticker = p.ticker
         WHERE {_YT_VIS_P}
           AND {_NON_QWEN_P}
+          AND {_NOT_EXCL_P}
         ORDER BY COALESCE(p.prediction_date, p.created_at) DESC
         LIMIT 20
     """)).fetchall()
@@ -96,6 +100,7 @@ def recently_scored(request: Request, db: Session = Depends(get_db)):
           AND COALESCE(p.evaluated_at, p.evaluation_date) > NOW() - INTERVAL '30 days'
           AND {_YT_VIS_P}
           AND {_NON_QWEN_P}
+          AND {_NOT_EXCL_P}
         ORDER BY COALESCE(p.evaluated_at, p.evaluation_date) DESC NULLS LAST
         LIMIT 30
     """)).fetchall()
@@ -119,6 +124,7 @@ def recently_scored(request: Request, db: Session = Depends(get_db)):
               AND p.actual_return != 0
               AND {_YT_VIS_P}
           AND {_NON_QWEN_P}
+          AND {_NOT_EXCL_P}
             ORDER BY COALESCE(p.evaluated_at, p.evaluation_date) DESC NULLS LAST
             LIMIT 30
         """)).fetchall()
@@ -172,6 +178,7 @@ def expiring_predictions(request: Request, db: Session = Depends(get_db)):
           AND p.evaluation_date < NOW() + INTERVAL '60 days'
           AND {_YT_VIS_P}
           AND {_NON_QWEN_P}
+          AND {_NOT_EXCL_P}
         ORDER BY p.evaluation_date ASC
         LIMIT 30
     """)).fetchall()

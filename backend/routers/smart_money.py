@@ -9,10 +9,13 @@ from sqlalchemy import text as sql_text
 
 from database import get_db
 from rate_limit import limiter
-from services.prediction_visibility import yt_visible_filter, non_qwen_filter
+from services.prediction_visibility import (
+    yt_visible_filter, non_qwen_filter, not_excluded_filter,
+)
 
 _YT_VIS_P = yt_visible_filter("p")
 _NON_QWEN_P = non_qwen_filter("p")
+_NOT_EXCL_P = not_excluded_filter("p")
 
 router = APIRouter()
 
@@ -74,6 +77,7 @@ def get_smart_money(
           AND p.forecaster_id = ANY(:ids)
           AND {_YT_VIS_P}
           AND {_NON_QWEN_P}
+          AND {_NOT_EXCL_P}
           {where}
     """), params).fetchall()
 
