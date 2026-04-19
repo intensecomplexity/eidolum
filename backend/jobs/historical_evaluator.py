@@ -1099,12 +1099,17 @@ def refresh_all_forecaster_stats():
 
         print(f"[StatsRefresh] Updated {updated} forecasters, zeroed unscored")
         return {"updated": updated, "total_forecasters_with_scored": len(fids)}
-    except Exception as e:
-        db.rollback()
-        print(f"[StatsRefresh] Error: {e}")
-        return {"error": str(e)}
+    except Exception:
+        try:
+            db.rollback()
+        except Exception:
+            pass
+        raise
     finally:
-        db.close()
+        try:
+            db.close()
+        except Exception:
+            pass
 
 
 # ── Conditional call phase-based scoring ────────────────────────────────────
