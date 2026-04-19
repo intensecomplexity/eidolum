@@ -1071,11 +1071,14 @@ def refresh_all_forecaster_stats():
         # (any outcome) in the last 30 days. Recompute last_prediction_at
         # from predictions, then flip is_dormant accordingly.
         try:
-            db.execute(sql_text("""
+            db.execute(sql_text(f"""
                 UPDATE forecasters f
                 SET last_prediction_at = (
-                    SELECT MAX(prediction_date) FROM predictions p
-                    WHERE p.forecaster_id = f.id
+                    SELECT MAX(prediction_date) FROM predictions
+                    WHERE forecaster_id = f.id
+                      AND {YT_VISIBLE_FILTER_SQL}
+                      AND {NON_QWEN_FILTER_SQL}
+                      AND {NOT_EXCLUDED_FILTER_SQL}
                 )
             """))
             db.execute(sql_text("""
