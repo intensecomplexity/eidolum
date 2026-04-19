@@ -10,6 +10,9 @@ from database import get_db
 from models import EarningsCalendar, UserPrediction, Prediction, Config
 from rate_limit import limiter
 from ticker_lookup import TICKER_INFO
+from services.ticker_display import (
+    resolve_ticker_display_name, resolve_ticker_display_sector,
+)
 
 router = APIRouter()
 
@@ -100,8 +103,8 @@ def upcoming_earnings(request: Request, db: Session = Depends(get_db)):
 
         results.append({
             "ticker": e.ticker,
-            "name": ti.get("company_name") or TICKER_INFO.get(e.ticker, e.ticker),
-            "sector": ti.get("sector"),
+            "name": resolve_ticker_display_name(e.ticker, ti.get("company_name")) or TICKER_INFO.get(e.ticker, e.ticker),
+            "sector": resolve_ticker_display_sector(e.ticker, ti.get("sector")),
             "logo_url": ti.get("logo_url"),
             "logo_domain": ti.get("logo_domain"),
             "earnings_date": str(edate),

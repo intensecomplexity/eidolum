@@ -8,6 +8,9 @@ from sqlalchemy import func
 from database import get_db
 from models import User, UserPrediction, Achievement, Follow
 from rate_limit import limiter
+from services.ticker_display import (
+    resolve_ticker_display_name, resolve_ticker_display_sector,
+)
 from xp import get_xp_info as _get_xp_info, _level_name as _level_name_for
 from rivals import get_rival as _get_rival
 from perks import get_user_perks as _get_user_perks
@@ -812,10 +815,10 @@ def get_all_consensus(
         canon = canonical_sector(ticker_sector)
         results.append({
             "ticker": ticker,
-            "company_name": company_name,
+            "company_name": resolve_ticker_display_name(ticker, company_name),
             "logo_domain": logo_domain,
             "logo_url": logo_url,
-            "sector": canon if canon != UNKNOWN_SECTOR else None,
+            "sector": resolve_ticker_display_sector(ticker, canon if canon != UNKNOWN_SECTOR else None),
             "total_predictions": total,
             "bullish_count": bullish,
             "bearish_count": bearish,

@@ -11,6 +11,7 @@ from sqlalchemy import func
 from database import get_db
 from models import Forecaster, Prediction, AnalystSubscription, User
 from rate_limit import limiter
+from services.ticker_display import resolve_ticker_display_sector
 from auth import get_current_user as _decode_token
 
 _optional_bearer = HTTPBearer(auto_error=False)
@@ -295,7 +296,7 @@ def analyst_predictions(
                 "entry_price": p.entry_price,
                 "outcome": p.outcome,
                 "actual_return": p.actual_return,
-                "sector": p.sector,
+                "sector": resolve_ticker_display_sector(p.ticker, p.sector),
                 "prediction_date": p.prediction_date.isoformat() if p.prediction_date else None,
                 "evaluation_date": p.evaluation_date.isoformat() if p.evaluation_date else None,
                 "source_url": p.source_url,

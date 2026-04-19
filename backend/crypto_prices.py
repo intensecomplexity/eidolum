@@ -27,6 +27,46 @@ CRYPTO_TICKERS = {
     "OP": "optimism",
     "FIL": "filecoin",
     "SHIB": "shiba-inu",
+    "TRX": "tron",
+    "XLM": "stellar",
+    "ALGO": "algorand",
+    "HBAR": "hedera-hashgraph",
+    "BCH": "bitcoin-cash",
+    "SAND": "the-sandbox",
+}
+
+# Canonical human-readable name for every crypto ticker we recognize.
+# Used at API-serialization time to override ticker_sectors.company_name
+# when a ticker letter collides with a real US equity (LTC/SOL/LINK/etc.).
+# The evaluator already prices these as crypto (services/price_fetch.py);
+# this dict aligns the user-facing label with the pricing reality.
+CRYPTO_NAMES = {
+    "BTC": "Bitcoin",
+    "ETH": "Ethereum",
+    "SOL": "Solana",
+    "XRP": "XRP",
+    "LTC": "Litecoin",
+    "LINK": "Chainlink",
+    "DOGE": "Dogecoin",
+    "ADA": "Cardano",
+    "DOT": "Polkadot",
+    "AVAX": "Avalanche",
+    "UNI": "Uniswap",
+    "ATOM": "Cosmos",
+    "NEAR": "NEAR Protocol",
+    "SHIB": "Shiba Inu",
+    "TRX": "Tron",
+    "XLM": "Stellar",
+    "ALGO": "Algorand",
+    "HBAR": "Hedera",
+    "BCH": "Bitcoin Cash",
+    "SAND": "The Sandbox",
+    "BNB": "BNB",
+    "MATIC": "Polygon",
+    "APT": "Aptos",
+    "ARB": "Arbitrum",
+    "OP": "Optimism",
+    "FIL": "Filecoin",
 }
 
 # Cache: {ticker: (price, timestamp)}
@@ -36,6 +76,14 @@ _CACHE_TTL = 300  # 5 minutes
 
 def is_crypto(ticker: str) -> bool:
     return ticker.upper() in CRYPTO_TICKERS
+
+
+def get_crypto_display_name(ticker: str) -> str | None:
+    """Return the canonical crypto display name for a ticker, or None
+    if the ticker isn't on the crypto allowlist."""
+    if not ticker:
+        return None
+    return CRYPTO_NAMES.get(ticker.upper())
 
 
 def get_crypto_price(ticker: str) -> float | None:

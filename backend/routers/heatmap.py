@@ -15,6 +15,9 @@ from models import User, UserPrediction
 from rate_limit import limiter
 from ticker_lookup import TICKER_INFO
 from badge_engine import SECTOR_MAP, get_sector
+from services.ticker_display import (
+    resolve_ticker_display_name, resolve_ticker_display_sector,
+)
 
 router = APIRouter()
 
@@ -195,8 +198,8 @@ def ticker_heatmap(request: Request, db: Session = Depends(get_db)):
 
         results.append({
             "ticker": ticker,
-            "name": TICKER_INFO.get(ticker, ticker),
-            "sector": get_sector(ticker),
+            "name": resolve_ticker_display_name(ticker, TICKER_INFO.get(ticker, ticker)),
+            "sector": resolve_ticker_display_sector(ticker, get_sector(ticker)),
             "bullish_pct": bull_pct,
             "bearish_pct": round(100 - bull_pct, 1),
             "total_predictions": data["total"],

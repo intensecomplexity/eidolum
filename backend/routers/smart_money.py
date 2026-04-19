@@ -12,6 +12,9 @@ from rate_limit import limiter
 from services.prediction_visibility import (
     yt_visible_filter, non_qwen_filter, not_excluded_filter,
 )
+from services.ticker_display import (
+    resolve_ticker_display_name, resolve_ticker_display_sector,
+)
 
 _YT_VIS_P = yt_visible_filter("p")
 _NON_QWEN_P = non_qwen_filter("p")
@@ -144,10 +147,10 @@ def get_smart_money(
 
         base = {
             "ticker": ticker,
-            "company_name": td["company_name"],
+            "company_name": resolve_ticker_display_name(ticker, td["company_name"]),
             "logo_url": td["logo_url"],
             "logo_domain": td["logo_domain"],
-            "sector": td["sector"],
+            "sector": resolve_ticker_display_sector(ticker, td["sector"]),
             "avg_target": avg_target,
             "current_price": current,
             "upside_pct": upside,

@@ -7,6 +7,9 @@ from models import Prediction, Forecaster, format_timestamp, get_youtube_timesta
 from utils import compute_forecaster_stats
 from utils.ticker import ticker_is_known
 from rate_limit import limiter
+from services.ticker_display import (
+    resolve_ticker_display_name, resolve_ticker_display_sector,
+)
 
 router = APIRouter()
 
@@ -19,9 +22,9 @@ def _empty_ticker_result(ticker: str, company_name: str = None) -> dict:
     """Return a valid but empty result for tickers with no predictions."""
     return {
         "ticker": ticker,
-        "company_name": company_name,
+        "company_name": resolve_ticker_display_name(ticker, company_name),
         "industry": None,
-        "sector": None,
+        "sector": resolve_ticker_display_sector(ticker, None),
         "total_predictions": 0,
         "current_consensus": {
             "total": 0, "bullish_count": 0, "bearish_count": 0,
@@ -314,11 +317,11 @@ def _build_ticker_detail(ticker: str, db) -> dict:
 
     result = {
         "ticker": ticker,
-        "company_name": company_name,
+        "company_name": resolve_ticker_display_name(ticker, company_name),
         "logo_domain": logo_domain,
         "description": description,
         "industry": industry,
-        "sector": sector,
+        "sector": resolve_ticker_display_sector(ticker, sector),
         "total_predictions": total_all,
         "current_consensus": current_consensus,
         "historical": historical,
@@ -391,11 +394,11 @@ def get_asset_consensus(
     if not all_predictions:
         return {
             "ticker": ticker,
-            "company_name": _company,
+            "company_name": resolve_ticker_display_name(ticker, _company),
             "logo_url": _logo_url,
             "logo_domain": _logo_domain,
             "description": _description,
-            "sector": _sector,
+            "sector": resolve_ticker_display_sector(ticker, _sector),
             "total_predictions": 0,
             "total_all_predictions": 0,
             "bullish_count": 0,
@@ -436,7 +439,7 @@ def get_asset_consensus(
             "prediction_date": p.prediction_date.isoformat(),
             "outcome": p.outcome,
             "actual_return": p.actual_return,
-            "sector": p.sector,
+            "sector": resolve_ticker_display_sector(p.ticker, p.sector),
             "context": p.context,
             "exact_quote": p.exact_quote,
             "source_url": p.source_url,
@@ -527,11 +530,11 @@ def get_asset_consensus(
 
     return {
         "ticker": ticker,
-        "company_name": _company,
+        "company_name": resolve_ticker_display_name(ticker, _company),
         "logo_url": _logo_url,
         "logo_domain": _logo_domain,
         "description": _description,
-        "sector": _sector,
+        "sector": resolve_ticker_display_sector(ticker, _sector),
         "total_predictions": total,
         "total_all_predictions": len(all_predictions),
         "bullish_count": len(bull),

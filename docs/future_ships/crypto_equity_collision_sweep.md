@@ -83,3 +83,16 @@ Pure mechanical rule — no LLM calls. One SQL pass. Runs in seconds.
 ## Follow-up
 
 Once the rule is coded, back-run against all YouTube-era predictions (not just the Haiku-inferred pile). Expected haul based on the eyeball sample rate (3/15 = 20% of the true-MIS pile): ~24 rows across the 132 v2-MIS set, but likely more across the broader population since this pattern is most visible when the ticker itself is stable-and-mapped to a crypto (e.g. many more `BTC` predictions).
+
+---
+
+## Status update — 2026-04-19
+
+**Superseded at the pricing layer by `backend/services/price_fetch.py`** (Polygon `X:{SYM}USD` primary + Tiingo `/tiingo/crypto/prices` fallback). The historical evaluator routes crypto tickers through crypto spot before the equity chain sees them (`historical_evaluator.py:909-914`), so the IBIT/ETHA retag and the quarantine fallback proposed above are **not needed**. Verified 2026-04-19: sampled scored rows for BTC/ETH/SOL/XRP/LTC all carry crypto spot prices, not equity.
+
+What this ship still does:
+1. **Extends `CRYPTO_TICKERS`** with 6 missing allowlist symbols (TRX, XLM, ALGO, HBAR, BCH, SAND) — defensive, zero rows fire today but protects forward ingest.
+2. **Fixes the display-name bug** — LTC/SOL/LINK no longer show the colliding equity company name on the frontend. Crypto tickers now display their canonical crypto name + "Cryptocurrency" sector. Pricing is unchanged.
+
+What stays as a future ship:
+- Classifier prompt patch (Option B from the original rec) so the ingest-time Haiku assigns canonical crypto display metadata directly. Deferred — current ingest correctness is OK; display is now handled at the API edge.

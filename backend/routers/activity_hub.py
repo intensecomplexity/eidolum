@@ -12,6 +12,7 @@ from typing import Optional
 from database import get_db
 from rate_limit import limiter
 from auth import get_current_user as _decode_token
+from services.ticker_display import resolve_ticker_display_name
 from services.prediction_visibility import (
     yt_visible_filter, non_qwen_filter, not_excluded_filter,
 )
@@ -64,7 +65,7 @@ def recent_predictions(request: Request, db: Session = Depends(get_db)):
             "created_at": r[9].isoformat() if r[9] else None,
             "forecaster_id": r[10], "forecaster_name": r[11],
             "accuracy": round(float(r[12]), 1) if r[12] else None,
-            "company_name": r[13],
+            "company_name": resolve_ticker_display_name(r[1], r[13]),
             "source_type": r[14], "verified_by": r[15],
             "source_verbatim_quote": r[16],
             "evaluation_deferred": r[17],
@@ -141,7 +142,7 @@ def recently_scored(request: Request, db: Session = Depends(get_db)):
             "context": (r[18] or r[10] or r[9] or "")[:300],
             "forecaster_id": r[11], "forecaster_name": r[12],
             "accuracy": round(float(r[13]), 1) if r[13] else None,
-            "company_name": r[14],
+            "company_name": resolve_ticker_display_name(r[1], r[14]),
             "scored_at": r[15].isoformat() if r[15] else (r[7].isoformat() if r[7] else None),
             "source_type": r[16], "verified_by": r[17],
             "source_verbatim_quote": r[18],
@@ -196,7 +197,7 @@ def expiring_predictions(request: Request, db: Session = Depends(get_db)):
             "days_remaining": max(0, (r[5] - now).days) if r[5] else None,
             "forecaster_id": r[10], "forecaster_name": r[11],
             "accuracy": round(float(r[12]), 1) if r[12] else None,
-            "company_name": r[13],
+            "company_name": resolve_ticker_display_name(r[1], r[13]),
             "source_type": r[14], "verified_by": r[15],
             "source_verbatim_quote": r[16],
             "evaluation_deferred": r[17],
@@ -267,7 +268,7 @@ def friend_activity(
             "window_days": r[9],
             "user_id": r[10], "username": r[11],
             "user_type": r[12] or "player",
-            "company_name": r[13],
+            "company_name": resolve_ticker_display_name(r[1], r[13]),
             "type": "friend",
         }
         for r in rows

@@ -6,6 +6,9 @@ from sqlalchemy import func, text as sql_text
 from database import get_db
 from models import Forecaster, Prediction
 from rate_limit import limiter
+from services.ticker_display import (
+    resolve_ticker_display_name, resolve_ticker_display_sector,
+)
 from services.prediction_visibility import (
     yt_visible_filter, YT_VISIBLE_FILTER_SQL,
     non_qwen_filter, NON_QWEN_FILTER_SQL,
@@ -1203,7 +1206,7 @@ def get_pending_predictions(request: Request, db: Session = Depends(get_db)):
             "window_days": window,
             "days_elapsed": days_elapsed, "days_remaining": days_remaining,
             "progress_pct": min(100, round(days_elapsed / window * 100, 1)) if window else 0,
-            "current_return": r[8], "context": r[9], "sector": r[10],
+            "current_return": r[8], "context": r[9], "sector": resolve_ticker_display_sector(r[1], r[10]),
             "forecaster": {"id": r[11], "name": r[12], "handle": r[13], "platform": r[14] or "youtube"},
             "evaluation_deferred": r[15],
             "evaluation_deferred_reason": r[16],
@@ -1402,7 +1405,7 @@ def get_homepage_data(request: Request, db: Session = Depends(get_db)):
                 "prediction_date": r[7].isoformat() if r[7] else None,
                 "forecaster_id": r[8], "forecaster_name": r[9],
                 "accuracy": round(float(r[10]), 1) if r[10] else 0,
-                "logo_domain": r[11], "logo_url": r[12], "company_name": r[13],
+                "logo_domain": r[11], "logo_url": r[12], "company_name": resolve_ticker_display_name(r[1], r[13]),
                 "verified_by": r[14], "source_type": r[15],
                 "evaluation_deferred": r[16],
                 "evaluation_deferred_reason": r[17],
@@ -1440,7 +1443,7 @@ def get_homepage_data(request: Request, db: Session = Depends(get_db)):
                 "bull_pct": round(bull / total * 100, 1) if total > 0 else 50,
                 "logo_domain": ts_row[0] if ts_row else None,
                 "logo_url": ts_row[1] if ts_row else None,
-                "company_name": ts_row[2] if ts_row else None,
+                "company_name": resolve_ticker_display_name(ticker, ts_row[2] if ts_row else None),
             })
     except Exception:
         pass
@@ -1497,7 +1500,7 @@ def get_homepage_data(request: Request, db: Session = Depends(get_db)):
                 "evaluation_date": feat_row[8].isoformat() if feat_row[8] else None,
                 "forecaster_id": feat_row[9], "forecaster_name": feat_row[10],
                 "firm": feat_row[11],
-                "company_name": feat_row[12], "logo_url": feat_row[13],
+                "company_name": resolve_ticker_display_name(feat_row[1], feat_row[12]), "logo_url": feat_row[13],
                 "verified_by": feat_row[14], "source_type": feat_row[15],
                 "evaluation_deferred": feat_row[16],
                 "evaluation_deferred_reason": feat_row[17],
@@ -1554,7 +1557,7 @@ def get_trending_tickers(request: Request, db: Session = Depends(get_db)):
             continue
         bull_pct = round(counts["bullish"] / total * 100)
         info = info_map.get(t, {})
-        name = info.get("name") or TICKER_INFO.get(t, t)
+        name = resolve_ticker_display_name(t, info.get("name")) or TICKER_INFO.get(t, t)
         tickers.append({
             "ticker": t, "name": name, "total": total,
             "bullish": counts["bullish"], "bearish": counts["bearish"],

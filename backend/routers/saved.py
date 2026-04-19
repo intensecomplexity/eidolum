@@ -6,6 +6,7 @@ from sqlalchemy import func
 from database import get_db
 from models import SavedPrediction, Prediction, Forecaster
 from rate_limit import limiter
+from services.ticker_display import resolve_ticker_display_sector
 
 router = APIRouter()
 
@@ -38,7 +39,7 @@ def _prediction_to_dict(p, f, save_record=None):
         "sp500_return": p.sp500_return,
         "alpha": p.alpha,
         "current_return": p.current_return,
-        "sector": p.sector,
+        "sector": resolve_ticker_display_sector(p.ticker, p.sector),
         "context": p.context,
         "exact_quote": p.exact_quote,
         "source_verbatim_quote": p.source_verbatim_quote,

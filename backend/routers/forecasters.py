@@ -9,6 +9,9 @@ from database import get_db
 from models import Forecaster, Prediction, format_timestamp, get_youtube_timestamp_url
 from rate_limit import limiter
 from firm_urls import get_firm_url
+from services.ticker_display import (
+    resolve_ticker_display_name, resolve_ticker_display_sector,
+)
 from services.prediction_visibility import (
     yt_visible_filter, YT_VISIBLE_FILTER_SQL,
     non_qwen_filter, NON_QWEN_FILTER_SQL,
@@ -766,7 +769,7 @@ def _get_preds(fid, page, limit, filter_type, sector, db):
             "window_days": w,
             "time_horizon": "short" if w <= 30 else ("long" if w >= 365 else "medium"),
             "outcome": p[8], "actual_return": p[9], "evaluation_summary": p[10],
-            "sector": p[11], "context": p[12], "exact_quote": p[13],
+            "sector": resolve_ticker_display_sector(p[1], p[11]), "context": p[12], "exact_quote": p[13],
             "source_url": p[14], "archive_url": p[15],
             "source_type": p[16], "source_platform_id": p[17],
             "video_timestamp_sec": p[18], "verified_by": p[19],
@@ -774,7 +777,7 @@ def _get_preds(fid, page, limit, filter_type, sector, db):
             "has_source": bool(p[14] and ('/status/' in (p[14] or '') or '/watch?v=' in (p[14] or ''))),
             "timestamp_display": format_timestamp(p[18]),
             "timestamp_url": get_youtube_timestamp_url(p[17], p[18]),
-            "logo_domain": p[22], "logo_url": p[23], "company_name": p[24],
+            "logo_domain": p[22], "logo_url": p[23], "company_name": resolve_ticker_display_name(p[1], p[24]),
             "url_quality": p[25],
             # Revision metadata (commit: target revisions ship). Both
             # fields are null/false for the vast majority of rows.
