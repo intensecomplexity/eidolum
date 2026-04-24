@@ -159,6 +159,14 @@ RUNPOD_API_KEY = os.getenv("RUNPOD_API_KEY", "").strip()
 RUNPOD_ENDPOINT_ID = os.getenv("RUNPOD_ENDPOINT_ID", "").strip()
 RUNPOD_MODEL_NAME = os.getenv("RUNPOD_MODEL_NAME", "OENO/eidolum-qwen-merged")
 
+# HALT 4: self-hosted classifier reached via Cloudflare-Access-protected
+# Pavilion tunnel. CLASSIFIER_BASE_URL is the tunnel origin (no trailing
+# slash, no path) — we append /v1/chat/completions at call time.
+CLASSIFIER_BASE_URL      = os.getenv("CLASSIFIER_BASE_URL", "").strip().rstrip("/")
+CLASSIFIER_MODEL_NAME    = os.getenv("CLASSIFIER_MODEL_NAME", "eidolum-qwen-v2:latest").strip()
+CF_ACCESS_CLIENT_ID      = os.getenv("CF_ACCESS_CLIENT_ID", "").strip()
+CF_ACCESS_CLIENT_SECRET  = os.getenv("CF_ACCESS_CLIENT_SECRET", "").strip()
+
 # Current Haiku model. The spec called for claude-haiku-4-5-20250514 but
 # that model ID doesn't exist on the Anthropic API; the actual current
 # Haiku 4.5 ID is claude-haiku-4-5-20251001 (verified against the system
@@ -408,11 +416,8 @@ VERIFIED_BY_QWEN = "youtube_qwen_v1"
 VERIFIED_BY = VERIFIED_BY_HAIKU
 PIPELINE_VERSION = "youtube_v1"
 
-# ── RunPod vLLM (fine-tuned Qwen 2.5 7B) ────────────────────────────────────
+# ── Classifier HTTP timeouts (env reads live above next to CLASSIFIER_*) ───
 
-RUNPOD_API_KEY = os.getenv("RUNPOD_API_KEY", "").strip()
-RUNPOD_ENDPOINT_ID = os.getenv("RUNPOD_ENDPOINT_ID", "").strip()
-USE_FINETUNED_MODEL = os.getenv("USE_FINETUNED_MODEL", "false").lower() == "true"
 RUNPOD_TIMEOUT_SECONDS = 300  # 5min — cold starts download 14.2GB model from HF
 RUNPOD_COLD_START_THRESHOLD = 30  # seconds — log a warning above this
 
@@ -482,8 +487,8 @@ def call_runpod_vllm(
     publish_date: str,
     video_id: str | None = None,
 ) -> tuple[str, float, float]:
-    """Call the fine-tuned Qwen 2.5 7B on RunPod Serverless via vLLM's
-    OpenAI-compatible API.
+    """Call the fine-tuned Qwen 2.5 7B classifier via the Pavilion tunnel's
+    OpenAI-compatible API (Cloudflare Access protected).
 
     Returns (raw_text_response, estimated_cost_usd, latency_seconds).
     Raises on ANY failure (timeout, HTTP error, empty response).
@@ -499,16 +504,18 @@ def call_runpod_vllm(
         if _runpod_consecutive_failures >= RUNPOD_CIRCUIT_BREAKER_THRESHOLD:
             _runpod_circuit_open = True
             print(
-                f"[YOUTUBE-QWEN] RunPod circuit breaker open — "
+                f"[YOUTUBE-QWEN] Classifier circuit breaker open — "
                 f"{RUNPOD_CIRCUIT_BREAKER_THRESHOLD} consecutive failures, "
                 f"using Haiku for remaining videos this cycle",
                 flush=True,
             )
 
-    if not RUNPOD_API_KEY or not RUNPOD_ENDPOINT_ID:
-        raise RuntimeError("RUNPOD_API_KEY or RUNPOD_ENDPOINT_ID not set")
+    if not CLASSIFIER_BASE_URL or not CF_ACCESS_CLIENT_ID or not CF_ACCESS_CLIENT_SECRET:
+        raise RuntimeError(
+            "CLASSIFIER_BASE_URL / CF_ACCESS_CLIENT_ID / CF_ACCESS_CLIENT_SECRET not set"
+        )
 
-    url = f"https://api.runpod.ai/v2/{RUNPOD_ENDPOINT_ID}/openai/v1/chat/completions"
+    url = f"{CLASSIFIER_BASE_URL}/v1/chat/completions"
 
     user_msg = (
         f"Video title: {title}\n"
@@ -521,7 +528,7 @@ def call_runpod_vllm(
     )
 
     payload = {
-        "model": RUNPOD_MODEL_NAME,
+        "model": CLASSIFIER_MODEL_NAME,
         "messages": [
             {"role": "system", "content": QWEN_SYSTEM_PROMPT},
             {"role": "user", "content": user_msg},
@@ -537,7 +544,8 @@ def call_runpod_vllm(
             url,
             json=payload,
             headers={
-                "Authorization": f"Bearer {RUNPOD_API_KEY}",
+                "CF-Access-Client-Id": CF_ACCESS_CLIENT_ID,
+                "CF-Access-Client-Secret": CF_ACCESS_CLIENT_SECRET,
                 "Content-Type": "application/json",
             },
             timeout=RUNPOD_TIMEOUT_SECONDS,
@@ -545,7 +553,7 @@ def call_runpod_vllm(
     except _httpx.TimeoutException:
         _record_failure()
         raise RuntimeError(
-            f"RunPod timeout after {RUNPOD_TIMEOUT_SECONDS}s for {identifier}"
+            f"Classifier timeout after {RUNPOD_TIMEOUT_SECONDS}s for {identifier}"
         )
     except Exception:
         _record_failure()
@@ -556,19 +564,19 @@ def call_runpod_vllm(
     if r.status_code != 200:
         _record_failure()
         raise RuntimeError(
-            f"RunPod HTTP {r.status_code}: {r.text[:300]}"
+            f"Classifier HTTP {r.status_code}: {r.text[:300]}"
         )
 
     data = r.json()
     choices = data.get("choices") or []
     if not choices:
         _record_failure()
-        raise RuntimeError("RunPod returned empty choices")
+        raise RuntimeError("Classifier returned empty choices")
 
     content = (choices[0].get("message") or {}).get("content") or ""
     if not content.strip():
         _record_failure()
-        raise RuntimeError("RunPod returned empty content")
+        raise RuntimeError("Classifier returned empty content")
 
     # Success — reset consecutive failure counter
     _runpod_consecutive_failures = 0
@@ -583,7 +591,7 @@ def call_runpod_vllm(
     if latency > RUNPOD_COLD_START_THRESHOLD:
         cold_tag = f" COLD_START={latency:.1f}s"
         print(
-            f"[YOUTUBE-QWEN] RunPod cold start detected: {latency:.1f}s "
+            f"[YOUTUBE-QWEN] Classifier cold start detected: {latency:.1f}s "
             f"for {identifier}",
             flush=True,
         )
@@ -2540,7 +2548,7 @@ def _classify_video_qwen(
         # Circuit breaker check
         if is_circuit_breaker_tripped():
             tag = (
-                f"RunPod circuit breaker tripped — "
+                f"Classifier circuit breaker tripped — "
                 f"{RUNPOD_CIRCUIT_BREAKER_THRESHOLD} consecutive failures, "
                 f"skipping chunk {i+1}/{len(chunks)}"
             )
@@ -2560,7 +2568,7 @@ def _classify_video_qwen(
             total_cost += cost
             total_latency += latency
         except Exception as e:
-            tag = f"RunPod error chunk {i+1}/{len(chunks)}: {e}"
+            tag = f"Classifier error chunk {i+1}/{len(chunks)}: {e}"
             log.warning("[YT-CLF] %s", tag)
             telemetry["error"] = tag[:300]
             print(
@@ -2684,6 +2692,7 @@ def classify_video(channel_name: str, title: str, publish_date: str,
     error) returns ([], {"error": "<tag>"}). The caller should treat
     empty predictions + an error tag as a transient skip.
     """
+    global _runpod_circuit_open
     telemetry: dict = {"chunks": 0, "input_tokens": 0, "output_tokens": 0,
                        "last_status": None, "predictions_raw": 0,
                        "prompt_variant": "standard"}
@@ -2692,21 +2701,29 @@ def classify_video(channel_name: str, title: str, publish_date: str,
         telemetry["error"] = "empty_transcript"
         return [], telemetry
 
-    # ── Qwen path (fine-tuned model on RunPod) ─────────────────────────
+    # ── Qwen path (fine-tuned model via self-hosted classifier) ────────
     if USE_FINETUNED_MODEL and not _runpod_circuit_open:
-        try:
-            result = _classify_video_qwen(
-                channel_name, title, publish_date, chunks,
-                video_id=video_id, telemetry=telemetry,
+        if not CLASSIFIER_BASE_URL or not CF_ACCESS_CLIENT_ID or not CF_ACCESS_CLIENT_SECRET:
+            # fall through to Haiku — prevents silent misconfig
+            _runpod_circuit_open = True
+            log.warning(
+                "[YT-CLF] Classifier misconfigured (missing CLASSIFIER_BASE_URL / "
+                "CF_ACCESS_CLIENT_ID / CF_ACCESS_CLIENT_SECRET); tripping circuit → Haiku"
             )
-            if result is not None:
-                return result
-            # result is None → Qwen failed, fall through to Haiku
-        except Exception as e:
-            log.warning("[YT-CLF] Qwen path failed, falling back to Haiku: %s", e)
-            # Reset telemetry for Haiku retry
-            telemetry["chunks"] = 0
-            telemetry["predictions_raw"] = 0
+        else:
+            try:
+                result = _classify_video_qwen(
+                    channel_name, title, publish_date, chunks,
+                    video_id=video_id, telemetry=telemetry,
+                )
+                if result is not None:
+                    return result
+                # result is None → Qwen failed, fall through to Haiku
+            except Exception as e:
+                log.warning("[YT-CLF] Qwen path failed, falling back to Haiku: %s", e)
+                # Reset telemetry for Haiku retry
+                telemetry["chunks"] = 0
+                telemetry["predictions_raw"] = 0
 
     # ── Haiku path (original) ──────────────────────────────────────────
     _verified_by_local.tag = VERIFIED_BY_HAIKU
