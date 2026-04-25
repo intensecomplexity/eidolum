@@ -103,7 +103,7 @@ TARGET_CHANNELS = [
     "Dividends And Income", "FinanceUnfolded", "GenExDividendInvestor",
     "Heresy Financial", "Invest with Henry", "Investing with Tom",
     "Investor Center", "Kenji Explains", "Let's Talk Money",
-    "LevelFields AI", "Mark Moss", "Michael Jay Value Investing",
+    "LevelFields AI", "Mark Moss", "MarketBeat", "Michael Jay Value Investing",
     "Millennial Investing", "Money Talks Beavis Wealth", "Motley Fool",
     "Nick Peitsch Investing", "Phil Town Rule One Investing",
     "Proactive Investors", "Richard Moglen", "Ryan Scribner",
