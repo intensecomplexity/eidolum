@@ -268,17 +268,54 @@ def run(args: argparse.Namespace) -> int:
             return 0
 
         # ── Wet run ─────────────────────────────────────────────────────
-        stats: dict = {}
-        # Initialize the counter keys _process_one_video / log_youtube_rejection touch
-        for k in (
-            "videos_classified", "videos_skipped_no_transcript",
-            "predictions_extracted", "classifier_errors",
-            "items_rejected", "haiku_retries_count",
-            "total_input_tokens", "total_output_tokens",
-            "total_cache_create_tokens", "total_cache_read_tokens",
-            "estimated_cost_usd", "timeframes_rejected", "reference_rejected",
-        ):
-            stats[k] = 0
+        # Canonical counter set — must match the live-cycle stats dict in
+        # youtube_channel_monitor.py:894-998 so _process_one_video and the
+        # insert_*_prediction helpers can increment any counter without
+        # raising KeyError. The previous short list missed
+        # 'predictions_inserted' (incremented on every successful insert),
+        # which silently lost predictions on videos that classified to
+        # >= 1 row — the script's outer try/except swallowed the KeyError.
+        stats: dict = {
+            "channels_checked": 0,
+            "videos_seen": 0,
+            "videos_skipped_already_processed": 0,
+            "videos_skipped_short": 0,
+            "videos_skipped_no_transcript": 0,
+            "videos_classified": 0,
+            "predictions_extracted": 0,
+            "predictions_inserted": 0,
+            "classifier_errors": 0,
+            "yt_api_units": 0,
+            "items_rejected": 0,
+            "items_deduped": 0,
+            "total_input_tokens": 0,
+            "total_output_tokens": 0,
+            "total_cache_create_tokens": 0,
+            "total_cache_read_tokens": 0,
+            "estimated_cost_usd": 0.0,
+            "haiku_retries_count": 0,
+            "sector_calls_extracted": 0,
+            "options_positions_extracted": 0,
+            "earnings_calls_extracted": 0,
+            "macro_calls_extracted": 0,
+            "pair_calls_extracted": 0,
+            "binary_events_extracted": 0,
+            "metric_forecasts_extracted": 0,
+            "conditional_calls_extracted": 0,
+            "disclosures_extracted": 0,
+            "timestamps_matched": 0,
+            "timestamps_failed": 0,
+            "regime_calls_extracted": 0,
+            "timeframes_explicit": 0,
+            "timeframes_inferred": 0,
+            "timeframes_rejected": 0,
+            "reference_rejected": 0,
+            "conviction_strong": 0,
+            "conviction_moderate": 0,
+            "conviction_hedged": 0,
+            "conviction_hypothetical": 0,
+            "conviction_unknown": 0,
+        }
 
         n_total = len(kept_videos)
         n_inserted = 0
