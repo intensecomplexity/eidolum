@@ -486,9 +486,16 @@ QWEN_SYSTEM_PROMPT = (
     "Return a JSON array of prediction objects. If no predictions found, return []."
 )
 
-# RunPod Serverless pricing: ~$0.00076/s active GPU time.
-# Average call ~1.5s → ~$0.0012/call.
-QWEN_PRICE_PER_CALL_USD = 0.0012
+# Migrated from RunPod Serverless to the self-hosted Pavilion tunnel
+# on 2026-04-24 (c372672). Marginal per-call cost on Pavilion is $0:
+# the GPU is already paid for and idle when not classifying, the
+# Cloudflare Access tunnel is on a free plan, and YouTube API quota
+# is not metered in dollars. Electricity and the fixed Webshare proxy
+# plan are sunk costs that don't scale per call. Telemetry still
+# tracks input/output tokens for capacity planning, but the dollar
+# field is now structurally zero — anything else is a stale RunPod
+# heuristic that misled per-run/per-day cost reports.
+QWEN_PRICE_PER_CALL_USD = 0.0
 
 
 def call_runpod_vllm(

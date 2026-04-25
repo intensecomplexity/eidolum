@@ -62,14 +62,17 @@ UPLOADS_PLAYLIST = "UU" + CHANNEL_ID[2:]  # = UUDMRj2UMCY4Jp49Waf_2X9g
 DEFAULT_SINCE = "2023-04-25"
 
 # Estimates for --dry-run reporting. Sourced from production telemetry:
-# - QWEN_PRICE_PER_CALL_USD = 0.0012 in youtube_classifier.py
+# - QWEN_PRICE_PER_CALL_USD = 0.0 in youtube_classifier.py (Pavilion is
+#   sunk-cost: own GPU + free CF Access tunnel + free YouTube API
+#   quota; only electricity and the fixed Webshare plan are paid, and
+#   neither scales per call).
 # - QWEN_AVG_LATENCY_S: rolling median over the last 30 days of
 #   [YOUTUBE-QWEN] log lines is ~6.5s per chunk
 # - AVG_TRANSCRIPT_CHARS_HEURISTIC: median transcript_chars across all
 #   youtube_videos with transcript_status='ok_inserted' or
 #   'ok_no_predictions' is ~14k; rounded to 12k as a conservative
-#   under-estimate so cost projections don't undershoot
-QWEN_COST_PER_CALL = 0.0012
+#   under-estimate so the wall-time projection doesn't undershoot
+QWEN_COST_PER_CALL = 0.0
 QWEN_AVG_LATENCY_S = 6.5
 AVG_TRANSCRIPT_CHARS_HEURISTIC = 12_000
 # Long transcripts get chunked at TRANSCRIPT_CHUNK_THRESHOLD = 100_000
