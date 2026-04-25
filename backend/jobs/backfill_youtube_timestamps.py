@@ -74,13 +74,19 @@ TRANSCRIPT_TIMEOUT = 30
 HAIKU_PRICE_INPUT_PER_M = 1.00
 HAIKU_PRICE_OUTPUT_PER_M = 5.00
 
-# Qwen on RunPod Serverless (primary path). Same endpoint as the main
-# classifier in youtube_classifier.py. ~$0.0012/call vs ~$0.008 Haiku.
-RUNPOD_API_KEY = os.getenv("RUNPOD_API_KEY", "").strip()
-RUNPOD_ENDPOINT_ID = os.getenv("RUNPOD_ENDPOINT_ID", "").strip()
-QWEN_MODEL_PATH = os.getenv("RUNPOD_MODEL_NAME", "/runpod-volume/eidolum-qwen-merged")
-QWEN_PRICE_PER_CALL_USD = 0.0012
-RUNPOD_TIMEOUT_SECONDS = 300  # 5min — cold starts download 14.2GB model from HF
+# Qwen on the self-hosted Pavilion tunnel (primary path). Same endpoint
+# as the main classifier in youtube_classifier.py. Migrated off RunPod
+# Serverless on 2026-04-25 — RunPod endpoint is being decommissioned and
+# the worker's 15-min yt_timestamp_backfill cycle would otherwise fail
+# with HTTP 4xx the moment the endpoint goes down. Marginal per-call
+# cost on Pavilion is $0 (own GPU + free CF Access tunnel; same
+# rationale as PR #4).
+CLASSIFIER_BASE_URL      = os.getenv("CLASSIFIER_BASE_URL", "").strip().rstrip("/")
+CLASSIFIER_MODEL_NAME    = os.getenv("CLASSIFIER_MODEL_NAME", "eidolum-qwen-v2:latest").strip()
+CF_ACCESS_CLIENT_ID      = os.getenv("CF_ACCESS_CLIENT_ID", "").strip()
+CF_ACCESS_CLIENT_SECRET  = os.getenv("CF_ACCESS_CLIENT_SECRET", "").strip()
+QWEN_PRICE_PER_CALL_USD  = 0.0  # Pavilion is sunk-cost (see PR #4)
+PAVILION_TIMEOUT_SECONDS = 300  # match the live classifier path
 
 # Progress file for --resume.
 _PROGRESS_FILE = os.path.join(os.path.dirname(__file__), ".backfill_ts_progress.json")
@@ -233,23 +239,28 @@ def _parse_llm_response(raw_text: str) -> str | None:
 
 
 def _call_qwen_for_quote(transcript_text: str, row) -> tuple[str | None, str | None, float]:
-    """Call the fine-tuned Qwen 2.5 7B on RunPod Serverless for quote extraction.
+    """Call the fine-tuned Qwen 2.5 7B via the self-hosted Pavilion tunnel
+    (Cloudflare-Access protected) for quote extraction.
 
     Returns (quote, reason, cost_usd). `reason` is the optional
     model-supplied explanation for a null quote (e.g.
     "no_real_quote_in_transcript"). Raises on any failure so the caller
-    can fall back to Haiku.
+    can fall back to Haiku — though Haiku credit balance is currently
+    too low (see reference_anthropic_api_billing memory), so a Pavilion
+    failure effectively turns into stats["no_quote"] += 1 in the caller.
     """
     import httpx as _httpx
 
-    if not RUNPOD_API_KEY or not RUNPOD_ENDPOINT_ID:
-        raise RuntimeError("RUNPOD_API_KEY or RUNPOD_ENDPOINT_ID not set")
+    if not CLASSIFIER_BASE_URL or not CF_ACCESS_CLIENT_ID or not CF_ACCESS_CLIENT_SECRET:
+        raise RuntimeError(
+            "CLASSIFIER_BASE_URL / CF_ACCESS_CLIENT_ID / CF_ACCESS_CLIENT_SECRET not set"
+        )
 
-    url = f"https://api.runpod.ai/v2/{RUNPOD_ENDPOINT_ID}/openai/v1/chat/completions"
+    url = f"{CLASSIFIER_BASE_URL}/v1/chat/completions"
     user_msg = _build_quote_user_msg(transcript_text, row)
 
     payload = {
-        "model": QWEN_MODEL_PATH,
+        "model": CLASSIFIER_MODEL_NAME,
         "messages": [
             {"role": "system", "content": _PATHB_SYSTEM},
             {"role": "user", "content": user_msg},
@@ -266,23 +277,24 @@ def _call_qwen_for_quote(transcript_text: str, row) -> tuple[str | None, str | N
         url,
         json=payload,
         headers={
-            "Authorization": f"Bearer {RUNPOD_API_KEY}",
+            "CF-Access-Client-Id": CF_ACCESS_CLIENT_ID,
+            "CF-Access-Client-Secret": CF_ACCESS_CLIENT_SECRET,
             "Content-Type": "application/json",
         },
-        timeout=RUNPOD_TIMEOUT_SECONDS,
+        timeout=PAVILION_TIMEOUT_SECONDS,
     )
 
     if r.status_code != 200:
-        raise RuntimeError(f"RunPod HTTP {r.status_code}: {r.text[:300]}")
+        raise RuntimeError(f"Pavilion HTTP {r.status_code}: {r.text[:300]}")
 
     data = r.json()
     choices = data.get("choices") or []
     if not choices:
-        raise RuntimeError("RunPod returned empty choices")
+        raise RuntimeError("Pavilion returned empty choices")
 
     content = (choices[0].get("message") or {}).get("content") or ""
     if not content.strip():
-        raise RuntimeError("RunPod returned empty content")
+        raise RuntimeError("Pavilion returned empty content")
 
     try:
         quote, reason = _parse_llm_response_full(content)
