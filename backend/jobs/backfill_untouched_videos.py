@@ -97,6 +97,21 @@ TERMINAL_REJECTION_REASONS = (
     "no_transcript",
 )
 
+# Some videos have a youtube_videos row with NO rejection log entry but a
+# transcript_status that already encodes the terminal classifier verdict
+# or a pre-classifier filter outcome. Drill-down on 2026-04-25 showed
+# 8,782 of 14,074 such "never_classified" rows fall in this bucket
+# (62.4%). Excluding them at SELECT time avoids re-classifying videos
+# the classifier already finished cleanly. transcript_status values
+# starting with "error" (e.g. "error: RetryError ... /sorry/index ...")
+# are also pre-classifier transcript-fetch failures and excluded.
+TERMINAL_TRANSCRIPT_STATUSES = (
+    "ok_no_predictions",       # classifier ran, said no predictions
+    "shorts_skipped",          # pre-classifier duration filter
+    "no_transcript",           # pre-classifier transcript fetch failure
+    "transcripts_disabled",    # YouTube disabled transcripts on the video
+)
+
 
 # Estimated per-call latency for runtime projection. Sourced from the
 # rolling median of [YOUTUBE-QWEN] log latency lines over the last 30
@@ -108,12 +123,15 @@ def _build_candidate_sql(*, since: str | None, channel: str | None,
                          limit: int) -> tuple[str, dict]:
     """Build the candidate-selection SQL + bind params.
 
-    The CASE expression tags each row's state for dry-run breakdown:
-    'never_classified' when no rejection exists, otherwise the most
-    recent rejection_reason for that video.
+    The state column tags each row's most recent state for the dry-run
+    breakdown: 'never_classified' when no rejection log entry exists,
+    otherwise the most recent rejection_reason for that video.
     """
     where_extra = []
-    params: dict = {"terminal": list(TERMINAL_REJECTION_REASONS)}
+    params: dict = {
+        "terminal": list(TERMINAL_REJECTION_REASONS),
+        "terminal_status": list(TERMINAL_TRANSCRIPT_STATUSES),
+    }
     if since:
         where_extra.append("AND yv.publish_date >= :since_date")
         params["since_date"] = since
@@ -153,6 +171,8 @@ def _build_candidate_sql(*, since: str | None, channel: str | None,
               WHERE rt.video_id = yv.youtube_video_id
                 AND rt.rejection_reason = ANY(:terminal)
           )
+          AND COALESCE(yv.transcript_status, '') <> ALL(:terminal_status)
+          AND COALESCE(yv.transcript_status, '') NOT LIKE 'error:%'
           {chr(10).join(where_extra)}
         ORDER BY yv.publish_date DESC NULLS LAST
         {limit_clause}
