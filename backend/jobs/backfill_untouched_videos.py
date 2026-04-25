@@ -327,6 +327,20 @@ def run(args: argparse.Namespace) -> int:
             publish_date_str = (
                 r["publish_date"].isoformat() if r["publish_date"] else ""
             )
+            # Refresh the session per video — Pavilion calls routinely
+            # take 90+ seconds and the DB connection's TCP socket gets
+            # blackholed by an intermediate idle-timeout (proxy/NAT)
+            # during that window. SQLAlchemy's pool_pre_ping only fires
+            # on initial pool checkout, so a long-held session has no
+            # way to know its connection died — the next op blocks in
+            # poll() under TCP retransmit backoff (observed in MarketBeat
+            # backfill: rto=120s, hung 5+ minutes). Closing + reacquiring
+            # per video bounds connection age to one iteration's wall time.
+            try:
+                db.close()
+            except Exception:
+                pass
+            db = BgSessionLocal()
             try:
                 inserted, transcript_chars, transcript_status = _process_one_video(
                     db, channel_name, channel_id, video_id, title,
