@@ -120,12 +120,21 @@ QWEN_AVG_LATENCY_S = 6.5
 
 
 def _build_candidate_sql(*, since: str | None, channel: str | None,
-                         limit: int) -> tuple[str, dict]:
+                         limit: int,
+                         rejection_reasons: list[str] | None,
+                         ) -> tuple[str, dict]:
     """Build the candidate-selection SQL + bind params.
 
     The state column tags each row's most recent state for the dry-run
     breakdown: 'never_classified' when no rejection log entry exists,
     otherwise the most recent rejection_reason for that video.
+
+    When rejection_reasons is non-empty, restricts the candidate set to
+    rows that have at least one rejection_reason in the given list. The
+    other filters (no successful prediction, no terminal rejection, no
+    terminal transcript_status) still apply, so this is an intersection
+    not a replacement: "rows with classifier_error AND no later
+    successful classification".
     """
     where_extra = []
     params: dict = {
@@ -138,6 +147,13 @@ def _build_candidate_sql(*, since: str | None, channel: str | None,
     if channel:
         where_extra.append("AND yv.channel_name = :channel_name")
         params["channel_name"] = channel
+    if rejection_reasons:
+        params["specified_reasons"] = list(rejection_reasons)
+        where_extra.append(
+            "AND EXISTS (SELECT 1 FROM youtube_scraper_rejections rs "
+            "WHERE rs.video_id = yv.youtube_video_id "
+            "AND rs.rejection_reason = ANY(:specified_reasons))"
+        )
     if limit and limit > 0:
         params["row_limit"] = limit
         limit_clause = "LIMIT :row_limit"
@@ -220,15 +236,21 @@ def _print_dry_run_report(rows: list[dict], rate_limit_sleep: float) -> None:
 
 def run(args: argparse.Namespace) -> int:
     started_at = time.time()
+    rejection_reasons = (
+        [r.strip() for r in args.rejection_reason.split(",") if r.strip()]
+        if args.rejection_reason else None
+    )
     print(
         f"[BackfillUT] dry_run={args.dry_run} since={args.since!r} "
         f"channel={args.channel!r} batch_size={args.batch_size} "
-        f"rate_limit_sleep={args.rate_limit_sleep}s limit={args.limit}",
+        f"rate_limit_sleep={args.rate_limit_sleep}s limit={args.limit} "
+        f"rejection_reasons={rejection_reasons}",
         flush=True,
     )
 
     sql, params = _build_candidate_sql(
         since=args.since, channel=args.channel, limit=args.limit,
+        rejection_reasons=rejection_reasons,
     )
 
     db = BgSessionLocal()
@@ -330,6 +352,13 @@ def main() -> int:
                     help="Seconds between Qwen calls (default 1.0)")
     ap.add_argument("--limit", type=int, default=0,
                     help="Cap total videos processed (0 = no cap)")
+    ap.add_argument("--rejection-reason", default="",
+                    help="Comma-separated list of rejection_reason values "
+                         "to target (e.g. 'classifier_error,qwen_exception'). "
+                         "When set, candidate set is restricted to videos "
+                         "that have a row in youtube_scraper_rejections with "
+                         "rejection_reason in this list. Default empty = no "
+                         "filter (process all candidates).")
     args = ap.parse_args()
 
     if args.since:
