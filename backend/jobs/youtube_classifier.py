@@ -149,11 +149,22 @@ def log_youtube_rejection(
 
 ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "").strip()
 
-# ââ Fine-tuned model (Qwen 2.5 7B) on RunPod Serverless ââââââââââââââââââ
-# When USE_FINETUNED_MODEL is "true", classify_video calls our self-hosted
-# Qwen 2.5 7B LoRA-merged model via RunPod's OpenAI-compatible endpoint
-# instead of Anthropic Haiku. Haiku is kept as automatic fallback if the
-# RunPod call fails. Cost: ~$0.00019/s on 24GB GPU vs ~$36/mo Haiku.
+# -- Fine-tuned model (Qwen 2.5 7B) is the canonical classifier ---------
+# classify_video routes every call through our self-hosted Qwen 2.5 7B
+# LoRA-merged model behind the Cloudflare-Access-protected Pavilion
+# tunnel. There is no Haiku fallback on the live cycle path: when Qwen
+# fails (HTTP error, parse error, circuit breaker, misconfigured
+# tunnel creds), classify_video returns ([], telemetry) with
+# telemetry["error"] set, and the channel monitor logs the video as
+# a classifier_error rejection with the underlying Qwen failure tag
+# in haiku_reason. Haiku was removed from the cycle on 2026-04-25 to
+# match the original Apr 16 LoRA design intent and to eliminate the
+# Anthropic-credit-balance failure mode that blacked out Apr 20-25.
+#
+# USE_FINETUNED_MODEL is retained as a config knob: false is now a hard
+# disable (classifier_disabled), not a Haiku flip. The Haiku helpers
+# (call_youtube_haiku_with_retry, HAIKU_SYSTEM, etc.) stay in this
+# module solely for the post-hoc fixer scripts in fix_*.py.
 USE_FINETUNED_MODEL = os.getenv("USE_FINETUNED_MODEL", "false").strip().lower() == "true"
 RUNPOD_API_KEY = os.getenv("RUNPOD_API_KEY", "").strip()
 RUNPOD_ENDPOINT_ID = os.getenv("RUNPOD_ENDPOINT_ID", "").strip()
@@ -2672,359 +2683,86 @@ def classify_video(channel_name: str, title: str, publish_date: str,
                    transcript: str,
                    video_id: str | None = None,
                    db=None) -> tuple[list[dict], dict]:
-    """Classify a video transcript and extract financial predictions.
+    """Classify a video transcript and extract financial predictions via Qwen.
 
-    Model selection (checked once per call):
-      - USE_FINETUNED_MODEL=true → try Qwen 2.5 7B on RunPod first.
-        If RunPod fails for ANY reason, fall back to Haiku silently.
-      - USE_FINETUNED_MODEL=false or unset → Haiku only.
+    The Qwen 2.5 7B LoRA-merged classifier behind the Pavilion tunnel is
+    the only classifier on the live cycle path. Haiku is no longer wired
+    in (removed 2026-04-25 to match the original Apr 16 LoRA design
+    intent and to remove the Anthropic-credit-balance failure mode that
+    blacked out Apr 20-25).
+
+    Behavior:
+      - USE_FINETUNED_MODEL=true (production): route to Qwen. On any
+        Qwen failure (HTTP error, parse error, circuit breaker tripped,
+        misconfigured tunnel creds) return ([], telemetry) with
+        telemetry["error"] set. The channel monitor maps that to a
+        classifier_error rejection with the underlying tag in
+        haiku_reason.
+      - USE_FINETUNED_MODEL=false: classifier is hard-disabled. Every
+        call returns ([], {"error": "classifier_disabled"}). This is a
+        misconfiguration in production; the knob exists for local
+        bring-up only.
 
     verified_by tagging:
-      - Qwen path:  youtube_qwen_v1
-      - Haiku path:  youtube_haiku_v1
+      - Qwen path: youtube_qwen_v1
 
     Returns (predictions, telemetry):
-      predictions — list of validated prediction dicts (may be empty)
-      telemetry   — dict with token usage, chunk count, last_status, and
-                    optionally an error tag for non-fatal classifier failures
+      predictions - list of validated prediction dicts (may be empty)
+      telemetry   - dict with token usage, chunk count, latency, cost,
+                    and optionally an error tag for non-fatal failures
 
-    NEVER raises. On any classifier failure (no key, HTTP error, parse
-    error) returns ([], {"error": "<tag>"}). The caller should treat
-    empty predictions + an error tag as a transient skip.
+    NEVER raises.
     """
     global _runpod_circuit_open
     telemetry: dict = {"chunks": 0, "input_tokens": 0, "output_tokens": 0,
                        "last_status": None, "predictions_raw": 0,
-                       "prompt_variant": "standard"}
+                       "prompt_variant": "qwen_finetuned"}
     chunks = chunk_transcript(transcript or "")
     if not chunks:
         telemetry["error"] = "empty_transcript"
         return [], telemetry
 
-    # ── Qwen path (fine-tuned model via self-hosted classifier) ────────
-    if USE_FINETUNED_MODEL and not _runpod_circuit_open:
-        if not CLASSIFIER_BASE_URL or not CF_ACCESS_CLIENT_ID or not CF_ACCESS_CLIENT_SECRET:
-            # fall through to Haiku — prevents silent misconfig
-            _runpod_circuit_open = True
-            log.warning(
-                "[YT-CLF] Classifier misconfigured (missing CLASSIFIER_BASE_URL / "
-                "CF_ACCESS_CLIENT_ID / CF_ACCESS_CLIENT_SECRET); tripping circuit → Haiku"
-            )
-        else:
-            try:
-                result = _classify_video_qwen(
-                    channel_name, title, publish_date, chunks,
-                    video_id=video_id, telemetry=telemetry,
-                )
-                if result is not None:
-                    return result
-                # result is None → Qwen failed, fall through to Haiku
-            except Exception as e:
-                log.warning("[YT-CLF] Qwen path failed, falling back to Haiku: %s", e)
-                # Reset telemetry for Haiku retry
-                telemetry["chunks"] = 0
-                telemetry["predictions_raw"] = 0
+    if not USE_FINETUNED_MODEL:
+        log.error(
+            "[YT-CLF] USE_FINETUNED_MODEL is false but Haiku fallback was "
+            "removed; classifier is disabled. Set USE_FINETUNED_MODEL=true "
+            "and provision Pavilion tunnel creds to re-enable."
+        )
+        telemetry["error"] = "classifier_disabled"
+        return [], telemetry
 
-    # ── Haiku path (original) ──────────────────────────────────────────
-    _verified_by_local.tag = VERIFIED_BY_HAIKU
+    if _runpod_circuit_open:
+        telemetry["error"] = "classifier_circuit_open"
+        return [], telemetry
 
-    if not ANTHROPIC_API_KEY:
-        telemetry["error"] = "no_api_key"
+    if not CLASSIFIER_BASE_URL or not CF_ACCESS_CLIENT_ID or not CF_ACCESS_CLIENT_SECRET:
+        _runpod_circuit_open = True
+        log.error(
+            "[YT-CLF] Classifier misconfigured (missing CLASSIFIER_BASE_URL / "
+            "CF_ACCESS_CLIENT_ID / CF_ACCESS_CLIENT_SECRET); tripping circuit"
+        )
+        telemetry["error"] = "classifier_misconfigured"
         return [], telemetry
 
     try:
-        import anthropic
-    except ImportError:
-        telemetry["error"] = "anthropic_sdk_missing"
+        result = _classify_video_qwen(
+            channel_name, title, publish_date, chunks,
+            video_id=video_id, telemetry=telemetry,
+        )
+    except Exception as e:
+        tag = f"{type(e).__name__}: {str(e)[:200]}"
+        log.error("[YT-CLF] Qwen path raised for video=%s: %s", video_id or "?", tag)
+        telemetry["error"] = f"qwen_exception: {tag[:280]}"
         return [], telemetry
 
-    client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
+    if result is None:
+        # _classify_video_qwen already populated telemetry["error"] with
+        # the underlying failure (HTTP code, parse error, circuit trip).
+        if "error" not in telemetry:
+            telemetry["error"] = "qwen_failed_no_tag"
+        return [], telemetry
 
-
-    # Decide which system prompt this video gets. Stable hash routing
-    # guarantees retries see the same prompt, and the cached flag read
-    # (60s TTL) keeps this cheap in tight batch loops.
-    use_sector_prompt = False
-    use_ranked_list = False
-    use_revisions = False
-    use_options = False
-    use_earnings = False
-    use_macro = False
-    use_pair = False
-    use_binary_event = False
-    use_metric_forecast = False
-    use_conditional = False
-    use_disclosure = False
-    use_regime = False
-    use_source_timestamps = False
-    use_metadata_enrichment = False
-    if db is not None and video_id:
-        try:
-            from feature_flags import should_use_sector_prompt
-            use_sector_prompt = should_use_sector_prompt(db, video_id)
-        except Exception as _e:
-            log.warning("[YT-CLF] sector prompt flag check failed: %s", _e)
-            use_sector_prompt = False
-    if db is not None:
-        try:
-            from feature_flags import is_ranked_list_extraction_enabled
-            use_ranked_list = is_ranked_list_extraction_enabled(db)
-        except Exception as _e:
-            log.warning("[YT-CLF] ranked-list flag check failed: %s", _e)
-            use_ranked_list = False
-        try:
-            from feature_flags import is_target_revisions_enabled
-            use_revisions = is_target_revisions_enabled(db)
-        except Exception as _e:
-            log.warning("[YT-CLF] revisions flag check failed: %s", _e)
-            use_revisions = False
-        try:
-            from feature_flags import is_options_extraction_enabled
-            use_options = is_options_extraction_enabled(db)
-        except Exception as _e:
-            log.warning("[YT-CLF] options flag check failed: %s", _e)
-            use_options = False
-        try:
-            from feature_flags import is_earnings_extraction_enabled
-            use_earnings = is_earnings_extraction_enabled(db)
-        except Exception as _e:
-            log.warning("[YT-CLF] earnings flag check failed: %s", _e)
-            use_earnings = False
-        try:
-            from feature_flags import is_macro_extraction_enabled
-            use_macro = is_macro_extraction_enabled(db)
-        except Exception as _e:
-            log.warning("[YT-CLF] macro flag check failed: %s", _e)
-            use_macro = False
-        try:
-            from feature_flags import is_pair_extraction_enabled
-            use_pair = is_pair_extraction_enabled(db)
-        except Exception as _e:
-            log.warning("[YT-CLF] pair flag check failed: %s", _e)
-            use_pair = False
-        try:
-            from feature_flags import is_binary_event_extraction_enabled
-            use_binary_event = is_binary_event_extraction_enabled(db)
-        except Exception as _e:
-            log.warning("[YT-CLF] binary event flag check failed: %s", _e)
-            use_binary_event = False
-        try:
-            from feature_flags import is_metric_forecast_enabled
-            use_metric_forecast = is_metric_forecast_enabled(db)
-        except Exception as _e:
-            log.warning("[YT-CLF] metric forecast flag check failed: %s", _e)
-            use_metric_forecast = False
-        try:
-            from feature_flags import is_conditional_extraction_enabled
-            use_conditional = is_conditional_extraction_enabled(db)
-        except Exception as _e:
-            log.warning("[YT-CLF] conditional flag check failed: %s", _e)
-            use_conditional = False
-        try:
-            from feature_flags import is_disclosure_extraction_enabled
-            use_disclosure = is_disclosure_extraction_enabled(db)
-        except Exception as _e:
-            log.warning("[YT-CLF] disclosure flag check failed: %s", _e)
-            use_disclosure = False
-        try:
-            from feature_flags import is_regime_call_extraction_enabled
-            use_regime = is_regime_call_extraction_enabled(db)
-        except Exception as _e:
-            log.warning("[YT-CLF] regime flag check failed: %s", _e)
-            use_regime = False
-        try:
-            from feature_flags import is_source_timestamps_enabled
-            use_source_timestamps = is_source_timestamps_enabled(db)
-        except Exception as _e:
-            log.warning("[YT-CLF] source_timestamps flag check failed: %s", _e)
-            use_source_timestamps = False
-        try:
-            from feature_flags import is_prediction_metadata_enrichment_enabled
-            use_metadata_enrichment = is_prediction_metadata_enrichment_enabled(db)
-        except Exception as _e:
-            log.warning("[YT-CLF] metadata_enrichment flag check failed: %s", _e)
-            use_metadata_enrichment = False
-    base_system = YOUTUBE_HAIKU_SECTOR_SYSTEM if use_sector_prompt else HAIKU_SYSTEM
-    # Append optional instruction blocks ONLY when each flag is on. When
-    # every flag is off (the default), base_system is sent byte-for-byte
-    # unchanged so Anthropic's prompt cache hit rate on the base prompt
-    # stays at 100%. Order matters for cache hits: ranked list → revisions
-    # → options → earnings → macro → pair → binary_event → metric_forecast,
-    # stable across calls with any combination of flags on so extended-
-    # prompt cache entries match. (conditional_call slots in between pair
-    # and binary_event when it lands; disclosure slots AFTER metric_forecast
-    # when that ship lands — the append order leaves room for both.)
-    active_system = base_system
-    if use_ranked_list:
-        active_system = active_system + "\n\n" + YOUTUBE_HAIKU_RANKED_LIST_INSTRUCTIONS
-    if use_revisions:
-        active_system = active_system + "\n\n" + YOUTUBE_HAIKU_REVISIONS_INSTRUCTIONS
-    if use_options:
-        active_system = active_system + "\n\n" + YOUTUBE_HAIKU_OPTIONS_INSTRUCTIONS
-    if use_earnings:
-        active_system = active_system + "\n\n" + YOUTUBE_HAIKU_EARNINGS_INSTRUCTIONS
-    if use_macro:
-        active_system = active_system + "\n\n" + YOUTUBE_HAIKU_MACRO_INSTRUCTIONS
-    if use_pair:
-        active_system = active_system + "\n\n" + YOUTUBE_HAIKU_PAIR_INSTRUCTIONS
-    if use_conditional:
-        active_system = active_system + "\n\n" + YOUTUBE_HAIKU_CONDITIONAL_INSTRUCTIONS
-    if use_binary_event:
-        active_system = active_system + "\n\n" + YOUTUBE_HAIKU_BINARY_EVENT_INSTRUCTIONS
-    if use_metric_forecast:
-        active_system = active_system + "\n\n" + YOUTUBE_HAIKU_METRIC_FORECAST_INSTRUCTIONS
-    if use_disclosure:
-        active_system = active_system + "\n\n" + YOUTUBE_HAIKU_DISCLOSURE_INSTRUCTIONS
-    if use_regime:
-        active_system = active_system + "\n\n" + YOUTUBE_HAIKU_REGIME_INSTRUCTIONS
-    # The SOURCE_TIMESTAMP block asks Haiku to add a verbatim_quote
-    # field to every prediction emitted by ANY of the previous blocks
-    # (regime_call included), so it must be appended after the
-    # category-specific instructions. METADATA_ENRICHMENT (ship #9
-    # rescoped) is the 14th and current-last layer — it runs AFTER
-    # source_timestamp so extended-prompt cache entries stay stable
-    # for users with timestamps=on and metadata=off.
-    if use_source_timestamps:
-        active_system = active_system + "\n\n" + YOUTUBE_HAIKU_SOURCE_TIMESTAMP_INSTRUCTIONS
-    if use_metadata_enrichment:
-        active_system = active_system + "\n\n" + YOUTUBE_HAIKU_METADATA_ENRICHMENT_INSTRUCTIONS
-        active_system = active_system + "\n\n" + YOUTUBE_HAIKU_VAGUE_TIMEFRAME_INSTRUCTIONS
-    telemetry["prompt_variant"] = "sector" if use_sector_prompt else "standard"
-    telemetry["ranked_list_enabled"] = bool(use_ranked_list)
-    telemetry["revisions_enabled"] = bool(use_revisions)
-    telemetry["options_enabled"] = bool(use_options)
-    telemetry["earnings_enabled"] = bool(use_earnings)
-    telemetry["macro_enabled"] = bool(use_macro)
-    telemetry["pair_enabled"] = bool(use_pair)
-    telemetry["binary_event_enabled"] = bool(use_binary_event)
-    telemetry["metric_forecast_enabled"] = bool(use_metric_forecast)
-    telemetry["conditional_enabled"] = bool(use_conditional)
-    telemetry["disclosure_enabled"] = bool(use_disclosure)
-    telemetry["regime_enabled"] = bool(use_regime)
-    telemetry["source_timestamps_enabled"] = bool(use_source_timestamps)
-    telemetry["metadata_enrichment_enabled"] = bool(use_metadata_enrichment)
-    print(
-        f"[YOUTUBE-HAIKU] video={video_id or '?'} channel={channel_name} "
-        f"prompt_variant={telemetry['prompt_variant']} "
-        f"ranked_list={'on' if use_ranked_list else 'off'} "
-        f"revisions={'on' if use_revisions else 'off'} "
-        f"options={'on' if use_options else 'off'} "
-        f"earnings={'on' if use_earnings else 'off'} "
-        f"macro={'on' if use_macro else 'off'} "
-        f"pair={'on' if use_pair else 'off'} "
-        f"binary_event={'on' if use_binary_event else 'off'} "
-        f"metric_forecast={'on' if use_metric_forecast else 'off'} "
-        f"conditional={'on' if use_conditional else 'off'} "
-        f"disclosure={'on' if use_disclosure else 'off'} "
-        f"regime={'on' if use_regime else 'off'} "
-        f"timestamps={'on' if use_source_timestamps else 'off'} "
-        f"metadata={'on' if use_metadata_enrichment else 'off'}",
-        flush=True,
-    )
-
-    all_preds: list[dict] = []
-    for i, chunk in enumerate(chunks):
-        telemetry["chunks"] += 1
-        # System + messages built per-chunk; the cache_control ephemeral
-        # wrapper means the retry path reuses the same cached system
-        # prompt. The wrapper records tokens + cost from both the first
-        # attempt and (if triggered) the retry into telemetry.
-        system_block = [
-            {
-                "type": "text",
-                "text": active_system,
-                "cache_control": {"type": "ephemeral"},
-            }
-        ]
-        messages_block = [
-            {
-                "role": "user",
-                "content": _build_user_prompt(channel_name, title, publish_date, chunk),
-            }
-        ]
-        try:
-            resp, _was_retried = call_youtube_haiku_with_retry(
-                client,
-                system=system_block,
-                messages=messages_block,
-                video_id=video_id,
-                channel_name=channel_name,
-                telemetry=telemetry,
-            )
-        except Exception as e:
-            tag = f"{type(e).__name__}: {str(e)[:200]}"
-            print(f"[YT-CLF] Haiku error on chunk {i+1}/{len(chunks)} for "
-                  f"\"\"{title[:60]}\": {tag}", flush=True)
-            telemetry["error"] = tag[:300]
-            telemetry["last_status"] = "exception"
-            return [], telemetry
-
-        try:
-            content = resp.content[0].text.strip()
-        except (AttributeError, IndexError):
-            telemetry["error"] = "no_content"
-            return [], telemetry
-
-        # Strip markdown fences if Haiku wraps the JSON in them
-        if content.startswith("```"):
-            content = content.split("```")[1]
-            if content.startswith("json"):
-                content = content[4:]
-            content = content.strip()
-
-        try:
-            parsed = json.loads(content)
-        except json.JSONDecodeError as pe:
-            print(f"[YT-CLF] Parse error on chunk {i+1}/{len(chunks)} for "
-                  f"\"{title[:60]}\": {pe} | raw={content[:200]!r}", flush=True)
-            telemetry["error"] = f"parse_error: {str(pe)[:120]}"
-            return [], telemetry
-
-        if not isinstance(parsed, list):
-            telemetry["error"] = f"non_list_response: {type(parsed).__name__}"
-            return [], telemetry
-
-        telemetry["predictions_raw"] += len(parsed)
-        # Ship #9 (rescoped) — rejection handling. Split Haiku's
-        # response into accepted entries and explicit rejections. The
-        # metadata enrichment prompt block teaches Haiku to emit
-        # {"rejected": true, "reason": "...", "notes": "..."} for
-        # predictions that fail the no_timeframe_determinable or
-        # unresolvable_reference checks. These entries are NOT fed to
-        # the validator — instead, they're buffered on telemetry so
-        # the channel monitor can log them to youtube_scraper_rejections
-        # with full context (channel_id, publish_dt, transcript snippet)
-        # that isn't in scope here.
-        for _p in parsed:
-            if isinstance(_p, dict) and _p.get("rejected") is True:
-                telemetry.setdefault("rejections", []).append(_p)
-                reason = str(_p.get("reason") or "").strip().lower()
-                if reason == "no_timeframe_determinable":
-                    telemetry["timeframes_rejected"] = int(
-                        telemetry.get("timeframes_rejected", 0)
-                    ) + 1
-                elif reason == "unresolvable_reference":
-                    telemetry["reference_rejected"] = int(
-                        telemetry.get("reference_rejected", 0)
-                    ) + 1
-            else:
-                all_preds.append(_p)
-
-        # 1-second pacing between API calls per the spec
-        if i < len(chunks) - 1:
-            time.sleep(1.0)
-
-    # Validate and dedupe across chunks
-    valid = _validate_and_dedupe_predictions(all_preds)
-    if len(valid) > MAX_PREDICTIONS_PER_VIDEO:
-        log.warning(
-            "[YT-CLF] %s returned %d preds, capping at %d (\"%s\")",
-            channel_name, len(valid), MAX_PREDICTIONS_PER_VIDEO, title[:60],
-        )
-        valid = valid[:MAX_PREDICTIONS_PER_VIDEO]
-
-    telemetry["predictions_validated"] = len(valid)
-    return valid, telemetry
+    return result
 
 
 # ── Validation ──────────────────────────────────────────────────────────────
