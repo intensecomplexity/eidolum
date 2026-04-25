@@ -107,7 +107,7 @@ TARGET_CHANNELS = [
     "Millennial Investing", "Money Talks Beavis Wealth", "Motley Fool",
     "Nick Peitsch Investing", "Phil Town Rule One Investing",
     "Proactive Investors", "Richard Moglen", "Ryan Scribner",
-    "Sasha Yanshin", "Simply Wall St", "SMB Capital",
+    "Sasha Yanshin", "Simply Wall St",
     "Stock Curry", "StockBros Research", "Stocks with Josh",
     "Ticker Symbol YOU", "Trade Brigade", "Wall Street Millennial",
     "Wealth Adventures", "Wisesheets", "Zacks Investment Research",
