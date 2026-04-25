@@ -103,11 +103,11 @@ TARGET_CHANNELS = [
     "Dividends And Income", "FinanceUnfolded", "GenExDividendInvestor",
     "Heresy Financial", "Invest with Henry", "Investing with Tom",
     "Investor Center", "Kenji Explains", "Let's Talk Money",
-    "LevelFields AI", "Mark Moss", "Michael Jay Value Investing",
+    "LevelFields AI", "Mark Moss", "MarketBeat", "Michael Jay Value Investing",
     "Millennial Investing", "Money Talks Beavis Wealth", "Motley Fool",
     "Nick Peitsch Investing", "Phil Town Rule One Investing",
     "Proactive Investors", "Richard Moglen", "Ryan Scribner",
-    "Sasha Yanshin", "Simply Wall St", "SMB Capital",
+    "Sasha Yanshin", "Simply Wall St",
     "Stock Curry", "StockBros Research", "Stocks with Josh",
     "Ticker Symbol YOU", "Trade Brigade", "Wall Street Millennial",
     "Wealth Adventures", "Wisesheets", "Zacks Investment Research",
@@ -461,6 +461,15 @@ def _get_catalog_videos(
     return unseen, api_units, catalog_complete
 
 
+# Auto-discovery is gated as of 2026-04-25. _seed_target_channels now
+# sync-deactivates any active row whose channel_name is not in
+# TARGET_CHANNELS, which would also deactivate every row produced by
+# _discover_new_channels on the very next cycle. Flip to True only
+# after the sync logic learns to spare discovered rows (e.g., via an
+# is_seed_managed schema flag) or there's a deliberate path to
+# promote useful discoveries into TARGET_CHANNELS by hand.
+ENABLE_AUTO_DISCOVERY = False
+
 _DISCOVERY_QUERIES = [
     "stock market analysis", "stock picks 2026", "investment portfolio",
     "dividend investing", "growth stocks analysis", "value investing stocks",
@@ -643,10 +652,24 @@ def run_channel_monitor(db=None):
 
 
 def _seed_target_channels(db):
-    """Make sure every TARGET_CHANNELS entry exists in youtube_channels.
+    """Synchronize youtube_channels with TARGET_CHANNELS.
 
-    Idempotent: rows added by prior runs are left alone. New entries
-    inherit is_active=TRUE from the column default.
+    Two phases, both idempotent:
+
+    1. INSERT phase: every TARGET_CHANNELS name not already in the table
+       gets a new row with is_active=TRUE.
+
+    2. DEACTIVATE phase: every active row whose channel_name is NOT in
+       TARGET_CHANNELS gets is_active=FALSE, deactivated_at=NOW(),
+       deactivation_reason='manual_dropped_from_seed_list'. Makes
+       TARGET_CHANNELS the single source of truth — drops from the seed
+       list propagate to the live cycle on the next run.
+
+    Side effect: rows seeded by _discover_new_channels stay active only
+    if their channel_name is later promoted into TARGET_CHANNELS by
+    hand. Discovered channels not promoted will be deactivated by the
+    next sync run. To preserve auto-discovery's freedom add discovered
+    names to TARGET_CHANNELS or carry a separate schema flag.
     """
     existing_names = {
         r[0] for r in db.execute(
@@ -665,6 +688,30 @@ def _seed_target_channels(db):
     if inserted:
         db.commit()
         print(f"[ChannelMonitor] Seeded {inserted} new channels")
+
+    # Sync deactivation: rows whose channel_name is no longer in
+    # TARGET_CHANNELS get soft-deactivated. Match key is channel_name
+    # (TARGET_CHANNELS doesn't carry IDs). Idempotent — UPDATE with
+    # zero matches is a no-op.
+    result = db.execute(
+        sql_text(
+            "UPDATE youtube_channels "
+            "SET is_active = FALSE, "
+            "    deactivated_at = NOW(), "
+            "    deactivation_reason = 'manual_dropped_from_seed_list' "
+            "WHERE is_active = TRUE "
+            "  AND channel_name <> ALL(:seed)"
+        ),
+        {"seed": list(TARGET_CHANNELS)},
+    )
+    deactivated = result.rowcount or 0
+    if deactivated:
+        db.commit()
+        print(
+            f"[ChannelMonitor] Sync-deactivated {deactivated} channels "
+            f"(no longer in TARGET_CHANNELS)",
+            flush=True,
+        )
 
 
 def _ensure_youtube_forecasters(db):
@@ -752,7 +799,7 @@ def _run_inner(db, channels_with_new=None):
             "SELECT COUNT(*) FROM youtube_channels "
             "WHERE is_active = TRUE AND catalog_complete = FALSE"
         )).scalar() or 0)
-        if _incomplete == 0:
+        if ENABLE_AUTO_DISCOVERY and _incomplete == 0:
             _discover_new_channels(db)
     except Exception:
         pass
