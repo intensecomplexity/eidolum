@@ -79,7 +79,7 @@ if __name__ == "__main__":
 from sqlalchemy import text as sql_text
 
 from database import BgSessionLocal
-from jobs.youtube_channel_monitor import _process_one_video
+from jobs.youtube_channel_monitor import _process_one_video, _record_processed_video
 
 
 # Rejection reasons that mark a video as terminally classified — i.e.
@@ -328,17 +328,34 @@ def run(args: argparse.Namespace) -> int:
                 r["publish_date"].isoformat() if r["publish_date"] else ""
             )
             try:
-                inserted, _chars, _status = _process_one_video(
+                inserted, transcript_chars, transcript_status = _process_one_video(
                     db, channel_name, channel_id, video_id, title,
                     publish_date_str, stats,
                 )
                 n_inserted += inserted
+                # Mirror the live cycle's per-video persistence boundary
+                # (youtube_channel_monitor.py:1155-1163): record the dedup
+                # row + commit so db.add()'d predictions actually reach
+                # disk. Without commit the session closes with pending
+                # writes and every prediction rolls back silently.
+                # _record_processed_video uses ON CONFLICT DO UPDATE so
+                # re-classifying an existing youtube_videos row just
+                # updates its predictions_extracted / processed_at.
+                _record_processed_video(
+                    db, video_id, channel_name, title, "", publish_date_str,
+                    transcript_status, transcript_chars, inserted,
+                )
+                db.commit()
             except Exception as e:
                 print(
                     f"[BackfillUT] _process_one_video raised for {video_id} "
                     f"({channel_name}): {type(e).__name__}: {str(e)[:200]}",
                     flush=True,
                 )
+                try:
+                    db.rollback()
+                except Exception:
+                    pass
             n_done += 1
             if n_done % args.batch_size == 0:
                 elapsed = time.time() - started_at
