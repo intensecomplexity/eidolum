@@ -461,6 +461,15 @@ def _get_catalog_videos(
     return unseen, api_units, catalog_complete
 
 
+# Auto-discovery is gated as of 2026-04-25. _seed_target_channels now
+# sync-deactivates any active row whose channel_name is not in
+# TARGET_CHANNELS, which would also deactivate every row produced by
+# _discover_new_channels on the very next cycle. Flip to True only
+# after the sync logic learns to spare discovered rows (e.g., via an
+# is_seed_managed schema flag) or there's a deliberate path to
+# promote useful discoveries into TARGET_CHANNELS by hand.
+ENABLE_AUTO_DISCOVERY = False
+
 _DISCOVERY_QUERIES = [
     "stock market analysis", "stock picks 2026", "investment portfolio",
     "dividend investing", "growth stocks analysis", "value investing stocks",
@@ -790,7 +799,7 @@ def _run_inner(db, channels_with_new=None):
             "SELECT COUNT(*) FROM youtube_channels "
             "WHERE is_active = TRUE AND catalog_complete = FALSE"
         )).scalar() or 0)
-        if _incomplete == 0:
+        if ENABLE_AUTO_DISCOVERY and _incomplete == 0:
             _discover_new_channels(db)
     except Exception:
         pass
