@@ -78,39 +78,14 @@ CYCLE_TIMEOUT_SECONDS = 30 * 60  # 30 minutes max per cycle
 # pulled from a single videos.list batch call per channel (~1 quota unit).
 YOUTUBE_MIN_DURATION_SECONDS = 180  # 3 minutes
 
+# TEMP: limited to Everything Money for debugging — 2026-05-04
+# ROLLBACK: git revert <THIS_COMMIT_SHA> && git push origin main
+# THEN run the re-activation SQL in
+#   _done/2026-05-04-restrict-everything-money-result.md
+# (a plain revert is NOT enough — _seed_target_channels won't re-activate
+#  rows soft-deactivated during the temp window).
 TARGET_CHANNELS = [
-    # TIER 1: Value/Fundamental Analysis (original 45)
-    "Joseph Carlson", "The Plain Bagel", "Aswath Damodaran", "Sven Carlin",
-    "Patrick Boyle", "Ben Felix", "The Money Guy Show", "New Money",
-    "Everything Money", "The Swedish Investor", "Unrivaled Investing",
-    "Hamish Hodder", "Marko WhiteBoard Finance", "Parkev Tatevosian CFA",
-    "Chris Invests", "Damien Talks Money", "Chip Stock Investor",
-    "The Investor Channel", "Morningstar", "Rob Berger",
-    # TIER 2: Stock Pick / Equity Analysis (original 45)
-    "Financial Education", "Learn to Invest", "Investors Grow",
-    "The Popular Investor", "Dividend Data", "Dividendology",
-    "PPCIAN", "Stock Compounder", "Meet Kevin", "Graham Stephan",
-    "Andrei Jikh", "Minority Mindset", "Tom Nash", "Nanalyze",
-    "Fast Graphs", "PensionCraft", "The Long-Term Investor",
-    "DIY Investing", "The Financial Tortoise", "Stock Moe",
-    "The Quality Investor", "Ales World of Stocks",
-    "The Patient Investor", "Rational Investing with Cameron Stewart",
-    "The Compounding Investor",
-    # TIER 3: Expansion — April 2026 (41 new channels)
-    "Adam Khoo", "ARK Invest", "Brian Shannon AlphaTrends",
-    "BWB - Business With Brian", "Cooper Academy", "Daniel Pronk",
-    "Dividend Bull", "Dividend Growth Investing", "Dividend Talks",
-    "Dividends And Income", "FinanceUnfolded", "GenExDividendInvestor",
-    "Heresy Financial", "Invest with Henry", "Investing with Tom",
-    "Investor Center", "Kenji Explains", "Let's Talk Money",
-    "LevelFields AI", "Mark Moss", "MarketBeat", "Michael Jay Value Investing",
-    "Millennial Investing", "Money Talks Beavis Wealth", "Motley Fool",
-    "Nick Peitsch Investing", "Phil Town Rule One Investing",
-    "Proactive Investors", "Richard Moglen", "Ryan Scribner",
-    "Sasha Yanshin", "Simply Wall St",
-    "Stock Curry", "StockBros Research", "Stocks with Josh",
-    "Ticker Symbol YOU", "Trade Brigade", "Wall Street Millennial",
-    "Wealth Adventures", "Wisesheets", "Zacks Investment Research",
+    "Everything Money",
 ]
 
 
