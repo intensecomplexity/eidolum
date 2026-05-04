@@ -1406,7 +1406,7 @@ def _process_one_video(db, channel_name, channel_id, video_id, title, publish_da
                 video_title=title,
                 video_publish_date=publish_dt,
                 transcript_text=text,
-                transcript_format="json3" if use_ts else "text",
+                transcript_format="json3" if transcript_data else "text",
             )
         except Exception as _e:
             print(f"[ChannelMonitor] transcript capture failed for {video_id}: {_e}", flush=True)
