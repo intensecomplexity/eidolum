@@ -496,6 +496,7 @@ QWEN_SYSTEM_PROMPT = (
 # field is now structurally zero — anything else is a stale RunPod
 # heuristic that misled per-run/per-day cost reports.
 QWEN_PRICE_PER_CALL_USD = 0.0
+CLASSIFIER_MAX_OUTPUT_TOKENS = 400  # Cap generation to stay under CF 100s timeout
 
 
 def call_runpod_vllm(
@@ -552,7 +553,7 @@ def call_runpod_vllm(
             {"role": "user", "content": user_msg},
         ],
         "temperature": 0,
-        "max_tokens": 4000,
+        "max_tokens": CLASSIFIER_MAX_OUTPUT_TOKENS,
     }
 
     identifier = video_id or channel_name
