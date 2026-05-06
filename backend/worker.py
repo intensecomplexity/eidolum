@@ -236,9 +236,9 @@ def _drain_scraper_job_queue():
 
 def _enrich():
     try:
-        from jobs.enrich_source_urls import enrich_batch
+        from jobs.enrich_urls import enrich_source_urls
         db = BgSessionLocal()
-        try: enrich_batch(db)
+        try: enrich_source_urls(db)
         finally: db.close()
     except Exception as e: log.error(f"[enrich] {e}")
 
