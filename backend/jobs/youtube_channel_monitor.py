@@ -689,6 +689,31 @@ def _seed_target_channels(db):
         db.commit()
         print(f"[ChannelMonitor] Seeded {inserted} new channels")
 
+    # Re-activate phase: rows whose channel_name IS in TARGET_CHANNELS
+    # but is_active=FALSE get flipped back on. Symmetric to deactivation
+    # — without this, a manual or temp-restriction sweep that turns rows
+    # off cannot be undone by editing TARGET_CHANNELS alone (incident
+    # 2026-05-06).
+    reactivated_result = db.execute(
+        sql_text(
+            "UPDATE youtube_channels "
+            "SET is_active = TRUE, "
+            "    deactivated_at = NULL, "
+            "    deactivation_reason = NULL "
+            "WHERE channel_name = ANY(:seed) "
+            "  AND is_active = FALSE"
+        ),
+        {"seed": list(TARGET_CHANNELS)},
+    )
+    reactivated = reactivated_result.rowcount or 0
+    if reactivated:
+        db.commit()
+        print(
+            f"[ChannelMonitor] Re-activated {reactivated} channels "
+            f"(back in TARGET_CHANNELS)",
+            flush=True,
+        )
+
     # Sync deactivation: rows whose channel_name is no longer in
     # TARGET_CHANNELS get soft-deactivated. Match key is channel_name
     # (TARGET_CHANNELS doesn't carry IDs). Idempotent — UPDATE with
