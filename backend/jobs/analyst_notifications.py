@@ -18,9 +18,11 @@ FROM_EMAIL = os.getenv("FROM_EMAIL", "alerts@eidolum.com")
 SITE_URL = "https://www.eidolum.com"
 
 
-def run_analyst_notifications():
+def run_analyst_notifications(db=None):
     """Check for new analyst predictions in the last hour and notify subscribers."""
-    db = SessionLocal()
+    own_db = db is None
+    if own_db:
+        db = SessionLocal()
     try:
         cutoff = datetime.utcnow() - timedelta(hours=1)
 
@@ -33,7 +35,6 @@ def run_analyst_notifications():
         )
 
         if not new_preds:
-            db.close()
             return
 
         # Group by forecaster
@@ -114,7 +115,8 @@ def run_analyst_notifications():
         db.rollback()
         print(f"[AnalystNotif] Error: {e}")
     finally:
-        db.close()
+        if own_db:
+            db.close()
 
 
 def _send_analyst_digest_email(to_email: str, analyst_preds: list):
