@@ -438,7 +438,8 @@ class _YTStats:
     """Simple in-memory counters for the daily summary. Reset once per day."""
     __slots__ = (
         "predictions", "errors", "circuit_breaker_trips",
-        "total_latency", "classifications", "last_reset_day",
+        "total_latency", "classifications", "truncated_outputs",
+        "last_reset_day",
     )
     def __init__(self):
         self.reset()
@@ -448,6 +449,7 @@ class _YTStats:
         self.circuit_breaker_trips = 0
         self.total_latency = 0.0
         self.classifications = 0
+        self.truncated_outputs = 0
         self.last_reset_day = datetime.utcnow().date()
     def maybe_reset_daily(self):
         today = datetime.utcnow().date()
@@ -496,7 +498,7 @@ QWEN_SYSTEM_PROMPT = (
 # field is now structurally zero — anything else is a stale RunPod
 # heuristic that misled per-run/per-day cost reports.
 QWEN_PRICE_PER_CALL_USD = 0.0
-CLASSIFIER_MAX_OUTPUT_TOKENS = 400  # Cap generation to stay under CF 100s timeout
+CLASSIFIER_MAX_OUTPUT_TOKENS = 800  # Cap generation to stay under CF 100s timeout
 
 
 def call_runpod_vllm(
@@ -592,7 +594,22 @@ def call_runpod_vllm(
         _record_failure()
         raise RuntimeError("Classifier returned empty choices")
 
-    content = (choices[0].get("message") or {}).get("content") or ""
+    choice0 = choices[0] or {}
+    finish_reason = choice0.get("finish_reason")
+    content = (choice0.get("message") or {}).get("content") or ""
+
+    # finish_reason == "length" means we hit max_tokens mid-generation.
+    # The partial JSON would either fail to parse or silently drop
+    # predictions; raise here so the caller logs a clean truncated_output
+    # classifier_error and the daily summary surfaces it.
+    if finish_reason == "length":
+        _record_failure()
+        yt_stats.truncated_outputs += 1
+        raise RuntimeError(
+            f"truncated_output: classifier hit max_tokens={CLASSIFIER_MAX_OUTPUT_TOKENS} "
+            f"for {identifier} (output_chars={len(content)})"
+        )
+
     if not content.strip():
         _record_failure()
         raise RuntimeError("Classifier returned empty content")
