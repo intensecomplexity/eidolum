@@ -190,12 +190,14 @@ HAIKU_MODEL = "claude-haiku-4-5-20251001"
 # 15 protects the database from a single bad video flooding the table.
 MAX_PREDICTIONS_PER_VIDEO = 15
 
-# Long-transcript chunking. Above 100k characters we split into ~80k
-# chunks with 2k overlap so that predictions straddling a chunk boundary
-# are still recoverable from at least one chunk.
-TRANSCRIPT_CHUNK_THRESHOLD = 100_000
-TRANSCRIPT_CHUNK_SIZE = 80_000
-TRANSCRIPT_CHUNK_OVERLAP = 2_000
+# Long-transcript chunking. The old 100k/80k/2k tuple was designed
+# around Haiku's context window, not Pavilion's prefill speed. Pavilion
+# (Ollama on a single GPU) needs >100s to prefill an 11k-char Hindi
+# transcript in one shot, which always 524s the Cloudflare Access
+# tunnel (~100s timeout). Splitting at 8k caps each prefill to ~30-60s.
+TRANSCRIPT_CHUNK_THRESHOLD = 8_000
+TRANSCRIPT_CHUNK_SIZE = 6_000
+TRANSCRIPT_CHUNK_OVERLAP = 500
 
 # Default evaluation window when the classifier returns no timeframe.
 DEFAULT_EVAL_WINDOW_DAYS = 90
@@ -530,6 +532,18 @@ def call_runpod_vllm(
                 f"using Haiku for remaining videos this cycle",
                 flush=True,
             )
+
+    # Empty-input guard. When the Webshare proxy returns an empty
+    # transcript the model hallucinates predictions ({"ticker":"TSLA"...}
+    # observed in probe). Short-circuit before burning a Pavilion call.
+    if not transcript_chunk or not transcript_chunk.strip():
+        identifier = video_id or channel_name
+        print(
+            f"[YOUTUBE-QWEN] empty transcript for {identifier} — "
+            f"skipping classifier call, returning []",
+            flush=True,
+        )
+        return "[]", 0.0, 0.0
 
     if not CLASSIFIER_BASE_URL or not CF_ACCESS_CLIENT_ID or not CF_ACCESS_CLIENT_SECRET:
         raise RuntimeError(
