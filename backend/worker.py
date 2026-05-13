@@ -2095,9 +2095,10 @@ def main():
     sched.add_job(_standalone("youtube_scraper", _youtube), "interval", hours=8, id="youtube_scraper", next_run_time=t0 + timedelta(minutes=55), executor='default')
     sched.add_job(_standalone("enrich_urls", _enrich), "interval", hours=1, id="enrich_urls", next_run_time=t0 + timedelta(minutes=35), executor='default')
 
-    # YouTube Channel Monitor — V2 transcript-based, Qwen-powered, every 30min.
+    # YouTube Channel Monitor — V2 transcript-based, Qwen-powered.
     # Smart scheduling: lightweight YouTube API check first, only fires Qwen
-    # when new videos exist. 45 channels × 48 checks/day = 2,160 units (< 10K free).
+    # when new videos exist. Interval is env-driven so backfill windows can
+    # double it to 60 min to halve live-cycle cost; defaults to 30 min.
     def _channel_monitor():
         try:
             from jobs.youtube_channel_monitor import run_channel_monitor
@@ -2108,7 +2109,12 @@ def main():
                 db.close()
         except Exception as e:
             log.error(f"[channel_monitor] {e}")
-    sched.add_job(_standalone("channel_monitor", _channel_monitor), "interval", minutes=30, id="channel_monitor", next_run_time=t0 + timedelta(minutes=5), executor='default')
+    try:
+        _ym_interval = max(5, int(os.environ.get("YOUTUBE_MONITOR_INTERVAL_MINUTES", "30")))
+    except (TypeError, ValueError):
+        _ym_interval = 30
+    sched.add_job(_standalone("channel_monitor", _channel_monitor), "interval", minutes=_ym_interval, id="channel_monitor", next_run_time=t0 + timedelta(minutes=5), executor='default')
+    log.info(f"[channel_monitor] interval={_ym_interval}min (env YOUTUBE_MONITOR_INTERVAL_MINUTES)")
 
     # Disclosure follow-through (ship #8) — daily sweep that
     # computes 1/3/6/12-month stock returns for every disclosure

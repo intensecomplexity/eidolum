@@ -111,6 +111,38 @@ TARGET_CHANNELS = [
     "Stock Curry", "StockBros Research", "Stocks with Josh",
     "Ticker Symbol YOU", "Trade Brigade", "Wall Street Millennial",
     "Wealth Adventures", "Wisesheets", "Zacks Investment Research",
+    # TIER 4: Expansion — May 2026 (53 channels, verified ≥50k subs + active ≤6mo)
+    # TIER 4 — Macro / Economy
+    "George Gammon", "Garys Economics", "Eurodollar University", "Peter Schiff",
+    # TIER 4 — Trading / Technical
+    "tastylive", "Interactive Brokers", "TraderTV Live",
+    # TIER 4 — News / Mainstream
+    "CNBC Television", "Yahoo Finance", "Forbes", "Financial Times",
+    "MarketWatch", "The Compound",
+    # TIER 4 — Personal Finance
+    "The Ramsey Show Highlights", "Caleb Hammer", "George Kamel",
+    "I Will Teach You To Be Rich", "Your Rich BFF", "Two Cents",
+    "The Financial Diet", "Debt Free Dana ツ", "Rachel Cruze",
+    # TIER 4 — Semis / Hardware
+    "Asianometry", "Anastasi In Tech", "The Limiting Factor",
+    # TIER 4 — EV / Auto
+    "Tesla Daily", "Solving The Money Problem", "Munro Live",
+    "AI Stocks Report with Warren Redlich",
+    # TIER 4 — Crypto
+    "Coin Bureau", "InvestAnswers", "CryptosRUs", "Altcoin Daily",
+    "DataDash", "Crypto Tips", "Anthony Pompliano",
+    # TIER 4 — UK / Europe
+    "James Shack", "Toby Newbatt", "Finanzfluss", "Aktien mit Kopf",
+    "Mission Money",
+    # TIER 4 — India
+    "Pranjal Kamra", "CA Rachana Phadke Ranade", "Labour Law Advisor",
+    "Zerodha", "Yadnya Investment Academy", "Trade Brains", "ET Money", "Groww",
+    # TIER 4 — Canada
+    "Parallel Wealth", "Preet Banerjee",
+    # TIER 4 — Quant
+    "QuantPy",
+    # TIER 4 — Sector / Specialty
+    "MoneyShow",
 ]
 
 
