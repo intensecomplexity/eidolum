@@ -68,21 +68,43 @@ LOOKBACK = timedelta(days=365)
 
 def _stats_bootstrap() -> dict:
     """Return a stats dict pre-seeded with every counter
-    _process_one_video / log_youtube_rejection touches. Missing keys
-    blow up the existing helpers, so we shadow run_channel_monitor's
-    bootstrap exactly.
+    _process_one_video / log_youtube_rejection / insert_youtube_*
+    touches. Missing keys raise KeyError on the very first successful
+    classification (predictions_inserted += inserted), so we mirror
+    run_channel_monitor's stats dict in youtube_channel_monitor.py
+    verbatim and add a few backfill-only counters at the end.
     """
     return {
+        # ── Mirrors run_channel_monitor's stats dict, line-for-line ──
         "channels_checked": 0,
         "videos_seen": 0,
-        "videos_classified": 0,
+        "videos_skipped_already_processed": 0,
         "videos_skipped_short": 0,
         "videos_skipped_no_transcript": 0,
+        "videos_classified": 0,
         "predictions_extracted": 0,
+        "predictions_inserted": 0,
+        "classifier_errors": 0,
         "yt_api_units": 0,
-        "rejections_logged": 0,
-        "tickers_resolved": 0,
-        "tickers_unresolved": 0,
+        "items_rejected": 0,
+        "items_deduped": 0,
+        "total_input_tokens": 0,
+        "total_output_tokens": 0,
+        "total_cache_create_tokens": 0,
+        "total_cache_read_tokens": 0,
+        "estimated_cost_usd": 0.0,
+        "haiku_retries_count": 0,
+        "sector_calls_extracted": 0,
+        "options_positions_extracted": 0,
+        "earnings_calls_extracted": 0,
+        "macro_calls_extracted": 0,
+        "pair_calls_extracted": 0,
+        "binary_events_extracted": 0,
+        "metric_forecasts_extracted": 0,
+        "conditional_calls_extracted": 0,
+        "disclosures_extracted": 0,
+        "timestamps_matched": 0,
+        "timestamps_failed": 0,
         "regime_calls_extracted": 0,
         "timeframes_explicit": 0,
         "timeframes_inferred": 0,
@@ -93,14 +115,11 @@ def _stats_bootstrap() -> dict:
         "conviction_hedged": 0,
         "conviction_hypothetical": 0,
         "conviction_unknown": 0,
-        "total_input_tokens": 0,
-        "total_output_tokens": 0,
-        "total_cache_create_tokens": 0,
-        "total_cache_read_tokens": 0,
-        "estimated_cost_usd": 0.0,
-        # Backfill-specific telemetry
+        # ── Backfill-only telemetry ──
+        "rejections_logged": 0,
+        "tickers_resolved": 0,
+        "tickers_unresolved": 0,
         "classifier_524s": 0,
-        "classifier_errors": 0,
     }
 
 
