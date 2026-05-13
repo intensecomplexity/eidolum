@@ -35,6 +35,11 @@ from typing import Optional
 
 import httpx
 
+# Line-buffer stdout so tailing /tmp/backfill_*.log shows progress in
+# real time instead of revealing batches every few KB of buffer.
+sys.stdout.reconfigure(line_buffering=True)
+sys.stderr.reconfigure(line_buffering=True)
+
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parent.parent
 sys.path.insert(0, str(ROOT / "backend"))
@@ -385,11 +390,23 @@ def main() -> int:
 
                 stats["videos_seen"] += 1
                 videos_attempted += 1
-
+                inserted, tchars, status = 0, 0, "classifier_error"
                 try:
                     inserted, tchars, status = _process_one_video(
                         db, name, cid, vid, title, publish, stats,
                     )
+                    _update_channel_yield_counters(db, cid, name, status, inserted)
+                    _record_processed_video(
+                        db, vid, name, title, vinfo["description"],
+                        publish, status, tchars, inserted,
+                    )
+                    try:
+                        db.commit()
+                    except Exception as e:
+                        print(f"[backfill]   commit err {vid}: {e}")
+                        db.rollback()
+                    if inserted:
+                        predictions_inserted += inserted
                 except Exception as e:
                     err = str(e)[:200]
                     print(f"[backfill]   {vid} error: {err}")
@@ -397,27 +414,27 @@ def main() -> int:
                     if "524" in err:
                         stats["classifier_524s"] += 1
                     db.rollback()
-                    continue
-
-                _update_channel_yield_counters(db, cid, name, status, inserted)
-                _record_processed_video(
-                    db, vid, name, title, vinfo["description"],
-                    publish, status, tchars, inserted,
-                )
-                try:
-                    db.commit()
-                except Exception as e:
-                    print(f"[backfill]   commit err {vid}: {e}")
-                    db.rollback()
-
-                if inserted:
-                    predictions_inserted += inserted
-
-                ch_state["videos_attempted"] = videos_attempted
-                ch_state["predictions_inserted"] = predictions_inserted
-                ch_state["last_video_id"] = vid
-                ch_state["last_video_published"] = publish
-                _save_state(args.state_file, state)
+                    # Mark as classifier_error in DB so resumption skips
+                    # this video. Without this row, the next run would
+                    # re-fetch the transcript and re-call Pavilion.
+                    try:
+                        _record_processed_video(
+                            db, vid, name, title, vinfo["description"],
+                            publish, "classifier_error", 0, 0,
+                        )
+                        db.commit()
+                    except Exception:
+                        db.rollback()
+                finally:
+                    # State save runs on every path (success, exception,
+                    # commit failure) so .backfill_new_channels_state.json
+                    # always reflects the latest attempt count and the
+                    # daily-cap accounting stays correct.
+                    ch_state["videos_attempted"] = videos_attempted
+                    ch_state["predictions_inserted"] = predictions_inserted
+                    ch_state["last_video_id"] = vid
+                    ch_state["last_video_published"] = publish
+                    _save_state(args.state_file, state)
 
                 # Stagger Pavilion calls so a single channel can't
                 # monopolize the tunnel.
