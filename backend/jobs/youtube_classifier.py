@@ -199,6 +199,16 @@ TRANSCRIPT_CHUNK_THRESHOLD = 8_000
 TRANSCRIPT_CHUNK_SIZE = 6_000
 TRANSCRIPT_CHUNK_OVERLAP = 500
 
+# Non-Latin scripts (Devanagari, Han, Hangul, Hiragana/Katakana, Arabic,
+# Cyrillic, Persian, Thai) tokenize at ~3-5x more tokens per char than
+# Latin scripts. At 6k chars these still need ~3.5k tokens of prefill,
+# which on Pavilion's single-GPU Ollama can sit at the 100s tunnel
+# limit. Halve the budget for these langs.
+NON_LATIN_LANG_CODES = {"hi", "ja", "zh", "ko", "ar", "ru", "fa", "th"}
+TRANSCRIPT_CHUNK_THRESHOLD_NON_LATIN = 4_000
+TRANSCRIPT_CHUNK_SIZE_NON_LATIN = 3_000
+TRANSCRIPT_CHUNK_OVERLAP_NON_LATIN = 300
+
 # Default evaluation window when the classifier returns no timeframe.
 DEFAULT_EVAL_WINDOW_DAYS = 90
 
@@ -562,6 +572,11 @@ def call_runpod_vllm(
         f"Return JSON array only, no other text."
     )
 
+    # stream=True lifts the Cloudflare Access 100s ceiling: as long as
+    # the upstream is emitting bytes, CF keeps the tunnel open. Without
+    # this, any single-shot call where prefill+generate ≥ 100s 524s
+    # regardless of chunk size. Response shape is reassembled below so
+    # the rest of the function is unchanged.
     payload = {
         "model": CLASSIFIER_MODEL_NAME,
         "messages": [
@@ -570,21 +585,58 @@ def call_runpod_vllm(
         ],
         "temperature": 0,
         "max_tokens": CLASSIFIER_MAX_OUTPUT_TOKENS,
+        "stream": True,
     }
 
     identifier = video_id or channel_name
     t0 = time.time()
+    content_parts: list[str] = []
+    finish_reason: str | None = None
+    usage: dict = {}
+    status_code = 0
+    error_body = ""
     try:
-        r = _httpx.post(
+        with _httpx.stream(
+            "POST",
             url,
             json=payload,
             headers={
                 "CF-Access-Client-Id": CF_ACCESS_CLIENT_ID,
                 "CF-Access-Client-Secret": CF_ACCESS_CLIENT_SECRET,
                 "Content-Type": "application/json",
+                "Accept": "text/event-stream",
             },
-            timeout=RUNPOD_TIMEOUT_SECONDS,
-        )
+            timeout=_httpx.Timeout(connect=15.0, read=RUNPOD_TIMEOUT_SECONDS, write=15.0, pool=15.0),
+        ) as r:
+            status_code = r.status_code
+            if status_code != 200:
+                error_body = r.read().decode("utf-8", errors="replace")[:300]
+            else:
+                for line in r.iter_lines():
+                    if not line:
+                        continue
+                    if not line.startswith("data:"):
+                        continue
+                    data_str = line[5:].lstrip()
+                    if data_str == "[DONE]":
+                        break
+                    try:
+                        chunk_data = json.loads(data_str)
+                    except json.JSONDecodeError:
+                        continue
+                    if chunk_data.get("usage"):
+                        usage = chunk_data["usage"]
+                    choices = chunk_data.get("choices") or []
+                    if not choices:
+                        continue
+                    choice0 = choices[0] or {}
+                    delta = choice0.get("delta") or {}
+                    piece = delta.get("content")
+                    if piece:
+                        content_parts.append(piece)
+                    fr = choice0.get("finish_reason")
+                    if fr:
+                        finish_reason = fr
     except _httpx.TimeoutException:
         _record_failure()
         raise RuntimeError(
@@ -596,21 +648,16 @@ def call_runpod_vllm(
 
     latency = time.time() - t0
 
-    if r.status_code != 200:
+    if status_code != 200:
         _record_failure()
         raise RuntimeError(
-            f"Classifier HTTP {r.status_code}: {r.text[:300]}"
+            f"Classifier HTTP {status_code}: {error_body}"
         )
 
-    data = r.json()
-    choices = data.get("choices") or []
-    if not choices:
+    content = "".join(content_parts)
+    if not content:
         _record_failure()
-        raise RuntimeError("Classifier returned empty choices")
-
-    choice0 = choices[0] or {}
-    finish_reason = choice0.get("finish_reason")
-    content = (choice0.get("message") or {}).get("content") or ""
+        raise RuntimeError("Classifier returned empty stream")
 
     # finish_reason == "length" means we hit max_tokens mid-generation.
     # The partial JSON would either fail to parse or silently drop
@@ -624,14 +671,9 @@ def call_runpod_vllm(
             f"for {identifier} (output_chars={len(content)})"
         )
 
-    if not content.strip():
-        _record_failure()
-        raise RuntimeError("Classifier returned empty content")
-
     # Success — reset consecutive failure counter
     _runpod_consecutive_failures = 0
 
-    usage = data.get("usage") or {}
     in_tok = usage.get("prompt_tokens", 0)
     out_tok = usage.get("completion_tokens", 0)
     cost = QWEN_PRICE_PER_CALL_USD
@@ -2534,26 +2576,39 @@ def fetch_transcript(video_id: str) -> tuple[str | None, str | None]:
     return result["text"], status
 
 
-def chunk_transcript(text: str) -> list[str]:
+def chunk_transcript(text: str, lang: str | None = None) -> list[str]:
     """Split a long transcript into overlapping chunks for the classifier.
 
-    Below TRANSCRIPT_CHUNK_THRESHOLD chars: returns [text] unchanged.
-    Above: returns ~TRANSCRIPT_CHUNK_SIZE chunks with TRANSCRIPT_CHUNK_OVERLAP
-    char overlap so a prediction sentence that spans a chunk boundary
-    survives in at least one chunk.
+    Below the threshold: returns [text] unchanged.
+    Above: returns ~CHUNK_SIZE chunks with CHUNK_OVERLAP char overlap so
+    a prediction sentence spanning a chunk boundary survives in at least
+    one chunk.
+
+    When `lang` is in NON_LATIN_LANG_CODES, the budget is halved
+    (4k/3k/300 vs 8k/6k/500) because those scripts tokenize at 3-5x
+    more tokens per char and would otherwise blow past Pavilion's CF
+    Access tunnel timeout. Unknown lang → Latin defaults (safe fallback).
     """
     if not text:
         return []
-    if len(text) <= TRANSCRIPT_CHUNK_THRESHOLD:
+    if lang and lang.lower() in NON_LATIN_LANG_CODES:
+        threshold = TRANSCRIPT_CHUNK_THRESHOLD_NON_LATIN
+        size = TRANSCRIPT_CHUNK_SIZE_NON_LATIN
+        overlap = TRANSCRIPT_CHUNK_OVERLAP_NON_LATIN
+    else:
+        threshold = TRANSCRIPT_CHUNK_THRESHOLD
+        size = TRANSCRIPT_CHUNK_SIZE
+        overlap = TRANSCRIPT_CHUNK_OVERLAP
+    if len(text) <= threshold:
         return [text]
     chunks = []
     start = 0
     while start < len(text):
-        end = start + TRANSCRIPT_CHUNK_SIZE
+        end = start + size
         chunks.append(text[start:end])
         if end >= len(text):
             break
-        start = end - TRANSCRIPT_CHUNK_OVERLAP
+        start = end - overlap
     return chunks
 
 
@@ -2721,7 +2776,8 @@ def _classify_video_qwen(
 def classify_video(channel_name: str, title: str, publish_date: str,
                    transcript: str,
                    video_id: str | None = None,
-                   db=None) -> tuple[list[dict], dict]:
+                   db=None,
+                   lang: str | None = None) -> tuple[list[dict], dict]:
     """Classify a video transcript and extract financial predictions via Qwen.
 
     The Qwen 2.5 7B LoRA-merged classifier behind the Pavilion tunnel is
@@ -2756,7 +2812,8 @@ def classify_video(channel_name: str, title: str, publish_date: str,
     telemetry: dict = {"chunks": 0, "input_tokens": 0, "output_tokens": 0,
                        "last_status": None, "predictions_raw": 0,
                        "prompt_variant": "qwen_finetuned"}
-    chunks = chunk_transcript(transcript or "")
+    chunks = chunk_transcript(transcript or "", lang=lang)
+    telemetry["lang"] = lang or ""
     if not chunks:
         telemetry["error"] = "empty_transcript"
         return [], telemetry

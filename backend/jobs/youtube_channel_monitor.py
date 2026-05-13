@@ -1440,11 +1440,13 @@ def _process_one_video(db, channel_name, channel_id, video_id, title, publish_da
     # path so transcript_data (segments + words + has_word_level) stays
     # in scope through classify → insert.
     transcript_data: dict | None = None
+    transcript_lang: str | None = None
     rich = fetch_transcript_with_timestamps(video_id)
     if rich.get("status") == "ok" and rich.get("text"):
         transcript_data = rich
         text = rich["text"]
         transcript_status = rich.get("lang") or "ok"
+        transcript_lang = rich.get("lang") or None
     else:
         # Fallback to plain fetch if rich fails
         text, transcript_status = fetch_transcript(video_id)
@@ -1495,7 +1497,7 @@ def _process_one_video(db, channel_name, channel_id, video_id, title, publish_da
     preds, telem = classify_video(
         channel_name, title,
         publish_date_str[:10] if publish_date_str else "",
-        text, video_id=video_id, db=db,
+        text, video_id=video_id, db=db, lang=transcript_lang,
     )
     _clf_elapsed = time.time() - _clf_start
     stats["videos_classified"] += 1
