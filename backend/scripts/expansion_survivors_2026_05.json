@@ -1,0 +1,1076 @@
+{
+  "generated_at": "2026-05-13T13:35:18.837771+00:00",
+  "candidates_total": 156,
+  "survivors_total": 55,
+  "rejected_total": 101,
+  "api_units_used": 214,
+  "survivors": [
+    {
+      "name": "George Gammon",
+      "channel_id": "UCpvyOqtEc86X8w8_Se0t4-w",
+      "handle": "@GeorgeGammon",
+      "subscribers": 578000,
+      "last_upload_date": "2026-03-26",
+      "category": "Macro / Economy"
+    },
+    {
+      "name": "Garys Economics",
+      "channel_id": "UC5Ghe5TBQGYIOANuiNW4hDQ",
+      "handle": "@GarysEconomics",
+      "subscribers": 1600000,
+      "last_upload_date": "2026-05-10",
+      "category": "Macro / Economy"
+    },
+    {
+      "name": "Eurodollar University",
+      "channel_id": "UCrXNkk4IESnqU-8GMad2vyA",
+      "handle": "@EurodollarUniversity",
+      "subscribers": 219000,
+      "last_upload_date": "2026-05-12",
+      "category": "Macro / Economy"
+    },
+    {
+      "name": "Grant Cardone",
+      "channel_id": "UCdlNK1xcy-Sn8liq7feNxWw",
+      "handle": "@grantcardone",
+      "subscribers": 3130000,
+      "last_upload_date": "2026-05-13",
+      "category": "Macro / Economy"
+    },
+    {
+      "name": "Peter Schiff",
+      "channel_id": "UCIjuLiLHdFxYtFmWlbTGQRQ",
+      "handle": "@PeterSchiff",
+      "subscribers": 623000,
+      "last_upload_date": "2026-05-12",
+      "category": "Macro / Economy"
+    },
+    {
+      "name": "tastylive",
+      "channel_id": "UCLJiSMXJ9K-1AOTqIqdXJgQ",
+      "handle": "@tastyliveshow",
+      "subscribers": 477000,
+      "last_upload_date": "2026-05-12",
+      "category": "Trading / Technical"
+    },
+    {
+      "name": "Interactive Brokers",
+      "channel_id": "UCbY1hA0wpRcbyjBLxI-dxvQ",
+      "handle": "@InteractiveBrokers",
+      "subscribers": 132000,
+      "last_upload_date": "2026-05-13",
+      "category": "Trading / Technical"
+    },
+    {
+      "name": "TraderTV Live",
+      "channel_id": "UCn75vF3UxwWeWPAY4-5Z6HQ",
+      "handle": "@TraderTVLive",
+      "subscribers": 565000,
+      "last_upload_date": "2026-05-13",
+      "category": "Trading / Technical"
+    },
+    {
+      "name": "CNBC Television",
+      "channel_id": "UCrp_UI8XtuYfpiqluWLD7Lw",
+      "handle": "@CNBCtelevision",
+      "subscribers": 3360000,
+      "last_upload_date": "2026-05-13",
+      "category": "News / Mainstream"
+    },
+    {
+      "name": "Yahoo Finance",
+      "channel_id": "UCEAZeUIeJs0IjQiqTCdVSIg",
+      "handle": "@YahooFinance",
+      "subscribers": 1500000,
+      "last_upload_date": "2026-05-13",
+      "category": "News / Mainstream"
+    },
+    {
+      "name": "Forbes",
+      "channel_id": "UCmh7afBz-uWwOSSNTqUBAhg",
+      "handle": "@Forbes",
+      "subscribers": 2120000,
+      "last_upload_date": "2026-05-13",
+      "category": "News / Mainstream"
+    },
+    {
+      "name": "Financial Times",
+      "channel_id": "UCoUxsWakJucWg46KW5RsvPw",
+      "handle": "@FinancialTimes",
+      "subscribers": 1410000,
+      "last_upload_date": "2026-05-13",
+      "category": "News / Mainstream"
+    },
+    {
+      "name": "MarketWatch",
+      "channel_id": "UCPaSu8qnjJhF1vkXVOGojBQ",
+      "handle": "@MarketWatch",
+      "subscribers": 84100,
+      "last_upload_date": "2026-05-07",
+      "category": "News / Mainstream"
+    },
+    {
+      "name": "The Compound",
+      "channel_id": "UCBRpqrzuuqE8TZcWw75JSdw",
+      "handle": "@TheCompoundNews",
+      "subscribers": 235000,
+      "last_upload_date": "2026-05-13",
+      "category": "News / Mainstream"
+    },
+    {
+      "name": "The Ramsey Show Highlights",
+      "channel_id": "UC7eBNeDW1GQf2NJQ6G6gAxw",
+      "handle": "@TheRamseyShow",
+      "subscribers": 4560000,
+      "last_upload_date": "2026-05-13",
+      "category": "Personal Finance"
+    },
+    {
+      "name": "Caleb Hammer",
+      "channel_id": "UCLe_q9axMaeTbjN0hy1Z9xA",
+      "handle": "@CalebHammer",
+      "subscribers": 3190000,
+      "last_upload_date": "2026-05-13",
+      "category": "Personal Finance"
+    },
+    {
+      "name": "George Kamel",
+      "channel_id": "UCNIFV-Bgh2YtrWQxmrgFS4w",
+      "handle": "@GeorgeKamel",
+      "subscribers": 583000,
+      "last_upload_date": "2026-05-13",
+      "category": "Personal Finance"
+    },
+    {
+      "name": "I Will Teach You To Be Rich",
+      "channel_id": "UC7ZddA__ewP3AtDefjl_tWg",
+      "handle": "@ramitsethi",
+      "subscribers": 1090000,
+      "last_upload_date": "2026-05-12",
+      "category": "Personal Finance"
+    },
+    {
+      "name": "Your Rich BFF",
+      "channel_id": "UCgbXT2QuTj4SYxaWCs3vuAw",
+      "handle": "@yourrichbff",
+      "subscribers": 1240000,
+      "last_upload_date": "2026-05-13",
+      "category": "Personal Finance"
+    },
+    {
+      "name": "Two Cents",
+      "channel_id": "UCL8w_A8p8P1HWI3k6PR5Z6w",
+      "handle": "@TwoCentsPBS",
+      "subscribers": 819000,
+      "last_upload_date": "2026-05-13",
+      "category": "Personal Finance"
+    },
+    {
+      "name": "The Financial Diet",
+      "channel_id": "UCSPYNpQ2fHv9HJ-q6MIMaPw",
+      "handle": "@TheFinancialDiet",
+      "subscribers": 1320000,
+      "last_upload_date": "2026-05-12",
+      "category": "Personal Finance"
+    },
+    {
+      "name": "Debt Free Dana \u30c4",
+      "channel_id": "UCYXBL1Orm_6UL_n3rOa9UJw",
+      "handle": "@DebtFreeDana",
+      "subscribers": 85100,
+      "last_upload_date": "2026-05-12",
+      "category": "Personal Finance"
+    },
+    {
+      "name": "Rachel Cruze",
+      "channel_id": "UCt59W0ScV709iwy2h-oiulQ",
+      "handle": "@RachelCruze",
+      "subscribers": 639000,
+      "last_upload_date": "2026-05-12",
+      "category": "Personal Finance"
+    },
+    {
+      "name": "Asianometry",
+      "channel_id": "UC1LpsuAUaKoMzzJSEt5WImw",
+      "handle": "@Asianometry",
+      "subscribers": 932000,
+      "last_upload_date": "2026-05-10",
+      "category": "Semis / Hardware"
+    },
+    {
+      "name": "Anastasi In Tech",
+      "channel_id": "UCORX3Cl7ByidjEgzSCgv9Yw",
+      "handle": "@AnastasiInTech",
+      "subscribers": 469000,
+      "last_upload_date": "2026-05-11",
+      "category": "Semis / Hardware"
+    },
+    {
+      "name": "The Limiting Factor",
+      "channel_id": "UCIFn7ONIJHyC-lMnb7Fm_jw",
+      "handle": "@TheLimitingFactor",
+      "subscribers": 135000,
+      "last_upload_date": "2026-05-06",
+      "category": "Semis / Hardware"
+    },
+    {
+      "name": "Tesla Daily",
+      "channel_id": "UCgYkuL87rUwiBl7tqfN53Eg",
+      "handle": "@TeslaDaily",
+      "subscribers": 225000,
+      "last_upload_date": "2026-01-29",
+      "category": "EV / Auto"
+    },
+    {
+      "name": "Solving The Money Problem",
+      "channel_id": "UCagiBBx1prefrlsDzDxuA9A",
+      "handle": "@SolvingTheMoneyProblem",
+      "subscribers": 299000,
+      "last_upload_date": "2026-05-13",
+      "category": "EV / Auto"
+    },
+    {
+      "name": "Munro Live",
+      "channel_id": "UCj--iMtToRO_cGG_fpmP5XQ",
+      "handle": "@MunroLive",
+      "subscribers": 478000,
+      "last_upload_date": "2026-05-12",
+      "category": "EV / Auto"
+    },
+    {
+      "name": "AI Stocks Report with Warren Redlich",
+      "channel_id": "UC5PyBAYohCboit2wCn6e-UQ",
+      "handle": "@WarrenRedlich",
+      "subscribers": 70500,
+      "last_upload_date": "2026-05-13",
+      "category": "EV / Auto"
+    },
+    {
+      "name": "Coin Bureau",
+      "channel_id": "UCqK_GSMbpiV8spgD3ZGloSw",
+      "handle": "@CoinBureau",
+      "subscribers": 2730000,
+      "last_upload_date": "2026-05-12",
+      "category": "Crypto"
+    },
+    {
+      "name": "InvestAnswers",
+      "channel_id": "UClgJyzwGs-GyaNxUHcLZrkg",
+      "handle": "@InvestAnswers",
+      "subscribers": 577000,
+      "last_upload_date": "2026-05-12",
+      "category": "Crypto"
+    },
+    {
+      "name": "CryptosRUs",
+      "channel_id": "UCI7M65p3A-D3P4v5qW8POxQ",
+      "handle": "@CryptosRUs",
+      "subscribers": 805000,
+      "last_upload_date": "2026-05-13",
+      "category": "Crypto"
+    },
+    {
+      "name": "Altcoin Daily",
+      "channel_id": "UCbLhGKVY-bJPcawebgtNfbw",
+      "handle": "@AltcoinDaily",
+      "subscribers": 1650000,
+      "last_upload_date": "2026-05-12",
+      "category": "Crypto"
+    },
+    {
+      "name": "DataDash",
+      "channel_id": "UCCatR7nWbYrkVXdxXb4cGXw",
+      "handle": "@DataDash",
+      "subscribers": 508000,
+      "last_upload_date": "2026-05-11",
+      "category": "Crypto"
+    },
+    {
+      "name": "Crypto Tips",
+      "channel_id": "UCavTvSwEoRABvnPtLg0e6LQ",
+      "handle": "@CryptoTips",
+      "subscribers": 258000,
+      "last_upload_date": "2026-05-11",
+      "category": "Crypto"
+    },
+    {
+      "name": "Anthony Pompliano",
+      "channel_id": "UCevXpeL8cNyAnww-NqJ4m2w",
+      "handle": "@AnthonyPompliano",
+      "subscribers": 645000,
+      "last_upload_date": "2026-05-11",
+      "category": "Crypto"
+    },
+    {
+      "name": "Tom Bilyeu",
+      "channel_id": "UCnYMOamNKLGVlJgRUbamveA",
+      "handle": "@TomBilyeu",
+      "subscribers": 4630000,
+      "last_upload_date": "2026-05-12",
+      "category": "Crypto"
+    },
+    {
+      "name": "James Shack",
+      "channel_id": "UCLXQalldcm6gMYMQfLMliww",
+      "handle": "@JamesShack",
+      "subscribers": 255000,
+      "last_upload_date": "2026-05-11",
+      "category": "UK / Europe"
+    },
+    {
+      "name": "Toby Newbatt",
+      "channel_id": "UC2DCjFH0taLx6MB4a3pbLmQ",
+      "handle": "@TobyNewbatt",
+      "subscribers": 191000,
+      "last_upload_date": "2026-05-12",
+      "category": "UK / Europe"
+    },
+    {
+      "name": "Finanzfluss",
+      "channel_id": "UCeARcCUiZg79SQQ-2_XNlXQ",
+      "handle": "@Finanzfluss",
+      "subscribers": 1610000,
+      "last_upload_date": "2026-05-13",
+      "category": "UK / Europe"
+    },
+    {
+      "name": "Aktien mit Kopf",
+      "channel_id": "UCpV9LpCg4uwYCQZ3qoEn_YQ",
+      "handle": "@AktienMitKopf",
+      "subscribers": 721000,
+      "last_upload_date": "2026-05-13",
+      "category": "UK / Europe"
+    },
+    {
+      "name": "Mission Money",
+      "channel_id": "UCpvNsu17XsZFH3a_6tl_YyQ",
+      "handle": "@MissionMoney",
+      "subscribers": 281000,
+      "last_upload_date": "2026-04-22",
+      "category": "UK / Europe"
+    },
+    {
+      "name": "Pranjal Kamra",
+      "channel_id": "UCwAdQUuPT6laN-AQR17fe1g",
+      "handle": "@PranjalKamra",
+      "subscribers": 6490000,
+      "last_upload_date": "2026-05-10",
+      "category": "India"
+    },
+    {
+      "name": "CA Rachana Phadke Ranade",
+      "channel_id": "UCe3qdG0A_gr-sEdat5y2twQ",
+      "handle": "@CARachanaRanade",
+      "subscribers": 5390000,
+      "last_upload_date": "2026-05-09",
+      "category": "India"
+    },
+    {
+      "name": "Labour Law Advisor",
+      "channel_id": "UCVOTBwF0vnSxMRIbfSE_K_g",
+      "handle": "@LabourLawAdvisor",
+      "subscribers": 5440000,
+      "last_upload_date": "2026-05-12",
+      "category": "India"
+    },
+    {
+      "name": "Zerodha",
+      "channel_id": "UC59YUBhNLMkS2Q8NBWBGHAA",
+      "handle": "@ZerodhaOnline",
+      "subscribers": 755000,
+      "last_upload_date": "2026-05-13",
+      "category": "India"
+    },
+    {
+      "name": "Yadnya Investment Academy",
+      "channel_id": "UCPohbSYq4IXhv0yxiy-sT4g",
+      "handle": "@investYadnya",
+      "subscribers": 936000,
+      "last_upload_date": "2026-05-13",
+      "category": "India"
+    },
+    {
+      "name": "Trade Brains",
+      "channel_id": "UCzw35O6toJtjqEAAt4LTjKQ",
+      "handle": "@TradeBrains",
+      "subscribers": 217000,
+      "last_upload_date": "2026-05-12",
+      "category": "India"
+    },
+    {
+      "name": "ET Money",
+      "channel_id": "UCxv9T8da7658T9R8LQT_3PQ",
+      "handle": "@ETMONEY",
+      "subscribers": 564000,
+      "last_upload_date": "2026-05-11",
+      "category": "India"
+    },
+    {
+      "name": "Groww",
+      "channel_id": "UCw5TLrz3qADabwezTEcOmgQ",
+      "handle": "@Groww",
+      "subscribers": 2460000,
+      "last_upload_date": "2026-05-12",
+      "category": "India"
+    },
+    {
+      "name": "Parallel Wealth",
+      "channel_id": "UCQPbiV4Poo3X7_POJ9GC6nA",
+      "handle": "@ParallelWealth",
+      "subscribers": 157000,
+      "last_upload_date": "2026-05-11",
+      "category": "Canada"
+    },
+    {
+      "name": "Preet Banerjee",
+      "channel_id": "UCT5tNhFbfQRXMkUzZE8XzyQ",
+      "handle": "@PreetBanerjee",
+      "subscribers": 127000,
+      "last_upload_date": "2026-05-06",
+      "category": "Canada"
+    },
+    {
+      "name": "QuantPy",
+      "channel_id": "UClT4BTqePQDxFHsnrSWQ8Wg",
+      "handle": "@QuantPy",
+      "subscribers": 94400,
+      "last_upload_date": "2026-02-20",
+      "category": "Quant"
+    },
+    {
+      "name": "MoneyShow",
+      "channel_id": "UCLnjAUrBG0G5Z8oGae_yZKg",
+      "handle": "@MoneyShow",
+      "subscribers": 160000,
+      "last_upload_date": "2026-05-12",
+      "category": "Sector / Specialty"
+    }
+  ],
+  "rejected": [
+    {
+      "handle": "@WealthionTV",
+      "reason": "not_found",
+      "category": "Macro / Economy"
+    },
+    {
+      "handle": "@LynAldenInvestmentStrategy",
+      "reason": "not_found",
+      "category": "Macro / Economy"
+    },
+    {
+      "handle": "@SantiagoCapital",
+      "title": "Ca",
+      "channel_id": "UCadwFp94xbVUZGfvov2SK3A",
+      "reason": "below_sub_floor",
+      "subscribers": 1,
+      "category": "Macro / Economy"
+    },
+    {
+      "handle": "@RealVision",
+      "title": "Real Vision",
+      "channel_id": "UCwSVtQvURxiyn1CQeyoExZg",
+      "reason": "stale",
+      "subscribers": 57200,
+      "last_upload_date": "2024-04-29",
+      "category": "Macro / Economy"
+    },
+    {
+      "handle": "@macrovoices",
+      "title": "Existential Echo",
+      "channel_id": "UCPQsZQ2yvJFv0TCo2wqZMgg",
+      "reason": "below_sub_floor",
+      "subscribers": 3,
+      "category": "Macro / Economy"
+    },
+    {
+      "handle": "@HedgeyeTV",
+      "reason": "not_found",
+      "category": "Macro / Economy"
+    },
+    {
+      "handle": "@TheFelderReport",
+      "reason": "not_found",
+      "category": "Macro / Economy"
+    },
+    {
+      "handle": "@KitcoNEWS",
+      "reason": "not_found",
+      "category": "Macro / Economy"
+    },
+    {
+      "handle": "@forwardguidance",
+      "title": "D Dixon",
+      "channel_id": "UC0E-St9TloQ7TAu8hn1xJ9w",
+      "reason": "below_sub_floor",
+      "subscribers": 6,
+      "category": "Macro / Economy"
+    },
+    {
+      "handle": "@blockworks_",
+      "reason": "not_found",
+      "category": "Macro / Economy"
+    },
+    {
+      "handle": "@doomberg",
+      "title": "Doomberg",
+      "channel_id": "UCQvPDfGqPFxpUEyzRqDM33Q",
+      "reason": "below_sub_floor",
+      "subscribers": 6,
+      "category": "Macro / Economy"
+    },
+    {
+      "handle": "@ThoughtfulMoney",
+      "title": "Thoughtful Money",
+      "channel_id": "UCKSl2GeK0iK1Ld9dzSv2HTw",
+      "reason": "below_sub_floor",
+      "subscribers": 46,
+      "category": "Macro / Economy"
+    },
+    {
+      "handle": "@JuliaLaRocheShow",
+      "reason": "not_found",
+      "category": "Macro / Economy"
+    },
+    {
+      "handle": "@LanceRoberts",
+      "title": "Lance Roberts",
+      "channel_id": "UCrKPlqtadvCTUq_YKMvqcMA",
+      "reason": "below_sub_floor",
+      "subscribers": 0,
+      "category": "Macro / Economy"
+    },
+    {
+      "handle": "@SteveVanMetre",
+      "title": "Stevevanmetre",
+      "channel_id": "UCSywTY7zgImxrCQ4fxRCT4Q",
+      "reason": "below_sub_floor",
+      "subscribers": 0,
+      "category": "Macro / Economy"
+    },
+    {
+      "handle": "@MichaelEveryGlobal",
+      "reason": "not_found",
+      "category": "Macro / Economy"
+    },
+    {
+      "handle": "@DavidLin_TV",
+      "reason": "not_found",
+      "category": "Macro / Economy"
+    },
+    {
+      "handle": "@PalisadesRadio",
+      "reason": "not_found",
+      "category": "Macro / Economy"
+    },
+    {
+      "handle": "@MichaelPento",
+      "reason": "not_found",
+      "category": "Macro / Economy"
+    },
+    {
+      "handle": "@TheJackFarleyChannel",
+      "reason": "not_found",
+      "category": "Macro / Economy"
+    },
+    {
+      "handle": "@TheInvestorsPodcastNetwork",
+      "reason": "not_found",
+      "category": "Value / Fundamental"
+    },
+    {
+      "handle": "@WeStudyBillionaires",
+      "reason": "not_found",
+      "category": "Value / Fundamental"
+    },
+    {
+      "handle": "@TheAcquirersPodcast",
+      "title": "The Acquirers Podcast",
+      "channel_id": "UCJ27FwJZ3hsMrPCviG5gCFg",
+      "reason": "below_sub_floor",
+      "subscribers": 16100,
+      "category": "Value / Fundamental"
+    },
+    {
+      "handle": "@FocusedCompounding",
+      "title": "Focused Compounding",
+      "channel_id": "UCeXFg-8SYfqa2bF-2ERR1SA",
+      "reason": "below_sub_floor",
+      "subscribers": 11700,
+      "category": "Value / Fundamental"
+    },
+    {
+      "handle": "@VitaliyKatsenelson",
+      "reason": "not_found",
+      "category": "Value / Fundamental"
+    },
+    {
+      "handle": "@CompoundingQuality",
+      "title": "Compounding Quality",
+      "channel_id": "UCxUxD8PSFN_JofKFMRGz4hA",
+      "reason": "below_sub_floor",
+      "subscribers": 3600,
+      "category": "Value / Fundamental"
+    },
+    {
+      "handle": "@StigBrodersen",
+      "reason": "not_found",
+      "category": "Value / Fundamental"
+    },
+    {
+      "handle": "@SafalNiveshak",
+      "title": "Vishal Khandelwal",
+      "channel_id": "UCcXACV7kOf0zMGIGZx0NSeg",
+      "reason": "below_sub_floor",
+      "subscribers": 14100,
+      "category": "Value / Fundamental"
+    },
+    {
+      "handle": "@TheValueInvestor",
+      "title": "TheValueinvestor",
+      "channel_id": "UCRPS2OfOi26lYTkavnxG9Zw",
+      "reason": "below_sub_floor",
+      "subscribers": 0,
+      "category": "Value / Fundamental"
+    },
+    {
+      "handle": "@OldSchoolValue",
+      "reason": "not_found",
+      "category": "Value / Fundamental"
+    },
+    {
+      "handle": "@TheRationalReminder",
+      "title": "The Rational Reminder",
+      "channel_id": "UC2z2gzgbUG65oOfaoa2hYXg",
+      "reason": "below_sub_floor",
+      "subscribers": 4,
+      "category": "Value / Fundamental"
+    },
+    {
+      "handle": "@AswathDamodaranOfficial",
+      "reason": "not_found",
+      "category": "Value / Fundamental"
+    },
+    {
+      "handle": "@MarkMinervini",
+      "reason": "not_found",
+      "category": "Trading / Technical"
+    },
+    {
+      "handle": "@TheTradingChannel",
+      "title": "The Trading Channel (The Trading Channel)",
+      "channel_id": "UCGL9ubdGcvZh_dvSV2z1hoQ",
+      "reason": "stale",
+      "subscribers": 2850000,
+      "last_upload_date": "2024-11-08",
+      "category": "Trading / Technical"
+    },
+    {
+      "handle": "@WarriorTrading",
+      "title": "\u0639\u0631\u0628 \u0641\u064a \u0648\u0648\u0644 \u0633\u062a\u0631\u064a\u062a / Arab in WS",
+      "channel_id": "UC-QUEw1_ACK0eiB_Lca2UXw",
+      "reason": "below_sub_floor",
+      "subscribers": 7310,
+      "category": "Trading / Technical"
+    },
+    {
+      "handle": "@TimSykes",
+      "title": "TimSykes",
+      "channel_id": "UCZ2BesUXJOmajpbSb11X1hA",
+      "reason": "below_sub_floor",
+      "subscribers": 7,
+      "category": "Trading / Technical"
+    },
+    {
+      "handle": "@AdamMancini",
+      "title": "Adam",
+      "channel_id": "UCTAdW2ABcvp6d56di15HrSg",
+      "reason": "below_sub_floor",
+      "subscribers": 0,
+      "category": "Trading / Technical"
+    },
+    {
+      "handle": "@TheChartGuys",
+      "reason": "not_found",
+      "category": "Trading / Technical"
+    },
+    {
+      "handle": "@SteveBurnsTrades",
+      "reason": "not_found",
+      "category": "Trading / Technical"
+    },
+    {
+      "handle": "@StockMarketLive",
+      "reason": "not_found",
+      "category": "Trading / Technical"
+    },
+    {
+      "handle": "@HumbledTrader",
+      "title": "HT",
+      "channel_id": "UCwMoQEGc4IqkuGLhJUkLwYQ",
+      "reason": "below_sub_floor",
+      "subscribers": 595,
+      "category": "Trading / Technical"
+    },
+    {
+      "handle": "@AndreasClenowOfficial",
+      "reason": "not_found",
+      "category": "Trading / Technical"
+    },
+    {
+      "handle": "@BloombergTelevision",
+      "title": "\ubbf8\uc18c \ub2e4\uc774\uc5b4\ub9ac : \ubbf8\uc18c\ub9d8 \uacc4\uc815",
+      "channel_id": "UCdK2BueKxC9VxXh7e1Ne4oQ",
+      "reason": "below_sub_floor",
+      "subscribers": 50,
+      "category": "News / Mainstream"
+    },
+    {
+      "handle": "@WallStreetJournal",
+      "reason": "not_found",
+      "category": "News / Mainstream"
+    },
+    {
+      "handle": "@ReutersBusiness",
+      "reason": "not_found",
+      "category": "News / Mainstream"
+    },
+    {
+      "handle": "@CNNBusiness",
+      "title": "CNN Business",
+      "channel_id": "UCe-4xQosMQGkIA8mT4sR98Q",
+      "reason": "stale",
+      "subscribers": 747000,
+      "last_upload_date": "2020-12-11",
+      "category": "News / Mainstream"
+    },
+    {
+      "handle": "@MorningBrewDaily",
+      "reason": "not_found",
+      "category": "News / Mainstream"
+    },
+    {
+      "handle": "@HumphreyTalks",
+      "title": "Humphrey Talks",
+      "channel_id": "UCsvIZLbGmbpCMuobt-eXNYg",
+      "reason": "below_sub_floor",
+      "subscribers": 15,
+      "category": "Personal Finance"
+    },
+    {
+      "handle": "@ErikaKullberg",
+      "reason": "not_found",
+      "category": "Personal Finance"
+    },
+    {
+      "handle": "@DowJanes",
+      "reason": "not_found",
+      "category": "Personal Finance"
+    },
+    {
+      "handle": "@MoneyWithKatie",
+      "title": "Money with Katie",
+      "channel_id": "UCHYk1jOFYyuZE4-bvhGuV4Q",
+      "reason": "below_sub_floor",
+      "subscribers": 29200,
+      "category": "Personal Finance"
+    },
+    {
+      "handle": "@DaveRamsey",
+      "title": "Ramsey Solutions",
+      "channel_id": "UCQGUMLtkv5X-tGc3VDghu9Q",
+      "reason": "below_sub_floor",
+      "subscribers": 40300,
+      "category": "Personal Finance"
+    },
+    {
+      "handle": "@ColdFusion_TV",
+      "reason": "not_found",
+      "category": "Semis / Hardware"
+    },
+    {
+      "handle": "@TheTechAltar",
+      "reason": "not_found",
+      "category": "Semis / Hardware"
+    },
+    {
+      "handle": "@ApertureUnknown",
+      "title": "aperture unknown",
+      "channel_id": "UCjdya45MeI_RGp8PSOaUbnQ",
+      "reason": "below_sub_floor",
+      "subscribers": 6,
+      "category": "Semis / Hardware"
+    },
+    {
+      "handle": "@HighYieldHarry",
+      "title": "High Yield Harry",
+      "channel_id": "UCzlkKRB1aUPvte6C3uK3jug",
+      "reason": "below_sub_floor",
+      "subscribers": 0,
+      "category": "Semis / Hardware"
+    },
+    {
+      "handle": "@ChipStockInvestorPlus",
+      "reason": "not_found",
+      "category": "Semis / Hardware"
+    },
+    {
+      "handle": "@DaveLeeonInvesting",
+      "reason": "not_found",
+      "category": "EV / Auto"
+    },
+    {
+      "handle": "@HyperChange",
+      "title": "HyperChange",
+      "channel_id": "UCjHi3W14t_neeoWKeTZftHg",
+      "reason": "below_sub_floor",
+      "subscribers": 17,
+      "category": "EV / Auto"
+    },
+    {
+      "handle": "@TheElectricViking",
+      "title": "theelectricviking",
+      "channel_id": "UCpmKt6QENP7qQV1YeGtmDhA",
+      "reason": "below_sub_floor",
+      "subscribers": 1,
+      "category": "EV / Auto"
+    },
+    {
+      "handle": "@BearishBullsTesla",
+      "reason": "not_found",
+      "category": "EV / Auto"
+    },
+    {
+      "handle": "@BenjaminCowen",
+      "reason": "not_found",
+      "category": "Crypto"
+    },
+    {
+      "handle": "@cryptobanter",
+      "reason": "not_found",
+      "category": "Crypto"
+    },
+    {
+      "handle": "@APompliano",
+      "title": "\ud835\udd38\ud835\udd5f\ud835\udd65\ud835\udd59\ud835\udd60\ud835\udd5f\ud835\udd6a \u2119\ud835\udd60\ud835\udd5e\ud835\udd61\ud835\udd5d\ud835\udd5a\ud835\udd52\ud835\udd5f\ud835\udd60",
+      "channel_id": "UCYXLs8tkNQrENrT1s60rxCw",
+      "reason": "below_sub_floor",
+      "subscribers": 11,
+      "category": "Crypto"
+    },
+    {
+      "handle": "@TheMoonCarl",
+      "reason": "not_found",
+      "category": "Crypto"
+    },
+    {
+      "handle": "@AndreasMAntonopoulos",
+      "reason": "not_found",
+      "category": "Crypto"
+    },
+    {
+      "handle": "@RaoulPalSpace",
+      "reason": "not_found",
+      "category": "Crypto"
+    },
+    {
+      "handle": "@MoneyToTheMasses",
+      "title": "Money to the Masses",
+      "channel_id": "UCghrS4IJtiY3B1FJ7nFIuSw",
+      "reason": "below_sub_floor",
+      "subscribers": 14900,
+      "category": "UK / Europe"
+    },
+    {
+      "handle": "@MoneyUnshackled",
+      "title": "Money Unshackled",
+      "channel_id": "UCsK9grupHNsIsSqIAyBBU7w",
+      "reason": "below_sub_floor",
+      "subscribers": 38400,
+      "category": "UK / Europe"
+    },
+    {
+      "handle": "@PensionCraftUK",
+      "reason": "not_found",
+      "category": "UK / Europe"
+    },
+    {
+      "handle": "@DamienTalksMoneyOfficial",
+      "reason": "not_found",
+      "category": "UK / Europe"
+    },
+    {
+      "handle": "@TheFinanceStorytellerNL",
+      "reason": "not_found",
+      "category": "UK / Europe"
+    },
+    {
+      "handle": "@MissionMillionaireDE",
+      "reason": "not_found",
+      "category": "UK / Europe"
+    },
+    {
+      "handle": "@xelius_finance",
+      "reason": "not_found",
+      "category": "UK / Europe"
+    },
+    {
+      "handle": "@VolkerVollath",
+      "reason": "not_found",
+      "category": "UK / Europe"
+    },
+    {
+      "handle": "@PR_Sundar",
+      "reason": "not_found",
+      "category": "India"
+    },
+    {
+      "handle": "@powerofstocks",
+      "reason": "not_found",
+      "category": "India"
+    },
+    {
+      "handle": "@FinnovationZ",
+      "reason": "not_found",
+      "category": "India"
+    },
+    {
+      "handle": "@SamcoSecurities",
+      "title": "Bhushan Rocks",
+      "channel_id": "UCy9iXo1HfTNsLqC6Z9vdW2A",
+      "reason": "below_sub_floor",
+      "subscribers": 1,
+      "category": "India"
+    },
+    {
+      "handle": "@CAaJay",
+      "title": "caajay",
+      "channel_id": "UCh7OcCG07gcp6-LKxPyiKjA",
+      "reason": "below_sub_floor",
+      "subscribers": 0,
+      "category": "India"
+    },
+    {
+      "handle": "@AsoCFA",
+      "reason": "not_found",
+      "category": "India"
+    },
+    {
+      "handle": "@AnishMehra_Investment",
+      "reason": "not_found",
+      "category": "India"
+    },
+    {
+      "handle": "@TheRaskGroup",
+      "title": "TheRaskGroup",
+      "channel_id": "UCb2pBch97emKxV0uoTbt3-A",
+      "reason": "below_sub_floor",
+      "subscribers": 15,
+      "category": "Australia / NZ"
+    },
+    {
+      "handle": "@EquityMatesInvestPodcast",
+      "reason": "not_found",
+      "category": "Australia / NZ"
+    },
+    {
+      "handle": "@StrongMoneyAustralia",
+      "reason": "not_found",
+      "category": "Australia / NZ"
+    },
+    {
+      "handle": "@TheAussieInvestor",
+      "title": "Williamson Wealth",
+      "channel_id": "UC0RGzoDoh8lsb3YvCQAHyZQ",
+      "reason": "below_sub_floor",
+      "subscribers": 2,
+      "category": "Australia / NZ"
+    },
+    {
+      "handle": "@AusFinanceFootprint",
+      "reason": "not_found",
+      "category": "Australia / NZ"
+    },
+    {
+      "handle": "@TawcanFinance",
+      "reason": "not_found",
+      "category": "Canada"
+    },
+    {
+      "handle": "@BlossomSocial",
+      "reason": "not_found",
+      "category": "Canada"
+    },
+    {
+      "handle": "@CanadianInPursuit",
+      "reason": "not_found",
+      "category": "Canada"
+    },
+    {
+      "handle": "@TheCanadianInvestor",
+      "title": "The Canadian Investor",
+      "channel_id": "UCGxyPg0jpX6dqqh9vBN7Clw",
+      "reason": "below_sub_floor",
+      "subscribers": 0,
+      "category": "Canada"
+    },
+    {
+      "handle": "@LucasCarlos",
+      "title": "Carlos Marcos",
+      "channel_id": "UCspB0Bodnw3BG4mAgMMmFrQ",
+      "reason": "below_sub_floor",
+      "subscribers": 2,
+      "category": "LatAm / Spain"
+    },
+    {
+      "handle": "@DanielsTradingChannel",
+      "reason": "not_found",
+      "category": "LatAm / Spain"
+    },
+    {
+      "handle": "@ProyectoinversionES",
+      "reason": "not_found",
+      "category": "LatAm / Spain"
+    },
+    {
+      "handle": "@QuantConnect",
+      "title": "QuantConnect",
+      "channel_id": "UCAdFNuXoeO6zRYC39pyDA6g",
+      "reason": "below_sub_floor",
+      "subscribers": 15400,
+      "category": "Quant"
+    },
+    {
+      "handle": "@TheAlgoTradingClub",
+      "reason": "not_found",
+      "category": "Quant"
+    },
+    {
+      "handle": "@MachineLearningPlus",
+      "title": "AiML Mastery Club",
+      "channel_id": "UCpcJNrQyW3Ge7w9-dmijW9Q",
+      "reason": "below_sub_floor",
+      "subscribers": 32200,
+      "category": "Quant"
+    },
+    {
+      "handle": "@BiotechBreakouts",
+      "reason": "not_found",
+      "category": "Sector / Specialty"
+    },
+    {
+      "handle": "@StockBrosResearchPlus",
+      "reason": "not_found",
+      "category": "Sector / Specialty"
+    },
+    {
+      "handle": "@WallStreetMillenialPlus",
+      "reason": "not_found",
+      "category": "Sector / Specialty"
+    },
+    {
+      "handle": "@SubstackInvesting",
+      "reason": "not_found",
+      "category": "Sector / Specialty"
+    }
+  ]
+}
