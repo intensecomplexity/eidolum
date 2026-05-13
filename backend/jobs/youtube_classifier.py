@@ -510,7 +510,13 @@ QWEN_SYSTEM_PROMPT = (
 # field is now structurally zero — anything else is a stale RunPod
 # heuristic that misled per-run/per-day cost reports.
 QWEN_PRICE_PER_CALL_USD = 0.0
-CLASSIFIER_MAX_OUTPUT_TOKENS = 800  # Cap generation to stay under CF 100s timeout
+# Streaming responses (see call_runpod_vllm) keep the CF Access tunnel
+# open token-by-token, so we no longer need to cap generation to fit
+# under the 100s timeout. Bumped 800→2000 so chunks in dense scripts
+# (Hindi/CJK tokenize at 3-5x more tokens per char than English) don't
+# truncate mid-output. The truncated_output exception path is preserved
+# as a signal — if we start hitting 2000 too, the chunk size is wrong.
+CLASSIFIER_MAX_OUTPUT_TOKENS = 2000
 
 
 def call_runpod_vllm(
