@@ -47,6 +47,46 @@ from jobs.youtube_classifier import (  # noqa: E402
 
 YOUTUBE_API = "https://www.googleapis.com/youtube/v3"
 
+
+def _existing_channel_ids() -> set[str]:
+    """Pull active TARGET_CHANNELS' resolved channel_ids from the DB
+    once at startup. Used to skip the classifier-heavy tryout step
+    for channels already in production.
+    """
+    import psycopg2
+    url = os.environ.get("DATABASE_URL") or os.environ.get("DATABASE_PUBLIC_URL")
+    if not url:
+        return set()
+    try:
+        conn = psycopg2.connect(url)
+        cur = conn.cursor()
+        cur.execute(
+            "SELECT youtube_channel_id FROM youtube_channels "
+            "WHERE is_active = TRUE AND youtube_channel_id IS NOT NULL"
+        )
+        ids = {r[0] for r in cur.fetchall() if r[0]}
+        cur.close(); conn.close()
+        return ids
+    except Exception as e:
+        print(f"[dup-check] DB lookup failed ({e}); falling back to name match only")
+        return set()
+
+
+def _existing_target_names() -> set[str]:
+    """Lowercase-stripped TARGET_CHANNELS entries for name-based fallback
+    dup detection (catches channels where channel_id isn't yet resolved
+    in the DB but the display name is already in the seed list).
+    """
+    try:
+        from jobs.youtube_channel_monitor import TARGET_CHANNELS
+        return {n.strip().lower() for n in TARGET_CHANNELS}
+    except Exception:
+        return set()
+
+
+EXISTING_CHANNEL_IDS = _existing_channel_ids()
+EXISTING_NAMES = _existing_target_names()
+
 API_KEY = (
     os.environ.get("YOUTUBE_DATA_API_KEY")
     or os.environ.get("YOUTUBE_API_KEY")
@@ -236,6 +276,29 @@ def tryout_channel(handle: str) -> dict:
         or ""
     )
     print(f"  resolved → {name} ({cid}, {subs:,} subs)")
+
+    # DUP skip — channel_id already in production (youtube_channels) OR
+    # display name already in TARGET_CHANNELS seed list. Either signal
+    # means classifier work would be wasted.
+    if cid and cid in EXISTING_CHANNEL_IDS:
+        print(f"  DUP — channel_id already in TARGET_CHANNELS")
+        return {
+            "handle": handle, "channel_id": cid, "channel_name": name,
+            "subscriber_count": subs, "verdict": "DUP",
+            "dup_match": "channel_id",
+            "videos_tested": 0, "videos_with_prediction": 0,
+            "total_predictions": 0, "sample_predictions": [],
+        }
+    if name and name.strip().lower() in EXISTING_NAMES:
+        print(f"  DUP — display name matches TARGET_CHANNELS entry")
+        return {
+            "handle": handle, "channel_id": cid, "channel_name": name,
+            "subscriber_count": subs, "verdict": "DUP",
+            "dup_match": "name",
+            "videos_tested": 0, "videos_with_prediction": 0,
+            "total_predictions": 0, "sample_predictions": [],
+        }
+
     if not uploads:
         return {
             "handle": handle, "channel_id": cid, "channel_name": name,
