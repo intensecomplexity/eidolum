@@ -1,12 +1,26 @@
 from datetime import datetime
 from fastapi import APIRouter, Depends, Query, Request
 from sqlalchemy.orm import Session
+from sqlalchemy import text
 from database import get_db
 from models import Prediction, Forecaster
 from utils import append_youtube_timestamp
+from services.prediction_visibility import (
+    yt_visible_filter, not_excluded_filter, non_qwen_filter,
+)
 from rate_limit import limiter
 
 router = APIRouter()
+
+# User-facing visibility policy: hide NULL-timestamp YouTube rows
+# (2026-04-18 policy), quality-excluded rows (excluded_from_training),
+# and Qwen-audit rows — matching every other user-facing router. This
+# feed previously applied no filter at all.
+_VISIBLE = text(
+    f"{yt_visible_filter('predictions')} "
+    f"AND {not_excluded_filter('predictions')} "
+    f"AND {non_qwen_filter('predictions')}"
+)
 
 
 @router.get("/predictions/today")
@@ -18,6 +32,7 @@ def get_today_predictions(request: Request, db: Session = Depends(get_db)):
     predictions = (
         db.query(Prediction)
         .filter(Prediction.prediction_date >= today_start)
+        .filter(_VISIBLE)
         .order_by(Prediction.prediction_date.desc())
         .limit(5)
         .all()
@@ -27,6 +42,7 @@ def get_today_predictions(request: Request, db: Session = Depends(get_db)):
     if not predictions:
         predictions = (
             db.query(Prediction)
+            .filter(_VISIBLE)
             .order_by(Prediction.prediction_date.desc())
             .limit(5)
             .all()
@@ -64,7 +80,7 @@ def get_recent_predictions(
     db: Session = Depends(get_db),
 ):
     """Get all recent predictions, paginated, newest first."""
-    query = db.query(Prediction)
+    query = db.query(Prediction).filter(_VISIBLE)
 
     if ticker:
         query = query.filter(Prediction.ticker == ticker.upper())
