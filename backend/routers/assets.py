@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import text as sql_text
 from database import get_db
 from models import Prediction, Forecaster, format_timestamp, get_youtube_timestamp_url
-from utils import compute_forecaster_stats
+from utils import compute_forecaster_stats, append_youtube_timestamp
 from utils.ticker import ticker_is_known
 from rate_limit import limiter
 from services.ticker_display import (
@@ -202,7 +202,8 @@ def _build_ticker_detail(ticker: str, db) -> dict:
             SELECT p.id, p.direction, p.target_price, p.entry_price,
                    p.prediction_date, p.evaluation_date, p.window_days,
                    p.context, p.exact_quote, p.source_url,
-                   f.id, f.name, f.handle, f.accuracy_score, f.firm
+                   f.id, f.name, f.handle, f.accuracy_score, f.firm,
+                   p.source_type, p.source_timestamp_seconds, p.video_timestamp_sec
             FROM predictions p
             JOIN forecasters f ON f.id = p.forecaster_id
             WHERE p.ticker = :t AND p.outcome = 'pending'
@@ -223,7 +224,7 @@ def _build_ticker_detail(ticker: str, db) -> dict:
                 "prediction_date": pred_date.isoformat() if pred_date else None,
                 "evaluation_date": eval_date.isoformat() if eval_date else None,
                 "window_days": r[6], "context": r[7], "exact_quote": r[8],
-                "source_url": r[9], "days_remaining": days_rem, "ticker": ticker,
+                "source_url": append_youtube_timestamp(r[9], r[15], r[16], r[17]), "days_remaining": days_rem, "ticker": ticker,
                 "outcome": "pending",
                 "forecaster": {"id": r[10], "name": r[11], "handle": r[12],
                                "accuracy_rate": acc, "firm": r[14] or None},
@@ -442,7 +443,7 @@ def get_asset_consensus(
             "sector": resolve_ticker_display_sector(p.ticker, p.sector),
             "context": p.context,
             "exact_quote": p.exact_quote,
-            "source_url": p.source_url,
+            "source_url": append_youtube_timestamp(p.source_url, p.source_type, p.source_timestamp_seconds, p.video_timestamp_sec),
             "source_type": p.source_type,
             "source_title": p.source_title,
             "source_platform_id": p.source_platform_id,
@@ -520,7 +521,7 @@ def get_asset_consensus(
             "prediction_date": p.prediction_date.isoformat() if p.prediction_date else None,
             "evaluation_date": p.evaluation_date.isoformat() if p.evaluation_date else None,
             "window_days": p.window_days, "context": p.context, "exact_quote": p.exact_quote,
-            "source_url": p.source_url, "outcome": "pending", "ticker": ticker,
+            "source_url": append_youtube_timestamp(p.source_url, p.source_type, p.source_timestamp_seconds, p.video_timestamp_sec), "outcome": "pending", "ticker": ticker,
             "forecaster": {"id": f.id, "name": f.name, "handle": f.handle,
                            "accuracy_rate": round(acc, 1), "firm": getattr(f, 'firm', None)},
         })

@@ -8,9 +8,45 @@ file re-hosts the original utils.py contents inside the package so
 existing call sites keep working alongside ``from utils.sector import …``.
 """
 import datetime
+import re
 from collections import defaultdict
 from sqlalchemy.orm import Session
 from models import Forecaster, Prediction
+
+
+_YT_T_PARAM = re.compile(r'[?&]t=[^&]*')
+
+
+def append_youtube_timestamp(source_url, source_type=None,
+                             source_timestamp_seconds=None,
+                             video_timestamp_sec=None):
+    """Return source_url with an &t=Ns YouTube deep-link anchor appended.
+
+    The DB stores the resolved timestamp in source_timestamp_seconds
+    (Ship #9) but persists a bare ``watch?v=...`` URL. The API/render
+    layer assembles the deep link. Null-safe and idempotent: non-YouTube
+    URLs and missing timestamps return the URL unchanged, and any
+    pre-existing ``t=`` param is stripped before re-adding so repeated
+    serialization never duplicates it.
+    """
+    url = source_url
+    if not url or not isinstance(url, str):
+        return source_url
+    if 'youtube.com' not in url and 'youtu.be' not in url:
+        return url
+    secs = (source_timestamp_seconds if source_timestamp_seconds is not None
+            else video_timestamp_sec)
+    if secs is None:
+        return url
+    try:
+        n = int(secs)
+    except (TypeError, ValueError):
+        return url
+    if n < 0:
+        return url
+    cleaned = _YT_T_PARAM.sub('', url)
+    sep = '&' if '?' in cleaned else '?'
+    return f"{cleaned}{sep}t={n}s"
 
 
 def compute_forecaster_stats(

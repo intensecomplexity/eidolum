@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func
 
 from database import get_db
+from utils import append_youtube_timestamp
 from models import User, UserPrediction, Prediction, Forecaster, PredictionReaction, PredictionComment
 from rate_limit import limiter
 from ticker_lookup import TICKER_INFO
@@ -122,7 +123,7 @@ def get_prediction_detail(
             "accuracy": forecaster.accuracy_score if forecaster else 0,
             "scored_count": forecaster.total_predictions if forecaster else 0,
             "rank": "Analyst",
-            "source_url": pred.source_url,
+            "source_url": append_youtube_timestamp(pred.source_url, pred.source_type, pred.source_timestamp_seconds, pred.video_timestamp_sec),
             "exact_quote": pred.exact_quote,
             "source_verbatim_quote": pred.source_verbatim_quote,
             "evaluation_deferred": getattr(pred, "evaluation_deferred", None),

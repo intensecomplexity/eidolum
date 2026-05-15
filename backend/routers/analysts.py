@@ -10,6 +10,7 @@ from sqlalchemy import func
 
 from database import get_db
 from models import Forecaster, Prediction, AnalystSubscription, User
+from utils import append_youtube_timestamp
 from rate_limit import limiter
 from services.ticker_display import resolve_ticker_display_sector
 from auth import get_current_user as _decode_token
@@ -195,7 +196,7 @@ def analyst_profile(request: Request, name: str, db: Session = Depends(get_db)):
                 "actual_return": p.actual_return,
                 "prediction_date": p.prediction_date.isoformat() if p.prediction_date else None,
                 "evaluation_date": p.evaluation_date.isoformat() if p.evaluation_date else None,
-                "source_url": p.source_url,
+                "source_url": append_youtube_timestamp(p.source_url, p.source_type, p.source_timestamp_seconds, p.video_timestamp_sec),
                 "evaluation_deferred": getattr(p, "evaluation_deferred", None),
                 "evaluation_deferred_reason": getattr(p, "evaluation_deferred_reason", None),
             }
@@ -299,7 +300,7 @@ def analyst_predictions(
                 "sector": resolve_ticker_display_sector(p.ticker, p.sector),
                 "prediction_date": p.prediction_date.isoformat() if p.prediction_date else None,
                 "evaluation_date": p.evaluation_date.isoformat() if p.evaluation_date else None,
-                "source_url": p.source_url,
+                "source_url": append_youtube_timestamp(p.source_url, p.source_type, p.source_timestamp_seconds, p.video_timestamp_sec),
                 "exact_quote": p.exact_quote,
                 "source_verbatim_quote": p.source_verbatim_quote,
                 "evaluation_deferred": getattr(p, "evaluation_deferred", None),

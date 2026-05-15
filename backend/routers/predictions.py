@@ -3,6 +3,7 @@ from fastapi import APIRouter, Depends, Query, Request
 from sqlalchemy.orm import Session
 from database import get_db
 from models import Prediction, Forecaster
+from utils import append_youtube_timestamp
 from rate_limit import limiter
 
 router = APIRouter()
@@ -39,7 +40,7 @@ def get_today_predictions(request: Request, db: Session = Depends(get_db)):
             "ticker": p.ticker,
             "direction": p.direction,
             "context": p.context,
-            "source_url": p.source_url,
+            "source_url": append_youtube_timestamp(p.source_url, p.source_type, p.source_timestamp_seconds, p.video_timestamp_sec),
             "archive_url": p.archive_url,
             "prediction_date": p.prediction_date.isoformat() if p.prediction_date else None,
             "forecaster_name": forecaster.name if forecaster else "Unknown",
@@ -89,7 +90,7 @@ def get_recent_predictions(
             "ticker": p.ticker,
             "direction": p.direction,
             "context": p.context,
-            "source_url": p.source_url,
+            "source_url": append_youtube_timestamp(p.source_url, p.source_type, p.source_timestamp_seconds, p.video_timestamp_sec),
             "archive_url": p.archive_url,
             "prediction_date": p.prediction_date.isoformat() if p.prediction_date else None,
             "forecaster_name": forecaster.name if forecaster else "Unknown",

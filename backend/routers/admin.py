@@ -6,6 +6,7 @@ from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import func, text as sql_text
 from database import get_db
+from utils import append_youtube_timestamp
 from models import (
     Forecaster, Prediction, Disclosure, TrackedXAccount, SuggestedXAccount,
     XScraperRejection, YouTubeChannelMeta, SectorEtfAlias,
@@ -170,7 +171,7 @@ def list_pending_review(request: Request, admin: bool = Depends(require_admin), 
             "direction": p.direction,
             "context": p.context,
             "exact_quote": p.exact_quote,
-            "source_url": p.source_url,
+            "source_url": append_youtube_timestamp(p.source_url, p.source_type, p.source_timestamp_seconds, p.video_timestamp_sec),
             "source_type": p.source_type,
             "prediction_date": p.prediction_date.isoformat() if p.prediction_date else None,
             "verified_by": p.verified_by,

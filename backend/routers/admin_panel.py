@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func, text as sql_text
 
 from database import get_db
+from utils import append_youtube_timestamp
 from models import User, Forecaster, Prediction, UserPrediction, AuditLog
 from middleware.auth import require_admin_user
 from rate_limit import limiter
@@ -255,7 +256,7 @@ def list_predictions_v2(request: Request, admin_id: int = Depends(require_admin_
             "actual_return": float(p.actual_return) if p.actual_return is not None else None,
             "forecaster_name": fname_map.get(p.forecaster_id, "Unknown"),
             "exact_quote": (p.exact_quote or p.context or "")[:120],
-            "source_url": p.source_url,
+            "source_url": append_youtube_timestamp(p.source_url, p.source_type, p.source_timestamp_seconds, p.video_timestamp_sec),
         } for p in predictions],
         "total": total,
         "page": page,

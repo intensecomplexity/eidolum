@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func
 from database import get_db
 from models import SavedPrediction, Prediction, Forecaster
+from utils import append_youtube_timestamp
 from rate_limit import limiter
 from services.ticker_display import resolve_ticker_display_sector
 
@@ -45,7 +46,7 @@ def _prediction_to_dict(p, f, save_record=None):
         "source_verbatim_quote": p.source_verbatim_quote,
         "evaluation_deferred": getattr(p, "evaluation_deferred", None),
         "evaluation_deferred_reason": getattr(p, "evaluation_deferred_reason", None),
-        "source_url": p.source_url,
+        "source_url": append_youtube_timestamp(p.source_url, p.source_type, p.source_timestamp_seconds, p.video_timestamp_sec),
         "source_type": p.source_type,
         "source_title": p.source_title,
         # Resolution tracking
