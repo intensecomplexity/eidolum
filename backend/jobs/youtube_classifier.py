@@ -6024,6 +6024,11 @@ def insert_youtube_regime_prediction(
             prediction_category="regime_call",
             regime_type=regime_type,
             regime_instrument=instrument,
+            # Link to youtube_videos via the 11-char video-id string key
+            # (predictions.video_id FKs to the empty legacy `videos`
+            # table and is unused). The other 7 category inserts already
+            # set this; regime_call was the lone gap.
+            transcript_video_id=(video_id or "")[:11] or None,
             # regime_max_drawdown / regime_max_runup / regime_new_highs
             # / regime_new_lows stay NULL until the evaluator scores.
             **_meta_fields,
