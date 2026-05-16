@@ -522,6 +522,12 @@ QWEN_PRICE_PER_CALL_USD = 0.0
 CLASSIFIER_MAX_OUTPUT_TOKENS = 2000
 
 
+class _ClassifierRetryable(Exception):
+    """Transient classifier failure — the caller retries with backoff.
+    Distinct from RuntimeError, which call_runpod_vllm raises for
+    terminal failures (4xx, truncated output) that a retry won't fix."""
+
+
 def call_runpod_vllm(
     transcript_chunk: str,
     channel_name: str,
@@ -598,75 +604,119 @@ def call_runpod_vllm(
     }
 
     identifier = video_id or channel_name
-    t0 = time.time()
-    content_parts: list[str] = []
-    finish_reason: str | None = None
-    usage: dict = {}
-    status_code = 0
-    error_body = ""
-    try:
-        with _httpx.stream(
-            "POST",
-            url,
-            json=payload,
-            headers={
-                "CF-Access-Client-Id": CF_ACCESS_CLIENT_ID,
-                "CF-Access-Client-Secret": CF_ACCESS_CLIENT_SECRET,
-                "Content-Type": "application/json",
-                "Accept": "text/event-stream",
-            },
-            timeout=_httpx.Timeout(connect=15.0, read=RUNPOD_TIMEOUT_SECONDS, write=15.0, pool=15.0),
-        ) as r:
-            status_code = r.status_code
-            if status_code != 200:
-                error_body = r.read().decode("utf-8", errors="replace")[:300]
-            else:
-                for line in r.iter_lines():
-                    if not line:
-                        continue
-                    if not line.startswith("data:"):
-                        continue
-                    data_str = line[5:].lstrip()
-                    if data_str == "[DONE]":
-                        break
-                    try:
-                        chunk_data = json.loads(data_str)
-                    except json.JSONDecodeError:
-                        continue
-                    if chunk_data.get("usage"):
-                        usage = chunk_data["usage"]
-                    choices = chunk_data.get("choices") or []
-                    if not choices:
-                        continue
-                    choice0 = choices[0] or {}
-                    delta = choice0.get("delta") or {}
-                    piece = delta.get("content")
-                    if piece:
-                        content_parts.append(piece)
-                    fr = choice0.get("finish_reason")
-                    if fr:
-                        finish_reason = fr
-    except _httpx.TimeoutException:
-        _record_failure()
-        raise RuntimeError(
-            f"Classifier timeout after {RUNPOD_TIMEOUT_SECONDS}s for {identifier}"
-        )
-    except Exception:
-        _record_failure()
-        raise
 
-    latency = time.time() - t0
+    # Retry-with-backoff around the streaming classifier call. Pavilion
+    # (the self-hosted vLLM box behind the Cloudflare Access tunnel)
+    # intermittently returns transient gateway errors — HTTP 524 (origin
+    # slow), 530 (tunnel dropped), 502/503 — and the SSE stream can close
+    # mid-response. A short backoff usually clears them. Terminal errors
+    # (4xx, truncated output) are not retried. Only the final give-up
+    # calls _record_failure(), so a blip absorbed by a retry no longer
+    # counts toward tripping the circuit breaker.
+    _RETRYABLE_HTTP = {502, 503, 524, 530}
+    _BACKOFFS = [5, 15, 45]  # seconds before retry 1, 2, 3
 
-    if status_code != 200:
-        _record_failure()
-        raise RuntimeError(
-            f"Classifier HTTP {status_code}: {error_body}"
-        )
+    def _attempt():
+        """One streaming classifier call. Returns
+        (content, finish_reason, usage, latency). Raises
+        _ClassifierRetryable for transient failures (caller retries) and
+        RuntimeError for terminal ones (caller re-raises). The streaming
+        parse below is unchanged from the pre-retry implementation."""
+        t0 = time.time()
+        content_parts: list[str] = []
+        finish_reason: str | None = None
+        usage: dict = {}
+        status_code = 0
+        error_body = ""
+        try:
+            with _httpx.stream(
+                "POST",
+                url,
+                json=payload,
+                headers={
+                    "CF-Access-Client-Id": CF_ACCESS_CLIENT_ID,
+                    "CF-Access-Client-Secret": CF_ACCESS_CLIENT_SECRET,
+                    "Content-Type": "application/json",
+                    "Accept": "text/event-stream",
+                },
+                timeout=_httpx.Timeout(connect=15.0, read=RUNPOD_TIMEOUT_SECONDS, write=15.0, pool=15.0),
+            ) as r:
+                status_code = r.status_code
+                if status_code != 200:
+                    error_body = r.read().decode("utf-8", errors="replace")[:300]
+                else:
+                    for line in r.iter_lines():
+                        if not line:
+                            continue
+                        if not line.startswith("data:"):
+                            continue
+                        data_str = line[5:].lstrip()
+                        if data_str == "[DONE]":
+                            break
+                        try:
+                            chunk_data = json.loads(data_str)
+                        except json.JSONDecodeError:
+                            continue
+                        if chunk_data.get("usage"):
+                            usage = chunk_data["usage"]
+                        choices = chunk_data.get("choices") or []
+                        if not choices:
+                            continue
+                        choice0 = choices[0] or {}
+                        delta = choice0.get("delta") or {}
+                        piece = delta.get("content")
+                        if piece:
+                            content_parts.append(piece)
+                        fr = choice0.get("finish_reason")
+                        if fr:
+                            finish_reason = fr
+        except _httpx.TimeoutException as _e:
+            raise _ClassifierRetryable(
+                f"timeout after {RUNPOD_TIMEOUT_SECONDS}s") from _e
+        except _httpx.TransportError as _e:
+            # connect / read / remote-protocol (mid-stream close) errors
+            raise _ClassifierRetryable(type(_e).__name__) from _e
+        latency = time.time() - t0
+        if status_code != 200:
+            if status_code in _RETRYABLE_HTTP:
+                raise _ClassifierRetryable(f"HTTP {status_code}")
+            raise RuntimeError(f"Classifier HTTP {status_code}: {error_body}")
+        content = "".join(content_parts)
+        if not content:
+            # 200 but no content — usually the SSE stream closed
+            # mid-response; transient, so retry.
+            raise _ClassifierRetryable("empty stream")
+        return content, finish_reason, usage, latency
 
-    content = "".join(content_parts)
-    if not content:
-        _record_failure()
-        raise RuntimeError("Classifier returned empty stream")
+    content = ""
+    finish_reason = None
+    usage = {}
+    latency = 0.0
+    for _attempt_i in range(len(_BACKOFFS) + 1):
+        try:
+            content, finish_reason, usage, latency = _attempt()
+            break
+        except _ClassifierRetryable as _re:
+            if _attempt_i < len(_BACKOFFS):
+                _wait = _BACKOFFS[_attempt_i]
+                print(
+                    f"[classifier] retry {_attempt_i + 1}/{len(_BACKOFFS)} "
+                    f"after {_re} — waiting {_wait}s ({identifier})",
+                    flush=True,
+                )
+                time.sleep(_wait)
+                continue
+            _record_failure()
+            raise RuntimeError(
+                f"Classifier failed after {len(_BACKOFFS) + 1} attempts "
+                f"for {identifier}: {_re}"
+            )
+        except RuntimeError:
+            _record_failure()
+            raise
+        except Exception:
+            _record_failure()
+            raise
 
     # finish_reason == "length" means we hit max_tokens mid-generation.
     # The partial JSON would either fail to parse or silently drop

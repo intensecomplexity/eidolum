@@ -341,6 +341,60 @@ def _watchdog():
     _youtube_pipeline_watchdog()
 
 
+def _classifier_warmup_loop():
+    """Every 5 minutes, ping the classifier endpoint with a tiny prompt
+    to keep the Pavilion vLLM model warm and the Cloudflare Access
+    tunnel exercised — fewer cold-start 524s on the next real cycle.
+
+    This is a standalone HTTP call: it deliberately does NOT go through
+    call_runpod_vllm, so it never touches the classifier circuit
+    breaker or the YouTube stats. Failures are logged and ignored.
+    Disable with CLASSIFIER_WARMUP_ENABLED=false.
+    """
+    if os.getenv("CLASSIFIER_WARMUP_ENABLED", "true").strip().lower() in (
+        "false", "0", "no", "off",
+    ):
+        log.info("[warmup] classifier warmup disabled via CLASSIFIER_WARMUP_ENABLED")
+        return
+    import httpx
+    from jobs.youtube_classifier import (
+        CLASSIFIER_BASE_URL, CLASSIFIER_MODEL_NAME,
+        CF_ACCESS_CLIENT_ID, CF_ACCESS_CLIENT_SECRET,
+    )
+    if not (CLASSIFIER_BASE_URL and CF_ACCESS_CLIENT_ID and CF_ACCESS_CLIENT_SECRET):
+        log.warning("[warmup] classifier warmup off — endpoint / CF-Access env not set")
+        return
+    url = f"{CLASSIFIER_BASE_URL}/v1/chat/completions"
+    payload = {
+        "model": CLASSIFIER_MODEL_NAME,
+        "messages": [
+            {"role": "system", "content": "warmup"},
+            {"role": "user", "content":
+                "TEST WARMUP - The market opened higher today. Apple is doing well."},
+        ],
+        "temperature": 0,
+        "max_tokens": 16,
+        "stream": False,
+    }
+    headers = {
+        "CF-Access-Client-Id": CF_ACCESS_CLIENT_ID,
+        "CF-Access-Client-Secret": CF_ACCESS_CLIENT_SECRET,
+        "Content-Type": "application/json",
+    }
+    log.info("[warmup] classifier warmup loop started (every 300s)")
+    while True:
+        try:
+            t0 = time.time()
+            r = httpx.post(url, json=payload, headers=headers, timeout=60.0)
+            log.info(
+                f"[warmup] classifier ping HTTP {r.status_code} "
+                f"({time.time() - t0:.1f}s)"
+            )
+        except Exception as e:
+            log.warning(f"[warmup] classifier ping failed: {type(e).__name__}: {e}")
+        time.sleep(300)
+
+
 # ── Main ────────────────────────────────────────────────────────────────────
 def main():
     log.info("=" * 60)
@@ -355,6 +409,10 @@ def main():
     port = int(os.environ.get("PORT", 8081))
     threading.Thread(target=lambda: HTTPServer(("0.0.0.0", port), _Health).serve_forever(), daemon=True).start()
     log.info(f"[Worker] Health on :{port}")
+
+    # Classifier warm-up pinger — keeps Pavilion's vLLM model warm so the
+    # next monitor cycle is less likely to hit a cold-start 524.
+    threading.Thread(target=_classifier_warmup_loop, daemon=True).start()
 
     # Tables
     try:
