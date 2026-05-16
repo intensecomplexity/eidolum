@@ -2685,6 +2685,115 @@ def _build_user_prompt(channel_name: str, title: str, publish_date: str, transcr
     )
 
 
+def _strip_to_json(raw: str) -> str:
+    """Slice `raw` from the first [ or { to the last ] or } — drops any
+    non-JSON prefix/suffix the model bled in around the array."""
+    starts = [i for i in (raw.find("["), raw.find("{")) if i >= 0]
+    ends = [i for i in (raw.rfind("]"), raw.rfind("}")) if i >= 0]
+    if not starts or not ends:
+        return ""
+    s, e = min(starts), max(ends)
+    return raw[s:e + 1] if e > s else ""
+
+
+def _extract_brace_blocks(s: str) -> list:
+    """Return every top-level {...} substring, string-aware (braces inside
+    JSON strings are ignored). A truncated final object never closes and is
+    dropped."""
+    blocks = []
+    depth = 0
+    start = -1
+    in_str = False
+    esc = False
+    for i, ch in enumerate(s):
+        if in_str:
+            if esc:
+                esc = False
+            elif ch == "\\":
+                esc = True
+            elif ch == '"':
+                in_str = False
+            continue
+        if ch == '"':
+            in_str = True
+        elif ch == "{":
+            if depth == 0:
+                start = i
+            depth += 1
+        elif ch == "}":
+            if depth > 0:
+                depth -= 1
+                if depth == 0 and start >= 0:
+                    blocks.append(s[start:i + 1])
+                    start = -1
+    return blocks
+
+
+def _parse_classifier_output_tolerant(raw: str):
+    """Parse a Qwen classifier response into a list of prediction dicts,
+    salvaging what it can from malformed output.
+
+    Returns (predictions, meta). meta["mode"] is one of:
+      "clean"     — standard json.loads succeeded; predictions are verbatim
+                    (success path — behaviour identical to the old code).
+      "recovered" — output was malformed; some/all prediction objects were
+                    salvaged. meta has "recovered" and "total".
+      "failed"    — output was malformed and nothing valid could be salvaged.
+
+    Salvage only validates against fields the RAW classifier output actually
+    carries (ticker + direction); context / source_timestamp_seconds are
+    added downstream and must not be required here. Stdlib only.
+    """
+    raw = (raw or "").strip()
+
+    # (a) standard parse — the success path, untouched.
+    try:
+        obj = json.loads(raw)
+        if isinstance(obj, list):
+            return obj, {"mode": "clean"}
+        if isinstance(obj, dict):
+            return [obj], {"mode": "clean"}
+        # a JSON scalar is not a valid classifier response — fall through
+    except (json.JSONDecodeError, ValueError):
+        pass
+
+    # (b/c) strip non-JSON prefix/suffix, retry whole-string parse.
+    stripped = _strip_to_json(raw)
+    if stripped and stripped != raw:
+        try:
+            obj = json.loads(stripped)
+            lst = obj if isinstance(obj, list) else ([obj] if isinstance(obj, dict) else None)
+            if lst is not None:
+                return lst, {"mode": "recovered", "recovered": len(lst), "total": len(lst)}
+        except (json.JSONDecodeError, ValueError):
+            pass
+
+    # (d) per-object brace extraction.
+    blocks = _extract_brace_blocks(stripped or raw)
+    good = []
+    for b in blocks:
+        try:
+            d = json.loads(b)
+        except (json.JSONDecodeError, ValueError):
+            continue
+        if isinstance(d, dict) and d.get("ticker") and d.get("direction"):
+            good.append(d)
+    if good:
+        return good, {"mode": "recovered", "recovered": len(good), "total": len(blocks)}
+    return [], {"mode": "failed", "total": len(blocks)}
+
+
+def _log_parse_failure(video_id, raw: str) -> None:
+    """Append a malformed classifier response (first 500 chars) to a side
+    log for offline review. Best-effort — never raises."""
+    try:
+        with open("/tmp/classifier_parse_failures.log", "a") as f:
+            f.write(f"{datetime.utcnow().isoformat()} video={video_id or '?'} "
+                    f"chars={len(raw or '')}\n{(raw or '')[:500]}\n---\n")
+    except Exception:
+        pass
+
+
 def _classify_video_qwen(
     channel_name: str,
     title: str,
@@ -2751,15 +2860,31 @@ def _classify_video_qwen(
                 content = content[4:]
             content = content.strip()
 
-        try:
-            parsed = json.loads(content)
-        except json.JSONDecodeError as pe:
+        parsed, _pmeta = _parse_classifier_output_tolerant(content)
+        if _pmeta["mode"] == "failed":
             log.warning(
-                "[YT-CLF] Qwen parse error chunk %d/%d: %s | raw=%r",
-                i + 1, len(chunks), pe, content[:200],
+                "[YT-CLF] Qwen parse error chunk %d/%d | raw=%r",
+                i + 1, len(chunks), content[:200],
             )
-            telemetry["error"] = f"qwen_parse_error: {str(pe)[:120]}"
+            log.warning(
+                "[classifier] tolerant parse FAILED: 0 predictions extracted, "
+                "video=%s, raw_output_chars=%d", video_id or "?", len(content),
+            )
+            _log_parse_failure(video_id, content)
+            telemetry["error"] = (
+                "qwen_parse_error: no valid prediction objects in malformed output"
+            )
             return None
+        if _pmeta["mode"] == "recovered":
+            log.info(
+                "[classifier] tolerant parse: recovered %d/%d predictions from "
+                "malformed output, video=%s",
+                _pmeta.get("recovered", len(parsed)),
+                _pmeta.get("total", len(parsed)), video_id or "?",
+            )
+            telemetry["tolerant_parse_recovery"] = (
+                telemetry.get("tolerant_parse_recovery", 0) + 1
+            )
 
         # Qwen may return a single dict or a list
         if isinstance(parsed, dict):
