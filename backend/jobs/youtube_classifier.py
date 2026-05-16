@@ -481,6 +481,9 @@ RUNPOD_CIRCUIT_BREAKER_THRESHOLD = 5
 _runpod_consecutive_failures = 0
 _runpod_circuit_open = False
 
+# One-time guard for the startup payload-keys log line.
+_payload_logged = False
+
 
 def reset_circuit_breaker():
     """Call at the start of each monitor/backfill cycle."""
@@ -601,7 +604,17 @@ def call_runpod_vllm(
         "temperature": 0,
         "max_tokens": CLASSIFIER_MAX_OUTPUT_TOKENS,
         "stream": True,
+        # Pin the model in Ollama's memory (Pavilion runs Ollama 0.21).
+        # keep_alive=-1 = never unload — eliminates the 30-700s cold-start
+        # reloads seen on the re-classify backfill. Verified the endpoint
+        # accepts this field in the /v1/chat/completions body (HTTP 200).
+        "keep_alive": -1,
     }
+    global _payload_logged
+    if not _payload_logged:
+        _payload_logged = True
+        log.info("[classifier] request payload (one-time): %s",
+                 sorted(payload.keys()))
 
     identifier = video_id or channel_name
 
