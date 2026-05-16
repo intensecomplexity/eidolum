@@ -726,6 +726,11 @@ def _seed_target_channels(db):
     # — without this, a manual or temp-restriction sweep that turns rows
     # off cannot be undone by editing TARGET_CHANNELS alone (incident
     # 2026-05-06).
+    # Exception: channels turned off by the low-yield auto-cull
+    # (deactivation_reason='auto_cull_low_yield') stay off even though
+    # they remain in TARGET_CHANNELS — the cull is the deliberate
+    # decision. To restore one, clear its deactivation_reason (or set
+    # is_active=TRUE directly) and the next sync re-activates it.
     reactivated_result = db.execute(
         sql_text(
             "UPDATE youtube_channels "
@@ -733,7 +738,8 @@ def _seed_target_channels(db):
             "    deactivated_at = NULL, "
             "    deactivation_reason = NULL "
             "WHERE channel_name = ANY(:seed) "
-            "  AND is_active = FALSE"
+            "  AND is_active = FALSE "
+            "  AND deactivation_reason IS DISTINCT FROM 'auto_cull_low_yield'"
         ),
         {"seed": list(TARGET_CHANNELS)},
     )
