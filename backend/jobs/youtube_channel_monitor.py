@@ -1363,6 +1363,33 @@ def _run_inner(db, channels_with_new=None):
         flush=True,
     )
 
+    # ── Validation gate cycle stats (Ship: classifier hardening) ────────
+    # In shadow mode "rejected" is what the gate WOULD have rejected;
+    # everything still inserts, so this line is the A/B signal.
+    _vr = stats.get("validation_rejections", {})
+    _v_rej = sum(_vr.values())
+    print(
+        f"[validation] cycle stats: inserted={stats['predictions_inserted']} "
+        f"rejected={_v_rej} ("
+        f"invalid_ticker={_vr.get('invalid_ticker', 0)} "
+        f"ticker_not_in_context={_vr.get('ticker_not_in_context', 0)} "
+        f"ad_read={_vr.get('ad_read', 0)} "
+        f"past_tense={_vr.get('past_tense', 0)} "
+        f"contradictory={_vr.get('contradictory', 0)} "
+        f"context_short={_vr.get('context_short', 0)})",
+        flush=True,
+    )
+    for _ch, _c in sorted(stats.get("validation_by_channel", {}).items(),
+                          key=lambda kv: -kv[1]["rejected"]):
+        if not _c["rejected"]:
+            continue
+        _rate = (100.0 * _c["rejected"] / _c["seen"]) if _c["seen"] else 0.0
+        _flag = ("  <-- FLAG: >50% rejection, review channel"
+                 if _rate > 50 and _c["seen"] >= 3 else "")
+        print(f"[validation]   channel {_ch!r}: "
+              f"{_c['rejected']}/{_c['seen']} rejected ({_rate:.0f}%){_flag}",
+              flush=True)
+
     # Legacy DONE summary (kept for backwards compat with anything grepping
     # the worker logs).
     print(

@@ -37,6 +37,9 @@ import logging
 from datetime import datetime, timedelta
 
 from sqlalchemy import text as sql_text
+from jobs.classifier_validation import (
+    validate_or_reject, contradicting_ids, RULE_VERSION, TELEMETRY_KEYS,
+)
 
 log = logging.getLogger(__name__)
 
@@ -4023,6 +4026,71 @@ def _resolve_metadata_enrichment(
         return {}, fallback_window, fallback_eval
 
 
+def _classifier_validation_gate(pred, db, stats):
+    """Post-classifier validation gate (Ship: classifier hardening).
+
+    `pred` is a constructed-but-not-yet-added Prediction ORM object.
+    Returns True when the prediction should be BLOCKED from insertion.
+
+    Honors env var CLASSIFIER_VALIDATION_GATE:
+      off     — skip the gate entirely
+      shadow  — run the gate, log would-be rejections, never block (A/B)
+      enforce — run the gate and block rejected predictions
+
+    Fail-open: any internal error logs a warning and lets the row insert.
+    """
+    mode = (os.environ.get("CLASSIFIER_VALIDATION_GATE", "shadow")
+            or "shadow").strip().lower()
+    if mode == "off":
+        return False
+    try:
+        fields = {
+            "ticker": getattr(pred, "ticker", None),
+            "direction": getattr(pred, "direction", None),
+            "source_url": getattr(pred, "source_url", None),
+            "source_verbatim_quote": getattr(pred, "source_verbatim_quote", None),
+        }
+        accepted, reason = validate_or_reject(fields, db)
+    except Exception as _e:
+        log.warning("[validation] gate error (fail-open, inserting): %s", _e)
+        return False
+
+    # context is templated "Channel: Bull/Bear on TICKER" — channel is the prefix
+    channel = (getattr(pred, "context", "") or "").split(":")[0].strip() or "unknown"
+    if stats is not None:
+        bc = stats.setdefault("validation_by_channel", {})
+        bc.setdefault(channel, {"seen": 0, "rejected": 0})["seen"] += 1
+    if accepted:
+        return False
+
+    rule_key = TELEMETRY_KEYS.get(reason, reason)
+    log.info("[validation] classifier_rejection_%s ticker=%s channel=%r mode=%s%s",
+             rule_key, fields["ticker"], channel, mode,
+             "" if mode == "enforce" else " (shadow — inserting anyway)")
+    if stats is not None:
+        vr = stats.setdefault("validation_rejections", {})
+        vr[rule_key] = vr.get(rule_key, 0) + 1
+        stats["validation_by_channel"][channel]["rejected"] += 1
+
+    if mode != "enforce":
+        return False  # shadow: log only, never block
+
+    # enforce: for a contradiction, also exclude the pre-existing opposite row(s)
+    if reason == "contradictory_pair":
+        try:
+            ids = contradicting_ids(fields["source_url"], fields["direction"],
+                                    fields["ticker"], db)
+            if ids:
+                db.execute(sql_text(
+                    "UPDATE predictions SET excluded_from_training=TRUE, "
+                    "exclusion_reason='contradictory_pair', "
+                    "exclusion_flagged_at=NOW(), exclusion_rule_version=:v "
+                    "WHERE id = ANY(:ids)"), {"v": RULE_VERSION, "ids": ids})
+        except Exception as _e:
+            log.warning("[validation] contradiction exclude failed: %s", _e)
+    return True
+
+
 def insert_youtube_prediction(
     pred: dict,
     *,
@@ -4268,8 +4336,7 @@ def insert_youtube_prediction(
     if _gaps:
         return _reject("incomplete_training_fields", hr=",".join(_gaps))
 
-    db.add(
-        Prediction(
+    _pred = Prediction(
             forecaster_id=forecaster.id,
             ticker=ticker,
             direction=direction,
@@ -4299,7 +4366,9 @@ def insert_youtube_prediction(
             **_ts_fields,
             **_meta_fields,
         )
-    )
+    if _classifier_validation_gate(_pred, db, stats):
+        return _reject("classifier_validation_gate")
+    db.add(_pred)
     db.flush()
     # Per-run sub-type counters. Options and earnings both land as
     # prediction_category='ticker_call' rows — these counters expose
@@ -4436,8 +4505,7 @@ def insert_youtube_sector_prediction(
     if _gaps:
         return _reject("incomplete_training_fields", hr=",".join(_gaps))
 
-    db.add(
-        Prediction(
+    _pred = Prediction(
             forecaster_id=forecaster.id,
             ticker=etf_ticker,
             direction=direction,
@@ -4466,7 +4534,9 @@ def insert_youtube_sector_prediction(
             **_ts_fields,
             **_meta_fields,
         )
-    )
+    if _classifier_validation_gate(_pred, db, stats):
+        return _reject("classifier_validation_gate")
+    db.add(_pred)
     db.flush()
     if stats is not None:
         stats["sector_calls_extracted"] = int(stats.get("sector_calls_extracted", 0)) + 1
@@ -4663,8 +4733,7 @@ def insert_youtube_macro_prediction(
     if _gaps:
         return _reject("incomplete_training_fields", hr=",".join(_gaps))
 
-    db.add(
-        Prediction(
+    _pred = Prediction(
             forecaster_id=forecaster.id,
             ticker=etf_ticker,
             direction=stored_direction,
@@ -4690,7 +4759,9 @@ def insert_youtube_macro_prediction(
             **_ts_fields,
             **_meta_fields,
         )
-    )
+    if _classifier_validation_gate(_pred, db, stats):
+        return _reject("classifier_validation_gate")
+    db.add(_pred)
     db.flush()
     if stats is not None:
         stats["macro_calls_extracted"] = int(
@@ -4869,8 +4940,7 @@ def insert_youtube_pair_prediction(
     if _gaps:
         return _reject("incomplete_training_fields", hr=",".join(_gaps))
 
-    db.add(
-        Prediction(
+    _pred = Prediction(
             forecaster_id=forecaster.id,
             ticker=long_ticker,  # long leg fills the ticker index slot
             direction="bullish",  # always bullish on the spread
@@ -4897,7 +4967,9 @@ def insert_youtube_pair_prediction(
             **_ts_fields,
             **_meta_fields,
         )
-    )
+    if _classifier_validation_gate(_pred, db, stats):
+        return _reject("classifier_validation_gate")
+    db.add(_pred)
     db.flush()
     if stats is not None:
         stats["pair_calls_extracted"] = int(
@@ -5109,8 +5181,7 @@ def insert_youtube_binary_event_prediction(
     if _gaps:
         return _reject("incomplete_training_fields", hr=",".join(_gaps))
 
-    db.add(
-        Prediction(
+    _pred = Prediction(
             forecaster_id=forecaster.id,
             ticker=ticker_to_store,
             direction="bullish",  # always bullish on the event happening
@@ -5141,7 +5212,9 @@ def insert_youtube_binary_event_prediction(
             **_ts_fields,
             **_meta_fields,
         )
-    )
+    if _classifier_validation_gate(_pred, db, stats):
+        return _reject("classifier_validation_gate")
+    db.add(_pred)
     db.flush()
     if stats is not None:
         stats["binary_events_extracted"] = int(
@@ -5351,8 +5424,7 @@ def insert_youtube_metric_forecast_prediction(
     if _gaps:
         return _reject("incomplete_training_fields", hr=",".join(_gaps))
 
-    db.add(
-        Prediction(
+    _pred = Prediction(
             forecaster_id=forecaster.id,
             ticker=ticker_to_store,
             direction=direction,
@@ -5383,7 +5455,9 @@ def insert_youtube_metric_forecast_prediction(
             **_ts_fields,
             **_meta_fields,
         )
-    )
+    if _classifier_validation_gate(_pred, db, stats):
+        return _reject("classifier_validation_gate")
+    db.add(_pred)
     db.flush()
     if stats is not None:
         stats["metric_forecasts_extracted"] = int(
@@ -5580,8 +5654,7 @@ def insert_youtube_conditional_prediction(
     if _gaps:
         return _reject("incomplete_training_fields", hr=",".join(_gaps))
 
-    db.add(
-        Prediction(
+    _pred = Prediction(
             forecaster_id=forecaster.id,
             ticker=ticker,
             direction=direction,
@@ -5613,7 +5686,9 @@ def insert_youtube_conditional_prediction(
             **_ts_fields,
             **_meta_fields,
         )
-    )
+    if _classifier_validation_gate(_pred, db, stats):
+        return _reject("classifier_validation_gate")
+    db.add(_pred)
     db.flush()
     if stats is not None:
         stats["conditional_calls_extracted"] = int(
@@ -6000,8 +6075,7 @@ def insert_youtube_regime_prediction(
     # have no verbatim_quote in their schema. Extending timestamps to
     # regime is a separate ship that needs prompt verification.
 
-    db.add(
-        Prediction(
+    _pred = Prediction(
             forecaster_id=forecaster.id,
             ticker=instrument,
             direction=direction,
@@ -6033,7 +6107,9 @@ def insert_youtube_regime_prediction(
             # / regime_new_lows stay NULL until the evaluator scores.
             **_meta_fields,
         )
-    )
+    if _classifier_validation_gate(_pred, db, stats):
+        return _reject("classifier_validation_gate")
+    db.add(_pred)
     db.flush()
     if stats is not None:
         stats["regime_calls_extracted"] = int(
