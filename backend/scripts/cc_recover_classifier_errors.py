@@ -73,6 +73,8 @@ USAGE_LIMIT_BACKOFF = 1800         # seconds to sleep when CC usage-limited
 CLAUDE_MODEL = "sonnet"
 TRANSCRIPT_FETCH_PACING = 2.0      # seconds between live YouTube transcript fetches
 BATCH_PACING = 15.0                # seconds between batches
+FETCH_TIMEOUT = 120                # hard cap (s) on one live transcript fetch —
+                                   # youtube_transcript_api has no socket timeout
 
 # Terminal transcript_status values — nothing more to do, mark the video done.
 # Anything else (classifier_error, transient "error: ..." network/anti-bot
@@ -369,6 +371,32 @@ def install_monkeypatches() -> None:
     ycm.classify_video = _shim_classify_video
 
 
+# ── Live transcript fetch with a hard timeout ───────────────────────────────
+class _FetchTimeout(Exception):
+    pass
+
+
+def _alarm_handler(signum, frame):
+    raise _FetchTimeout(f"transcript fetch exceeded {FETCH_TIMEOUT}s")
+
+
+def fetch_transcript_guarded(video_id: str) -> dict:
+    """fetch_transcript_with_timestamps wrapped in a SIGALRM hard timeout.
+    youtube_transcript_api's HTTP calls carry no socket timeout — a single
+    stalled Webshare/YouTube connection would otherwise hang the whole run
+    indefinitely (observed: 70min frozen with the process idle at 0% CPU).
+    On timeout, raises _FetchTimeout — the caller records it as a retriable
+    'error: ...' status so the video is retried, not lost."""
+    from jobs.youtube_classifier import fetch_transcript_with_timestamps
+    prev = signal.signal(signal.SIGALRM, _alarm_handler)
+    signal.alarm(FETCH_TIMEOUT)
+    try:
+        return fetch_transcript_with_timestamps(video_id)
+    finally:
+        signal.alarm(0)
+        signal.signal(signal.SIGALRM, prev)
+
+
 # ── Main ────────────────────────────────────────────────────────────────────
 def main() -> int:
     os.makedirs(ARTIFACTS_DIR, exist_ok=True)
@@ -392,10 +420,21 @@ def main() -> int:
     # proxy host (postgres.railway.internal isn't resolvable off-network);
     # it survives `railway run`, which would otherwise override DATABASE_URL.
     db_url = os.environ.get("RECOVERY_DATABASE_URL") or os.environ["DATABASE_URL"]
+    # TCP keepalives + connect_timeout + pool_recycle: the run idles its DB
+    # connection across multi-minute `claude -p` calls; without these the
+    # Railway public proxy silently drops it (observed SSL-closed errors).
     engine = create_engine(
         db_url,
-        connect_args={"options": "-c statement_timeout=0"},
+        connect_args={
+            "options": "-c statement_timeout=0",
+            "connect_timeout": 30,
+            "keepalives": 1,
+            "keepalives_idle": 30,
+            "keepalives_interval": 10,
+            "keepalives_count": 5,
+        },
         pool_pre_ping=True,
+        pool_recycle=600,
     )
     db = sessionmaker(bind=engine)()
 
@@ -458,15 +497,14 @@ def main() -> int:
         batch = pend[:MAX_BATCH_VIDEOS]
         batch_ids = [v["video_id"] for v in batch]
 
-        # ── 1. Live re-fetch transcripts (the REAL functions) ──────────────
-        from jobs.youtube_classifier import fetch_transcript_with_timestamps
+        # ── 1. Live re-fetch transcripts (real fetch, hard-timeout-guarded) ─
         _TRANSCRIPT_CACHE.clear()
         _PRED_CACHE.clear()
         for vid in batch_ids:
             if _stop["flag"]:
                 break
             try:
-                _TRANSCRIPT_CACHE[vid] = fetch_transcript_with_timestamps(vid)
+                _TRANSCRIPT_CACHE[vid] = fetch_transcript_guarded(vid)
             except Exception as e:
                 _TRANSCRIPT_CACHE[vid] = {
                     "text": "", "lang": None,
