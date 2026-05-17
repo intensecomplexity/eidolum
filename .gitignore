@@ -27,3 +27,6 @@ backend/scripts/groq_layer3_eval_results.json
 smoke_test_plan.md
 smoke_test_results.md
 backend/scripts/flag_smoke_test_results.json
+
+# Classifier-error recovery — checkpoint + progress artifacts, local-only
+backend/scripts/_artifacts/
