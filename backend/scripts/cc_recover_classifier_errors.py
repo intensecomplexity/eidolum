@@ -63,12 +63,12 @@ CC_CWD = "/tmp/cc_recovery_cwd"  # empty dir => `claude -p` finds no repo CLAUDE
 
 # ── Tuning ──────────────────────────────────────────────────────────────────
 GENERATING_MODEL = "cc_sonnet_recovery_2026_05_17"  # cohort tag — DO NOT CHANGE
-MAX_BATCH_VIDEOS = 20
-MAX_BATCH_CHARS = 300_000          # ~75k input tokens — safe inside Sonnet ctx
+MAX_BATCH_VIDEOS = 10              # ~9-min `claude -p` call; 20 ran ~20min+
+MAX_BATCH_CHARS = 220_000          # ~55k input tokens — safe inside Sonnet ctx
 CONSECUTIVE_FAILURE_ABORT = 5      # abort after N consecutive CC-level failures
 MAX_VIDEO_ATTEMPTS = 5             # give up on a video after N failed attempts
 PROGRESS_EVERY = 200               # videos between progress snapshots
-CLAUDE_TIMEOUT = 1200              # seconds per `claude -p` call
+CLAUDE_TIMEOUT = 1800              # seconds per `claude -p` call (30min headroom)
 USAGE_LIMIT_BACKOFF = 1800         # seconds to sleep when CC usage-limited
 CLAUDE_MODEL = "sonnet"
 TRANSCRIPT_FETCH_PACING = 2.0      # seconds between live YouTube transcript fetches
