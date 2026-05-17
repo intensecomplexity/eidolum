@@ -66,11 +66,23 @@ GENERATING_MODEL = "cc_sonnet_recovery_2026_05_17"  # cohort tag — DO NOT CHAN
 MAX_BATCH_VIDEOS = 20
 MAX_BATCH_CHARS = 300_000          # ~75k input tokens — safe inside Sonnet ctx
 CONSECUTIVE_FAILURE_ABORT = 5      # abort after N consecutive CC-level failures
-MAX_VIDEO_ATTEMPTS = 3             # give up on a video after N exceptions
+MAX_VIDEO_ATTEMPTS = 5             # give up on a video after N failed attempts
 PROGRESS_EVERY = 200               # videos between progress snapshots
 CLAUDE_TIMEOUT = 1200              # seconds per `claude -p` call
 USAGE_LIMIT_BACKOFF = 1800         # seconds to sleep when CC usage-limited
 CLAUDE_MODEL = "sonnet"
+TRANSCRIPT_FETCH_PACING = 2.0      # seconds between live YouTube transcript fetches
+BATCH_PACING = 15.0                # seconds between batches
+
+# Terminal transcript_status values — nothing more to do, mark the video done.
+# Anything else (classifier_error, transient "error: ..." network/anti-bot
+# blocks, cc_classify_missing) is RETRIABLE: leave the video pending so a
+# later loop / re-run picks it up. A transient YouTube block must never be
+# treated as terminal — that silently drops recoverable videos.
+TERMINAL_STATUSES = {
+    "ok_inserted", "ok_no_predictions", "no_transcript", "transcripts_disabled",
+    "video_unavailable", "empty_transcript", "library_missing", "no_video_id",
+}
 
 # Qwen-variant -> canonical field names the validator expects. Mirrors the
 # _QWEN_FIELD_MAP inside _classify_video_qwen so CC output is normalized
@@ -396,14 +408,18 @@ def main() -> int:
              f"{cp['total'] - done} pending")
 
     # Video metadata + channel id map (re-queried each run, not checkpointed).
+    # Keyed by the checkpoint's video_ids — NOT by transcript_status. A
+    # retried video's status may have flipped to a transient "error: ..."
+    # value, which would drop it from a status-filtered query and strand it.
+    all_ids = [v["video_id"] for v in cp["videos"]]
     meta = {
         r[0]: {"channel_name": r[1], "title": r[2] or "",
                "description": r[3] or "", "publish": r[4]}
         for r in db.execute(sql_text(
             "SELECT youtube_video_id, channel_name, title, description, "
             "publish_date FROM youtube_videos "
-            "WHERE transcript_status = 'classifier_error'"
-        )).fetchall()
+            "WHERE youtube_video_id = ANY(:ids)"
+        ), {"ids": all_ids}).fetchall()
     }
     chan_id = {
         r[0]: r[1] for r in db.execute(sql_text(
@@ -447,6 +463,8 @@ def main() -> int:
         _TRANSCRIPT_CACHE.clear()
         _PRED_CACHE.clear()
         for vid in batch_ids:
+            if _stop["flag"]:
+                break
             try:
                 _TRANSCRIPT_CACHE[vid] = fetch_transcript_with_timestamps(vid)
             except Exception as e:
@@ -456,6 +474,9 @@ def main() -> int:
                     "segments": [], "words": None, "has_word_level": False,
                     "is_generated": False, "fetched_at": datetime.utcnow(),
                 }
+            # Pace the live fetches — hammering YouTube back-to-back trips
+            # Google's /sorry anti-bot block even through the proxy.
+            time.sleep(TRANSCRIPT_FETCH_PACING)
 
         # Trim the batch to a char budget — classify only good transcripts.
         good: dict = {}
@@ -545,17 +566,19 @@ def main() -> int:
                     for pid in new_ids:
                         f.write(f"{pid}\n")
 
-            if status == "classifier_error":
-                # CC subagent failure for this video — leave pending. Rule 5.
-                if v["attempts"] >= MAX_VIDEO_ATTEMPTS:
-                    v["status"] = "done"
-                    v["result"] = {"inserted": 0, "status": "classifier_error_exhausted"}
-            else:
+            if status in TERMINAL_STATUSES:
                 v["status"] = "done"
                 v["result"] = {"inserted": inserted, "status": status}
                 inserted_total += inserted
                 processed_since_log += 1
                 processed_this_run += 1
+            elif v["attempts"] >= MAX_VIDEO_ATTEMPTS:
+                # Retriable (classifier_error / transient transcript block)
+                # but out of attempts — mark done so the run can finish.
+                v["status"] = "done"
+                v["result"] = {"inserted": inserted, "status": f"{status[:60]}|exhausted"}
+                processed_since_log += 1
+            # else: retriable with attempts left — leave pending for next loop.
             save_checkpoint(cp)
             _log(f"[recover] video={vid} -> {status}, {inserted} preds "
                  f"(attempt {v['attempts']})")
@@ -568,6 +591,8 @@ def main() -> int:
         if limit is not None:
             _log(f"[recover] --limit {limit} reached — stopping")
             break
+        if not _stop["flag"]:
+            time.sleep(BATCH_PACING)
 
     log_progress(cp, start, batches_run, cc_latencies, inserted_total,
                  consecutive_failures, final=True)
@@ -585,7 +610,8 @@ def log_progress(cp, start, batches_run, cc_latencies, inserted_total,
     no_pred = [v for v in done
                if (v.get("result") or {}).get("status") == "ok_no_predictions"]
     still_err = [v for v in done
-                 if "classifier_error" in str((v.get("result") or {}).get("status", ""))]
+                 if (v.get("result") or {}).get("status")
+                 not in ("ok_inserted", "ok_no_predictions")]
     elapsed = time.time() - start
     avg_lat = sum(cc_latencies) / len(cc_latencies) if cc_latencies else 0.0
     rate = (n_done / elapsed) if elapsed > 0 else 0  # videos/sec this run
@@ -603,7 +629,7 @@ def log_progress(cp, start, batches_run, cc_latencies, inserted_total,
     _log(f"  Pending:                 {n_pending}")
     _log(f"    - ok_inserted:         {len(inserted_rows)}")
     _log(f"    - ok_no_predictions:   {len(no_pred)}")
-    _log(f"    - classifier_error:    {len(still_err)} (exhausted retries)")
+    _log(f"    - no-data / exhausted: {len(still_err)} (no transcript, dead video, or retries spent)")
     _log(f"  Predictions inserted:    {inserted_total}")
     _log(f"  Yield (preds/done):      {yield_rate:.2f}")
     _log(f"  CC batches run:          {batches_run}")
