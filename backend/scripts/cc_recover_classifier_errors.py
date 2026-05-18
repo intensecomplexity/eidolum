@@ -56,10 +56,29 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 # ── Paths ───────────────────────────────────────────────────────────────────
 _SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 ARTIFACTS_DIR = os.path.join(_SCRIPT_DIR, "_artifacts")
-CHECKPOINT = os.path.join(ARTIFACTS_DIR, "_recovery_checkpoint.json")
-PROGRESS_LOG = os.path.join(ARTIFACTS_DIR, "recovery_progress.log")
-IDS_FILE = os.path.join(ARTIFACTS_DIR, "2026-05-17-classifier-error-recovery-ids.txt")
-CC_CWD = "/tmp/cc_recovery_cwd"  # empty dir => `claude -p` finds no repo CLAUDE.md
+
+
+def _resolve_checkpoint_path() -> str:
+    """--checkpoint-path <file> selects this worker's checkpoint. Default is
+    the original single-worker file, so existing invocations are unchanged.
+    Parallel workers each pass their own (_recovery_checkpoint_a.json, ...)."""
+    if "--checkpoint-path" in sys.argv:
+        return os.path.abspath(sys.argv[sys.argv.index("--checkpoint-path") + 1])
+    return os.path.join(ARTIFACTS_DIR, "_recovery_checkpoint.json")
+
+
+CHECKPOINT = _resolve_checkpoint_path()
+# Per-worker suffix from the checkpoint filename: _recovery_checkpoint_a.json
+# -> "_a"; _recovery_checkpoint.json -> "". Keeps progress/ids/run logs
+# separate so parallel workers never clobber each other.
+_cp_base = os.path.basename(CHECKPOINT)
+_SUFFIX = ""
+if _cp_base.startswith("_recovery_checkpoint") and _cp_base.endswith(".json"):
+    _SUFFIX = _cp_base[len("_recovery_checkpoint"):-len(".json")]
+PROGRESS_LOG = os.path.join(ARTIFACTS_DIR, f"recovery_progress{_SUFFIX}.log")
+IDS_FILE = os.path.join(
+    ARTIFACTS_DIR, f"2026-05-17-classifier-error-recovery-ids{_SUFFIX}.txt")
+CC_CWD = f"/tmp/cc_recovery_cwd{_SUFFIX}"  # empty dir => `claude -p` finds no CLAUDE.md
 
 # ── Tuning ──────────────────────────────────────────────────────────────────
 GENERATING_MODEL = "cc_sonnet_recovery_2026_05_17"  # cohort tag — DO NOT CHANGE
@@ -71,7 +90,9 @@ PROGRESS_EVERY = 200               # videos between progress snapshots
 CLAUDE_TIMEOUT = 1800              # seconds per `claude -p` call (30min headroom)
 USAGE_LIMIT_BACKOFF = 1800         # seconds to sleep when CC usage-limited
 CLAUDE_MODEL = "sonnet"
-TRANSCRIPT_FETCH_PACING = 2.0      # seconds between live YouTube transcript fetches
+TRANSCRIPT_FETCH_PACING = 4.0      # seconds between live YouTube transcript fetches —
+                                   # 4s/worker keeps the aggregate ~2s across the 2
+                                   # parallel workers (avoids the /sorry anti-bot block)
 BATCH_PACING = 15.0                # seconds between batches
 FETCH_TIMEOUT = 120                # hard cap (s) on one live transcript fetch —
                                    # youtube_transcript_api has no socket timeout

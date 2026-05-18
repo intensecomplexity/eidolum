@@ -1,22 +1,40 @@
 #!/usr/bin/env bash
-# Launch (or resume) the classifier_error recovery run, detached so it
-# survives terminal/SSH close. Resumable: the script reads its checkpoint
-# at backend/scripts/_artifacts/_recovery_checkpoint.json and continues.
+# Launch (or resume) a classifier_error recovery worker, detached so it
+# survives terminal/SSH close. Resumable: the worker reads its checkpoint
+# and continues.
 #
-#   bash backend/scripts/run_cc_recovery.sh          # start / resume
-#   tail -f backend/scripts/_artifacts/recovery_progress.log   # watch
+#   bash backend/scripts/run_cc_recovery.sh                                  # single worker (default checkpoint)
+#   bash backend/scripts/run_cc_recovery.sh --checkpoint-path <file.json>     # one parallel worker
+#   tail -f backend/scripts/_artifacts/recovery_progress[_x].log             # watch
 #
-# Stop:  pkill -f cc_recover_classifier_errors.py    (checkpoint is safe;
-#        re-run this script to resume from where it left off)
+# Stop:  pkill -f cc_recover_classifier_errors.py     (checkpoint is safe;
+#        re-run with the same args to resume where it left off)
 set -euo pipefail
 cd "$(dirname "$0")/../.."          # repo root
 
 ART="backend/scripts/_artifacts"
 mkdir -p "$ART"
 
-if pgrep -f cc_recover_classifier_errors.py >/dev/null; then
-  echo "Recovery already running (pid $(pgrep -f cc_recover_classifier_errors.py | tr '\n' ' '))."
-  echo "tail -f $ART/recovery_progress.log"
+# Optional --checkpoint-path forwarded to the orchestrator. Each worker gets
+# its own checkpoint + run/progress logs (suffix derived from the filename).
+CKPT_ARG=""
+SUFFIX=""
+if [[ "${1:-}" == "--checkpoint-path" ]]; then
+  CKPT="${2:?--checkpoint-path requires a file path}"
+  CKPT_ARG="--checkpoint-path $CKPT"
+  base="$(basename "$CKPT")"
+  s="${base#_recovery_checkpoint}"      # _recovery_checkpoint_a.json -> _a.json
+  SUFFIX="${s%.json}"                   # -> _a
+fi
+RUNLOG="$ART/run${SUFFIX}.log"
+PROGRESS="$ART/recovery_progress${SUFFIX}.log"
+# Run-guard keys on the FULL command line (script + this worker's checkpoint
+# arg) so parallel workers A/B don't see each other as duplicates.
+GUARD="cc_recover_classifier_errors.py${CKPT_ARG:+ $CKPT_ARG}"
+
+if pgrep -f "$GUARD" >/dev/null; then
+  echo "Worker already running (pid $(pgrep -f "$GUARD" | tr '\n' ' '))."
+  echo "tail -f $PROGRESS"
   exit 0
 fi
 
@@ -30,16 +48,17 @@ if [[ "$PUB" != postgres* ]]; then
 fi
 export RECOVERY_DATABASE_URL="$PUB"
 
-echo "Launching detached recovery run — log: $ART/run.log"
+echo "Launching detached recovery worker — log: $RUNLOG"
+# shellcheck disable=SC2086  # CKPT_ARG must word-split into 0 or 2 args
 setsid nohup railway run -s hopeful-expression --environment production \
-  python3 backend/scripts/cc_recover_classifier_errors.py \
-  < /dev/null >> "$ART/run.log" 2>&1 &
+  python3 backend/scripts/cc_recover_classifier_errors.py $CKPT_ARG \
+  < /dev/null >> "$RUNLOG" 2>&1 &
 sleep 3
-if pgrep -f cc_recover_classifier_errors.py >/dev/null; then
-  echo "Started (pid $(pgrep -f cc_recover_classifier_errors.py | tr '\n' ' '))."
-  echo "tail -f $ART/recovery_progress.log"
+if pgrep -f "$GUARD" >/dev/null; then
+  echo "Started (pid $(pgrep -f "$GUARD" | tr '\n' ' '))."
+  echo "tail -f $PROGRESS"
 else
-  echo "ERROR: process did not stay up — check $ART/run.log" >&2
-  tail -20 "$ART/run.log" >&2 || true
+  echo "ERROR: worker did not stay up — check $RUNLOG" >&2
+  tail -20 "$RUNLOG" >&2 || true
   exit 1
 fi
