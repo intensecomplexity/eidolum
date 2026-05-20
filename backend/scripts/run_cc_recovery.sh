@@ -38,6 +38,14 @@ if pgrep -f "$GUARD" >/dev/null; then
   exit 0
 fi
 
+# Sanity check Railway CLI auth — otherwise we hang on a dead token.
+# Exit 42 = the auth-dead signal so the watchtower can distinguish auth
+# failures from genuine crashes and stop burning restart budget.
+if ! railway variables -s Postgres --environment production --json >/dev/null 2>&1; then
+  echo "FATAL: Railway CLI auth/link probe failed. Run 'railway login' and 'railway link' then retry." >&2
+  exit 42
+fi
+
 # postgres.railway.internal isn't resolvable off Railway's network — use
 # the Postgres service's public TCP proxy URL for a local long-running job.
 PUB="$(railway variables -s Postgres --environment production --json \
