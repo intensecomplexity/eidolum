@@ -1,8 +1,25 @@
-import { FaYoutube, FaReddit } from 'react-icons/fa';
+import { FaReddit } from 'react-icons/fa';
 import { FaXTwitter } from 'react-icons/fa6';
 
+// FaYoutube is a single-color glyph; rendered red on the red badge bg the
+// play triangle disappeared and the badge read as a featureless red blob.
+// Inline 2-color SVG keeps the rect red AND draws the play triangle white.
+function YouTubeGlyph({ size = 16 }) {
+  return (
+    <svg
+      width={size} height={size} viewBox="0 0 24 24"
+      xmlns="http://www.w3.org/2000/svg"
+      aria-label="YouTube" role="img"
+      style={{ display: 'block' }}
+    >
+      <path d="M23.5 6.2a3 3 0 0 0-2.1-2.1C19.5 3.6 12 3.6 12 3.6s-7.5 0-9.4.5A3 3 0 0 0 .5 6.2 31 31 0 0 0 0 12a31 31 0 0 0 .5 5.8 3 3 0 0 0 2.1 2.1C4.5 20.4 12 20.4 12 20.4s7.5 0 9.4-.5a3 3 0 0 0 2.1-2.1A31 31 0 0 0 24 12a31 31 0 0 0-.5-5.8z" fill="#FF0000"/>
+      <path d="M9.6 15.6 15.8 12 9.6 8.4z" fill="#fff"/>
+    </svg>
+  );
+}
+
 const PLATFORM_CONFIG = {
-  youtube:       { Icon: FaYoutube, iconColor: '#FF0000', label: 'YouTube', bg: '#FF0000', text: '#ffffff' },
+  youtube:       { Icon: YouTubeGlyph, iconColor: '#FF0000', label: 'YouTube', bg: '#FF0000', text: '#ffffff' },
   twitter:       { Icon: FaXTwitter, iconColor: '#ffffff', label: 'X', bg: '#000000', text: '#ffffff' },
   x:             { Icon: FaXTwitter, iconColor: '#ffffff', label: 'X', bg: '#000000', text: '#ffffff' },
   reddit:        { Icon: FaReddit, iconColor: '#FF4500', label: 'Reddit', bg: '#FF4500', text: '#ffffff' },
