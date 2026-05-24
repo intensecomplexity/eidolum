@@ -36,20 +36,13 @@ const SHORT_SECTOR = {
   'Diversified Consumer Services': 'Consumer Svcs',
 };
 
-// Gray pill rendered next to a forecaster's name when is_dormant=true.
-// Visible only when "Show dormant" is on (otherwise the API filters
-// dormant rows out before they ever reach the frontend).
-function DormantBadge({ visible }) {
-  if (!visible) return null;
-  return (
-    <span
-      className="rounded-md px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider"
-      style={{ backgroundColor: '#4b5563', color: '#e5e7eb' }}
-      title="No new predictions in 30+ days"
-    >
-      DORMANT
-    </span>
-  );
+// DORMANT badge hidden — many "dormant" forecasters publish constantly
+// but our classifier can't extract predictions from their content style
+// (TA, personal-finance commentary). The badge implied inactivity when
+// the real story is content-type mismatch. is_dormant data and the
+// "Show dormant" filter toggle still work — only the visual is hidden.
+function DormantBadge() {
+  return null;
 }
 
 function SectorBadge({ sector, accuracy, count, onClick }) {
