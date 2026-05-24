@@ -8,7 +8,6 @@ import PageHeader from '../components/PageHeader';
 import MiniPieChart from '../components/MiniPieChart';
 import PlatformBadge from '../components/PlatformBadge';
 import { getSourceBadgeKey } from '../utils/getSourceBadgeKey';
-import { pluralize } from '../utils/pluralize';
 import RankBadge from '../components/RankBadge';
 import StreakBadge from '../components/StreakBadge';
 import LeaderboardCard from '../components/LeaderboardCard';
@@ -49,13 +48,17 @@ function SectorBadge({ sector, accuracy, count, onClick }) {
   const color = accuracy >= 60 ? '#00c896' : accuracy >= 30 ? '#e5a100' : '#ef4444';
   const label = SHORT_SECTOR[sector] || sector;
   const correct = count > 0 ? Math.round(accuracy * count / 100) : 0;
+  // Long sector labels (e.g. "MOTOR VEHICLES & PASSENGER CAR BODIES") used to
+  // overflow into the Watch column. Split the pill into a truncating label
+  // span and an always-visible ratio span so the N/M number is never cut off.
   return (
     <span
-      className={`inline-block px-2 py-0.5 rounded text-[11px] font-mono font-medium whitespace-nowrap ${onClick ? 'cursor-pointer hover:brightness-125 transition-all' : ''}`}
+      className={`inline-flex items-center gap-1 max-w-full overflow-hidden px-2 py-0.5 rounded text-[11px] font-mono font-medium ${onClick ? 'cursor-pointer hover:brightness-125 transition-all' : ''}`}
       style={{ backgroundColor: `${color}15`, color, border: `1px solid ${color}30` }}
       title={`${sector}: ${correct}/${count}${onClick ? ' — click to filter' : ''}`}
       onClick={onClick ? (e) => { e.preventDefault(); e.stopPropagation(); onClick(sector); } : undefined}>
-      {label}: {correct}/{count}
+      <span className="truncate min-w-0">{label}:</span>
+      <span className="flex-shrink-0">{correct}/{count}</span>
     </span>
   );
 }
@@ -455,13 +458,8 @@ export default function Leaderboard() {
                             </div>
                           </th>
                           <th className="px-3 py-3 text-right">Predictions</th>
-                          <th className="px-3 py-3 text-right hidden 2xl:table-cell w-20" title="Pair call accuracy — spread-scored relative-value predictions (long beats short).">Pair Calls</th>
-                          <th className="px-3 py-3 text-right hidden 2xl:table-cell w-20" title="Binary event accuracy — yes/no predictions on discrete events (Fed decisions, M&amp;A, IPOs, index inclusions).">Binary Events</th>
-                          <th className="px-3 py-3 text-right hidden 2xl:table-cell w-20" title="Metric forecast accuracy — numerical predictions on EPS, revenue, CPI, unemployment, etc. Scored on target vs actual.">Metric Forecasts</th>
-                          <th className="px-3 py-3 text-right hidden 2xl:table-cell w-20" title="Regime call accuracy — structural market-phase claims (no top yet, bottom is in, topping process, correction not bear) scored on drawdown / runup / new-high behavior, NOT final price vs target.">Regime Calls</th>
-                          <th className="px-3 py-3 text-right hidden 2xl:table-cell w-24" title="Average 3-month follow-through on disclosed positions — what the stock did after the forecaster said they bought / sold / added / trimmed. Sell-side actions are sign-flipped so positive = good call. SEPARATE from prediction accuracy.">Avg Follow-Through 3M</th>
                           <th className="px-3 py-3 text-center hidden xl:table-cell w-16">Streak</th>
-                          <th className="px-3 py-3 hidden xl:table-cell max-w-[180px]">Top Sector</th>
+                          <th className="px-3 py-3 hidden xl:table-cell w-[180px]">Top Sector</th>
                           <th className="px-2 py-3 text-center hidden lg:table-cell w-14">Watch</th>
                         </tr>
                       </thead>
@@ -529,70 +527,8 @@ export default function Leaderboard() {
                               <div className="font-mono tnum text-text-secondary text-sm">{f.evaluated_predictions}</div>
                               <div className="text-muted text-[10px] font-mono">{f.total_predictions} total</div>
                             </td>
-                            <td className="px-3 py-3 text-right hidden 2xl:table-cell">
-                              {f.pair_call_total > 0 && f.pair_call_accuracy != null ? (
-                                <div className="flex flex-col items-end">
-                                  <span className={`font-mono tnum text-sm ${f.pair_call_accuracy >= 60 ? 'text-positive' : 'text-negative'}`}>
-                                    {f.pair_call_accuracy.toFixed(1)}%
-                                  </span>
-                                  <span className="text-muted text-[10px] font-mono">{pluralize(f.pair_call_total, 'call')}</span>
-                                </div>
-                              ) : (
-                                <span className="font-mono text-muted">—</span>
-                              )}
-                            </td>
-                            <td className="px-3 py-3 text-right hidden 2xl:table-cell">
-                              {f.binary_event_total > 0 && f.binary_event_accuracy != null ? (
-                                <div className="flex flex-col items-end">
-                                  <span className={`font-mono tnum text-sm ${f.binary_event_accuracy >= 60 ? 'text-positive' : 'text-negative'}`}>
-                                    {f.binary_event_accuracy.toFixed(1)}%
-                                  </span>
-                                  <span className="text-muted text-[10px] font-mono">{f.binary_event_total} events</span>
-                                </div>
-                              ) : (
-                                <span className="font-mono text-muted">—</span>
-                              )}
-                            </td>
-                            <td className="px-3 py-3 text-right hidden 2xl:table-cell">
-                              {f.metric_forecast_total > 0 && f.metric_forecast_accuracy != null ? (
-                                <div className="flex flex-col items-end">
-                                  <span className={`font-mono tnum text-sm ${f.metric_forecast_accuracy >= 60 ? 'text-positive' : 'text-negative'}`}>
-                                    {f.metric_forecast_accuracy.toFixed(1)}%
-                                  </span>
-                                  <span className="text-muted text-[10px] font-mono">{f.metric_forecast_total} forecasts</span>
-                                </div>
-                              ) : (
-                                <span className="font-mono text-muted">—</span>
-                              )}
-                            </td>
-                            <td className="px-3 py-3 text-right hidden 2xl:table-cell"
-                              title="Regime call accuracy — structural market-phase claims scored on drawdown / runup / new-high behavior, NOT final price vs target.">
-                              {f.regime_call_total > 0 && f.regime_call_accuracy != null ? (
-                                <div className="flex flex-col items-end">
-                                  <span className={`font-mono tnum text-sm ${f.regime_call_accuracy >= 60 ? 'text-positive' : 'text-negative'}`}>
-                                    {f.regime_call_accuracy.toFixed(1)}%
-                                  </span>
-                                  <span className="text-muted text-[10px] font-mono">{f.regime_call_total} regime</span>
-                                </div>
-                              ) : (
-                                <span className="font-mono text-muted">—</span>
-                              )}
-                            </td>
-                            <td className="px-3 py-3 text-right hidden 2xl:table-cell"
-                              title="Average 3-month follow-through on disclosed positions — separate from prediction accuracy.">
-                              {f.disclosure_count > 0 && f.avg_follow_through_3m != null ? (
-                                <div className="flex flex-col items-end">
-                                  <span className={`font-mono tnum text-sm ${f.avg_follow_through_3m >= 0 ? 'text-positive' : 'text-negative'}`}>
-                                    {f.avg_follow_through_3m >= 0 ? '+' : ''}{(f.avg_follow_through_3m * 100).toFixed(1)}%
-                                  </span>
-                                  <span className="text-muted text-[10px] font-mono">{f.disclosure_count} disclosures</span>
-                                </div>
-                              ) : (
-                                <span className="font-mono text-muted">—</span>
-                              )}
-                            </td>
                             <td className="px-3 py-3 text-center hidden xl:table-cell"><StreakBadge streak={f.streak} /></td>
-                            <td className="px-3 py-3 hidden xl:table-cell max-w-[180px]">
+                            <td className="px-3 py-3 hidden xl:table-cell w-[180px] max-w-[180px] overflow-hidden">
                               {f.sector_strengths?.[0] && (
                                 <SectorBadge sector={f.sector_strengths[0].sector} accuracy={f.sector_strengths[0].accuracy} count={f.sector_strengths[0].count} onClick={setSector} />
                               )}
@@ -603,7 +539,7 @@ export default function Leaderboard() {
                           </tr>
                           {heroEnabled && previewId === f.id && (
                             <tr data-testid="lb-preview-row">
-                              <td colSpan={16} className="bg-surface-2/20 border-b border-border/40 p-0">
+                              <td colSpan={10} className="bg-surface-2/20 border-b border-border/40 p-0">
                                 <LeaderboardHoverPreview forecasterId={f.id} active={true} />
                               </td>
                             </tr>
