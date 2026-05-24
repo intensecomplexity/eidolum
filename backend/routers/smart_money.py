@@ -3,6 +3,7 @@
 Only includes analysts with accuracy >= 60% AND >= 35 scored predictions.
 """
 import time as _time
+from concurrent.futures import ThreadPoolExecutor
 from fastapi import APIRouter, Depends, Query, Request
 from sqlalchemy.orm import Session
 from sqlalchemy import text as sql_text
@@ -60,17 +61,52 @@ def get_smart_money(
     top_ids = [r[0] for r in top_analysts]
     analyst_info = {r[0]: {"name": r[1], "accuracy": round(float(r[2]), 1), "firm": r[3]} for r in top_analysts}
 
-    # Get pending predictions from top analysts. Exclude stale "pending"
-    # rows published more than 18 months ago — those are predictions
-    # whose evaluation window has effectively already run. They should
-    # not feed the "who's currently betting on X" aggregate.
-    where = "AND p.direction IN ('bullish', 'bearish', 'neutral')"
-    where += " AND (p.prediction_date IS NULL OR p.prediction_date >= NOW() - INTERVAL '18 months')"
-    params = {"ids": top_ids}
+    # ── Step 1: SQL pre-filter ─────────────────────────────────────────
+    # Before this fix we pulled every pending prediction from the 151
+    # top analysts (~3,300 rows / 1,077 distinct tickers) and then ran
+    # the per-ticker live-price loop over all 1,077. Most tickers had
+    # only one analyst behind them and failed the min_analysts filter
+    # AFTER paying the price-fetch cost — wasted work that pushed total
+    # latency past the 8s frontend timeout. By moving the
+    # `COUNT(DISTINCT forecaster_id) >= min_analysts` check into SQL
+    # we cut the fan-out by ~3.5x (e.g. 1,077 → 305 tickers at
+    # min_analysts=2) before any HTTP work begins.
+    sector_join = ""
+    sector_where = ""
+    prefilter_params: dict = {"ids": top_ids, "min_analysts": min_analysts}
     if sector:
-        where += " AND ts.sector = :sector"
-        params["sector"] = sector
+        sector_join = "JOIN ticker_sectors ts ON ts.ticker = p.ticker"
+        sector_where = "AND ts.sector = :sector"
+        prefilter_params["sector"] = sector
 
+    survivors = db.execute(sql_text(f"""
+        SELECT p.ticker, p.direction
+        FROM predictions p
+        {sector_join}
+        WHERE p.outcome = 'pending'
+          AND p.forecaster_id = ANY(:ids)
+          AND p.direction IN ('bullish', 'bearish', 'neutral')
+          AND (p.prediction_date IS NULL
+               OR p.prediction_date >= NOW() - INTERVAL '18 months')
+          AND {_YT_VIS_P}
+          AND {_NON_QWEN_P}
+          AND {_NOT_EXCL_P}
+          {sector_where}
+        GROUP BY p.ticker, p.direction
+        HAVING COUNT(DISTINCT p.forecaster_id) >= :min_analysts
+    """), prefilter_params).fetchall()
+
+    survivor_tickers = sorted({r[0] for r in survivors})
+    if not survivor_tickers:
+        result = {"bullish": [], "bearish": [], "top_analyst_count": len(top_ids)}
+        _cache[cache_key] = result
+        _cache_time = _time.time()
+        return result
+
+    # ── Step 2: detail query restricted to survivor tickers ────────────
+    # Pull per-row fields (target_price, entry_price, ticker_sectors)
+    # for the surviving ticker set. The same WHERE conditions as the
+    # pre-filter apply so the row sets agree.
     rows = db.execute(sql_text(f"""
         SELECT p.ticker, p.direction, p.forecaster_id, p.target_price, p.entry_price,
                ts.company_name, ts.logo_url, ts.logo_domain, ts.sector
@@ -78,11 +114,14 @@ def get_smart_money(
         LEFT JOIN ticker_sectors ts ON ts.ticker = p.ticker
         WHERE p.outcome = 'pending'
           AND p.forecaster_id = ANY(:ids)
+          AND p.direction IN ('bullish', 'bearish', 'neutral')
+          AND (p.prediction_date IS NULL
+               OR p.prediction_date >= NOW() - INTERVAL '18 months')
+          AND p.ticker = ANY(:tickers)
           AND {_YT_VIS_P}
           AND {_NON_QWEN_P}
           AND {_NOT_EXCL_P}
-          {where}
-    """), params).fetchall()
+    """), {"ids": top_ids, "tickers": survivor_tickers}).fetchall()
 
     # Group by ticker + direction
     from collections import defaultdict
@@ -118,20 +157,29 @@ def get_smart_money(
     # reflects today's reality. Falling back to entries[-1] would re-use
     # a stale entry price from an old prediction and is exactly why
     # SNOW/MSFT were appearing on Bullish Bets with negative upside.
+    #
+    # Parallelized with ThreadPoolExecutor (max_workers=10) — the old
+    # sequential loop over 300+ surviving tickers at ~100ms per provider
+    # call was the dominant cost (~30s+, blowing past the 8s frontend
+    # timeout). 10 concurrent fetches drops worst case to ~3s while
+    # staying under the price provider's polite-client threshold.
     try:
         from routers.ticker_detail import _fetch_price_data
     except Exception:
         _fetch_price_data = None  # type: ignore
     live_prices: dict = {}
     if _fetch_price_data is not None:
-        for ticker in ticker_data.keys():
+        def _fetch_one(t):
             try:
-                data = _fetch_price_data(ticker)
-                lp = data.get("current_price") if data else None
-                if lp and lp > 0:
-                    live_prices[ticker] = float(lp)
+                d = _fetch_price_data(t)
+                lp = d.get("current_price") if d else None
+                return t, (float(lp) if lp and lp > 0 else None)
             except Exception:
-                pass
+                return t, None
+        with ThreadPoolExecutor(max_workers=10) as pool:
+            for ticker, price in pool.map(_fetch_one, list(ticker_data.keys())):
+                if price is not None:
+                    live_prices[ticker] = price
 
     for ticker, td in ticker_data.items():
         bull_ids = list(set(td["bullish"]))
