@@ -1,9 +1,10 @@
 import { FaReddit } from 'react-icons/fa';
 import { FaXTwitter } from 'react-icons/fa6';
 
-// FaYoutube is a single-color glyph; rendered red on the red badge bg the
-// play triangle disappeared and the badge read as a featureless red blob.
-// Inline 2-color SVG keeps the rect red AND draws the play triangle white.
+// Wrapper span already provides the red rounded rect via bg + border-radius,
+// so the SVG only needs the white play triangle. Sized 8x10 in the 24x24
+// viewBox (~33% wide, ~42% tall) to match YouTube's official play-button
+// proportions instead of looking like a speck.
 function YouTubeGlyph({ size = 16 }) {
   return (
     <svg
@@ -12,8 +13,7 @@ function YouTubeGlyph({ size = 16 }) {
       aria-label="YouTube" role="img"
       style={{ display: 'block' }}
     >
-      <path d="M23.5 6.2a3 3 0 0 0-2.1-2.1C19.5 3.6 12 3.6 12 3.6s-7.5 0-9.4.5A3 3 0 0 0 .5 6.2 31 31 0 0 0 0 12a31 31 0 0 0 .5 5.8 3 3 0 0 0 2.1 2.1C4.5 20.4 12 20.4 12 20.4s7.5 0 9.4-.5a3 3 0 0 0 2.1-2.1A31 31 0 0 0 24 12a31 31 0 0 0-.5-5.8z" fill="#FF0000"/>
-      <path d="M9.6 15.6 15.8 12 9.6 8.4z" fill="#fff"/>
+      <path d="M9.5 7v10l8-5z" fill="#fff"/>
     </svg>
   );
 }
