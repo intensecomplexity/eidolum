@@ -462,13 +462,17 @@ export default function Leaderboard() {
                             </div>
                           </th>
                           <th className="px-3 py-3 text-right">Predictions</th>
-                          <th className="px-3 py-3 text-right hidden xl:table-cell w-20" title="Sector call accuracy (separate from ticker call accuracy)">Sector Calls</th>
+                          {['all', 'youtube'].includes(source) && (
+                            <th className="px-3 py-3 text-right hidden xl:table-cell w-20" title="Sector call accuracy (separate from ticker call accuracy). YouTube-source only — article/X scrapers don't produce sector-level forecasts.">Sector Calls</th>
+                          )}
                           <th className="px-3 py-3 text-right hidden 2xl:table-cell w-20" title="Pair call accuracy — spread-scored relative-value predictions (long beats short).">Pair Calls</th>
                           <th className="px-3 py-3 text-right hidden 2xl:table-cell w-20" title="Binary event accuracy — yes/no predictions on discrete events (Fed decisions, M&amp;A, IPOs, index inclusions).">Binary Events</th>
                           <th className="px-3 py-3 text-right hidden 2xl:table-cell w-20" title="Metric forecast accuracy — numerical predictions on EPS, revenue, CPI, unemployment, etc. Scored on target vs actual.">Metric Forecasts</th>
                           <th className="px-3 py-3 text-right hidden 2xl:table-cell w-20" title="Regime call accuracy — structural market-phase claims (no top yet, bottom is in, topping process, correction not bear) scored on drawdown / runup / new-high behavior, NOT final price vs target.">Regime Calls</th>
                           <th className="px-3 py-3 text-right hidden 2xl:table-cell w-24" title="Average 3-month follow-through on disclosed positions — what the stock did after the forecaster said they bought / sold / added / trimmed. Sell-side actions are sign-flipped so positive = good call. SEPARATE from prediction accuracy.">Avg Follow-Through 3M</th>
-                          <th className="px-3 py-3 text-right hidden xl:table-cell w-20" title="Accuracy on ordering stocks within their ranked lists. Higher = better at predicting which picks will outperform which.">Ranking</th>
+                          {['all', 'youtube'].includes(source) && (
+                            <th className="px-3 py-3 text-right hidden xl:table-cell w-20" title="Accuracy on ordering stocks within their ranked lists. Higher = better at predicting which picks will outperform which. YouTube-source only.">Ranking</th>
+                          )}
                           <th className="px-3 py-3 text-center hidden xl:table-cell w-16">Streak</th>
                           <th className="px-3 py-3 hidden xl:table-cell max-w-[180px]">Top Sector</th>
                           <th className="px-2 py-3 text-center hidden lg:table-cell w-14">Watch</th>
@@ -538,18 +542,20 @@ export default function Leaderboard() {
                               <div className="font-mono tnum text-text-secondary text-sm">{f.evaluated_predictions}</div>
                               <div className="text-muted text-[10px] font-mono">{f.total_predictions} total</div>
                             </td>
-                            <td className="px-3 py-3 text-right hidden xl:table-cell">
-                              {f.sector_call_total > 0 && f.sector_call_accuracy != null ? (
-                                <div className="flex flex-col items-end">
-                                  <span className={`font-mono tnum text-sm ${f.sector_call_accuracy >= 60 ? 'text-positive' : 'text-negative'}`}>
-                                    {f.sector_call_accuracy.toFixed(1)}%
-                                  </span>
-                                  <span className="text-muted text-[10px] font-mono">{pluralize(f.sector_call_total, 'call')}</span>
-                                </div>
-                              ) : (
-                                <span className="font-mono text-muted">—</span>
-                              )}
-                            </td>
+                            {['all', 'youtube'].includes(source) && (
+                              <td className="px-3 py-3 text-right hidden xl:table-cell">
+                                {f.sector_call_total > 0 && f.sector_call_accuracy != null ? (
+                                  <div className="flex flex-col items-end">
+                                    <span className={`font-mono tnum text-sm ${f.sector_call_accuracy >= 60 ? 'text-positive' : 'text-negative'}`}>
+                                      {f.sector_call_accuracy.toFixed(1)}%
+                                    </span>
+                                    <span className="text-muted text-[10px] font-mono">{pluralize(f.sector_call_total, 'call')}</span>
+                                  </div>
+                                ) : (
+                                  <span className="font-mono text-muted">—</span>
+                                )}
+                              </td>
+                            )}
                             <td className="px-3 py-3 text-right hidden 2xl:table-cell">
                               {f.pair_call_total > 0 && f.pair_call_accuracy != null ? (
                                 <div className="flex flex-col items-end">
@@ -612,21 +618,23 @@ export default function Leaderboard() {
                                 <span className="font-mono text-muted">—</span>
                               )}
                             </td>
-                            <td className="px-3 py-3 text-right hidden xl:table-cell">
-                              {f.ranking_accuracy != null ? (
-                                <div className="flex flex-col items-end"
-                                  title="Accuracy on ordering stocks within ranked lists. Higher = better at predicting which picks will outperform which.">
-                                  <span className={`font-mono tnum text-sm ${f.ranking_accuracy >= 60 ? 'text-positive' : 'text-negative'}`}>
-                                    {f.ranking_accuracy.toFixed(1)}%
-                                  </span>
-                                  <span className="text-muted text-[10px] font-mono">
-                                    {f.lists_published || 0} list{f.lists_published === 1 ? '' : 's'}
-                                  </span>
-                                </div>
-                              ) : (
-                                <span className="font-mono text-muted">—</span>
-                              )}
-                            </td>
+                            {['all', 'youtube'].includes(source) && (
+                              <td className="px-3 py-3 text-right hidden xl:table-cell">
+                                {f.ranking_accuracy != null ? (
+                                  <div className="flex flex-col items-end"
+                                    title="Accuracy on ordering stocks within ranked lists. Higher = better at predicting which picks will outperform which.">
+                                    <span className={`font-mono tnum text-sm ${f.ranking_accuracy >= 60 ? 'text-positive' : 'text-negative'}`}>
+                                      {f.ranking_accuracy.toFixed(1)}%
+                                    </span>
+                                    <span className="text-muted text-[10px] font-mono">
+                                      {f.lists_published || 0} list{f.lists_published === 1 ? '' : 's'}
+                                    </span>
+                                  </div>
+                                ) : (
+                                  <span className="font-mono text-muted">—</span>
+                                )}
+                              </td>
+                            )}
                             <td className="px-3 py-3 text-center hidden xl:table-cell"><StreakBadge streak={f.streak} /></td>
                             <td className="px-3 py-3 hidden xl:table-cell max-w-[180px]">
                               {f.sector_strengths?.[0] && (
