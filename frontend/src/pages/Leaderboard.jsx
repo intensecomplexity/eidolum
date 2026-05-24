@@ -111,6 +111,21 @@ export default function Leaderboard() {
   const [metricOpen, setMetricOpen] = useState(false);
   const [expandedId, setExpandedId] = useState(null);
   const metricRef = useRef(null);
+  // Debounced hover-to-expand timer for the row breakdown panel.
+  // 200ms guards against accidental scroll-by hovers. Per launch spec
+  // (2026-05-25): hover OPENS expansion, mouse-leave does NOT close it —
+  // the panel stays open until the user hovers a different row or
+  // toggles it via click. Single timer is reused across rows.
+  const hoverTimerRef = useRef(null);
+  const expandOnHover = (id) => {
+    if (heroEnabled) setPreviewId(id);
+    clearTimeout(hoverTimerRef.current);
+    hoverTimerRef.current = setTimeout(() => setExpandedId(id), 200);
+  };
+  const cancelExpandTimer = (id) => {
+    if (heroEnabled) setPreviewId(curr => (curr === id ? null : curr));
+    clearTimeout(hoverTimerRef.current);
+  };
   const [timeframe, setTimeframe] = useState(() => searchParams.get('timeframe') || 'all');
   const [source, setSource] = useState(() => searchParams.get('source') || 'all');
   const [minPreds, setMinPreds] = useState(() => Number(searchParams.get('min_preds')) || 10);
@@ -464,8 +479,9 @@ export default function Leaderboard() {
                         {data.map((f, idx) => (
                           <React.Fragment key={f.id}>
                           <tr className="border-b border-border/50 transition-colors hover:bg-surface-2/30"
-                            onMouseEnter={heroEnabled ? () => setPreviewId(f.id) : undefined}
-                            onMouseLeave={heroEnabled ? () => setPreviewId(curr => (curr === f.id ? null : curr)) : undefined}
+                            onMouseEnter={() => expandOnHover(f.id)}
+                            onMouseLeave={() => cancelExpandTimer(f.id)}
+                            onFocus={() => setExpandedId(f.id)}
                             data-testid="lb-row"
                             style={{ animation: `leaderboardFadeIn 0.3s ease-out ${idx * 0.02}s both` }}>
                             <td className="px-3 py-4"><RankBadge rank={f.rank} movement={f.rank_movement} /></td>
