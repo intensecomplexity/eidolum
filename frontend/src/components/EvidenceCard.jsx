@@ -33,7 +33,7 @@ function SourceIcon({ type }) {
 /** Extract the 11-char YouTube video ID from a source_platform_id.
  *  Format is always "yt_{VIDEO_ID}_..." where video ID is exactly 11 chars.
  *  Returns null if the format doesn't match. */
-function extractYouTubeVideoId(sourcePlatformId) {
+export function extractYouTubeVideoId(sourcePlatformId) {
   if (!sourcePlatformId || typeof sourcePlatformId !== 'string') return null;
   if (!sourcePlatformId.startsWith('yt_')) return null;
   const vid = sourcePlatformId.slice(3, 14);
@@ -281,10 +281,13 @@ export default function EvidenceCard({ prediction: p, forecaster = null, expanda
   );
 }
 
-/** Inline YouTube player component */
-function InlinePlayer({ videoId, timestamp, onClose }) {
+/** Inline YouTube player component.
+ *  `sm:max-w-[720px]` caps the width at ≥640px so it doesn't sprawl when
+ *  the parent is a wide desktop container (e.g. an expanded table row).
+ *  Mobile (<640px) is unaffected — viewport widths sit well below 720px. */
+export function InlinePlayer({ videoId, timestamp, onClose }) {
   return (
-    <div className="mt-3 rounded-lg overflow-hidden bg-bg border border-border">
+    <div className="mt-3 rounded-lg overflow-hidden bg-bg border border-border sm:max-w-[720px]">
       <div className="flex items-center justify-between px-3 py-1.5 bg-surface-2 border-b border-border">
         <span className="text-muted text-[10px] font-mono">YouTube Player</span>
         <button

@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { ExternalLink, ArrowLeft, ChevronUp, ChevronDown, ChevronLeft, ChevronRight, Lock, TrendingUp, TrendingDown, ArrowRight } from 'lucide-react';
+import { ExternalLink, ArrowLeft, ChevronUp, ChevronDown, ChevronLeft, ChevronRight, Lock, TrendingUp, TrendingDown, ArrowRight, Play } from 'lucide-react';
 import LoadingSpinner from '../components/LoadingSpinner';
 import useSEO from '../hooks/useSEO';
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, ReferenceLine } from 'recharts';
@@ -12,7 +12,7 @@ import { getSourceBadgeKey } from '../utils/getSourceBadgeKey';
 import StreakBadge from '../components/StreakBadge';
 import PredictionCard from '../components/PredictionCard';
 import SourceBadge from '../components/SourceBadge';
-import EvidenceCard from '../components/EvidenceCard';
+import EvidenceCard, { InlinePlayer, extractYouTubeVideoId } from '../components/EvidenceCard';
 import BookmarkButton from '../components/BookmarkButton';
 import NotificationBanner from '../components/NotificationBanner';
 import FollowButton from '../components/FollowButton';
@@ -1029,6 +1029,7 @@ const HORIZON_LABELS = { short: '30d', medium: '90d', long: '1y', custom: 'Custo
 const FP_API_BASE = 'https://eidolum-production.up.railway.app';
 
 function ProofBlock({ p }) {
+  const [showVideo, setShowVideo] = useState(false);
   const source = p.source_url || '';
   const archive = p.archive_url;
   const archiveUrl = archive && archive.startsWith('/archive/') ? `${FP_API_BASE}${archive}` : null;
@@ -1043,12 +1044,16 @@ function ProofBlock({ p }) {
 
   const ts = p.source_timestamp_seconds ?? p.video_timestamp_sec;
   const timeStr = ts ? `${Math.floor(ts / 60)}:${String(ts % 60).padStart(2, '0')}` : null;
+  // Real 11-char video ID extracted from source_platform_id (the format
+  // the inline player expects). Falls through to URL-opener if missing.
+  const ytVid = isYT ? extractYouTubeVideoId(p.source_platform_id) : null;
   // Append ?t=Ns anchor to YouTube URLs when we have a resolved timestamp.
+  // Used only by the external "Open on YouTube" fallback link.
   const ytHref = isYT && ts
     ? (() => { const n = Math.floor(Number(ts)); const sep = source.includes('?') ? '&' : '?'; return `${source}${sep}t=${n}s`; })()
     : source;
 
-  const label = isYT ? (timeStr ? `Watch at ${timeStr}` : 'Watch on YouTube')
+  const label = isYT ? (timeStr ? `Watch at ${timeStr}` : 'Watch')
     : isTwitter ? 'View on X' : isReddit ? 'View on Reddit' : 'View Source';
   const bg = isYT ? '#FF0000' : isTwitter ? '#000' : isReddit ? '#FF4500' : '#333';
 
@@ -1075,12 +1080,28 @@ function ProofBlock({ p }) {
               border: '1px solid rgba(255,255,255,0.1)', cursor: 'pointer', display: 'block' }} />
         </a>
       )}
-      <a href={isYT ? ytHref : source} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()}
-        style={{ display: 'inline-flex', alignItems: 'center', gap: '6px',
-          padding: '6px 14px', borderRadius: '6px', background: bg, color: '#fff',
-          fontSize: '0.85rem', fontWeight: 500, textDecoration: 'none' }}>
-        {label}
-      </a>
+      {isYT && ytVid ? (
+        <button
+          type="button"
+          onClick={(e) => { e.stopPropagation(); setShowVideo(v => !v); }}
+          style={{ display: 'inline-flex', alignItems: 'center', gap: '6px',
+            padding: '6px 14px', borderRadius: '6px', background: bg, color: '#fff',
+            fontSize: '0.85rem', fontWeight: 500, border: 'none', cursor: 'pointer' }}>
+          <Play size={14} fill="currentColor" /> {label}
+        </button>
+      ) : (
+        <a href={isYT ? ytHref : source} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()}
+          style={{ display: 'inline-flex', alignItems: 'center', gap: '6px',
+            padding: '6px 14px', borderRadius: '6px', background: bg, color: '#fff',
+            fontSize: '0.85rem', fontWeight: 500, textDecoration: 'none' }}>
+          {label}
+        </a>
+      )}
+      {showVideo && isYT && ytVid && (
+        <div onClick={(e) => e.stopPropagation()}>
+          <InlinePlayer videoId={ytVid} timestamp={ts} onClose={() => setShowVideo(false)} />
+        </div>
+      )}
     </div>
   );
 }
