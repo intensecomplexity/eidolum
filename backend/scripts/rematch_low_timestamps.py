@@ -213,9 +213,10 @@ def main() -> int:
                      WHERE id = %s""",
                 (int(new_seconds), int(pred_id)),
             )
-
-    if args.commit:
-        conn.commit()
+            # Commit per row so a mid-loop SSL drop (the Railway public
+            # proxy idle-kills long-held connections) doesn't roll back
+            # all the successful updates that came before it.
+            conn.commit()
 
     print("\n=== Summary ===")
     print(f"  scanned:                {len(rows)}")
