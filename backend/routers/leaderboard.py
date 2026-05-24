@@ -40,6 +40,11 @@ _integrity_check_time: float = 0
 INTEGRITY_CHECK_TTL = 600
 _last_forecaster_count: int = 0
 
+# Weekly leaderboard inclusion threshold — see prompt 2026-05-25.
+# Without this, 1/1 and 2/2 perfect-week analysts dominate the top 100
+# and high-volume YouTube creators (e.g. Meet Kevin 4/20) sink below.
+MIN_WEEKLY_EVALUATED = 5
+
 
 def _fetch_dormancy(db: Session, fids: list) -> dict:
     """Return {forecaster_id: (is_dormant, last_prediction_at)}.
@@ -752,8 +757,10 @@ def _week_leaderboard_impl(db: Session) -> dict:
         if r[6] in ("hit", "correct"):
             scored_map[key]["correct"] += 1
 
-    # Build sorted leaderboard
-    scored_list = sorted(scored_map.values(), key=lambda x: (x["correct"] / x["total"] if x["total"] > 0 else 0, x["total"]), reverse=True)
+    # Build sorted leaderboard. Apply MIN_WEEKLY_EVALUATED threshold so
+    # 1/1 and 2/2 perfect weeks don't crowd out higher-volume forecasters.
+    eligible = [v for v in scored_map.values() if v["total"] >= MIN_WEEKLY_EVALUATED]
+    scored_list = sorted(eligible, key=lambda x: (x["correct"] / x["total"] if x["total"] > 0 else 0, x["total"]), reverse=True)
 
     scored_lb = []
     for i, s in enumerate(scored_list[:100]):
