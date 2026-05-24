@@ -132,7 +132,8 @@ export default function Leaderboard() {
   const [timeframe, setTimeframe] = useState(() => searchParams.get('timeframe') || 'all');
   const [source, setSource] = useState(() => searchParams.get('source') || 'all');
   const [minPreds, setMinPreds] = useState(() => Number(searchParams.get('min_preds')) || 10);
-  const [showDormant, setShowDormant] = useState(() => searchParams.get('dormant') === 'true');
+  // Toggle button removed; URL ?dormant=true bookmarks still honored as a read.
+  const [showDormant] = useState(() => searchParams.get('dormant') === 'true');
   const [availableTf, setAvailableTf] = useState({ all: true, short: true, medium: true, long: true });
 
   // Ship #13B Bug 14: write current filter state back to the URL so
@@ -385,22 +386,6 @@ export default function Leaderboard() {
                     </button>
                   ))}
                 </div>
-              )}
-
-              {/* Show dormant toggle — off by default; survey said 75% of users
-                  want to hide forecasters who haven't made a new call in 30+ days. */}
-              {activeTab !== 'week' && (
-                <button
-                  onClick={() => setShowDormant(d => !d)}
-                  title="Forecasters with no new predictions in 30+ days"
-                  className={`px-2.5 py-1 rounded text-[11px] font-semibold transition-colors shrink-0 ${
-                    showDormant
-                      ? 'bg-surface-2 text-text-primary border border-border'
-                      : 'bg-surface-2 text-muted border border-border'
-                  }`}
-                >
-                  {showDormant ? '\u2713 Show dormant' : 'Show dormant'}
-                </button>
               )}
 
               {activeTab === 'recent' && (
