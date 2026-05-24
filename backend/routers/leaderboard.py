@@ -728,7 +728,7 @@ def _week_leaderboard_impl(db: Session) -> dict:
                 "correct": 0, "total": 0,
             }
         scored_map[key]["total"] += 1
-        if r[6] == "correct":
+        if r[6] in ("hit", "correct"):
             scored_map[key]["correct"] += 1
 
     for r in player_scored:
@@ -749,7 +749,7 @@ def _week_leaderboard_impl(db: Session) -> dict:
                 "correct": 0, "total": 0,
             }
         scored_map[key]["total"] += 1
-        if r[6] == "correct":
+        if r[6] in ("hit", "correct"):
             scored_map[key]["correct"] += 1
 
     # Build sorted leaderboard
