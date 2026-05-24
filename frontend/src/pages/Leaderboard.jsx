@@ -13,9 +13,7 @@ import StreakBadge from '../components/StreakBadge';
 import LeaderboardCard from '../components/LeaderboardCard';
 import NotificationBanner from '../components/NotificationBanner';
 import FollowButton from '../components/FollowButton';
-import LeaderboardHoverPreview from '../components/LeaderboardHoverPreview';
 import SectionHeader from '../components/SectionHeader';
-import { usePublicFlag } from '../hooks/usePublicFlag';
 import { getLeaderboard, getAvailableTimeframes } from '../api';
 
 // Ship #13B Bug 13: all 11 Morningstar sectors. Real Estate /
@@ -99,8 +97,6 @@ export default function Leaderboard() {
   // Ship #14 — hover preview of last scored call. Gated on the same
   // hero flag as the other Ship #14 polish so it can ship behind one
   // kill switch.
-  const heroEnabled = usePublicFlag('homepage_hero');
-  const [previewId, setPreviewId] = useState(null);
   const [weekData, setWeekData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState(() => searchParams.get('tab') || 'alltime');
@@ -111,20 +107,27 @@ export default function Leaderboard() {
   const [metricOpen, setMetricOpen] = useState(false);
   const [expandedId, setExpandedId] = useState(null);
   const metricRef = useRef(null);
-  // Debounced hover-to-expand timer for the row breakdown panel.
-  // 200ms guards against accidental scroll-by hovers. Per launch spec
-  // (2026-05-25): hover OPENS expansion, mouse-leave does NOT close it —
-  // the panel stays open until the user hovers a different row or
-  // toggles it via click. Single timer is reused across rows.
+  // Hover-to-expand timers for the row breakdown panel.
+  //  - hoverTimerRef (200ms): debounces OPEN so scroll-by hovers don't fire.
+  //  - leaveTimerRef (150ms): debounces CLOSE so the cursor can cross the
+  //    pixel gap between the main row and the breakdown row in the same
+  //    React.Fragment without the panel flickering shut.
+  // Both timers are shared across rows since only one row can be expanded
+  // at a time. The setExpandedId(curr === id ? null : ...) guard inside
+  // the leave callback keeps a freshly-hovered different row open even if
+  // a previous row's leave timer fires after.
   const hoverTimerRef = useRef(null);
+  const leaveTimerRef = useRef(null);
   const expandOnHover = (id) => {
-    if (heroEnabled) setPreviewId(id);
+    clearTimeout(leaveTimerRef.current);
     clearTimeout(hoverTimerRef.current);
     hoverTimerRef.current = setTimeout(() => setExpandedId(id), 200);
   };
   const cancelExpandTimer = (id) => {
-    if (heroEnabled) setPreviewId(curr => (curr === id ? null : curr));
     clearTimeout(hoverTimerRef.current);
+    leaveTimerRef.current = setTimeout(() => {
+      setExpandedId(curr => (curr === id ? null : curr));
+    }, 150);
   };
   const [timeframe, setTimeframe] = useState(() => searchParams.get('timeframe') || 'all');
   const [source, setSource] = useState(() => searchParams.get('source') || 'all');
@@ -550,13 +553,6 @@ export default function Leaderboard() {
                               <FollowButton forecaster={f} compact />
                             </td>
                           </tr>
-                          {heroEnabled && previewId === f.id && (
-                            <tr data-testid="lb-preview-row">
-                              <td colSpan={10} className="bg-surface-2/20 border-b border-border/40 p-0">
-                                <LeaderboardHoverPreview forecasterId={f.id} active={true} />
-                              </td>
-                            </tr>
-                          )}
                           {expandedId === f.id && (() => {
                             const hits = f.hits || f.correct_predictions || 0;
                             const nears = f.nears || 0;
@@ -569,7 +565,9 @@ export default function Leaderboard() {
                             const dTotal = bull + bear + neut;
                             const pct = (n, t) => t > 0 ? Math.round(n / t * 100) : 0;
                             return (
-                              <tr>
+                              <tr
+                                onMouseEnter={() => expandOnHover(f.id)}
+                                onMouseLeave={() => cancelExpandTimer(f.id)}>
                                 <td colSpan={10} className="bg-surface-2/30 border-t border-accent/10 py-6 px-6">
                                   <div className="grid grid-cols-2 gap-8 max-w-lg mx-auto">
                                     <div>
