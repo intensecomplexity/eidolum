@@ -878,15 +878,15 @@ export default function ForecasterProfile() {
               <thead>
                 <tr className="text-left text-muted text-xs uppercase tracking-wider border-b border-border">
                   <th className="px-2 py-3 w-10"></th>
-                  <th className="px-6 py-3">Date</th>
-                  <th className="px-6 py-3">Ticker</th>
-                  <th className="px-6 py-3">Call</th>
-                  <th className="px-6 py-3">Source</th>
-                  <th className="px-6 py-3 text-right">Entry</th>
-                  <th className="px-6 py-3 text-center">Outcome</th>
-                  <th className="px-6 py-3 text-right">Return</th>
-                  <th className="px-6 py-3 text-center hidden md:table-cell">Eval Date</th>
-                  <th className="px-6 py-3 hidden lg:table-cell">Context</th>
+                  <th className="px-3 py-3">Date</th>
+                  <th className="px-3 py-3">Ticker</th>
+                  <th className="px-3 py-3">Call</th>
+                  <th className="px-3 py-3">Source</th>
+                  <th className="px-3 py-3 text-right">Entry</th>
+                  <th className="px-3 py-3 text-center">Outcome</th>
+                  <th className="px-3 py-3 text-right">Return</th>
+                  <th className="px-3 py-3 text-center hidden md:table-cell">Eval Date</th>
+                  <th className="px-3 py-3 hidden lg:table-cell w-[200px]">Context</th>
                 </tr>
               </thead>
               <tbody>
@@ -1327,11 +1327,11 @@ function PredictionRow({ p, forecaster: fc }) {
         onClick={() => setExpanded(!expanded)}
       >
         <td className="px-2 py-3"><BookmarkButton predictionId={p.id} /></td>
-        <td className="px-6 py-3">
+        <td className="px-3 py-3">
           <div className="text-sm text-text-secondary font-mono whitespace-nowrap">{p.prediction_date?.slice(0, 10)}</div>
           <span className="text-muted text-[10px] font-mono">{horizonLabel}</span>
         </td>
-        <td className="px-6 py-3">
+        <td className="px-3 py-3">
           <div className="flex items-center gap-1.5">
             <TickerLogo ticker={p.ticker} logoUrl={p.logo_url} size={18} />
             <Link to={`/asset/${p.ticker}`} className="ticker-mono text-accent hover:underline" onClick={e => e.stopPropagation()}>{p.ticker}</Link>
@@ -1340,7 +1340,7 @@ function PredictionRow({ p, forecaster: fc }) {
             <span className="ml-1 text-[9px] font-bold tracking-wide px-1 py-0.5 rounded-full" style={{ backgroundColor: 'rgba(247, 147, 26, 0.15)', color: '#f7931a' }}>CRYPTO</span>
           )}
         </td>
-        <td className="px-6 py-3">
+        <td className="px-3 py-3">
           <div className="inline-flex items-center gap-1 flex-wrap">
             <PredictionBadge direction={p.direction} windowDays={p.window_days || p.evaluation_window_days} />
             {p.has_conflict && <ConflictBadge note={p.conflict_note} size="small" />}
@@ -1352,27 +1352,27 @@ function PredictionRow({ p, forecaster: fc }) {
             <RegimeBadge p={p} />
           </div>
         </td>
-        <td className="px-6 py-3">
+        <td className="px-3 py-3">
           <SourceBadge verifiedBy={p.verified_by} date={p.prediction_date} />
         </td>
-        <td className="px-6 py-3 text-right font-mono text-sm text-text-secondary">{p.entry_price ? `$${p.entry_price.toFixed(2)}` : '-'}</td>
-        <td className="px-6 py-3 text-center"><PredictionBadge outcome={p.outcome} evaluationDeferred={p.evaluation_deferred} evaluationDeferredReason={p.evaluation_deferred_reason} /></td>
-        <td className="px-6 py-3 text-right font-mono text-sm">
+        <td className="px-3 py-3 text-right font-mono text-sm text-text-secondary">{p.entry_price ? `$${p.entry_price.toFixed(2)}` : '-'}</td>
+        <td className="px-3 py-3 text-center"><PredictionBadge outcome={p.outcome} evaluationDeferred={p.evaluation_deferred} evaluationDeferredReason={p.evaluation_deferred_reason} /></td>
+        <td className="px-3 py-3 text-right font-mono text-sm">
           {p.actual_return !== null ? (
             <span className={p.actual_return >= 0 ? 'text-positive' : 'text-negative'}>{p.actual_return >= 0 ? '+' : ''}{p.actual_return.toFixed(1)}%</span>
           ) : <span className="text-muted">-</span>}
         </td>
-        <td className="px-6 py-3 text-center font-mono text-sm hidden md:table-cell">
+        <td className="px-3 py-3 text-center font-mono text-sm hidden md:table-cell">
           {evalDate ? (
             <span className={`text-xs ${p.outcome === 'pending' ? 'text-warning' : 'text-text-secondary'}`}>
               {evalDate.slice(0, 10)}
             </span>
           ) : <span className="text-muted">-</span>}
         </td>
-        <td className="px-6 py-3 hidden lg:table-cell">
-          <div className="flex items-center gap-1 max-w-xs" title={quoteText}>
-            <span className="text-text-secondary text-xs italic truncate">
-              {quoteText.length > 60 ? quoteText.slice(0, 60) + '...' : quoteText}
+        <td className="px-3 py-3 hidden lg:table-cell w-[200px] max-w-[200px] overflow-hidden">
+          <div className="flex items-center gap-1 max-w-[200px]" title={quoteText}>
+            <span className="text-text-secondary text-xs italic truncate min-w-0">
+              {quoteText.length > 48 ? quoteText.slice(0, 48) + '...' : quoteText}
             </span>
             <span className="text-muted text-xs shrink-0">{expanded ? '\u25BC' : '\u203A'}</span>
           </div>
