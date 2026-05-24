@@ -91,6 +91,77 @@ _WRITTEN_SUBS: tuple[tuple[str, str], ...] = (
 _APOSTROPHE_PATS = tuple((re.compile(pat), sub) for pat, sub in _APOSTROPHE_SUBS)
 _WRITTEN_PATS = tuple((re.compile(pat), sub) for pat, sub in _WRITTEN_SUBS)
 
+# ── Anchor stopwords (Path A first-distinctive-token anchor) ──────────────
+#
+# Used to pick the FIRST DISTINCTIVE quote token whose appearance in the
+# winning window defines the timestamp. Without this, a wide window that
+# wins Jaccard by stretching across the entire opening (because the lead
+# quote token's natural form appears later in the transcript) anchors
+# at the window's left edge — typically 1-2 words after the true sentence
+# start. The MU/Chip Stock Investor case (id=609724): ASR mis-transcribed
+# "Micron" as "Microlin"; Haiku spell-corrected back to "Micron"; the
+# winning window stretched to idx 34 (">> Micron" @ 12.7s) to satisfy the
+# qset hit; old anchor returned " just" @ 0.8s = 1s; new anchor finds
+# "micron" at idx 34 = 13s.
+#
+# Set scope: English-only, kept small and inline. Covers the most common
+# ASR fillers, grammatical glue, and short discourse markers that should
+# never define a timestamp by themselves.
+_ANCHOR_STOPWORDS: frozenset[str] = frozenset({
+    "the", "a", "an", "of", "to", "in", "on", "at", "for", "with",
+    "and", "or", "but", "is", "are", "was", "were", "be", "been", "being",
+    "this", "that", "these", "those", "it", "its",
+    "just", "had", "has", "have", "will", "would", "could", "should",
+    "may", "might", "can", "do", "does", "did",
+    "so", "very", "really", "well",
+    "you", "your", "we", "our", "i", "me", "my",
+    "they", "their", "he", "she", "his", "her",
+    "as", "by", "from", "up", "down", "out", "about",
+    "like", "get", "got", "going", "gonna", "kinda", "sorta",
+    "yeah", "ok", "okay", "um", "uh", "uhh",
+})
+
+
+def _first_distinctive_anchor_ms(
+    quote_tokens: list[str],
+    normed_words: list[tuple[str, int]],
+    start_idx: int,
+    end_idx: int,
+) -> Optional[int]:
+    """Return the start_ms of the first distinctive quote token's first
+    appearance inside the [start_idx, end_idx) window.
+
+    Algorithm — try each lead in QUOTE ORDER (not window order):
+      1. Compute up to 3 non-stopword tokens from `quote_tokens`, in
+         quote order. These are the "leads".
+      2. For each lead in order, scan the window for its first
+         occurrence. The first lead with a hit defines the anchor.
+      3. If no lead appears in the window at all → return None
+         (caller falls back to window-edge with a confidence penalty).
+
+    Quote-order priority matters: for "Micron just had a banger..." the
+    natural anchor is wherever "micron" first lands in the window, NOT
+    wherever the earliest-in-window lead (which may be "banger" or
+    "quarter") lands. Falling back to later leads only when an earlier
+    one is missing handles the ASR-mangled-lead-word case.
+    """
+    leads: list[str] = []
+    for tok in quote_tokens:
+        if tok and tok not in _ANCHOR_STOPWORDS:
+            if tok not in leads:
+                leads.append(tok)
+            if len(leads) >= 3:
+                break
+    if not leads:
+        return None
+    end = min(end_idx, len(normed_words))
+    for lead in leads:
+        for i in range(start_idx, end):
+            tok, ms = normed_words[i]
+            if tok == lead:
+                return ms
+    return None
+
 # ── Key-phrase anchor constants ────────────────────────────────────────────
 #
 # Used by Path F (_match_key_phrase_anchor) to find segments that share a
@@ -180,6 +251,7 @@ def _match_word_level(
     aggressive: bool = False,
     use_overlap_ratio: bool = False,
     threshold: float = _WORD_LEVEL_THRESHOLD,
+    video_id: Optional[str] = None,
 ) -> Optional[Tuple[int, float]]:
     """Slide a window the length of quote_tokens across the word-level
     ASR list, computing a similarity score for each position. Returns
@@ -187,10 +259,9 @@ def _match_word_level(
     or None if nothing clears the bar.
 
     Path A (default): Jaccard similarity over non-aggressively-normalized
-    tokens. Existing behavior — byte-for-byte preserved when called with
-    default kwargs.
+    tokens.
 
-    New variants (Ship: fuzzy matcher):
+    New variants:
       - aggressive=True → transcript words are re-normalized with
         contraction expansion, matching the same normalization applied
         to quote_tokens by the caller. Rescues "gonna" vs "going to" and
@@ -199,6 +270,18 @@ def _match_word_level(
         instead of Jaccard. Asymmetric: filler words in the window no
         longer drag the score down. Best for cases where the transcript
         has lots of disfluencies around the target phrase.
+
+    Anchor selection: after the winning window is chosen, the returned
+    timestamp is anchored on the FIRST DISTINCTIVE quote token (non-
+    stopword, in quote order, top-3) found inside the window — NOT the
+    window's left edge. This fixes the misanchoring case where the
+    window wins Jaccard by stretching wide enough to include a token
+    that ASR garbled at the true quote start (see the MU example in
+    `_first_distinctive_anchor_ms`'s docstring). When no distinctive
+    quote token is present in the winning window (degenerate; shouldn't
+    happen for a Jaccard-1.0 match), the timestamp falls back to the
+    window's left edge AND confidence is downgraded by 0.2 so callers
+    that gate on confidence can react.
     """
     if not quote_tokens or not words:
         return None
@@ -206,18 +289,15 @@ def _match_word_level(
     qset = set(quote_tokens)
     qset_len = len(qset)
     best_score = 0.0
-    best_start_ms: Optional[int] = None
+    best_start_idx: Optional[int] = None
+    best_end_idx: Optional[int] = None
 
     # Pre-normalize every word in the transcript once. When aggressive,
     # the caller expects contraction expansion to apply to both sides.
-    normed_words = []
+    normed_words: list[tuple[str, int]] = []
     for w in words:
         toks = _normalize_tokens(w.get("text") or "", aggressive=aggressive)
         if toks:
-            # A JSON3 "seg" is usually one token (e.g. "welcome", " to",
-            # " the"), but may occasionally contain a contraction like
-            # "don't" that normalizes to two. Preserve all tokens for
-            # matching but anchor the timestamp on the seg's start_ms.
             for t in toks:
                 normed_words.append((t, int(w.get("start_ms") or 0)))
     if len(normed_words) < max(qlen // 2, 3):
@@ -233,12 +313,7 @@ def _match_word_level(
         widths: tuple[int, ...] = (qlen, min_w, max(qlen, int(qlen * 2)))
     else:
         widths = (qlen, min_w, max(qlen, int(qlen * 1.3)))
-    # Stride 1 is fine — qlen is small (10-30) and normed_words fits
-    # in memory. For a 30-minute auto-ASR video that's ~5000 tokens,
-    # so ~5000 * 20 window sizes = 100K comparisons. Well within budget.
     for start in range(len(normed_words)):
-        # Try the canonical width first (most common match shape),
-        # then fall back to the stretched widths if it looks close.
         for width in widths:
             end = start + width
             if end > len(normed_words):
@@ -246,21 +321,55 @@ def _match_word_level(
             window_tokens = [t for (t, _s) in normed_words[start:end]]
             wset = set(window_tokens)
             if use_overlap_ratio:
-                # |qset ∩ wset| / |qset| — asymmetric, tolerates filler.
                 sim = len(qset & wset) / qset_len if qset_len else 0.0
             else:
                 sim = _jaccard(qset, wset)
             if sim > best_score:
                 best_score = sim
-                best_start_ms = normed_words[start][1]
+                best_start_idx = start
+                best_end_idx = end
                 if sim >= 0.98:
                     break
         if best_score >= 0.98:
             break
 
-    if best_start_ms is None or best_score < threshold:
+    if best_start_idx is None or best_score < threshold:
         return None
-    return (int(round(best_start_ms / 1000)), float(best_score))
+
+    # Anchor on the first distinctive (non-stopword) quote token that
+    # appears inside the winning window. Fixes the wide-window
+    # misanchoring case (see docstring).
+    window_start_ms = normed_words[best_start_idx][1]
+    anchor_ms = _first_distinctive_anchor_ms(
+        quote_tokens, normed_words, best_start_idx, best_end_idx or best_start_idx + 1,
+    )
+    confidence = float(best_score)
+    if anchor_ms is None:
+        # Degenerate: no distinctive quote token landed in the winning
+        # window. Keep the legacy window-edge anchor but penalize
+        # confidence so downstream filters can drop the row.
+        anchor_ms = window_start_ms
+        confidence = max(0.0, confidence - 0.2)
+
+    old_seconds = int(round(window_start_ms / 1000))
+    new_seconds = int(round(anchor_ms / 1000))
+    if abs(new_seconds - old_seconds) > 3:
+        # Structured log so we can measure the population of shifts in
+        # the next week before deciding to widen the backfill window.
+        log.info(
+            "timestamp_anchor_shift",
+            extra={
+                "video_id": video_id,
+                "old_seconds": old_seconds,
+                "new_seconds": new_seconds,
+                "quote_head": " ".join(quote_tokens[:10])[:60],
+                "score": round(best_score, 3),
+                "aggressive": aggressive,
+                "use_overlap_ratio": use_overlap_ratio,
+            },
+        )
+
+    return (new_seconds, confidence)
 
 
 def _match_fuzzy_segment(
@@ -559,6 +668,7 @@ def match_quote_to_timestamp(
     transcript_data: Optional[dict],
     *,
     enable_two_pass: bool = True,
+    video_id: Optional[str] = None,
 ) -> Tuple[Optional[int], str, float]:
     """Resolve a verbatim quote to (seconds, method, confidence).
 
@@ -607,7 +717,7 @@ def match_quote_to_timestamp(
         if has_words:
             quote_tokens = _normalize_tokens(verbatim_quote)
             a_result = _match_word_level(
-                quote_tokens, transcript_data["words"]
+                quote_tokens, transcript_data["words"], video_id=video_id,
             )
             if a_result is not None:
                 seconds, sim = a_result
@@ -630,7 +740,7 @@ def match_quote_to_timestamp(
         if has_words:
             a2_result = _match_word_level(
                 quote_tokens_agg, transcript_data["words"],
-                aggressive=True, use_overlap_ratio=True,
+                aggressive=True, use_overlap_ratio=True, video_id=video_id,
             )
             if a2_result is not None:
                 seconds, sim = a2_result
