@@ -321,10 +321,13 @@ export default function Leaderboard() {
                   {[
                     { key: 'all', label: 'All Sources' },
                     { key: 'wallst', label: 'Wall St', color: '#3b82f6' },
-                    { key: 'x', label: 'X', color: '#000000' },
-                    { key: 'stocktwits', label: 'StockTwits', color: '#1DA1F2' },
                     { key: 'youtube', label: 'YouTube', color: '#FF0000' },
                     { key: 'community', label: 'Community', color: '#34d399' },
+                    // X and StockTwits intentionally hidden pre-launch: X is
+                    // paused on Anthropic credits (~161 preds DB-wide) and
+                    // StockTwits coverage is too sparse to surface. URL params
+                    // ?source=x and ?source=stocktwits still work — the
+                    // backend filter logic is untouched, only the pills go.
                   ].map(s => (
                     <button key={s.key} onClick={() => setSource(s.key)}
                       className={`px-2.5 py-1 rounded text-[11px] font-semibold transition-colors ${
