@@ -721,6 +721,40 @@ def _seed_target_channels(db):
         db.commit()
         print(f"[ChannelMonitor] Seeded {inserted} new channels")
 
+    # Resolve youtube_channel_id for any active rows still NULL — both rows
+    # just inserted above and any historical orphans. Without this, the
+    # smart-scheduling path in _check_for_new_videos filters NULL-ID rows out,
+    # and the in-loop resolver at _check_for_new_videos's caller can never
+    # reach them. (Catch-22 documented in
+    # _alerts/channel-diagnostic-2026-05-24.md after 47 May-13 batch
+    # channels sat untouched for 10 days.)
+    null_id_rows = db.execute(sql_text(
+        "SELECT channel_name FROM youtube_channels "
+        "WHERE is_active = TRUE AND youtube_channel_id IS NULL"
+    )).fetchall()
+    if null_id_rows:
+        resolved_count = 0
+        for (name,) in null_id_rows:
+            cid = _resolve_channel_id(name)
+            if cid:
+                db.execute(
+                    sql_text(
+                        "UPDATE youtube_channels SET youtube_channel_id = :cid "
+                        "WHERE channel_name = :name AND youtube_channel_id IS NULL"
+                    ),
+                    {"cid": cid, "name": name},
+                )
+                db.commit()
+                resolved_count += 1
+                print(f"[ChannelMonitor] Sync-resolved {name!r} -> {cid}")
+            # _resolve_channel_id already logs failures to stdout; on transient
+            # 429s the row stays NULL and the next sync retries it.
+        print(
+            f"[ChannelMonitor] Sync-resolver: {resolved_count}/{len(null_id_rows)} "
+            f"channels newly resolved",
+            flush=True,
+        )
+
     # Re-activate phase: rows whose channel_name IS in TARGET_CHANNELS
     # but is_active=FALSE get flipped back on. Symmetric to deactivation
     # — without this, a manual or temp-restriction sweep that turns rows
