@@ -276,10 +276,11 @@ export default function Leaderboard() {
           ))}
         </div>
 
-        {/* Filters — horizontally scrollable with right-edge fade hint. */}
-        <div className="relative mb-4 sm:mb-6">
-        <div className="flex items-center gap-2 overflow-x-auto pb-1" style={{ scrollbarWidth: 'none' }}>
-          <style>{`.chip-scroll::-webkit-scrollbar{display:none}`}</style>
+        {/* Filters — wraps to a second line when content exceeds viewport
+            instead of horizontally scrolling. The previous overflow-x-auto +
+            right-edge fade was clipping "Show dormant" on the right at 1280px. */}
+        <div className="mb-4 sm:mb-6">
+        <div className="flex flex-wrap items-center gap-2 pb-1">
               <Filter className="w-4 h-4 text-muted shrink-0 hidden sm:block" />
 
               {/* Sector dropdown — always visible */}
@@ -390,13 +391,6 @@ export default function Leaderboard() {
                 </span>
               )}
             </div>
-            {/* Right-edge fade — signals more chips to scroll. Uses an
-                absolute overlay so it doesn't affect layout. */}
-            <div
-              aria-hidden
-              className="hidden sm:block pointer-events-none absolute right-0 top-0 bottom-0 w-10"
-              style={{ background: 'linear-gradient(to right, transparent, var(--color-bg, #16140E))' }}
-            />
           </div>
 
             {/* Loading */}
