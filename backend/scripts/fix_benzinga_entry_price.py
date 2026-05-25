@@ -244,15 +244,41 @@ def phase_b_restamp_scored(db, commit: bool) -> dict:
             )
 
     if commit and proposed:
-        print(f"\n[Phase B] APPLYING {len(proposed):,} updates...")
-        for p in proposed:
-            db.execute(sql_text("""
-                UPDATE predictions
-                   SET entry_price = :ep, actual_return = :ret
-                 WHERE id = :id
-            """), {"ep": p["new_entry"], "ret": p["new_return"], "id": p["id"]})
-        db.commit()
-        print(f"[Phase B] APPLIED — {len(proposed):,} rows updated")
+        print(f"\n[Phase B] APPLYING {len(proposed):,} updates in batches of 500...")
+        applied = 0
+        chunk = 500
+        i = 0
+        while i < len(proposed):
+            batch = proposed[i:i + chunk]
+            for attempt in range(3):
+                try:
+                    for p in batch:
+                        db.execute(sql_text("""
+                            UPDATE predictions
+                               SET entry_price = :ep, actual_return = :ret
+                             WHERE id = :id
+                        """), {"ep": p["new_entry"], "ret": p["new_return"], "id": p["id"]})
+                    db.commit()
+                    applied += len(batch)
+                    if (i // chunk) % 10 == 0:
+                        print(f"  ...committed {applied:,}/{len(proposed):,}", flush=True)
+                    break
+                except Exception as e:
+                    print(f"  [retry {attempt+1}/3] batch starting at {i}: {e}", flush=True)
+                    try:
+                        db.rollback()
+                    except Exception:
+                        pass
+                    try:
+                        db.close()
+                    except Exception:
+                        pass
+                    time.sleep(2 ** attempt)
+                    db = BgSessionLocal()
+            else:
+                print(f"  [give up] batch starting at {i} — {len(batch)} rows skipped", flush=True)
+            i += chunk
+        print(f"[Phase B] APPLIED — {applied:,}/{len(proposed):,} rows updated")
     elif proposed:
         print(f"\n[Phase B] DRY RUN — would update {len(proposed):,} rows")
     return {
