@@ -268,35 +268,39 @@ export default function ForecasterProfile() {
               <div className="flex items-center gap-2 sm:gap-3 mb-1 flex-wrap">
                 <div className="text-[10px] text-accent/60 uppercase tracking-widest font-mono mb-0.5">The Vault</div>
                 <h1 className="headline-serif" style={{ fontSize: 'clamp(24px, 5vw, 36px)' }}>{data.name}</h1>
-                <PlatformBadge platform={getSourceBadgeKey(data)} size={20} showLabel />
+                {/* PlatformBadge — when the source has a public channel
+                    URL (YouTube / X / Reddit), wrap the badge in an
+                    external link so the pill itself opens the channel.
+                    No visual change: the badge already provides its own
+                    background + label. */}
+                {data.channel_url ? (
+                  <a
+                    href={data.channel_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex"
+                    aria-label={`Open ${platformLabel} channel`}
+                    title={`Open on ${platformLabel}`}
+                  >
+                    <PlatformBadge platform={getSourceBadgeKey(data)} size={20} showLabel />
+                  </a>
+                ) : (
+                  <PlatformBadge platform={getSourceBadgeKey(data)} size={20} showLabel />
+                )}
                 <StreakBadge streak={data.streak} />
                 <FollowButton forecaster={data} />
                 <CompareButton forecaster={data} />
               </div>
-              {/* Channel / firm link — YouTube gets the red Play CTA to
-                  match the ProofBlock styling used in prediction cards;
-                  Wall Street firms still link to /firm/<slug>; other
-                  platforms keep the lightweight blue external link. */}
-              {(data.firm || data.channel_url) && (
+              {/* Wall Street firm link — institutional sources only. The
+                  former YouTube/X/Reddit "external link" row was deleted
+                  because the small PlatformBadge above is now the
+                  clickable entry point for those platforms. */}
+              {data.firm && (
                 <div className="flex items-center gap-2 sm:gap-3 text-text-secondary text-sm flex-wrap">
-                  {data.firm ? (
-                    <Link to={`/firm/${data.firm.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')}`}
-                       className="inline-flex items-center gap-1 text-accent hover:underline min-h-[44px] sm:min-h-0 text-xs font-medium">
-                      {data.firm}
-                    </Link>
-                  ) : data.platform === 'youtube' && data.channel_url ? (
-                    <a href={data.channel_url} target="_blank" rel="noopener noreferrer"
-                       style={{ display: 'inline-flex', alignItems: 'center', gap: '6px',
-                                padding: '6px 14px', borderRadius: '6px', background: '#FF0000', color: '#fff',
-                                fontSize: '0.85rem', fontWeight: 500, textDecoration: 'none' }}>
-                      <Play size={14} fill="currentColor" /> YouTube
-                    </a>
-                  ) : data.channel_url ? (
-                    <a href={data.channel_url} target="_blank" rel="noopener noreferrer"
-                       className="inline-flex items-center gap-1 text-blue active:underline min-h-[44px] sm:min-h-0">
-                      {platformLabel} <ExternalLink className="w-3 h-3" />
-                    </a>
-                  ) : null}
+                  <Link to={`/firm/${data.firm.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')}`}
+                     className="inline-flex items-center gap-1 text-accent hover:underline min-h-[44px] sm:min-h-0 text-xs font-medium">
+                    {data.firm}
+                  </Link>
                 </div>
               )}
               {platformInfo && (
