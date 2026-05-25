@@ -331,11 +331,63 @@ export default function ForecasterProfile() {
               )}
             </div>
 
-            {/* Stats — pie chart + 2x2 grid on mobile, row on desktop */}
-            <div className="flex items-center gap-4 sm:gap-6 shrink-0">
-              {/* Pie chart */}
+            {/* CENTER band — 4 headline stat tiles. 2x2 on mobile,
+                4-up grid on desktop so columns line up cleanly. */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-5 sm:shrink-0 min-w-0">
+              <div className="text-center p-3 sm:p-0">
+                <div className="flex items-center justify-center gap-2">
+                  {/* Tiny pie on mobile only */}
+                  {(data.prediction_counts?.evaluated > 0 || data.prediction_counts?.correct > 0) && (
+                    <div className="sm:hidden">
+                      <MiniPieChart
+                        hits={data.prediction_counts?.hits || 0}
+                        nears={data.prediction_counts?.nears || 0}
+                        misses={data.prediction_counts?.misses || 0}
+                        correct={data.prediction_counts?.correct || data.correct_predictions || 0}
+                        incorrect={data.prediction_counts?.incorrect || 0}
+                        pending={data.prediction_counts?.pending || 0}
+                        size={28}
+                      />
+                    </div>
+                  )}
+                  <div className={`font-mono text-xl sm:text-2xl font-bold ${data.accuracy_rate >= 60 ? 'text-positive' : 'text-negative'}`}>
+                    {data.accuracy_rate.toFixed(1)}%
+                  </div>
+                </div>
+                <div className="text-muted text-[11px] sm:text-xs">Accuracy</div>
+                {/* Mobile-only inline disclaimer. Desktop reads the
+                    same line once in the card footer below — keeps
+                    the per-tile chrome to a minimum on the wider
+                    layout while preserving mobile behavior. */}
+                <div className="sm:hidden text-muted/70 text-[9px] mt-0.5 italic max-w-[180px] mx-auto leading-tight">
+                  Calculated from specific predictions only. Vague mentions are not counted.
+                </div>
+              </div>
+              <div className="text-center p-3 sm:p-0">
+                <div className={`font-mono text-xl sm:text-2xl font-bold ${(data.avg_return ?? 0) >= 0 ? 'text-positive' : 'text-negative'}`}>
+                  {(data.avg_return ?? 0) >= 0 ? '+' : ''}{(data.avg_return ?? 0).toFixed(2)}%
+                </div>
+                <div className="text-muted text-[11px] sm:text-xs">Avg Return</div>
+              </div>
+              <div className="text-center p-3 sm:p-0">
+                <div className={`font-mono text-xl sm:text-2xl font-bold ${data.alpha >= 0 ? 'text-positive' : 'text-negative'}`}>
+                  {data.alpha >= 0 ? '+' : ''}{data.alpha.toFixed(2)}%
+                </div>
+                <div className="text-muted text-[11px] sm:text-xs">Alpha vs S&amp;P 500</div>
+              </div>
+              <div className="text-center p-3 sm:p-0">
+                <div className="font-mono text-xl sm:text-2xl font-bold text-accent">{data.total_predictions}</div>
+                <div className="text-muted text-[11px] sm:text-xs">Scored Predictions</div>
+              </div>
+            </div>
+
+            {/* RIGHT band — donut visualizations (Accuracy Breakdown +
+                Direction Mix). Hidden on mobile; mobile shows a tiny
+                pie inline inside the Accuracy tile above. */}
+            <div className="hidden sm:flex items-center gap-4 sm:gap-6 shrink-0">
               {(data.prediction_counts?.evaluated > 0 || data.prediction_counts?.correct > 0) && (
-                <div className="hidden sm:flex flex-col items-center gap-2">
+                <div className="flex flex-col items-center gap-2">
+                  <div className="text-[10px] text-accent/60 uppercase tracking-widest font-mono mb-0.5">Accuracy Breakdown</div>
                   <MiniPieChart
                     hits={data.prediction_counts?.hits || 0}
                     nears={data.prediction_counts?.nears || 0}
@@ -346,7 +398,6 @@ export default function ForecasterProfile() {
                     size={100}
                     showCenter
                   />
-                  {/* Outcome legend */}
                   <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-[10px]">
                     {(data.prediction_counts?.hits || data.prediction_counts?.correct || 0) > 0 && (
                       <div className="flex items-center gap-1"><span className="w-2 h-2 rounded-full" style={{ backgroundColor: '#34d399' }} /><span className="text-text-secondary">{data.prediction_counts?.hits || data.prediction_counts?.correct} Hits</span></div>
@@ -363,82 +414,41 @@ export default function ForecasterProfile() {
                   </div>
                 </div>
               )}
-              {/* Direction pie chart */}
               {(data.prediction_counts?.bullish > 0 || data.prediction_counts?.bearish > 0 || data.prediction_counts?.neutral > 0) && (
-                  <div className="hidden sm:flex flex-col items-center gap-2">
-                    <MiniPieChart
-                      bullish={data.prediction_counts?.bullish || 0}
-                      bearish={data.prediction_counts?.bearish || 0}
-                      neutral={data.prediction_counts?.neutral || 0}
-                      size={72}
-                      showCenter
-                    />
-                    {/* Ship #13B Bug 17: pending count lives on the
-                        direction row so readers see that the pie
-                        includes unevaluated calls and numbers match
-                        total_predictions. Previously pending was only
-                        surfaced on the outcome row. */}
-                    <div className="flex gap-3 text-[10px] flex-wrap justify-center">
-                      {data.prediction_counts?.bullish > 0 && (
-                        <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-positive" /><span className="text-text-secondary">{data.prediction_counts.bullish} Bull</span></span>
-                      )}
-                      {data.prediction_counts?.neutral > 0 && (
-                        <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-warning" /><span className="text-text-secondary">{data.prediction_counts.neutral} Hold</span></span>
-                      )}
-                      {data.prediction_counts?.bearish > 0 && (
-                        <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-negative" /><span className="text-text-secondary">{data.prediction_counts.bearish} Bear</span></span>
-                      )}
-                      {(data.prediction_counts?.pending || 0) > 0 && (
-                        <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full" style={{ backgroundColor: '#4b5563' }} /><span className="text-text-secondary">{data.prediction_counts.pending} Pending</span></span>
-                      )}
-                    </div>
-                  </div>
-                )}
-              <div className="grid grid-cols-2 sm:flex gap-3 sm:gap-5 sm:shrink-0 min-w-0">
-                <div className="text-center p-3 sm:p-0">
-                  <div className="flex items-center justify-center gap-2">
-                    {/* Tiny pie on mobile only */}
-                    {(data.prediction_counts?.evaluated > 0 || data.prediction_counts?.correct > 0) && (
-                      <div className="sm:hidden">
-                        <MiniPieChart
-                          hits={data.prediction_counts?.hits || 0}
-                          nears={data.prediction_counts?.nears || 0}
-                          misses={data.prediction_counts?.misses || 0}
-                          correct={data.prediction_counts?.correct || data.correct_predictions || 0}
-                          incorrect={data.prediction_counts?.incorrect || 0}
-                          pending={data.prediction_counts?.pending || 0}
-                          size={28}
-                        />
-                      </div>
+                <div className="flex flex-col items-center gap-2">
+                  <div className="text-[10px] text-accent/60 uppercase tracking-widest font-mono mb-0.5">Direction Mix</div>
+                  <MiniPieChart
+                    bullish={data.prediction_counts?.bullish || 0}
+                    bearish={data.prediction_counts?.bearish || 0}
+                    neutral={data.prediction_counts?.neutral || 0}
+                    size={72}
+                    showCenter
+                  />
+                  <div className="flex gap-3 text-[10px] flex-wrap justify-center">
+                    {data.prediction_counts?.bullish > 0 && (
+                      <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-positive" /><span className="text-text-secondary">{data.prediction_counts.bullish} Bull</span></span>
                     )}
-                    <div className={`font-mono text-xl sm:text-2xl font-bold ${data.accuracy_rate >= 60 ? 'text-positive' : 'text-negative'}`}>
-                      {data.accuracy_rate.toFixed(1)}%
-                    </div>
-                  </div>
-                  <div className="text-muted text-[11px] sm:text-xs">Accuracy</div>
-                  <div className="text-muted/70 text-[9px] sm:text-[10px] mt-0.5 italic max-w-[180px] mx-auto leading-tight">
-                    Calculated from specific predictions only. Vague mentions are not counted.
+                    {data.prediction_counts?.neutral > 0 && (
+                      <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-warning" /><span className="text-text-secondary">{data.prediction_counts.neutral} Hold</span></span>
+                    )}
+                    {data.prediction_counts?.bearish > 0 && (
+                      <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-negative" /><span className="text-text-secondary">{data.prediction_counts.bearish} Bear</span></span>
+                    )}
+                    {(data.prediction_counts?.pending || 0) > 0 && (
+                      <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full" style={{ backgroundColor: '#4b5563' }} /><span className="text-text-secondary">{data.prediction_counts.pending} Pending</span></span>
+                    )}
                   </div>
                 </div>
-                <div className="text-center p-3 sm:p-0">
-                  <div className={`font-mono text-xl sm:text-2xl font-bold ${(data.avg_return ?? 0) >= 0 ? 'text-positive' : 'text-negative'}`}>
-                    {(data.avg_return ?? 0) >= 0 ? '+' : ''}{(data.avg_return ?? 0).toFixed(2)}%
-                  </div>
-                  <div className="text-muted text-[11px] sm:text-xs">Avg Return</div>
-                </div>
-                <div className="text-center p-3 sm:p-0">
-                  <div className={`font-mono text-xl sm:text-2xl font-bold ${data.alpha >= 0 ? 'text-positive' : 'text-negative'}`}>
-                    {data.alpha >= 0 ? '+' : ''}{data.alpha.toFixed(2)}%
-                  </div>
-                  <div className="text-muted text-[11px] sm:text-xs">Alpha vs S&amp;P 500</div>
-                </div>
-                <div className="text-center p-3 sm:p-0">
-                  <div className="font-mono text-xl sm:text-2xl font-bold text-accent">{data.total_predictions}</div>
-                  <div className="text-muted text-[11px] sm:text-xs">Predictions</div>
-                </div>
-              </div>
+              )}
             </div>
           </div>
+
+          {/* Desktop-only single disclaimer covering all four metrics —
+              avoids the per-tile italic clutter under Accuracy. Mobile
+              shows the same line inline inside the Accuracy tile above. */}
+          <p className="hidden sm:block text-muted/70 text-[10px] italic mt-3">
+            All metrics calculated from specific predictions only. Vague mentions are not counted.
+          </p>
 
           <NotificationBanner text={`Get notified when ${data.name} makes a new prediction.`} forecasterName={data.name} />
         </div>
