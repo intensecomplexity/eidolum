@@ -124,7 +124,7 @@ def analyst_profile(request: Request, name: str, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Analyst not found")
 
     all_preds = db.query(Prediction).filter(Prediction.forecaster_id == f.id).all()
-    scored = [p for p in all_preds if p.outcome in ("correct", "incorrect")]
+    scored = [p for p in all_preds if p.outcome in ("hit", "near", "miss", "correct", "incorrect")]
     correct = [p for p in scored if p.outcome in ("hit", "correct")]
     pending = [p for p in all_preds if p.outcome == "pending"]
 
