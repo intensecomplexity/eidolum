@@ -212,16 +212,15 @@ export default function AssetConsensus() {
               </div>
             )}
 
-            {/* Recent predictions — cards on mobile with evidence */}
+            {/* Recent predictions — cards on mobile. The compact EvidenceCard
+                used to render below each PredictionCard but it duplicated the
+                quote + ExplainerLine that PredictionCard already shows, and
+                its green "Watch" link competed with the new prominent red
+                Watch CTA inside the card. Dropped per 2026-05-25. */}
             <div className="sm:hidden space-y-3 mb-6">
               <h2 className="text-base font-semibold mb-2">Recent Predictions</h2>
               {(data.recent_predictions || []).map((p) => (
-                <div key={p.prediction_id}>
-                  <PredictionCard prediction={p} showForecaster />
-                  <div className="px-4 -mt-3 pb-3">
-                    <EvidenceCard prediction={p} forecaster={p.forecaster} compact />
-                  </div>
-                </div>
+                <PredictionCard key={p.prediction_id} prediction={p} showForecaster />
               ))}
             </div>
 

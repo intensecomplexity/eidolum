@@ -198,35 +198,6 @@ function ProofLinks({ p }) {
 
   return (
     <>
-      {/* Prominent mobile-only CTA — watching the source at the exact
-          timestamp is THE signature Eidolum feature, so we surface it as
-          a full-width red button on mobile instead of the desktop's
-          text-[10px] inline link. Desktop layout below is unchanged.
-          For non-YouTube predictions (article/X) we keep the same
-          full-width prominence but switch to "Read source" + accent color. */}
-      <a
-        href={href}
-        target="_blank"
-        rel="noopener noreferrer"
-        onClick={e => e.stopPropagation()}
-        className={`flex md:hidden items-center justify-center gap-2 min-h-[44px] px-4 mb-2 rounded-lg text-sm font-semibold ${
-          isYT
-            ? 'bg-red-600 text-white active:bg-red-700'
-            : 'bg-accent/15 text-accent border border-accent/30 active:bg-accent/25'
-        }`}
-      >
-        {isYT ? (
-          <>
-            <Play className="w-4 h-4" fill="currentColor" />
-            {timeStr ? `Watch at ${timeStr}` : 'Watch'}
-          </>
-        ) : (
-          <>
-            <ExternalLink className="w-4 h-4" />
-            Read source
-          </>
-        )}
-      </a>
       <div className="flex items-center gap-2 text-[10px] text-muted">
         <a href={href} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()}
           className="inline-flex items-center gap-1 hover:text-accent transition-colors">
@@ -242,6 +213,47 @@ function ProofLinks({ p }) {
       </div>
       <VerbatimQuoteRow p={p} />
     </>
+  );
+}
+
+// Prominent mobile-only CTA below the quote. The signature Eidolum
+// feature is "watch the source at the exact timestamp" — on mobile we
+// surface that as a full-width red button (or accent-outlined "Read
+// source" for non-YouTube). Desktop renders the existing inline link
+// in ProofLinks instead — this component is `flex md:hidden`. Placed
+// here so it can be inserted directly under the quote block in each
+// PredictionCard variant rather than below the source-badge row.
+function MobileWatchCTA({ p }) {
+  const source = p.source_url || '';
+  if (!source || (p.url_quality && p.url_quality !== 'real_article')) return null;
+  const isYT = source.includes('youtube.com') || source.includes('youtu.be');
+  const ts = p.source_timestamp_seconds ?? p.video_timestamp_sec;
+  const href = isYT ? withTimestampAnchor(source, ts) : source;
+  const timeStr = formatTimestamp(ts);
+  return (
+    <a
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+      onClick={e => e.stopPropagation()}
+      className={`flex md:hidden items-center justify-center gap-2 min-h-[44px] px-4 mb-2 rounded-lg text-sm font-semibold ${
+        isYT
+          ? 'bg-red-600 text-white active:bg-red-700'
+          : 'bg-accent/15 text-accent border border-accent/30 active:bg-accent/25'
+      }`}
+    >
+      {isYT ? (
+        <>
+          <Play className="w-4 h-4" fill="currentColor" />
+          {timeStr ? `Watch at ${timeStr}` : 'Watch'}
+        </>
+      ) : (
+        <>
+          <ExternalLink className="w-4 h-4" />
+          Read source
+        </>
+      )}
+    </a>
   );
 }
 
@@ -836,6 +848,11 @@ export default function PredictionCard({ prediction: p, showForecaster = false, 
           &ldquo;{annotateContext(p.source_verbatim_quote || p.exact_quote, p.ticker)}&rdquo;
         </p>
       )}
+
+      {/* Mobile-only red CTA — sits DIRECTLY UNDER the quote per launch UX
+          (2026-05-25). Desktop still shows the existing inline link in
+          ProofLinks below; this is `flex md:hidden` so it doesn't double-render. */}
+      {!compact && <MobileWatchCTA p={p} />}
 
       {/* Evaluation summary */}
       {p.evaluation_summary && (
