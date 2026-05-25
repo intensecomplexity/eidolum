@@ -853,18 +853,17 @@ export default function ForecasterProfile() {
           <ImpliedPortfolioPanel snapshot={impliedPortfolio} loading={impliedLoading} />
         )}
 
-        {/* Predictions — cards on mobile with evidence inside */}
+        {/* Predictions — cards on mobile. PredictionCard's MobileWatchCTA
+            (under the quote) replaces the previous EvidenceCard compact
+            teaser; the teaser was duplicating the quote and its green
+            Watch link was competing with the red CTA. Same dedup pattern
+            applied to AssetConsensus in commit c903c6a. */}
         {activeTab === 'predictions' && <>
         <div className="sm:hidden space-y-3 mb-6 mx-0">
           <h2 className="text-base font-semibold mb-2">Prediction History</h2>
           {displayedPredictions.map((p) => (
-            <div key={p.id} className="bg-surface border border-border rounded-xl overflow-hidden" style={{ wordBreak: 'break-word' }}>
-              <div className="p-4">
-                <PredictionCard prediction={p} forecaster={data} />
-              </div>
-              <div className="px-4 pb-3 border-t border-border/20">
-                <EvidenceCard prediction={p} forecaster={data} compact />
-              </div>
+            <div key={p.id} className="bg-surface border border-border rounded-xl overflow-hidden p-4" style={{ wordBreak: 'break-word' }}>
+              <PredictionCard prediction={p} forecaster={data} />
             </div>
           ))}
         </div>

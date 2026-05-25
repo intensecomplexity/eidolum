@@ -216,17 +216,24 @@ function ProofLinks({ p }) {
   );
 }
 
-// Prominent mobile-only CTA below the quote. The signature Eidolum
-// feature is "watch the source at the exact timestamp" — on mobile we
-// surface that as a full-width red button (or accent-outlined "Read
-// source" for non-YouTube). Desktop renders the existing inline link
-// in ProofLinks instead — this component is `flex md:hidden`. Placed
-// here so it can be inserted directly under the quote block in each
-// PredictionCard variant rather than below the source-badge row.
+// Prominent mobile-only CTA below the quote. Matches desktop's
+// ProofBlock red button (ForecasterProfile.jsx:1083) — same #FF0000
+// YouTube brand red, same Play icon, same "Watch at MM:SS" label —
+// just sized for mobile tap targets (44px min-height, full-width)
+// instead of desktop's inline 6px padding.
+//
+// Bail rules:
+//  - No source URL at all → render nothing.
+//  - Non-YouTube URLs (article/X) get the accent-outlined "Read source"
+//    fallback, but ONLY if url_quality is 'real_article' (or NULL/legacy).
+//    The earlier "url_quality !== 'real_article'" guard was inherited
+//    from ProofLinks and inadvertently bailed for every YouTube card
+//    too — fixed by short-circuiting on isYT first.
 function MobileWatchCTA({ p }) {
   const source = p.source_url || '';
-  if (!source || (p.url_quality && p.url_quality !== 'real_article')) return null;
+  if (!source) return null;
   const isYT = source.includes('youtube.com') || source.includes('youtu.be');
+  if (!isYT && p.url_quality && p.url_quality !== 'real_article') return null;
   const ts = p.source_timestamp_seconds ?? p.video_timestamp_sec;
   const href = isYT ? withTimestampAnchor(source, ts) : source;
   const timeStr = formatTimestamp(ts);
@@ -236,11 +243,10 @@ function MobileWatchCTA({ p }) {
       target="_blank"
       rel="noopener noreferrer"
       onClick={e => e.stopPropagation()}
-      className={`flex md:hidden items-center justify-center gap-2 min-h-[44px] px-4 mb-2 rounded-lg text-sm font-semibold ${
-        isYT
-          ? 'bg-red-600 text-white active:bg-red-700'
-          : 'bg-accent/15 text-accent border border-accent/30 active:bg-accent/25'
-      }`}
+      className="flex md:hidden items-center justify-center gap-2 min-h-[44px] px-4 mb-2 rounded-lg text-sm font-semibold"
+      style={isYT
+        ? { background: '#FF0000', color: '#fff' }
+        : undefined}
     >
       {isYT ? (
         <>
@@ -248,10 +254,10 @@ function MobileWatchCTA({ p }) {
           {timeStr ? `Watch at ${timeStr}` : 'Watch'}
         </>
       ) : (
-        <>
+        <span className="flex items-center justify-center gap-2 w-full bg-accent/15 text-accent border border-accent/30 rounded-lg min-h-[44px] px-4">
           <ExternalLink className="w-4 h-4" />
           Read source
-        </>
+        </span>
       )}
     </a>
   );
