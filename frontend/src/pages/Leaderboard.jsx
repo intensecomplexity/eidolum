@@ -459,7 +459,7 @@ export default function Leaderboard() {
                           <th className="px-3 py-3 text-right">Predictions</th>
                           <th className="px-3 py-3 text-center hidden xl:table-cell w-16">Streak</th>
                           <th className="px-3 py-3 hidden xl:table-cell w-[180px]">Top Sector</th>
-                          <th className="px-2 py-3 text-center hidden lg:table-cell w-14">Watch</th>
+                          <th className="px-2 py-3 text-center hidden lg:table-cell w-14">Follow</th>
                         </tr>
                       </thead>
                       <tbody key={metric}>

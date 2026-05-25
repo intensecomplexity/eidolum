@@ -11,7 +11,6 @@ import AssetConsensus from './pages/AssetConsensus';
 import Platforms from './pages/Platforms';
 import PlatformDetail from './pages/PlatformDetail';
 import SavedPredictions from './pages/SavedPredictions';
-import Watchlist from './pages/Watchlist';
 import WatchlistPage from './pages/WatchlistPage';
 import PredictionOfTheDayPage from './pages/PredictionOfTheDayPage';
 import ReportCards from './pages/ReportCards';
