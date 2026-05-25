@@ -114,7 +114,7 @@ export default function StockChart({ ticker }) {
     .filter(p => p.date && priceMap[p.date] !== undefined)
     .map(p => ({
       ...p,
-      close: p.price_at_prediction || priceMap[p.date],
+      close: priceMap[p.date],
       color: OUTCOME_COLORS[p.outcome] || OUTCOME_COLORS.pending,
     }));
 
@@ -368,7 +368,7 @@ export default function StockChart({ ticker }) {
         )}
       </div>
       <p className="text-[10px] italic text-muted/70 text-center mt-1 px-2">
-        Each dot's height reflects the stock price at the moment the prediction was made.
+        Each dot sits on the stock's closing price for the day the prediction was made.
       </p>
     </div>
   );
