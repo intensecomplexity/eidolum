@@ -91,7 +91,7 @@ function SectorScroller({ sectors, activeSector, setActiveSector, totalPredictio
         </button>
         {sectors.map((s) => (
           <button key={s.sector} onClick={() => setActiveSector(s.sector)} className={btnClass(activeSector === s.sector)}>
-            {s.sector} ({s.count})
+            {s.sector} ({s.scored})
           </button>
         ))}
       </div>
