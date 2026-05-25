@@ -549,9 +549,16 @@ def get_forecaster_by_slug(
 def get_forecaster_sectors(request: Request, forecaster_id: int, db: Session = Depends(get_db)):
     """Lazy-loaded sector strengths and prediction counts."""
     try:
-        # Show sector breakdown for ALL predictions (not just scored)
+        # Show sector breakdown for ALL predictions (not just scored).
+        # GROUP BY (p.sector, ts.sector) instead of the coalesced single
+        # column so the Python post-processor can fall back to ts.sector
+        # when p.sector canonicalizes to UNKNOWN. Benzinga ships a literal
+        # "Other" label for ~half of an analyst's coverage on some names
+        # — without this fallback those rows used to be silently dropped
+        # from the sector strip even though ticker_sectors knows the
+        # real Morningstar sector for the ticker.
         sector_rows = db.execute(sql_text(f"""
-            SELECT COALESCE(p.sector, ts.sector) as sec,
+            SELECT p.sector AS p_sec, ts.sector AS ts_sec,
                    COUNT(*) as total,
                    SUM(CASE WHEN p.outcome IN ('hit','correct') THEN 1 ELSE 0 END) as hits,
                    SUM(CASE WHEN p.outcome = 'near' THEN 1 ELSE 0 END) as nears,
@@ -564,23 +571,26 @@ def get_forecaster_sectors(request: Request, forecaster_id: int, db: Session = D
               AND {_YT_VIS_P}
               AND {_NON_QWEN_P}
               AND {_NOT_EXCL_P}
-            GROUP BY sec ORDER BY total DESC
+            GROUP BY p.sector, ts.sector ORDER BY total DESC
         """), {"fid": forecaster_id}).fetchall()
-        # Canonicalize the raw sector field into Morningstar sectors and
-        # re-aggregate, so Jefferies no longer ships 25 chips including
-        # "Professional Services" / "Packaging" / "Life Sciences Tools &
-        # Services" etc. alongside the proper Morningstar values.
+        # Canonicalize each raw row, trying p.sector first and falling
+        # back to ts.sector when p's value maps to UNKNOWN. canonical_
+        # sector() is applied to both candidates so SIC-style labels in
+        # either column get folded to Morningstar buckets.
         from utils.sector import canonical_sector, UNKNOWN_SECTOR
         by_canonical: dict = {}
         for r in sector_rows:
-            canon = canonical_sector(r[0])
+            p_sec, ts_sec, total, hits, nears, scored = r
+            canon = canonical_sector(p_sec) if p_sec else UNKNOWN_SECTOR
+            if canon == UNKNOWN_SECTOR and ts_sec:
+                canon = canonical_sector(ts_sec)
             if canon == UNKNOWN_SECTOR:
                 continue
             bucket = by_canonical.setdefault(canon, {"total": 0, "hits": 0, "nears": 0, "scored": 0})
-            bucket["total"] += int(r[1] or 0)
-            bucket["hits"] += int(r[2] or 0)
-            bucket["nears"] += int(r[3] or 0)
-            bucket["scored"] += int(r[4] or 0)
+            bucket["total"] += int(total or 0)
+            bucket["hits"] += int(hits or 0)
+            bucket["nears"] += int(nears or 0)
+            bucket["scored"] += int(scored or 0)
         sectors = []
         for canon, agg in by_canonical.items():
             scored = agg["scored"]
