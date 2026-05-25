@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ExternalLink, Archive, Lock, Play } from 'lucide-react';
 import PredictionBadge from './PredictionBadge';
@@ -10,6 +11,7 @@ import { getSourceBadgeKey } from '../utils/getSourceBadgeKey';
 import CommentSection from './CommentSection';
 import ScoringBreakdown from './ScoringBreakdown';
 import TickerLogo from './TickerLogo';
+import { InlinePlayer, extractYouTubeVideoId } from './EvidenceCard';
 
 const API_BASE = 'https://eidolum-production.up.railway.app';
 
@@ -219,17 +221,19 @@ function ProofLinks({ p }) {
 // Prominent mobile-only CTA below the quote. Matches desktop's
 // ProofBlock red button (ForecasterProfile.jsx:1083) — same #FF0000
 // YouTube brand red, same Play icon, same "Watch at MM:SS" label —
-// just sized for mobile tap targets (44px min-height, full-width)
-// instead of desktop's inline 6px padding.
+// just sized for mobile tap targets (44px min-height, full-width).
+//
+// Tapping the YouTube button toggles the same InlinePlayer iframe that
+// desktop's ProofBlock uses — mobile no longer redirects to
+// youtube.com in a new tab; the video plays inline in the card.
 //
 // Bail rules:
 //  - No source URL at all → render nothing.
-//  - Non-YouTube URLs (article/X) get the accent-outlined "Read source"
-//    fallback, but ONLY if url_quality is 'real_article' (or NULL/legacy).
-//    The earlier "url_quality !== 'real_article'" guard was inherited
-//    from ProofLinks and inadvertently bailed for every YouTube card
-//    too — fixed by short-circuiting on isYT first.
+//  - Non-YouTube URLs (article/X): accent-outlined "Read source" link
+//    that opens in a new tab, ONLY if url_quality is 'real_article'
+//    (or NULL/legacy). YouTube short-circuits before that check.
 function MobileWatchCTA({ p }) {
+  const [showVideo, setShowVideo] = useState(false);
   const source = p.source_url || '';
   if (!source) return null;
   const isYT = source.includes('youtube.com') || source.includes('youtu.be');
@@ -237,6 +241,50 @@ function MobileWatchCTA({ p }) {
   const ts = p.source_timestamp_seconds ?? p.video_timestamp_sec;
   const href = isYT ? withTimestampAnchor(source, ts) : source;
   const timeStr = formatTimestamp(ts);
+  const ytVid = isYT ? extractYouTubeVideoId(p.source_platform_id) : null;
+
+  // Non-YouTube → external link, accent-outlined.
+  if (!isYT) {
+    return (
+      <a
+        href={href}
+        target="_blank"
+        rel="noopener noreferrer"
+        onClick={e => e.stopPropagation()}
+        className="flex md:hidden items-center justify-center gap-2 min-h-[44px] px-4 mb-2 rounded-lg text-sm font-semibold bg-accent/15 text-accent border border-accent/30"
+      >
+        <ExternalLink className="w-4 h-4" />
+        Read source
+      </a>
+    );
+  }
+
+  // YouTube with an embeddable video ID → inline player toggle (matches
+  // desktop ProofBlock behavior). The InlinePlayer is reused from
+  // EvidenceCard so mobile/desktop share the same iframe component.
+  if (ytVid) {
+    return (
+      <div className="md:hidden">
+        <button
+          type="button"
+          onClick={(e) => { e.stopPropagation(); setShowVideo(v => !v); }}
+          className="flex items-center justify-center gap-2 min-h-[44px] px-4 mb-2 rounded-lg text-sm font-semibold w-full"
+          style={{ background: '#FF0000', color: '#fff' }}
+        >
+          <Play className="w-4 h-4" fill="currentColor" />
+          {timeStr ? `Watch at ${timeStr}` : 'Watch'}
+        </button>
+        {showVideo && (
+          <div onClick={(e) => e.stopPropagation()}>
+            <InlinePlayer videoId={ytVid} timestamp={ts} onClose={() => setShowVideo(false)} />
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // YouTube without an embeddable video ID (rare — source_platform_id
+  // missing or malformed) → fall back to external link, same red styling.
   return (
     <a
       href={href}
@@ -244,21 +292,10 @@ function MobileWatchCTA({ p }) {
       rel="noopener noreferrer"
       onClick={e => e.stopPropagation()}
       className="flex md:hidden items-center justify-center gap-2 min-h-[44px] px-4 mb-2 rounded-lg text-sm font-semibold"
-      style={isYT
-        ? { background: '#FF0000', color: '#fff' }
-        : undefined}
+      style={{ background: '#FF0000', color: '#fff' }}
     >
-      {isYT ? (
-        <>
-          <Play className="w-4 h-4" fill="currentColor" />
-          {timeStr ? `Watch at ${timeStr}` : 'Watch'}
-        </>
-      ) : (
-        <span className="flex items-center justify-center gap-2 w-full bg-accent/15 text-accent border border-accent/30 rounded-lg min-h-[44px] px-4">
-          <ExternalLink className="w-4 h-4" />
-          Read source
-        </span>
-      )}
+      <Play className="w-4 h-4" fill="currentColor" />
+      {timeStr ? `Watch at ${timeStr}` : 'Watch'}
     </a>
   );
 }
@@ -839,25 +876,33 @@ export default function PredictionCard({ prediction: p, showForecaster = false, 
         )}
       </div>
 
-      {/* Line 5: Explainer (gold) */}
-      <ExplainerLine prediction={p} className="mb-1" />
+      {/* Mobile reorders this trio via flex-col-reverse so the QUOTE sits
+          on top, ratingChange in the middle, and "In simple terms" BELOW
+          the quote — per launch UX (2026-05-25). Desktop stays at
+          flex-col which preserves the original explainer→ratingChange→
+          quote order. JSX order is preserved (matches desktop). */}
+      <div className="flex flex-col-reverse md:flex-col">
+        {/* Line 5: Explainer (gold) */}
+        <ExplainerLine prediction={p} className="mb-1" />
 
-      {/* Rating change context */}
-      {(() => {
-        const rc = ratingChangeLabel(p);
-        return rc ? <p className="text-[10px] text-muted italic mb-1">{rc}</p> : null;
-      })()}
+        {/* Rating change context */}
+        {(() => {
+          const rc = ratingChangeLabel(p);
+          return rc ? <p className="text-[10px] text-muted italic mb-1">{rc}</p> : null;
+        })()}
 
-      {/* Quote — prefer source_verbatim_quote (Ship #9 transcript-matched) over exact_quote (may be template). */}
-      {!compact && (p.source_verbatim_quote || (p.exact_quote && p.exact_quote !== p.context)) && (
-        <p className="text-xs text-text-secondary italic leading-relaxed mb-2 break-words">
-          &ldquo;{annotateContext(p.source_verbatim_quote || p.exact_quote, p.ticker)}&rdquo;
-        </p>
-      )}
+        {/* Quote — prefer source_verbatim_quote (Ship #9 transcript-matched) over exact_quote (may be template). */}
+        {!compact && (p.source_verbatim_quote || (p.exact_quote && p.exact_quote !== p.context)) && (
+          <p className="text-xs text-text-secondary italic leading-relaxed mb-2 break-words">
+            &ldquo;{annotateContext(p.source_verbatim_quote || p.exact_quote, p.ticker)}&rdquo;
+          </p>
+        )}
+      </div>
 
-      {/* Mobile-only red CTA — sits DIRECTLY UNDER the quote per launch UX
-          (2026-05-25). Desktop still shows the existing inline link in
-          ProofLinks below; this is `flex md:hidden` so it doesn't double-render. */}
+      {/* Mobile-only red CTA — after the flex-col-reverse block, so on
+          mobile it follows the explainer (which itself follows the
+          quote). Desktop has `md:hidden` here; ProofLinks below handles
+          the desktop source link. */}
       {!compact && <MobileWatchCTA p={p} />}
 
       {/* Evaluation summary */}
