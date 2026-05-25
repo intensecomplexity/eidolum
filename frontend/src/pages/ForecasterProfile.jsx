@@ -430,6 +430,29 @@ export default function ForecasterProfile() {
             </div>
           </div>
 
+          {/* Combined metadata footer — single muted line of factual
+              context ("Since … · N predictions · M sectors · auto-tracked
+              from …") followed by the desktop-only methodology disclaimer.
+              Sits below the 3-band layout so it doesn't compete with the
+              name + CTAs in the identity column. Mobile keeps the inline
+              short disclaimer inside the Accuracy tile. */}
+          <p className="text-muted text-xs mt-3">
+            {[
+              data.first_prediction_date && `Since ${new Date(data.first_prediction_date).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}`,
+              `${data.scorable_predictions ?? data.total_predictions ?? 0} predictions`,
+              data.sector_count > 0 && `${data.sector_count} ${data.sector_count === 1 ? 'sector' : 'sectors'}`,
+              (data.revisions_made || 0) > 0 && `${data.revisions_made} ${data.revisions_made === 1 ? 'revision' : 'revisions'}`,
+              ['institutional', 'congress'].includes(data.platform)
+                ? 'Predictions auto-tracked from published analyst reports'
+                : data.platform === 'player'
+                ? 'Predictions submitted by this player'
+                : 'Predictions auto-tracked from public content',
+            ].filter(Boolean).join(' · ')}
+          </p>
+          <p className="hidden sm:block text-muted/70 text-[10px] italic mt-1">
+            All metrics calculated from specific predictions only. Vague mentions are not counted.
+          </p>
+
           <NotificationBanner text={`Get notified when ${data.name} makes a new prediction.`} forecasterName={data.name} />
         </div>
 
@@ -581,47 +604,6 @@ export default function ForecasterProfile() {
             </div>
           </div>
         )}
-
-        {/* Metadata strip — moved out of the header for a calmer top
-            band; "Since … · N predictions · M sectors" plus the
-            platform-specific auto-tracked tagline plus the metrics-
-            methodology disclaimer all live here, just above the
-            Accuracy Trend chart they describe. */}
-        <div className="text-xs text-muted mb-4 sm:mb-6 flex flex-col gap-1">
-          <div className="flex items-center gap-3 flex-wrap">
-            {data.first_prediction_date && (
-              <>
-                <span>Since {new Date(data.first_prediction_date).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}</span>
-                <span className="text-border">·</span>
-              </>
-            )}
-            <span>{data.scorable_predictions ?? data.total_predictions ?? 0} predictions</span>
-            {data.sector_count > 0 && (
-              <>
-                <span className="text-border">·</span>
-                <span>{data.sector_count} {data.sector_count === 1 ? 'sector' : 'sectors'}</span>
-              </>
-            )}
-            {(data.revisions_made || 0) > 0 && (
-              <>
-                <span className="text-border">·</span>
-                <span title="Price target revisions this forecaster has published — updates to their own prior calls.">
-                  {data.revisions_made} {data.revisions_made === 1 ? 'revision' : 'revisions'}
-                </span>
-              </>
-            )}
-          </div>
-          <p className="italic">
-            {['institutional', 'congress'].includes(data.platform)
-              ? 'Predictions auto-tracked from published analyst reports'
-              : data.platform === 'player'
-              ? 'Predictions submitted by this player'
-              : 'Predictions auto-tracked from public content'}
-          </p>
-          <p className="text-muted/70 text-[10px] italic">
-            All metrics calculated from specific predictions only. Vague mentions are not counted.
-          </p>
-        </div>
 
         {/* Sector filter with scrollable arrows */}
         {sectorCounts.length > 0 && <SectorScroller
