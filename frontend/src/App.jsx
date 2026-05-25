@@ -1,42 +1,89 @@
-import { Routes, Route, useParams } from 'react-router-dom';
+import { lazy, Suspense, useState } from 'react';
+import { Routes, Route, Navigate, useParams } from 'react-router-dom';
+
+// ── Eager shell + entry routes ──────────────────────────────────────────────
+// Things that ship in the initial JS download. Kept eager because:
+//  - Navbar / BottomNav / SaveToast / ComparisonTray render on every route.
+//  - Splash + Onboarding are pre-paint chrome.
+//  - Landing / LandingPublic / Dashboard cover ~all first-visit destinations.
+//  - Leaderboard is the most-trafficked route by far.
+//  - Login / Register / NotFound are tiny, frequently first-visited for new
+//    users / catch-all fallback.
 import Navbar from './components/Navbar';
 import BottomNav from './components/BottomNav';
 import SaveToast from './components/SaveToast';
+import ComparisonTray from './components/ComparisonTray';
+import OnboardingOverlay from './components/OnboardingOverlay';
+import VaultDoorSplash from './components/VaultDoorSplash';
+import LoadingSpinner from './components/LoadingSpinner';
 import Landing from './pages/Landing';
 import LandingPublic from './pages/LandingPublic';
 import Dashboard from './pages/Dashboard';
 import Leaderboard from './pages/Leaderboard';
-import ForecasterProfile from './pages/ForecasterProfile';
-import AssetConsensus from './pages/AssetConsensus';
-import Platforms from './pages/Platforms';
-import PlatformDetail from './pages/PlatformDetail';
-import SavedPredictions from './pages/SavedPredictions';
-import WatchlistPage from './pages/WatchlistPage';
-import PredictionOfTheDayPage from './pages/PredictionOfTheDayPage';
-import ReportCards from './pages/ReportCards';
-import ContrarianSignals from './pages/ContrarianSignals';
-import PowerRankings from './pages/PowerRankings';
-import InversePortfolio from './pages/InversePortfolio';
-import RecentPredictions from './pages/RecentPredictions';
-import ForecastersList from './pages/ForecastersList';
-import AdminPanel from './pages/AdminPanel';
-import AdminDashboard from './pages/AdminDashboard';
-import AdminXAccounts from './pages/AdminXAccounts';
-import AdminYouTubeChannels from './pages/AdminYouTubeChannels';
-import AdminSectorAliases from './pages/AdminSectorAliases';
-import AdminMacroConcepts from './pages/AdminMacroConcepts';
 import Login from './pages/Login';
 import Register from './pages/Register';
-import ForgotPassword from './pages/ForgotPassword';
-import ResetPassword from './pages/ResetPassword';
-import GoogleCallback from './pages/GoogleCallback';
-import Profile from './pages/Profile';
-import SubmitCall from './pages/SubmitCall';
-import MyCalls from './pages/MyCalls';
-import CommunityLeaderboard from './pages/CommunityLeaderboard';
-import Badges from './pages/Badges';
-import Consensus from './pages/Consensus';
-import { Navigate } from 'react-router-dom';
+import NotFound from './pages/NotFound';
+
+// ── Lazy routes ─────────────────────────────────────────────────────────────
+// Each route's code lives in its own chunk and downloads only when the user
+// navigates there. The Recharts library (used by ~10 of these) is split into
+// its own vendor chunk via vite.config.js manualChunks — pages that import
+// charts pull from that shared chunk instead of duplicating chart code.
+const ForecasterProfile      = lazy(() => import('./pages/ForecasterProfile'));
+const AssetConsensus         = lazy(() => import('./pages/AssetConsensus'));
+const Platforms              = lazy(() => import('./pages/Platforms'));
+const PlatformDetail         = lazy(() => import('./pages/PlatformDetail'));
+const SavedPredictions       = lazy(() => import('./pages/SavedPredictions'));
+const WatchlistPage          = lazy(() => import('./pages/WatchlistPage'));
+const PredictionOfTheDayPage = lazy(() => import('./pages/PredictionOfTheDayPage'));
+const ReportCards            = lazy(() => import('./pages/ReportCards'));
+const ContrarianSignals      = lazy(() => import('./pages/ContrarianSignals'));
+const PowerRankings          = lazy(() => import('./pages/PowerRankings'));
+const InversePortfolio       = lazy(() => import('./pages/InversePortfolio'));
+const RecentPredictions      = lazy(() => import('./pages/RecentPredictions'));
+const ForecastersList        = lazy(() => import('./pages/ForecastersList'));
+const AdminPanel             = lazy(() => import('./pages/AdminPanel'));
+const AdminDashboard         = lazy(() => import('./pages/AdminDashboard'));
+const AdminXAccounts         = lazy(() => import('./pages/AdminXAccounts'));
+const AdminYouTubeChannels   = lazy(() => import('./pages/AdminYouTubeChannels'));
+const AdminSectorAliases     = lazy(() => import('./pages/AdminSectorAliases'));
+const AdminMacroConcepts     = lazy(() => import('./pages/AdminMacroConcepts'));
+const ForgotPassword         = lazy(() => import('./pages/ForgotPassword'));
+const ResetPassword          = lazy(() => import('./pages/ResetPassword'));
+const GoogleCallback         = lazy(() => import('./pages/GoogleCallback'));
+const Profile                = lazy(() => import('./pages/Profile'));
+const SubmitCall             = lazy(() => import('./pages/SubmitCall'));
+const MyCalls                = lazy(() => import('./pages/MyCalls'));
+const CommunityLeaderboard   = lazy(() => import('./pages/CommunityLeaderboard'));
+const Badges                 = lazy(() => import('./pages/Badges'));
+const Consensus              = lazy(() => import('./pages/Consensus'));
+const Duels                  = lazy(() => import('./pages/Duels'));
+const Seasons                = lazy(() => import('./pages/Seasons'));
+const Friends                = lazy(() => import('./pages/Friends'));
+const Notifications          = lazy(() => import('./pages/Notifications'));
+const TickerDetail           = lazy(() => import('./pages/TickerDetail'));
+const Activity               = lazy(() => import('./pages/Activity'));
+const PredictionView         = lazy(() => import('./pages/PredictionView'));
+const DailyChallengePage     = lazy(() => import('./pages/DailyChallenge'));
+const ToldYouSo              = lazy(() => import('./pages/ToldYouSo'));
+const SettingsPage           = lazy(() => import('./pages/Settings'));
+const ControversialPage      = lazy(() => import('./pages/Controversial'));
+const AnalystsPage           = lazy(() => import('./pages/Analysts'));
+const AnalystProfilePage     = lazy(() => import('./pages/AnalystProfile'));
+const HeatmapPage            = lazy(() => import('./pages/Heatmap'));
+const EarningsPage           = lazy(() => import('./pages/Earnings'));
+const ComparePage            = lazy(() => import('./pages/Compare'));
+const CompareForecasters     = lazy(() => import('./pages/CompareForecasters'));
+const Discover               = lazy(() => import('./pages/Discover'));
+const SmartMoney             = lazy(() => import('./pages/SmartMoney'));
+const Tournaments            = lazy(() => import('./pages/Tournaments'));
+const HowItWorks             = lazy(() => import('./pages/HowItWorks'));
+const FirmProfile            = lazy(() => import('./pages/FirmProfile'));
+
+import { useAuth } from './context/AuthContext';
+import { useFeatures } from './context/FeatureContext';
+import { CompareProvider } from './context/CompareContext';
+import { SubscriptionsProvider } from './context/SubscriptionsContext';
 
 // Ship #13 Bug B: /ticker/:symbol is a legacy alias. Redirect to the
 // canonical /asset/:ticker URL so TickerDetail only ever receives one
@@ -46,44 +93,24 @@ function LegacyTickerRedirect() {
   return <Navigate to={`/asset/${symbol}`} replace />;
 }
 
-import Duels from './pages/Duels';
-import Seasons from './pages/Seasons';
-import Friends from './pages/Friends';
-import Notifications from './pages/Notifications';
-import TickerDetail from './pages/TickerDetail';
-import Activity from './pages/Activity';
-import PredictionView from './pages/PredictionView';
-import DailyChallengePage from './pages/DailyChallenge';
-import ToldYouSo from './pages/ToldYouSo';
-import SettingsPage from './pages/Settings';
-import ControversialPage from './pages/Controversial';
-import AnalystsPage from './pages/Analysts';
-import AnalystProfilePage from './pages/AnalystProfile';
-import HeatmapPage from './pages/Heatmap';
-import EarningsPage from './pages/Earnings';
-import ComparePage from './pages/Compare';
-import CompareForecasters from './pages/CompareForecasters';
-import Discover from './pages/Discover';
-import SmartMoney from './pages/SmartMoney';
-import Tournaments from './pages/Tournaments';
-import HowItWorks from './pages/HowItWorks';
-import FirmProfile from './pages/FirmProfile';
-import NotFound from './pages/NotFound';
-import OnboardingOverlay from './components/OnboardingOverlay';
-import VaultDoorSplash from './components/VaultDoorSplash';
-import ComparisonTray from './components/ComparisonTray';
-import { useAuth } from './context/AuthContext';
-import { useFeatures } from './context/FeatureContext';
-import { CompareProvider } from './context/CompareContext';
-import { SubscriptionsProvider } from './context/SubscriptionsContext';
-import { useState } from 'react';
-
 function ComingSoon({ feature }) {
   return (
     <div className="max-w-lg mx-auto px-4 py-20 text-center">
       <div className="text-4xl mb-4">🚧</div>
       <h1 className="text-xl font-bold mb-2">{feature} — Coming Soon</h1>
       <p className="text-text-secondary text-sm">This feature is being built. Check back soon.</p>
+    </div>
+  );
+}
+
+// Suspense fallback rendered while a lazy route chunk is downloading.
+// Centered subtle spinner — matches LoadingSpinner used elsewhere on
+// data-fetch waits. Visible for ~100-300ms on first navigation to a
+// previously-uncached route, then vanishes when the chunk lands.
+function RouteFallback() {
+  return (
+    <div className="flex items-center justify-center min-h-[60vh]">
+      <LoadingSpinner size="lg" />
     </div>
   );
 }
@@ -108,6 +135,7 @@ export default function App() {
       {showOnboarding && !isAuthenticated && (
         <OnboardingOverlay onComplete={() => setShowOnboarding(false)} />
       )}
+      <Suspense fallback={<RouteFallback />}>
       <Routes>
         <Route path="/" element={isAuthenticated ? <Dashboard /> : <LandingPublic />} />
         <Route path="/home" element={<Landing />} />
@@ -178,6 +206,7 @@ export default function App() {
             unmatched paths fall through to this component. */}
         <Route path="*" element={<NotFound />} />
       </Routes>
+      </Suspense>
       <SaveToast />
       <ComparisonTray />
       <BottomNav />
