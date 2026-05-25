@@ -162,6 +162,12 @@ def get_forecaster(
     if cached and (_time.time() - cached[1]) < FORECASTER_CACHE_TTL:
         result = dict(cached[0])
         result["predictions"] = _get_preds(forecaster_id, page, limit, filter, sector, db)
+        # accuracy_over_time is sector-dependent; the cache key is just
+        # forecaster_id, so recompute it per-request the same way
+        # predictions is. Without this, the cache returns whatever trend
+        # was computed for the FIRST sector after expiry to every
+        # subsequent sector for the next 300s.
+        result["accuracy_over_time"] = _build_accuracy_trend(forecaster_id, db, sector)
         return result
 
     # Uncached: 1 query for forecaster + 1 for predictions

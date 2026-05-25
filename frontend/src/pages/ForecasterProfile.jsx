@@ -620,7 +620,7 @@ export default function ForecasterProfile() {
             {chartData.length > 0 ? (
               <>
                 <ResponsiveContainer width="100%" height={220}>
-                  <AreaChart key={activeSector} data={chartData} margin={{ top: 5, right: 5, bottom: 5, left: 0 }}>
+                  <AreaChart data={chartData} margin={{ top: 5, right: 5, bottom: 5, left: 0 }}>
                     <defs>
                       <linearGradient id="accGrad" x1="0" y1="0" x2="0" y2="1">
                         <stop offset="5%" stopColor="#D4A843" stopOpacity={0.2} />
