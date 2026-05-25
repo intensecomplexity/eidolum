@@ -51,7 +51,7 @@ def list_analysts(request: Request, q: str = Query(""), db: Session = Depends(ge
             ).scalar() or 0
             correct = db.query(func.count(Prediction.id)).filter(
                 Prediction.forecaster_id == f.id,
-                Prediction.outcome == "correct",
+                Prediction.outcome.in_(("hit", "correct")),
             ).scalar() or 0
             total = db.query(func.count(Prediction.id)).filter(Prediction.forecaster_id == f.id).scalar() or 0
 
@@ -90,7 +90,7 @@ def analyst_rankings(request: Request, db: Session = Depends(get_db)):
             continue
         correct = db.query(func.count(Prediction.id)).filter(
             Prediction.forecaster_id == f.id,
-            Prediction.outcome == "correct",
+            Prediction.outcome.in_(("hit", "correct")),
         ).scalar() or 0
 
         results.append({
@@ -125,7 +125,7 @@ def analyst_profile(request: Request, name: str, db: Session = Depends(get_db)):
 
     all_preds = db.query(Prediction).filter(Prediction.forecaster_id == f.id).all()
     scored = [p for p in all_preds if p.outcome in ("correct", "incorrect")]
-    correct = [p for p in scored if p.outcome == "correct"]
+    correct = [p for p in scored if p.outcome in ("hit", "correct")]
     pending = [p for p in all_preds if p.outcome == "pending"]
 
     # Sector breakdown
@@ -133,7 +133,7 @@ def analyst_profile(request: Request, name: str, db: Session = Depends(get_db)):
     for p in scored:
         s = p.sector or "Other"
         sector_stats[s]["total"] += 1
-        if p.outcome == "correct":
+        if p.outcome in ("hit", "correct"):
             sector_stats[s]["correct"] += 1
 
     sector_breakdown = sorted([
@@ -145,7 +145,7 @@ def analyst_profile(request: Request, name: str, db: Session = Depends(get_db)):
     ticker_stats = defaultdict(lambda: {"correct": 0, "total": 0})
     for p in scored:
         ticker_stats[p.ticker]["total"] += 1
-        if p.outcome == "correct":
+        if p.outcome in ("hit", "correct"):
             ticker_stats[p.ticker]["correct"] += 1
 
     ticker_breakdown = sorted([
@@ -232,7 +232,7 @@ def analyst_accuracy_history(request: Request, name: str, db: Session = Depends(
     for p in scored:
         key = p.evaluation_date.strftime("%Y-%m")
         months[key]["scored"] += 1
-        if p.outcome == "correct":
+        if p.outcome in ("hit", "correct"):
             months[key]["correct"] += 1
 
     import datetime as _dt

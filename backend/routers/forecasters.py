@@ -584,7 +584,13 @@ def get_forecaster_sectors(request: Request, forecaster_id: int, db: Session = D
         sectors = []
         for canon, agg in by_canonical.items():
             scored = agg["scored"]
-            acc = round((agg["hits"] + agg["nears"] * 0.5) / scored * 100, 1) if scored > 0 else 0
+            # Skip sectors that have only pending predictions — surfacing
+            # them with accuracy=0 reads as "0% in this sector" in the UI
+            # (see Andre Madrid Basic Materials: 1 pending → ts=0%). The
+            # no-fake-data rule says omit, not placeholder.
+            if scored == 0:
+                continue
+            acc = round((agg["hits"] + agg["nears"] * 0.5) / scored * 100, 1)
             sectors.append({
                 "sector": canon,
                 "accuracy": acc,
