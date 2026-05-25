@@ -472,12 +472,11 @@ def _insert_rating(rating: dict, db) -> bool:
         except (ValueError, TypeError):
             pass
 
+    # entry_price must hold spot-at-prediction. pt_prior is the
+    # analyst's PRIOR price target, not spot — stamping it here breaks
+    # the evaluator's return formula. Leave NULL; the evaluator fills
+    # it from historical close on its first pass.
     entry_price = None
-    if pt_prior:
-        try:
-            entry_price = float(str(pt_prior).replace("$", "").replace(",", ""))
-        except (ValueError, TypeError):
-            pass
 
     window_days = 365 if target_price else 90
     # Prefer real article URLs, reject generic quote pages

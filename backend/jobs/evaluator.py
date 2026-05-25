@@ -431,8 +431,49 @@ def _evaluate_pair_call(p: Prediction, now: datetime) -> str:
     return outcome
 
 
+def _relock_entry_price(p: Prediction) -> None:
+    """Mirror historical_evaluator.py "Bug 8" re-lock: if the stored
+    entry_price deviates from the historical close on prediction_date
+    by more than 2%, overwrite it with the historical close. This
+    catches Benzinga rows whose entry_price was stamped with pt_prior
+    (the analyst's previous target) instead of spot — without this,
+    the return formula below is computed against the wrong baseline.
+
+    Idempotent for already-correct rows. Best-effort: a failed
+    historical lookup leaves p.entry_price untouched.
+    """
+    if not p.prediction_date or not p.ticker:
+        return
+    try:
+        from jobs.historical_evaluator import _fetch_history, _closest_price
+    except Exception:
+        return
+    prices = _fetch_history(p.ticker, None, None)
+    if not prices:
+        return
+    historical_entry = _closest_price(prices, p.prediction_date)
+    if not historical_entry or historical_entry <= 0:
+        return
+    if not p.entry_price or float(p.entry_price) <= 0:
+        p.entry_price = historical_entry
+        return
+    try:
+        deviation = abs(float(p.entry_price) - historical_entry) / historical_entry
+    except Exception:
+        return
+    if deviation > 0.02:
+        print(
+            f"[Evaluator] re-lock id={p.id} {p.ticker} "
+            f"stored_entry={float(p.entry_price):.2f} historical={historical_entry:.2f} "
+            f"deviation={deviation:.1%}",
+            flush=True,
+        )
+        p.entry_price = historical_entry
+
+
 def _evaluate_prediction(p: Prediction, price: float, now: datetime):
     """Score a prediction using three-tier system: hit / near / miss."""
+    _relock_entry_price(p)
     if not p.entry_price or p.entry_price <= 0:
         return False
 
@@ -660,6 +701,10 @@ def run_evaluator(db: Session):
                 skipped += 1
             continue
 
+        # Hydrate / re-lock entry_price from historical close before the
+        # missing-data check (cleared Benzinga rows arrive with NULL).
+        _relock_entry_price(p)
+
         if not p.entry_price or p.entry_price <= 0:
             # No entry price — can't calculate return, mark as no_data if old enough
             eval_date = p.evaluation_date or (
@@ -770,6 +815,11 @@ def sweep_stuck_predictions(db: Session):
             continue
 
         price = get_current_price(p.ticker)
+
+        # Fill or re-lock entry_price BEFORE the missing-data check so
+        # cleared Benzinga rows (entry_price=NULL) get hydrated from
+        # historical close instead of being dropped to no_data.
+        _relock_entry_price(p)
 
         if price is None or not p.entry_price or p.entry_price <= 0:
             p.outcome = "no_data"
