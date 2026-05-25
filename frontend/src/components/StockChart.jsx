@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
-import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, ReferenceDot, ReferenceLine } from 'recharts';
+import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, ReferenceDot } from 'recharts';
 import { X as XIcon } from 'lucide-react';
 import { getTickerChart } from '../api';
 import downsample from '../utils/downsample';
@@ -240,24 +240,6 @@ export default function StockChart({ ticker }) {
               tickFormatter={v => `$${v >= 1000 ? Math.round(v) : v}`}
               tickCount={isMobile ? 4 : 6} width={isMobile ? 40 : 50} />
             <Tooltip content={makePriceTooltip(dotsByDate)} cursor={{ stroke: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)' }} />
-            {currentPrice != null && (
-              <ReferenceLine
-                y={currentPrice}
-                stroke="#D4A843"
-                strokeOpacity={0.4}
-                strokeDasharray="4 4"
-                strokeWidth={1}
-                label={{
-                  value: `$${currentPrice.toFixed(2)}`,
-                  position: 'right',
-                  fill: '#D4A843',
-                  fontSize: 9,
-                  fontWeight: 600,
-                  offset: 4,
-                }}
-                ifOverflow="extendDomain"
-              />
-            )}
             <Area
               type="monotone"
               dataKey="close"
