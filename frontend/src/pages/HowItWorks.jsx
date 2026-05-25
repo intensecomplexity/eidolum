@@ -42,7 +42,7 @@ export default function HowItWorks() {
                 <div>
                   <h3 className="font-semibold text-sm mb-1">Social Predictions</h3>
                   <p className="text-sm text-text-secondary leading-relaxed">
-                    We also track predictions from X/Twitter and StockTwits — real people making real calls, held to the same scoring standard as Wall Street.
+                    We also track predictions from X/Twitter and StockTwits. Real people making real calls, held to the same scoring standard as Wall Street.
                   </p>
                 </div>
               </div>
@@ -138,7 +138,7 @@ export default function HowItWorks() {
           <div className="space-y-3">
             {[
               { icon: Lock, text: 'No prediction can be changed after it\'s recorded.' },
-              { icon: Shield, text: 'Scoring is 100% automated — no human judgment, no appeals, no exceptions.' },
+              { icon: Shield, text: 'Scoring is 100% automated. No human judgment, no appeals, no exceptions.' },
               { icon: Trophy, text: 'A retail trader and Goldman Sachs stand on the same leaderboard. Both are judged by the same rules.' },
             ].map(({ icon: Icon, text }) => (
               <div key={text} className="flex items-center gap-3 card py-3">
@@ -201,7 +201,7 @@ export default function HowItWorks() {
                 num: '7',
                 icon: Lock,
                 title: 'Immutable Record',
-                body: 'Once recorded, a prediction cannot be edited, backdated, or deleted. The forecaster owns the call forever — hit or miss.',
+                body: 'Once recorded, a prediction cannot be edited, backdated, or deleted. The forecaster owns the call forever, hit or miss.',
               },
             ].map(({ num, icon: Icon, title, body }) => (
               <div key={num} className="card py-4">
@@ -250,7 +250,7 @@ export default function HowItWorks() {
           <div className="grid sm:grid-cols-2 gap-4">
             <div className="card py-5">
               <h3 className="font-semibold mb-2 flex items-center gap-2"><Trophy className="w-4 h-4 text-accent" /> Analysts</h3>
-              <p className="text-sm text-text-secondary leading-relaxed">Auto-tracked from published reports. Goldman Sachs, UBS, Morgan Stanley — their predictions are collected and scored automatically.</p>
+              <p className="text-sm text-text-secondary leading-relaxed">Auto-tracked from published reports. Goldman Sachs, UBS, Morgan Stanley. Their predictions are collected and scored automatically.</p>
             </div>
             <div className="card py-5">
               <h3 className="font-semibold mb-2 flex items-center gap-2"><Users className="w-4 h-4 text-accent" /> Players</h3>
