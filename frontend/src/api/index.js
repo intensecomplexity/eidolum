@@ -423,8 +423,8 @@ export function getInversePortfolio(forecasterId, startingAmount = 10000) {
 
 // ——— Search ———
 
-export function searchTickers(query) {
-  return api.get('/tickers/search', { params: { q: query } }).then(r => r.data);
+export function searchTickers(query, { signal } = {}) {
+  return api.get('/tickers/search', { params: { q: query }, signal }).then(r => r.data);
 }
 
 export function universalSearch(query, { signal } = {}) {
@@ -536,8 +536,8 @@ export function compareForecasters(aId, bId) {
   return api.get('/compare/forecasters', { params: { a: aId, b: bId } }).then(r => r.data);
 }
 
-export function searchForecasters(q) {
-  return api.get('/forecasters/all', { params: { q } }).then(r => r.data);
+export function searchForecasters(q, { signal } = {}) {
+  return api.get('/forecasters/all', { params: { q }, signal }).then(r => r.data);
 }
 
 // ——— Prediction Detail ———
