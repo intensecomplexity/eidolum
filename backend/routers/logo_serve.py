@@ -41,7 +41,7 @@ async def serve_logo(ticker: str, request: Request):
         return Response(
             content=cached,
             media_type="image/png",
-            headers={"Cache-Control": "public, max-age=604800", "X-Logo-Source": "cache"},
+            headers={"Cache-Control": "public, max-age=604800, s-maxage=2592000, immutable", "X-Logo-Source": "cache"},
         )
 
     # Check DB
@@ -62,5 +62,5 @@ async def serve_logo(ticker: str, request: Request):
     return Response(
         content=image_data,
         media_type="image/png",
-        headers={"Cache-Control": "public, max-age=604800", "X-Logo-Source": "db"},
+        headers={"Cache-Control": "public, max-age=604800, s-maxage=2592000, immutable", "X-Logo-Source": "db"},
     )
