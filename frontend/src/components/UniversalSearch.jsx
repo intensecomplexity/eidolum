@@ -205,9 +205,14 @@ export default function UniversalSearch({
       e.preventDefault();
       setHighlightedIdx(i => (i <= 0 ? flatItems.length - 1 : i - 1));
     } else if (e.key === 'Enter') {
-      if (highlightedIdx >= 0 && flatItems[highlightedIdx]) {
+      // Fall back to the first suggestion when no row is highlighted
+      // (common flow: type "apple" → Enter). With no fallback, Enter
+      // was a no-op until the user pressed ↓ first, which is not what
+      // anyone trying to "open the obvious top result" expects.
+      const item = highlightedIdx >= 0 ? flatItems[highlightedIdx] : flatItems[0];
+      if (item) {
         e.preventDefault();
-        activateItem(flatItems[highlightedIdx]);
+        activateItem(item);
       }
     } else if (e.key === 'Tab') {
       // Don't trap focus inside the dropdown — let Tab move focus on,
