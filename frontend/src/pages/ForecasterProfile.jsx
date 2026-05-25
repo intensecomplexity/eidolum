@@ -394,7 +394,7 @@ export default function ForecasterProfile() {
                     </div>
                   </div>
                 )}
-              <div className="grid grid-cols-2 sm:flex gap-3 sm:gap-5 shrink-0">
+              <div className="grid grid-cols-2 sm:flex gap-3 sm:gap-5 sm:shrink-0 min-w-0">
                 <div className="text-center p-3 sm:p-0">
                   <div className="flex items-center justify-center gap-2">
                     {/* Tiny pie on mobile only */}
