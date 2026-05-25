@@ -343,23 +343,29 @@ export default function StockChart({ ticker }) {
         </div>
       )}
 
-      {/* Legend */}
-      {dots.length > 0 && (
-        <div className="flex items-center justify-center gap-4 mt-3 text-[10px] text-muted">
-          {dots.some(d => d.outcome === 'hit' || d.outcome === 'correct') && (
-            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full" style={{ backgroundColor: '#34d399' }} /> Hit</span>
-          )}
-          {dots.some(d => d.outcome === 'near') && (
-            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full" style={{ backgroundColor: '#fbbf24' }} /> Near</span>
-          )}
-          {dots.some(d => d.outcome === 'miss' || d.outcome === 'incorrect') && (
-            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full" style={{ backgroundColor: '#f87171' }} /> Miss</span>
-          )}
-          {dots.some(d => d.outcome === 'pending' || !d.outcome) && (
-            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full" style={{ backgroundColor: '#6b7280' }} /> Pending</span>
-          )}
-        </div>
-      )}
+      {/* Legend — first item explains the gold line; remaining items
+          legend the prediction-outcome dots (conditional, only render
+          when that outcome appears on the chart). flex-wrap so the
+          four prediction-labelled items can wrap below the Stock price
+          item on narrow viewports (390px etc.). */}
+      <div className="flex items-center justify-center flex-wrap gap-x-3 gap-y-1 mt-3 text-[10px] text-muted">
+        <span className="flex items-center gap-1">
+          <span className="inline-block w-4 h-0.5" style={{ backgroundColor: '#D4A843' }} aria-hidden="true" />
+          Stock price
+        </span>
+        {dots.some(d => d.outcome === 'hit' || d.outcome === 'correct') && (
+          <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full" style={{ backgroundColor: '#34d399' }} /> Correct prediction</span>
+        )}
+        {dots.some(d => d.outcome === 'near') && (
+          <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full" style={{ backgroundColor: '#fbbf24' }} /> Near-miss prediction</span>
+        )}
+        {dots.some(d => d.outcome === 'miss' || d.outcome === 'incorrect') && (
+          <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full" style={{ backgroundColor: '#f87171' }} /> Wrong prediction</span>
+        )}
+        {dots.some(d => d.outcome === 'pending' || !d.outcome) && (
+          <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full" style={{ backgroundColor: '#6b7280' }} /> Pending prediction</span>
+        )}
+      </div>
     </div>
   );
 }
