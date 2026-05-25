@@ -32,7 +32,7 @@ _NOT_EXCL_P = not_excluded_filter("p")
 
 router = APIRouter()
 
-_forecaster_cache: dict[int, tuple] = {}
+_forecaster_cache: dict[tuple[int, str | None], tuple] = {}
 FORECASTER_CACHE_TTL = 300
 
 
@@ -158,7 +158,7 @@ def get_forecaster(
     db: Session = Depends(get_db),
 ):
     # Fast path: return cached stats + fresh predictions (1 DB query)
-    cached = _forecaster_cache.get(forecaster_id)
+    cached = _forecaster_cache.get((forecaster_id, sector))
     if cached and (_time.time() - cached[1]) < FORECASTER_CACHE_TTL:
         result = dict(cached[0])
         result["predictions"] = _get_preds(forecaster_id, page, limit, filter, sector, db)
@@ -520,7 +520,7 @@ def get_forecaster(
 
     # Cache the base stats (without predictions)
     cache_data = {k: v for k, v in result.items() if k != "predictions"}
-    _forecaster_cache[forecaster_id] = (cache_data, _time.time())
+    _forecaster_cache[(forecaster_id, sector)] = (cache_data, _time.time())
 
     return result
 
