@@ -75,6 +75,7 @@ import ComparisonTray from './components/ComparisonTray';
 import { useAuth } from './context/AuthContext';
 import { useFeatures } from './context/FeatureContext';
 import { CompareProvider } from './context/CompareContext';
+import { SubscriptionsProvider } from './context/SubscriptionsContext';
 import { useState } from 'react';
 
 function ComingSoon({ feature }) {
@@ -100,6 +101,7 @@ export default function App() {
 
   return (
     <CompareProvider>
+    <SubscriptionsProvider>
     <div className="min-h-screen bg-bg pb-bottom-nav sm:pb-0">
       {!splashDone && <VaultDoorSplash onComplete={() => setSplashDone(true)} />}
       <Navbar />
@@ -180,6 +182,7 @@ export default function App() {
       <ComparisonTray />
       <BottomNav />
     </div>
+    </SubscriptionsProvider>
     </CompareProvider>
   );
 }

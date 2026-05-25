@@ -1,29 +1,39 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { UserPlus, UserCheck } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-import { subscribeAnalyst, unsubscribeAnalyst, getAnalystSubscriptionStatus } from '../api';
+import { useSubscriptions } from '../context/SubscriptionsContext';
 
+/**
+ * FollowButton reads/writes through SubscriptionsContext so the
+ * /leaderboard's 50-100 button instances share a single bulk fetch
+ * instead of each firing /api/analysts/{name}/subscription-status.
+ *
+ * Auth gate: unauthenticated users see a transient "Sign in to follow"
+ * toast on click (preserved from the parallel session's recent
+ * change). Legacy localStorage display state is honored so people
+ * with pre-gating follows still see their prior selections.
+ */
 export default function FollowButton({ forecaster, compact = false }) {
   const { isAuthenticated } = useAuth();
-  const [isFollowing, setIsFollowing] = useState(false);
+  const { isFollowing: ctxIsFollowing, subscribe, unsubscribe } = useSubscriptions();
   const [loading, setLoading] = useState(false);
   const [signInPrompt, setSignInPrompt] = useState(false);
-
-  // Check subscription status for logged-in users
-  useEffect(() => {
-    if (isAuthenticated && forecaster?.name) {
-      getAnalystSubscriptionStatus(forecaster.name)
-        .then(d => setIsFollowing(d?.subscribed || false))
-        .catch(() => {
-          // Fallback to localStorage
-          const followed = JSON.parse(localStorage.getItem('qa_followed') || '[]');
-          setIsFollowing(followed.includes(forecaster.id));
-        });
-    } else {
-      const followed = JSON.parse(localStorage.getItem('qa_followed') || '[]');
-      setIsFollowing(followed.includes(forecaster.id));
+  // Legacy localStorage display for unauthenticated users with
+  // pre-sign-in-gate follows. Mutations are blocked behind the toast,
+  // but their old "Following" state remains honest.
+  const [localFollowingFallback, setLocalFollowingFallback] = useState(() => {
+    if (typeof window === 'undefined' || !forecaster?.id) return false;
+    try {
+      const arr = JSON.parse(localStorage.getItem('qa_followed') || '[]');
+      return arr.includes(forecaster.id);
+    } catch {
+      return false;
     }
-  }, [forecaster?.id, forecaster?.name, isAuthenticated]);
+  });
+
+  const isFollowing = isAuthenticated
+    ? !!forecaster?.name && ctxIsFollowing(forecaster.name)
+    : localFollowingFallback;
 
   async function handleClick(e) {
     e.preventDefault();
@@ -31,7 +41,6 @@ export default function FollowButton({ forecaster, compact = false }) {
 
     // Gate Follow behind sign-in. Unauthenticated clicks surface a
     // transient prompt — no subscribe API call, no email-modal fallback.
-    // Same toast pattern used in AnalystProfile / SavedPredictionsContext.
     if (!isAuthenticated) {
       setSignInPrompt(true);
       setTimeout(() => setSignInPrompt(false), 3500);
@@ -41,22 +50,27 @@ export default function FollowButton({ forecaster, compact = false }) {
     setLoading(true);
     try {
       if (isFollowing) {
-        await unsubscribeAnalyst(forecaster.name);
-        setIsFollowing(false);
+        await unsubscribe(forecaster.name);
       } else {
-        await subscribeAnalyst(forecaster.name);
-        setIsFollowing(true);
+        await subscribe(forecaster.name);
       }
     } catch {
-      // Fallback to localStorage toggle
+      // Optimistic update inside the context already rolled back.
+      // Fall through to localStorage for graceful degradation if the
+      // server was unreachable — matches the pre-context fallback
+      // behavior so a momentary API failure doesn't lose the user's
+      // intent entirely.
       const followed = JSON.parse(localStorage.getItem('qa_followed') || '[]');
       if (isFollowing) {
-        localStorage.setItem('qa_followed', JSON.stringify(followed.filter(id => id !== forecaster.id)));
-        setIsFollowing(false);
-      } else {
+        localStorage.setItem(
+          'qa_followed',
+          JSON.stringify(followed.filter(id => id !== forecaster.id)),
+        );
+        setLocalFollowingFallback(false);
+      } else if (forecaster?.id) {
         followed.push(forecaster.id);
         localStorage.setItem('qa_followed', JSON.stringify(followed));
-        setIsFollowing(true);
+        setLocalFollowingFallback(true);
       }
     } finally {
       setLoading(false);
