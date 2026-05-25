@@ -721,6 +721,12 @@ export function unsubscribeAnalyst(name, email) {
   return api.delete(`/analysts/${encodeURIComponent(name)}/subscribe`, { headers, params }).then(r => r.data);
 }
 
+export function getMyAnalystSubscriptions() {
+  const token = localStorage.getItem('eidolum_token');
+  const config = token ? { headers: { Authorization: `Bearer ${token}` } } : {};
+  return api.get('/analysts/subscriptions', config).then(r => r.data);
+}
+
 // ——— Controversial ———
 
 export function getControversialPredictions() {

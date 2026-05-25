@@ -1,28 +1,37 @@
 import { useEffect, useState } from 'react';
 import LoadingSpinner from '../components/LoadingSpinner';
 import { useNavigate, Link } from 'react-router-dom';
-import { Eye, X, TrendingUp, TrendingDown, Plus, Bell, BellOff } from 'lucide-react';
+import { Eye, X, TrendingUp, TrendingDown, Plus, Bell, BellOff, Users } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import ConsensusBar from '../components/ConsensusBar';
 import TickerSearch from '../components/TickerSearch';
 import TickerLink from '../components/TickerLink';
 import TypeBadge from '../components/TypeBadge';
+import PlatformBadge from '../components/PlatformBadge';
 import Footer from '../components/Footer';
-import { getWatchlist, getWatchlistFeed, removeFromWatchlist, addToWatchlist, toggleWatchlistNotify } from '../api';
+import {
+  getWatchlist, getWatchlistFeed, removeFromWatchlist, addToWatchlist, toggleWatchlistNotify,
+  getMyAnalystSubscriptions,
+} from '../api';
 
 export default function WatchlistPage() {
   const navigate = useNavigate();
   const { isAuthenticated } = useAuth();
   const [items, setItems] = useState([]);
   const [feed, setFeed] = useState([]);
+  const [follows, setFollows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showAdd, setShowAdd] = useState(false);
 
   useEffect(() => {
     if (!isAuthenticated) { setLoading(false); return; }
     setLoading(true);
-    Promise.all([getWatchlist(), getWatchlistFeed()])
-      .then(([w, f]) => { setItems(w); setFeed(f); })
+    Promise.all([
+      getWatchlist(),
+      getWatchlistFeed(),
+      getMyAnalystSubscriptions().catch(() => []),
+    ])
+      .then(([w, f, subs]) => { setItems(w); setFeed(f); setFollows(subs || []); })
       .catch(() => {})
       .finally(() => setLoading(false));
   }, [isAuthenticated]);
@@ -83,13 +92,47 @@ export default function WatchlistPage() {
           </div>
         )}
 
+        {/* Followed Forecasters — server-side AnalystSubscription rows.
+            Rendered above the ticker grid since this is the surface most
+            users miss after clicking the Watch button on a profile. */}
+        {follows.length > 0 && (
+          <div className="mb-8">
+            <h2 className="text-xs text-muted uppercase tracking-wider font-bold mb-3 flex items-center gap-2">
+              <Users className="w-4 h-4 text-accent" /> Followed Forecasters
+            </h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              {follows.map((f) => (
+                <Link
+                  key={f.forecaster_id}
+                  to={f.slug ? `/analyst/${f.slug}` : `/forecaster/${f.forecaster_id}`}
+                  className="card p-4 active:border-accent/30 transition-colors"
+                >
+                  <div className="flex items-center gap-2 mb-1 flex-wrap">
+                    <span className="font-medium text-text-primary">{f.name}</span>
+                    <PlatformBadge platform={f.platform} size={14} />
+                  </div>
+                  <div className="font-mono text-xs text-muted mb-2">{f.handle}</div>
+                  <div className="flex items-center gap-3">
+                    <span className={`font-mono text-lg font-bold ${f.accuracy_rate >= 60 ? 'text-positive' : 'text-negative'}`}>
+                      {f.accuracy_rate.toFixed(1)}%
+                    </span>
+                    <span className="text-muted text-xs">{f.total_predictions} predictions</span>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Ticker cards */}
         {items.length === 0 ? (
-          <div className="text-center py-12">
-            <Eye className="w-10 h-10 text-muted/30 mx-auto mb-3" />
-            <p className="text-text-secondary mb-2">Your watchlist is empty.</p>
-            <p className="text-muted text-sm">Add tickers you care about to see all community predictions in one place.</p>
-          </div>
+          follows.length === 0 ? (
+            <div className="text-center py-12">
+              <Eye className="w-10 h-10 text-muted/30 mx-auto mb-3" />
+              <p className="text-text-secondary mb-2">Your watchlist is empty.</p>
+              <p className="text-muted text-sm">Follow forecasters or add tickers you care about to get started.</p>
+            </div>
+          ) : null
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-8">
             {items.map(item => (

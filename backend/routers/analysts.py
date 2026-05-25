@@ -110,6 +110,50 @@ def analyst_rankings(request: Request, db: Session = Depends(get_db)):
     return results[:50]
 
 
+# ── GET /api/analysts/subscriptions ───────────────────────────────────────────
+#
+# Lists the current authenticated user's followed analysts. Powers the
+# "Followed Forecasters" section on /watchlist. Anonymous callers get
+# an empty list (not 401) so the page can render quietly. JOINs
+# analyst_subscriptions × forecasters by name (the subscription table
+# stores forecaster_name, not forecaster_id — historical artefact).
+#
+# IMPORTANT: this literal-path route MUST be declared before the
+# /analysts/{name} parameterized route below, or FastAPI's order-based
+# matcher will route `subscriptions` as the {name} parameter and call
+# analyst_profile() instead.
+
+
+@router.get("/analysts/subscriptions")
+@limiter.limit("60/minute")
+def list_my_subscriptions(
+    request: Request,
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(_optional_bearer),
+    db: Session = Depends(get_db),
+):
+    uid = _get_user_id(credentials)
+    if not uid:
+        return []
+    rows = db.query(AnalystSubscription, Forecaster).join(
+        Forecaster, func.lower(Forecaster.name) == func.lower(AnalystSubscription.forecaster_name)
+    ).filter(AnalystSubscription.user_id == uid).order_by(
+        AnalystSubscription.created_at.desc()
+    ).all()
+    return [
+        {
+            "forecaster_id": f.id,
+            "name": f.name,
+            "handle": f.handle,
+            "platform": f.platform,
+            "slug": f.slug,
+            "accuracy_rate": float(f.accuracy_score or 0),
+            "total_predictions": int(f.total_predictions or 0),
+            "subscribed_at": s.created_at.isoformat() if s.created_at else None,
+        }
+        for s, f in rows
+    ]
+
+
 # ── GET /api/analysts/{name} ──────────────────────────────────────────────────
 
 
