@@ -293,7 +293,7 @@ export default function ForecasterProfile() {
 
         {/* Header */}
         <div className="card mb-6 sm:mb-8">
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 sm:gap-6">
+          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 sm:gap-6">
             <div>
               <div className="flex items-center gap-2 sm:gap-3 mb-1 flex-wrap">
                 <div className="text-[10px] text-accent/60 uppercase tracking-widest font-mono mb-0.5">The Vault</div>
