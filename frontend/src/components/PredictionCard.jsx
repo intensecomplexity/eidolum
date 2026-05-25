@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { ExternalLink, Archive, Lock } from 'lucide-react';
+import { ExternalLink, Archive, Lock, Play } from 'lucide-react';
 import PredictionBadge from './PredictionBadge';
 import ConflictBadge from './ConflictBadge';
 import BookmarkButton from './BookmarkButton';
@@ -198,6 +198,35 @@ function ProofLinks({ p }) {
 
   return (
     <>
+      {/* Prominent mobile-only CTA — watching the source at the exact
+          timestamp is THE signature Eidolum feature, so we surface it as
+          a full-width red button on mobile instead of the desktop's
+          text-[10px] inline link. Desktop layout below is unchanged.
+          For non-YouTube predictions (article/X) we keep the same
+          full-width prominence but switch to "Read source" + accent color. */}
+      <a
+        href={href}
+        target="_blank"
+        rel="noopener noreferrer"
+        onClick={e => e.stopPropagation()}
+        className={`flex md:hidden items-center justify-center gap-2 min-h-[44px] px-4 mb-2 rounded-lg text-sm font-semibold ${
+          isYT
+            ? 'bg-red-600 text-white active:bg-red-700'
+            : 'bg-accent/15 text-accent border border-accent/30 active:bg-accent/25'
+        }`}
+      >
+        {isYT ? (
+          <>
+            <Play className="w-4 h-4" fill="currentColor" />
+            {timeStr ? `Watch at ${timeStr}` : 'Watch'}
+          </>
+        ) : (
+          <>
+            <ExternalLink className="w-4 h-4" />
+            Read source
+          </>
+        )}
+      </a>
       <div className="flex items-center gap-2 text-[10px] text-muted">
         <a href={href} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()}
           className="inline-flex items-center gap-1 hover:text-accent transition-colors">

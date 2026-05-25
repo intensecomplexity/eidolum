@@ -71,7 +71,10 @@ export default function CommentSection({ predictionId, source = 'user' }) {
   }
 
   return (
-    <div className="mt-2">
+    // Hidden on mobile per launch UX (2026-05-25): the speech-bubble
+    // toggle below "Locked …" cluttered the card without earning the
+    // tap-target real estate it took up. Desktop behavior unchanged.
+    <div className="mt-2 hidden md:block">
       {/* Toggle button */}
       <button onClick={() => setOpen(!open)} className="flex items-center gap-1 text-muted hover:text-text-secondary transition-colors text-xs">
         <MessageCircle className="w-3.5 h-3.5" />
