@@ -123,12 +123,21 @@ export default function ForecasterProfile() {
   const [disclosuresLoading, setDisclosuresLoading] = useState(false);
   const [impliedPortfolio, setImpliedPortfolio] = useState(null);
   const [impliedLoading, setImpliedLoading] = useState(false);
+  // Prediction History pagination — server is page-based (1-indexed) via
+  // /forecaster/{id}?page=N&limit=M. Initial fetch loads page 1 (BATCH_SIZE
+  // rows); "Load more" appends successive pages into extraPreds. State
+  // resets when activeSector changes (different filter window).
+  const BATCH_SIZE = 25;
+  const [extraPreds, setExtraPreds] = useState([]);
+  const [nextPage, setNextPage] = useState(2);
+  const [hasMore, setHasMore] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   // Map forecaster platform to platformId for routing
   const PLATFORM_ID_MAP = { youtube: 'youtube', x: 'twitter', reddit: 'reddit', congress: 'congress', institutional: 'institutional' };
 
   useEffect(() => {
     setLoading(true);
-    const fetchFn = slug ? () => getForecasterBySlug(slug) : () => getForecaster(id);
+    const fetchFn = slug ? () => getForecasterBySlug(slug, { limit: BATCH_SIZE }) : () => getForecaster(id, { limit: BATCH_SIZE });
     fetchFn()
       .then((d) => {
         setData(d);
@@ -168,7 +177,12 @@ export default function ForecasterProfile() {
 
   useEffect(() => {
     if (!data) return;
-    const params = activeSector !== 'All' ? { sector: activeSector } : {};
+    // Reset Prediction History pagination — old extraPreds belong to a
+    // different filter window and shouldn't bleed into the new one.
+    setExtraPreds([]);
+    setNextPage(2);
+    setHasMore(true);
+    const params = { limit: BATCH_SIZE, ...(activeSector !== 'All' ? { sector: activeSector } : {}) };
     const fetchFn = slug
       ? () => getForecasterBySlug(slug, params)
       : () => getForecaster(data.id, params);
@@ -243,7 +257,24 @@ export default function ForecasterProfile() {
 
   const chartData = data.accuracy_over_time || [];
   const platformLabel = { youtube: 'YouTube', reddit: 'Reddit', x: 'X' }[data.platform] || 'Profile';
-  const displayedPredictions = data.predictions || [];
+  const displayedPredictions = [...(data.predictions || []), ...extraPreds];
+
+  async function loadMorePredictions() {
+    if (loadingMore || !hasMore) return;
+    setLoadingMore(true);
+    try {
+      const params = { page: nextPage, limit: BATCH_SIZE, ...(activeSector !== 'All' ? { sector: activeSector } : {}) };
+      const r = slug ? await getForecasterBySlug(slug, params) : await getForecaster(data.id, params);
+      const newPreds = r?.predictions || [];
+      setExtraPreds(prev => [...prev, ...newPreds]);
+      setNextPage(p => p + 1);
+      if (newPreds.length < BATCH_SIZE) setHasMore(false);
+    } catch {
+      // silent fail; user can retry by clicking again
+    } finally {
+      setLoadingMore(false);
+    }
+  }
 
   return (
     <div>
@@ -920,6 +951,34 @@ export default function ForecasterProfile() {
             </table>
           </div>
         </div>
+
+        {/* Load more — server-paginated. Shows when the API still has
+            unseen rows for this (forecaster, sector) combo. Remaining
+            count uses data.total_predictions when available; falls back
+            to a generic label when the total is unknown so the button
+            stays useful while the API-end signal drives the hide. */}
+        {hasMore && displayedPredictions.length > 0 && (() => {
+          const total = data.total_predictions || 0;
+          const visible = displayedPredictions.length;
+          const remaining = Math.max(0, total - visible);
+          if (total && remaining <= 0) return null;
+          let label;
+          if (loadingMore) label = 'Loading…';
+          else if (!total) label = `Load ${BATCH_SIZE} more`;
+          else if (remaining <= BATCH_SIZE) label = `Load ${remaining} more`;
+          else label = `Load ${BATCH_SIZE} more (${remaining} remaining)`;
+          return (
+            <div className="flex justify-center mt-4 sm:mt-6 mb-6 sm:mb-8">
+              <button
+                onClick={loadMorePredictions}
+                disabled={loadingMore}
+                className="w-full sm:w-auto min-h-[44px] px-6 text-sm font-medium text-text-secondary bg-surface-2 border border-border rounded-lg active:border-accent/50 active:text-accent hover:border-accent/40 hover:text-accent transition-colors disabled:opacity-50"
+              >
+                {label}
+              </button>
+            </div>
+          );
+        })()}
         </>}
       </div>
 
