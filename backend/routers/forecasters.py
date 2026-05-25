@@ -47,23 +47,71 @@ def slugify(name: str) -> str:
 def _build_accuracy_trend(forecaster_id: int, db: Session, sector: str = None) -> list:
     """Build prediction-by-prediction cumulative accuracy trend.
     Uses three-tier scoring: hit/correct=1.0, near=0.5, miss/incorrect=0.
-    Optionally filter by sector."""
+
+    Sector matching mirrors the sector_strengths canonicalization (ship
+    31f1649): try canonical(p.sector), fall back to canonical(ts.sector),
+    surface UNKNOWN as "Other". Without this, the trend used to filter
+    on raw p.sector only — meaning rows recovered by the ts.sector
+    fallback (e.g. p.sector='Other' but ts.sector='Utilities') showed
+    up in the sector_strengths tab count but vanished from the chart.
+
+    The pair-enumeration trick keeps it a single hot query: pre-query
+    the (p.sector, ts.sector) pairs for this forecaster, Python-
+    canonicalize them, then pass the matching set into the main query
+    as an OR-of-pairs filter. Pre-query is bounded by O(distinct
+    sector pairs) which is < 30 even for huge analysts.
+    """
+    from utils.sector import canonical_sector, UNKNOWN_SECTOR
+
+    base_where = (
+        "WHERE p.forecaster_id = :fid AND p.outcome IN "
+        "('hit','near','miss','correct','incorrect') "
+        f"AND {_YT_VIS_P} AND {_NON_QWEN_P} AND {_NOT_EXCL_P}"
+    )
+    params = {"fid": forecaster_id}
+    sector_filter = ""
+
+    if sector and sector != "All":
+        try:
+            pair_rows = db.execute(sql_text(f"""
+                SELECT DISTINCT p.sector, ts.sector
+                FROM predictions p
+                LEFT JOIN ticker_sectors ts ON ts.ticker = p.ticker
+                {base_where}
+            """), params).fetchall()
+        except Exception:
+            return []
+        matching_pairs = []
+        for p_sec, ts_sec in pair_rows:
+            canon = canonical_sector(p_sec) if p_sec else UNKNOWN_SECTOR
+            if canon == UNKNOWN_SECTOR and ts_sec:
+                canon = canonical_sector(ts_sec)
+            if canon == UNKNOWN_SECTOR:
+                canon = "Other"
+            if canon == sector:
+                matching_pairs.append((p_sec, ts_sec))
+        if not matching_pairs:
+            return []
+        # IS NOT DISTINCT FROM treats NULL = NULL as TRUE, so pairs where
+        # one side is NULL still match correctly via parameter binding.
+        clauses = []
+        for i, (p_sec, ts_sec) in enumerate(matching_pairs):
+            pkey, tkey = f"p{i}", f"t{i}"
+            clauses.append(
+                f"(p.sector IS NOT DISTINCT FROM :{pkey} "
+                f"AND ts.sector IS NOT DISTINCT FROM :{tkey})"
+            )
+            params[pkey] = p_sec
+            params[tkey] = ts_sec
+        sector_filter = " AND (" + " OR ".join(clauses) + ")"
+
     try:
-        where = (
-            "WHERE forecaster_id = :fid AND outcome IN "
-            "('hit','near','miss','correct','incorrect') "
-            "AND actual_return IS NOT NULL "
-            f"AND {_YT_VIS_BARE} AND {_NON_QWEN_BARE} AND {_NOT_EXCL_BARE}"
-        )
-        params = {"fid": forecaster_id}
-        if sector and sector != "All":
-            where += " AND sector = :sector"
-            params["sector"] = sector
         rows = db.execute(sql_text(f"""
-            SELECT outcome
-            FROM predictions
-            {where}
-            ORDER BY COALESCE(evaluated_at, evaluation_date, prediction_date) ASC
+            SELECT p.outcome
+            FROM predictions p
+            LEFT JOIN ticker_sectors ts ON ts.ticker = p.ticker
+            {base_where}{sector_filter}
+            ORDER BY COALESCE(p.evaluated_at, p.evaluation_date, p.prediction_date) ASC
         """), params).fetchall()
     except Exception:
         return []
@@ -585,7 +633,13 @@ def get_forecaster_sectors(request: Request, forecaster_id: int, db: Session = D
             if canon == UNKNOWN_SECTOR and ts_sec:
                 canon = canonical_sector(ts_sec)
             if canon == UNKNOWN_SECTOR:
-                continue
+                # Surface the residual bucket as "Other" instead of
+                # dropping it — keeps the math reconciling end-to-end
+                # (sum of visible sector scored counts == All scored).
+                # _build_accuracy_trend uses the same canonical = "Other"
+                # rule, so clicking the Other tab filters the chart
+                # correctly.
+                canon = "Other"
             bucket = by_canonical.setdefault(canon, {"total": 0, "hits": 0, "nears": 0, "scored": 0})
             bucket["total"] += int(total or 0)
             bucket["hits"] += int(hits or 0)
