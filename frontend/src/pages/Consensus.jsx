@@ -78,7 +78,7 @@ export default function Consensus() {
       <PageHeader
         title={heroEnabled ? 'The Verdict' : 'Consensus'}
         subtitle={heroEnabled
-          ? 'Bull, bear, hold — where the analyst community has landed on every ticker.'
+          ? 'Bull, bear, hold. Where the analyst community has landed on every ticker.'
           : 'What Wall Street thinks about every stock.'}
         watermark={heroEnabled}
       />
