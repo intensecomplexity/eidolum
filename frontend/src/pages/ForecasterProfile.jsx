@@ -14,7 +14,6 @@ import PredictionCard from '../components/PredictionCard';
 import SourceBadge from '../components/SourceBadge';
 import EvidenceCard, { InlinePlayer, extractYouTubeVideoId } from '../components/EvidenceCard';
 import BookmarkButton from '../components/BookmarkButton';
-import NotificationBanner from '../components/NotificationBanner';
 import FollowButton from '../components/FollowButton';
 import CompareButton from '../components/CompareButton';
 import TickerLogo from '../components/TickerLogo';
@@ -288,7 +287,10 @@ export default function ForecasterProfile() {
                   <PlatformBadge platform={getSourceBadgeKey(data)} size={20} showLabel />
                 )}
                 <StreakBadge streak={data.streak} />
-                <FollowButton forecaster={data} />
+                {/* TODO: re-enable Watch when notification email delivery is wired
+                    (Notify Me banner removed 2026-05-25; FollowButton kept for the
+                    flip-back but hidden until the email side ships). */}
+                {false && <FollowButton forecaster={data} />}
                 <CompareButton forecaster={data} />
               </div>
               {/* Wall Street firm link — institutional sources only. The
@@ -452,8 +454,6 @@ export default function ForecasterProfile() {
           <p className="hidden sm:block text-muted/70 text-[10px] italic mt-1">
             All metrics calculated from specific predictions only. Vague mentions are not counted.
           </p>
-
-          <NotificationBanner text={`Get notified when ${data.name} makes a new prediction.`} forecasterName={data.name} />
         </div>
 
         {/* Ranked Lists section — rendered only when this forecaster has

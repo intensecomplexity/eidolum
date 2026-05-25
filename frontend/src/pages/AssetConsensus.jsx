@@ -7,7 +7,6 @@ import ConflictBadge from '../components/ConflictBadge';
 import PredictionCard from '../components/PredictionCard';
 import EvidenceCard from '../components/EvidenceCard';
 import BookmarkButton from '../components/BookmarkButton';
-import NotificationBanner from '../components/NotificationBanner';
 import WatchButton from '../components/WatchButton';
 import RareSignalBanner from '../components/RareSignalBanner';
 import TickerLogo from '../components/TickerLogo';
@@ -162,8 +161,6 @@ export default function AssetConsensus() {
                     </p>
                   ) : <p className="text-sm text-muted">Not enough data yet.</p>}
                 </div>
-
-                <NotificationBanner text={`Get notified on ${ticker.toUpperCase()} predictions.`} />
               </div>
             </div>
 

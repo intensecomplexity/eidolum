@@ -11,7 +11,6 @@ import { getSourceBadgeKey } from '../utils/getSourceBadgeKey';
 import RankBadge from '../components/RankBadge';
 import StreakBadge from '../components/StreakBadge';
 import LeaderboardCard from '../components/LeaderboardCard';
-import NotificationBanner from '../components/NotificationBanner';
 import FollowButton from '../components/FollowButton';
 import SectionHeader from '../components/SectionHeader';
 import { getLeaderboard, getAvailableTimeframes } from '../api';
@@ -460,7 +459,10 @@ export default function Leaderboard() {
                           <th className="px-3 py-3 text-right">Predictions</th>
                           <th className="px-3 py-3 text-center hidden xl:table-cell w-16">Streak</th>
                           <th className="px-3 py-3 hidden xl:table-cell w-[180px]">Top Sector</th>
-                          <th className="px-2 py-3 text-center hidden lg:table-cell w-14">Watch</th>
+                          {/* TODO: re-enable Watch column when notification email delivery is wired
+                              (Notify Me banner removed 2026-05-25; header + row cell kept inside
+                              `{false && …}` so it's a 1-line flip when the email side ships). */}
+                          {false && <th className="px-2 py-3 text-center hidden lg:table-cell w-14">Watch</th>}
                         </tr>
                       </thead>
                       <tbody key={metric}>
@@ -536,9 +538,13 @@ export default function Leaderboard() {
                                 <SectorBadge sector={f.sector_strengths[0].sector} accuracy={f.sector_strengths[0].accuracy} count={f.sector_strengths[0].count} onClick={setSector} />
                               )}
                             </td>
-                            <td className="px-2 py-3 text-center hidden lg:table-cell">
-                              <FollowButton forecaster={f} compact />
-                            </td>
+                            {/* TODO: re-enable Watch cell when notification email delivery is wired
+                                (paired with the hidden Watch column header above). */}
+                            {false && (
+                              <td className="px-2 py-3 text-center hidden lg:table-cell">
+                                <FollowButton forecaster={f} compact />
+                              </td>
+                            )}
                           </tr>
                           {expandedId === f.id && (() => {
                             const hits = f.hits || f.correct_predictions || 0;
@@ -604,9 +610,6 @@ export default function Leaderboard() {
             )}
 
 
-            {activeTab === 'week' && data.length > 0 && (
-              <NotificationBanner text="Get weekly leaderboard updates delivered to your inbox every Monday." />
-            )}
       </div>
 
       <Footer />
