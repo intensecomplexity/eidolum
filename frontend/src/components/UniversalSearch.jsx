@@ -73,6 +73,11 @@ export default function UniversalSearch({
   // -1 = nothing highlighted. ↓/↑ navigate through the flattened
   // suggestion list; Enter activates the highlighted row.
   const [highlightedIdx, setHighlightedIdx] = useState(-1);
+  // True when Enter was pressed before the debounce + fetch produced
+  // results. The effect below auto-activates ranked[0] as soon as
+  // results arrive. Cleared on input change, Esc, arrow-key nav,
+  // click-outside, or fetch-returned-empty.
+  const [pendingActivate, setPendingActivate] = useState(false);
   const debounceRef = useRef(null);
   const wrapperRef = useRef(null);
   const inputRef = useRef(null);
@@ -85,6 +90,7 @@ export default function UniversalSearch({
     function handle(e) {
       if (wrapperRef.current && !wrapperRef.current.contains(e.target)) {
         setOpen(false);
+        setPendingActivate(false);
       }
     }
     document.addEventListener('mousedown', handle);
@@ -102,6 +108,7 @@ export default function UniversalSearch({
     function handle(e) {
       if (e.key === 'Escape') {
         setOpen(false);
+        setPendingActivate(false);
         // Keep the input focused so Esc dismisses the dropdown without
         // losing the typed query — matches Google's behavior.
         inputRef.current?.focus();
@@ -117,6 +124,10 @@ export default function UniversalSearch({
   function handleInput(text) {
     setQuery(text);
     setHighlightedIdx(-1);
+    // Typing more invalidates a queued Enter intent — the user's mental
+    // model is "the next Enter applies to the latest query", not a stale
+    // earlier one.
+    setPendingActivate(false);
     if (debounceRef.current) clearTimeout(debounceRef.current);
     // Cancel any in-flight request — its result would be stale relative
     // to the new query and shouldn't paint over the upcoming response.
@@ -232,15 +243,42 @@ export default function UniversalSearch({
     }
   }
 
+  // Ref to the latest activateItem so the auto-activate effect can call
+  // it without depending on its identity (which churns every render and
+  // would re-fire the effect spuriously).
+  const activateRef = useRef(activateItem);
+  activateRef.current = activateItem;
+
+  // Auto-activate ranked[0] when results arrive after a queued Enter
+  // (set by handleKeyDown when Enter fires on an empty dropdown but a
+  // valid-length query). Also clears pendingActivate when the fetch
+  // resolves with zero results, so a "no results" outcome doesn't leave
+  // the intent hanging forever.
+  useEffect(() => {
+    if (!pendingActivate) return;
+    if (ranked.length > 0) {
+      activateRef.current(ranked[0]);
+      setPendingActivate(false);
+    } else if (!loading && results !== null) {
+      // Fetch came back empty — abandon the queued intent.
+      setPendingActivate(false);
+    }
+  }, [pendingActivate, ranked, loading, results]);
+
   function handleKeyDown(e) {
     if (!open) return;
     if (e.key === 'ArrowDown') {
       if (ranked.length === 0) return;
       e.preventDefault();
+      // Arrow nav means the user wants to pick a specific row — cancel
+      // any queued auto-activate so the queued intent doesn't fire on
+      // top of an active highlight.
+      setPendingActivate(false);
       setHighlightedIdx(i => (i + 1) % ranked.length);
     } else if (e.key === 'ArrowUp') {
       if (ranked.length === 0) return;
       e.preventDefault();
+      setPendingActivate(false);
       setHighlightedIdx(i => (i <= 0 ? ranked.length - 1 : i - 1));
     } else if (e.key === 'Enter') {
       // Fall back to the first suggestion when no row is highlighted
@@ -251,6 +289,12 @@ export default function UniversalSearch({
       if (item) {
         e.preventDefault();
         activateItem(item);
+      } else if (query.trim().length >= MIN_QUERY_LEN) {
+        // Dropdown is empty because the debounced fetch hasn't resolved
+        // yet (200ms debounce + network). Queue the intent — the effect
+        // below auto-activates ranked[0] as soon as results arrive.
+        e.preventDefault();
+        setPendingActivate(true);
       }
     } else if (e.key === 'Tab') {
       // Don't trap focus inside the dropdown — let Tab move focus on,
