@@ -11,6 +11,42 @@ const DEBOUNCE_MS = 200;            // delay after last keystroke before fetchin
 const MIN_QUERY_LEN = 2;            // queries shorter than this never hit the API
 const MAX_SUGGESTIONS = 8;          // total cap across all sections (analyst+ticker+user)
 
+// Relevance scoring for ranked suggestions. Higher = better match. Used to
+// sort the merged ticker/forecaster/user list so exact + word-prefix
+// matches outrank substring-hits-on-a-different-word (e.g. "apple"
+// hitting "Apple Inc." outranks "apple" hitting "Frohnapple").
+//
+// Buckets:
+//   1000  exact match on a primary field
+//    800  exact match on the FIRST whitespace token
+//    600  query is a prefix of any whole-word token
+//    400  query is a prefix of the field as a whole
+//    200  query is a substring of the field, no stronger match
+//      0  no match (defensive — items reach this function only after a
+//         backend hit so they always score >0 in practice)
+function scoreMatch(item, q) {
+  if (!q) return 0;
+  let fields;
+  if (item.kind === 'ticker') fields = [item.data.ticker, item.data.name];
+  else if (item.kind === 'forecaster') fields = [item.data.name, item.data.handle];
+  else if (item.kind === 'user') fields = [item.data.username, item.data.display_name];
+  else return 0;
+
+  let best = 0;
+  for (const raw of fields) {
+    if (!raw) continue;
+    const f = String(raw).toLowerCase();
+    if (!f) continue;
+    if (f === q) { best = Math.max(best, 1000); continue; }
+    const tokens = f.split(/\s+/).filter(Boolean);
+    if (tokens[0] === q) { best = Math.max(best, 800); continue; }
+    if (tokens.some(t => t.startsWith(q))) { best = Math.max(best, 600); continue; }
+    if (f.startsWith(q)) { best = Math.max(best, 400); continue; }
+    if (f.includes(q)) { best = Math.max(best, 200); }
+  }
+  return best;
+}
+
 /**
  * Universal search — searches tickers + analysts (forecasters) + people,
  * shows dropdown with three sections.
@@ -156,33 +192,35 @@ export default function UniversalSearch({
     if (onStartDuel) onStartDuel(user);
   }
 
-  // Flattened, capped suggestion list — the source of truth for
-  // keyboard navigation. Forecasters first (Ship #13B priority order),
-  // then tickers, then users; everything truncated to MAX_SUGGESTIONS.
-  // Each section then renders the subset of flatItems that fall in
-  // its kind, so a row's global index always matches `highlightedIdx`.
-  const flatItems = useMemo(() => {
+  // Ranked, capped suggestion list — the source of truth for both the
+  // dropdown render order and keyboard navigation. We build the full
+  // merged set FIRST (forecasters → tickers → users carries the
+  // Ship #13B section bias as the tiebreak), then sort by scoreMatch()
+  // descending, then cap at MAX_SUGGESTIONS. This means "apple" hits
+  // AAPL (Apple Inc., word-exact = 800) ahead of Neil Frohnapple
+  // (substring inside "frohnapple" = 200), regardless of which section
+  // they came from. The 8-cap applies AFTER sorting so a low-ranked
+  // forecaster can't crowd out a high-ranked ticker.
+  const ranked = useMemo(() => {
     if (!results) return [];
-    const out = [];
+    const raw = [];
     for (const f of (results.forecasters || [])) {
-      if (out.length >= MAX_SUGGESTIONS) break;
-      out.push({ kind: 'forecaster', key: `forecaster-${f.forecaster_id || f.id}`, data: f });
+      raw.push({ kind: 'forecaster', key: `forecaster-${f.forecaster_id || f.id}`, data: f, originalIdx: raw.length });
     }
     for (const t of (results.tickers || [])) {
-      if (out.length >= MAX_SUGGESTIONS) break;
-      out.push({ kind: 'ticker', key: `ticker-${t.ticker}`, data: t });
+      raw.push({ kind: 'ticker', key: `ticker-${t.ticker}`, data: t, originalIdx: raw.length });
     }
     for (const u of (results.users || [])) {
-      if (out.length >= MAX_SUGGESTIONS) break;
-      out.push({ kind: 'user', key: `user-${u.user_id}`, data: u });
+      raw.push({ kind: 'user', key: `user-${u.user_id}`, data: u, originalIdx: raw.length });
     }
-    return out;
-  }, [results]);
-  const indexByKey = useMemo(() => {
-    const m = new Map();
-    flatItems.forEach((it, i) => m.set(it.key, i));
-    return m;
-  }, [flatItems]);
+    const q = query.trim().toLowerCase();
+    if (!q) return raw.slice(0, MAX_SUGGESTIONS);
+    return raw
+      .map(item => ({ item, score: scoreMatch(item, q) }))
+      .sort((a, b) => b.score - a.score || a.item.originalIdx - b.item.originalIdx)
+      .map(r => r.item)
+      .slice(0, MAX_SUGGESTIONS);
+  }, [results, query]);
 
   function activateItem(item) {
     if (item.kind === 'forecaster') {
@@ -197,19 +235,19 @@ export default function UniversalSearch({
   function handleKeyDown(e) {
     if (!open) return;
     if (e.key === 'ArrowDown') {
-      if (flatItems.length === 0) return;
+      if (ranked.length === 0) return;
       e.preventDefault();
-      setHighlightedIdx(i => (i + 1) % flatItems.length);
+      setHighlightedIdx(i => (i + 1) % ranked.length);
     } else if (e.key === 'ArrowUp') {
-      if (flatItems.length === 0) return;
+      if (ranked.length === 0) return;
       e.preventDefault();
-      setHighlightedIdx(i => (i <= 0 ? flatItems.length - 1 : i - 1));
+      setHighlightedIdx(i => (i <= 0 ? ranked.length - 1 : i - 1));
     } else if (e.key === 'Enter') {
       // Fall back to the first suggestion when no row is highlighted
       // (common flow: type "apple" → Enter). With no fallback, Enter
       // was a no-op until the user pressed ↓ first, which is not what
       // anyone trying to "open the obvious top result" expects.
-      const item = highlightedIdx >= 0 ? flatItems[highlightedIdx] : flatItems[0];
+      const item = highlightedIdx >= 0 ? ranked[highlightedIdx] : ranked[0];
       if (item) {
         e.preventDefault();
         activateItem(item);
@@ -222,10 +260,7 @@ export default function UniversalSearch({
     }
   }
 
-  const hasTickers = (results?.tickers || []).some(t => indexByKey.has(`ticker-${t.ticker}`));
-  const hasUsers = (results?.users || []).some(u => indexByKey.has(`user-${u.user_id}`));
-  const hasForecasters = (results?.forecasters || []).some(f => indexByKey.has(`forecaster-${f.forecaster_id || f.id}`));
-  const hasAny = flatItems.length > 0;
+  const hasAny = ranked.length > 0;
   const showEmptyState = !loading && results !== null && !hasAny && query.trim().length >= MIN_QUERY_LEN;
 
   return (
@@ -245,8 +280,8 @@ export default function UniversalSearch({
           aria-expanded={open}
           aria-controls="universal-search-listbox"
           aria-autocomplete="list"
-          aria-activedescendant={highlightedIdx >= 0 && flatItems[highlightedIdx]
-            ? `us-row-${flatItems[highlightedIdx].key}` : undefined}
+          aria-activedescendant={highlightedIdx >= 0 && ranked[highlightedIdx]
+            ? `us-row-${ranked[highlightedIdx].key}` : undefined}
           placeholder={placeholder}
           autoFocus={autoFocus}
           className={`w-full pl-9 pr-3 py-2 bg-surface border border-border rounded-lg text-text-primary placeholder:text-muted focus:outline-none focus:border-accent/50 ${inputClassName}`}
@@ -264,26 +299,25 @@ export default function UniversalSearch({
           {!loading && showEmptyState && (
             <div className="px-3 py-2.5 text-xs text-muted italic">No results for "{query.trim()}"</div>
           )}
-          {/* Analysts (forecasters) — placed first because "search for an
-              analyst" is the Ship #13B motivating use case. */}
-          {hasForecasters && (
-            <div>
-              <div className="px-3 py-1.5 text-[10px] text-muted uppercase tracking-wider font-bold bg-surface-2/50">
-                Analysts
-              </div>
-              {results.forecasters.map(f => {
-                const key = `forecaster-${f.forecaster_id || f.id}`;
-                const gi = indexByKey.get(key);
-                if (gi === undefined) return null;
-                const isHi = gi === highlightedIdx;
-                return (
+          {/* Ranked flat list — section headers dropped per 2026-05-25
+              relevance ship. Each row still carries its kind's visual
+              signature (ticker symbol + name vs avatar + name + stats)
+              so the user can tell what they're picking. Render order =
+              scoreMatch() descending with the forecaster/ticker/user
+              source-order bias as the stable tiebreak. */}
+          {ranked.map((item, idx) => {
+            const isHi = idx === highlightedIdx;
+            const rowId = `us-row-${item.key}`;
+            if (item.kind === 'forecaster') {
+              const f = item.data;
+              return (
                 <button
-                  key={key}
-                  id={`us-row-${key}`}
+                  key={item.key}
+                  id={rowId}
                   role="option"
                   aria-selected={isHi}
                   type="button"
-                  onMouseEnter={() => setHighlightedIdx(gi)}
+                  onMouseEnter={() => setHighlightedIdx(idx)}
                   onClick={() => handleForecasterClick(f.forecaster_id || f.id)}
                   className={`w-full flex items-center gap-2.5 px-3 py-2.5 text-left hover:bg-surface-2 active:bg-surface-2 transition-colors min-h-[44px] ${isHi ? 'bg-surface-2' : ''}`}
                 >
@@ -303,114 +337,82 @@ export default function UniversalSearch({
                     </div>
                   </div>
                 </button>
-                );
-              })}
-            </div>
-          )}
-
-          {/* Divider between Analysts and Tickers */}
-          {hasForecasters && hasTickers && <div className="border-t border-border" />}
-
-          {/* Tickers */}
-          {hasTickers && (
-            <div>
-              <div className="px-3 py-1.5 text-[10px] text-muted uppercase tracking-wider font-bold bg-surface-2/50">
-                Tickers
-              </div>
-              {results.tickers.map(t => {
-                const key = `ticker-${t.ticker}`;
-                const gi = indexByKey.get(key);
-                if (gi === undefined) return null;
-                const isHi = gi === highlightedIdx;
-                return (
+              );
+            }
+            if (item.kind === 'ticker') {
+              const t = item.data;
+              return (
                 <button
-                  key={key}
-                  id={`us-row-${key}`}
+                  key={item.key}
+                  id={rowId}
                   role="option"
                   aria-selected={isHi}
                   type="button"
-                  onMouseEnter={() => setHighlightedIdx(gi)}
+                  onMouseEnter={() => setHighlightedIdx(idx)}
                   onClick={() => handleTickerClick(t.ticker)}
                   className={`w-full flex items-center gap-3 px-3 py-2.5 text-left hover:bg-surface-2 active:bg-surface-2 transition-colors min-h-[44px] ${isHi ? 'bg-surface-2' : ''}`}
                 >
                   <span className="font-mono font-bold text-accent text-sm tracking-wider min-w-[44px]">{t.ticker}</span>
                   <span className="text-text-secondary text-sm truncate">{t.name}</span>
                 </button>
-                );
-              })}
-            </div>
-          )}
-
-          {/* Divider */}
-          {hasTickers && hasUsers && <div className="border-t border-border" />}
-
-          {/* Users */}
-          {hasUsers && (
-            <div>
-              <div className="px-3 py-1.5 text-[10px] text-muted uppercase tracking-wider font-bold bg-surface-2/50">
-                People
-              </div>
-              {results.users.map(u => {
-                const key = `user-${u.user_id}`;
-                const gi = indexByKey.get(key);
-                if (gi === undefined) return null;
-                const isHi = gi === highlightedIdx;
-                return (
-                <div
-                  key={key}
-                  id={`us-row-${key}`}
-                  role="option"
-                  aria-selected={isHi}
-                  onMouseEnter={() => setHighlightedIdx(gi)}
-                  className={`flex items-center gap-2.5 px-3 py-2.5 hover:bg-surface-2 transition-colors min-h-[44px] ${isHi ? 'bg-surface-2' : ''}`}>
-                  {/* Avatar */}
-                  <div className="w-8 h-8 rounded-full bg-accent/10 border border-accent/20 flex items-center justify-center flex-shrink-0">
-                    <span className="font-mono text-xs text-accent font-bold">
-                      {(u.username || '?')[0].toUpperCase()}
-                    </span>
-                  </div>
-
-                  {/* Info */}
-                  <button
-                    type="button"
-                    onClick={() => handleUserClick(u.user_id)}
-                    className="flex-1 min-w-0 text-left"
-                  >
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-sm font-medium truncate">{u.display_name || u.username}</span>
-                      <TypeBadge type={u.type === 'user' ? (u.user_type || 'player') : 'player'} size={12} />
-                      <span className="text-[10px] text-muted font-mono">@{u.username}</span>
-                    </div>
-                    <div className="flex items-center gap-2 text-[10px] text-muted">
-                      <span className="font-mono">{u.accuracy}%</span>
-                      <span>{u.rank}</span>
-                    </div>
-                  </button>
-
-                  {/* Actions */}
-                  {isAuthenticated && (
-                    <div className="flex items-center gap-1 flex-shrink-0">
-                      <div onClick={e => e.stopPropagation()}>
-                        <FriendButton
-                          compact
-                          status={u.is_friend === true || u.is_friend === 'accepted' ? 'accepted' : u.is_friend === 'pending_sent' ? 'pending_sent' : 'none'}
-                          onAction={(action) => handleFriendAction(u.user_id, action)}
-                        />
-                      </div>
-                      <button
-                        type="button"
-                        onClick={(e) => { e.stopPropagation(); handleDuel(u); }}
-                        className="text-[10px] text-warning font-medium flex items-center gap-0.5 ml-1 hover:text-warning/80"
-                      >
-                        <Swords className="w-3 h-3" />
-                      </button>
-                    </div>
-                  )}
+              );
+            }
+            // user
+            const u = item.data;
+            return (
+              <div
+                key={item.key}
+                id={rowId}
+                role="option"
+                aria-selected={isHi}
+                onMouseEnter={() => setHighlightedIdx(idx)}
+                className={`flex items-center gap-2.5 px-3 py-2.5 hover:bg-surface-2 transition-colors min-h-[44px] ${isHi ? 'bg-surface-2' : ''}`}>
+                {/* Avatar */}
+                <div className="w-8 h-8 rounded-full bg-accent/10 border border-accent/20 flex items-center justify-center flex-shrink-0">
+                  <span className="font-mono text-xs text-accent font-bold">
+                    {(u.username || '?')[0].toUpperCase()}
+                  </span>
                 </div>
-                );
-              })}
-            </div>
-          )}
+
+                {/* Info */}
+                <button
+                  type="button"
+                  onClick={() => handleUserClick(u.user_id)}
+                  className="flex-1 min-w-0 text-left"
+                >
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-sm font-medium truncate">{u.display_name || u.username}</span>
+                    <TypeBadge type={u.type === 'user' ? (u.user_type || 'player') : 'player'} size={12} />
+                    <span className="text-[10px] text-muted font-mono">@{u.username}</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-[10px] text-muted">
+                    <span className="font-mono">{u.accuracy}%</span>
+                    <span>{u.rank}</span>
+                  </div>
+                </button>
+
+                {/* Actions */}
+                {isAuthenticated && (
+                  <div className="flex items-center gap-1 flex-shrink-0">
+                    <div onClick={e => e.stopPropagation()}>
+                      <FriendButton
+                        compact
+                        status={u.is_friend === true || u.is_friend === 'accepted' ? 'accepted' : u.is_friend === 'pending_sent' ? 'pending_sent' : 'none'}
+                        onAction={(action) => handleFriendAction(u.user_id, action)}
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={(e) => { e.stopPropagation(); handleDuel(u); }}
+                      className="text-[10px] text-warning font-medium flex items-center gap-0.5 ml-1 hover:text-warning/80"
+                    >
+                      <Swords className="w-3 h-3" />
+                    </button>
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
       )}
     </div>
