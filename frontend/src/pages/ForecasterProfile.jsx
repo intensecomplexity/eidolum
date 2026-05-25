@@ -627,6 +627,8 @@ export default function ForecasterProfile() {
                     <CartesianGrid strokeDasharray="3 3" stroke="rgba(128,128,128,0.15)" vertical={false} />
                     <XAxis
                       dataKey="prediction_number"
+                      type="number"
+                      domain={[1, 'dataMax']}
                       tick={{ fill: '#6b7280', fontSize: 10 }}
                       axisLine={false}
                       tickLine={false}
@@ -634,10 +636,22 @@ export default function ForecasterProfile() {
                       ticks={(() => {
                         const last = chartData[chartData.length - 1]?.prediction_number || 1;
                         if (last <= 12) return undefined;
-                        const step = Math.ceil(last / 10);
-                        const t = [1];
-                        for (let i = step; i < last; i += step) t.push(i);
-                        if (t[t.length - 1] !== last) t.push(last);
+                        // Nice-step picker — target ~10 ticks at round
+                        // multiples that read cleanly. Without this the
+                        // old Math.ceil(last/10) produced non-round
+                        // step=26 for 254-pred forecasters, and Recharts'
+                        // category-axis behavior silently dropped every
+                        // tick that didn't match a sampled data point.
+                        // type="number" + domain=[1, dataMax] above lets
+                        // these arbitrary ticks render regardless of
+                        // whether they coincide with a backend sample.
+                        const candidates = [5, 10, 20, 25, 50, 100, 200, 250, 500, 1000];
+                        let step = candidates[candidates.length - 1];
+                        for (const s of candidates) {
+                          if (last / s <= 11) { step = s; break; }
+                        }
+                        const t = [];
+                        for (let i = step; i <= last; i += step) t.push(i);
                         return t;
                       })()}
                     />
