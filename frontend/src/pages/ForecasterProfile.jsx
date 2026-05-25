@@ -287,10 +287,7 @@ export default function ForecasterProfile() {
                   <PlatformBadge platform={getSourceBadgeKey(data)} size={20} showLabel />
                 )}
                 <StreakBadge streak={data.streak} />
-                {/* TODO: re-enable Watch when notification email delivery is wired
-                    (Notify Me banner removed 2026-05-25; FollowButton kept for the
-                    flip-back but hidden until the email side ships). */}
-                {false && <FollowButton forecaster={data} />}
+                <FollowButton forecaster={data} />
                 <CompareButton forecaster={data} />
               </div>
               {/* Wall Street firm link — institutional sources only. The

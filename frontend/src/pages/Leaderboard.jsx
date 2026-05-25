@@ -459,10 +459,7 @@ export default function Leaderboard() {
                           <th className="px-3 py-3 text-right">Predictions</th>
                           <th className="px-3 py-3 text-center hidden xl:table-cell w-16">Streak</th>
                           <th className="px-3 py-3 hidden xl:table-cell w-[180px]">Top Sector</th>
-                          {/* TODO: re-enable Watch column when notification email delivery is wired
-                              (Notify Me banner removed 2026-05-25; header + row cell kept inside
-                              `{false && …}` so it's a 1-line flip when the email side ships). */}
-                          {false && <th className="px-2 py-3 text-center hidden lg:table-cell w-14">Watch</th>}
+                          <th className="px-2 py-3 text-center hidden lg:table-cell w-14">Watch</th>
                         </tr>
                       </thead>
                       <tbody key={metric}>
@@ -538,13 +535,9 @@ export default function Leaderboard() {
                                 <SectorBadge sector={f.sector_strengths[0].sector} accuracy={f.sector_strengths[0].accuracy} count={f.sector_strengths[0].count} onClick={setSector} />
                               )}
                             </td>
-                            {/* TODO: re-enable Watch cell when notification email delivery is wired
-                                (paired with the hidden Watch column header above). */}
-                            {false && (
-                              <td className="px-2 py-3 text-center hidden lg:table-cell">
-                                <FollowButton forecaster={f} compact />
-                              </td>
-                            )}
+                            <td className="px-2 py-3 text-center hidden lg:table-cell">
+                              <FollowButton forecaster={f} compact />
+                            </td>
                           </tr>
                           {expandedId === f.id && (() => {
                             const hits = f.hits || f.correct_predictions || 0;
