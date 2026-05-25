@@ -22,7 +22,11 @@ export default function PortfolioSimulator({ forecasterId, forecasterName }) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [showTrades, setShowTrades] = useState(false);
-  const [customCapital, setCustomCapital] = useState(10000);
+  // capitalInput is the raw string the user typed (so empty is preservable);
+  // customCapital is the parsed numeric value used for chart math. Zero or
+  // empty input is allowed — the chart flatlines at $0.
+  const [capitalInput, setCapitalInput] = useState((10000).toLocaleString());
+  const customCapital = parseInt(capitalInput.replace(/[^0-9]/g, '')) || 0;
 
   useEffect(() => {
     if (!forecasterId) return;
@@ -46,7 +50,10 @@ export default function PortfolioSimulator({ forecasterId, forecasterName }) {
   const { starting_capital, current_value, total_return_pct, total_predictions,
           time_period, alpha, best_call, worst_call, portfolio_over_time, trades } = data;
 
-  // Scale all values proportionally based on custom starting capital
+  // Scale all values proportionally based on custom starting capital.
+  // When customCapital is 0 (or input was cleared), scale=0 → every chart
+  // value flatlines at $0. The return percentage is not shown in that
+  // case since "X% of $0" is meaningless.
   const scale = customCapital / (starting_capital || 10000);
   const scaledCurrent = Math.round(current_value * scale);
   const scaledTimeline = (portfolio_over_time || []).map(p => ({
@@ -74,10 +81,12 @@ export default function PortfolioSimulator({ forecasterId, forecasterName }) {
               <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-accent text-xs font-mono">$</span>
               <input
                 type="text"
-                value={customCapital.toLocaleString()}
+                value={capitalInput}
                 onChange={e => {
-                  const v = parseInt(e.target.value.replace(/[^0-9]/g, '')) || 0;
-                  setCustomCapital(Math.max(1, Math.min(10000000, v)));
+                  const raw = e.target.value.replace(/[^0-9]/g, '');
+                  if (raw === '') { setCapitalInput(''); return; }
+                  const n = Math.min(10000000, parseInt(raw) || 0);
+                  setCapitalInput(n.toLocaleString());
                 }}
                 className="w-28 pl-5 pr-2 py-1.5 bg-surface-2 border border-accent/30 rounded-lg text-xs font-mono text-text-primary focus:outline-none focus:border-accent/60"
               />
@@ -88,7 +97,7 @@ export default function PortfolioSimulator({ forecasterId, forecasterName }) {
         {/* Preset buttons */}
         <div className="flex gap-1.5 mb-3">
           {PRESETS.map(amt => (
-            <button key={amt} onClick={() => setCustomCapital(amt)}
+            <button key={amt} onClick={() => setCapitalInput(amt.toLocaleString())}
               className={`px-2.5 py-1 rounded text-[10px] font-mono transition-colors ${
                 customCapital === amt ? 'bg-accent/15 text-accent border border-accent/30' : 'bg-surface-2 text-muted border border-border hover:border-accent/20'
               }`}>
@@ -102,7 +111,9 @@ export default function PortfolioSimulator({ forecasterId, forecasterName }) {
             If you followed <span className="text-accent font-medium">{forecasterName}</span>'s last {total_predictions} calls with ${customCapital.toLocaleString()}
           </span>
           <span className="font-mono text-2xl font-bold text-accent">${scaledCurrent.toLocaleString()}</span>
-          <span className={`font-mono text-sm font-bold ${isPositive ? 'text-positive' : 'text-negative'}`}>{isPositive ? '+' : ''}{total_return_pct}%</span>
+          {customCapital > 0 && (
+            <span className={`font-mono text-sm font-bold ${isPositive ? 'text-positive' : 'text-negative'}`}>{isPositive ? '+' : ''}{total_return_pct}%</span>
+          )}
         </div>
         {alpha !== 0 && (
           <p className="text-xs text-muted mt-1">
