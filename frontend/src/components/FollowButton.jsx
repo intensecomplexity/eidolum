@@ -2,13 +2,12 @@ import { useState, useEffect } from 'react';
 import { UserPlus, UserCheck } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { subscribeAnalyst, unsubscribeAnalyst, getAnalystSubscriptionStatus } from '../api';
-import FollowModal from './FollowModal';
 
 export default function FollowButton({ forecaster, compact = false }) {
   const { isAuthenticated } = useAuth();
   const [isFollowing, setIsFollowing] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [showModal, setShowModal] = useState(false);
+  const [signInPrompt, setSignInPrompt] = useState(false);
 
   // Check subscription status for logged-in users
   useEffect(() => {
@@ -30,39 +29,37 @@ export default function FollowButton({ forecaster, compact = false }) {
     e.preventDefault();
     e.stopPropagation();
 
-    if (isAuthenticated) {
-      // Direct API call for logged-in users
-      setLoading(true);
-      try {
-        if (isFollowing) {
-          await unsubscribeAnalyst(forecaster.name);
-          setIsFollowing(false);
-        } else {
-          await subscribeAnalyst(forecaster.name);
-          setIsFollowing(true);
-        }
-      } catch {
-        // Fallback to localStorage toggle
-        const followed = JSON.parse(localStorage.getItem('qa_followed') || '[]');
-        if (isFollowing) {
-          localStorage.setItem('qa_followed', JSON.stringify(followed.filter(id => id !== forecaster.id)));
-          setIsFollowing(false);
-        } else {
-          followed.push(forecaster.id);
-          localStorage.setItem('qa_followed', JSON.stringify(followed));
-          setIsFollowing(true);
-        }
-      } finally {
-        setLoading(false);
+    // Gate Follow behind sign-in. Unauthenticated clicks surface a
+    // transient prompt — no subscribe API call, no email-modal fallback.
+    // Same toast pattern used in AnalystProfile / SavedPredictionsContext.
+    if (!isAuthenticated) {
+      setSignInPrompt(true);
+      setTimeout(() => setSignInPrompt(false), 3500);
+      return;
+    }
+
+    setLoading(true);
+    try {
+      if (isFollowing) {
+        await unsubscribeAnalyst(forecaster.name);
+        setIsFollowing(false);
+      } else {
+        await subscribeAnalyst(forecaster.name);
+        setIsFollowing(true);
       }
-    } else if (isFollowing) {
-      // Non-auth unfollow
+    } catch {
+      // Fallback to localStorage toggle
       const followed = JSON.parse(localStorage.getItem('qa_followed') || '[]');
-      localStorage.setItem('qa_followed', JSON.stringify(followed.filter(id => id !== forecaster.id)));
-      setIsFollowing(false);
-    } else {
-      // Non-auth: show email modal
-      setShowModal(true);
+      if (isFollowing) {
+        localStorage.setItem('qa_followed', JSON.stringify(followed.filter(id => id !== forecaster.id)));
+        setIsFollowing(false);
+      } else {
+        followed.push(forecaster.id);
+        localStorage.setItem('qa_followed', JSON.stringify(followed));
+        setIsFollowing(true);
+      }
+    } finally {
+      setLoading(false);
     }
   }
 
@@ -90,12 +87,10 @@ export default function FollowButton({ forecaster, compact = false }) {
         )}
       </button>
 
-      {showModal && (
-        <FollowModal
-          forecaster={forecaster}
-          onClose={() => setShowModal(false)}
-          onFollowed={() => setIsFollowing(true)}
-        />
+      {signInPrompt && (
+        <div className="fixed bottom-[80px] sm:bottom-6 left-1/2 -translate-x-1/2 z-[70] px-4 py-2.5 rounded-xl text-xs font-medium shadow-lg border bg-surface border-border text-text-primary backdrop-blur-sm toast-slide-up">
+          Sign in to follow forecasters
+        </div>
       )}
     </>
   );
