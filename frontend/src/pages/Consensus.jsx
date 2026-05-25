@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import LoadingSpinner from '../components/LoadingSpinner';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { TrendingUp, ChevronDown, Search, AlertTriangle, CheckCircle } from 'lucide-react';
 import ConsensusBar from '../components/ConsensusBar';
 import TickerLogo from '../components/TickerLogo';
@@ -46,12 +46,32 @@ export default function Consensus() {
     },
   });
 
+  const [searchParams, setSearchParams] = useSearchParams();
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [sector, setSector] = useState('All Sectors');
+  // Seed the sector filter from ?sector=… so click-throughs from the
+  // Discover "Top by Sector" cards land on the right filter. Validate
+  // against the known list to ignore garbage values (e.g. ?sector=foo).
+  const [sector, setSector] = useState(() => {
+    const fromUrl = searchParams.get('sector');
+    return fromUrl && SECTORS.includes(fromUrl) ? fromUrl : 'All Sectors';
+  });
   const [sort, setSort] = useState('count');
   const [search, setSearch] = useState('');
   const [tab, setTab] = useState('all');
+
+  // Keep the URL in sync when the user changes the dropdown — makes
+  // the filtered view linkable, refresh-stable, and back-button-aware.
+  // `replace: true` avoids polluting browser history with every change.
+  useEffect(() => {
+    const next = new URLSearchParams(searchParams);
+    if (sector === 'All Sectors') next.delete('sector');
+    else next.set('sector', sector);
+    if (next.toString() !== searchParams.toString()) {
+      setSearchParams(next, { replace: true });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sector]);
 
   useEffect(() => {
     setLoading(true);
