@@ -366,7 +366,7 @@ export default function UniversalSearch({
                   // off the input — without it, blur fires before mouseup,
                   // the dropdown unmounts, and the click never lands on
                   // a target. Real-mouse clicks would no-op.
-                  onMouseDown={(e) => e.preventDefault()}
+                  onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); }}
                   onClick={() => handleForecasterClick(f.forecaster_id || f.id)}
                   className={`w-full flex items-center gap-2.5 px-3 py-2.5 text-left hover:bg-surface-2 active:bg-surface-2 transition-colors min-h-[44px] ${isHi ? 'bg-surface-2' : ''}`}
                 >
@@ -398,7 +398,7 @@ export default function UniversalSearch({
                   aria-selected={isHi}
                   type="button"
                   onMouseEnter={() => setHighlightedIdx(idx)}
-                  onMouseDown={(e) => e.preventDefault()}
+                  onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); }}
                   onClick={() => handleTickerClick(t.ticker)}
                   className={`w-full flex items-center gap-3 px-3 py-2.5 text-left hover:bg-surface-2 active:bg-surface-2 transition-colors min-h-[44px] ${isHi ? 'bg-surface-2' : ''}`}
                 >
@@ -427,7 +427,7 @@ export default function UniversalSearch({
                 {/* Info */}
                 <button
                   type="button"
-                  onMouseDown={(e) => e.preventDefault()}
+                  onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); }}
                   onClick={() => handleUserClick(u.user_id)}
                   className="flex-1 min-w-0 text-left"
                 >

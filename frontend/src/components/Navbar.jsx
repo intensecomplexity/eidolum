@@ -22,6 +22,13 @@ export default function Navbar() {
   const [showHelp, setShowHelp] = useState(false);
   const [searchExpanded, setSearchExpanded] = useState(false);
   const searchRef = useRef(null);
+  // The expanded-search modal renders OUTSIDE searchRef (it's a sibling
+  // fixed-position overlay), so the click-outside detector needs a
+  // second ref to know "the user clicked something inside the modal,
+  // don't close." Without this, clicking a dropdown row collapsed the
+  // modal mid-mousedown and the row's click never fired — silent bug
+  // verified live on bundle DC5-TAVT.
+  const searchModalRef = useRef(null);
   const navRef = useRef(null);
   const dropdownRef = useRef(null);
 
@@ -66,11 +73,15 @@ export default function Navbar() {
   const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPod|iPad/i.test(navigator.platform);
   const shortcutHint = isMac ? '\u2318K' : 'Ctrl K';
 
-  // Close search on outside click
+  // Close search on outside click. Must check BOTH the trigger-button
+  // ref AND the modal-overlay ref — they're DOM siblings, not nested,
+  // so a click in the modal looks "outside" searchRef alone.
   useEffect(() => {
     if (!searchExpanded) return;
     function handle(e) {
-      if (searchRef.current && !searchRef.current.contains(e.target)) setSearchExpanded(false);
+      const inTrigger = searchRef.current && searchRef.current.contains(e.target);
+      const inModal = searchModalRef.current && searchModalRef.current.contains(e.target);
+      if (!inTrigger && !inModal) setSearchExpanded(false);
     }
     document.addEventListener('mousedown', handle);
     return () => document.removeEventListener('mousedown', handle);
@@ -132,7 +143,7 @@ export default function Navbar() {
                 </button>
               </div>
               {searchExpanded && (
-                <div className="hidden sm:block fixed inset-x-0 top-0 z-[60] bg-bg/95 backdrop-blur-md border-b border-border">
+                <div ref={searchModalRef} className="hidden sm:block fixed inset-x-0 top-0 z-[60] bg-bg/95 backdrop-blur-md border-b border-border">
                   <div className="max-w-2xl mx-auto px-4 py-3">
                     <UniversalSearch
                       className="w-full"

@@ -276,7 +276,7 @@ export default function HeroSearch({ compact = false }) {
                   // See UniversalSearch for the blur-before-click race
                   // this protects against. Without preventDefault the
                   // dropdown unmounts on mousedown and click never lands.
-                  onMouseDown={(e) => e.preventDefault()}
+                  onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); }}
                   onClick={() => go(f.slug ? `/analyst/${f.slug}` : `/forecaster/${f.id}`)}
                   className={`w-full flex items-center justify-between px-4 py-2.5 hover:bg-surface-2 transition-colors min-h-[44px] ${isHi ? 'bg-surface-2' : ''}`}>
                   <div className="flex items-center gap-2 min-w-0">
@@ -302,7 +302,7 @@ export default function HeroSearch({ compact = false }) {
                 aria-selected={isHi}
                 type="button"
                 onMouseEnter={() => setHighlightedIdx(idx)}
-                onMouseDown={(e) => e.preventDefault()}
+                onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); }}
                 onClick={() => go(`/asset/${t.ticker}`)}
                 className={`w-full flex items-center gap-3 px-4 py-2.5 hover:bg-surface-2 transition-colors min-h-[44px] ${isHi ? 'bg-surface-2' : ''}`}>
                 <span className="font-mono font-bold text-accent text-sm">{t.ticker}</span>
