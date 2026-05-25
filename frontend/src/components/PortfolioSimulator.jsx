@@ -137,7 +137,7 @@ export default function PortfolioSimulator({ forecasterId, forecasterName }) {
                 axisLine={false}
                 tickLine={false}
                 tickFormatter={v => `$${(v / 1000).toFixed(0)}k`}
-                width={45}
+                width={60}
               />
               <Tooltip content={<SimTooltip />} cursor={{ stroke: 'rgba(255,255,255,0.1)' }} />
               <ReferenceLine y={customCapital} stroke="#8b8f9a" strokeDasharray="3 3" strokeWidth={1} />
