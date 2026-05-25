@@ -1,10 +1,9 @@
 import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { TrendingUp, TrendingDown, Trophy, ArrowLeft, Check, X, BarChart3, Users, MessageSquare, ChevronDown, Clock, Target, Calendar, Minus } from 'lucide-react';
+import { TrendingUp, TrendingDown, Trophy, ArrowLeft, Check, X, BarChart3, MessageSquare, ChevronDown, Clock, Target, Calendar, Minus } from 'lucide-react';
 import useSEO from '../hooks/useSEO';
 import LoadingSpinner from '../components/LoadingSpinner';
 import PredictionBadge from '../components/PredictionBadge';
-import ConsensusBar from '../components/ConsensusBar';
 import StockChart from '../components/StockChart';
 import StockPrice from '../components/StockPrice';
 import TickerLogo from '../components/TickerLogo';
@@ -96,7 +95,6 @@ export default function TickerDetail() {
   const hist = data.historical || {};
   const stats = data.stats || {};
 
-  const pending = data.pending_predictions || [];
   const scored = data.recent_evaluated || [];
 
   return (
@@ -177,123 +175,6 @@ export default function TickerDetail() {
             </div>
           );
         })()}
-
-        {/* ── SECTION 1: CURRENT ANALYST OUTLOOK ────────────────────────── */}
-        <div className="mb-8">
-          <div className="mb-3">
-            <h2 className="text-sm font-semibold text-muted uppercase tracking-wider flex items-center gap-1.5">
-              <Users className="w-4 h-4 text-accent" /> Current Analyst Outlook
-            </h2>
-            {cc.total > 0 && <p className="text-muted text-xs mt-0.5">{cc.total} active prediction{cc.total !== 1 ? 's' : ''}</p>}
-          </div>
-
-          {cc.total > 0 ? (
-            <>
-              {/* Consensus bar for pending only */}
-              <div className="card mb-4">
-                <ConsensusBar bullish={cc.bullish_count || 0} bearish={cc.bearish_count || 0} neutral={cc.neutral_count || 0} />
-                <div className="flex justify-between text-[10px] mt-1">
-                  <span className="text-positive font-mono">{cc.bullish_pct}% bullish ({cc.bullish_count})</span>
-                  <span className="text-negative font-mono">{cc.bearish_pct}% bearish ({cc.bearish_count})</span>
-                </div>
-              </div>
-
-              {/* Bull/Bear analyst lists */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                {/* Bulls */}
-                {cc.bulls && cc.bulls.length > 0 && (
-                  <div className="card">
-                    <div className="flex items-center gap-2 mb-3">
-                      <TrendingUp className="w-4 h-4 text-positive" />
-                      <span className="text-xs font-bold uppercase text-positive">
-                        Bullish ({cc.bulls.length} analyst{cc.bulls.length !== 1 ? 's' : ''})
-                      </span>
-                    </div>
-                    <div className="space-y-2.5">
-                      {cc.bulls.map((a, i) => (
-                        <div key={i} className="flex items-center justify-between gap-2">
-                          <div className="flex items-center gap-2 min-w-0">
-                            <Link to={`/forecaster/${a.forecaster_id}`} className="text-sm font-medium hover:text-accent transition-colors truncate">
-                              {a.name}
-                            </Link>
-                            {a.firm && <span className="text-[10px] text-muted hidden sm:inline">at {a.firm}</span>}
-                            {a.accuracy > 0 && (
-                              <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded border ${accuracyColor(a.accuracy)}`}>
-                                {a.accuracy.toFixed(1)}%
-                              </span>
-                            )}
-                          </div>
-                          {a.target != null && (
-                            <span className="text-xs font-mono text-text-secondary flex-shrink-0">${a.target.toFixed(0)}</span>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Bears */}
-                {cc.bears && cc.bears.length > 0 && (
-                  <div className="card">
-                    <div className="flex items-center gap-2 mb-3">
-                      <TrendingDown className="w-4 h-4 text-negative" />
-                      <span className="text-xs font-bold uppercase text-negative">
-                        Bearish ({cc.bears.length} analyst{cc.bears.length !== 1 ? 's' : ''})
-                      </span>
-                    </div>
-                    <div className="space-y-2.5">
-                      {cc.bears.map((a, i) => (
-                        <div key={i} className="flex items-center justify-between gap-2">
-                          <div className="flex items-center gap-2 min-w-0">
-                            <Link to={`/forecaster/${a.forecaster_id}`} className="text-sm font-medium hover:text-accent transition-colors truncate">
-                              {a.name}
-                            </Link>
-                            {a.firm && <span className="text-[10px] text-muted hidden sm:inline">at {a.firm}</span>}
-                            {a.accuracy > 0 && (
-                              <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded border ${accuracyColor(a.accuracy)}`}>
-                                {a.accuracy.toFixed(1)}%
-                              </span>
-                            )}
-                          </div>
-                          {a.target != null && (
-                            <span className="text-xs font-mono text-text-secondary flex-shrink-0">${a.target.toFixed(0)}</span>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Detailed pending prediction cards */}
-              {['bullish', 'bearish'].map(dir => {
-                const group = pending.filter(p => p.direction === dir);
-                if (group.length === 0) return null;
-                return (
-                  <div key={dir} className="mb-4">
-                    <div className="flex items-center gap-2 mb-2">
-                      {dir === 'bullish'
-                        ? <TrendingUp className="w-3.5 h-3.5 text-positive" />
-                        : <TrendingDown className="w-3.5 h-3.5 text-negative" />}
-                      <span className={`text-xs font-bold uppercase ${dir === 'bullish' ? 'text-positive' : 'text-negative'}`}>
-                        {dir} predictions ({group.length})
-                      </span>
-                    </div>
-                    <div className="space-y-2">
-                      {group.map(p => (
-                        <PredictionItem key={p.id} p={p} />
-                      ))}
-                    </div>
-                  </div>
-                );
-              })}
-            </>
-          ) : (
-            <div className="card text-center py-8">
-              <p className="text-text-secondary">No active predictions for {ticker} right now.</p>
-            </div>
-          )}
-        </div>
 
         {/* ── SECTION 2: HISTORICAL TRACK RECORD ────────────────────────── */}
         {hist.total_evaluated > 0 && (
