@@ -7,6 +7,7 @@ import { getSourceBadgeKey } from '../utils/getSourceBadgeKey';
 import RankBadge from './RankBadge';
 import StreakBadge from './StreakBadge';
 import CompareButton from './CompareButton';
+import FollowButton from './FollowButton';
 
 function getMetricValue(f, metricKey) {
   if (metricKey === 'avg_return') {
@@ -170,25 +171,33 @@ export default function LeaderboardCard({ forecaster: f, metric = 'avg_return', 
         </div>
       )}
 
-      {/* Top sector */}
-      {f.sector_strengths?.[0] && (() => {
-        const s = f.sector_strengths[0];
-        const color = s.accuracy >= 60 ? '#00c896' : s.accuracy >= 30 ? '#e5a100' : '#ef4444';
-        const SHORT = { 'Technology': 'Tech', 'Financial Services': 'Finance', 'Communication Services': 'Comms', 'Consumer Cyclical': 'Consumer', 'Consumer Defensive': 'Consumer Def.', 'Basic Materials': 'Materials', 'Commercial Services & Supplies': 'Commercial Svcs', 'Diversified Consumer Services': 'Consumer Svcs' };
-        const label = SHORT[s.sector] || s.sector;
-        const correct = s.count > 0 ? Math.round(s.accuracy * s.count / 100) : 0;
-        return (
-          <div className="mt-3">
-            <div className="text-[9px] text-muted uppercase tracking-wider mb-1">Top Sector</div>
-            <span className={`inline-block px-2 py-0.5 rounded text-[11px] font-mono font-medium whitespace-nowrap ${onSectorClick ? 'cursor-pointer hover:brightness-125 transition-all' : ''}`}
-              style={{ backgroundColor: `${color}15`, color, border: `1px solid ${color}30` }}
-              title={`${s.sector}: ${correct}/${s.count}${onSectorClick ? ' — tap to filter' : ''}`}
-              onClick={onSectorClick ? (e) => { e.preventDefault(); e.stopPropagation(); onSectorClick(s.sector); } : undefined}>
-              {label}: {correct}/{s.count}
-            </span>
-          </div>
-        );
-      })()}
+      {/* Bottom row — Top Sector on the left, Watch on the right.
+          Watch always anchors right via ml-auto, so the button still
+          appears at bottom-right when this forecaster has no sector
+          strength to display. */}
+      <div className="mt-3 flex items-end gap-2">
+        {f.sector_strengths?.[0] && (() => {
+          const s = f.sector_strengths[0];
+          const color = s.accuracy >= 60 ? '#00c896' : s.accuracy >= 30 ? '#e5a100' : '#ef4444';
+          const SHORT = { 'Technology': 'Tech', 'Financial Services': 'Finance', 'Communication Services': 'Comms', 'Consumer Cyclical': 'Consumer', 'Consumer Defensive': 'Consumer Def.', 'Basic Materials': 'Materials', 'Commercial Services & Supplies': 'Commercial Svcs', 'Diversified Consumer Services': 'Consumer Svcs' };
+          const label = SHORT[s.sector] || s.sector;
+          const correct = s.count > 0 ? Math.round(s.accuracy * s.count / 100) : 0;
+          return (
+            <div>
+              <div className="text-[9px] text-muted uppercase tracking-wider mb-1">Top Sector</div>
+              <span className={`inline-block px-2 py-0.5 rounded text-[11px] font-mono font-medium whitespace-nowrap ${onSectorClick ? 'cursor-pointer hover:brightness-125 transition-all' : ''}`}
+                style={{ backgroundColor: `${color}15`, color, border: `1px solid ${color}30` }}
+                title={`${s.sector}: ${correct}/${s.count}${onSectorClick ? ' — tap to filter' : ''}`}
+                onClick={onSectorClick ? (e) => { e.preventDefault(); e.stopPropagation(); onSectorClick(s.sector); } : undefined}>
+                {label}: {correct}/{s.count}
+              </span>
+            </div>
+          );
+        })()}
+        <div className="ml-auto">
+          <FollowButton forecaster={f} />
+        </div>
+      </div>
     </div>
   );
 }
