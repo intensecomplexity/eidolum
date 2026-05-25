@@ -427,8 +427,8 @@ export function searchTickers(query) {
   return api.get('/tickers/search', { params: { q: query } }).then(r => r.data);
 }
 
-export function universalSearch(query) {
-  return api.get('/search', { params: { q: query }, headers: authHeaders() }).then(r => r.data);
+export function universalSearch(query, { signal } = {}) {
+  return api.get('/search', { params: { q: query }, headers: authHeaders(), signal }).then(r => r.data);
 }
 
 export function getFriendSuggestions() {
