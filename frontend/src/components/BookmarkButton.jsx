@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Bookmark } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
 import { useSavedPredictions } from '../context/SavedPredictionsContext';
 
 export default function BookmarkButton({
@@ -10,38 +11,58 @@ export default function BookmarkButton({
   floating = false,
   className = '',
 }) {
+  const { isAuthenticated } = useAuth();
   const { isSaved, toggleSave } = useSavedPredictions();
   const [animating, setAnimating] = useState(false);
+  const [signInPrompt, setSignInPrompt] = useState(false);
   const saved = isSaved(predictionId);
 
+  // Mirrors FollowButton's pattern: unauthenticated clicks surface a
+  // transient toast and short-circuit before toggleSave. Pre-gating
+  // saves in localStorage still render as "saved" via SavedPredictionsContext
+  // — read-only, mutations gated.
   function handleClick(e) {
     e.preventDefault();
     e.stopPropagation();
+    if (!isAuthenticated) {
+      setSignInPrompt(true);
+      setTimeout(() => setSignInPrompt(false), 3500);
+      return;
+    }
     setAnimating(true);
     toggleSave(predictionId);
     setTimeout(() => setAnimating(false), 300);
   }
 
+  const promptToast = signInPrompt ? (
+    <div className="fixed bottom-[80px] sm:bottom-6 left-1/2 -translate-x-1/2 z-[70] px-4 py-2.5 rounded-xl text-xs font-medium shadow-lg border bg-surface border-border text-text-primary backdrop-blur-sm toast-slide-up">
+      Sign in to save predictions
+    </div>
+  ) : null;
+
   // Floating variant: thumb-sized pill (44x44 on mobile, 36x36 on
   // desktop) used by PredictionCard's top-right placement. Background +
   // border use bare theme tokens (no /opacity modifier) so the
-  // [data-theme="light"] overrides in index.css apply \u2014 the previous
+  // [data-theme="light"] overrides in index.css apply — the previous
   // `bg-surface-2/80` generated `.bg-surface-2\/80`, which the override
   // doesn't match, leaving a dark blob on the cream light theme.
   if (floating) {
     return (
-      <button
-        onClick={handleClick}
-        aria-label={saved ? 'Remove from saved' : 'Save prediction'}
-        title={saved ? 'Saved \u2014 view in My Saves' : 'Save this prediction'}
-        className={`${className} flex items-center justify-center rounded-full w-11 h-11 md:w-9 md:h-9 bg-surface-2 border border-border active:scale-95 transition-transform touch-manipulation ${
-          saved ? 'text-accent' : 'text-muted hover:text-text-secondary'
-        } ${animating ? 'bookmark-pulse' : ''}`}
-      >
-        <Bookmark
-          className={`w-6 h-6 md:w-5 md:h-5 transition-all ${saved ? 'fill-accent' : ''}`}
-        />
-      </button>
+      <>
+        <button
+          onClick={handleClick}
+          aria-label={saved ? 'Remove from saved' : 'Save prediction'}
+          title={saved ? 'Saved — view in My Saves' : 'Save this prediction'}
+          className={`${className} flex items-center justify-center rounded-full w-11 h-11 md:w-9 md:h-9 bg-surface-2 border border-border active:scale-95 transition-transform touch-manipulation ${
+            saved ? 'text-accent' : 'text-muted hover:text-text-secondary'
+          } ${animating ? 'bookmark-pulse' : ''}`}
+        >
+          <Bookmark
+            className={`w-6 h-6 md:w-5 md:h-5 transition-all ${saved ? 'fill-accent' : ''}`}
+          />
+        </button>
+        {promptToast}
+      </>
     );
   }
 
@@ -49,21 +70,24 @@ export default function BookmarkButton({
   const btnSize = size === 'lg' ? 'w-10 h-10' : 'w-8 h-8 sm:w-7 sm:h-7';
 
   return (
-    <button
-      onClick={handleClick}
-      className={`inline-flex items-center justify-center gap-1 rounded-lg transition-all duration-150 min-h-[44px] min-w-[44px] sm:min-h-0 sm:min-w-0 ${btnSize} ${
-        saved
-          ? 'text-accent'
-          : 'text-muted hover:text-text-secondary'
-      } ${animating ? 'bookmark-pulse' : ''}`}
-      title={saved ? 'Saved \u2014 view in My Saves' : 'Save this prediction'}
-    >
-      <Bookmark
-        className={`${iconSize} transition-all ${saved ? 'fill-accent' : ''}`}
-      />
-      {showCount && saveCount !== null && (
-        <span className="text-muted text-[10px] font-mono">{saveCount}</span>
-      )}
-    </button>
+    <>
+      <button
+        onClick={handleClick}
+        className={`inline-flex items-center justify-center gap-1 rounded-lg transition-all duration-150 min-h-[44px] min-w-[44px] sm:min-h-0 sm:min-w-0 ${btnSize} ${
+          saved
+            ? 'text-accent'
+            : 'text-muted hover:text-text-secondary'
+        } ${animating ? 'bookmark-pulse' : ''}`}
+        title={saved ? 'Saved — view in My Saves' : 'Save this prediction'}
+      >
+        <Bookmark
+          className={`${iconSize} transition-all ${saved ? 'fill-accent' : ''}`}
+        />
+        {showCount && saveCount !== null && (
+          <span className="text-muted text-[10px] font-mono">{saveCount}</span>
+        )}
+      </button>
+      {promptToast}
+    </>
   );
 }
