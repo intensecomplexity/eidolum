@@ -49,6 +49,15 @@ function buildTimeTicks(minMs, maxMs) {
     while (m >= 12) { m -= 12; y += 1; }
     cursor = Date.UTC(y, m, 1);
   }
+  // Drop ticks whose label would clip the plot edges. DD/MM/YYYY needs
+  // ~50px of horizontal room; at typical chart widths, 35% of one step
+  // is the minimum clearance that keeps the label fully inside the plot
+  // area. Apply symmetrically on both ends so the rightmost tick gets
+  // the same treatment as the leftmost. Fall back to the unfiltered
+  // list if filtering would leave too few ticks to read the axis.
+  const pad = stepMonths * monthMs * 0.35;
+  const filtered = ticks.filter(t => t - minMs >= pad && maxMs - t >= pad);
+  if (filtered.length >= 2) return filtered;
   return ticks.length >= 2 ? ticks : undefined;
 }
 
