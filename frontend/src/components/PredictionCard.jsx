@@ -382,15 +382,6 @@ function PairCallCard({ prediction: p, forecaster: fc, showForecaster, compact }
         </p>
       )}
 
-      {p.evaluation_summary && (
-        <p className={`text-xs italic leading-relaxed mb-2 ${
-          p.outcome === 'hit' ? 'text-positive/80' :
-          p.outcome === 'near' ? 'text-warning/80' : 'text-negative/80'
-        }`}>
-          {p.evaluation_summary}
-        </p>
-      )}
-
       <div className="flex items-center gap-2 text-[10px] text-muted flex-wrap">
         <SourceBadge verifiedBy={p.verified_by} />
         <LockedDate dateStr={p.prediction_date} />
@@ -516,15 +507,6 @@ function BinaryEventCard({ prediction: p, forecaster: fc, showForecaster, compac
       {!compact && (p.source_verbatim_quote || (p.exact_quote && p.exact_quote !== p.context)) && (
         <p className="text-xs text-text-secondary italic leading-relaxed mb-2 break-words">
           &ldquo;{p.source_verbatim_quote || p.exact_quote}&rdquo;
-        </p>
-      )}
-
-      {p.evaluation_summary && (
-        <p className={`text-xs italic leading-relaxed mb-2 ${
-          p.outcome === 'hit' ? 'text-positive/80' :
-          p.outcome === 'miss' ? 'text-negative/80' : 'text-muted'
-        }`}>
-          {p.evaluation_summary}
         </p>
       )}
 
@@ -698,15 +680,6 @@ function MetricForecastCard({ prediction: p, forecaster: fc, showForecaster, com
       {!compact && (p.source_verbatim_quote || (p.exact_quote && p.exact_quote !== p.context)) && (
         <p className="text-xs text-text-secondary italic leading-relaxed mb-2 break-words">
           &ldquo;{p.source_verbatim_quote || p.exact_quote}&rdquo;
-        </p>
-      )}
-
-      {p.evaluation_summary && (
-        <p className={`text-xs italic leading-relaxed mb-2 ${
-          p.outcome === 'hit' ? 'text-positive/80' :
-          p.outcome === 'near' ? 'text-warning/80' : 'text-negative/80'
-        }`}>
-          {p.evaluation_summary}
         </p>
       )}
 
@@ -914,16 +887,6 @@ export default function PredictionCard({ prediction: p, showForecaster = false, 
           quote). Desktop has `md:hidden` here; ProofLinks below handles
           the desktop source link. */}
       {!compact && <MobileWatchCTA p={p} />}
-
-      {/* Evaluation summary */}
-      {p.evaluation_summary && (
-        <p className={`text-xs italic leading-relaxed mb-2 ${
-          p.outcome === 'hit' || p.outcome === 'correct' ? 'text-positive/80' :
-          p.outcome === 'near' ? 'text-warning/80' : 'text-negative/80'
-        }`}>
-          {p.evaluation_summary}
-        </p>
-      )}
 
       {/* Scoring breakdown (expandable) */}
       <ScoringBreakdown prediction={p} />
