@@ -88,7 +88,7 @@ export default function CommentSection({ predictionId, source = 'user' }) {
                       <Link to={`/profile/${c.user_id}`} className="text-accent font-medium hover:underline">{c.username}</Link>
                       <span className="text-[9px] text-muted">{c.rank}</span>
                       <span className="text-muted">&middot;</span>
-                      <span className="text-muted">{formatDate(c.created_at, { relative: true })}</span>
+                      <span className="text-muted">{formatDate(c.created_at, { relative: true, compact: true })}</span>
                       {c.user_id === uid && (
                         <button onClick={() => handleDelete(c.id)} className="opacity-0 group-hover:opacity-100 text-muted hover:text-negative transition-opacity ml-auto">
                           <Trash2 className="w-3 h-3" />

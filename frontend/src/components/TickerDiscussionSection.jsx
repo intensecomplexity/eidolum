@@ -88,7 +88,7 @@ export default function TickerDiscussionSection({ ticker }) {
             scored={0}
             linkToProfile={false}
           />
-          <span className="text-[10px] text-muted">{formatDate(p.created_at, { relative: true })}</span>
+          <span className="text-[10px] text-muted">{formatDate(p.created_at, { relative: true, compact: true })}</span>
         </div>
         <p className="text-sm text-text-secondary break-words mb-1">{p.text}</p>
         <div className="flex items-center gap-3">
