@@ -300,11 +300,18 @@ function PairCallCard({ prediction: p, forecaster: fc, showForecaster, compact }
     ? Number(p.pair_spread_return)
     : (p.actual_return != null ? Number(p.actual_return) : null);
   return (
-    <div className={`bg-surface border rounded-xl p-4 overflow-hidden ${
+    <div className={`relative bg-surface border rounded-xl p-4 overflow-hidden ${
       isPending ? 'border-warning/30' : 'border-border'
     }`} style={{ wordBreak: 'break-word' }}>
+      {predId && !compact && (
+        <BookmarkButton
+          predictionId={predId}
+          floating
+          className="absolute top-3 right-3 md:top-4 md:right-4 z-10"
+        />
+      )}
       {(showForecaster || fc) && fc && (
-        <div className="flex items-center gap-1.5 mb-2 flex-wrap">
+        <div className="flex items-center gap-1.5 mb-2 flex-wrap pr-12 md:pr-10">
           <PlatformBadge platform={getSourceBadgeKey(p, fc)} size={14} />
           <Link to={`/forecaster/${fc.id}`} className="text-sm font-medium text-text-primary hover:text-accent transition-colors">
             {fc.name}
@@ -322,7 +329,7 @@ function PairCallCard({ prediction: p, forecaster: fc, showForecaster, compact }
       )}
 
       {/* Pair header: Long X / Short Y */}
-      <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
+      <div className="flex items-center justify-between mb-2 flex-wrap gap-2 pr-12 md:pr-10">
         <div className="flex items-center gap-2 flex-wrap min-w-0">
           <span className="text-[10px] uppercase tracking-wider text-positive font-semibold">Long</span>
           <TickerLogo ticker={longT} logoUrl={p.logo_url} size={20} />
@@ -337,7 +344,6 @@ function PairCallCard({ prediction: p, forecaster: fc, showForecaster, compact }
           </Link>
         </div>
         <div className="flex items-center gap-1.5 shrink-0">
-          {predId && !compact && <BookmarkButton predictionId={predId} />}
           {p.outcome && p.outcome !== 'pending' && p.outcome !== 'no_data' && (
             <span className="text-[9px] text-muted italic">The verdict:</span>
           )}
@@ -417,11 +423,18 @@ function BinaryEventCard({ prediction: p, forecaster: fc, showForecaster, compac
   const evType = (p.event_type || 'other').replace(/_/g, ' ');
   const tickerIsSentinel = !p.ticker || /^(event|__event__)/i.test(p.ticker);
   return (
-    <div className={`bg-surface border rounded-xl p-4 overflow-hidden ${
+    <div className={`relative bg-surface border rounded-xl p-4 overflow-hidden ${
       isPending ? 'border-warning/30' : 'border-border'
     }`} style={{ wordBreak: 'break-word' }}>
+      {predId && !compact && (
+        <BookmarkButton
+          predictionId={predId}
+          floating
+          className="absolute top-3 right-3 md:top-4 md:right-4 z-10"
+        />
+      )}
       {(showForecaster || fc) && fc && (
-        <div className="flex items-center gap-1.5 mb-2 flex-wrap">
+        <div className="flex items-center gap-1.5 mb-2 flex-wrap pr-12 md:pr-10">
           <PlatformBadge platform={getSourceBadgeKey(p, fc)} size={14} />
           <Link to={`/forecaster/${fc.id}`} className="text-sm font-medium text-text-primary hover:text-accent transition-colors">
             {fc.name}
@@ -439,7 +452,7 @@ function BinaryEventCard({ prediction: p, forecaster: fc, showForecaster, compac
       )}
 
       {/* Header: ticker (if real) + TYPE tag + outcome badge */}
-      <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
+      <div className="flex items-center justify-between mb-2 flex-wrap gap-2 pr-12 md:pr-10">
         <div className="flex items-center gap-2 flex-wrap min-w-0">
           {!tickerIsSentinel && (
             <>
@@ -457,7 +470,6 @@ function BinaryEventCard({ prediction: p, forecaster: fc, showForecaster, compac
           </span>
         </div>
         <div className="flex items-center gap-1.5 shrink-0">
-          {predId && !compact && <BookmarkButton predictionId={predId} />}
           {isPending ? (
             <span
               className="text-[10px] px-2 py-0.5 rounded-full font-semibold"
@@ -592,11 +604,18 @@ function MetricForecastCard({ prediction: p, forecaster: fc, showForecaster, com
   const errorStr = p.metric_error_pct != null ? `${Number(p.metric_error_pct).toFixed(2)}%` : null;
   const tickerIsSentinel = !p.ticker || /^(macro|__metric__|metric)/i.test(p.ticker);
   return (
-    <div className={`bg-surface border rounded-xl p-4 overflow-hidden ${
+    <div className={`relative bg-surface border rounded-xl p-4 overflow-hidden ${
       isPending ? 'border-warning/30' : 'border-border'
     }`} style={{ wordBreak: 'break-word' }}>
+      {predId && !compact && (
+        <BookmarkButton
+          predictionId={predId}
+          floating
+          className="absolute top-3 right-3 md:top-4 md:right-4 z-10"
+        />
+      )}
       {(showForecaster || fc) && fc && (
-        <div className="flex items-center gap-1.5 mb-2 flex-wrap">
+        <div className="flex items-center gap-1.5 mb-2 flex-wrap pr-12 md:pr-10">
           <PlatformBadge platform={getSourceBadgeKey(p, fc)} size={14} />
           <Link to={`/forecaster/${fc.id}`} className="text-sm font-medium text-text-primary hover:text-accent transition-colors">
             {fc.name}
@@ -614,7 +633,7 @@ function MetricForecastCard({ prediction: p, forecaster: fc, showForecaster, com
       )}
 
       {/* Header: ticker (if real) + METRIC tag + outcome badge */}
-      <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
+      <div className="flex items-center justify-between mb-2 flex-wrap gap-2 pr-12 md:pr-10">
         <div className="flex items-center gap-2 flex-wrap min-w-0">
           {!tickerIsSentinel && (
             <>
@@ -632,7 +651,6 @@ function MetricForecastCard({ prediction: p, forecaster: fc, showForecaster, com
           </span>
         </div>
         <div className="flex items-center gap-1.5 shrink-0">
-          {predId && !compact && <BookmarkButton predictionId={predId} />}
           {p.outcome && p.outcome !== 'pending' && p.outcome !== 'no_data' && (
             <span className="text-[9px] text-muted italic">The verdict:</span>
           )}
@@ -716,6 +734,7 @@ export default function PredictionCard({ prediction: p, showForecaster = false, 
   const windowDays = p.window_days || p.evaluation_window_days;
   const isPending = !p.outcome || p.outcome === 'pending';
   const fc = p.forecaster || forecaster;
+  const isStructuredSource = getSourceBadgeKey(p, fc) === 'institutional';
 
   if ((p.prediction_category || '').toLowerCase() === 'pair_call') {
     return (
@@ -751,13 +770,20 @@ export default function PredictionCard({ prediction: p, showForecaster = false, 
   }
 
   return (
-    <div className={`bg-surface border rounded-xl p-4 overflow-hidden ${
+    <div className={`relative bg-surface border rounded-xl p-4 overflow-hidden ${
       isPending ? 'border-warning/30' : 'border-border'
     }`} style={{ wordBreak: 'break-word' }}>
+      {predId && !compact && (
+        <BookmarkButton
+          predictionId={predId}
+          floating
+          className="absolute top-3 right-3 md:top-4 md:right-4 z-10"
+        />
+      )}
 
       {/* Line 1: Forecaster + credibility badge + firm */}
       {(showForecaster || fc) && fc && (
-        <div className="flex items-center gap-1.5 mb-2 flex-wrap">
+        <div className="flex items-center gap-1.5 mb-2 flex-wrap pr-12 md:pr-10">
           <PlatformBadge platform={getSourceBadgeKey(p, fc)} size={14} />
           <Link to={`/forecaster/${fc.id}`} className="text-sm font-medium text-text-primary hover:text-accent transition-colors">
             {fc.name}
@@ -775,7 +801,7 @@ export default function PredictionCard({ prediction: p, showForecaster = false, 
       )}
 
       {/* Line 2: Ticker + company name + direction + score badge */}
-      <div className="flex items-center justify-between mb-2">
+      <div className="flex items-center justify-between mb-2 pr-12 md:pr-10">
         <div className="flex items-center gap-2 flex-wrap min-w-0">
           <TickerLogo ticker={p.ticker} logoUrl={p.logo_url} size={20} />
           <Link to={`/asset/${p.ticker}`} className="font-mono text-accent text-base font-bold hover:underline shrink-0">
@@ -788,7 +814,6 @@ export default function PredictionCard({ prediction: p, showForecaster = false, 
           {p.has_conflict && <ConflictBadge note={p.conflict_note} size="small" />}
         </div>
         <div className="flex items-center gap-1.5 shrink-0">
-          {predId && !compact && <BookmarkButton predictionId={predId} />}
           {p.outcome && p.outcome !== 'pending' && p.outcome !== 'no_data' && (
             <span className="text-[9px] text-muted italic">The verdict:</span>
           )}
