@@ -106,7 +106,8 @@ export default function PortfolioSimulator({ forecasterId, forecasterName }) {
         const ts = parseISODateUTC(p.date);
         return ts != null ? { ...p, ts } : null;
       })
-      .filter(Boolean);
+      .filter(Boolean)
+      .sort((a, b) => a.ts - b.ts);
   }, [data]);
 
   const xAxisTicks = useMemo(() => {
