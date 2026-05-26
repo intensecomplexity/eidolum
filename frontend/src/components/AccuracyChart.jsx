@@ -70,9 +70,9 @@ export default function AccuracyChart({ data = [], onMonthClick }) {
             <Line type="monotone" dataKey="cumulative_accuracy" stroke="#D4A843" strokeWidth={2} dot={{ r: 2.5, fill: '#D4A843', stroke: '#0e1212', strokeWidth: 1.5 }} activeDot={{ r: 5 }} />
           </LineChart>
         </ResponsiveContainer>
-        <div className="text-center text-muted text-[10px] mt-1 font-mono">
-          Based on {data[data.length - 1]?.total || 0} scored predictions
-        </div>
+        <p className="text-[10px] italic text-muted/70 text-center mt-1 px-2">
+          Hit rate (vertical) as predictions accumulate (horizontal).
+        </p>
       </div>
     );
   }

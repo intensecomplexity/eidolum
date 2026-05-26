@@ -726,9 +726,9 @@ export default function ForecasterProfile() {
                     />
                   </AreaChart>
                 </ResponsiveContainer>
-                <div className="text-center text-muted text-[10px] mt-1 font-mono">
-                  Based on {chartData[chartData.length - 1]?.total || 0} scored predictions{activeSector !== 'All' ? ` in ${activeSector}` : ''}
-                </div>
+                <p className="text-[10px] italic text-muted/70 text-center mt-1 px-2">
+                  Hit rate (vertical) as predictions accumulate (horizontal).
+                </p>
               </>
             ) : (
               <div className="text-center py-8">
