@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { ChevronDown } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 import { getForecasterSimulator } from '../api';
+import { formatDate } from '../utils/formatDate';
 
 // "YYYY-MM-DD" → UTC midnight epoch ms. Used to feed Recharts a numeric
 // X-axis so ticks can land at evenly-spaced calendar positions rather
@@ -14,12 +15,12 @@ function parseISODateUTC(s) {
   return Date.UTC(y, m - 1, d);
 }
 
-function formatDDMMYYYY(ms) {
-  if (ms == null || !isFinite(ms)) return '';
+// UTC ms → a local-time Date carrying the same calendar day. formatDate
+// reads via local-time getters; without this, viewers west of UTC see
+// the previous day on dates parsed via parseISODateUTC.
+function utcMsToLocalDate(ms) {
   const d = new Date(ms);
-  const dd = String(d.getUTCDate()).padStart(2, '0');
-  const mm = String(d.getUTCMonth() + 1).padStart(2, '0');
-  return `${dd}/${mm}/${d.getUTCFullYear()}`;
+  return new Date(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
 }
 
 // Pick a month-step that yields ~5-8 ticks across the span, then walk
@@ -49,12 +50,10 @@ function buildTimeTicks(minMs, maxMs) {
     while (m >= 12) { m -= 12; y += 1; }
     cursor = Date.UTC(y, m, 1);
   }
-  // Drop ticks whose label would clip the plot edges. DD/MM/YYYY needs
-  // ~50px of horizontal room; at typical chart widths, 35% of one step
-  // is the minimum clearance that keeps the label fully inside the plot
-  // area. Apply symmetrically on both ends so the rightmost tick gets
-  // the same treatment as the leftmost. Fall back to the unfiltered
-  // list if filtering would leave too few ticks to read the axis.
+  // Drop ticks whose label would clip the plot edges. Apply symmetrically
+  // on both ends so the rightmost tick gets the same treatment as the
+  // leftmost. Fall back to the unfiltered list if filtering would leave
+  // too few ticks to read the axis.
   const pad = stepMonths * monthMs * 0.35;
   const filtered = ticks.filter(t => t - minMs >= pad && maxMs - t >= pad);
   if (filtered.length >= 2) return filtered;
@@ -64,7 +63,7 @@ function buildTimeTicks(minMs, maxMs) {
 function SimTooltip({ active, payload }) {
   if (!active || !payload?.length) return null;
   const d = payload[0].payload;
-  const dateLabel = d.ts != null ? formatDDMMYYYY(d.ts) : d.date;
+  const dateLabel = d.ts != null ? formatDate(utcMsToLocalDate(d.ts)) : formatDate(d.date);
   return (
     <div className="bg-surface border border-border rounded-lg px-3 py-2 text-xs shadow-lg">
       <div className="text-muted mb-0.5">{dateLabel}</div>
@@ -115,6 +114,17 @@ export default function PortfolioSimulator({ forecasterId, forecasterName }) {
     const min = sourceTimeline[0].ts;
     const max = sourceTimeline[sourceTimeline.length - 1].ts;
     return buildTimeTicks(min, max);
+  }, [sourceTimeline]);
+
+  // When the whole simulation lives inside one calendar year, drop the
+  // year suffix on the X-axis to avoid clutter — "May 21" beats
+  // "May 21, 2026" when every tick shares the same year. Cross-year sims
+  // keep the year so the boundary is unambiguous.
+  const allSameYear = useMemo(() => {
+    if (sourceTimeline.length < 2) return true;
+    const minYear = new Date(sourceTimeline[0].ts).getUTCFullYear();
+    const maxYear = new Date(sourceTimeline[sourceTimeline.length - 1].ts).getUTCFullYear();
+    return minYear === maxYear;
   }, [sourceTimeline]);
 
   if (loading) return (
@@ -197,19 +207,14 @@ export default function PortfolioSimulator({ forecasterId, forecasterName }) {
             <span className={`font-mono text-sm font-bold ${isPositive ? 'text-positive' : 'text-negative'}`}>{isPositive ? '+' : ''}{total_return_pct}%</span>
           )}
         </div>
-        {alpha !== 0 && (
-          <p className="text-xs text-muted mt-1">
-            Alpha vs S&P 500: <span className={`font-mono font-semibold ${alpha >= 0 ? 'text-positive' : 'text-negative'}`}>{alpha >= 0 ? '+' : ''}{alpha}%</span>
-          </p>
-        )}
-        {time_period && <p className="text-[10px] text-muted mt-0.5">{time_period}</p>}
+        {time_period && <p className="text-[10px] text-muted mt-1">{time_period}</p>}
       </div>
 
       {/* Chart */}
       {timeline.length > 0 && (
         <div className="mb-4 w-full" style={{ minHeight: 180 }}>
           <ResponsiveContainer width="100%" height={180} minWidth={0}>
-            <AreaChart data={timeline} margin={{ top: 5, right: 5, bottom: 5, left: -15 }}>
+            <AreaChart data={timeline} margin={{ top: 5, right: 20, bottom: 5, left: -15 }}>
               <defs>
                 <linearGradient id="simGrad" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="5%" stopColor="#D4A843" stopOpacity={0.2} />
@@ -222,11 +227,15 @@ export default function PortfolioSimulator({ forecasterId, forecasterName }) {
                 type="number"
                 domain={['dataMin', 'dataMax']}
                 ticks={xAxisTicks}
-                tickFormatter={formatDDMMYYYY}
+                tickFormatter={(ms) => {
+                  if (ms == null || !isFinite(ms)) return '';
+                  return formatDate(utcMsToLocalDate(ms), { includeYear: !allSameYear });
+                }}
                 tick={{ fill: '#8b8f9a', fontSize: 10 }}
                 axisLine={{ stroke: '#1e2028' }}
                 tickLine={false}
                 interval={0}
+                padding={{ left: 0, right: 30 }}
               />
               <YAxis
                 tick={{ fill: '#8b8f9a', fontSize: 10 }}
