@@ -54,7 +54,13 @@ export default function FollowButton({ forecaster, compact = false }) {
       } else {
         await subscribe(forecaster.name);
       }
-    } catch {
+    } catch (err) {
+      // Cap-reached errors are surfaced as a modal by the context; do
+      // not pretend the follow succeeded by writing the legacy
+      // localStorage marker.
+      if (err && err.limitReached) {
+        return;
+      }
       // Optimistic update inside the context already rolled back.
       // Fall through to localStorage for graceful degradation if the
       // server was unreachable — matches the pre-context fallback

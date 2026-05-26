@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useState, useCallback, useMemo } from 'react';
 import { useAuth } from './AuthContext';
+import { useLimitReached, getLimitReachedMessage } from './LimitReachedContext';
 import { getMyAnalystSubscriptions, subscribeAnalyst, unsubscribeAnalyst } from '../api';
 
 /**
@@ -30,6 +31,7 @@ const SubscriptionsContext = createContext({
 
 export function SubscriptionsProvider({ children }) {
   const { isAuthenticated } = useAuth();
+  const { show: showLimitReached } = useLimitReached();
   const [followingSet, setFollowingSet] = useState(() => new Set());
   const [isLoading, setIsLoading] = useState(false);
 
@@ -88,9 +90,16 @@ export function SubscriptionsProvider({ children }) {
         next.delete(key);
         return next;
       });
+      const limitMsg = getLimitReachedMessage(err);
+      if (limitMsg) {
+        showLimitReached(limitMsg);
+        // Tag so FollowButton's catch can skip the localStorage
+        // fallback — the user did NOT successfully follow.
+        err.limitReached = true;
+      }
       throw err;
     }
-  }, []);
+  }, [showLimitReached]);
 
   const unsubscribe = useCallback(async (name) => {
     if (!name) return;
