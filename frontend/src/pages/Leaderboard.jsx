@@ -130,7 +130,13 @@ export default function Leaderboard() {
   };
   const [timeframe, setTimeframe] = useState(() => searchParams.get('timeframe') || 'all');
   const [source, setSource] = useState(() => searchParams.get('source') || 'all');
-  const [minPreds, setMinPreds] = useState(() => Number(searchParams.get('min_preds')) || 10);
+  const [minPreds, setMinPreds] = useState(() => {
+    // 250+/500+ removed from the dropdown; fall back to 10 if the URL
+    // still carries an old min_preds so the select stays in sync.
+    const allowed = [10, 25, 50, 100];
+    const fromUrl = Number(searchParams.get('min_preds'));
+    return allowed.includes(fromUrl) ? fromUrl : 10;
+  });
   // Toggle button removed; URL ?dormant=true bookmarks still honored as a read.
   const [showDormant] = useState(() => searchParams.get('dormant') === 'true');
   const [availableTf, setAvailableTf] = useState({ all: true, short: true, medium: true, long: true });
@@ -325,7 +331,7 @@ export default function Leaderboard() {
                     onChange={(e) => setMinPreds(Number(e.target.value))}
                     className="appearance-none bg-surface border border-border rounded-lg px-3 py-1.5 pr-8 text-sm text-text-primary focus:outline-none focus:border-accent/50 cursor-pointer"
                   >
-                    {[10, 25, 50, 100, 250, 500].map(n => (
+                    {[10, 25, 50, 100].map(n => (
                       <option key={n} value={n}>{n}+ calls</option>
                     ))}
                   </select>
