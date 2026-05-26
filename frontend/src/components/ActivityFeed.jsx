@@ -2,17 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Activity, ExternalLink, TrendingUp, TrendingDown } from 'lucide-react';
 import { getTodayPredictions } from '../api';
-
-function timeAgo(ts) {
-  const diff = Date.now() - new Date(ts).getTime();
-  const mins = Math.floor(diff / 60000);
-  if (mins < 1) return 'just now';
-  if (mins < 60) return `${mins}m ago`;
-  const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `${hrs}h ago`;
-  const days = Math.floor(hrs / 24);
-  return `${days}d ago`;
-}
+import { formatDate } from '../utils/formatDate';
 
 export default function ActivityFeed() {
   const [predictions, setPredictions] = useState([]);
@@ -101,7 +91,7 @@ export default function ActivityFeed() {
                   </p>
                   <div className="flex items-center gap-3 mt-1">
                     <span className="text-muted text-xs font-mono">
-                      {p.prediction_date ? timeAgo(p.prediction_date) : ''}
+                      {formatDate(p.prediction_date, { relative: true })}
                     </span>
                     {p.source_url && (
                       <a href={p.source_url} target="_blank" rel="noopener noreferrer"

@@ -30,17 +30,6 @@ import formatRoundNumber from '../utils/formatNumber';
 import timeLeft from '../utils/timeLeft';
 import { formatDate } from '../utils/formatDate';
 
-// ── Time ago helper ─────────────────────────────────────────────────────────
-function timeAgo(dateStr) {
-  if (!dateStr) return '';
-  const diff = Date.now() - new Date(dateStr).getTime();
-  const hours = Math.floor(diff / 3600000);
-  if (hours < 1) return 'just now';
-  if (hours < 24) return `${hours}h ago`;
-  const days = Math.floor(hours / 24);
-  return `${days}d ago`;
-}
-
 export default function Dashboard() {
   const { user } = useAuth();
   const uid = user?.id || user?.user_id;
@@ -438,7 +427,7 @@ export default function Dashboard() {
               <span className="text-xs text-text-secondary">{p.username}</span>
               <span className="font-mono text-xs text-muted">{p.price_target}</span>
             </div>
-            <span className="text-muted text-[10px] font-mono">{timeAgo(p.created_at)}</span>
+            <span className="text-muted text-[10px] font-mono">{formatDate(p.created_at, { relative: true })}</span>
           </div>
         ))}
       </div>

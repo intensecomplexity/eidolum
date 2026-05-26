@@ -31,15 +31,6 @@ const TABS = [
   { key: 'disclosures', label: 'Disclosures' },
 ];
 
-function timeAgo(dateStr) {
-  if (!dateStr) return '';
-  const diff = (Date.now() - new Date(dateStr).getTime()) / 1000;
-  if (diff < 60) return 'just now';
-  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
-  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
-  return `${Math.floor(diff / 86400)}d ago`;
-}
-
 function borderColor(item) {
   if (item.type === 'prediction') return 'border-l-amber-400';
   if (item.type === 'scored') {
@@ -129,7 +120,7 @@ function PredictionCard({ item }) {
             <span className="text-[10px] font-mono text-muted">{item.accuracy}%</span>
           )}
         </div>
-        <span className="text-[10px] text-muted flex-shrink-0">{timeAgo(item.prediction_date || item.created_at)}</span>
+        <span className="text-[10px] text-muted flex-shrink-0">{formatDate(item.prediction_date || item.created_at, { relative: true })}</span>
       </div>
       <div className="flex items-center gap-2 mt-1.5">
         <DirectionBadge direction={item.direction} />
@@ -156,7 +147,7 @@ function ScoredCard({ item }) {
           <span className="text-muted text-xs">on</span>
           <TickerLink ticker={item.ticker} className="text-sm" />
         </div>
-        <span className="text-[10px] text-muted flex-shrink-0">{timeAgo(item.scored_at || item.evaluation_date)}</span>
+        <span className="text-[10px] text-muted flex-shrink-0">{formatDate(item.scored_at || item.evaluation_date, { relative: true })}</span>
       </div>
       <div className="flex items-center gap-2 mt-1.5">
         <OutcomeBadge outcome={item.outcome} actualReturn={item.actual_return} evaluationDeferred={item.evaluation_deferred} evaluationDeferredReason={item.evaluation_deferred_reason} />
@@ -204,7 +195,7 @@ function FriendCard({ item }) {
             @{item.username}
           </Link>
         </div>
-        <span className="text-[10px] text-muted flex-shrink-0">{timeAgo(item.created_at)}</span>
+        <span className="text-[10px] text-muted flex-shrink-0">{formatDate(item.created_at, { relative: true })}</span>
       </div>
       <div className="flex items-center gap-2 mt-1.5">
         {item.evaluation_deferred ? (

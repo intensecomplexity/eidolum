@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { MessageCircle, Send, Trash2 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { getComments, postComment, deleteComment, getCommentCount } from '../api';
+import { formatDate } from '../utils/formatDate';
 
 /**
  * Props:
@@ -62,14 +63,6 @@ export default function CommentSection({ predictionId, source = 'user' }) {
 
   const uid = user?.id || user?.user_id;
 
-  function timeAgo(dateStr) {
-    const diff = (Date.now() - new Date(dateStr).getTime()) / 1000;
-    if (diff < 60) return 'now';
-    if (diff < 3600) return `${Math.floor(diff / 60)}m`;
-    if (diff < 86400) return `${Math.floor(diff / 3600)}h`;
-    return `${Math.floor(diff / 86400)}d`;
-  }
-
   return (
     // Hidden on mobile per launch UX (2026-05-25): the speech-bubble
     // toggle below "Locked …" cluttered the card without earning the
@@ -95,7 +88,7 @@ export default function CommentSection({ predictionId, source = 'user' }) {
                       <Link to={`/profile/${c.user_id}`} className="text-accent font-medium hover:underline">{c.username}</Link>
                       <span className="text-[9px] text-muted">{c.rank}</span>
                       <span className="text-muted">&middot;</span>
-                      <span className="text-muted">{timeAgo(c.created_at)}</span>
+                      <span className="text-muted">{formatDate(c.created_at, { relative: true })}</span>
                       {c.user_id === uid && (
                         <button onClick={() => handleDelete(c.id)} className="opacity-0 group-hover:opacity-100 text-muted hover:text-negative transition-opacity ml-auto">
                           <Trash2 className="w-3 h-3" />

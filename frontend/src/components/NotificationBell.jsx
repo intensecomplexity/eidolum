@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Bell, Check, X, Trophy, Swords, UserPlus, Flame, Calendar, CheckCircle } from 'lucide-react';
 import { getNotifications, markNotificationRead, markAllNotificationsRead } from '../api';
 import { useAuth } from '../context/AuthContext';
+import { formatDate } from '../utils/formatDate';
 
 const TYPE_CONFIG = {
   prediction_scored: { icon: CheckCircle, color: 'text-positive', nav: '/my-calls' },
@@ -94,14 +95,6 @@ export default function NotificationBell() {
     setUnreadCount(0);
   }
 
-  function timeAgo(dateStr) {
-    const diff = (Date.now() - new Date(dateStr).getTime()) / 1000;
-    if (diff < 60) return 'now';
-    if (diff < 3600) return `${Math.floor(diff / 60)}m`;
-    if (diff < 86400) return `${Math.floor(diff / 3600)}h`;
-    return `${Math.floor(diff / 86400)}d`;
-  }
-
   if (!isAuthenticated) return null;
 
   return (
@@ -156,7 +149,7 @@ export default function NotificationBell() {
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between gap-2">
                           <span className={`text-xs font-medium truncate ${!n.read ? 'text-text-primary' : 'text-text-secondary'}`}>{n.title}</span>
-                          <span className="text-[10px] text-muted flex-shrink-0">{timeAgo(n.created_at)}</span>
+                          <span className="text-[10px] text-muted flex-shrink-0">{formatDate(n.created_at, { relative: true })}</span>
                         </div>
                         <p className="text-[11px] text-muted mt-0.5 line-clamp-2">{n.message}</p>
                       </div>

@@ -16,17 +16,6 @@ import { InlinePlayer, extractYouTubeVideoId } from './EvidenceCard';
 
 const API_BASE = 'https://eidolum-production.up.railway.app';
 
-function timeAgo(dateStr) {
-  if (!dateStr) return '';
-  const diff = Date.now() - new Date(dateStr).getTime();
-  const hours = Math.floor(diff / 3600000);
-  if (hours < 1) return 'just now';
-  if (hours < 24) return `${hours}h ago`;
-  const days = Math.floor(hours / 24);
-  if (days < 30) return `${days}d ago`;
-  return `${Math.floor(days / 30)}mo ago`;
-}
-
 function getDomainLabel(url) {
   if (!url) return null;
   if (url.includes('benzinga.com')) return 'Benzinga';
@@ -865,7 +854,7 @@ export default function PredictionCard({ prediction: p, showForecaster = false, 
           <>
             <span className="text-muted">|</span>
             <span className="text-muted">
-              {isPending ? `Evaluates ${timeAgo(evalDate) || formatDate(evalDate)}` : `Scored ${timeAgo(evalDate) || formatDate(evalDate)}`}
+              {isPending ? `Evaluates ${formatDate(evalDate, { relative: true })}` : `Scored ${formatDate(evalDate, { relative: true })}`}
             </span>
           </>
         )}
