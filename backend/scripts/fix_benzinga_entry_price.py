@@ -31,8 +31,15 @@ Notes:
   - Outcome (hit/near/miss) is intentionally left alone. The
     historical_evaluator's next pass will reconcile if the corrected
     return implies a different verdict. Surgical fix, minimal blast.
-  - Uses Tiingo as the price source (no daily cap on this account)
-    with a 24h-block-on-429 mirror of historical_evaluator._try_tiingo.
+  - Price-source cascade per ticker: Tiingo (~3y window) → FMP
+    /stable/historical-price-eod/full (~30y window, catches delisted) →
+    yfinance period='max' (local-only fallback). First non-empty wins
+    and is cached. Each source has its own 429 backoff.
+
+LANDMINE — yfinance fallback works ONLY when this script runs on a
+local machine. Yahoo blocks Railway egress IPs
+(see reference_eidolum_yfinance_blocked memory). Do not invoke this
+script from any Railway service. FMP + Tiingo are safe everywhere.
 """
 import os
 import sys
@@ -50,17 +57,18 @@ from database import BgSessionLocal
 
 DEVIATION_THRESHOLD = 0.02  # 2% — same as historical_evaluator Bug 8
 TIINGO_KEY = os.getenv("TIINGO_API_KEY", "").strip()
+FMP_KEY = os.getenv("FMP_KEY", "").strip()
 SCORED_BATCH_SIZE = int(os.getenv("BENZINGA_FIX_BATCH", "5000"))
 
 _history_cache: dict[str, dict] = {}
+_source_hits = {"tiingo": 0, "fmp": 0, "yfinance": 0, "none": 0}
 _tiingo_blocked_until: datetime | None = None
+_fmp_blocked_until: datetime | None = None
 
 
-def _fetch_tiingo_history(ticker: str) -> dict:
-    """Daily close history for the past ~3 years. {date_str: close}."""
+def _try_tiingo(ticker: str) -> dict:
+    """Tiingo daily close history (~3y window). {} on failure or 429."""
     global _tiingo_blocked_until
-    if ticker in _history_cache:
-        return _history_cache[ticker]
     if not TIINGO_KEY:
         return {}
     if _tiingo_blocked_until and datetime.utcnow() < _tiingo_blocked_until:
@@ -81,8 +89,6 @@ def _fetch_tiingo_history(ticker: str) -> dict:
             print(f"[benzinga-fix] Tiingo 429 — backing off 24h. body={r.text[:200]}", flush=True)
             return {}
         if r.status_code != 200:
-            print(f"[benzinga-fix] Tiingo {r.status_code} for {ticker}. body={r.text[:200]}", flush=True)
-            _history_cache[ticker] = {}
             return {}
         data = r.json()
         prices: dict[str, float] = {}
@@ -92,12 +98,97 @@ def _fetch_tiingo_history(ticker: str) -> dict:
                 close = day.get("close")
                 if ds and close and float(close) > 0:
                     prices[ds] = float(close)
-        _history_cache[ticker] = prices
         return prices
     except Exception as e:
         print(f"[benzinga-fix] Tiingo exception for {ticker}: {e}", flush=True)
-        _history_cache[ticker] = {}
         return {}
+
+
+def _try_fmp(ticker: str) -> dict:
+    """FMP /stable/historical-price-eod/full — 30y window, catches
+    delisted tickers Tiingo doesn't cover. Mirrors the legacy-endpoint
+    fix from historical_evaluator._try_fmp."""
+    global _fmp_blocked_until
+    if not FMP_KEY:
+        return {}
+    if _fmp_blocked_until and datetime.utcnow() < _fmp_blocked_until:
+        return {}
+    try:
+        from_date = (datetime.utcnow() - timedelta(days=365 * 30)).strftime("%Y-%m-%d")
+        to_date = datetime.utcnow().strftime("%Y-%m-%d")
+        r = httpx.get(
+            "https://financialmodelingprep.com/stable/historical-price-eod/full",
+            params={"symbol": ticker, "from": from_date, "to": to_date, "apikey": FMP_KEY},
+            timeout=20,
+        )
+        if r.status_code == 429:
+            _fmp_blocked_until = datetime.utcnow() + timedelta(hours=1)
+            print(f"[benzinga-fix] FMP 429 — backing off 1h. body={r.text[:200]}", flush=True)
+            return {}
+        if r.status_code != 200:
+            return {}
+        data = r.json()
+        historical = data.get("historical", data) if isinstance(data, dict) else data
+        prices: dict[str, float] = {}
+        if isinstance(historical, list):
+            for day in historical:
+                if not isinstance(day, dict):
+                    continue
+                ds = (day.get("date") or "")[:10]
+                close = day.get("close") or day.get("adjClose")
+                if ds and close:
+                    try:
+                        val = float(close)
+                        if val > 0:
+                            prices[ds] = val
+                    except (ValueError, TypeError):
+                        pass
+        return prices
+    except Exception as e:
+        print(f"[benzinga-fix] FMP exception for {ticker}: {e}", flush=True)
+        return {}
+
+
+def _try_yfinance(ticker: str) -> dict:
+    """yfinance period='max' — LOCAL ONLY. Yahoo blocks Railway egress.
+    Returns {} on any exception; never crashes the run."""
+    try:
+        import yfinance as yf
+    except ImportError:
+        return {}
+    try:
+        hist = yf.Ticker(ticker).history(period="max", auto_adjust=False)
+        if hist is None or hist.empty:
+            return {}
+        prices: dict[str, float] = {}
+        for ts, close in zip(hist.index, hist["Close"]):
+            try:
+                cv = float(close)
+            except (ValueError, TypeError):
+                continue
+            if cv > 0:
+                prices[ts.strftime("%Y-%m-%d")] = cv
+        return prices
+    except Exception as e:
+        print(f"[benzinga-fix] yfinance exception for {ticker}: {e}", flush=True)
+        return {}
+
+
+def _fetch_price_history(ticker: str) -> dict:
+    """Cascade: Tiingo → FMP → yfinance. First non-empty wins; cached
+    per ticker (including empty after all sources fail, so we don't
+    retry the same dead ticker on every prediction row)."""
+    if ticker in _history_cache:
+        return _history_cache[ticker]
+    for src, fn in (("tiingo", _try_tiingo), ("fmp", _try_fmp), ("yfinance", _try_yfinance)):
+        prices = fn(ticker)
+        if prices:
+            _history_cache[ticker] = prices
+            _source_hits[src] += 1
+            return prices
+    _history_cache[ticker] = {}
+    _source_hits["none"] += 1
+    return {}
 
 
 def _closest_close(prices: dict, target_date) -> float | None:
@@ -180,7 +271,7 @@ def phase_b_restamp_scored(db, commit: bool) -> dict:
         ticker = r.ticker
         if not ticker:
             continue
-        prices = _fetch_tiingo_history(ticker)
+        prices = _fetch_price_history(ticker)
         if not prices:
             skipped_no_history += 1
             continue
@@ -218,6 +309,10 @@ def phase_b_restamp_scored(db, commit: bool) -> dict:
     print(f"  skipped (no history)      : {skipped_no_history:,}")
     print(f"  skipped (no close in range): {skipped_no_close:,}")
     print(f"  distinct tickers fetched  : {len(_history_cache):,}")
+    print(f"  source hits — tiingo={_source_hits['tiingo']} "
+          f"fmp={_source_hits['fmp']} "
+          f"yfinance={_source_hits['yfinance']} "
+          f"none={_source_hits['none']}")
 
     if proposed:
         old_rets = [p["old_return"] for p in proposed if p["old_return"] is not None]
