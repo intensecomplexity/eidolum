@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { ChevronDown } from 'lucide-react';
-import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, ReferenceLine } from 'recharts';
+import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 import { getForecasterSimulator } from '../api';
 
 // "YYYY-MM-DD" → UTC midnight epoch ms. Used to feed Recharts a numeric
@@ -226,7 +226,6 @@ export default function PortfolioSimulator({ forecasterId, forecasterName }) {
                 width={60}
               />
               <Tooltip content={<SimTooltip />} cursor={{ stroke: 'rgba(255,255,255,0.1)' }} />
-              <ReferenceLine y={customCapital} stroke="#8b8f9a" strokeDasharray="3 3" strokeWidth={1} />
               <Area
                 type="monotone"
                 dataKey="value"
