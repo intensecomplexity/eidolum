@@ -461,18 +461,6 @@ export default function ForecasterProfile() {
             </div>
           </div>
 
-          {/* Header band footer — trimmed to a single "Since YYYY" line.
-              Predictions count duplicated the Scored Predictions tile,
-              sector count duplicated the tabs strip below, and the full
-              methodology disclaimer moved to a page-bottom footer so the
-              prime header row isn't competing with legal copy. Omitted
-              entirely when the first-prediction date is unknown — no
-              "Since undefined" placeholder. */}
-          {data.first_prediction_date && (
-            <p className="text-muted text-xs mt-3">
-              Since {formatDate(data.first_prediction_date)}
-            </p>
-          )}
         </div>
 
         {/* Ranked Lists section — rendered only when this forecaster has
