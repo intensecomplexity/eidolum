@@ -8,6 +8,7 @@ from models import SavedPrediction, Prediction, Forecaster
 from utils import append_youtube_timestamp
 from rate_limit import limiter
 from services.ticker_display import resolve_ticker_display_sector
+from services.limits import MAX_SAVED_PREDICTIONS_PER_USER, SAVED_LIMIT_MESSAGE
 
 router = APIRouter()
 
@@ -95,6 +96,22 @@ def save_prediction(
     )
     if existing:
         return {"status": "already_saved", "id": existing.id}
+
+    current_count = (
+        db.query(SavedPrediction)
+        .filter(SavedPrediction.user_identifier == user_id)
+        .count()
+    )
+    if current_count >= MAX_SAVED_PREDICTIONS_PER_USER:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "code": "limit_reached",
+                "kind": "saved",
+                "limit": MAX_SAVED_PREDICTIONS_PER_USER,
+                "message": SAVED_LIMIT_MESSAGE,
+            },
+        )
 
     save = SavedPrediction(
         user_identifier=user_id,
