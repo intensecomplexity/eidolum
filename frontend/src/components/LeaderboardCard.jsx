@@ -42,6 +42,12 @@ export default function LeaderboardCard({ forecaster: f, metric = 'avg_return', 
   const dirTotal = bullish + bearish + neutral;
   const p = (n, t) => t > 0 ? Math.round(n / t * 100) : 0;
 
+  // Wall St / institutional rows store the handle as the name with
+  // spaces stripped — pure noise to render under the name. Suppress
+  // the handle fallback there; keep it for YouTube / X / Reddit etc.
+  // where the handle is the actual platform handle.
+  const isInstitutional = getSourceBadgeKey(f) === 'institutional';
+
   return (
     <div className="bg-surface border border-border rounded-xl p-4 transition-colors">
       <div>
@@ -58,9 +64,9 @@ export default function LeaderboardCard({ forecaster: f, metric = 'avg_return', 
               </div>
               {f.firm ? (
                 <div className="text-muted text-xs">{f.firm}</div>
-              ) : (
+              ) : (!isInstitutional && f.handle && (
                 <div className="text-muted text-xs font-mono">{f.handle}</div>
-              )}
+              ))}
             </div>
           </div>
           <div className="flex items-center gap-1 shrink-0">
