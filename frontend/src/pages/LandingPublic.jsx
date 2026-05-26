@@ -9,6 +9,7 @@ import { getSourceBadgeKey } from '../utils/getSourceBadgeKey';
 import Footer from '../components/Footer';
 import TickerLogo from '../components/TickerLogo';
 import { getHomepageData } from '../api';
+import { formatDate } from '../utils/formatDate';
 
 function DirectionBadge({ direction }) {
   if (direction === 'bullish') return <span title="Expects the stock price to go up" className="text-[10px] font-bold uppercase px-1.5 py-0.5 rounded text-positive bg-positive/10">BULL</span>;
@@ -159,7 +160,7 @@ export default function LandingPublic() {
                   <span>Target ${featured.target_price.toFixed(2)}</span>
                 )}
                 {featured.evaluation_date && (
-                  <span className="text-muted">Scored {new Date(featured.evaluation_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
+                  <span className="text-muted">Scored {formatDate(featured.evaluation_date)}</span>
                 )}
               </div>
             )}
@@ -167,7 +168,7 @@ export default function LandingPublic() {
               <PlatformBadge platform={getSourceBadgeKey(featured)} size={12} showLabel />
               {featured.prediction_date && (
                 <span className="inline-flex items-center gap-1 text-[10px]" style={{ color: 'var(--color-text-tertiary)' }}>
-                  <Lock size={10} /> Locked {new Date(featured.prediction_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                  <Lock size={10} /> Locked {formatDate(featured.prediction_date)}
                 </span>
               )}
             </div>

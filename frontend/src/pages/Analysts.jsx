@@ -5,6 +5,7 @@ import { Search, Shield } from 'lucide-react';
 import TypeBadge from '../components/TypeBadge';
 import Footer from '../components/Footer';
 import { getAnalysts } from '../api';
+import { formatDate } from '../utils/formatDate';
 
 const SORTS = [
   { key: 'volume', label: 'Most Predictions' },
@@ -81,7 +82,7 @@ export default function Analysts() {
                   </div>
                 </div>
                 {a.most_recent && (
-                  <div className="text-[10px] text-muted mt-2">Last call: {new Date(a.most_recent).toLocaleDateString()}</div>
+                  <div className="text-[10px] text-muted mt-2">Last call: {formatDate(a.most_recent, { relative: true })}</div>
                 )}
               </Link>
             ))}

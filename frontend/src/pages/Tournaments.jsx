@@ -6,6 +6,7 @@ import { useAuth } from '../context/AuthContext';
 import TickerSearch from '../components/TickerSearch';
 import Footer from '../components/Footer';
 import api from '../api';
+import { formatDate } from '../utils/formatDate';
 
 function authHeaders() {
   const token = localStorage.getItem('eidolum_token') || '';
@@ -105,9 +106,9 @@ export default function Tournaments() {
                 </span>
               </div>
               <div className="flex gap-4 text-xs text-muted">
-                <span><Clock className="w-3 h-3 inline mr-1" />{t.start_date?.slice(0, 10)} — {t.end_date?.slice(0, 10)}</span>
+                <span><Clock className="w-3 h-3 inline mr-1" />{formatDate(t.start_date)} — {formatDate(t.end_date)}</span>
                 <span><Users className="w-3 h-3 inline mr-1" />{t.entries}/{t.max_participants} entered</span>
-                {isUpcoming && <span><Lock className="w-3 h-3 inline mr-1" />Deadline: {t.entry_deadline?.slice(0, 10)}</span>}
+                {isUpcoming && <span><Lock className="w-3 h-3 inline mr-1" />Deadline: {formatDate(t.entry_deadline)}</span>}
               </div>
             </div>
 

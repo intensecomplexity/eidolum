@@ -9,6 +9,7 @@ import BookmarkButton from '../components/BookmarkButton';
 import { useSavedPredictions } from '../context/SavedPredictionsContext';
 import { getSavedPredictions, updateSavedNote } from '../api';
 import { formatTimeRemaining } from '../utils/timeRemaining';
+import { formatDate } from '../utils/formatDate';
 
 const FILTERS = [
   { key: 'all', label: 'All' },
@@ -308,7 +309,7 @@ function SavedCard({ prediction: p, userId, onUpdate }) {
     setSaving(false);
   }
 
-  const savedDate = p.saved_at ? new Date(p.saved_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '';
+  const savedDate = formatDate(p.saved_at);
 
   return (
     <div className={`card p-0 overflow-hidden border-l-[3px] ${borderColor} ${bgTint}`}>

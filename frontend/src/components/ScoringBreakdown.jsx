@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { ChevronDown, Check, X, Minus } from 'lucide-react';
+import { formatDate } from '../utils/formatDate';
 
 function formatWindowLabel(d) {
   if (d <= 1) return '1-day';
@@ -67,7 +68,7 @@ export default function ScoringBreakdown({ prediction: p }) {
 
           {/* Entry price */}
           {entry != null && (
-            <Row label="Entry price" value={`$${entry.toFixed(2)}`} sub={p.prediction_date ? `on ${p.prediction_date.slice(0, 10)}` : null} />
+            <Row label="Entry price" value={`$${entry.toFixed(2)}`} sub={p.prediction_date ? `on ${formatDate(p.prediction_date)}` : null} />
           )}
 
           {/* Target price */}
@@ -80,7 +81,7 @@ export default function ScoringBreakdown({ prediction: p }) {
           {/* Eval price */}
           {evalPrice != null && (
             <Row label="Price at evaluation" value={`$${evalPrice.toFixed(2)}`} sub={
-              p.evaluation_date ? `on ${(p.evaluation_date || '').slice(0, 10)}` : null
+              p.evaluation_date ? `on ${formatDate(p.evaluation_date)}` : null
             } />
           )}
 

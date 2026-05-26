@@ -14,6 +14,7 @@ import ScoringBreakdown from '../components/ScoringBreakdown';
 import { annotateContext } from '../utils/predictionExplainer';
 import { formatTimeRemaining } from '../utils/timeRemaining';
 import { pluralize } from '../utils/pluralize';
+import { formatDate } from '../utils/formatDate';
 import { getTickerDetail } from '../api';
 
 // ── Accuracy badge color helper ────────────────────────────────────────────
@@ -306,9 +307,9 @@ function TimelineBar({ predictionDate, evaluationDate }) {
   return (
     <div className="mt-3">
       <div className="flex justify-between text-[10px] text-muted mb-1">
-        <span>{predictionDate.slice(0, 10)}</span>
+        <span>{formatDate(predictionDate)}</span>
         <span>{isComplete ? 'Evaluated' : `${Math.max(0, Math.ceil((end - now) / 86400000))}d left`}</span>
-        <span>{evaluationDate.slice(0, 10)}</span>
+        <span>{formatDate(evaluationDate)}</span>
       </div>
       <div className="w-full h-1.5 bg-surface-2 rounded-full overflow-hidden">
         <div
@@ -375,7 +376,7 @@ function PredictionItem({ p, showOutcome = false }) {
 
       {/* ── Footer (always visible) ──────────────────────────── */}
       <div className="flex items-center justify-between mt-1.5 text-[10px] text-muted">
-        <span>{p.prediction_date?.slice(0, 10)}</span>
+        <span>{formatDate(p.prediction_date, { relative: true })}</span>
         {!isScored && (p.days_remaining != null || p.evaluation_date) && (() => {
           const tr = formatTimeRemaining(p.evaluation_date, p.days_remaining);
           if (tr.isEvaluating) return <span className="font-mono text-accent font-semibold">Evaluating</span>;
@@ -383,7 +384,7 @@ function PredictionItem({ p, showOutcome = false }) {
           return <span className={`font-mono ${tr.isUrgent ? 'text-warning font-semibold' : ''}`}>{tr.label}</span>;
         })()}
         {isScored && p.evaluation_date && (
-          <span>Evaluated {p.evaluation_date.slice(0, 10)}</span>
+          <span>Evaluated {formatDate(p.evaluation_date, { relative: true })}</span>
         )}
       </div>
 
@@ -428,12 +429,12 @@ function PredictionItem({ p, showOutcome = false }) {
           <div className="flex flex-wrap gap-x-6 gap-y-1 text-xs">
             {p.prediction_date && (
               <div className="flex items-center gap-1.5 text-muted">
-                <Calendar className="w-3 h-3" /> Predicted: <span className="text-text-secondary font-mono">{p.prediction_date.slice(0, 10)}</span>
+                <Calendar className="w-3 h-3" /> Predicted: <span className="text-text-secondary font-mono">{formatDate(p.prediction_date)}</span>
               </div>
             )}
             {p.evaluation_date && (
               <div className="flex items-center gap-1.5 text-muted">
-                <Clock className="w-3 h-3" /> {isScored ? 'Evaluated' : 'Evaluates'}: <span className="text-text-secondary font-mono">{p.evaluation_date.slice(0, 10)}</span>
+                <Clock className="w-3 h-3" /> {isScored ? 'Evaluated' : 'Evaluates'}: <span className="text-text-secondary font-mono">{formatDate(p.evaluation_date)}</span>
               </div>
             )}
             {(p.window_days || p.evaluation_window_days) && (

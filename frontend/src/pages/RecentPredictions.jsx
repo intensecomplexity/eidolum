@@ -4,11 +4,7 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { TrendingUp, TrendingDown, ExternalLink, Archive, ChevronLeft, ChevronRight } from 'lucide-react';
 import Footer from '../components/Footer';
 import { getRecentPredictions } from '../api';
-
-function formatDate(iso) {
-  if (!iso) return '';
-  return iso.slice(0, 10);
-}
+import { formatDate } from '../utils/formatDate';
 
 export default function RecentPredictions() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -114,7 +110,7 @@ export default function RecentPredictions() {
                       <div className="flex-1 min-w-0">
                         {/* Row 1: Date + Forecaster + Ticker + Direction + Outcome */}
                         <div className="flex items-center gap-2 flex-wrap">
-                          <span className="text-muted text-xs font-mono">{formatDate(p.prediction_date)}</span>
+                          <span className="text-muted text-xs font-mono">{formatDate(p.prediction_date, { relative: true })}</span>
                           <Link to={`/forecaster/${p.forecaster_id}`} className="font-medium text-sm text-text-primary active:text-accent">
                             {p.forecaster_name}
                           </Link>

@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import TickerLogo from './TickerLogo';
+import { formatDate } from '../utils/formatDate';
 
 /**
  * DisclosureCard — renders a single forecaster disclosure (what they
@@ -27,7 +28,7 @@ export default function DisclosureCard({ disclosure, compact = false, showForeca
   const { color, bg, verb } = _actionStyle(action);
   const sizeLabel = _formatSize(size_shares, size_pct, size_qualitative);
   const ftDisplay = _formatFollowThrough(follow_through_3m, follow_through_1m, follow_through_12m);
-  const dateLabel = disclosed_at ? new Date(disclosed_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : '';
+  const dateLabel = formatDate(disclosed_at);
 
   return (
     <div

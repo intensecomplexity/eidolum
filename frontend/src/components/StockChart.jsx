@@ -4,6 +4,7 @@ import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianG
 import { X as XIcon } from 'lucide-react';
 import { getTickerChart } from '../api';
 import downsample from '../utils/downsample';
+import { formatDate } from '../utils/formatDate';
 
 const PERIODS = [
   { key: '1m', label: '1M' },
@@ -289,7 +290,7 @@ export default function StockChart({ ticker }) {
                   {selectedDot.predictions.length} prediction{selectedDot.predictions.length !== 1 ? 's' : ''}
                 </span>
                 <span className="text-[10px] text-muted font-mono ml-1.5">
-                  {new Date(selectedDot.date + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                  {formatDate(selectedDot.date + 'T12:00:00')}
                 </span>
               </div>
               <button onClick={() => setSelectedDot(null)} className="text-muted hover:text-text-primary transition-colors p-0.5">
@@ -301,7 +302,7 @@ export default function StockChart({ ticker }) {
               {selectedDot.predictions.map((p, i) => {
                 const outcomeColor = OUTCOME_COLORS[p.outcome] || OUTCOME_COLORS.pending;
                 const outcomeLabel = OUTCOME_LABELS[p.outcome] || 'Pending';
-                const evalDate = p.evaluation_date ? new Date(p.evaluation_date + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : null;
+                const evalDate = p.evaluation_date ? formatDate(p.evaluation_date + 'T12:00:00', { includeYear: false }) : null;
                 return (
                   <div key={i} className={`border-l-2 pl-3 ${i > 0 ? 'pt-2.5 border-t border-border/50' : ''}`} style={{ borderLeftColor: outcomeColor }}>
                     <div className="flex items-center gap-1.5 flex-wrap">

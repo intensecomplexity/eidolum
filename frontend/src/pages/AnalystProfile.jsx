@@ -9,6 +9,7 @@ import AccuracyChart from '../components/AccuracyChart';
 import SourceBadge from '../components/SourceBadge';
 import Footer from '../components/Footer';
 import { getAnalystProfile, getAnalystAccuracyHistory, getAnalystSubscriptionStatus, subscribeAnalyst, unsubscribeAnalyst } from '../api';
+import { formatDate } from '../utils/formatDate';
 
 export default function AnalystProfile() {
   const { name } = useParams();
@@ -210,7 +211,7 @@ export default function AnalystProfile() {
                   </div>
                   <div className="text-xs text-muted">
                     {p.target_price && <span>Target: ${p.target_price} </span>}
-                    {p.prediction_date && <span>{new Date(p.prediction_date).toLocaleDateString()}</span>}
+                    {p.prediction_date && <span>{formatDate(p.prediction_date)}</span>}
                   </div>
                 </div>
               ))}
@@ -250,7 +251,7 @@ export default function AnalystProfile() {
                           </span>
                         ) : '-'}
                       </td>
-                      <td className="px-4 py-3 text-right text-xs text-muted">{p.prediction_date ? new Date(p.prediction_date).toLocaleDateString() : '-'}</td>
+                      <td className="px-4 py-3 text-right text-xs text-muted">{formatDate(p.prediction_date) || '-'}</td>
                     </tr>
                   ))}
                 </tbody>
