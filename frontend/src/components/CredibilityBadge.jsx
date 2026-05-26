@@ -2,15 +2,19 @@ import { useState, useRef, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 
 /**
- * Inline credibility badge: "username [72% · Lv.5]"
+ * Inline credibility badge: "username [72% ✓]"
  * On hover/tap shows expanded card with full stats.
+ *
+ * The platform suffix (Wall St / YouTube / X / Lv.N) used to follow the
+ * accuracy, but it duplicated the PlatformBadge already rendered above
+ * the pill on prediction cards. Stripped to just the accuracy + outcome
+ * glyph. Callers may still pass platform/level/isInstitutional — they
+ * are ignored.
  *
  * Props:
  *  - userId: number (required)
  *  - username: string
  *  - accuracy: number (0-100, or null for "New")
- *  - level: number (xp_level)
- *  - isInstitutional: boolean (show "INST" instead of level)
  *  - scored: number (optional, for expanded card)
  *  - streak: number (optional)
  *  - duelRecord: { wins, losses } (optional)
@@ -20,7 +24,7 @@ import { Link } from 'react-router-dom';
  *  - linkToProfile: boolean (wrap in link, default true)
  */
 export default function CredibilityBadge({
-  userId, username, accuracy, level = 1, isInstitutional = false, platform,
+  userId, username, accuracy,
   scored = 0, streak = 0, duelRecord, topSector, memberSince,
   showName = false, linkToProfile = true,
 }) {
@@ -43,8 +47,6 @@ export default function CredibilityBadge({
     : 'text-muted';
   const accLabel = hasAccuracy ? `${accuracy.toFixed(0)}%` : 'New';
   const accIcon = hasAccuracy ? (accuracy >= 60 ? ' ✓' : accuracy < 40 ? ' ✗' : ' ~') : '';
-  const SOURCE_LABELS = { institutional: 'Wall St', congress: 'Gov', youtube: 'YouTube', x: 'X', twitter: 'X', player: 'Community', user: 'Community' };
-  const levelLabel = (platform && SOURCE_LABELS[platform]) || (isInstitutional ? 'Wall St' : `Lv.${level}`);
 
   const badge = (
     <span
@@ -56,8 +58,6 @@ export default function CredibilityBadge({
       )}
       <span className="px-1 py-0.5 rounded bg-surface-2 border border-border">
         <span className={accColor}>{accLabel}{accIcon}</span>
-        <span className="text-muted mx-0.5">·</span>
-        <span className={isInstitutional || (platform && SOURCE_LABELS[platform]) ? 'text-accent' : 'text-muted'}>{levelLabel}</span>
       </span>
     </span>
   );
