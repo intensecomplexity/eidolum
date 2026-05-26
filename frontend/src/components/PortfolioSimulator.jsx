@@ -245,7 +245,7 @@ export default function PortfolioSimulator({ forecasterId, forecasterName }) {
 
       {/* Chart */}
       {timeline.length > 0 && (
-        <div className="mb-4 w-full" style={{ minHeight: 180 }}>
+        <div className="mb-4 w-full max-w-full overflow-hidden" style={{ minHeight: 180 }}>
           <ResponsiveContainer width="100%" height={180} minWidth={0}>
             <AreaChart data={timeline} margin={{ top: 5, right: 20, bottom: 5, left: -15 }}>
               <defs>

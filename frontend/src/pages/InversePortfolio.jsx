@@ -180,7 +180,7 @@ export default function InversePortfolio() {
 
             {/* Portfolio growth chart */}
             {data.portfolio_over_time.length > 2 && (
-              <div className="card mb-6">
+              <div className="card mb-6 w-full max-w-full overflow-hidden">
                 <h2 className="text-base sm:text-lg font-semibold mb-4">Portfolio Growth Over Time</h2>
                 <ResponsiveContainer width="100%" height={300}>
                   <LineChart data={data.portfolio_over_time}>
