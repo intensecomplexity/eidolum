@@ -12,9 +12,9 @@ function FLink({ to, children }) {
 
 function Column({ title, children }) {
   return (
-    <div>
+    <div className="text-center">
       <div className="text-[10px] text-muted uppercase tracking-wider mb-3">{title}</div>
-      <div className="flex flex-col gap-1.5">{children}</div>
+      <div className="flex flex-col items-center gap-1.5">{children}</div>
     </div>
   );
 }
@@ -23,11 +23,11 @@ export default function Footer() {
   const { isAuthenticated } = useAuth();
 
   return (
-    <footer className="border-t border-border mt-12 sm:mt-20">
+    <footer className="mt-12 sm:mt-20">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 md:gap-12">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 md:gap-12 max-w-6xl mx-auto text-center">
           {/* Eidolum */}
-          <div className="flex flex-col items-start gap-2">
+          <div className="flex flex-col items-center gap-2">
             <div className="flex items-center gap-2">
               <EidolumLogo size={24} />
               <span className="font-serif text-lg text-accent">Eidolum</span>
