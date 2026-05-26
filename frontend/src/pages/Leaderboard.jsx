@@ -393,9 +393,6 @@ export default function Leaderboard() {
                 </div>
               )}
 
-              {activeTab === 'recent' && (
-                <span className="text-muted text-xs ml-1 shrink-0">Scored in the last 30 days</span>
-              )}
               {activeTab === 'week' && (
                 <span className="text-muted text-xs font-mono ml-1 sm:ml-2 shrink-0">
                   Resets Monday
