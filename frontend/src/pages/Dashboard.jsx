@@ -335,7 +335,7 @@ export default function Dashboard() {
   const mostDividedBlock = mostDivided.length > 0 && (
     <div className="mb-6">
       <SectionHeader subtitle="Analysts can't agree on these stocks.">Most Divided</SectionHeader>
-      <div className="flex gap-3 overflow-x-auto pills-scroll pb-2">
+      <div className="flex gap-3 overflow-x-auto xl:justify-center pills-scroll pb-2">
         {mostDivided.map(t => (
           <Link key={t.ticker} to={`/asset/${t.ticker}`}
             className="shrink-0 w-44 sm:w-48 card py-3 px-4 hover:border-accent/30 transition-colors">
