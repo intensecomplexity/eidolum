@@ -76,6 +76,7 @@ const EarningsPage           = lazy(() => import('./pages/Earnings'));
 const ComparePage            = lazy(() => import('./pages/Compare'));
 const CompareForecasters     = lazy(() => import('./pages/CompareForecasters'));
 const Discover               = lazy(() => import('./pages/Discover'));
+const AllSectors             = lazy(() => import('./pages/AllSectors'));
 const SmartMoney             = lazy(() => import('./pages/SmartMoney'));
 const Tournaments            = lazy(() => import('./pages/Tournaments'));
 const HowItWorks             = lazy(() => import('./pages/HowItWorks'));
@@ -196,6 +197,7 @@ export default function App() {
         <Route path="/analyst/:name" element={<AnalystProfilePage />} />
         <Route path="/heatmap" element={<HeatmapPage />} />
         <Route path="/discover" element={<Discover />} />
+        <Route path="/sectors" element={<AllSectors />} />
         <Route path="/smart-money" element={<SmartMoney />} />
         <Route path="/how-it-works" element={<HowItWorks />} />
         <Route path="/firm/:slug" element={<FirmProfile />} />

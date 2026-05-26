@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import LoadingSpinner from '../components/LoadingSpinner';
 import { Link, useNavigate } from 'react-router-dom';
-import { Search, TrendingUp, TrendingDown, Flame, AlertTriangle, Clock, BarChart3, Star } from 'lucide-react';
+import { Search, TrendingUp, TrendingDown, Flame, AlertTriangle, Clock, BarChart3, Star, ArrowRight } from 'lucide-react';
 import Footer from '../components/Footer';
 import PageHeader from '../components/PageHeader';
 import SectionHeader from '../components/SectionHeader';
@@ -235,6 +235,13 @@ export default function Discover() {
                 );
               })}
             </div>
+            {sectors.filter(s => (s.sector || s.name) !== 'Other').length > 9 && (
+              <div className="text-center mt-3">
+                <Link to="/sectors" className="text-accent text-xs font-medium inline-flex items-center gap-1">
+                  View all sectors <ArrowRight className="w-3 h-3" />
+                </Link>
+              </div>
+            )}
           </div>
         )}
 
