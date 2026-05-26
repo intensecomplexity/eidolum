@@ -23,16 +23,18 @@ export default function BookmarkButton({
   }
 
   // Floating variant: thumb-sized pill (44x44 on mobile, 36x36 on
-  // desktop) used by PredictionCard's top-right placement. The pill
-  // background sits above whatever card content scrolls underneath the
-  // absolute anchor, so it stays legible even when text gets long.
+  // desktop) used by PredictionCard's top-right placement. Background +
+  // border use bare theme tokens (no /opacity modifier) so the
+  // [data-theme="light"] overrides in index.css apply \u2014 the previous
+  // `bg-surface-2/80` generated `.bg-surface-2\/80`, which the override
+  // doesn't match, leaving a dark blob on the cream light theme.
   if (floating) {
     return (
       <button
         onClick={handleClick}
         aria-label={saved ? 'Remove from saved' : 'Save prediction'}
         title={saved ? 'Saved \u2014 view in My Saves' : 'Save this prediction'}
-        className={`${className} flex items-center justify-center rounded-full w-11 h-11 md:w-9 md:h-9 bg-surface-2/80 backdrop-blur-sm hover:bg-surface-2/95 active:scale-95 transition-transform touch-manipulation ${
+        className={`${className} flex items-center justify-center rounded-full w-11 h-11 md:w-9 md:h-9 bg-surface-2 border border-border active:scale-95 transition-transform touch-manipulation ${
           saved ? 'text-accent' : 'text-muted hover:text-text-secondary'
         } ${animating ? 'bookmark-pulse' : ''}`}
       >
