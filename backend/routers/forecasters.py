@@ -922,7 +922,12 @@ def get_portfolio_simulator(
     if not f:
         raise HTTPException(status_code=404, detail="Forecaster not found")
 
-    # Get all scored predictions ordered by date
+    # Get all scored predictions ordered by when P&L actually lands.
+    # Accumulating in eval_date order (instead of prediction_date) keeps
+    # the cumulative `portfolio` value monotone-in-time relative to the
+    # X-axis the frontend renders, which uses each row's emitted `date`
+    # = evaluation_date. Tiebreak on prediction_date so same-day evals
+    # are deterministic across runs.
     rows = db.execute(sql_text(f"""
         SELECT ticker, direction, prediction_date, evaluation_date,
                entry_price, target_price, actual_return, outcome, window_days
@@ -932,7 +937,7 @@ def get_portfolio_simulator(
           AND actual_return IS NOT NULL
           AND prediction_date IS NOT NULL
           AND {_YT_VIS_BARE}
-        ORDER BY prediction_date ASC
+        ORDER BY COALESCE(evaluation_date, prediction_date) ASC, prediction_date ASC
     """), {"fid": forecaster_id}).fetchall()
 
     if len(rows) < 5:
