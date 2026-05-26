@@ -12,6 +12,7 @@ import ToldYouSoModal from '../components/ToldYouSoModal';
 import PnLBadge from '../components/PnLBadge';
 import CommentSection from '../components/CommentSection';
 import { getUserPredictions, deletePrediction, getDeletionStatus } from '../api';
+import { formatDate } from '../utils/formatDate';
 
 const OUTCOME_FILTERS = [
   { key: null, label: 'All' },
@@ -245,7 +246,7 @@ function PredictionCard({ p, onDelete }) {
       {p.reasoning && <p className="text-xs text-text-secondary mt-3 line-clamp-2 italic">"{p.reasoning}"</p>}
 
       <div className="flex items-center justify-between mt-3 text-xs text-muted">
-        <span>{new Date(p.created_at).toLocaleDateString()}</span>
+        <span>{formatDate(p.created_at, { relative: true })}</span>
         {(() => { const tl = timeLeft(p.expires_at || remaining); return tl.expired ? <span className="font-mono text-muted">Evaluating</span> : remaining > 0 ? <span className={`font-mono ${tl.urgent ? 'text-warning' : 'text-muted'}`}>{tl.text}</span> : null; })()}
       </div>
       <ReactionBar predictionId={p.id} source="user" isOwn={true} outcome={p.outcome} />
@@ -280,7 +281,7 @@ function PredictionRow({ p, onDelete }) {
         </span>
       </td>
       <td className="px-6 py-4 text-center"><OutcomeBadge outcome={p.outcome} /></td>
-      <td className="px-6 py-4 text-right text-xs text-muted">{new Date(p.created_at).toLocaleDateString()}</td>
+      <td className="px-6 py-4 text-right text-xs text-muted">{formatDate(p.created_at, { relative: true })}</td>
       <td className="px-6 py-4 text-center">
         {canDelete ? <DeleteButton prediction={p} onDelete={onDelete} /> : (p.outcome === 'pending' ? <Lock className="w-3 h-3 text-muted/30 mx-auto" /> : null)}
       </td>

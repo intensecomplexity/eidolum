@@ -7,6 +7,7 @@ import TimeframeSlider from '../components/TimeframeSlider';
 import TickerSearch from '../components/TickerSearch';
 import Footer from '../components/Footer';
 import { submitUserPrediction, getDeletionStatus, searchTickers, getWeeklyChallenge, getUserPerks, getTickerPrice } from '../api';
+import { formatDate } from '../utils/formatDate';
 
 // ── Confetti burst ───────────────────────────────────────────────────────────
 
@@ -218,7 +219,7 @@ export default function SubmitCall() {
 
   if (success) {
     const expiresDate = success.expires_at
-      ? new Date(success.expires_at).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
+      ? formatDate(success.expires_at)
       : null;
 
     const daysLeft = success.expires_at
@@ -445,7 +446,7 @@ export default function SubmitCall() {
                 </span>.
               </p>
               <p className="text-muted text-xs mt-1">
-                Evaluated on: {new Date(Date.now() + windowDays * 86400000).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+                Evaluated on: {formatDate(new Date(Date.now() + windowDays * 86400000))}
               </p>
             </div>
           )}

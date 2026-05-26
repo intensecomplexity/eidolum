@@ -7,6 +7,7 @@ import PageHeader from '../components/PageHeader';
 import Footer from '../components/Footer';
 import { getFirm } from '../api';
 import { pluralize } from '../utils/pluralize';
+import { formatDate } from '../utils/formatDate';
 
 function OutcomeBadge({ outcome, evaluationDeferred, evaluationDeferredReason }) {
   if (evaluationDeferred) {
@@ -227,7 +228,7 @@ export default function FirmProfile() {
                     <div className="text-xs text-muted mt-0.5">
                       <Link to={p.forecaster_slug ? `/analyst/${p.forecaster_slug}` : `/forecaster/${p.forecaster_id}`}
                         className="hover:text-accent transition-colors">{p.forecaster_name}</Link>
-                      {p.prediction_date && <span> | {new Date(p.prediction_date).toLocaleDateString()}</span>}
+                      {p.prediction_date && <span> | {formatDate(p.prediction_date)}</span>}
                     </div>
                   </div>
                   {p.actual_return != null && (

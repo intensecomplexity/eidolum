@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Share2 } from 'lucide-react';
 import BadgeIcon from './BadgeIcon';
 import ShareModal from './ShareModal';
+import { formatDate } from '../utils/formatDate';
 
 export default function BadgeCard({ badge, username }) {
   const { earned, icon, name, description, unlocked_at, progress, badge_id } = badge;
@@ -32,7 +33,7 @@ export default function BadgeCard({ badge, username }) {
           <p className="text-xs text-muted mt-0.5">{description}</p>
           {earned && unlocked_at && (
             <p className="text-[10px] text-accent/50 font-mono mt-1">
-              Unlocked {new Date(unlocked_at).toLocaleDateString()}
+              Unlocked {formatDate(unlocked_at)}
             </p>
           )}
           {!earned && progress && progress.target > 0 && (

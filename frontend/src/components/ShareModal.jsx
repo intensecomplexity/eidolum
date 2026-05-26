@@ -3,6 +3,7 @@ import { X, Copy, Check, ExternalLink, TrendingUp, TrendingDown } from 'lucide-r
 import EidolumLogo from './EidolumLogo';
 import useLockBodyScroll from '../hooks/useLockBodyScroll';
 import { getPredictionShareData, getProfileShareData } from '../api';
+import { formatDate } from '../utils/formatDate';
 
 /**
  * Props:
@@ -190,7 +191,7 @@ function BadgePreview({ data }) {
       <div className="font-semibold text-base mb-1">{data.name}</div>
       <p className="text-xs text-text-secondary mb-2">{data.description}</p>
       {data.unlocked_at && (
-        <p className="text-[10px] text-accent/60 font-mono">Earned {new Date(data.unlocked_at).toLocaleDateString()}</p>
+        <p className="text-[10px] text-accent/60 font-mono">Earned {formatDate(data.unlocked_at)}</p>
       )}
       {data.username && (
         <p className="text-[10px] text-muted mt-2">@{data.username}</p>

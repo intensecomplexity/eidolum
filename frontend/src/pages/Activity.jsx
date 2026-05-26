@@ -18,6 +18,7 @@ import DisclosureCard from '../components/DisclosureCard';
 import timeLeft from '../utils/timeLeft';
 import PlatformBadge from '../components/PlatformBadge';
 import { getSourceBadgeKey } from '../utils/getSourceBadgeKey';
+import { formatDate } from '../utils/formatDate';
 
 const TABS = [
   { key: 'all', label: 'All' },
@@ -100,8 +101,7 @@ function getSourceLabel(verifiedBy) {
 }
 
 function TrustSignals({ item }) {
-  const dateStr = item.prediction_date;
-  const formatted = dateStr ? new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : null;
+  const formatted = formatDate(item.prediction_date);
   return (
     <div className="flex items-center gap-2 mt-1.5">
       <span style={{ fontSize: 10, padding: '1px 7px', borderRadius: 12, background: 'rgba(100,100,100,0.15)', color: 'var(--color-text-secondary)', whiteSpace: 'nowrap' }}>

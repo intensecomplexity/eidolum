@@ -8,6 +8,7 @@ import PlatformBadge from './PlatformBadge';
 import CredibilityBadge from './CredibilityBadge';
 import { annotateContext, ExplainerLine, ratingChangeLabel } from '../utils/predictionExplainer';
 import { getSourceBadgeKey } from '../utils/getSourceBadgeKey';
+import { formatDate } from '../utils/formatDate';
 import CommentSection from './CommentSection';
 import ScoringBreakdown from './ScoringBreakdown';
 import TickerLogo from './TickerLogo';
@@ -24,11 +25,6 @@ function timeAgo(dateStr) {
   const days = Math.floor(hours / 24);
   if (days < 30) return `${days}d ago`;
   return `${Math.floor(days / 30)}mo ago`;
-}
-
-function formatDate(iso) {
-  if (!iso) return null;
-  return iso.slice(0, 10);
 }
 
 function getDomainLabel(url) {
@@ -77,9 +73,8 @@ function SourceBadge({ verifiedBy }) {
 }
 
 function LockedDate({ dateStr }) {
-  if (!dateStr) return null;
-  const d = new Date(dateStr);
-  const formatted = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  const formatted = formatDate(dateStr);
+  if (!formatted) return null;
   return (
     <span style={{
       display: 'inline-flex', alignItems: 'center', gap: 3,
@@ -196,7 +191,7 @@ function ProofLinks({ p }) {
   const timeStr = formatTimestamp(ts);
   const label = isYT && timeStr ? `YouTube at ${timeStr}` : getDomainLabel(source);
   const href = isYT ? withTimestampAnchor(source, ts) : source;
-  const dateStr = formatDate(p.prediction_date);
+  const dateStr = formatDate(p.prediction_date, { relative: true });
 
   return (
     <>

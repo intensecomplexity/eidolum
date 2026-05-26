@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { Share2, ArrowRight } from 'lucide-react';
 import PlatformBadge from './PlatformBadge';
 import { getPredictionOfTheDay } from '../api';
+import { formatDate } from '../utils/formatDate';
 
 export default function PredictionOfTheDay() {
   const [data, setData] = useState(null);
@@ -16,7 +17,7 @@ export default function PredictionOfTheDay() {
   const isCorrect = data.outcome === 'correct';
   const returnStr = data.actual_return >= 0 ? `+${data.actual_return.toFixed(1)}%` : `${data.actual_return.toFixed(1)}%`;
   const directionLabel = data.direction === 'bullish' ? 'BULLISH' : 'BEARISH';
-  const dateStr = data.prediction_date ? new Date(data.prediction_date).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) : '';
+  const dateStr = formatDate(data.prediction_date);
 
   function handleShare() {
     const text = `${data.forecaster.name} called ${data.ticker} ${directionLabel} and was ${isCorrect ? 'CORRECT' : 'WRONG'} (${returnStr}) \u2014 via Eidolum`;

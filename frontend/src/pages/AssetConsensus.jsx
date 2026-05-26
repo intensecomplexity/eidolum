@@ -15,6 +15,7 @@ import SourceBadge from '../components/SourceBadge';
 import Footer from '../components/Footer';
 import { getAssetConsensus } from '../api';
 import { pluralize } from '../utils/pluralize';
+import { formatDate } from '../utils/formatDate';
 
 export default function AssetConsensus() {
   const { ticker } = useParams();
@@ -269,7 +270,7 @@ function AssetPredictionRow({ p }) {
         onClick={() => setExpanded(!expanded)}
       >
         <td className="px-2 py-3">{predId && <BookmarkButton predictionId={predId} />}</td>
-        <td className="px-6 py-3 font-mono text-sm text-text-secondary whitespace-nowrap">{p.prediction_date?.slice(0, 10)}</td>
+        <td className="px-6 py-3 font-mono text-sm text-text-secondary whitespace-nowrap">{formatDate(p.prediction_date)}</td>
         <td className="px-6 py-3">
           <Link to={`/forecaster/${p.forecaster.id}`} className="hover:text-accent transition-colors" onClick={e => e.stopPropagation()}>
             <div className="font-medium text-sm">{p.forecaster.name}</div>
@@ -293,7 +294,7 @@ function AssetPredictionRow({ p }) {
         <td className="px-6 py-3 text-center font-mono text-sm hidden md:table-cell">
           {evalDate ? (
             <span className={`text-xs ${p.outcome === 'pending' ? 'text-warning' : 'text-text-secondary'}`}>
-              {evalDate.slice(0, 10)}
+              {formatDate(evalDate)}
             </span>
           ) : <span className="text-muted">-</span>}
         </td>
@@ -309,8 +310,8 @@ function AssetPredictionRow({ p }) {
             <EvidenceCard prediction={p} forecaster={p.forecaster} expandable={false} />
             <p className="text-[10px] text-muted italic mt-2">
               {p.outcome === 'pending'
-                ? `Evaluates on ${evalDate?.slice(0, 10)} \u2014 the date ${p.time_horizon === 'custom' ? 'specified' : 'defaulted'} at time of prediction`
-                : `Evaluated at ${evalDate?.slice(0, 10)} \u2014 the date ${p.time_horizon === 'custom' ? 'specified' : 'defaulted'} at time of prediction`
+                ? `Evaluates on ${formatDate(evalDate)} \u2014 the date ${p.time_horizon === 'custom' ? 'specified' : 'defaulted'} at time of prediction`
+                : `Evaluated at ${formatDate(evalDate)} \u2014 the date ${p.time_horizon === 'custom' ? 'specified' : 'defaulted'} at time of prediction`
               }
             </p>
           </td>

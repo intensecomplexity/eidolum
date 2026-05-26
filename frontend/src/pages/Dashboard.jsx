@@ -28,6 +28,7 @@ import {
 } from '../api';
 import formatRoundNumber from '../utils/formatNumber';
 import timeLeft from '../utils/timeLeft';
+import { formatDate } from '../utils/formatDate';
 
 // ── Time ago helper ─────────────────────────────────────────────────────────
 function timeAgo(dateStr) {
@@ -276,7 +277,7 @@ export default function Dashboard() {
                 <PlatformBadge platform={getSourceBadgeKey(p)} size={10} showLabel />
                 {p.prediction_date && (
                   <span className="inline-flex items-center gap-1 text-[9px] text-muted">
-                    <Lock size={9} /> {new Date(p.prediction_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                    <Lock size={9} /> {formatDate(p.prediction_date, { relative: true })}
                   </span>
                 )}
               </div>

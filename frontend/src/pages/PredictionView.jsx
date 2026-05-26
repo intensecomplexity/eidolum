@@ -11,6 +11,7 @@ import CommentSection from '../components/CommentSection';
 import ShareButton from '../components/ShareButton';
 import Footer from '../components/Footer';
 import { getPredictionDetail } from '../api';
+import { formatDate } from '../utils/formatDate';
 
 export default function PredictionView() {
   const { predictionId } = useParams();
@@ -107,7 +108,7 @@ export default function PredictionView() {
             <div className="text-center">
               <div className="text-[10px] text-muted uppercase mb-1">Scoring in</div>
               <Countdown expiresAt={data.expires_at} className="text-2xl" />
-              <div className="text-xs text-muted mt-2">{data.evaluation_window_days} day window &middot; Expires {new Date(data.expires_at).toLocaleDateString()}</div>
+              <div className="text-xs text-muted mt-2">{data.evaluation_window_days} day window &middot; Expires {formatDate(data.expires_at)}</div>
             </div>
           )}
           {data.outcome === 'correct' && (
@@ -115,7 +116,7 @@ export default function PredictionView() {
               <div className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-positive/10 text-positive border border-positive/20 font-mono font-bold text-lg mb-2">
                 <Check className="w-5 h-5" /> CORRECT
               </div>
-              {data.evaluated_at && <div className="text-xs text-muted">Scored {new Date(data.evaluated_at).toLocaleDateString()}</div>}
+              {data.evaluated_at && <div className="text-xs text-muted">Scored {formatDate(data.evaluated_at)}</div>}
             </div>
           )}
           {data.outcome === 'incorrect' && (
@@ -123,14 +124,14 @@ export default function PredictionView() {
               <div className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-negative/10 text-negative border border-negative/20 font-mono font-bold text-lg mb-2">
                 <X className="w-5 h-5" /> INCORRECT
               </div>
-              {data.evaluated_at && <div className="text-xs text-muted">Scored {new Date(data.evaluated_at).toLocaleDateString()}</div>}
+              {data.evaluated_at && <div className="text-xs text-muted">Scored {formatDate(data.evaluated_at)}</div>}
             </div>
           )}
         </div>
 
         {/* ── DETAILS ─────────────────────────────────────────────────── */}
         <div className="card mb-4 text-xs text-muted space-y-1.5">
-          <div className="flex justify-between"><span>Published</span><span className="text-text-secondary">{data.created_at ? new Date(data.created_at).toLocaleDateString() : '-'}</span></div>
+          <div className="flex justify-between"><span>Published</span><span className="text-text-secondary">{formatDate(data.created_at) || '-'}</span></div>
           <div className="flex justify-between"><span>Window</span><span className="text-text-secondary">{data.evaluation_window_days} days</span></div>
           {data.template && data.template !== 'custom' && <div className="flex justify-between"><span>Template</span><span className="text-text-secondary capitalize">{data.template.replace(/_/g, ' ')}</span></div>}
           {data.source_url && <div className="flex justify-between"><span>Source</span><a href={data.source_url} target="_blank" rel="noopener noreferrer" className="text-accent truncate max-w-[200px]">View source</a></div>}

@@ -1,4 +1,5 @@
 import { Lock } from 'lucide-react';
+import { formatDate } from '../utils/formatDate';
 
 const SOURCE_MAP = {
   massive_benzinga: 'Benzinga', benzinga_api: 'Benzinga', benzinga_web: 'Benzinga',
@@ -17,9 +18,7 @@ export function getSourceLabel(verifiedBy) {
 
 export default function SourceBadge({ verifiedBy, date, showLocked = true }) {
   const label = getSourceLabel(verifiedBy);
-  const formatted = date
-    ? new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-    : null;
+  const formatted = formatDate(date);
 
   return (
     <div className="flex flex-col gap-0.5">
