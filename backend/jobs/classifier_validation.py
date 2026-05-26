@@ -1,7 +1,7 @@
 """Post-classifier validation gate.
 
 Rejects garbage predictions before they become rows in `predictions`.
-Seven rules, run in order by `validate_or_reject`. Each rule is an
+Eight rules, run in order by `validate_or_reject`. Each rule is an
 independently unit-testable function returning ``(accepted, reason)``.
 
 Schema notes (verified 2026-05-16):
@@ -9,16 +9,20 @@ Schema notes (verified 2026-05-16):
     (~12k rows; ticker -> company_name), which is the populated reference.
   * `predictions.context` is a templated label ("Channel: Bull/Bear on
     TICKER"), NOT the analyst's words. The real quoted text is
-    `source_verbatim_quote`. All text rules (2/3/4/6/7) therefore operate on
-    the verbatim quote, not `context`.
+    `source_verbatim_quote`. All text rules (2/3/4/6/7/10) therefore operate
+    on the verbatim quote, not `context`.
 
 This module performs only read-only DB queries — never writes. Rule 5
 detects contradictions; the caller (youtube_classifier) performs the
 `excluded_from_training` write via `contradicting_ids()`.
 
-Rule 7 (reported-speech rejection) is gated by the
-CLASSIFIER_RULE_REPORTED_SPEECH env var so production can switch it
-between enforce / shadow / off without redeploying.
+Per-rule kill switches:
+  * CLASSIFIER_RULE_REPORTED_SPEECH (Rule 7)
+  * CLASSIFIER_RULE_HYPOTHETICAL_SCENARIO (Rule 10)
+
+Each accepts enforce / shadow / off — flip via Railway env vars without
+redeploying. Rule numbering skips 8/9 — reserved for the rest of the
+hypothetical-handling policy (Tier 2 hide, Tier 3 conditional).
 """
 import logging
 import os
@@ -38,6 +42,14 @@ _REPORTED_SPEECH_MODE = os.environ.get(
     "CLASSIFIER_RULE_REPORTED_SPEECH", "enforce"
 ).lower()
 
+# Rule 10 kill switch — same enforce/shadow/off semantics as Rule 7.
+# Tier 1 hypotheticals only ("in a bull case", "imagine if",
+# "hypothetically"). Tier 2 hedges ("could", "might") must NOT match —
+# those are tagged conviction=hedged elsewhere, not gate-rejected.
+_HYPOTHETICAL_SCENARIO_MODE = os.environ.get(
+    "CLASSIFIER_RULE_HYPOTHETICAL_SCENARIO", "enforce"
+).lower()
+
 # reason code -> telemetry counter key (Step 4 cycle stats line)
 TELEMETRY_KEYS = {
     "invalid_ticker": "invalid_ticker",
@@ -47,6 +59,7 @@ TELEMETRY_KEYS = {
     "contradictory_pair": "contradictory",
     "context_too_short": "context_short",
     "reported_speech": "reported_speech",
+    "hypothetical_scenario": "hypothetical_scenario",
 }
 
 _CORP_SUFFIXES = {
@@ -306,6 +319,49 @@ def check_reported_speech(quote):
     return True, None
 
 
+# ── Rule 10 ───────────────────────────────────────────────────────────────
+# Pure scenario / hypothetical markers — narrow patterns only to keep
+# precision high. Tier-2 hedged commitments ("could", "might", "may")
+# MUST NOT match; those are separately tagged conviction=hedged and stay
+# in the data layer. Tier-3 explicit conditionals ("if X then Y") are
+# extracted as conditional_call category and also MUST NOT match here.
+_HYPOTHETICAL_SCENARIO_PATTERNS = [
+    re.compile(r"\bin a (?:bull|bear|base|worst|best)[\s-]?case\b", re.I),
+    re.compile(r"\bin a scenario where\b", re.I),
+    re.compile(r"\bimagine if\b", re.I),
+    re.compile(r"\blet'?s (?:say|imagine|pretend)\b", re.I),
+    re.compile(r"\bhypothetically\b", re.I),
+    re.compile(r"\bin a world where\b", re.I),
+    re.compile(r"\bpurely hypothetical\b", re.I),
+    re.compile(r"\bif we assume\b", re.I),
+    re.compile(r"\bin (?:the )?bull[\s-]?case scenario\b", re.I),
+    re.compile(r"\bin (?:the )?bear[\s-]?case scenario\b", re.I),
+]
+
+
+def check_hypothetical_scenario(quote):
+    """Reject Tier-1 pure hypothetical scenarios ("in a bull case TSLA
+    hits 300", "imagine if NVDA doubled", "hypothetically MSFT to 500").
+
+    No first-person override — "I think in a bull case TSLA hits 300" is
+    still scenario analysis, not a committed call. The speaker is musing
+    about a possible world, not stating their position.
+
+    Critical precision constraint: Tier-2 hedged commitments using
+    'could' / 'might' / 'may' / 'should' MUST NOT match these patterns —
+    they're real (if soft) predictions and are handled via conviction
+    metadata, not gate-rejection. The patterns above are deliberately
+    narrow (proper scenario framings) rather than catching all
+    speculation language.
+    """
+    if not quote or not quote.strip():
+        return True, None
+    for pat in _HYPOTHETICAL_SCENARIO_PATTERNS:
+        if pat.search(quote):
+            return False, "hypothetical_scenario"
+    return True, None
+
+
 # ── Orchestrator ──────────────────────────────────────────────────────────
 def validate_or_reject(pred, db, ref_time=None, exclude_id=None):
     """Run all six rules in order. Returns ``(accepted, reason)``.
@@ -353,4 +409,20 @@ def validate_or_reject(pred, db, ref_time=None, exclude_id=None):
                     ticker, (quote or "")[:120],
                 )
                 return False, "reported_speech"
+    # Rule 10 — Tier-1 hypothetical-scenario rejection. Same env-var
+    # kill-switch pattern as Rule 7.
+    if _HYPOTHETICAL_SCENARIO_MODE != "off":
+        ok, reason = check_hypothetical_scenario(quote)
+        if not ok:
+            if _HYPOTHETICAL_SCENARIO_MODE == "shadow":
+                log.warning(
+                    "[rule_10_shadow] would reject %s via hypothetical_scenario: %s",
+                    ticker, (quote or "")[:120],
+                )
+            else:  # 'enforce' (default; unknown values also enforce defensively)
+                log.info(
+                    "[rule_10_enforce] rejected %s via hypothetical_scenario: %s",
+                    ticker, (quote or "")[:120],
+                )
+                return False, "hypothetical_scenario"
     return True, None
