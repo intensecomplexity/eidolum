@@ -102,13 +102,21 @@ export default function PortfolioSimulator({ forecasterId, forecasterName }) {
   // affects value, never the date axis.
   const sourceTimeline = useMemo(() => {
     const rows = data?.portfolio_over_time || [];
-    return rows
+    const parsed = rows
       .map(p => {
         const ts = parseISODateUTC(p.date);
         return ts != null ? { ...p, ts } : null;
       })
       .filter(Boolean)
       .sort((a, b) => a.ts - b.ts);
+    // Trim trailing rows whose value can't render — Recharts treats NaN
+    // as a gap in the line, but those rows still extend dataMax and
+    // stretch the X-axis past where the gold line actually stops. Walk
+    // back from the end until we hit a finite numeric value, so the
+    // axis domain reflects the visible series, not the API's padding.
+    let last = parsed.length - 1;
+    while (last >= 0 && !Number.isFinite(parsed[last].value)) last -= 1;
+    return last < parsed.length - 1 ? parsed.slice(0, last + 1) : parsed;
   }, [data]);
 
   // Track viewport width so mobile gets fewer ticks. Recharts will print
@@ -131,9 +139,16 @@ export default function PortfolioSimulator({ forecasterId, forecasterName }) {
 
   const xAxisTicks = useMemo(() => {
     if (!rawTimeTicks || rawTimeTicks.length === 0) return undefined;
-    if (!isMobile || rawTimeTicks.length <= 4) return rawTimeTicks;
-    return rawTimeTicks.filter((_, i) => i % 2 === 0);
-  }, [rawTimeTicks, isMobile]);
+    // Defense in depth — buildTimeTicks already clamps to [min,max], but
+    // after trimming trailing nulls the data range can shrink, so drop
+    // any tick that now sits outside the trimmed series.
+    const minTs = sourceTimeline.length ? sourceTimeline[0].ts : -Infinity;
+    const maxTs = sourceTimeline.length ? sourceTimeline[sourceTimeline.length - 1].ts : Infinity;
+    let clamped = rawTimeTicks.filter(t => t >= minTs && t <= maxTs);
+    if (clamped.length === 0) clamped = rawTimeTicks;
+    if (!isMobile || clamped.length <= 4) return clamped;
+    return clamped.filter((_, i) => i % 2 === 0);
+  }, [rawTimeTicks, isMobile, sourceTimeline]);
 
   // When the whole simulation lives inside one calendar year, drop the
   // year suffix on the X-axis to avoid clutter — "May 21" beats
@@ -243,7 +258,7 @@ export default function PortfolioSimulator({ forecasterId, forecasterName }) {
               <XAxis
                 dataKey="ts"
                 type="number"
-                domain={['dataMin', 'dataMax']}
+                domain={[timeline[0].ts, timeline[timeline.length - 1].ts]}
                 ticks={xAxisTicks}
                 tickFormatter={(ms) => {
                   // Compact labels — full-month-name "August 17, 2025"
@@ -262,7 +277,6 @@ export default function PortfolioSimulator({ forecasterId, forecasterName }) {
                 axisLine={{ stroke: '#1e2028' }}
                 tickLine={false}
                 interval={0}
-                padding={{ left: 0, right: 30 }}
               />
               <YAxis
                 tick={{ fill: '#8b8f9a', fontSize: 10 }}
