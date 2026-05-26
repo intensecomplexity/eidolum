@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import LoadingSpinner from '../components/LoadingSpinner';
 import { Link } from 'react-router-dom';
-import { Bookmark, ArrowRight, Clock, Pencil, ExternalLink, X, ChevronDown, Trophy, Search, CircleDot, BarChart3, Bell, CheckCircle, XCircle, AlertTriangle } from 'lucide-react';
+import { Bookmark, ArrowRight, Clock, Pencil, ExternalLink, X, ChevronDown, Trophy, CircleDot, CheckCircle, XCircle, AlertTriangle } from 'lucide-react';
 import Footer from '../components/Footer';
 import PredictionBadge from '../components/PredictionBadge';
 import PlatformBadge from '../components/PlatformBadge';
@@ -135,7 +135,7 @@ export default function SavedPredictions() {
           <div className="flex items-center gap-2 mb-1 sm:mb-2">
             <Bookmark className="w-6 h-6 text-accent fill-accent" />
             <h1 className="font-bold" style={{ fontSize: 'clamp(24px, 5vw, 36px)' }}>
-              My Saved Predictions
+              Saved Predictions
             </h1>
           </div>
           <p className="text-text-secondary text-sm sm:text-base">
@@ -236,27 +236,9 @@ function EmptyState() {
         Browse predictions and click the bookmark icon to save them here and track them live.
       </p>
 
-      {/* Onboarding cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 max-w-2xl mx-auto mb-8">
-        {[
-          { Icon: Bookmark, title: 'Save predictions you want to track', desc: 'Tap the bookmark icon on any prediction to save it here and watch it live.' },
-          { Icon: BarChart3, title: 'Watch them move in real time', desc: 'See if the prediction is tracking toward its target \u2014 before it resolves.' },
-          { Icon: Bell, title: 'Get notified when they resolve', desc: 'Enter your email to get an alert when any saved prediction gets its final verdict.' },
-        ].map((step, i) => (
-          <div key={i} className="card text-left">
-            <step.Icon className="w-6 h-6 text-accent mb-2" />
-            <h3 className="text-sm font-semibold mb-1">{step.title}</h3>
-            <p className="text-text-secondary text-xs leading-relaxed">{step.desc}</p>
-          </div>
-        ))}
-      </div>
-
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-3">
+      <div className="flex justify-center">
         <Link to="/leaderboard" className="btn-primary text-sm">
           <Trophy className="w-4 h-4" /> Browse Leaderboard
-        </Link>
-        <Link to="/" className="btn-secondary text-sm">
-          <Search className="w-4 h-4" /> Explore Assets
         </Link>
       </div>
     </div>
