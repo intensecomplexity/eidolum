@@ -207,7 +207,6 @@ export default function PortfolioSimulator({ forecasterId, forecasterName }) {
             <span className={`font-mono text-sm font-bold ${isPositive ? 'text-positive' : 'text-negative'}`}>{isPositive ? '+' : ''}{total_return_pct}%</span>
           )}
         </div>
-        {time_period && <p className="text-[10px] text-muted mt-1">{time_period}</p>}
       </div>
 
       {/* Chart */}
