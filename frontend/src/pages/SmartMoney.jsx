@@ -16,6 +16,7 @@ const SORTS = [
   { key: 'upside', label: 'Highest Upside' },
   { key: 'sector', label: 'By Sector' },
 ];
+const PAGE_SIZE = 25;
 
 export default function SmartMoney() {
   useSEO({
@@ -30,6 +31,7 @@ export default function SmartMoney() {
   const [sector, setSector] = useState('All Sectors');
   const [minAnalysts, setMinAnalysts] = useState(2);
   const [sort, setSort] = useState('analysts_count');
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
 
   useEffect(() => {
     setLoading(true);
@@ -38,7 +40,16 @@ export default function SmartMoney() {
     getSmartMoney(params).then(setData).catch(() => setData(null)).finally(() => setLoading(false));
   }, [sector, minAnalysts, sort]);
 
+  // Reset pagination when any filter (or tab) changes so a switch
+  // never strands the user mid-page on the old slice. Mirrors the
+  // sector-filter reset on ForecasterProfile's Prediction History.
+  useEffect(() => {
+    setVisibleCount(PAGE_SIZE);
+  }, [tab, sector, minAnalysts, sort]);
+
   const items = data ? (tab === 'bullish' ? data.bullish : data.bearish) : [];
+  const visibleItems = items.slice(0, visibleCount);
+  const remaining = Math.max(0, items.length - visibleCount);
 
   return (
     <div>
@@ -103,7 +114,7 @@ export default function SmartMoney() {
         {/* Cards */}
         {!loading && items.length > 0 && (
           <div className="space-y-3">
-            {items.map(item => (
+            {visibleItems.map(item => (
               <div key={item.ticker} className="card">
                 {/* Row 1: Logo + Ticker + Sector */}
                 <div className="flex items-center gap-2.5 mb-1.5">
@@ -166,6 +177,21 @@ export default function SmartMoney() {
                 </div>
               </div>
             ))}
+          </div>
+        )}
+
+        {/* Load more — client-paginated. Hidden when the full slice is
+            already on screen. Label shape matches ForecasterProfile's
+            Prediction History button so the two paginations feel like
+            one widget across the app. */}
+        {!loading && remaining > 0 && (
+          <div className="flex justify-center mt-4 sm:mt-6 mb-6 sm:mb-8">
+            <button
+              onClick={() => setVisibleCount(c => c + PAGE_SIZE)}
+              className="w-full sm:w-auto min-h-[44px] px-6 text-sm font-medium text-text-secondary bg-surface-2 border border-border rounded-lg active:border-accent/50 active:text-accent hover:border-accent/40 hover:text-accent transition-colors"
+            >
+              {remaining <= PAGE_SIZE ? `Load ${remaining} more` : `Load ${PAGE_SIZE} more (${remaining} remaining)`}
+            </button>
           </div>
         )}
 
