@@ -15,6 +15,7 @@ import SaveToast from './components/SaveToast';
 import ComparisonTray from './components/ComparisonTray';
 import OnboardingOverlay from './components/OnboardingOverlay';
 import VaultDoorSplash from './components/VaultDoorSplash';
+import { ErrorBoundary } from './components/ErrorBoundary';
 import LoadingSpinner from './components/LoadingSpinner';
 import Landing from './pages/Landing';
 import LandingPublic from './pages/LandingPublic';
@@ -135,6 +136,7 @@ export default function App() {
       {showOnboarding && !isAuthenticated && (
         <OnboardingOverlay onComplete={() => setShowOnboarding(false)} />
       )}
+      <ErrorBoundary>
       <Suspense fallback={<RouteFallback />}>
       <Routes>
         <Route path="/" element={isAuthenticated ? <Dashboard /> : <LandingPublic />} />
@@ -207,6 +209,7 @@ export default function App() {
         <Route path="*" element={<NotFound />} />
       </Routes>
       </Suspense>
+      </ErrorBoundary>
       <SaveToast />
       <ComparisonTray />
       <BottomNav />
