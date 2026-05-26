@@ -18,12 +18,12 @@ const API_BASE = 'https://eidolum-production.up.railway.app';
 
 function getDomainLabel(url) {
   if (!url) return null;
-  if (url.includes('benzinga.com')) return 'Benzinga';
+  if (url.includes('benzinga.com')) return 'Article';
   if (url.includes('stockanalysis.com')) return 'Stock Analysis';
   if (url.includes('youtube.com') || url.includes('youtu.be')) return 'YouTube';
   if (url.includes('x.com') || url.includes('twitter.com')) return 'X';
   if (url.includes('reddit.com')) return 'Reddit';
-  if (url.includes('financialmodelingprep.com')) return 'FMP';
+  if (url.includes('financialmodelingprep.com')) return 'Article';
   if (url.includes('seekingalpha.com')) return 'Seeking Alpha';
   if (url.includes('reuters.com')) return 'Reuters';
   if (url.includes('cnbc.com')) return 'CNBC';
@@ -36,13 +36,17 @@ function isRealArchive(url) {
 
 function getSourceLabel(verifiedBy) {
   if (!verifiedBy) return 'Community';
+  // Data-aggregator brand names collapse to 'Wall St' (Benzinga / FMP /
+  // Finnhub / Yahoo Finance / MarketBeat / NewsAPI / Alpha Vantage are
+  // infrastructure — the call's substantive source is the analyst).
+  // Social platforms keep their name since that's the genuine context.
   const map = {
-    massive_benzinga: 'Benzinga', benzinga_api: 'Benzinga', benzinga_web: 'Benzinga',
-    benzinga_rss: 'Benzinga', fmp_grades: 'FMP', fmp_ratings: 'FMP', fmp_pt: 'FMP',
-    fmp_daily_grades: 'FMP', finnhub_upgrade: 'Finnhub', finnhub_news: 'Finnhub',
-    finnhub_api: 'Finnhub', x_scraper: 'X', stocktwits_scraper: 'StockTwits',
-    alphavantage: 'Alpha Vantage', marketbeat_rss: 'MarketBeat',
-    yfinance: 'Yahoo Finance', newsapi: 'NewsAPI', ai_parsed: 'AI Parsed',
+    massive_benzinga: 'Wall St', benzinga_api: 'Wall St', benzinga_web: 'Wall St',
+    benzinga_rss: 'Wall St', fmp_grades: 'Wall St', fmp_ratings: 'Wall St', fmp_pt: 'Wall St',
+    fmp_daily_grades: 'Wall St', finnhub_upgrade: 'Wall St', finnhub_news: 'Wall St',
+    finnhub_api: 'Wall St', x_scraper: 'X', stocktwits_scraper: 'StockTwits',
+    alphavantage: 'Wall St', marketbeat_rss: 'Wall St',
+    yfinance: 'Wall St', newsapi: 'Wall St', ai_parsed: 'AI Parsed',
     user: 'Community', manual: 'Community',
   };
   return map[verifiedBy] || 'Community';

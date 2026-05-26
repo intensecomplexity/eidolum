@@ -79,13 +79,15 @@ function OutcomeBadge({ outcome, actualReturn, evaluationDeferred, evaluationDef
 
 function getSourceLabel(verifiedBy) {
   if (!verifiedBy) return 'Community';
+  // Data-aggregator brand names collapse to 'Wall St' — same mapping as
+  // SourceBadge.jsx and PredictionCard.jsx.
   const map = {
-    massive_benzinga: 'Benzinga', benzinga_api: 'Benzinga', benzinga_web: 'Benzinga',
-    benzinga_rss: 'Benzinga', fmp_grades: 'FMP', fmp_ratings: 'FMP', fmp_pt: 'FMP',
-    fmp_daily_grades: 'FMP', finnhub_upgrade: 'Finnhub', finnhub_news: 'Finnhub',
-    finnhub_api: 'Finnhub', x_scraper: 'X', stocktwits_scraper: 'StockTwits',
-    alphavantage: 'Alpha Vantage', marketbeat_rss: 'MarketBeat',
-    yfinance: 'Yahoo Finance', newsapi: 'NewsAPI', ai_parsed: 'AI Parsed',
+    massive_benzinga: 'Wall St', benzinga_api: 'Wall St', benzinga_web: 'Wall St',
+    benzinga_rss: 'Wall St', fmp_grades: 'Wall St', fmp_ratings: 'Wall St', fmp_pt: 'Wall St',
+    fmp_daily_grades: 'Wall St', finnhub_upgrade: 'Wall St', finnhub_news: 'Wall St',
+    finnhub_api: 'Wall St', x_scraper: 'X', stocktwits_scraper: 'StockTwits',
+    alphavantage: 'Wall St', marketbeat_rss: 'Wall St',
+    yfinance: 'Wall St', newsapi: 'Wall St', ai_parsed: 'AI Parsed',
     user: 'Community', manual: 'Community',
   };
   return map[verifiedBy] || 'Community';

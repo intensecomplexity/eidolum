@@ -1,13 +1,18 @@
 import { Lock } from 'lucide-react';
 import { formatDate } from '../utils/formatDate';
 
+// All data-aggregator verified_by values render as the generic 'Wall St'
+// badge — vendor brand names (Benzinga / FMP / Finnhub / Yahoo Finance /
+// MarketBeat / NewsAPI / Alpha Vantage) are infrastructure detail users
+// don't need. Social-platform sources keep their platform name since
+// that IS the substantive context (the call was made on X/StockTwits).
 const SOURCE_MAP = {
-  massive_benzinga: 'Benzinga', benzinga_api: 'Benzinga', benzinga_web: 'Benzinga',
-  benzinga_rss: 'Benzinga', fmp_grades: 'FMP', fmp_ratings: 'FMP', fmp_pt: 'FMP',
-  fmp_daily_grades: 'FMP', fmp_daily: 'FMP', finnhub_upgrade: 'Finnhub',
-  finnhub_news: 'Finnhub', finnhub_api: 'Finnhub', x_scraper: 'X',
-  stocktwits_scraper: 'StockTwits', alphavantage: 'Alpha Vantage',
-  marketbeat_rss: 'MarketBeat', yfinance: 'Yahoo Finance', newsapi: 'NewsAPI',
+  massive_benzinga: 'Wall St', benzinga_api: 'Wall St', benzinga_web: 'Wall St',
+  benzinga_rss: 'Wall St', fmp_grades: 'Wall St', fmp_ratings: 'Wall St', fmp_pt: 'Wall St',
+  fmp_daily_grades: 'Wall St', fmp_daily: 'Wall St', finnhub_upgrade: 'Wall St',
+  finnhub_news: 'Wall St', finnhub_api: 'Wall St', x_scraper: 'X',
+  stocktwits_scraper: 'StockTwits', alphavantage: 'Wall St',
+  marketbeat_rss: 'Wall St', yfinance: 'Wall St', newsapi: 'Wall St',
   ai_parsed: 'AI Parsed', user: 'Community', manual: 'Community',
 };
 
