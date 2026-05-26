@@ -176,13 +176,8 @@ export default function Settings() {
               { key: 'friends', label: 'Friend requests' },
               { key: 'prediction_results', label: 'Prediction results' },
               { key: 'comments', label: 'Comments on my predictions' },
-              { key: 'reactions', label: 'Reaction milestones' },
-              { key: 'duels', label: 'Duel updates' },
               { key: 'badges', label: 'Badge unlocks' },
-              { key: 'daily_challenge', label: 'Daily Challenge' },
-              { key: 'seasons', label: 'Season updates' },
               { key: 'watchlist', label: 'Watchlist alerts' },
-              { key: 'price_alerts', label: 'Price alerts' },
               { key: 'leaderboard', label: 'Leaderboard changes' },
             ].map(cat => (
               <ToggleRow

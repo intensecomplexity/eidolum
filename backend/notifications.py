@@ -22,6 +22,7 @@ TYPE_TO_CATEGORY = {
     "season_ended": "seasons",
     "season_ending": "seasons",
     "price_alert": "price_alerts",
+    "watchlist_alert": "watchlist",
     "watchlist_prediction": "watchlist",
     "leaderboard_rank": "leaderboard",
     "analyst_prediction": "watchlist",
