@@ -10,16 +10,12 @@ from sqlalchemy import text as sql_text
 
 from database import get_db
 from rate_limit import limiter
-from services.prediction_visibility import (
-    yt_visible_filter, non_qwen_filter, not_excluded_filter,
-)
+from services.prediction_visibility import yt_visible_filter
 from services.ticker_display import (
     resolve_ticker_display_name, resolve_ticker_display_sector,
 )
 
 _YT_VIS_P = yt_visible_filter("p")
-_NON_QWEN_P = non_qwen_filter("p")
-_NOT_EXCL_P = not_excluded_filter("p")
 
 router = APIRouter()
 
@@ -89,8 +85,6 @@ def get_smart_money(
           AND (p.prediction_date IS NULL
                OR p.prediction_date >= NOW() - INTERVAL '18 months')
           AND {_YT_VIS_P}
-          AND {_NON_QWEN_P}
-          AND {_NOT_EXCL_P}
           {sector_where}
         GROUP BY p.ticker, p.direction
         HAVING COUNT(DISTINCT p.forecaster_id) >= :min_analysts
@@ -119,8 +113,6 @@ def get_smart_money(
                OR p.prediction_date >= NOW() - INTERVAL '18 months')
           AND p.ticker = ANY(:tickers)
           AND {_YT_VIS_P}
-          AND {_NON_QWEN_P}
-          AND {_NOT_EXCL_P}
     """), {"ids": top_ids, "tickers": survivor_tickers}).fetchall()
 
     # Group by ticker + direction

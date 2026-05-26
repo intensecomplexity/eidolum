@@ -5,22 +5,17 @@ from sqlalchemy import text
 from database import get_db
 from models import Prediction, Forecaster
 from utils import append_youtube_timestamp
-from services.prediction_visibility import (
-    yt_visible_filter, not_excluded_filter, non_qwen_filter,
-)
+from services.prediction_visibility import yt_visible_filter
 from rate_limit import limiter
 
 router = APIRouter()
 
 # User-facing visibility policy: hide NULL-timestamp YouTube rows
-# (2026-04-18 policy), quality-excluded rows (excluded_from_training),
-# and Qwen-audit rows — matching every other user-facing router. This
-# feed previously applied no filter at all.
-_VISIBLE = text(
-    f"{yt_visible_filter('predictions')} "
-    f"AND {not_excluded_filter('predictions')} "
-    f"AND {non_qwen_filter('predictions')}"
-)
+# (2026-04-18 policy). not_excluded_filter and non_qwen_filter were
+# previously folded in here but are training-data filters, not user
+# filters — removing them recovers 348K legitimate Wall St rating
+# rows on user-facing feeds.
+_VISIBLE = text(yt_visible_filter('predictions'))
 
 
 @router.get("/predictions/today")

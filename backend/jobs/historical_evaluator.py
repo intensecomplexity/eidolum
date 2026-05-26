@@ -1004,24 +1004,18 @@ def refresh_all_forecaster_stats():
     Zeros out forecasters with 0 scored predictions so they don't appear on leaderboard."""
     from database import BgSessionLocal as SessionLocal
     from feature_flags import x_filter_sql
-    from services.prediction_visibility import (
-        YT_VISIBLE_FILTER_SQL, NON_QWEN_FILTER_SQL, NOT_EXCLUDED_FILTER_SQL,
-    )
+    from services.prediction_visibility import YT_VISIBLE_FILTER_SQL
     db = SessionLocal()
     updated = 0
     zeroed = 0
     try:
         x_filter = x_filter_sql(db)
-        # Cached leaderboard stats must not count hidden rows. Three
-        # filters compose: yt_visible (missing timestamp), non_qwen
-        # (Qwen LoRA during audit), and not_excluded (Ship #12 flag
-        # reused by sonnet_rules_v2_mis quarantine). All appended
-        # because neither aggregate query uses a table alias.
-        yt_visible = (
-            f"AND {YT_VISIBLE_FILTER_SQL} "
-            f"AND {NON_QWEN_FILTER_SQL} "
-            f"AND {NOT_EXCLUDED_FILTER_SQL}"
-        )
+        # Cached leaderboard stats must not count YouTube rows with
+        # NULL source_timestamp_seconds. non_qwen + not_excluded
+        # previously composed here too; those are training-data
+        # filters that quietly suppressed 348K Wall St rows from the
+        # cached accuracy stat — dropped 2026-05-27.
+        yt_visible = f"AND {YT_VISIBLE_FILTER_SQL}"
         # Step 1: Zero out ALL forecasters first (removes stale scores from unscored forecasters)
         db.execute(sql_text(
             "UPDATE forecasters SET total_predictions=0, correct_predictions=0, accuracy_score=0, alpha=0, avg_return=0 "
@@ -1077,8 +1071,6 @@ def refresh_all_forecaster_stats():
                     SELECT MAX(prediction_date) FROM predictions
                     WHERE forecaster_id = f.id
                       AND {YT_VISIBLE_FILTER_SQL}
-                      AND {NON_QWEN_FILTER_SQL}
-                      AND {NOT_EXCLUDED_FILTER_SQL}
                 )
             """))
             db.execute(sql_text("""
