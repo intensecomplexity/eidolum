@@ -31,7 +31,7 @@ export default function HowItWorks() {
                 <div>
                   <h3 className="font-semibold text-sm mb-1">Licensed Financial Data APIs</h3>
                   <p className="text-sm text-text-secondary leading-relaxed">
-                    We pull analyst ratings from Benzinga and Financial Modeling Prep (FMP). These are the same data sources used by Bloomberg terminals and institutional trading desks.
+                    We pull analyst ratings from the same licensed data sources used by Bloomberg terminals and institutional trading desks.
                   </p>
                 </div>
               </div>
@@ -65,7 +65,7 @@ export default function HowItWorks() {
         <section className="mb-12">
           <h2 className="font-bold text-xl sm:text-2xl mb-4" style={{ color: '#D4A843' }}>How Scoring Works</h2>
           <p className="text-text-secondary text-sm mb-4">
-            When a prediction's evaluation window expires, we look up the actual stock price using Polygon.io market data. Every prediction gets one of three scores:
+            When a prediction's evaluation window expires, we look up the actual stock price using licensed real-time market data. Every prediction gets one of three scores:
           </p>
 
           <div className="grid gap-4 sm:grid-cols-3 mb-8">
@@ -177,7 +177,7 @@ export default function HowItWorks() {
                 num: '3',
                 icon: BarChart3,
                 title: 'Specific Asset',
-                body: 'A single, identifiable instrument that can be priced by Polygon, Tiingo, or FMP. Baskets, watchlists, and "the market" do not qualify.',
+                body: 'A single, identifiable instrument that can be priced by our market-data providers. Baskets, watchlists, and "the market" do not qualify.',
               },
               {
                 num: '4',
