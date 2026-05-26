@@ -65,6 +65,17 @@ html[data-theme="light"] {
     font-family: inherit;
   }
 
+  /* iOS Safari leaves the document at the previous landscape width after
+     a portrait→landscape→portrait rotation when any descendant briefly
+     overflowed the viewport (wide table, Recharts inline-sized box, etc.).
+     Clipping horizontal overflow at the document root locks the page to
+     the visible viewport so rotation back to portrait shrinks the layout
+     correctly. overflow-y stays default, so position: sticky on the nav
+     keeps tracking the viewport. */
+  html, body {
+    overflow-x: hidden;
+  }
+
   body {
     @apply bg-bg text-text-primary;
     font-family: 'Sora', sans-serif;
