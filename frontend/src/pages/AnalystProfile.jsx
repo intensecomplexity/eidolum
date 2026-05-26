@@ -197,7 +197,7 @@ export default function AnalystProfile() {
           <div className="mb-6">
             <h2 className="text-xs text-muted uppercase tracking-wider mb-3">Recent Predictions</h2>
             {/* Mobile cards */}
-            <div className="sm:hidden space-y-2">
+            <div className="lg:hidden space-y-2">
               {profile.recent_predictions.map(p => (
                 <div key={p.id} className="card py-3">
                   <div className="flex items-center justify-between mb-1">
@@ -217,7 +217,7 @@ export default function AnalystProfile() {
               ))}
             </div>
             {/* Desktop table */}
-            <div className="hidden sm:block card overflow-hidden p-0">
+            <div className="hidden lg:block card overflow-hidden p-0">
               <table className="w-full">
                 <thead>
                   <tr className="text-left text-muted text-xs uppercase tracking-wider border-b border-border">

@@ -412,7 +412,7 @@ export default function Leaderboard() {
             ) : (
               <>
                 {/* Mobile: card list */}
-                <div className="sm:hidden space-y-3" key={metric}>
+                <div className="lg:hidden space-y-3" key={metric}>
                   {data.map((f, idx) => (
                     <div key={f.id} style={{ animation: `leaderboardFadeIn 0.3s ease-out ${idx * 0.03}s both` }}>
                       <LeaderboardCard forecaster={f} metric={metric} onSectorClick={setSector} />
@@ -421,7 +421,7 @@ export default function Leaderboard() {
                 </div>
 
                 {/* Tablet+: table */}
-                <div className="hidden sm:block card overflow-hidden p-0">
+                <div className="hidden lg:block card overflow-hidden p-0">
                   <div className="overflow-x-auto">
                     <table className="w-full">
                       <thead>

@@ -111,7 +111,7 @@ export default function LandingPublic() {
         ) : (
           <div className="rounded-lg border border-border overflow-hidden bg-surface">
             {/* Desktop table */}
-            <div className="hidden sm:block">
+            <div className="hidden lg:block">
               <table className="w-full">
                 <thead>
                   <tr className="text-left text-muted text-[11px] uppercase tracking-wider border-b border-border">
@@ -174,7 +174,7 @@ export default function LandingPublic() {
             </div>
 
             {/* Mobile card list */}
-            <div className="sm:hidden divide-y divide-border">
+            <div className="lg:hidden divide-y divide-border">
               {top5.map(f => {
                 const hits = f.hits || f.correct_predictions || 0;
                 const nears = f.nears || 0;

@@ -129,7 +129,7 @@ export default function FirmProfile() {
         <h2 className="text-sm font-semibold text-muted uppercase tracking-wider mb-3">Analysts</h2>
         <div className="card overflow-hidden p-0 mb-8">
           {/* Desktop */}
-          <div className="hidden sm:block">
+          <div className="hidden lg:block">
             <table className="w-full">
               <thead>
                 <tr className="text-left text-muted text-[11px] uppercase tracking-wider border-b border-border">
@@ -169,7 +169,7 @@ export default function FirmProfile() {
             </table>
           </div>
           {/* Mobile */}
-          <div className="sm:hidden divide-y divide-border">
+          <div className="lg:hidden divide-y divide-border">
             {data.analysts.map(a => (
               <div key={a.id} className="flex items-center justify-between px-4 py-3.5">
                 <Link to={a.slug ? `/analyst/${a.slug}` : `/forecaster/${a.id}`}

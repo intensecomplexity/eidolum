@@ -215,14 +215,14 @@ export default function AssetConsensus() {
                 quote + ExplainerLine that PredictionCard already shows, and
                 its green "Watch" link competed with the new prominent red
                 Watch CTA inside the card. Dropped per 2026-05-25. */}
-            <div className="sm:hidden space-y-3 mb-6">
+            <div className="lg:hidden space-y-3 mb-6">
               <h2 className="text-base font-semibold mb-2">Recent Predictions</h2>
               {(data.recent_predictions || []).map((p) => (
                 <PredictionCard key={p.prediction_id} prediction={p} showForecaster />
               ))}
             </div>
 
-            <div className="hidden sm:block card overflow-hidden p-0">
+            <div className="hidden lg:block card overflow-hidden p-0">
               <div className="px-6 py-4 border-b border-border">
                 <h2 className="text-lg font-semibold">Recent Predictions</h2>
               </div>

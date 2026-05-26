@@ -893,7 +893,7 @@ export default function ForecasterProfile() {
             Watch link was competing with the red CTA. Same dedup pattern
             applied to AssetConsensus in commit c903c6a. */}
         {activeTab === 'predictions' && <>
-        <div className="sm:hidden space-y-3 mb-6 mx-0">
+        <div className="lg:hidden space-y-3 mb-6 mx-0">
           <h2 className="text-base font-semibold mb-2">Prediction History</h2>
           {displayedPredictions.map((p) => (
             <div key={p.id} className="bg-surface border border-border rounded-xl overflow-hidden p-4" style={{ wordBreak: 'break-word' }}>
@@ -902,7 +902,7 @@ export default function ForecasterProfile() {
           ))}
         </div>
 
-        <div className="hidden sm:block card overflow-hidden p-0">
+        <div className="hidden lg:block card overflow-hidden p-0">
           <div className="px-6 py-4 border-b border-border">
             <h2 className="text-lg font-semibold">Prediction History</h2>
           </div>

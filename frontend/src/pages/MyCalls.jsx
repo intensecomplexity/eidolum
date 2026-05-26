@@ -113,7 +113,7 @@ export default function MyCalls() {
         )}
 
         {/* Mobile cards */}
-        <div className="sm:hidden space-y-3">
+        <div className="lg:hidden space-y-3">
           {predictions.map(p => (
             <PredictionCard key={p.id} p={p} onDelete={handleDelete} />
           ))}
@@ -121,7 +121,7 @@ export default function MyCalls() {
 
         {/* Desktop table */}
         {predictions.length > 0 && (
-          <div className="hidden sm:block card overflow-hidden p-0">
+          <div className="hidden lg:block card overflow-hidden p-0">
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead>
