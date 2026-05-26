@@ -940,7 +940,6 @@ export default function ForecasterProfile() {
                   <th className="px-3 py-3 text-center">Outcome</th>
                   <th className="px-3 py-3 text-right">Return</th>
                   <th className="px-3 py-3 text-center hidden md:table-cell">Eval Date</th>
-                  <th className="px-3 py-3 hidden lg:table-cell w-[200px]">Context</th>
                 </tr>
               </thead>
               <tbody>
@@ -1451,18 +1450,10 @@ function PredictionRow({ p, forecaster: fc }) {
             </span>
           ) : <span className="text-muted">-</span>}
         </td>
-        <td className="px-3 py-3 hidden lg:table-cell w-[200px] max-w-[200px] overflow-hidden">
-          <div className="flex items-center gap-1 max-w-[200px]" title={quoteText}>
-            <span className="text-text-secondary text-xs italic truncate min-w-0">
-              {quoteText.length > 48 ? quoteText.slice(0, 48) + '...' : quoteText}
-            </span>
-            <span className="text-muted text-xs shrink-0">{expanded ? '\u25BC' : '\u203A'}</span>
-          </div>
-        </td>
       </tr>
       {expanded && (
         <tr className="bg-surface-2/30">
-          <td colSpan={10} className="px-6 py-4">
+          <td colSpan={9} className="px-6 py-4">
             {/* Full quote with glossary tooltips */}
             <blockquote style={{
               borderLeft: '3px solid #00c896',

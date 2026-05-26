@@ -232,7 +232,9 @@ def _inner(db: Session):
                 prediction_date=pred_date, evaluation_date=pred_date + timedelta(days=window_days),
                 window_days=window_days, source_url=source_url, archive_url=source_url,
                 source_type="article", source_platform_id=source_id,
-                target_price=new_pt, entry_price=old_pt,
+                # entry_price must be spot-at-prediction; old_pt is the
+                # analyst's prior target. Leave NULL — evaluator fills.
+                target_price=new_pt, entry_price=None,
                 context=context, exact_quote=context,
                 outcome="pending", verified_by="benzinga_web",
             ))

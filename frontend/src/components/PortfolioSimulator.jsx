@@ -1,15 +1,64 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { ChevronDown } from 'lucide-react';
-import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, ReferenceLine } from 'recharts';
+import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 import { getForecasterSimulator } from '../api';
+
+// "YYYY-MM-DD" → UTC midnight epoch ms. Used to feed Recharts a numeric
+// X-axis so ticks can land at evenly-spaced calendar positions rather
+// than at the irregular dates of actual trades.
+function parseISODateUTC(s) {
+  if (!s || typeof s !== 'string') return null;
+  const [y, m, d] = s.split('-').map(Number);
+  if (!y || !m || !d) return null;
+  return Date.UTC(y, m - 1, d);
+}
+
+function formatDDMMYYYY(ms) {
+  if (ms == null || !isFinite(ms)) return '';
+  const d = new Date(ms);
+  const dd = String(d.getUTCDate()).padStart(2, '0');
+  const mm = String(d.getUTCMonth() + 1).padStart(2, '0');
+  return `${dd}/${mm}/${d.getUTCFullYear()}`;
+}
+
+// Pick a month-step that yields ~5-8 ticks across the span, then walk
+// forward in month-aligned increments. Long spans (11y) get 24-month
+// steps → 5-6 ticks; sub-year spans get monthly → up to 12 ticks. Ticks
+// always land on the 1st of a month so labels read cleanly regardless
+// of where individual trade dates fall.
+function buildTimeTicks(minMs, maxMs) {
+  if (!isFinite(minMs) || !isFinite(maxMs) || maxMs <= minMs) return undefined;
+  const monthMs = 30.44 * 86400000;
+  const spanMonths = (maxMs - minMs) / monthMs;
+  const candidates = [1, 2, 3, 6, 12, 24, 36, 60];
+  let stepMonths = candidates[candidates.length - 1];
+  for (const s of candidates) {
+    if (spanMonths / s <= 7) { stepMonths = s; break; }
+  }
+  const start = new Date(minMs);
+  let y = start.getUTCFullYear();
+  let m = start.getUTCMonth();
+  if (start.getUTCDate() > 1) m += 1;
+  while (m >= 12) { m -= 12; y += 1; }
+  const ticks = [];
+  let cursor = Date.UTC(y, m, 1);
+  while (cursor <= maxMs) {
+    ticks.push(cursor);
+    m += stepMonths;
+    while (m >= 12) { m -= 12; y += 1; }
+    cursor = Date.UTC(y, m, 1);
+  }
+  return ticks.length >= 2 ? ticks : undefined;
+}
 
 function SimTooltip({ active, payload }) {
   if (!active || !payload?.length) return null;
   const d = payload[0].payload;
+  const dateLabel = d.ts != null ? formatDDMMYYYY(d.ts) : d.date;
   return (
     <div className="bg-surface border border-border rounded-lg px-3 py-2 text-xs shadow-lg">
-      <div className="text-muted mb-0.5">{d.date}</div>
+      <div className="text-muted mb-0.5">{dateLabel}</div>
       <div className="font-mono text-accent font-bold">${d.value?.toLocaleString()}</div>
       {d.prediction && <div className="text-text-secondary mt-0.5">{d.prediction}</div>}
     </div>
@@ -37,6 +86,27 @@ export default function PortfolioSimulator({ forecasterId, forecasterName }) {
       .finally(() => setLoading(false));
   }, [forecasterId]);
 
+  // Parse the API's "YYYY-MM-DD" strings into epoch ms once per fetch.
+  // Doing this here (instead of inside the scaled map below) keeps the
+  // tick array stable across $1k/$10k/$50k/$100k toggles — capital
+  // affects value, never the date axis.
+  const sourceTimeline = useMemo(() => {
+    const rows = data?.portfolio_over_time || [];
+    return rows
+      .map(p => {
+        const ts = parseISODateUTC(p.date);
+        return ts != null ? { ...p, ts } : null;
+      })
+      .filter(Boolean);
+  }, [data]);
+
+  const xAxisTicks = useMemo(() => {
+    if (sourceTimeline.length < 2) return undefined;
+    const min = sourceTimeline[0].ts;
+    const max = sourceTimeline[sourceTimeline.length - 1].ts;
+    return buildTimeTicks(min, max);
+  }, [sourceTimeline]);
+
   if (loading) return (
     <div className="card mb-6">
       <div className="flex items-center justify-center h-[100px]">
@@ -48,7 +118,7 @@ export default function PortfolioSimulator({ forecasterId, forecasterName }) {
   if (!data || data.insufficient_data) return null;
 
   const { starting_capital, current_value, total_return_pct, total_predictions,
-          time_period, alpha, best_call, worst_call, portfolio_over_time, trades } = data;
+          time_period, alpha, best_call, worst_call, trades } = data;
 
   // Scale all values proportionally based on custom starting capital.
   // When customCapital is 0 (or input was cleared), scale=0 → every chart
@@ -56,7 +126,9 @@ export default function PortfolioSimulator({ forecasterId, forecasterName }) {
   // case since "X% of $0" is meaningless.
   const scale = customCapital / (starting_capital || 10000);
   const scaledCurrent = Math.round(current_value * scale);
-  const scaledTimeline = (portfolio_over_time || []).map(p => ({
+  // Use the memoized timeline that already carries the parsed `ts`
+  // epoch — keeps the X-axis numeric and lets explicit ticks render.
+  const scaledTimeline = sourceTimeline.map(p => ({
     ...p, value: Math.round(p.value * scale),
   }));
   const scaledTrades = (trades || []).map(t => ({
@@ -136,12 +208,15 @@ export default function PortfolioSimulator({ forecasterId, forecasterName }) {
               </defs>
               <CartesianGrid strokeDasharray="3 3" stroke="rgba(128,128,128,0.15)" />
               <XAxis
-                dataKey="date"
+                dataKey="ts"
+                type="number"
+                domain={['dataMin', 'dataMax']}
+                ticks={xAxisTicks}
+                tickFormatter={formatDDMMYYYY}
                 tick={{ fill: '#8b8f9a', fontSize: 10 }}
-                tickFormatter={d => d?.slice(5) || ''}
                 axisLine={{ stroke: '#1e2028' }}
                 tickLine={false}
-                minTickGap={30}
+                interval={0}
               />
               <YAxis
                 tick={{ fill: '#8b8f9a', fontSize: 10 }}
@@ -151,7 +226,6 @@ export default function PortfolioSimulator({ forecasterId, forecasterName }) {
                 width={60}
               />
               <Tooltip content={<SimTooltip />} cursor={{ stroke: 'rgba(255,255,255,0.1)' }} />
-              <ReferenceLine y={customCapital} stroke="#8b8f9a" strokeDasharray="3 3" strokeWidth={1} />
               <Area
                 type="monotone"
                 dataKey="value"

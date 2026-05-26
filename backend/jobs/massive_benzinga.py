@@ -310,13 +310,13 @@ def _process_rating(rating: dict, db: Session) -> bool:
         except (ValueError, TypeError):
             pass
 
-    # Entry price (previous PT)
+    # entry_price must hold spot-at-prediction (the evaluator computes
+    # return = (price − entry_price) / entry_price). pt_prior is the
+    # analyst's previous price target, NOT spot — writing it here
+    # corrupts every downstream return calculation. Leave NULL and let
+    # the evaluator fill it from historical close on the first scoring
+    # pass (jobs/historical_evaluator.py "Bug 8" lookup).
     entry_price = None
-    if pt_prior:
-        try:
-            entry_price = float(str(pt_prior).replace("$", "").replace(",", ""))
-        except (ValueError, TypeError):
-            pass
 
     # Window: 365 days for price targets, 90 for rating changes
     window_days = 365 if target_price else 90
