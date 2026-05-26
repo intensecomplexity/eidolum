@@ -235,13 +235,11 @@ export default function Discover() {
                 );
               })}
             </div>
-            {sectors.filter(s => (s.sector || s.name) !== 'Other').length > 9 && (
-              <div className="text-center mt-3">
-                <Link to="/sectors" className="text-accent text-xs font-medium inline-flex items-center gap-1">
-                  View all sectors <ArrowRight className="w-3 h-3" />
-                </Link>
-              </div>
-            )}
+            <div className="text-center mt-3">
+              <Link to="/sectors" className="text-accent text-xs font-medium inline-flex items-center gap-1">
+                View all sectors <ArrowRight className="w-3 h-3" />
+              </Link>
+            </div>
           </div>
         )}
 
