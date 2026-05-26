@@ -1,0 +1,46 @@
+name: Sync staging with main
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout staging branch
+        uses: actions/checkout@v4
+        with:
+          ref: staging
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Configure git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Fetch main
+        run: git fetch origin main
+
+      - name: Merge main into staging
+        id: merge
+        run: |
+          set -e
+          if git merge --ff-only origin/main 2>/dev/null; then
+            echo "result=fast-forward" >> "$GITHUB_OUTPUT"
+          else
+            git merge origin/main --no-edit -m "chore: auto-merge main into staging [skip ci]"
+            echo "result=merge-commit" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Push staging
+        run: git push origin staging
+
+      - name: Summary
+        run: |
+          echo "Synced staging with main: ${{ steps.merge.outputs.result }}"
