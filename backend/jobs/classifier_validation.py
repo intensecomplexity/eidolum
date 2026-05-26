@@ -1,7 +1,7 @@
 """Post-classifier validation gate.
 
 Rejects garbage predictions before they become rows in `predictions`.
-Six rules, run in order by `validate_or_reject`. Each rule is an
+Seven rules, run in order by `validate_or_reject`. Each rule is an
 independently unit-testable function returning ``(accepted, reason)``.
 
 Schema notes (verified 2026-05-16):
@@ -9,18 +9,34 @@ Schema notes (verified 2026-05-16):
     (~12k rows; ticker -> company_name), which is the populated reference.
   * `predictions.context` is a templated label ("Channel: Bull/Bear on
     TICKER"), NOT the analyst's words. The real quoted text is
-    `source_verbatim_quote`. All text rules (2/3/4/6) therefore operate on
+    `source_verbatim_quote`. All text rules (2/3/4/6/7) therefore operate on
     the verbatim quote, not `context`.
 
 This module performs only read-only DB queries — never writes. Rule 5
 detects contradictions; the caller (youtube_classifier) performs the
 `excluded_from_training` write via `contradicting_ids()`.
+
+Rule 7 (reported-speech rejection) is gated by the
+CLASSIFIER_RULE_REPORTED_SPEECH env var so production can switch it
+between enforce / shadow / off without redeploying.
 """
+import logging
+import os
 import re
 from sqlalchemy import text
 
+log = logging.getLogger(__name__)
+
 # exclusion_rule_version is varchar(16) — keep <=16 chars.
 RULE_VERSION = "classifier_gate"
+
+# Rule 7 kill switch — flip via Railway env var:
+#   CLASSIFIER_RULE_REPORTED_SPEECH=enforce  (default) block matches
+#   CLASSIFIER_RULE_REPORTED_SPEECH=shadow   log would-be rejections, let through
+#   CLASSIFIER_RULE_REPORTED_SPEECH=off      skip rule entirely
+_REPORTED_SPEECH_MODE = os.environ.get(
+    "CLASSIFIER_RULE_REPORTED_SPEECH", "enforce"
+).lower()
 
 # reason code -> telemetry counter key (Step 4 cycle stats line)
 TELEMETRY_KEYS = {
@@ -30,6 +46,7 @@ TELEMETRY_KEYS = {
     "past_tense_only": "past_tense",
     "contradictory_pair": "contradictory",
     "context_too_short": "context_short",
+    "reported_speech": "reported_speech",
 }
 
 _CORP_SUFFIXES = {
@@ -220,6 +237,75 @@ def check_min_length(quote):
     return True, None
 
 
+# ── Rule 7 ────────────────────────────────────────────────────────────────
+# Attribution verbs that signal third-person reporting. Case-insensitive
+# since transcripts vary in casing on these.
+_REPORTED_SPEECH_PATTERNS = [
+    re.compile(
+        r"\b(?:said|stated|claimed|mentioned|warned|predicted|tweeted|posted|"
+        r"wrote|told|argued|insisted|noted|forecasted?|recommended|advised|"
+        r"reiterated)\b",
+        re.I,
+    ),
+    re.compile(r"\baccording to\b", re.I),
+    # "per <CapitalizedName>" — the trailing name MUST start with a
+    # capital letter to avoid matching common-noun uses like "$10 per
+    # share". "per" itself stays case-insensitive so sentence-initial
+    # "Per Goldman Sachs..." also catches.
+    re.compile(r"(?i:\bper)\s+[A-Z][a-z]+"),
+    # "<Capitalized Name> believes/thinks/expects/..." — strict caps on the
+    # name pattern so this fires only on proper nouns, not common-word
+    # collocations. (?i:...) keeps the verb list case-insensitive.
+    re.compile(
+        r"\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+)?\s+"
+        r"(?i:believes|thinks|expects|is\s+calling|has\s+been\s+calling|"
+        r"is\s+predicting|sees|projects)\b"
+    ),
+    re.compile(
+        r"\bin (?:his|her|their) (?:latest|recent|new)?\s*"
+        r"(?:note|report|interview|appearance|tweet|post)\b",
+        re.I,
+    ),
+]
+
+# First-person prediction language — overrides reported-speech rejection so
+# a row that genuinely is the speaker's own call but also references a
+# third party ("My call: NVDA $1500; Buffett also said something") passes.
+# Contractions ("We're", "I'll", "I've") are accepted via the optional
+# '\w+ group after the pronoun.
+_FIRST_PERSON_OVERRIDE = re.compile(
+    r"\b(?:I|we|my|our|me)(?:'\w+)?\b(?:\s+\w+){0,5}\s+"
+    r"(?:think(?:ing)?|believe|expect(?:ing)?|predict(?:ing)?|"
+    r"see(?:ing)?|project(?:ing)?|target(?:ing)?|call(?:ing)?|"
+    r"am\s+calling)\b",
+    re.I,
+)
+
+
+def check_reported_speech(quote):
+    """Reject reported-speech predictions ("Cathie Wood said TSLA to $2000").
+
+    The verbatim quote captures what the classifier extracted as
+    evidence; if that text attributes the prediction to a third party
+    rather than the channel's own forward-looking statement, the row
+    violates the Seven-Pillars "named forecaster" rule — we should not
+    credit MarketWatch / Yahoo Finance / etc. for a Cathie-Wood call
+    they're merely reporting on.
+
+    First-person hedges are checked first so a prediction that *also*
+    references a third party (e.g. "My call: NVDA $1500, Buffett also
+    said something about Apple") passes.
+    """
+    if not quote or not quote.strip():
+        return True, None
+    if _FIRST_PERSON_OVERRIDE.search(quote):
+        return True, None
+    for pat in _REPORTED_SPEECH_PATTERNS:
+        if pat.search(quote):
+            return False, "reported_speech"
+    return True, None
+
+
 # ── Orchestrator ──────────────────────────────────────────────────────────
 def validate_or_reject(pred, db, ref_time=None, exclude_id=None):
     """Run all six rules in order. Returns ``(accepted, reason)``.
@@ -251,4 +337,20 @@ def validate_or_reject(pred, db, ref_time=None, exclude_id=None):
     ok, reason = check_min_length(quote)
     if not ok:
         return False, reason
+    # Rule 7 — reported-speech rejection. Gated by env var so we can flip
+    # to shadow/off without redeploying if false-positives surface at scale.
+    if _REPORTED_SPEECH_MODE != "off":
+        ok, reason = check_reported_speech(quote)
+        if not ok:
+            if _REPORTED_SPEECH_MODE == "shadow":
+                log.warning(
+                    "[rule_7_shadow] would reject %s via reported_speech: %s",
+                    ticker, (quote or "")[:120],
+                )
+            else:  # 'enforce' (default; unknown values also enforce defensively)
+                log.info(
+                    "[rule_7_enforce] rejected %s via reported_speech: %s",
+                    ticker, (quote or "")[:120],
+                )
+                return False, "reported_speech"
     return True, None
