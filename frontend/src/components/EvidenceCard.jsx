@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Play, ExternalLink, X as XIcon, Search, Archive, MessageSquare, Newspaper, Link2 } from 'lucide-react';
 import getSourceUrl from '../utils/getSourceUrl';
+import { getSourceBadgeKey } from '../utils/getSourceBadgeKey';
 import { annotateContext, ExplainerLine } from '../utils/predictionExplainer';
 
 const SOURCE_BADGES = {
@@ -74,6 +75,7 @@ export default function EvidenceCard({ prediction: p, forecaster = null, expanda
   // Build contextual search link as fallback
   const fc = forecaster || p.forecaster || null;
   const ctxSource = getSourceUrl(p, fc);
+  const isStructuredSource = getSourceBadgeKey(p, fc) === 'institutional';
 
   // Compact mode: just the quote and source link inline
   if (compact) {
@@ -84,7 +86,7 @@ export default function EvidenceCard({ prediction: p, forecaster = null, expanda
             <p className="text-text-secondary text-xs italic leading-relaxed truncate">
               &ldquo;{annotateContext(displayQuote.slice(0, 100), p.ticker)}{displayQuote.length > 100 ? '...' : ''}&rdquo;
             </p>
-            <ExplainerLine prediction={p} className="mt-0.5" />
+            {!isStructuredSource && <ExplainerLine prediction={p} className="mt-0.5" />}
           </>
         )}
         {hasRealVideo && p.source_type === 'youtube' && (
@@ -144,7 +146,7 @@ export default function EvidenceCard({ prediction: p, forecaster = null, expanda
           {expanded && displayQuote.length > 10 && (
             <span className="absolute bottom-1 right-3 text-warning/30 text-3xl font-serif leading-none select-none">&rdquo;</span>
           )}
-          <ExplainerLine prediction={p} className="mt-2 pl-4 not-italic" />
+          {!isStructuredSource && <ExplainerLine prediction={p} className="mt-2 pl-4 not-italic" />}
         </div>
       )}
 
@@ -271,8 +273,9 @@ export default function EvidenceCard({ prediction: p, forecaster = null, expanda
         </div>
       )}
 
-      {/* Disclaimer */}
-      {expanded && (
+      {/* Disclaimer — Wall St rows have no extracted quote, so the
+          "quote sourced" copy is misleading there. */}
+      {expanded && !isStructuredSource && (
         <p className="text-[10px] text-muted italic mt-2">
           Quote sourced from public statement. Eidolum does not provide investment advice.
         </p>

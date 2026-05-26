@@ -891,8 +891,9 @@ export default function PredictionCard({ prediction: p, showForecaster = false, 
           flex-col which preserves the original explainer→ratingChange→
           quote order. JSX order is preserved (matches desktop). */}
       <div className="flex flex-col-reverse md:flex-col">
-        {/* Line 5: Explainer (gold) */}
-        <ExplainerLine prediction={p} className="mb-1" />
+        {/* Line 5: Explainer (gold) — hidden on Wall St structured cards
+            where the rating-action header already conveys it. */}
+        {!isStructuredSource && <ExplainerLine prediction={p} className="mb-1" />}
 
         {/* Rating change context */}
         {(() => {
@@ -947,8 +948,10 @@ export default function PredictionCard({ prediction: p, showForecaster = false, 
         <CommentSection predictionId={predId} source={fc ? 'analyst' : 'user'} />
       )}
 
-      {/* Disclaimer */}
-      {!compact && (
+      {/* Disclaimer — Wall St rows have no extracted quote (structured
+          API data, no analyst voice), so the "quote sourced" copy is
+          misleading there. Hidden on those; kept for transcript/social. */}
+      {!compact && !isStructuredSource && (
         <p className="text-muted/50 text-[9px] italic mt-2 pt-1.5 border-t border-border/20 leading-relaxed">
           Quote sourced from public statement. Not investment advice.
         </p>
