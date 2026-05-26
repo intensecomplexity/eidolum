@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Bookmark } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useSavedPredictions } from '../context/SavedPredictionsContext';
+import { useSignInPrompt } from '../hooks/useSignInPrompt';
 
 export default function BookmarkButton({
   predictionId,
@@ -14,7 +15,7 @@ export default function BookmarkButton({
   const { isAuthenticated } = useAuth();
   const { isSaved, toggleSave } = useSavedPredictions();
   const [animating, setAnimating] = useState(false);
-  const [signInPrompt, setSignInPrompt] = useState(false);
+  const { showPrompt, promptElement } = useSignInPrompt('Sign in to save predictions');
   const saved = isSaved(predictionId);
 
   // Mirrors FollowButton's pattern: unauthenticated clicks surface a
@@ -25,20 +26,13 @@ export default function BookmarkButton({
     e.preventDefault();
     e.stopPropagation();
     if (!isAuthenticated) {
-      setSignInPrompt(true);
-      setTimeout(() => setSignInPrompt(false), 3500);
+      showPrompt();
       return;
     }
     setAnimating(true);
     toggleSave(predictionId);
     setTimeout(() => setAnimating(false), 300);
   }
-
-  const promptToast = signInPrompt ? (
-    <div className="fixed bottom-[80px] sm:bottom-6 left-1/2 -translate-x-1/2 z-[70] px-4 py-2.5 rounded-xl text-xs font-medium shadow-lg border bg-surface border-border text-text-primary backdrop-blur-sm toast-slide-up">
-      Sign in to save predictions
-    </div>
-  ) : null;
 
   // Floating variant: thumb-sized pill (44x44 on mobile, 36x36 on
   // desktop) used by PredictionCard's top-right placement. Background +
@@ -61,7 +55,7 @@ export default function BookmarkButton({
             className={`w-6 h-6 md:w-5 md:h-5 transition-all ${saved ? 'fill-accent' : ''}`}
           />
         </button>
-        {promptToast}
+        {promptElement}
       </>
     );
   }
