@@ -5,6 +5,7 @@ import App from './App'
 import { SavedPredictionsProvider } from './context/SavedPredictionsContext'
 import { AuthProvider } from './context/AuthContext'
 import { FeatureProvider } from './context/FeatureContext'
+import { LimitReachedProvider } from './context/LimitReachedContext'
 import './index.css'
 
 ReactDOM.createRoot(document.getElementById('root')).render(
@@ -12,9 +13,11 @@ ReactDOM.createRoot(document.getElementById('root')).render(
     <BrowserRouter>
       <AuthProvider>
         <FeatureProvider>
-          <SavedPredictionsProvider>
-            <App />
-          </SavedPredictionsProvider>
+          <LimitReachedProvider>
+            <SavedPredictionsProvider>
+              <App />
+            </SavedPredictionsProvider>
+          </LimitReachedProvider>
         </FeatureProvider>
       </AuthProvider>
     </BrowserRouter>
