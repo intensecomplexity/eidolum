@@ -23,13 +23,15 @@ function utcMsToLocalDate(ms) {
   return new Date(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
 }
 
+const MONTHS_SHORT = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
 // Pick a month-step that yields ~5-8 ticks across the span, then walk
 // forward in month-aligned increments. Long spans (11y) get 24-month
 // steps → 5-6 ticks; sub-year spans get monthly → up to 12 ticks. Ticks
 // always land on the 1st of a month so labels read cleanly regardless
 // of where individual trade dates fall.
 function buildTimeTicks(minMs, maxMs) {
-  if (!isFinite(minMs) || !isFinite(maxMs) || maxMs <= minMs) return undefined;
+  if (!isFinite(minMs) || !isFinite(maxMs) || maxMs <= minMs) return { ticks: undefined, stepMonths: 12 };
   const monthMs = 30.44 * 86400000;
   const spanMonths = (maxMs - minMs) / monthMs;
   const candidates = [1, 2, 3, 6, 12, 24, 36, 60];
@@ -56,8 +58,8 @@ function buildTimeTicks(minMs, maxMs) {
   // too few ticks to read the axis.
   const pad = stepMonths * monthMs * 0.35;
   const filtered = ticks.filter(t => t - minMs >= pad && maxMs - t >= pad);
-  if (filtered.length >= 2) return filtered;
-  return ticks.length >= 2 ? ticks : undefined;
+  const finalTicks = filtered.length >= 2 ? filtered : (ticks.length >= 2 ? ticks : undefined);
+  return { ticks: finalTicks, stepMonths };
 }
 
 function SimTooltip({ active, payload }) {
@@ -109,12 +111,29 @@ export default function PortfolioSimulator({ forecasterId, forecasterName }) {
       .sort((a, b) => a.ts - b.ts);
   }, [data]);
 
-  const xAxisTicks = useMemo(() => {
-    if (sourceTimeline.length < 2) return undefined;
+  // Track viewport width so mobile gets fewer ticks. Recharts will print
+  // every tick we pass, so on ~380px screens we must hand it a thinner
+  // array — otherwise full date labels collide into each other.
+  const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined' && window.innerWidth < 640);
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const handler = () => setIsMobile(window.innerWidth < 640);
+    window.addEventListener('resize', handler);
+    return () => window.removeEventListener('resize', handler);
+  }, []);
+
+  const { ticks: rawTimeTicks, stepMonths } = useMemo(() => {
+    if (sourceTimeline.length < 2) return { ticks: undefined, stepMonths: 12 };
     const min = sourceTimeline[0].ts;
     const max = sourceTimeline[sourceTimeline.length - 1].ts;
     return buildTimeTicks(min, max);
   }, [sourceTimeline]);
+
+  const xAxisTicks = useMemo(() => {
+    if (!rawTimeTicks || rawTimeTicks.length === 0) return undefined;
+    if (!isMobile || rawTimeTicks.length <= 4) return rawTimeTicks;
+    return rawTimeTicks.filter((_, i) => i % 2 === 0);
+  }, [rawTimeTicks, isMobile]);
 
   // When the whole simulation lives inside one calendar year, drop the
   // year suffix on the X-axis to avoid clutter — "May 21" beats
@@ -227,8 +246,17 @@ export default function PortfolioSimulator({ forecasterId, forecasterName }) {
                 domain={['dataMin', 'dataMax']}
                 ticks={xAxisTicks}
                 tickFormatter={(ms) => {
+                  // Compact labels — full-month-name "August 17, 2025"
+                  // smears together on ~380px mobile. Multi-year + year-
+                  // aligned step (≥12mo) → year only ("2017"). Multi-
+                  // year + sub-year step → "Mon 'YY" so 6-month ticks
+                  // don't collapse into duplicate-year labels. Same-
+                  // year sims keep day-of-month for finer reading.
                   if (ms == null || !isFinite(ms)) return '';
-                  return formatDate(utcMsToLocalDate(ms), { includeYear: !allSameYear });
+                  const d = utcMsToLocalDate(ms);
+                  if (allSameYear) return `${MONTHS_SHORT[d.getMonth()]} ${d.getDate()}`;
+                  if (stepMonths >= 12) return String(d.getFullYear());
+                  return `${MONTHS_SHORT[d.getMonth()]} '${String(d.getFullYear() % 100).padStart(2, '0')}`;
                 }}
                 tick={{ fill: '#8b8f9a', fontSize: 10 }}
                 axisLine={{ stroke: '#1e2028' }}
