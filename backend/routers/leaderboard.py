@@ -894,9 +894,9 @@ def _build_filtered_leaderboard(db: Session, sector=None, call_type=None, sort="
     if timeframe == "short":
         where_clauses.append("p.window_days <= 90")
     elif timeframe == "medium":
-        where_clauses.append("p.window_days > 90 AND p.window_days <= 365")
+        where_clauses.append("p.window_days > 90 AND p.window_days < 365")
     elif timeframe == "long":
-        where_clauses.append("p.window_days > 365")
+        where_clauses.append("p.window_days >= 365")
 
     where_sql = " AND ".join(where_clauses)
     params["min_preds"] = min_predictions
@@ -1236,8 +1236,8 @@ def get_available_timeframes(request: Request, db: Session = Depends(get_db)):
     min_preds = 5
     buckets = {
         "short": "p.window_days <= 90",
-        "medium": "p.window_days > 90 AND p.window_days <= 365",
-        "long": "p.window_days > 365",
+        "medium": "p.window_days > 90 AND p.window_days < 365",
+        "long": "p.window_days >= 365",
     }
     result = {"all": True}  # always available
     for key, where in buckets.items():

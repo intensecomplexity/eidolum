@@ -373,7 +373,7 @@ export default function Leaderboard() {
                     { key: 'all', label: 'All', tip: 'All prediction timeframes' },
                     { key: 'short', label: 'Short', tip: 'Predictions 90 days or less' },
                     { key: 'medium', label: 'Mid', tip: 'Predictions between 91 and 365 days' },
-                    { key: 'long', label: 'Long', tip: 'Predictions over 1 year' },
+                    { key: 'long', label: 'Long', tip: 'Predictions of 1 year or more' },
                   ].filter(tf => tf.key === 'all' || availableTf[tf.key]).map(tf => (
                     <button key={tf.key} onClick={() => setTimeframe(tf.key)} title={tf.tip}
                       className={`px-2.5 py-1 rounded text-[11px] font-semibold transition-colors ${
