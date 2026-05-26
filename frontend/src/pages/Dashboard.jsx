@@ -93,9 +93,15 @@ export default function Dashboard() {
   // HeroBand + HowItWorks render at the top with stats from the backend.
   const heroEnabled = usePublicFlag('homepage_hero');
   const scoredCount = profile?.scored_predictions || 0;
+  const totalPredsCount = profile?.total_predictions || 0;
   const isFirstCall = profile && scoredCount === 0;
   const isNewcomer = profile && scoredCount < 3;
   const showFirstCallCta = heroEnabled && isFirstCall;
+  // CTA copy switches once the user has submitted at least one call
+  // (scored or pending), so returning users with only pending calls
+  // don't see "Make your first call." Falsy until profile loads, so a
+  // brand-new account never briefly sees the returning-user title.
+  const hasSubmitted = totalPredsCount > 0;
   // Editorial hero (UI-marathon) shown when Ship #13 hero is OFF and the
   // user is logged out OR has zero scored predictions. Removed once they
   // have at least one scored call so it never re-appears.
@@ -434,7 +440,7 @@ export default function Dashboard() {
     >
       <div>
         <div className="headline-serif text-text-primary text-2xl sm:text-3xl leading-tight">
-          Make your first call
+          {hasSubmitted ? 'Submit a call' : 'Make your first call'}
         </div>
         <div className="text-sm sm:text-base text-text-secondary mt-1.5">
           Pick a ticker, set a target, lock it. The market will grade you.
