@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { getSavedIds, savePrediction as apiSave, unsavePrediction as apiUnsave } from '../api';
+import { useLimitReached, getLimitReachedMessage } from './LimitReachedContext';
 
 const SavedPredictionsContext = createContext(null);
 
@@ -20,6 +21,7 @@ export function SavedPredictionsProvider({ children }) {
   });
   const [toast, setToast] = useState(null);
   const userId = getUserId();
+  const { show: showLimitReached } = useLimitReached();
 
   // Sync with server on mount
   useEffect(() => {
@@ -66,7 +68,7 @@ export function SavedPredictionsProvider({ children }) {
         await apiSave(userId, predictionId);
         showToast('Prediction saved!', '/saved');
       }
-    } catch {
+    } catch (err) {
       // Revert on failure
       setSavedIds(prev => {
         const next = new Set(prev);
@@ -77,8 +79,12 @@ export function SavedPredictionsProvider({ children }) {
         }
         return next;
       });
+      const limitMsg = getLimitReachedMessage(err);
+      if (limitMsg) {
+        showLimitReached(limitMsg);
+      }
     }
-  }, [savedIds, userId, showToast]);
+  }, [savedIds, userId, showToast, showLimitReached]);
 
   const count = savedIds.size;
 
