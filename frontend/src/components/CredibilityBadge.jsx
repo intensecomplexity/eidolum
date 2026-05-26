@@ -2,19 +2,23 @@ import { useState, useRef, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 
 /**
- * Inline credibility badge: "username [72% ✓]"
- * On hover/tap shows expanded card with full stats.
+ * Inline credibility badge: "username [72% ✓]" for ranked sources, or
+ * "username [62% ~ · Lv.5]" for community/player sources where the XP
+ * level is the only place that data shows.
  *
- * The platform suffix (Wall St / YouTube / X / Lv.N) used to follow the
- * accuracy, but it duplicated the PlatformBadge already rendered above
- * the pill on prediction cards. Stripped to just the accuracy + outcome
- * glyph. Callers may still pass platform/level/isInstitutional — they
- * are ignored.
+ * The platform suffix (Wall St / YouTube / X) used to follow the accuracy
+ * but duplicated the PlatformBadge already rendered above the pill on
+ * prediction cards — stripped in 08575ba. The Lv.X form is kept for
+ * community/player only since those cards have no PlatformBadge above.
  *
  * Props:
  *  - userId: number (required)
  *  - username: string
  *  - accuracy: number (0-100, or null for "New")
+ *  - level: number (xp_level — only rendered for community/player)
+ *  - platform: string (optional — 'player' / 'user' / 'community' to
+ *    force the Lv.X branch; omit if you'd like the heuristic to decide)
+ *  - isInstitutional: boolean (suppresses Lv.X)
  *  - scored: number (optional, for expanded card)
  *  - streak: number (optional)
  *  - duelRecord: { wins, losses } (optional)
@@ -24,7 +28,7 @@ import { Link } from 'react-router-dom';
  *  - linkToProfile: boolean (wrap in link, default true)
  */
 export default function CredibilityBadge({
-  userId, username, accuracy,
+  userId, username, accuracy, level, platform, isInstitutional = false,
   scored = 0, streak = 0, duelRecord, topSector, memberSince,
   showName = false, linkToProfile = true,
 }) {
@@ -48,6 +52,14 @@ export default function CredibilityBadge({
   const accLabel = hasAccuracy ? `${accuracy.toFixed(0)}%` : 'New';
   const accIcon = hasAccuracy ? (accuracy >= 60 ? ' ✓' : accuracy < 40 ? ' ✗' : ' ~') : '';
 
+  // Community/player cards have no PlatformBadge above, so the XP level
+  // inside the pill is the only place it appears. Explicit platform
+  // values from the spec force the branch; otherwise fall back to "level
+  // was passed and this isn't an institutional card" — that covers the
+  // current TickerDiscussionSection caller which passes only `level`.
+  const isCommunityPlayer = platform === 'player' || platform === 'user' || platform === 'community';
+  const showLevel = !isInstitutional && level != null && (isCommunityPlayer || platform == null);
+
   const badge = (
     <span
       className="inline-flex items-center gap-0.5 text-[10px] font-mono cursor-pointer"
@@ -58,6 +70,12 @@ export default function CredibilityBadge({
       )}
       <span className="px-1 py-0.5 rounded bg-surface-2 border border-border">
         <span className={accColor}>{accLabel}{accIcon}</span>
+        {showLevel && (
+          <>
+            <span className="text-muted mx-0.5">·</span>
+            <span className="text-muted">Lv.{level}</span>
+          </>
+        )}
       </span>
     </span>
   );
