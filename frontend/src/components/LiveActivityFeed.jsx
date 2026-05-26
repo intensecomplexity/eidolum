@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { TrendingUp, TrendingDown, Check, X, Trophy, Swords, Flame, UserPlus } from 'lucide-react';
 import TickerLink from './TickerLink';
 import { getGlobalFeed } from '../api';
+import { formatDate } from '../utils/formatDate';
 
 const EVENT_ICONS = {
   prediction_submitted: { bullish: TrendingUp, bearish: TrendingDown, default: TrendingUp, color: 'text-accent' },
@@ -22,14 +23,6 @@ function getIcon(event) {
   if (event.event_type === 'prediction_submitted') color = data.direction === 'bearish' ? 'text-negative' : 'text-positive';
   if (event.event_type === 'prediction_scored') color = data.outcome === 'incorrect' ? 'text-negative' : 'text-positive';
   return { Icon, color };
-}
-
-function timeAgo(dateStr) {
-  const diff = (Date.now() - new Date(dateStr).getTime()) / 1000;
-  if (diff < 60) return 'now';
-  if (diff < 3600) return `${Math.floor(diff / 60)}m`;
-  if (diff < 86400) return `${Math.floor(diff / 3600)}h`;
-  return `${Math.floor(diff / 86400)}d`;
 }
 
 /**
@@ -83,7 +76,7 @@ export default function LiveActivityFeed({ ticker, limit = 5, showHeader = true,
               <span className="text-xs text-text-secondary flex-1 min-w-0 truncate">
                 <EventDescription event={e} />
               </span>
-              <span className="text-[10px] text-muted flex-shrink-0">{timeAgo(e.created_at)}</span>
+              <span className="text-[10px] text-muted flex-shrink-0">{formatDate(e.created_at, { relative: true })}</span>
             </div>
           );
         })}
@@ -111,4 +104,4 @@ function EventDescription({ event }) {
 }
 
 // Export the helpers for the full page
-export { getIcon, timeAgo, EVENT_ICONS };
+export { getIcon, EVENT_ICONS };

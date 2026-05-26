@@ -1,6 +1,6 @@
 // formatDate(input, { relative = false, includeYear = true } = {})
 // - input: ISO string "2026-05-14" OR Date object OR null/undefined
-// - relative=true → "today", "yesterday", "Nd ago", "Nw ago", "Nmo ago" for <1y, else absolute
+// - relative=true → "just now", "Nm ago", "Nh ago", "yesterday", "Nd ago", "Nw ago", "Nmo ago" for <1y, else absolute
 // - relative=false → "May 14, 2026" (or "May 14" if includeYear=false and same calendar year)
 // - null/undefined/invalid → "" (never "Invalid Date")
 
@@ -16,9 +16,15 @@ export function formatDate(input, { relative = false, includeYear = true } = {})
 
   if (relative) {
     const diffMs = Date.now() - d.getTime();
-    const diffDays = Math.floor(diffMs / 86400000);
-    if (diffDays >= 0) {
-      if (diffDays === 0) return 'today';
+    if (diffMs >= 0) {
+      const diffSec = Math.floor(diffMs / 1000);
+      const diffMin = Math.floor(diffSec / 60);
+      const diffHr = Math.floor(diffMin / 60);
+      const diffDays = Math.floor(diffHr / 24);
+
+      if (diffSec < 45) return 'just now';
+      if (diffMin < 60) return `${diffMin}m ago`;
+      if (diffHr < 24) return `${diffHr}h ago`;
       if (diffDays === 1) return 'yesterday';
       if (diffDays < 7) return `${diffDays}d ago`;
       if (diffDays < 30) return `${Math.floor(diffDays / 7)}w ago`;

@@ -4,6 +4,7 @@ import { Heart, MessageCircle, Trash2, Send } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import CredibilityBadge from './CredibilityBadge';
 import { getTickerDiscussions, postTickerDiscussion, likeTickerDiscussion, deleteTickerDiscussion } from '../api';
+import { formatDate } from '../utils/formatDate';
 
 export default function TickerDiscussionSection({ ticker }) {
   const { isAuthenticated, user } = useAuth();
@@ -74,14 +75,6 @@ export default function TickerDiscussionSection({ ticker }) {
     } catch {}
   }
 
-  function timeAgo(dateStr) {
-    const diff = (Date.now() - new Date(dateStr).getTime()) / 1000;
-    if (diff < 60) return 'now';
-    if (diff < 3600) return `${Math.floor(diff / 60)}m`;
-    if (diff < 86400) return `${Math.floor(diff / 3600)}h`;
-    return `${Math.floor(diff / 86400)}d`;
-  }
-
   function PostRow({ p, isReply = false }) {
     return (
       <div className={`${isReply ? 'ml-6 border-l-2 border-border/30 pl-3' : ''} py-2`}>
@@ -95,7 +88,7 @@ export default function TickerDiscussionSection({ ticker }) {
             scored={0}
             linkToProfile={false}
           />
-          <span className="text-[10px] text-muted">{timeAgo(p.created_at)}</span>
+          <span className="text-[10px] text-muted">{formatDate(p.created_at, { relative: true })}</span>
         </div>
         <p className="text-sm text-text-secondary break-words mb-1">{p.text}</p>
         <div className="flex items-center gap-3">

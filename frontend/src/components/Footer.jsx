@@ -37,20 +37,24 @@ export default function Footer() {
             </p>
           </div>
 
-          {/* Explore */}
+          {/* Explore — picks routes NOT already in the top navbar
+              (which has Leaderboard, Consensus, Activity, Discover,
+              Top Calls). Home is dropped because the logo links home.
+              Submit stays gated on auth. */}
           <Column title="Explore">
-            <FLink to="/">Home</FLink>
             <FLink to="/leaderboard">Leaderboard</FLink>
-            <FLink to="/consensus">Consensus</FLink>
-            <FLink to="/activity">Activity</FLink>
-            <FLink to="/discover">Discover</FLink>
+            <FLink to="/forecasters">Forecasters</FLink>
+            <FLink to="/predictions">Predictions</FLink>
             {isAuthenticated && <FLink to="/submit">Submit</FLink>}
           </Column>
 
-          {/* Trust */}
+          {/* Trust — "Scoring Methodology" used to be a second label
+              pointing at /how-it-works; route doesn't exist as its
+              own page, so dropped. /platforms shows the data sources
+              we track, which is the same transparency theme. */}
           <Column title="Trust">
             <FLink to="/how-it-works">How It Works</FLink>
-            <FLink to="/how-it-works">Scoring Methodology</FLink>
+            <FLink to="/platforms">Platforms</FLink>
           </Column>
         </div>
 

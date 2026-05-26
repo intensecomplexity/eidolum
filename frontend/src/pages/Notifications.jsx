@@ -5,6 +5,7 @@ import { Bell, Check, Trophy, Swords, UserPlus, Flame, Calendar, CheckCircle } f
 import { useAuth } from '../context/AuthContext';
 import Footer from '../components/Footer';
 import { getNotifications, markNotificationRead, markAllNotificationsRead } from '../api';
+import { formatDate } from '../utils/formatDate';
 
 const TYPE_CONFIG = {
   prediction_scored: { icon: CheckCircle, color: 'text-positive', nav: '/my-calls', category: 'Predictions' },
@@ -59,14 +60,6 @@ export default function Notifications() {
     await markAllNotificationsRead().catch(() => {});
     setNotifications(prev => prev.map(n => ({ ...n, read: true })));
     setUnreadCount(0);
-  }
-
-  function timeAgo(dateStr) {
-    const diff = (Date.now() - new Date(dateStr).getTime()) / 1000;
-    if (diff < 60) return 'just now';
-    if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
-    if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
-    return `${Math.floor(diff / 86400)}d ago`;
   }
 
   if (!isAuthenticated) {
@@ -128,7 +121,7 @@ export default function Notifications() {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between gap-2">
                       <span className={`text-sm font-medium ${!n.read ? 'text-text-primary' : 'text-text-secondary'}`}>{n.title}</span>
-                      <span className="text-xs text-muted flex-shrink-0">{timeAgo(n.created_at)}</span>
+                      <span className="text-xs text-muted flex-shrink-0">{formatDate(n.created_at, { relative: true })}</span>
                     </div>
                     <p className="text-xs text-muted mt-0.5">{n.message}</p>
                   </div>

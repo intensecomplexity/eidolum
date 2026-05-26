@@ -5,22 +5,13 @@ import {
   getAdminPredictions, deleteAdminPrediction, bulkDeletePredictions,
   createAdminPrediction, getSchedulerStatus, getSocialStats,
 } from '../api';
+import { formatDate } from '../utils/formatDate';
 
 function formatCountdown(secondsLeft) {
   if (secondsLeft <= 0) return 'now';
   const m = Math.floor(secondsLeft / 60);
   const s = Math.floor(secondsLeft % 60);
   return `${m}:${String(s).padStart(2, '0')}`;
-}
-
-function timeAgo(iso) {
-  if (!iso) return 'never';
-  const diff = Date.now() - new Date(iso + 'Z').getTime();
-  const mins = Math.floor(diff / 60000);
-  if (mins < 1) return 'just now';
-  if (mins < 60) return `${mins}m ago`;
-  const hrs = Math.floor(mins / 60);
-  return `${hrs}h ${mins % 60}m ago`;
 }
 
 // ── Login Gate ──
@@ -52,7 +43,7 @@ function SchedulerCard({ job, now }) {
         <span className={`w-2 h-2 rounded-full ${statusColor}`} />
         <span className="text-sm font-semibold">{job.name}</span>
       </div>
-      <div className="text-muted text-xs">Last: {timeAgo(job.last_run)}</div>
+      <div className="text-muted text-xs">Last: {formatDate(job.last_run, { relative: true }) || 'never'}</div>
       <div className="font-mono text-accent text-lg mt-1">
         {job.next_run ? formatCountdown(secondsLeft) : '--:--'}
       </div>
@@ -122,7 +113,7 @@ function SocialScraperCard({ source, data }) {
       {/* Last run */}
       <div className="flex items-center justify-between text-xs mb-3 px-1">
         <span className="text-muted">
-          Last run: <span className="text-text-secondary">{timeAgo(data.last_run_at)}</span>
+          Last run: <span className="text-text-secondary">{formatDate(data.last_run_at, { relative: true }) || 'never'}</span>
         </span>
         <span className="text-muted font-mono">
           <span className="text-positive">+{data.last_run_inserted ?? 0}</span> inserted
@@ -174,7 +165,7 @@ function SocialScraperCard({ source, data }) {
                   <tr key={`${f.name}-${i}`} className="border-b border-border/20 last:border-0">
                     <td className="px-2 py-1.5 text-text-secondary truncate max-w-[140px]" title={f.name}>{f.name}</td>
                     <td className="px-2 py-1.5 text-right font-mono text-accent">{f.count}</td>
-                    <td className="px-2 py-1.5 text-right font-mono text-muted">{timeAgo(f.last_prediction)}</td>
+                    <td className="px-2 py-1.5 text-right font-mono text-muted">{formatDate(f.last_prediction, { relative: true }) || 'never'}</td>
                   </tr>
                 ))}
               </tbody>
