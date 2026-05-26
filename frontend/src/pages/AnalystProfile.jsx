@@ -9,6 +9,7 @@ import AccuracyChart from '../components/AccuracyChart';
 import SourceBadge from '../components/SourceBadge';
 import Footer from '../components/Footer';
 import { getAnalystProfile, getAnalystAccuracyHistory, getAnalystSubscriptionStatus, subscribeAnalyst, unsubscribeAnalyst } from '../api';
+import { useLimitReached, getLimitReachedMessage } from '../context/LimitReachedContext';
 import { formatDate } from '../utils/formatDate';
 
 export default function AnalystProfile() {
@@ -22,6 +23,7 @@ export default function AnalystProfile() {
   const [emailInput, setEmailInput] = useState('');
   const [emailSubmitted, setEmailSubmitted] = useState(false);
   const [toast, setToast] = useState(null);
+  const { show: showLimitReached } = useLimitReached();
 
   useEffect(() => {
     if (!name) return;
@@ -51,8 +53,13 @@ export default function AnalystProfile() {
       await subscribeAnalyst(name);
       setSubscribed(true);
       showToast(`You'll be notified when ${profile?.name || name} makes a new prediction`);
-    } catch {
-      showToast('Failed to subscribe');
+    } catch (err) {
+      const limitMsg = getLimitReachedMessage(err);
+      if (limitMsg) {
+        showLimitReached(limitMsg);
+      } else {
+        showToast('Failed to subscribe');
+      }
     } finally { setSubLoading(false); }
   }
 
