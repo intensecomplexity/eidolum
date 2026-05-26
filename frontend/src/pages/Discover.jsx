@@ -85,7 +85,7 @@ export default function Discover() {
   return (
     <div>
       <PageHeader
-        title={heroEnabled ? 'The Edge' : 'Discover'}
+        title="Discover"
         subtitle={heroEnabled
           ? 'Fresh tickers to watch, rising forecasters, and calls the market hasn\u2019t graded yet.'
           : 'Explore tickers, trending calls, and rising analysts.'}
