@@ -85,10 +85,10 @@ export default function Landing() {
               View all {forecasters.length} <ArrowRight className="w-3 h-3" />
             </Link>
           </div>
-          <div className="sm:hidden space-y-3">
+          <div className="lg:hidden space-y-3">
             {top5.map((f) => <LeaderboardCard key={f.id} forecaster={f} />)}
           </div>
-          <div className="hidden sm:block card overflow-hidden p-0">
+          <div className="hidden lg:block card overflow-hidden p-0">
             <table className="w-full">
               <thead>
                 <tr className="text-left text-muted uppercase border-b border-border" style={{ fontSize: '0.7rem', letterSpacing: '0.08em' }}>

@@ -62,7 +62,7 @@ export default function ReportCards() {
         ) : (
           <>
             {/* Mobile cards */}
-            <div className="sm:hidden space-y-3">
+            <div className="lg:hidden space-y-3">
               {data.report_cards.map(rc => (
                 <div
                   key={rc.forecaster_id}
@@ -130,7 +130,7 @@ export default function ReportCards() {
             </div>
 
             {/* Desktop table */}
-            <div className="hidden sm:block card overflow-hidden p-0">
+            <div className="hidden lg:block card overflow-hidden p-0">
               <div className="overflow-x-auto">
                 <table className="w-full">
                   <thead>

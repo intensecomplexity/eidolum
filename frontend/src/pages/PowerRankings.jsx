@@ -103,13 +103,13 @@ export default function PowerRankings() {
         )}
 
         {/* Rankings table — mobile cards, desktop table */}
-        <div className="sm:hidden space-y-3">
+        <div className="lg:hidden space-y-3">
           {rankings.map((r) => (
             <RankingCard key={r.forecaster_id} r={r} />
           ))}
         </div>
 
-        <div className="hidden sm:block card overflow-hidden p-0">
+        <div className="hidden lg:block card overflow-hidden p-0">
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead>

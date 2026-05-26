@@ -242,7 +242,7 @@ export default function PlatformDetail() {
         ) : (
           <>
             {/* Mobile: card list */}
-            <div className="sm:hidden space-y-3">
+            <div className="lg:hidden space-y-3">
               {leaderboard.map((f) => (
                 <LeaderboardCard key={f.id} forecaster={f} />
               ))}
@@ -252,7 +252,7 @@ export default function PlatformDetail() {
             </div>
 
             {/* Desktop: table */}
-            <div className="hidden sm:block card overflow-hidden p-0">
+            <div className="hidden lg:block card overflow-hidden p-0">
               <div className="overflow-x-auto">
                 <table className="w-full">
                   <thead>

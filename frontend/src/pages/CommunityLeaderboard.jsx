@@ -67,7 +67,7 @@ export default function CommunityLeaderboard() {
         )}
 
         {/* Mobile cards */}
-        <div className="sm:hidden space-y-3">
+        <div className="lg:hidden space-y-3">
           {data.map(u => {
             const isMe = user && (u.user_id === user.id || u.user_id === user.user_id);
             const isRival = u.user_id === rivalId;
@@ -109,7 +109,7 @@ export default function CommunityLeaderboard() {
 
         {/* Desktop table */}
         {data.length > 0 && (
-          <div className="hidden sm:block card overflow-hidden p-0">
+          <div className="hidden lg:block card overflow-hidden p-0">
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead>
