@@ -31,6 +31,7 @@ import {
 } from '../api';
 import DisclosureCard from '../components/DisclosureCard';
 import { annotateContext, ExplainerLine, ratingChangeLabel } from '../utils/predictionExplainer';
+import { formatDate } from '../utils/formatDate';
 
 function SectorScroller({ sectors, activeSector, setActiveSector, totalPredictions }) {
   const scrollRef = useRef(null);
@@ -469,7 +470,7 @@ export default function ForecasterProfile() {
               "Since undefined" placeholder. */}
           {data.first_prediction_date && (
             <p className="text-muted text-xs mt-3">
-              Since {new Date(data.first_prediction_date).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}
+              Since {formatDate(data.first_prediction_date)}
             </p>
           )}
         </div>
@@ -522,7 +523,7 @@ export default function ForecasterProfile() {
                   <div className="flex items-center justify-between flex-wrap gap-2 mb-2">
                     <div className="text-sm font-semibold text-accent font-mono">{l.list_id}</div>
                     <div className="text-[11px] text-muted font-mono">
-                      {l.prediction_date ? new Date(l.prediction_date).toLocaleDateString() : ''}
+                      {formatDate(l.prediction_date)}
                     </div>
                     <div className="text-[11px] font-mono">
                       {l.pairs_total > 0 ? (
@@ -971,27 +972,6 @@ export default function ForecasterProfile() {
         </>}
       </div>
 
-      {/* Methodology disclaimer — page-bottom muted footer. Moved here
-          from the header band so it stays visible/indexable without
-          competing for prime real estate. Provenance sentence is
-          platform-specific; omitted entirely when platform is unknown
-          rather than guessed (never fabricate a source). */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-8">
-        <p className="text-muted/70 text-[11px] italic text-center sm:text-left mt-12">
-          All metrics calculated from specific predictions only. Vague mentions are not counted.
-          {(() => {
-            const p = data.platform;
-            if (['institutional', 'congress'].includes(p)) return ' Predictions auto-tracked from published analyst reports.';
-            if (p === 'youtube')    return ' Predictions auto-tracked from public YouTube videos.';
-            if (p === 'x')          return ' Predictions auto-tracked from public posts on X.';
-            if (p === 'reddit')     return ' Predictions auto-tracked from public posts on Reddit.';
-            if (p === 'stocktwits') return ' Predictions auto-tracked from public posts on Stocktwits.';
-            if (p === 'player' || p === 'community') return ' Predictions submitted by community members.';
-            return '';
-          })()}
-        </p>
-      </div>
-
       <Footer />
     </div>
   );
@@ -1098,7 +1078,7 @@ function ImpliedPortfolioPanel({ snapshot, loading }) {
                 <td className="px-6 py-3 text-right font-mono text-text-secondary">{p.disclosure_count}</td>
                 <td className="px-6 py-3 text-right font-mono text-text-secondary">{(p.conviction_score * 100).toFixed(1)}%</td>
                 <td className="px-6 py-3 text-xs uppercase text-text-secondary">{p.last_action}</td>
-                <td className="px-6 py-3 text-xs text-muted">{p.last_disclosed_at ? new Date(p.last_disclosed_at).toLocaleDateString() : '—'}</td>
+                <td className="px-6 py-3 text-xs text-muted">{formatDate(p.last_disclosed_at) || '—'}</td>
                 <td className="px-6 py-3 text-center">
                   <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold ${p.is_open ? 'bg-positive/15 text-positive' : 'bg-surface-2 text-muted'}`}>
                     {p.is_open ? 'OPEN' : 'CLOSED'}
@@ -1284,7 +1264,7 @@ function TriggerFiredBadge({ p }) {
     <span
       className="inline-flex items-center rounded-full px-1.5 py-0.5 text-[9px] font-semibold whitespace-nowrap ml-1"
       style={{ backgroundColor: 'rgba(52,211,153,0.12)', color: '#34d399' }}
-      title={`Trigger fired: ${p.trigger_fired_at.slice(0, 10)}`}
+      title={`Trigger fired: ${formatDate(p.trigger_fired_at)}`}
     >
       TRIGGER FIRED
     </span>
@@ -1420,7 +1400,7 @@ function PredictionRow({ p, forecaster: fc }) {
       >
         <td className="px-2 py-3"><BookmarkButton predictionId={p.id} /></td>
         <td className="px-3 py-3">
-          <div className="text-sm text-text-secondary font-mono whitespace-nowrap">{p.prediction_date?.slice(0, 10)}</div>
+          <div className="text-sm text-text-secondary font-mono whitespace-nowrap">{formatDate(p.prediction_date)}</div>
           <span className="text-muted text-[10px] font-mono">{horizonLabel}</span>
         </td>
         <td className="px-3 py-3">
@@ -1457,7 +1437,7 @@ function PredictionRow({ p, forecaster: fc }) {
         <td className="px-3 py-3 text-center font-mono text-sm hidden md:table-cell">
           {evalDate ? (
             <span className={`text-xs ${p.outcome === 'pending' ? 'text-warning' : 'text-text-secondary'}`}>
-              {evalDate.slice(0, 10)}
+              {formatDate(evalDate)}
             </span>
           ) : <span className="text-muted">-</span>}
         </td>
@@ -1503,8 +1483,8 @@ function PredictionRow({ p, forecaster: fc }) {
               <p className="text-xs text-muted mb-2">
                 <span className="mr-1">&#x23F1;</span>
                 {p.outcome === 'pending'
-                  ? `Evaluates on ${evalDate.slice(0, 10)} \u2014 ${horizonLabel} horizon`
-                  : `Evaluated at ${evalDate.slice(0, 10)} \u2014 ${horizonLabel} horizon`
+                  ? `Evaluates on ${formatDate(evalDate)} \u2014 ${horizonLabel} horizon`
+                  : `Evaluated at ${formatDate(evalDate)} \u2014 ${horizonLabel} horizon`
                 }
               </p>
             )}
