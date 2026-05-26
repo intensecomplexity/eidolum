@@ -149,28 +149,45 @@ def _try_fmp(ticker: str) -> dict:
         return {}
 
 
+def _yf_hist_to_prices(hist) -> dict:
+    if hist is None or hist.empty:
+        return {}
+    prices: dict[str, float] = {}
+    for ts, close in zip(hist.index, hist["Close"]):
+        try:
+            cv = float(close)
+        except (ValueError, TypeError):
+            continue
+        if cv > 0:
+            prices[ts.strftime("%Y-%m-%d")] = cv
+    return prices
+
+
 def _try_yfinance(ticker: str) -> dict:
-    """yfinance period='max' — LOCAL ONLY. Yahoo blocks Railway egress.
-    Returns {} on any exception; never crashes the run."""
+    """yfinance — LOCAL ONLY. Yahoo blocks Railway egress.
+    Two-attempt strategy: period='max' first; if Yahoo returns an empty
+    frame (some tickers are restricted to short periods — see the
+    "Period 'max' is invalid, must be one of: 1d, 5d" warning), fall
+    back to an explicit 30-year start/end range. Any uncaught exception
+    just returns {} so the run never crashes."""
     try:
         import yfinance as yf
     except ImportError:
         return {}
     try:
         hist = yf.Ticker(ticker).history(period="max", auto_adjust=False)
-        if hist is None or hist.empty:
-            return {}
-        prices: dict[str, float] = {}
-        for ts, close in zip(hist.index, hist["Close"]):
-            try:
-                cv = float(close)
-            except (ValueError, TypeError):
-                continue
-            if cv > 0:
-                prices[ts.strftime("%Y-%m-%d")] = cv
-        return prices
+        prices = _yf_hist_to_prices(hist)
+        if prices:
+            return prices
+    except Exception:
+        pass
+    try:
+        end = datetime.utcnow().strftime("%Y-%m-%d")
+        start = (datetime.utcnow() - timedelta(days=365 * 30)).strftime("%Y-%m-%d")
+        hist = yf.Ticker(ticker).history(start=start, end=end, auto_adjust=False)
+        return _yf_hist_to_prices(hist)
     except Exception as e:
-        print(f"[benzinga-fix] yfinance exception for {ticker}: {e}", flush=True)
+        print(f"[benzinga-fix] yfinance fallback exception for {ticker}: {e}", flush=True)
         return {}
 
 
