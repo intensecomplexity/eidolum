@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Flame, Crosshair, TrendingUp, TrendingDown, ArrowRight, Clock, Trophy, Zap, Lock, X as XIcon } from 'lucide-react';
+import { Flame, Crosshair, TrendingUp, TrendingDown, ArrowRight, Clock, Trophy, Zap, X as XIcon } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import DailyChallengeCard from '../components/DailyChallengeCard';
 import WeeklyChallengeCard from '../components/WeeklyChallengeCard';
@@ -12,8 +12,6 @@ import RankNumber from '../components/RankNumber';
 import TickerLogo from '../components/TickerLogo';
 import ConsensusBar from '../components/ConsensusBar';
 import PredictionBadge from '../components/PredictionBadge';
-import PlatformBadge from '../components/PlatformBadge';
-import { getSourceBadgeKey } from '../utils/getSourceBadgeKey';
 import Footer from '../components/Footer';
 import HeroSearch from '../components/HeroSearch';
 import MiniPieChart from '../components/MiniPieChart';
@@ -21,7 +19,6 @@ import HeroBand from '../components/home/HeroBand';
 import HowItWorks from '../components/home/HowItWorks';
 import SectionHeader from '../components/SectionHeader';
 import { usePublicFlag } from '../hooks/usePublicFlag';
-import { Info } from 'lucide-react';
 import {
   getUserProfile, getUserPredictions, getLivePrices,
   getHomepageData, getWatchlistFeed,
@@ -42,7 +39,6 @@ export default function Dashboard() {
   // Public content (same as logged-out homepage)
   const [top5, setTop5] = useState([]);
   const [homeStats, setHomeStats] = useState(null);
-  const [biggestCalls, setBiggestCalls] = useState([]);
   const [mostDivided, setMostDivided] = useState([]);
 
   const [expandedId, setExpandedId] = useState(null);
@@ -64,7 +60,6 @@ export default function Dashboard() {
     getHomepageData().then(d => {
       if (d.stats) setHomeStats(d.stats);
       if (d.top_analysts) setTop5(d.top_analysts);
-      if (d.biggest_calls) setBiggestCalls(d.biggest_calls);
       if (d.most_divided) setMostDivided(d.most_divided);
     }).catch(() => {});
   }, []);
@@ -218,60 +213,6 @@ export default function Dashboard() {
               {p.expires_at && <Countdown expiresAt={p.expires_at} className="text-[10px]" />}
             </div>
           </div>
-        ))}
-      </div>
-    </div>
-  );
-
-  const biggestCallsBlock = biggestCalls.length > 0 && (
-    <div className={heroEnabled ? 'mt-0 mb-6' : 'mb-6'}>
-      {heroEnabled ? (
-        <SectionHeader subtitle="Recently graded — locked when made, settled by reality.">
-          Receipts
-        </SectionHeader>
-      ) : (
-        <SectionHeader>Biggest Calls</SectionHeader>
-      )}
-      <div className="space-y-2">
-        {biggestCalls.map(p => (
-          <Link key={p.id} to={`/asset/${p.ticker}`}
-            className="flex items-center gap-3 card py-3 hover:border-accent/20 transition-colors">
-            <TickerLogo ticker={p.ticker} logoUrl={p.logo_url} size={28} />
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2">
-                <span className="font-mono text-accent font-bold text-sm">{p.ticker}</span>
-                <PredictionBadge outcome={p.outcome} evaluationDeferred={p.evaluation_deferred} evaluationDeferredReason={p.evaluation_deferred_reason} />
-                <span
-                  className={`font-mono tnum text-sm font-bold cursor-help ${p.actual_return >= 0 ? 'text-positive' : 'text-negative'}`}
-                  title={
-                    heroEnabled
-                      ? 'Capped return vs S&P 500 over the same window — see scoring rules.'
-                      : "Stock's actual return from the call date to evaluation, capped at \u00B1200%."
-                  }
-                >
-                  {p.actual_return >= 0 ? '+' : ''}{p.actual_return}%
-                  {heroEnabled && (
-                    <Info className="inline-block w-2.5 h-2.5 ml-0.5 -mt-0.5 text-muted" />
-                  )}
-                </span>
-              </div>
-              <div className="text-xs text-text-secondary truncate">
-                <Link to={`/forecaster/${p.forecaster_id}`} className="text-accent hover:underline" onClick={e => e.stopPropagation()}>
-                  {p.forecaster_name}
-                </Link>
-                <span className="text-muted"> {p.direction === 'bullish' ? 'Bull' : p.direction === 'neutral' ? 'Hold' : 'Bear'}</span>
-                {p.target_price && <span className="text-muted">, target ${p.target_price.toFixed(0)}</span>}
-              </div>
-              <div className="flex items-center gap-2 mt-0.5">
-                <PlatformBadge platform={getSourceBadgeKey(p)} size={10} showLabel />
-                {p.prediction_date && (
-                  <span className="inline-flex items-center gap-1 text-[9px] text-muted">
-                    <Lock size={9} /> {formatDate(p.prediction_date, { relative: true })}
-                  </span>
-                )}
-              </div>
-            </div>
-          </Link>
         ))}
       </div>
     </div>
@@ -521,7 +462,6 @@ export default function Dashboard() {
 
         {isNewcomer ? (
           <>
-            {biggestCallsBlock}
             {top5Block}
             {mostDividedBlock}
             {personalStats}
@@ -535,7 +475,6 @@ export default function Dashboard() {
             {personalStats}
             {challenges}
             {yourOpenCalls}
-            {biggestCallsBlock}
             {top5Block}
             {mostDividedBlock}
             {watchlistBlock}
