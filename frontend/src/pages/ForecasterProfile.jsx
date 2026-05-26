@@ -1379,6 +1379,7 @@ function PredictionRow({ p, forecaster: fc }) {
   // exact_quote (may be template-generated for YouTube predictions).
   const quoteText = p.source_verbatim_quote || p.exact_quote || p.context || p.statement || 'No quote available';
   const horizonLabel = HORIZON_LABELS[p.time_horizon] || `${p.window_days}d`;
+  const isStructuredSource = getSourceBadgeKey(p, fc) === 'institutional';
 
   return (
     <>
@@ -1447,8 +1448,9 @@ function PredictionRow({ p, forecaster: fc }) {
               &ldquo;{annotateContext(quoteText, p.ticker)}&rdquo;
             </blockquote>
 
-            {/* Simple explainer */}
-            <ExplainerLine prediction={p} className="mb-1 ml-4" />
+            {/* Simple explainer — hidden on Wall St structured rows where
+                the rating-action context already conveys it. */}
+            {!isStructuredSource && <ExplainerLine prediction={p} className="mb-1 ml-4" />}
             {(() => {
               const rc = ratingChangeLabel(p);
               return rc ? <p className="text-[10px] text-muted italic mb-3 ml-4">{rc}</p> : null;
@@ -1477,10 +1479,13 @@ function PredictionRow({ p, forecaster: fc }) {
               </p>
             )}
 
-            {/* Disclaimer */}
-            <p className="text-[10px] text-muted italic">
-              Quote sourced from public statement. Eidolum does not provide investment advice.
-            </p>
+            {/* Disclaimer — Wall St rows have no extracted quote, so the
+                "quote sourced" copy is misleading there. */}
+            {!isStructuredSource && (
+              <p className="text-[10px] text-muted italic">
+                Quote sourced from public statement. Eidolum does not provide investment advice.
+              </p>
+            )}
           </td>
         </tr>
       )}
