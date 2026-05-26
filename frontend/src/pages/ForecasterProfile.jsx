@@ -460,28 +460,18 @@ export default function ForecasterProfile() {
             </div>
           </div>
 
-          {/* Combined metadata footer — single muted line of factual
-              context ("Since … · N predictions · M sectors · auto-tracked
-              from …") followed by the desktop-only methodology disclaimer.
-              Sits below the 3-band layout so it doesn't compete with the
-              name + CTAs in the identity column. Mobile keeps the inline
-              short disclaimer inside the Accuracy tile. */}
-          <p className="text-muted text-xs mt-3">
-            {[
-              data.first_prediction_date && `Since ${new Date(data.first_prediction_date).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}`,
-              `${data.scorable_predictions ?? data.total_predictions ?? 0} predictions`,
-              data.sector_count > 0 && `${data.sector_count} ${data.sector_count === 1 ? 'sector' : 'sectors'}`,
-              (data.revisions_made || 0) > 0 && `${data.revisions_made} ${data.revisions_made === 1 ? 'revision' : 'revisions'}`,
-              ['institutional', 'congress'].includes(data.platform)
-                ? 'Predictions auto-tracked from published analyst reports'
-                : data.platform === 'player'
-                ? 'Predictions submitted by this player'
-                : 'Predictions auto-tracked from public content',
-            ].filter(Boolean).join(' · ')}
-          </p>
-          <p className="hidden sm:block text-muted/70 text-[10px] italic mt-1">
-            All metrics calculated from specific predictions only. Vague mentions are not counted.
-          </p>
+          {/* Header band footer — trimmed to a single "Since YYYY" line.
+              Predictions count duplicated the Scored Predictions tile,
+              sector count duplicated the tabs strip below, and the full
+              methodology disclaimer moved to a page-bottom footer so the
+              prime header row isn't competing with legal copy. Omitted
+              entirely when the first-prediction date is unknown — no
+              "Since undefined" placeholder. */}
+          {data.first_prediction_date && (
+            <p className="text-muted text-xs mt-3">
+              Since {new Date(data.first_prediction_date).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}
+            </p>
+          )}
         </div>
 
         {/* Ranked Lists section — rendered only when this forecaster has
@@ -979,6 +969,27 @@ export default function ForecasterProfile() {
           );
         })()}
         </>}
+      </div>
+
+      {/* Methodology disclaimer — page-bottom muted footer. Moved here
+          from the header band so it stays visible/indexable without
+          competing for prime real estate. Provenance sentence is
+          platform-specific; omitted entirely when platform is unknown
+          rather than guessed (never fabricate a source). */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-8">
+        <p className="text-muted/70 text-[11px] italic text-center sm:text-left mt-12">
+          All metrics calculated from specific predictions only. Vague mentions are not counted.
+          {(() => {
+            const p = data.platform;
+            if (['institutional', 'congress'].includes(p)) return ' Predictions auto-tracked from published analyst reports.';
+            if (p === 'youtube')    return ' Predictions auto-tracked from public YouTube videos.';
+            if (p === 'x')          return ' Predictions auto-tracked from public posts on X.';
+            if (p === 'reddit')     return ' Predictions auto-tracked from public posts on Reddit.';
+            if (p === 'stocktwits') return ' Predictions auto-tracked from public posts on Stocktwits.';
+            if (p === 'player' || p === 'community') return ' Predictions submitted by community members.';
+            return '';
+          })()}
+        </p>
       </div>
 
       <Footer />
