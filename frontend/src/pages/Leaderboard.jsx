@@ -480,9 +480,9 @@ export default function Leaderboard() {
                               </div>
                               {f.firm ? (
                                 <div className="text-muted text-xs">{f.firm}</div>
-                              ) : (
+                              ) : (getSourceBadgeKey(f) !== 'institutional' && f.handle && (
                                 <div className="text-muted text-xs font-mono">{f.handle}</div>
-                              )}
+                              ))}
                             </td>
                             <td className="px-3 py-3 text-right">
                               <div className="flex items-center justify-end gap-1.5">
