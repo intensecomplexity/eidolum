@@ -65,20 +65,6 @@ html[data-theme="light"] {
     font-family: inherit;
   }
 
-  /* Belt-and-suspenders against iOS Safari leaving the document at the
-     previous landscape width after a portrait→landscape→portrait
-     rotation. The two underlying triggers identified in 581cce3 — the
-     desktop predictions table firing at sm: (640px), and Recharts'
-     ResponsiveContainer writing a stale inline pixel width on its SVG —
-     were fixed in 4da197a (bump table swaps to lg:) and bb01b2a (clip
-     chart parents). This rule remains because we can't fully verify the
-     iOS rotation behavior from CI; remove it only after a real-device
-     test confirms rotation is stable without it. overflow-y stays
-     default, so position: sticky on the nav still tracks the viewport. */
-  html, body {
-    overflow-x: hidden;
-  }
-
   body {
     @apply bg-bg text-text-primary;
     font-family: 'Sora', sans-serif;
