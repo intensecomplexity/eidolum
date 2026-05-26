@@ -1,5 +1,5 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Menu, X, Crosshair, HelpCircle, LogOut, Settings, Swords, Users, User, Search, BarChart3, Trophy, Star, BookmarkCheck, CircleUser, Wrench, Sun, Moon } from 'lucide-react';
+import { Menu, X, Crosshair, HelpCircle, LogOut, Settings, Swords, Users, User, Search, BarChart3, Trophy, Star, Bookmark, BookmarkCheck, CircleUser, Wrench, Sun, Moon } from 'lucide-react';
 import EidolumLogo from './EidolumLogo';
 import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
@@ -201,6 +201,7 @@ export default function Navbar() {
                         <DropdownItem to="/friends" icon={Users} label="Friends" onClick={() => setUserDropdown(false)} />
                         <DropdownItem to="/badges" icon={Star} label="Badges" onClick={() => setUserDropdown(false)} />
                         <DropdownItem to="/watchlist" icon={BookmarkCheck} label="Watchlist" onClick={() => setUserDropdown(false)} />
+                        <DropdownItem to="/saved" icon={Bookmark} label="Saved" onClick={() => setUserDropdown(false)} />
                         <DropdownItem to="/profile" icon={CircleUser} label="Profile" onClick={() => setUserDropdown(false)} />
                         <DropdownItem to="/settings" icon={Settings} label="Settings" onClick={() => setUserDropdown(false)} />
                         <button type="button" onClick={() => { setUserDropdown(false); setShowHelp(true); }}
@@ -251,6 +252,7 @@ export default function Navbar() {
                         <DropdownItem to="/friends" icon={Users} label="Friends" onClick={() => setUserDropdown(false)} />
                         <DropdownItem to="/badges" icon={Star} label="Badges" onClick={() => setUserDropdown(false)} />
                         <DropdownItem to="/watchlist" icon={BookmarkCheck} label="Watchlist" onClick={() => setUserDropdown(false)} />
+                        <DropdownItem to="/saved" icon={Bookmark} label="Saved" onClick={() => setUserDropdown(false)} />
                         <DropdownItem to="/profile" icon={CircleUser} label="Profile" onClick={() => setUserDropdown(false)} />
                         <DropdownItem to="/settings" icon={Settings} label="Settings" onClick={() => setUserDropdown(false)} />
                       </div>
