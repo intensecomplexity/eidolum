@@ -13,6 +13,7 @@ from models import Forecaster, Prediction, AnalystSubscription, User
 from utils import append_youtube_timestamp
 from rate_limit import limiter
 from services.ticker_display import resolve_ticker_display_sector
+from services.limits import MAX_FOLLOWS_PER_USER, FOLLOW_LIMIT_MESSAGE
 from auth import get_current_user as _decode_token
 
 _optional_bearer = HTTPBearer(auto_error=False)
@@ -418,6 +419,20 @@ def subscribe_analyst(
         ).first()
         if existing:
             return {"status": "already_subscribed"}
+
+        current_count = db.query(AnalystSubscription).filter(
+            AnalystSubscription.user_id == uid,
+        ).count()
+        if current_count >= MAX_FOLLOWS_PER_USER:
+            raise HTTPException(
+                status_code=409,
+                detail={
+                    "code": "limit_reached",
+                    "kind": "follows",
+                    "limit": MAX_FOLLOWS_PER_USER,
+                    "message": FOLLOW_LIMIT_MESSAGE,
+                },
+            )
 
         # Get user email for the record
         user = db.query(User).filter(User.id == uid).first()
