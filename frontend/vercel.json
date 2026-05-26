@@ -2,6 +2,9 @@
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
   "framework": "vite",
+  "skewProtection": {
+    "maxAge": 86400
+  },
   "rewrites": [
     { "source": "/sitemap.xml", "destination": "https://eidolum-production.up.railway.app/sitemap.xml" },
     { "source": "/robots.txt", "destination": "https://eidolum-production.up.railway.app/robots.txt" },
