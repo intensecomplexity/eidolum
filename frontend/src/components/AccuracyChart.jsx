@@ -41,7 +41,7 @@ export default function AccuracyChart({ data = [], onMonthClick }) {
   // Prediction-by-prediction chart
   if (isPredictionBased) {
     return (
-      <div>
+      <div className="w-full max-w-full overflow-hidden">
         <ResponsiveContainer width="100%" height={220}>
           <LineChart data={data} margin={{ top: 5, right: 5, bottom: 5, left: 0 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="rgba(128,128,128,0.15)" />
@@ -87,7 +87,7 @@ export default function AccuracyChart({ data = [], onMonthClick }) {
   }
 
   return (
-    <div>
+    <div className="w-full max-w-full overflow-hidden">
       <ResponsiveContainer width="100%" height={220}>
         <LineChart data={data} onClick={handleClick} margin={{ top: 5, right: 5, bottom: 5, left: 0 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="rgba(128,128,128,0.15)" />

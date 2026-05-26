@@ -622,7 +622,7 @@ export default function ForecasterProfile() {
 
         {/* Chart + Sector — items-stretch so both panels match height */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6 mb-6 sm:mb-8 lg:items-stretch">
-          <div className="card lg:col-span-2">
+          <div className="card lg:col-span-2 w-full max-w-full overflow-hidden">
             <h2 className="text-xs text-muted uppercase tracking-wider font-semibold mb-3 sm:mb-4">Accuracy Trend</h2>
             {chartData.length > 0 ? (
               <>

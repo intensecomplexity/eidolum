@@ -153,7 +153,7 @@ export default function StockChart({ ticker }) {
   const gridColor = isDark ? '#1e2028' : '#f0f0f0';
 
   return (
-    <div className="card mb-6 relative" ref={chartRef}>
+    <div className="card mb-6 relative w-full max-w-full overflow-hidden" ref={chartRef}>
       {/* Price + change */}
       <div className="flex items-baseline gap-2 mb-2">
         {currentPrice && <span className="font-mono text-2xl font-bold text-accent">${currentPrice.toFixed(2)}</span>}
