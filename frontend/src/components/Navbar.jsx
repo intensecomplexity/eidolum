@@ -201,7 +201,7 @@ export default function Navbar() {
                         <DropdownItem to="/friends" icon={Users} label="Friends" onClick={() => setUserDropdown(false)} />
                         <DropdownItem to="/badges" icon={Star} label="Badges" onClick={() => setUserDropdown(false)} />
                         <DropdownItem to="/watchlist" icon={BookmarkCheck} label="Watchlist" onClick={() => setUserDropdown(false)} />
-                        <DropdownItem to="/saved" icon={Bookmark} label="Saved" onClick={() => setUserDropdown(false)} />
+                        <DropdownItem to="/saved" icon={Bookmark} label="Saved Predictions" onClick={() => setUserDropdown(false)} />
                         <DropdownItem to="/profile" icon={CircleUser} label="Profile" onClick={() => setUserDropdown(false)} />
                         <DropdownItem to="/settings" icon={Settings} label="Settings" onClick={() => setUserDropdown(false)} />
                         <button type="button" onClick={() => { setUserDropdown(false); setShowHelp(true); }}
@@ -252,7 +252,7 @@ export default function Navbar() {
                         <DropdownItem to="/friends" icon={Users} label="Friends" onClick={() => setUserDropdown(false)} />
                         <DropdownItem to="/badges" icon={Star} label="Badges" onClick={() => setUserDropdown(false)} />
                         <DropdownItem to="/watchlist" icon={BookmarkCheck} label="Watchlist" onClick={() => setUserDropdown(false)} />
-                        <DropdownItem to="/saved" icon={Bookmark} label="Saved" onClick={() => setUserDropdown(false)} />
+                        <DropdownItem to="/saved" icon={Bookmark} label="Saved Predictions" onClick={() => setUserDropdown(false)} />
                         <DropdownItem to="/profile" icon={CircleUser} label="Profile" onClick={() => setUserDropdown(false)} />
                         <DropdownItem to="/settings" icon={Settings} label="Settings" onClick={() => setUserDropdown(false)} />
                       </div>
