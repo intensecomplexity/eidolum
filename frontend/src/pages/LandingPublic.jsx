@@ -1,49 +1,11 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Check, Minus, X, Lock } from 'lucide-react';
 import useSEO from '../hooks/useSEO';
 import RankNumber from '../components/RankNumber';
 import MiniPieChart from '../components/MiniPieChart';
 import PlatformBadge from '../components/PlatformBadge';
-import { getSourceBadgeKey } from '../utils/getSourceBadgeKey';
 import Footer from '../components/Footer';
-import TickerLogo from '../components/TickerLogo';
 import { getHomepageData } from '../api';
-import { formatDate } from '../utils/formatDate';
-
-function DirectionBadge({ direction }) {
-  if (direction === 'bullish') return <span title="Expects the stock price to go up" className="text-[10px] font-bold uppercase px-1.5 py-0.5 rounded text-positive bg-positive/10">BULL</span>;
-  if (direction === 'bearish') return <span title="Expects the stock price to go down" className="text-[10px] font-bold uppercase px-1.5 py-0.5 rounded text-negative bg-negative/10">BEAR</span>;
-  return <span title="Expects the stock to stay roughly flat" className="text-[10px] font-bold uppercase px-1.5 py-0.5 rounded text-muted bg-surface-2">HOLD</span>;
-}
-
-function OutcomeBadge({ outcome, actualReturn, evaluationDeferred, evaluationDeferredReason }) {
-  if (evaluationDeferred) {
-    return (
-      <span
-        className="text-muted text-[10px] italic font-mono whitespace-nowrap"
-        title={evaluationDeferredReason || 'Evaluation deferred'}
-      >
-        Long-term thesis — eval pending
-      </span>
-    );
-  }
-  const cfg = {
-    hit: { label: 'HIT', cls: 'text-positive bg-positive/10', icon: Check, tip: 'Prediction was correct within tolerance' },
-    correct: { label: 'HIT', cls: 'text-positive bg-positive/10', icon: Check, tip: 'Prediction was correct within tolerance' },
-    near: { label: 'NEAR', cls: 'text-yellow-400 bg-yellow-400/10', icon: Minus, tip: 'Right direction but missed the target' },
-    miss: { label: 'MISS', cls: 'text-negative bg-negative/10', icon: X, tip: 'Wrong direction or barely moved' },
-    incorrect: { label: 'MISS', cls: 'text-negative bg-negative/10', icon: X, tip: 'Wrong direction or barely moved' },
-  };
-  const c = cfg[outcome] || cfg.miss;
-  const Icon = c.icon;
-  return (
-    <span title={c.tip} className={`inline-flex items-center gap-0.5 text-[10px] font-bold uppercase px-1.5 py-0.5 rounded ${c.cls}`}>
-      <Icon className="w-3 h-3" /> {c.label}
-      {actualReturn != null && <span className="ml-0.5 font-mono">({actualReturn >= 0 ? '+' : ''}{actualReturn}%)</span>}
-    </span>
-  );
-}
 
 export default function LandingPublic() {
   useSEO({
@@ -67,7 +29,6 @@ export default function LandingPublic() {
 
   const navigate = useNavigate();
   const [top5, setTop5] = useState([]);
-  const [featured, setFeatured] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
 
@@ -76,13 +37,9 @@ export default function LandingPublic() {
       .then(result => {
         const analysts = result?.top_analysts || [];
         setTop5(Array.isArray(analysts) ? analysts.slice(0, 5) : []);
-        // Only show featured if it has real data (not null, has a real forecaster name)
-        const feat = result?.featured_prediction;
-        setFeatured(feat && feat.forecaster_name ? feat : null);
         setLoading(false);
       })
       .catch(() => {
-        setFeatured(null);
         setError(true);
         setLoading(false);
       });
@@ -113,71 +70,6 @@ export default function LandingPublic() {
           </Link>
         </div>
       </section>
-
-      {/* -- FEATURED PREDICTION CARD -- */}
-      {featured && (
-        <section className="max-w-2xl mx-auto px-4 sm:px-6 pt-8 sm:pt-12 pb-4">
-          <div className="rounded-lg border-l-4 border border-border py-4 px-5 bg-surface" style={{ borderLeftColor: '#D4A843' }}>
-            <div className="flex items-center justify-between gap-3">
-              <div className="flex items-center gap-2.5 min-w-0">
-                <TickerLogo ticker={featured.ticker} logoUrl={featured.logo_url} size={28} />
-                <div className="min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    {featured.forecaster_id ? (
-                      <Link
-                        to={`/forecaster/${featured.forecaster_id}`}
-                        className="text-sm font-medium text-text-primary hover:text-accent transition-colors"
-                      >
-                        {featured.forecaster_name}
-                      </Link>
-                    ) : (
-                      <span className="text-sm font-medium text-text-primary">{featured.forecaster_name}</span>
-                    )}
-                    {featured.firm && (
-                      <span className="text-xs text-muted">{featured.firm}</span>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-1.5 mt-0.5">
-                    <span className="text-xs text-muted">on</span>
-                    <span className="text-sm font-mono font-medium text-text-primary">{featured.ticker}</span>
-                    {featured.company_name && (
-                      <span className="text-xs text-muted hidden sm:inline">{featured.company_name}</span>
-                    )}
-                  </div>
-                </div>
-              </div>
-              <div className="flex flex-col items-end gap-1 shrink-0">
-                <OutcomeBadge outcome={featured.outcome} actualReturn={featured.actual_return} evaluationDeferred={featured.evaluation_deferred} evaluationDeferredReason={featured.evaluation_deferred_reason} />
-                <DirectionBadge direction={featured.direction} />
-              </div>
-            </div>
-            {(featured.entry_price || featured.target_price) && (
-              <div className="flex items-center gap-3 mt-2.5 text-xs font-mono text-text-secondary">
-                {featured.entry_price != null && (
-                  <span>Entry ${featured.entry_price.toFixed(2)}</span>
-                )}
-                {featured.target_price != null && (
-                  <span>Target ${featured.target_price.toFixed(2)}</span>
-                )}
-                {featured.evaluation_date && (
-                  <span className="text-muted">Scored {formatDate(featured.evaluation_date)}</span>
-                )}
-              </div>
-            )}
-            <div className="flex items-center gap-2 mt-2">
-              <PlatformBadge platform={getSourceBadgeKey(featured)} size={12} showLabel />
-              {featured.prediction_date && (
-                <span className="inline-flex items-center gap-1 text-[10px]" style={{ color: 'var(--color-text-tertiary)' }}>
-                  <Lock size={10} /> Locked {formatDate(featured.prediction_date)}
-                </span>
-              )}
-            </div>
-          </div>
-          <p className="text-center text-muted text-xs mt-4 tracking-wide">
-            Every prediction. Timestamped. Scored against reality.
-          </p>
-        </section>
-      )}
 
       {/* -- HOW IT WORKS -- */}
       <section className="max-w-3xl mx-auto px-4 sm:px-6 py-10 sm:py-14">
