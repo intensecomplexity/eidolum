@@ -81,7 +81,7 @@ export default function BookmarkButton({
           <span className="text-muted text-[10px] font-mono">{saveCount}</span>
         )}
       </button>
-      {promptToast}
+      {promptElement}
     </>
   );
 }
