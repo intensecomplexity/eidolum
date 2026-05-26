@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { UserPlus, UserCheck } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useSubscriptions } from '../context/SubscriptionsContext';
+import { useSignInPrompt } from '../hooks/useSignInPrompt';
 
 /**
  * FollowButton reads/writes through SubscriptionsContext so the
@@ -17,7 +18,7 @@ export default function FollowButton({ forecaster, compact = false }) {
   const { isAuthenticated } = useAuth();
   const { isFollowing: ctxIsFollowing, subscribe, unsubscribe } = useSubscriptions();
   const [loading, setLoading] = useState(false);
-  const [signInPrompt, setSignInPrompt] = useState(false);
+  const { showPrompt, promptElement } = useSignInPrompt('Sign in to follow forecasters');
   // Legacy localStorage display for unauthenticated users with
   // pre-sign-in-gate follows. Mutations are blocked behind the toast,
   // but their old "Following" state remains honest.
@@ -42,8 +43,7 @@ export default function FollowButton({ forecaster, compact = false }) {
     // Gate Follow behind sign-in. Unauthenticated clicks surface a
     // transient prompt — no subscribe API call, no email-modal fallback.
     if (!isAuthenticated) {
-      setSignInPrompt(true);
-      setTimeout(() => setSignInPrompt(false), 3500);
+      showPrompt();
       return;
     }
 
@@ -101,11 +101,7 @@ export default function FollowButton({ forecaster, compact = false }) {
         )}
       </button>
 
-      {signInPrompt && (
-        <div className="fixed bottom-[80px] sm:bottom-6 left-1/2 -translate-x-1/2 z-[70] px-4 py-2.5 rounded-xl text-xs font-medium shadow-lg border bg-surface border-border text-text-primary backdrop-blur-sm toast-slide-up">
-          Sign in to follow forecasters
-        </div>
-      )}
+      {promptElement}
     </>
   );
 }
