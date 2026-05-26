@@ -59,15 +59,9 @@ export default function LandingPublic() {
           >
             Who Should You Actually Listen To?
           </h1>
-          <p className="text-text-secondary text-base sm:text-lg leading-relaxed max-w-2xl mx-auto mb-10">
+          <p className="text-text-secondary text-base sm:text-lg leading-relaxed max-w-2xl mx-auto">
             274,000+ predictions. 6,000 analysts. Every call scored against real market data.
           </p>
-          <Link
-            to="/leaderboard"
-            className="inline-block px-8 py-3 rounded-lg text-sm font-semibold border border-accent/40 text-accent hover:bg-accent/10 transition-colors"
-          >
-            See the Leaderboard
-          </Link>
         </div>
       </section>
 
@@ -215,8 +209,11 @@ export default function LandingPublic() {
         )}
 
         <div className="text-center mt-8">
-          <Link to="/leaderboard" className="text-accent text-sm font-medium hover:underline">
-            View Full Leaderboard
+          <Link
+            to="/leaderboard"
+            className="inline-block px-8 py-3 rounded-lg text-sm font-semibold border border-accent/40 text-accent hover:bg-accent/10 transition-colors"
+          >
+            See the Leaderboard
           </Link>
         </div>
       </section>
