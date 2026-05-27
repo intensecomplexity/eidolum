@@ -12,7 +12,21 @@ except ImportError:
 
 
 def get_price_at_date(ticker: str, date: datetime.datetime) -> Optional[float]:
-    """Return closing price for ticker on the closest trading day to `date`."""
+    """Return closing price for ticker on the closest trading day to `date`.
+
+    Write-through (2026-05-27): checks the local price_bars table first.
+    On hit returns immediately at zero cost. On miss, falls back to the
+    yfinance live fetch and persists the result so the next caller hits L2.
+    """
+    # L2 cache: local price_bars table
+    try:
+        from services.price_store import get_close as _local_close, persist_bar as _local_persist
+        hit = _local_close(ticker, date)
+        if hit is not None:
+            return hit
+    except Exception:
+        _local_persist = None  # so the post-fetch persist branch can no-op
+
     if not YFINANCE_AVAILABLE:
         return None
     try:
@@ -26,7 +40,14 @@ def get_price_at_date(ticker: str, date: datetime.datetime) -> Optional[float]:
         df = df.sort_index()
         target_ts = date.timestamp()
         closest = min(df.index, key=lambda t: abs(t.timestamp() - target_ts))
-        return float(df.loc[closest]["Close"])
+        close = float(df.loc[closest]["Close"])
+        # Write-through to price_bars
+        if _local_persist is not None:
+            try:
+                _local_persist(ticker, closest, close, source="yfinance_live")
+            except Exception:
+                pass
+        return close
     except Exception:
         return None
 
