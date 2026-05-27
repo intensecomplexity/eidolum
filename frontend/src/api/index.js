@@ -49,8 +49,12 @@ export function getForecasterBySlug(slug, params = {}) {
   return api.get(`/forecaster/by-slug/${slug}`, { params }).then(r => r.data);
 }
 
-export function getForecasterSimulator(id) {
-  return api.get(`/forecaster/${id}/simulator`).then(r => r.data);
+export function getForecasterSimulator(id, options = {}) {
+  // include_trades defaults false so the initial profile-page paint pulls
+  // the lean ~25 KB response. The trades-disclosure click fetches once
+  // more with include_trades=true to populate the table.
+  const params = options.includeTrades ? { include_trades: 'true' } : undefined;
+  return api.get(`/forecaster/${id}/simulator`, { params }).then(r => r.data);
 }
 
 export function getSectors() {

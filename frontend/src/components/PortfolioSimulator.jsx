@@ -81,6 +81,13 @@ export default function PortfolioSimulator({ forecasterId, forecasterName }) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [showTrades, setShowTrades] = useState(false);
+  // Trades are no longer in the default simulator payload — backend ships
+  // null in data.trades unless ?include_trades=true. We lazy-fetch on the
+  // first disclosure expand and cache locally so subsequent toggles are
+  // instant. Wall St profiles' default simulator response drops from
+  // ~1.5 MB → ~25 KB.
+  const [tradesList, setTradesList] = useState(null);
+  const [tradesLoading, setTradesLoading] = useState(false);
   // capitalInput is the raw string the user typed (so empty is preservable);
   // customCapital is the parsed numeric value used for chart math. Zero or
   // empty input is allowed — the chart flatlines at $0.
@@ -202,7 +209,26 @@ export default function PortfolioSimulator({ forecasterId, forecasterName }) {
   if (!data || data.insufficient_data) return null;
 
   const { starting_capital, current_value, total_return_pct, total_predictions,
-          time_period, alpha, best_call, worst_call, trades } = data;
+          time_period, alpha, best_call, worst_call } = data;
+  // Prefer the locally-fetched trades (post-disclosure-expand) over
+  // anything on the data object — data.trades is null on the default
+  // response.
+  const trades = tradesList ?? data.trades ?? null;
+
+  async function handleToggleTrades() {
+    if (!showTrades && tradesList == null && !tradesLoading) {
+      setTradesLoading(true);
+      try {
+        const res = await getForecasterSimulator(forecasterId, { includeTrades: true });
+        setTradesList(res?.trades || []);
+      } catch {
+        setTradesList([]);
+      } finally {
+        setTradesLoading(false);
+      }
+    }
+    setShowTrades(s => !s);
+  }
 
   // Scale all values proportionally based on custom starting capital.
   // When customCapital is 0 (or input was cleared), scale=0 → every chart
@@ -364,16 +390,20 @@ export default function PortfolioSimulator({ forecasterId, forecasterName }) {
         )}
       </div>
 
-      {/* Trade log (collapsible) */}
-      {scaledTrades && scaledTrades.length > 0 && (
+      {/* Trade log (collapsible). Visible whenever the headline says
+          there are scored predictions — the actual rows lazy-fetch on
+          first expand, so we trust total_predictions for the gate
+          instead of the (possibly null) scaledTrades length. */}
+      {total_predictions > 0 && (
         <div>
-          <button onClick={() => setShowTrades(!showTrades)}
-            className="flex items-center gap-1.5 text-xs text-muted hover:text-text-secondary transition-colors w-full">
+          <button onClick={handleToggleTrades}
+            disabled={tradesLoading}
+            className="flex items-center gap-1.5 text-xs text-muted hover:text-text-secondary transition-colors w-full disabled:opacity-60">
             <ChevronDown className={`w-3.5 h-3.5 transition-transform ${showTrades ? 'rotate-180' : ''}`} />
-            {showTrades ? 'Hide' : 'Show'} trade log ({scaledTrades.length} trades)
+            {tradesLoading ? 'Loading…' : `${showTrades ? 'Hide' : 'Show'} trade log (${total_predictions} trades)`}
           </button>
 
-          {showTrades && (
+          {showTrades && trades && (
             <div className="mt-2 overflow-x-auto">
               <table className="w-full text-xs">
                 <thead>
