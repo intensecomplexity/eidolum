@@ -10,17 +10,20 @@ that since the v3→stable migration:
   * profile-bulk requires ?part=0..N chunking. Empirical N=3 (4 parts).
   * earning-calendar was renamed to earnings-calendar AND switched to
     JSON (it's no longer "bulk"-suffixed).
-  * stock-peers-bulk was removed entirely — the replacement /stable/stock-peers
-    is per-ticker and would need 10K+ calls. Skipped here with a TODO.
+  * stock-peers-bulk was removed entirely — the replacement is per-ticker
+    and would need 10K+ calls. Skipped here with a TODO.
   * earnings-surprises-bulk requires ?year=YYYY (no "all years" option).
     We loop 2020..current year.
   * sector-performance was renamed to sector-performance-snapshot, switched
-    to JSON, and requires ?date=YYYY-MM-DD. We use today/yesterday.
+    to JSON, and requires ?date=YYYY-MM-DD. We use today / yesterday.
   * Field schemas diverged. We map what survives and let unmapped INSERT
-    params remain NULL — the destination columns are all nullable.
+    params remain NULL — destination columns are all nullable.
 
-After completion the 9 tables (8 populated, stock_peers skipped) hold all
-the high-value reference data and survive the FMP plan downgrade.
+Performance v2 (2026-05-27): per-row INSERT...ON CONFLICT was hitting
+~70 rows/min on the 200K-row tables (every row was one network round-trip).
+Replaced with a single _bulk_upsert helper that builds VALUES clauses of
+500 rows per chunk — one round-trip per chunk instead of 500. Expected
+total runtime drops from ~6h to ~5min for the full 9-table harvest.
 """
 import csv
 import io
@@ -85,15 +88,13 @@ def _get_csv(path: str, params: dict | None = None) -> list[dict]:
     p["apikey"] = FMP_KEY
     url = BASE + path
     try:
-        r = httpx.get(url, params=p, timeout=120)
+        r = httpx.get(url, params=p, timeout=180)
         if r.status_code != 200:
             print(f"{TAG} {path} CSV HTTP {r.status_code} body={r.text[:150]}", flush=True)
             return []
         body = r.text
         if not body:
             return []
-        # FMP bulk CSV always starts with a quoted header row; if not, it's
-        # probably a JSON error envelope or some other shape.
         first_char = body.lstrip()[:1]
         if first_char != '"':
             return []
@@ -128,9 +129,87 @@ def _ensure_table(db, ddl: str) -> None:
         db.rollback()
 
 
+# ─── bulk-upsert helper ──────────────────────────────────────────────────
+def _bulk_upsert(db, table: str, rows: list[dict], cols: list[str],
+                 pk_cols: list[str], update_cols: list[str],
+                 chunk_size: int = 500) -> int:
+    """Chunked VALUES INSERT with ON CONFLICT DO UPDATE. Returns inserted count.
+
+    One round-trip per chunk instead of per row → ~500× speedup on big
+    bulks. Falls back to per-row on chunk failure so a single bad row
+    doesn't kill the whole batch.
+    """
+    if not rows:
+        return 0
+    cols_sql   = ", ".join(cols)
+    pk_sql     = ", ".join(pk_cols)
+    update_sql = ", ".join(f"{c} = EXCLUDED.{c}" for c in update_cols)
+    total = 0
+    for i in range(0, len(rows), chunk_size):
+        chunk = rows[i:i + chunk_size]
+        placeholders = []
+        params = {}
+        for j, row in enumerate(chunk):
+            row_ph = []
+            for col in cols:
+                key = f"{col}_{j}"
+                row_ph.append(f":{key}")
+                params[key] = row.get(col)
+            placeholders.append("(" + ",".join(row_ph) + ")")
+        sql = (
+            f"INSERT INTO {table} ({cols_sql}) VALUES "
+            + ",".join(placeholders) +
+            f" ON CONFLICT ({pk_sql}) DO UPDATE SET {update_sql}"
+        )
+        try:
+            db.execute(text(sql), params)
+            total += len(chunk)
+        except Exception as e:
+            print(f"{TAG} _bulk_upsert {table} chunk {i} failed ({e}); falling back row-by-row", flush=True)
+            try:
+                db.rollback()
+            except Exception:
+                pass
+            # Per-row fallback so one bad row doesn't lose the whole chunk
+            for row in chunk:
+                try:
+                    single_sql = (
+                        f"INSERT INTO {table} ({cols_sql}) VALUES ("
+                        + ",".join(f":{c}" for c in cols) +
+                        f") ON CONFLICT ({pk_sql}) DO UPDATE SET {update_sql}"
+                    )
+                    db.execute(text(single_sql), row)
+                    total += 1
+                except Exception:
+                    try:
+                        db.rollback()
+                    except Exception:
+                        pass
+            try:
+                db.commit()
+            except Exception:
+                pass
+    try:
+        db.commit()
+    except Exception:
+        try:
+            db.rollback()
+        except Exception:
+            pass
+    return total
+
+
 # ═══════════════════════════════════════════════════════════════════════════
 # 1. Company Profiles  (profile-bulk, CSV, ?part=0..N)
 # ═══════════════════════════════════════════════════════════════════════════
+
+PROFILE_COLS = [
+    "ticker", "company_name", "description", "sector", "industry", "market_cap",
+    "country", "exchange", "website", "ipo_date", "employees", "is_etf",
+    "is_actively_trading", "logo_url", "ceo", "city", "state", "currency",
+]
+PROFILE_UPDATE = [c for c in PROFILE_COLS if c != "ticker"]
+
 
 def harvest_company_profiles(db) -> int:
     print(f"{TAG} === Company Profiles ===", flush=True)
@@ -159,77 +238,50 @@ def harvest_company_profiles(db) -> int:
     """)
 
     total = 0
-    for part in range(0, 20):  # safety cap; observed part=0..3 active 2026-05-27
-        rows = _get_csv("profile-bulk", {"part": part})
-        if not rows:
-            print(f"{TAG} profile-bulk part={part} empty — done after {total} rows", flush=True)
+    for part in range(0, 20):  # observed 4 parts active 2026-05-27
+        csv_rows = _get_csv("profile-bulk", {"part": part})
+        if not csv_rows:
+            print(f"{TAG} profile-bulk part={part} empty — done after {total:,} rows", flush=True)
             break
-        for row in rows:
-            sym = _s(row.get("symbol"))
+        prepared = []
+        for r in csv_rows:
+            sym = _s(r.get("symbol"))
             if not sym:
                 continue
-            try:
-                db.execute(text("""
-                    INSERT INTO company_profiles (ticker, company_name, description,
-                        sector, industry, market_cap, country, exchange, website,
-                        ipo_date, employees, is_etf, is_actively_trading, logo_url,
-                        ceo, city, state, currency, fetched_at)
-                    VALUES (:t, :name, :desc, :sector, :industry, :mcap, :country,
-                            :exchange, :website, :ipo, :emp, :etf, :active, :logo,
-                            :ceo, :city, :state, :currency, NOW())
-                    ON CONFLICT (ticker) DO UPDATE SET
-                        company_name = EXCLUDED.company_name,
-                        description  = EXCLUDED.description,
-                        sector       = EXCLUDED.sector,
-                        industry     = EXCLUDED.industry,
-                        market_cap   = EXCLUDED.market_cap,
-                        country      = EXCLUDED.country,
-                        exchange     = EXCLUDED.exchange,
-                        website      = EXCLUDED.website,
-                        ipo_date     = EXCLUDED.ipo_date,
-                        employees    = EXCLUDED.employees,
-                        is_etf       = EXCLUDED.is_etf,
-                        is_actively_trading = EXCLUDED.is_actively_trading,
-                        logo_url     = EXCLUDED.logo_url,
-                        ceo          = EXCLUDED.ceo,
-                        city         = EXCLUDED.city,
-                        state        = EXCLUDED.state,
-                        currency     = EXCLUDED.currency,
-                        fetched_at   = NOW()
-                """), {
-                    "t": sym,
-                    "name":     _s(row.get("companyName")),
-                    "desc":     _s(row.get("description")),
-                    "sector":   _s(row.get("sector")),
-                    "industry": _s(row.get("industry")),
-                    "mcap":     _i(row.get("marketCap")),
-                    "country":  _s(row.get("country")),
-                    "exchange": _s(row.get("exchange")) or _s(row.get("exchangeFullName")),
-                    "website":  _s(row.get("website")),
-                    "ipo":      _s(row.get("ipoDate")),
-                    "emp":      _i(row.get("fullTimeEmployees")),
-                    "etf":      _b(row.get("isEtf")),
-                    "active":   _b(row.get("isActivelyTrading")),
-                    "logo":     _s(row.get("image")),
-                    "ceo":      _s(row.get("ceo")),
-                    "city":     _s(row.get("city")),
-                    "state":    _s(row.get("state")),
-                    "currency": _s(row.get("currency")),
-                })
-                total += 1
-                if total % 500 == 0:
-                    db.commit()
-            except Exception:
-                pass
-        db.commit()
-        print(f"{TAG} profile-bulk part={part} done — cumulative={total:,}", flush=True)
+            prepared.append({
+                "ticker":   sym,
+                "company_name": _s(r.get("companyName")),
+                "description":  _s(r.get("description")),
+                "sector":   _s(r.get("sector")),
+                "industry": _s(r.get("industry")),
+                "market_cap": _i(r.get("marketCap")),
+                "country":  _s(r.get("country")),
+                "exchange": _s(r.get("exchange")) or _s(r.get("exchangeFullName")),
+                "website":  _s(r.get("website")),
+                "ipo_date": _s(r.get("ipoDate")),
+                "employees": _i(r.get("fullTimeEmployees")),
+                "is_etf":    _b(r.get("isEtf")),
+                "is_actively_trading": _b(r.get("isActivelyTrading")),
+                "logo_url":  _s(r.get("image")),
+                "ceo":       _s(r.get("ceo")),
+                "city":      _s(r.get("city")),
+                "state":     _s(r.get("state")),
+                "currency":  _s(r.get("currency")),
+            })
+        n = _bulk_upsert(db, "company_profiles", prepared, PROFILE_COLS, ["ticker"], PROFILE_UPDATE)
+        total += n
+        print(f"{TAG} profile-bulk part={part}: +{n:,} (total {total:,})", flush=True)
     print(f"{TAG} Company profiles: {total:,} upserted", flush=True)
     return total
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-# 2. Analyst Consensus  (upgrades-downgrades-consensus-bulk, CSV, no params)
+# 2. Analyst Consensus  (upgrades-downgrades-consensus-bulk, CSV)
 # ═══════════════════════════════════════════════════════════════════════════
+
+CONSENSUS_COLS = ["ticker", "strong_buy", "buy", "hold", "sell", "strong_sell", "consensus"]
+CONSENSUS_UPDATE = [c for c in CONSENSUS_COLS if c != "ticker"]
+
 
 def harvest_analyst_consensus(db) -> int:
     print(f"{TAG} === Analyst Consensus ===", flush=True)
@@ -246,47 +298,33 @@ def harvest_analyst_consensus(db) -> int:
         )
     """)
 
-    rows = _get_csv("upgrades-downgrades-consensus-bulk")
-    count = 0
-    for r in rows:
+    csv_rows = _get_csv("upgrades-downgrades-consensus-bulk")
+    prepared = []
+    for r in csv_rows:
         sym = _s(r.get("symbol"))
         if not sym:
             continue
-        try:
-            db.execute(text("""
-                INSERT INTO analyst_consensus
-                    (ticker, strong_buy, buy, hold, sell, strong_sell, consensus, fetched_at)
-                VALUES (:t, :sb, :b, :h, :s, :ss, :c, NOW())
-                ON CONFLICT (ticker) DO UPDATE SET
-                    strong_buy = EXCLUDED.strong_buy, buy = EXCLUDED.buy,
-                    hold = EXCLUDED.hold, sell = EXCLUDED.sell,
-                    strong_sell = EXCLUDED.strong_sell,
-                    consensus = EXCLUDED.consensus, fetched_at = NOW()
-            """), {
-                "t": sym,
-                "sb": _i(r.get("strongBuy")) or 0,
-                "b":  _i(r.get("buy")) or 0,
-                "h":  _i(r.get("hold")) or 0,
-                "s":  _i(r.get("sell")) or 0,
-                "ss": _i(r.get("strongSell")) or 0,
-                "c":  _s(r.get("consensus")),
-            })
-            count += 1
-            if count % 500 == 0:
-                db.commit()
-        except Exception:
-            pass
-    db.commit()
-    print(f"{TAG} Analyst consensus: {count:,} upserted", flush=True)
-    return count
+        prepared.append({
+            "ticker":   sym,
+            "strong_buy":  _i(r.get("strongBuy")) or 0,
+            "buy":         _i(r.get("buy")) or 0,
+            "hold":        _i(r.get("hold")) or 0,
+            "sell":        _i(r.get("sell")) or 0,
+            "strong_sell": _i(r.get("strongSell")) or 0,
+            "consensus":   _s(r.get("consensus")),
+        })
+    n = _bulk_upsert(db, "analyst_consensus", prepared, CONSENSUS_COLS, ["ticker"], CONSENSUS_UPDATE)
+    print(f"{TAG} Analyst consensus: {n:,} upserted", flush=True)
+    return n
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-# 3. Price Target Summary  (price-target-summary-bulk, CSV, no params)
-# Schema note: /stable/ no longer returns high/low per period or current
-# price — only count + avg per period. Old columns kept; high/low/current
-# stay NULL going forward.
+# 3. Price Target Summary  (price-target-summary-bulk, CSV)
 # ═══════════════════════════════════════════════════════════════════════════
+
+PTS_COLS = ["ticker", "last_month_avg", "last_quarter_avg", "last_year_avg"]
+PTS_UPDATE = [c for c in PTS_COLS if c != "ticker"]
+
 
 def harvest_price_target_summary(db) -> int:
     print(f"{TAG} === Price Target Summary ===", flush=True)
@@ -301,47 +339,30 @@ def harvest_price_target_summary(db) -> int:
         )
     """)
 
-    rows = _get_csv("price-target-summary-bulk")
-    count = 0
-    for r in rows:
+    csv_rows = _get_csv("price-target-summary-bulk")
+    prepared = []
+    for r in csv_rows:
         sym = _s(r.get("symbol"))
         if not sym:
             continue
-        try:
-            db.execute(text("""
-                INSERT INTO price_target_summary
-                    (ticker, last_month_avg, last_month_high, last_month_low,
-                     last_quarter_avg, last_quarter_high, last_quarter_low,
-                     last_year_avg, last_year_high, last_year_low,
-                     current_price, fetched_at)
-                VALUES (:t, :lma, NULL, NULL, :lqa, NULL, NULL, :lya, NULL, NULL,
-                        NULL, NOW())
-                ON CONFLICT (ticker) DO UPDATE SET
-                    last_month_avg   = EXCLUDED.last_month_avg,
-                    last_quarter_avg = EXCLUDED.last_quarter_avg,
-                    last_year_avg    = EXCLUDED.last_year_avg,
-                    fetched_at = NOW()
-            """), {
-                "t":   sym,
-                "lma": _f(r.get("lastMonthAvgPriceTarget")),
-                "lqa": _f(r.get("lastQuarterAvgPriceTarget")),
-                "lya": _f(r.get("lastYearAvgPriceTarget")),
-            })
-            count += 1
-            if count % 500 == 0:
-                db.commit()
-        except Exception:
-            pass
-    db.commit()
-    print(f"{TAG} Price target summary: {count:,} upserted", flush=True)
-    return count
+        prepared.append({
+            "ticker": sym,
+            "last_month_avg":   _f(r.get("lastMonthAvgPriceTarget")),
+            "last_quarter_avg": _f(r.get("lastQuarterAvgPriceTarget")),
+            "last_year_avg":    _f(r.get("lastYearAvgPriceTarget")),
+        })
+    n = _bulk_upsert(db, "price_target_summary", prepared, PTS_COLS, ["ticker"], PTS_UPDATE)
+    print(f"{TAG} Price target summary: {n:,} upserted", flush=True)
+    return n
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-# 4. Stock Ratings  (rating-bulk, CSV, no params)
-# Schema note: no overall "score" or "recommendation" in /stable/ — those
-# stay NULL. New "returnOnAssetsScore" isn't kept; old roe/de/pe/pb map.
+# 4. Stock Ratings  (rating-bulk, CSV)
 # ═══════════════════════════════════════════════════════════════════════════
+
+RATING_COLS = ["ticker", "rating", "dcf_score", "roe_score", "de_score", "pe_score", "pb_score"]
+RATING_UPDATE = [c for c in RATING_COLS if c != "ticker"]
+
 
 def harvest_stock_ratings(db) -> int:
     print(f"{TAG} === Stock Ratings ===", flush=True)
@@ -357,47 +378,34 @@ def harvest_stock_ratings(db) -> int:
         )
     """)
 
-    rows = _get_csv("rating-bulk")
-    count = 0
-    for r in rows:
+    csv_rows = _get_csv("rating-bulk")
+    prepared = []
+    for r in csv_rows:
         sym = _s(r.get("symbol"))
         if not sym:
             continue
-        try:
-            db.execute(text("""
-                INSERT INTO stock_ratings (ticker, rating, score, recommendation,
-                    dcf_score, roe_score, de_score, pe_score, pb_score, fetched_at)
-                VALUES (:t, :r, NULL, NULL, :dcf, :roe, :de, :pe, :pb, NOW())
-                ON CONFLICT (ticker) DO UPDATE SET
-                    rating = EXCLUDED.rating,
-                    dcf_score = EXCLUDED.dcf_score,
-                    roe_score = EXCLUDED.roe_score,
-                    de_score  = EXCLUDED.de_score,
-                    pe_score  = EXCLUDED.pe_score,
-                    pb_score  = EXCLUDED.pb_score,
-                    fetched_at = NOW()
-            """), {
-                "t":   sym,
-                "r":   _s(r.get("rating")),
-                "dcf": _i(r.get("discountedCashFlowScore")),
-                "roe": _i(r.get("returnOnEquityScore")),
-                "de":  _i(r.get("debtToEquityScore")),
-                "pe":  _i(r.get("priceToEarningsScore")),
-                "pb":  _i(r.get("priceToBookScore")),
-            })
-            count += 1
-            if count % 500 == 0:
-                db.commit()
-        except Exception:
-            pass
-    db.commit()
-    print(f"{TAG} Stock ratings: {count:,} upserted", flush=True)
-    return count
+        prepared.append({
+            "ticker":    sym,
+            "rating":    _s(r.get("rating")),
+            "dcf_score": _i(r.get("discountedCashFlowScore")),
+            "roe_score": _i(r.get("returnOnEquityScore")),
+            "de_score":  _i(r.get("debtToEquityScore")),
+            "pe_score":  _i(r.get("priceToEarningsScore")),
+            "pb_score":  _i(r.get("priceToBookScore")),
+        })
+    n = _bulk_upsert(db, "stock_ratings", prepared, RATING_COLS, ["ticker"], RATING_UPDATE)
+    print(f"{TAG} Stock ratings: {n:,} upserted", flush=True)
+    return n
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-# 5. Earnings Calendar  (earnings-calendar, JSON, no "bulk" suffix anymore)
+# 5. Earnings Calendar  (earnings-calendar, JSON)
 # ═══════════════════════════════════════════════════════════════════════════
+
+EARN_COLS = ["ticker", "date", "eps_estimated", "eps_actual",
+             "revenue_estimated", "revenue_actual"]
+EARN_UPDATE = [c for c in EARN_COLS if c not in ("ticker", "date")]
+
 
 def harvest_earnings_calendar(db) -> int:
     print(f"{TAG} === Earnings Calendar ===", flush=True)
@@ -419,7 +427,7 @@ def harvest_earnings_calendar(db) -> int:
     data = _get_json("earnings-calendar")
     if not isinstance(data, list):
         return 0
-    count = 0
+    prepared = []
     for item in data:
         if not isinstance(item, dict):
             continue
@@ -427,40 +435,21 @@ def harvest_earnings_calendar(db) -> int:
         dt = _s(item.get("date"))
         if not sym or not dt:
             continue
-        try:
-            db.execute(text("""
-                INSERT INTO earnings_history
-                    (ticker, date, eps_estimated, eps_actual, revenue_estimated,
-                     revenue_actual, fiscal_period, fetched_at)
-                VALUES (:t, :d, :ee, :ea, :re, :ra, NULL, NOW())
-                ON CONFLICT (ticker, date) DO UPDATE SET
-                    eps_estimated     = EXCLUDED.eps_estimated,
-                    eps_actual        = EXCLUDED.eps_actual,
-                    revenue_estimated = EXCLUDED.revenue_estimated,
-                    revenue_actual    = EXCLUDED.revenue_actual,
-                    fetched_at = NOW()
-            """), {
-                "t": sym, "d": dt,
-                "ee": _f(item.get("epsEstimated")),
-                "ea": _f(item.get("epsActual")),
-                "re": _i(item.get("revenueEstimated")),
-                "ra": _i(item.get("revenueActual")),
-            })
-            count += 1
-            if count % 500 == 0:
-                db.commit()
-        except Exception:
-            pass
-    db.commit()
-    print(f"{TAG} Earnings calendar: {count:,} upserted", flush=True)
-    return count
+        prepared.append({
+            "ticker": sym, "date": dt,
+            "eps_estimated":     _f(item.get("epsEstimated")),
+            "eps_actual":        _f(item.get("epsActual")),
+            "revenue_estimated": _i(item.get("revenueEstimated")),
+            "revenue_actual":    _i(item.get("revenueActual")),
+        })
+    n = _bulk_upsert(db, "earnings_history", prepared, EARN_COLS,
+                    ["ticker", "date"], EARN_UPDATE)
+    print(f"{TAG} Earnings calendar: {n:,} upserted", flush=True)
+    return n
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-# 6. Stock Peers  — SKIPPED (no longer a bulk endpoint)
-# /stable/stock-peers is now per-ticker (requires ?symbol=X). Calling it
-# for every 10K+ ticker would burn 10K+ FMP calls. Defer to a separate
-# targeted job that pulls peers only for top-N forecasted tickers.
+# 6. Stock Peers  — SKIPPED (no bulk endpoint in /stable/)
 # ═══════════════════════════════════════════════════════════════════════════
 
 def harvest_stock_peers(db) -> int:
@@ -469,11 +458,12 @@ def harvest_stock_peers(db) -> int:
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-# 7. Key Metrics TTM  (key-metrics-ttm-bulk, CSV, no params)
-# Schema diverged heavily from v3. We map the survivors: market_cap,
-# current_ratio, roe, ev_to_ebitda. The rest stay NULL until we widen
-# the destination schema (or rename columns to match the new fields).
+# 7. Key Metrics TTM  (key-metrics-ttm-bulk, CSV) — schema diverged heavily
 # ═══════════════════════════════════════════════════════════════════════════
+
+KEY_COLS = ["ticker", "market_cap", "roe", "current_ratio", "ev_to_ebitda"]
+KEY_UPDATE = [c for c in KEY_COLS if c != "ticker"]
+
 
 def harvest_key_metrics(db) -> int:
     print(f"{TAG} === Key Metrics TTM ===", flush=True)
@@ -498,46 +488,31 @@ def harvest_key_metrics(db) -> int:
         )
     """)
 
-    rows = _get_csv("key-metrics-ttm-bulk")
-    count = 0
-    for r in rows:
+    csv_rows = _get_csv("key-metrics-ttm-bulk")
+    prepared = []
+    for r in csv_rows:
         sym = _s(r.get("symbol"))
         if not sym:
             continue
-        try:
-            db.execute(text("""
-                INSERT INTO key_metrics (ticker, market_cap, pe_ratio, eps,
-                    dividend_yield, revenue, net_income, roe, debt_to_equity,
-                    current_ratio, book_value_per_share, free_cash_flow_per_share,
-                    price_to_book, price_to_sales, ev_to_ebitda, fetched_at)
-                VALUES (:t, :mc, NULL, NULL, NULL, NULL, NULL, :roe, NULL, :cr,
-                        NULL, NULL, NULL, NULL, :eve, NOW())
-                ON CONFLICT (ticker) DO UPDATE SET
-                    market_cap   = EXCLUDED.market_cap,
-                    roe          = EXCLUDED.roe,
-                    current_ratio = EXCLUDED.current_ratio,
-                    ev_to_ebitda = EXCLUDED.ev_to_ebitda,
-                    fetched_at   = NOW()
-            """), {
-                "t":   sym,
-                "mc":  _i(r.get("marketCap")),
-                "roe": _f(r.get("returnOnEquityTTM")),
-                "cr":  _f(r.get("currentRatioTTM")),
-                "eve": _f(r.get("evToEBITDATTM")),
-            })
-            count += 1
-            if count % 500 == 0:
-                db.commit()
-        except Exception:
-            pass
-    db.commit()
-    print(f"{TAG} Key metrics: {count:,} upserted", flush=True)
-    return count
+        prepared.append({
+            "ticker":        sym,
+            "market_cap":    _i(r.get("marketCap")),
+            "roe":           _f(r.get("returnOnEquityTTM")),
+            "current_ratio": _f(r.get("currentRatioTTM")),
+            "ev_to_ebitda":  _f(r.get("evToEBITDATTM")),
+        })
+    n = _bulk_upsert(db, "key_metrics", prepared, KEY_COLS, ["ticker"], KEY_UPDATE)
+    print(f"{TAG} Key metrics: {n:,} upserted", flush=True)
+    return n
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-# 8. Earnings Surprises  (earnings-surprises-bulk, CSV, ?year=YYYY required)
+# 8. Earnings Surprises  (earnings-surprises-bulk, CSV, ?year=YYYY)
 # ═══════════════════════════════════════════════════════════════════════════
+
+SURP_COLS = ["ticker", "date", "eps_estimated", "eps_actual", "surprise_pct"]
+SURP_UPDATE = [c for c in SURP_COLS if c not in ("ticker", "date")]
+
 
 def harvest_earnings_surprises(db) -> int:
     print(f"{TAG} === Earnings Surprises ===", flush=True)
@@ -557,49 +532,40 @@ def harvest_earnings_surprises(db) -> int:
     cur_year = datetime.utcnow().year
     total = 0
     for year in range(2020, cur_year + 1):
-        rows = _get_csv("earnings-surprises-bulk", {"year": year})
-        if not rows:
+        csv_rows = _get_csv("earnings-surprises-bulk", {"year": year})
+        if not csv_rows:
             continue
-        year_count = 0
-        for r in rows:
+        prepared = []
+        for r in csv_rows:
             sym = _s(r.get("symbol"))
             dt  = _s(r.get("date"))
             if not sym or not dt:
                 continue
             actual    = _f(r.get("epsActual"))
             estimated = _f(r.get("epsEstimated"))
-            surprise = None
+            surprise  = None
             if actual is not None and estimated and estimated != 0:
                 surprise = round((actual - estimated) / abs(estimated) * 100, 2)
-            try:
-                db.execute(text("""
-                    INSERT INTO earnings_surprises
-                        (ticker, date, eps_estimated, eps_actual, surprise_pct, fetched_at)
-                    VALUES (:t, :d, :ee, :ea, :sp, NOW())
-                    ON CONFLICT (ticker, date) DO UPDATE SET
-                        eps_estimated = EXCLUDED.eps_estimated,
-                        eps_actual    = EXCLUDED.eps_actual,
-                        surprise_pct  = EXCLUDED.surprise_pct,
-                        fetched_at    = NOW()
-                """), {"t": sym, "d": dt, "ee": estimated, "ea": actual, "sp": surprise})
-                year_count += 1
-                if year_count % 1000 == 0:
-                    db.commit()
-            except Exception:
-                pass
-        db.commit()
-        total += year_count
-        print(f"{TAG} earnings-surprises year={year}: +{year_count:,} (total {total:,})", flush=True)
+            prepared.append({
+                "ticker": sym, "date": dt,
+                "eps_estimated": estimated, "eps_actual": actual,
+                "surprise_pct":  surprise,
+            })
+        n = _bulk_upsert(db, "earnings_surprises", prepared, SURP_COLS,
+                        ["ticker", "date"], SURP_UPDATE)
+        total += n
+        print(f"{TAG} earnings-surprises year={year}: +{n:,} (total {total:,})", flush=True)
     print(f"{TAG} Earnings surprises: {total:,} upserted", flush=True)
     return total
 
 
 # ═══════════════════════════════════════════════════════════════════════════
 # 9. Sector Performance  (sector-performance-snapshot, JSON, ?date=YYYY-MM-DD)
-# Schema note: snapshot is per (sector, exchange) per date. Old table is
-# PK(sector) only — we collapse to NASDAQ rows to keep one row per sector.
-# Future: add exchange column + composite PK for full coverage.
 # ═══════════════════════════════════════════════════════════════════════════
+
+SECT_COLS = ["sector", "change_pct"]
+SECT_UPDATE = ["change_pct"]
+
 
 def harvest_sector_performance(db) -> int:
     print(f"{TAG} === Sector Performance ===", flush=True)
@@ -611,7 +577,6 @@ def harvest_sector_performance(db) -> int:
         )
     """)
 
-    # Try today, fall back to yesterday if no data (market closed weekends/holidays)
     today = _date.today()
     data = None
     for offset in (0, 1, 2, 3, 4):
@@ -623,31 +588,20 @@ def harvest_sector_performance(db) -> int:
     if not isinstance(data, list):
         return 0
 
-    count = 0
+    prepared = []
     for item in data:
         if not isinstance(item, dict):
             continue
-        # Collapse to NASDAQ rows to keep one row per sector
         if (item.get("exchange") or "").upper() != "NASDAQ":
-            continue
+            continue  # collapse to NASDAQ to keep one row per sector
         sector = _s(item.get("sector"))
         pct = _f(item.get("averageChange"))
         if not sector or pct is None:
             continue
-        try:
-            db.execute(text("""
-                INSERT INTO sector_performance (sector, change_pct, fetched_at)
-                VALUES (:s, :p, NOW())
-                ON CONFLICT (sector) DO UPDATE SET
-                    change_pct = EXCLUDED.change_pct,
-                    fetched_at = NOW()
-            """), {"s": sector, "p": pct})
-            count += 1
-        except Exception:
-            pass
-    db.commit()
-    print(f"{TAG} Sector performance: {count:,} upserted", flush=True)
-    return count
+        prepared.append({"sector": sector, "change_pct": pct})
+    n = _bulk_upsert(db, "sector_performance", prepared, SECT_COLS, ["sector"], SECT_UPDATE)
+    print(f"{TAG} Sector performance: {n:,} upserted", flush=True)
+    return n
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -657,7 +611,7 @@ def harvest_sector_performance(db) -> int:
 def run_fmp_bulk_harvest(db=None):
     """Run the full FMP bulk harvest. Idempotent — safe to re-run."""
     print(f"{TAG} ═══════════════════════════════════════════", flush=True)
-    print(f"{TAG} Starting FMP Bulk Harvest (patched 2026-05-27)", flush=True)
+    print(f"{TAG} Starting FMP Bulk Harvest (v2 patched + bulk upsert 2026-05-27)", flush=True)
 
     if not FMP_KEY:
         print(f"{TAG} No FMP_KEY — skipping", flush=True)
@@ -691,7 +645,7 @@ def run_fmp_bulk_harvest(db=None):
         except Exception as e:
             print(f"{TAG} {name} FAILED: {e}", flush=True)
             results[name] = f"ERROR: {e}"
-        time.sleep(1)  # tiny breather between datasets
+        time.sleep(1)
 
     elapsed = time.time() - start
     print(f"{TAG} ═══════════════════════════════════════════", flush=True)
