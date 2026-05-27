@@ -900,6 +900,13 @@ def _fetch_history(ticker: str, start, end) -> dict:
     Equity priority is gated by FMP_PLAN:
       - Ultimate: FMP (primary, fast, global) -> Tiingo -> Finnhub
       - Starter:  Tiingo (free)                -> FMP (budget) -> Finnhub
+
+    Write-through layer (2026-05-27): on every equity fetch, check the
+    local price_bars table first (populated by the one-shot Phase 4
+    harvest, ~20M bars across 10.7K tickers). Hit returns immediately at
+    zero API cost. On miss, the existing live chain runs and the result
+    is persisted to price_bars so the next caller for the same ticker
+    gets the cached value forever after.
     """
     if ticker in _history_cache:
         return _history_cache[ticker]
@@ -913,6 +920,17 @@ def _fetch_history(ticker: str, start, end) -> dict:
             _history_cache[ticker] = prices
         return prices
 
+    # L2 cache: local price_bars table. Sub-ms PK index lookup. No live
+    # API call. Hit short-circuits the FMP/Tiingo/Finnhub chain.
+    try:
+        from services.price_store import get_history as _local_history
+        prices = _local_history(ticker, start, end)
+        if prices:
+            _history_cache[ticker] = prices
+            return prices
+    except Exception as e:
+        print(f"[HistEval] price_store read failed for {ticker}: {e}", flush=True)
+
     if FMP_IS_PRIMARY:
         sources = (_try_fmp, _try_tiingo, _try_finnhub)
     else:
@@ -922,6 +940,12 @@ def _fetch_history(ticker: str, start, end) -> dict:
         prices = fetch(ticker)
         if prices:
             _history_cache[ticker] = prices
+            # Write-through to price_bars so future calls hit the L2 cache.
+            try:
+                from services.price_store import persist_bars_bulk
+                persist_bars_bulk(ticker, prices, source="live_eval")
+            except Exception as e:
+                print(f"[HistEval] price_store write failed for {ticker}: {e}", flush=True)
             return prices
 
     return {}
