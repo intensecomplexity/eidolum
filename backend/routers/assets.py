@@ -10,6 +10,10 @@ from rate_limit import limiter
 from services.ticker_display import (
     resolve_ticker_display_name, resolve_ticker_display_sector,
 )
+from routers._prediction_filters import hedged_filter_sql
+
+_HEDGED_P = hedged_filter_sql("p")
+_HEDGED_NA = hedged_filter_sql("predictions")
 
 router = APIRouter()
 
@@ -71,7 +75,7 @@ def _build_ticker_detail(ticker: str, db) -> dict:
 
     # Quick check: does this ticker have ANY predictions?
     exists = db.execute(sql_text(
-        "SELECT 1 FROM predictions WHERE ticker = :t LIMIT 1"
+        f"SELECT 1 FROM predictions WHERE ticker = :t{_HEDGED_NA} LIMIT 1"
     ), {"t": ticker}).first()
 
     if not exists:
@@ -132,14 +136,14 @@ def _build_ticker_detail(ticker: str, db) -> dict:
     if not sector:
         try:
             sector = db.execute(sql_text(
-                "SELECT sector FROM predictions WHERE ticker = :t AND sector IS NOT NULL AND sector != 'Other' LIMIT 1"
+                f"SELECT sector FROM predictions WHERE ticker = :t AND sector IS NOT NULL AND sector != 'Other'{_HEDGED_NA} LIMIT 1"
             ), {"t": ticker}).scalar()
         except Exception:
             db.rollback()
 
     # ── Combined counts query (one round-trip instead of multiple) ──────
     try:
-        counts_row = db.execute(sql_text("""
+        counts_row = db.execute(sql_text(f"""
             SELECT
                 COUNT(*) as total_all,
                 SUM(CASE WHEN outcome = 'pending' THEN 1 ELSE 0 END) as pending_count,
@@ -156,7 +160,7 @@ def _build_ticker_detail(ticker: str, db) -> dict:
                 SUM(CASE WHEN direction='bullish' THEN 1 ELSE 0 END) as all_bullish,
                 SUM(CASE WHEN direction='bearish' THEN 1 ELSE 0 END) as all_bearish,
                 SUM(CASE WHEN direction='neutral' THEN 1 ELSE 0 END) as all_neutral
-            FROM predictions WHERE ticker = :t
+            FROM predictions WHERE ticker = :t{_HEDGED_NA}
         """), {"t": ticker}).first()
     except Exception as e:
         print(f"[TickerDetail] Counts query failed for {ticker}: {e}")
@@ -198,7 +202,7 @@ def _build_ticker_detail(ticker: str, db) -> dict:
     bulls = []
     bears = []
     try:
-        pending_rows = db.execute(sql_text("""
+        pending_rows = db.execute(sql_text(f"""
             SELECT p.id, p.direction, p.target_price, p.entry_price,
                    p.prediction_date, p.evaluation_date, p.window_days,
                    p.context, p.exact_quote, p.source_url,
@@ -206,7 +210,7 @@ def _build_ticker_detail(ticker: str, db) -> dict:
                    p.source_type, p.source_timestamp_seconds, p.video_timestamp_sec
             FROM predictions p
             JOIN forecasters f ON f.id = p.forecaster_id
-            WHERE p.ticker = :t AND p.outcome = 'pending'
+            WHERE p.ticker = :t AND p.outcome = 'pending'{_HEDGED_P}
             ORDER BY p.evaluation_date ASC NULLS LAST
             LIMIT 50
         """), {"t": ticker}).fetchall()
@@ -265,14 +269,14 @@ def _build_ticker_detail(ticker: str, db) -> dict:
     # ── Recent evaluated (last 15) ────────────────────────────────────────
     recent_scored = []
     try:
-        scored_rows = db.execute(sql_text("""
+        scored_rows = db.execute(sql_text(f"""
             SELECT p.id, p.direction, p.target_price, p.entry_price,
                    p.prediction_date, p.evaluation_date, p.outcome, p.actual_return,
                    p.context, p.exact_quote,
                    f.id, f.name, f.handle, f.accuracy_score, f.firm
             FROM predictions p
             JOIN forecasters f ON f.id = p.forecaster_id
-            WHERE p.ticker = :t AND p.outcome IN ('hit','near','miss','correct','incorrect')
+            WHERE p.ticker = :t AND p.outcome IN ('hit','near','miss','correct','incorrect'){_HEDGED_P}
             ORDER BY p.evaluation_date DESC NULLS LAST
             LIMIT 15
         """), {"t": ticker}).fetchall()
@@ -296,12 +300,12 @@ def _build_ticker_detail(ticker: str, db) -> dict:
     # ── Top forecaster on this ticker (simplified, no ::numeric cast) ────
     top_fc = None
     try:
-        top_row = db.execute(sql_text("""
+        top_row = db.execute(sql_text(f"""
             SELECT f.id, f.name,
                    SUM(CASE WHEN p.outcome='correct' THEN 1 ELSE 0 END) as c,
                    COUNT(*) as t
             FROM predictions p JOIN forecasters f ON f.id = p.forecaster_id
-            WHERE p.ticker = :t AND p.outcome IN ('hit','near','miss','correct','incorrect')
+            WHERE p.ticker = :t AND p.outcome IN ('hit','near','miss','correct','incorrect'){_HEDGED_P}
             GROUP BY f.id, f.name HAVING COUNT(*) >= 3
             ORDER BY SUM(CASE WHEN p.outcome='correct' THEN 1 ELSE 0 END) * 1.0 / COUNT(*) DESC
             LIMIT 1

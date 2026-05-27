@@ -6,6 +6,11 @@ from sqlalchemy import text as sql_text
 from database import get_db
 from models import Forecaster, Prediction
 from rate_limit import limiter
+from routers._prediction_filters import hedged_filter_sql
+
+_HEDGED_NA = hedged_filter_sql("predictions")
+_HEDGED_A = hedged_filter_sql("a")
+_HEDGED_B = hedged_filter_sql("b")
 
 router = APIRouter()
 
@@ -15,10 +20,10 @@ def _forecaster_stats(fid: int, db: Session) -> dict | None:
     if not f:
         return None
 
-    rows = db.execute(sql_text("""
+    rows = db.execute(sql_text(f"""
         SELECT outcome, actual_return, direction, sector
         FROM predictions
-        WHERE forecaster_id = :fid AND outcome IN ('hit','near','miss','correct','incorrect')
+        WHERE forecaster_id = :fid AND outcome IN ('hit','near','miss','correct','incorrect'){_HEDGED_NA}
     """), {"fid": fid}).fetchall()
 
     hit = sum(1 for r in rows if r[0] in ('hit', 'correct'))
@@ -56,9 +61,9 @@ def _forecaster_stats(fid: int, db: Session) -> dict | None:
     for r in rows:
         # direction is in r[2], but we don't have ticker here
         pass
-    top_tickers_rows = db.execute(sql_text("""
+    top_tickers_rows = db.execute(sql_text(f"""
         SELECT ticker, COUNT(*) as c FROM predictions
-        WHERE forecaster_id = :fid AND outcome IN ('hit','near','miss','correct','incorrect')
+        WHERE forecaster_id = :fid AND outcome IN ('hit','near','miss','correct','incorrect'){_HEDGED_NA}
         GROUP BY ticker ORDER BY c DESC LIMIT 5
     """), {"fid": fid}).fetchall()
     top_tickers = [r[0] for r in top_tickers_rows]
@@ -108,7 +113,7 @@ def compare_forecasters(
         return {"error": "One or both forecasters not found"}
 
     # Head-to-head: tickers both predicted on
-    h2h = db.execute(sql_text("""
+    h2h = db.execute(sql_text(f"""
         SELECT a.ticker, a.direction, a.outcome, a.actual_return,
                b.direction, b.outcome, b.actual_return
         FROM predictions a
@@ -116,7 +121,7 @@ def compare_forecasters(
             AND a.prediction_date = b.prediction_date
         WHERE a.forecaster_id = :a AND b.forecaster_id = :b
           AND a.outcome IN ('hit','near','miss','correct','incorrect')
-          AND b.outcome IN ('hit','near','miss','correct','incorrect')
+          AND b.outcome IN ('hit','near','miss','correct','incorrect'){_HEDGED_A}{_HEDGED_B}
         LIMIT 20
     """), {"a": a, "b": b}).fetchall()
 

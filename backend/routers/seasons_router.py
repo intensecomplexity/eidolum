@@ -8,6 +8,9 @@ from models import Season, SeasonEntry, User, Config
 from rate_limit import limiter
 from seasons import ensure_current_season
 from fastapi import HTTPException
+from routers._prediction_filters import hedged_filter_sql
+
+_HEDGED_P = hedged_filter_sql("p")
 
 router = APIRouter()
 
@@ -93,7 +96,7 @@ def season_leaderboard(request: Request, season_id: int, db: Session = Depends(g
     analyst_lb = []
     if season.starts_at and season.ends_at:
         try:
-            analyst_rows = db.execute(sql_text("""
+            analyst_rows = db.execute(sql_text(f"""
                 SELECT f.id, f.name, f.handle,
                        COUNT(*) as total,
                        SUM(CASE WHEN p.outcome = 'correct' THEN 1 ELSE 0 END) as correct
@@ -101,7 +104,7 @@ def season_leaderboard(request: Request, season_id: int, db: Session = Depends(g
                 JOIN forecasters f ON f.id = p.forecaster_id
                 WHERE p.outcome IN ('hit','near','miss','correct','incorrect')
                   AND COALESCE(p.evaluated_at, p.evaluation_date) >= :start
-                  AND COALESCE(p.evaluated_at, p.evaluation_date) < :end
+                  AND COALESCE(p.evaluated_at, p.evaluation_date) < :end{_HEDGED_P}
                 GROUP BY f.id, f.name, f.handle
                 HAVING COUNT(*) >= 2
                 ORDER BY ROUND(SUM(CASE WHEN p.outcome='correct' THEN 1 ELSE 0 END)::numeric / NULLIF(COUNT(*), 0) * 100, 1) DESC, COUNT(*) DESC

@@ -12,8 +12,10 @@ from models import User, UserPrediction
 from rate_limit import limiter
 from ticker_lookup import TICKER_INFO
 from services.prediction_visibility import yt_visible_filter
+from routers._prediction_filters import hedged_filter_sql
 
 _YT_VIS_P = yt_visible_filter("p")
+_HEDGED_P = hedged_filter_sql("p")
 
 router = APIRouter()
 
@@ -437,7 +439,7 @@ def get_ticker_chart(
             FROM predictions p
             JOIN forecasters f ON f.id = p.forecaster_id
             WHERE p.ticker = :t AND p.prediction_date >= :start
-              AND {_YT_VIS_P}
+              AND {_YT_VIS_P}{_HEDGED_P}
             ORDER BY p.prediction_date ASC
             LIMIT 100
         """), {"t": ticker, "start": start_date}).fetchall()

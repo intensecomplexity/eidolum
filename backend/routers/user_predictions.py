@@ -15,6 +15,9 @@ from middleware.auth import require_user
 from rate_limit import limiter
 from seasons import ensure_current_season
 from ticker_lookup import resolve_ticker, search_tickers as _search_tickers, TICKER_INFO
+from routers._prediction_filters import hedged_filter_sql
+
+_HEDGED_P = hedged_filter_sql("p")
 
 router = APIRouter()
 
@@ -195,10 +198,10 @@ def search_tickers_endpoint(request: Request, q: str = Query(""), db: Session = 
                 found_tickers.add(r[0])
 
         # Also search predictions for tickers not in ticker_sectors
-        pred_rows = db.execute(sql_text("""
+        pred_rows = db.execute(sql_text(f"""
             SELECT p.ticker, COUNT(*) as cnt
             FROM predictions p
-            WHERE UPPER(p.ticker) = :exact OR UPPER(p.ticker) LIKE :prefix
+            WHERE (UPPER(p.ticker) = :exact OR UPPER(p.ticker) LIKE :prefix){_HEDGED_P}
             GROUP BY p.ticker
             ORDER BY CASE WHEN UPPER(p.ticker) = :exact THEN 0 ELSE 1 END, cnt DESC
             LIMIT 5

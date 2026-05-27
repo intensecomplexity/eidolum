@@ -14,8 +14,10 @@ from services.prediction_visibility import yt_visible_filter
 from services.ticker_display import (
     resolve_ticker_display_name, resolve_ticker_display_sector,
 )
+from routers._prediction_filters import hedged_filter_sql
 
 _YT_VIS_P = yt_visible_filter("p")
+_HEDGED_P = hedged_filter_sql("p")
 
 router = APIRouter()
 
@@ -84,7 +86,7 @@ def get_smart_money(
           AND p.direction IN ('bullish', 'bearish', 'neutral')
           AND (p.prediction_date IS NULL
                OR p.prediction_date >= NOW() - INTERVAL '18 months')
-          AND {_YT_VIS_P}
+          AND {_YT_VIS_P}{_HEDGED_P}
           {sector_where}
         GROUP BY p.ticker, p.direction
         HAVING COUNT(DISTINCT p.forecaster_id) >= :min_analysts
@@ -112,7 +114,7 @@ def get_smart_money(
           AND (p.prediction_date IS NULL
                OR p.prediction_date >= NOW() - INTERVAL '18 months')
           AND p.ticker = ANY(:tickers)
-          AND {_YT_VIS_P}
+          AND {_YT_VIS_P}{_HEDGED_P}
     """), {"ids": top_ids, "tickers": survivor_tickers}).fetchall()
 
     # Group by ticker + direction
