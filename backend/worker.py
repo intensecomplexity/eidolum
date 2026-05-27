@@ -2394,6 +2394,29 @@ def main():
             log.error(f"[finnhub_upgrades] {e}")
     sched.add_job(_standalone("finnhub_upgrades", _finnhub_upgrades), "interval", hours=8, id="finnhub_upgrades", next_run_time=t0 + timedelta(minutes=70), executor='default')
 
+    # /api/stats/global precompute — UPSERTs the 7 COUNT(*) payload into
+    # global_stats_cache (one row, id=1). Endpoint reads that row directly,
+    # eliminating the per-worker cold-start cost (~2.7s) of the live counts.
+    def _refresh_global_stats():
+        try:
+            from jobs.refresh_global_stats import refresh_global_stats
+            db = BgSessionLocal()
+            try:
+                refresh_global_stats(db)
+                db.commit()
+            finally:
+                db.close()
+        except Exception as e:
+            log.error(f"[refresh_global_stats] {e}")
+    sched.add_job(
+        _standalone("refresh_global_stats", _refresh_global_stats),
+        "interval", minutes=5,
+        id="refresh_global_stats",
+        max_instances=1, coalesce=True,
+        next_run_time=t0 + timedelta(minutes=2),
+        executor='maintenance',
+    )
+
     # price_bars daily increment — keeps the local EOD cache current after the
     # Phase 4 one-shot harvest. Gated by ENABLE_PRICE_BARS_INCREMENTAL flag
     # (default false). Designed to fit FMP Free-tier's 250/day budget once

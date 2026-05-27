@@ -597,16 +597,40 @@ def get_my_rival(request: Request, current_user_id: int = Depends(_require_user)
 # ── GET /api/stats/global ──────────────────────────────────────────────────────
 
 import time as _stats_time
+from sqlalchemy import text as _stats_text
 
 _stats_cache: dict | None = None
 _stats_cache_time: float = 0
-_STATS_TTL = 60  # COUNT(*) on predictions is ~2.7s; cache to keep it off the hot path
+_STATS_TTL = 60  # L2 fallback for stale-table scenarios (cron stall, etc.)
+_STATS_TABLE_MAX_AGE_MIN = 30  # treat global_stats_cache row as fresh within this window
 
 
 @router.get("/stats/global")
 @limiter.limit("60/minute")
 def get_global_stats(request: Request, db: Session = Depends(get_db)):
     global _stats_cache, _stats_cache_time
+
+    # L1: precomputed table written by the worker every 5 min. Sub-1ms PK SELECT.
+    try:
+        row = db.execute(_stats_text(
+            "SELECT total_predictions, total_forecasters, total_users, "
+            "average_accuracy, active_predictions, total_scored "
+            "FROM global_stats_cache "
+            "WHERE id = 1 AND updated_at > NOW() - make_interval(mins => :max_age)"
+        ), {"max_age": _STATS_TABLE_MAX_AGE_MIN}).first()
+        if row is not None:
+            return {
+                "total_predictions": int(row.total_predictions),
+                "total_forecasters": int(row.total_forecasters),
+                "total_users": int(row.total_users),
+                "average_accuracy": float(row.average_accuracy),
+                "active_predictions": int(row.active_predictions),
+                "total_scored": int(row.total_scored),
+            }
+    except Exception:
+        pass  # fall through to live counts + in-process cache
+
+    # L2: in-process cache from d707df0 — protects against stale/missing table
     if _stats_cache and (_stats_time.time() - _stats_cache_time) < _STATS_TTL:
         return _stats_cache
 
