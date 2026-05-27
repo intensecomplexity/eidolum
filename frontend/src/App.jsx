@@ -16,6 +16,7 @@ import ComparisonTray from './components/ComparisonTray';
 import OnboardingOverlay from './components/OnboardingOverlay';
 import VaultDoorSplash from './components/VaultDoorSplash';
 import { ErrorBoundary } from './components/ErrorBoundary';
+import { ScrollToTop } from './components/ScrollToTop';
 import LoadingSpinner from './components/LoadingSpinner';
 import Landing from './pages/Landing';
 import LandingPublic from './pages/LandingPublic';
@@ -137,6 +138,7 @@ export default function App() {
       {showOnboarding && !isAuthenticated && (
         <OnboardingOverlay onComplete={() => setShowOnboarding(false)} />
       )}
+      <ScrollToTop />
       <ErrorBoundary>
       <Suspense fallback={<RouteFallback />}>
       <Routes>
