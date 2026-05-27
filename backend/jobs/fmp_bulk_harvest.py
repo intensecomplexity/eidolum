@@ -138,9 +138,20 @@ def _bulk_upsert(db, table: str, rows: list[dict], cols: list[str],
     One round-trip per chunk instead of per row → ~500× speedup on big
     bulks. Falls back to per-row on chunk failure so a single bad row
     doesn't kill the whole batch.
+
+    Dedupes rows by pk_cols within the input (Postgres rejects an entire
+    chunk if the same PK appears twice — CardinalityViolation). Last
+    occurrence wins, matching ON CONFLICT DO UPDATE semantics.
     """
     if not rows:
         return 0
+    # Dedup by composite PK — last write wins
+    seen: dict[tuple, dict] = {}
+    for r in rows:
+        key = tuple(r.get(c) for c in pk_cols)
+        seen[key] = r
+    rows = list(seen.values())
+
     cols_sql   = ", ".join(cols)
     pk_sql     = ", ".join(pk_cols)
     update_sql = ", ".join(f"{c} = EXCLUDED.{c}" for c in update_cols)
