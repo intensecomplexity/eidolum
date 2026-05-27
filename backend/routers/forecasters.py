@@ -881,17 +881,29 @@ def _get_preds(fid, page, limit, filter_type, sector, db):
 _sim_cache: dict[int, tuple] = {}
 _SIM_TTL = 3600  # 1 hour
 
+# Chart renders at ~600px wide; rendering 5,700 points would alias hundreds
+# into the same pixel column. Sample evenly, always include the last row so
+# the headline current_value stays accurate. Wall St profiles before this
+# shipped 1.5 MB responses; after, ~25 KB.
+_TIMELINE_MAX_POINTS = 300
+
 
 @router.get("/forecaster/{forecaster_id}/simulator")
 @limiter.limit("30/minute")
 def get_portfolio_simulator(
     request: Request,
     forecaster_id: int,
+    include_trades: bool = False,
     db: Session = Depends(get_db),
 ):
     cached = _sim_cache.get(forecaster_id)
     if cached and (_time.time() - cached[1]) < _SIM_TTL:
-        return cached[0]
+        full = cached[0]
+        # Option 1 cache: store the complete computed result keyed only by
+        # forecaster_id; per-request strip the trades list when the caller
+        # didn't ask for it. Avoids double-caching when both flag values
+        # are requested in the same TTL window.
+        return {**full, "trades": full.get("trades") if include_trades else None}
 
     f = db.query(Forecaster).filter(Forecaster.id == forecaster_id).first()
     if not f:
@@ -986,6 +998,20 @@ def get_portfolio_simulator(
 
     total_return = round((portfolio - starting) / starting * 100, 1)
 
+    # Downsample the timeline AFTER headline numbers are already computed
+    # from the full set. current_value / total_return_pct / best_call /
+    # worst_call all use the full row scan above. Only the wire payload
+    # gets the sampled version. Always include the last point so the
+    # chart endpoint matches the headline current_value exactly.
+    if len(timeline) > _TIMELINE_MAX_POINTS:
+        step = max(1, len(timeline) // _TIMELINE_MAX_POINTS)
+        sampled = timeline[::step]
+        if sampled[-1] is not timeline[-1]:
+            sampled.append(timeline[-1])
+        timeline_out = sampled
+    else:
+        timeline_out = timeline
+
     # Build time period string
     period_str = None
     if first_date and last_date:
@@ -1013,9 +1039,9 @@ def get_portfolio_simulator(
         "alpha": alpha,
         "best_call": best_call,
         "worst_call": worst_call,
-        "portfolio_over_time": timeline,
+        "portfolio_over_time": timeline_out,
         "trades": trades,
     }
 
     _sim_cache[forecaster_id] = (result, _time.time())
-    return result
+    return {**result, "trades": result["trades"] if include_trades else None}
