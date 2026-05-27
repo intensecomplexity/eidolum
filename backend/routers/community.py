@@ -596,10 +596,20 @@ def get_my_rival(request: Request, current_user_id: int = Depends(_require_user)
 
 # ── GET /api/stats/global ──────────────────────────────────────────────────────
 
+import time as _stats_time
+
+_stats_cache: dict | None = None
+_stats_cache_time: float = 0
+_STATS_TTL = 60  # COUNT(*) on predictions is ~2.7s; cache to keep it off the hot path
+
 
 @router.get("/stats/global")
 @limiter.limit("60/minute")
 def get_global_stats(request: Request, db: Session = Depends(get_db)):
+    global _stats_cache, _stats_cache_time
+    if _stats_cache and (_stats_time.time() - _stats_cache_time) < _STATS_TTL:
+        return _stats_cache
+
     # User predictions
     up_total = db.query(func.count(UserPrediction.id)).filter(UserPrediction.deleted_at.is_(None)).scalar() or 0
     up_active = db.query(func.count(UserPrediction.id)).filter(UserPrediction.outcome == "pending", UserPrediction.deleted_at.is_(None)).scalar() or 0
@@ -622,7 +632,7 @@ def get_global_stats(request: Request, db: Session = Depends(get_db)):
     avg_accuracy = round(total_correct / total_scored * 100, 1) if total_scored > 0 else 0
     total_users = db.query(func.count(User.id)).scalar() or 0
 
-    return {
+    result = {
         "total_predictions": total_predictions,
         "total_forecasters": total_forecasters,
         "total_users": total_users,
@@ -630,6 +640,9 @@ def get_global_stats(request: Request, db: Session = Depends(get_db)):
         "active_predictions": up_active,
         "total_scored": total_scored,
     }
+    _stats_cache = result
+    _stats_cache_time = _stats_time.time()
+    return result
 
 
 # ── GET /api/consensus/{ticker} ──────────────────────────────────────────────
