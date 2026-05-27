@@ -6,6 +6,7 @@ import Footer from '../components/Footer';
 import PageHeader from '../components/PageHeader';
 import useSEO from '../hooks/useSEO';
 import { getSectors } from '../api';
+import { formatSectorName } from '../utils/formatSectorName';
 
 export default function AllSectors() {
   useSEO({
@@ -56,7 +57,7 @@ export default function AllSectors() {
                   to={`/consensus?sector=${encodeURIComponent(name)}`}
                   className="card py-3 text-center hover:bg-surface-2 transition-colors"
                 >
-                  <div className="text-sm font-medium text-text-primary">{name}</div>
+                  <div className="text-sm font-medium text-text-primary">{formatSectorName(name)}</div>
                   <div className="text-[10px] text-muted font-mono">{count.toLocaleString()} predictions</div>
                   {s.accuracy > 0 && (
                     <div className="text-[10px] text-accent font-mono">{s.accuracy}% accuracy</div>

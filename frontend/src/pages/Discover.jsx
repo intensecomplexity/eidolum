@@ -10,6 +10,7 @@ import { usePublicFlag } from '../hooks/usePublicFlag';
 import TickerLogo from '../components/TickerLogo';
 import { searchTickers, getTrendingTickers, getSectors, getExpiringPredictions, getLeaderboard, getHomepageData } from '../api';
 import { pluralize } from '../utils/pluralize';
+import { formatSectorName } from '../utils/formatSectorName';
 
 function formatBullBear(bull, bear) {
   const total = bull + bear;
@@ -227,7 +228,7 @@ export default function Discover() {
                 return (
                   <Link key={name} to={`/consensus?sector=${encodeURIComponent(name)}`}
                     className="card py-3 text-center hover:bg-surface-2 transition-colors">
-                    <div className="text-sm font-medium text-text-primary">{name}</div>
+                    <div className="text-sm font-medium text-text-primary">{formatSectorName(name)}</div>
                     <div className="text-[10px] text-muted font-mono">{count.toLocaleString()} predictions</div>
                     {s.accuracy > 0 && <div className="text-[10px] text-accent font-mono">{s.accuracy}% accuracy</div>}
                     {topName && <div className="text-[10px] text-text-secondary mt-0.5 truncate">Top: {topName}</div>}
