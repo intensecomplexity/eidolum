@@ -382,23 +382,42 @@ def process_population(db, pop: str, args, sample_collector: list):
                     "new_outcome": new_outcome,
                 })
 
-        # Apply this batch
+        # Apply this batch — single VALUES-clause UPDATE for one round-trip
         if updates and not args.dry_run:
+            values_clauses = []
+            params = {}
+            for i, u in enumerate(updates):
+                # CAST() not :name::type — the latter is silently mangled by
+                # SQLAlchemy's text() parameter parser.
+                values_clauses.append(
+                    f"(CAST(:id{i} AS int), CAST(:ep{i} AS numeric), "
+                    f"CAST(:ret{i} AS numeric), :outcome{i}, "
+                    f"CAST(:spy{i} AS numeric), CAST(:alpha{i} AS numeric))"
+                )
+                params[f"id{i}"]      = u["id"]
+                params[f"ep{i}"]      = u["ep"]
+                params[f"ret{i}"]     = u["ret"]
+                params[f"outcome{i}"] = u["outcome"]
+                params[f"spy{i}"]     = u["spy_ret"]
+                params[f"alpha{i}"]   = u["alpha"]
+            bulk_sql = (
+                "UPDATE predictions p SET "
+                "entry_price = v.ep, actual_return = v.ret, outcome = v.outcome, "
+                "sp500_return = v.spy, alpha = v.alpha, "
+                "last_backfill_attempt = NOW(), evaluated_at = NOW() "
+                "FROM (VALUES " + ",".join(values_clauses) + ") "
+                "AS v(id, ep, ret, outcome, spy, alpha) "
+                "WHERE p.id = v.id"
+            )
+            committed = False
             for attempt in range(3):
                 try:
-                    for u in updates:
-                        db.execute(sql_text("""
-                            UPDATE predictions
-                               SET entry_price   = :ep,
-                                   actual_return = :ret,
-                                   outcome       = :outcome,
-                                   sp500_return  = :spy_ret,
-                                   alpha         = :alpha,
-                                   last_backfill_attempt = NOW(),
-                                   evaluated_at  = NOW()
-                             WHERE id = :id
-                        """), u)
+                    result = db.execute(sql_text(bulk_sql), params)
                     db.commit()
+                    # Sanity check: if rowcount doesn't match update count, something's off
+                    if result.rowcount != len(updates):
+                        print(f"{TAG} pop={pop} WARN rowcount={result.rowcount} != updates={len(updates)} last_id={last_id}", flush=True)
+                    committed = True
                     break
                 except Exception as e:
                     print(f"{TAG} pop={pop} commit retry {attempt+1}/3 last_id={last_id}: {e}", flush=True)
@@ -412,8 +431,12 @@ def process_population(db, pop: str, args, sample_collector: list):
                         pass
                     time.sleep(2 ** attempt)
                     db = BgSessionLocal()
-            else:
-                print(f"{TAG} pop={pop} commit failed 3x at last_id={last_id}", flush=True)
+            if not committed:
+                # Loud failure — script must NOT silently report phantom updates
+                msg = f"{TAG} pop={pop} FATAL commit failed 3x at last_id={last_id} — aborting"
+                print(msg, flush=True)
+                _stats["exit_reason"] = msg
+                raise SystemExit(4)
 
         # Progress log
         print(
