@@ -1001,10 +1001,21 @@ _HIT_OUTCOMES = "('hit','correct')"
 def refresh_all_forecaster_stats():
     """Recalculate stats for ALL forecasters from scratch, including alpha.
     Uses three-tier scoring: accuracy = (hits*1 + nears*0.5) / total_scored * 100.
-    Zeros out forecasters with 0 scored predictions so they don't appear on leaderboard."""
+    Zeros out forecasters with 0 scored predictions so they don't appear on leaderboard.
+
+    Hedged/hypothetical predictions are excluded from the aggregate via
+    routers._prediction_filters.hedged_filter_sql so cached
+    forecasters.accuracy_score reflects the same T2 policy the API
+    routers enforce (commit 2baa8db + 95a11ae). The kill switch is the
+    same env var — HIDE_HEDGED_PREDICTIONS — but it must be set on the
+    WORKER service (hopeful-expression) to silence the filter here;
+    setting it only on the API service leaves the worker filtering.
+    """
     from database import BgSessionLocal as SessionLocal
     from feature_flags import x_filter_sql
     from services.prediction_visibility import YT_VISIBLE_FILTER_SQL
+    from routers._prediction_filters import hedged_filter_sql
+    _hedged_na = hedged_filter_sql("predictions")
     db = SessionLocal()
     updated = 0
     zeroed = 0
@@ -1020,7 +1031,7 @@ def refresh_all_forecaster_stats():
         db.execute(sql_text(
             "UPDATE forecasters SET total_predictions=0, correct_predictions=0, accuracy_score=0, alpha=0, avg_return=0 "
             "WHERE total_predictions > 0 AND id NOT IN "
-            f"(SELECT DISTINCT forecaster_id FROM predictions WHERE outcome IN {_SCORED_OUTCOMES} AND actual_return IS NOT NULL{x_filter} {yt_visible})"
+            f"(SELECT DISTINCT forecaster_id FROM predictions WHERE outcome IN {_SCORED_OUTCOMES} AND actual_return IS NOT NULL{x_filter} {yt_visible}{_hedged_na})"
         ))
         zeroed = db.execute(sql_text(
             "SELECT changes()"  # SQLite
@@ -1029,7 +1040,7 @@ def refresh_all_forecaster_stats():
 
         # Step 2: Recalculate stats for forecasters WITH scored predictions
         fids = [r[0] for r in db.execute(sql_text(
-            f"SELECT DISTINCT forecaster_id FROM predictions WHERE outcome IN {_SCORED_OUTCOMES} AND actual_return IS NOT NULL{x_filter} {yt_visible}"
+            f"SELECT DISTINCT forecaster_id FROM predictions WHERE outcome IN {_SCORED_OUTCOMES} AND actual_return IS NOT NULL{x_filter} {yt_visible}{_hedged_na}"
         )).fetchall()]
         print(f"[StatsRefresh] Refreshing {len(fids)} forecasters with scored predictions (x_filter={'on' if x_filter else 'off'})")
         for fid in fids:
@@ -1044,6 +1055,7 @@ def refresh_all_forecaster_stats():
                   AND actual_return IS NOT NULL
                   {x_filter}
                   {yt_visible}
+                  {_hedged_na}
             """), {"f": fid}).first()
             total = row[0] or 0
             hits = row[1] or 0
@@ -1071,6 +1083,7 @@ def refresh_all_forecaster_stats():
                     SELECT MAX(prediction_date) FROM predictions
                     WHERE forecaster_id = f.id
                       AND {YT_VISIBLE_FILTER_SQL}
+                      {_hedged_na}
                 )
             """))
             db.execute(sql_text("""
