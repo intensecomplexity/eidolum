@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { ChevronDown } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
@@ -87,14 +87,44 @@ export default function PortfolioSimulator({ forecasterId, forecasterName }) {
   const [capitalInput, setCapitalInput] = useState((10000).toLocaleString());
   const customCapital = parseInt(capitalInput.replace(/[^0-9]/g, '')) || 0;
 
+  // Defer the simulator fetch until the section is near the viewport.
+  // The simulator endpoint iterates every scored prediction (e.g. ~5,700
+  // rows for Wells Fargo after the visibility-filter cleanup landed), so
+  // running it in parallel with the rest of the profile load meant the
+  // whole page paint waited on the slowest request. The loading spinner
+  // card renders as the IntersectionObserver target so there's always a
+  // DOM element to observe before data arrives. rootMargin starts the
+  // fetch a beat before the user can actually see the section.
+  const sentinelRef = useRef(null);
+  const [shouldFetch, setShouldFetch] = useState(false);
+
   useEffect(() => {
-    if (!forecasterId) return;
+    if (shouldFetch || typeof window === 'undefined' || !('IntersectionObserver' in window)) {
+      // No observer available → fall back to fetching immediately so
+      // the section is never permanently stuck on the spinner.
+      if (!shouldFetch) setShouldFetch(true);
+      return;
+    }
+    const node = sentinelRef.current;
+    if (!node) return;
+    const obs = new IntersectionObserver(([entry]) => {
+      if (entry.isIntersecting) {
+        setShouldFetch(true);
+        obs.disconnect();
+      }
+    }, { rootMargin: '200px' });
+    obs.observe(node);
+    return () => obs.disconnect();
+  }, [shouldFetch]);
+
+  useEffect(() => {
+    if (!forecasterId || !shouldFetch) return;
     setLoading(true);
     getForecasterSimulator(forecasterId)
       .then(setData)
       .catch(() => setData(null))
       .finally(() => setLoading(false));
-  }, [forecasterId]);
+  }, [forecasterId, shouldFetch]);
 
   // Parse the API's "YYYY-MM-DD" strings into epoch ms once per fetch.
   // Doing this here (instead of inside the scaled map below) keeps the
@@ -162,7 +192,7 @@ export default function PortfolioSimulator({ forecasterId, forecasterName }) {
   }, [sourceTimeline]);
 
   if (loading) return (
-    <div className="card mb-6">
+    <div ref={sentinelRef} className="card mb-6">
       <div className="flex items-center justify-center h-[100px]">
         <div className="w-6 h-6 border-2 border-accent border-t-transparent rounded-full animate-spin" />
       </div>
