@@ -6,6 +6,11 @@ from sqlalchemy.orm import Session
 from sqlalchemy import text as sql_text
 from database import get_db
 from rate_limit import limiter
+from routers._prediction_filters import hedged_filter_sql
+
+_HEDGED_P = hedged_filter_sql("p")
+_HEDGED_P2 = hedged_filter_sql("p2")
+_HEDGED_P3 = hedged_filter_sql("p3")
 
 router = APIRouter()
 
@@ -121,7 +126,7 @@ def get_firm(slug: str, request: Request, db: Session = Depends(get_db)):
                SUM(CASE WHEN p.outcome IN ('miss','incorrect') THEN 1 ELSE 0 END) as misses
         FROM forecasters f
         LEFT JOIN predictions p ON p.forecaster_id = f.id
-            AND p.outcome IN ('hit','near','miss','correct','incorrect')
+            AND p.outcome IN ('hit','near','miss','correct','incorrect'){_HEDGED_P}
         WHERE f.firm IN ({placeholders})
         GROUP BY f.id, f.name, f.slug, f.accuracy_score, f.total_predictions
         ORDER BY scored DESC, f.total_predictions DESC
@@ -174,7 +179,7 @@ def get_firm(slug: str, request: Request, db: Session = Depends(get_db)):
             JOIN forecasters f ON f.id = p.forecaster_id
             WHERE f.firm IN ({placeholders})
               AND p.outcome IN ('hit','near','miss','correct','incorrect')
-              AND p.alpha IS NOT NULL
+              AND p.alpha IS NOT NULL{_HEDGED_P}
         """), alias_params).first()
         firm_alpha = round(float(alpha_row[0]), 2) if alpha_row and alpha_row[0] else None
     except Exception:
@@ -190,7 +195,7 @@ def get_firm(slug: str, request: Request, db: Session = Depends(get_db)):
             JOIN forecasters f ON f.id = p.forecaster_id
             WHERE f.firm IN ({placeholders})
               AND p.outcome IN ('hit','near','miss','correct','incorrect')
-              AND p.sector IS NOT NULL AND p.sector != '' AND p.sector != 'Other'
+              AND p.sector IS NOT NULL AND p.sector != '' AND p.sector != 'Other'{_HEDGED_P}
             GROUP BY p.sector
             HAVING COUNT(*) >= 3
             ORDER BY COUNT(*) DESC
@@ -215,7 +220,7 @@ def get_firm(slug: str, request: Request, db: Session = Depends(get_db)):
                    f.id, f.name, f.slug
             FROM predictions p
             JOIN forecasters f ON f.id = p.forecaster_id
-            WHERE f.firm IN ({placeholders})
+            WHERE f.firm IN ({placeholders}){_HEDGED_P}
             ORDER BY p.prediction_date DESC
             LIMIT 10
         """), alias_params).fetchall()
@@ -265,21 +270,21 @@ def list_firms(request: Request, db: Session = Depends(get_db)):
     if _firms_list_cache and (_time.time() - _firms_list_time) < _FIRMS_LIST_TTL:
         return _firms_list_cache
 
-    rows = db.execute(sql_text("""
+    rows = db.execute(sql_text(f"""
         SELECT f.firm,
                COUNT(DISTINCT f.id) as analyst_count,
                SUM(COALESCE(f.total_predictions, 0)) as total_preds,
                (SELECT COUNT(*) FROM predictions p2
                 JOIN forecasters f2 ON f2.id = p2.forecaster_id
                 WHERE f2.firm = f.firm
-                AND p2.outcome IN ('hit','near','miss','correct','incorrect')) as scored,
+                AND p2.outcome IN ('hit','near','miss','correct','incorrect'){_HEDGED_P2}) as scored,
                (SELECT SUM(CASE WHEN p3.outcome IN ('hit','correct') THEN 1.0
                                 WHEN p3.outcome = 'near' THEN 0.5 ELSE 0 END)
                      / NULLIF(COUNT(*), 0) * 100
                 FROM predictions p3
                 JOIN forecasters f3 ON f3.id = p3.forecaster_id
                 WHERE f3.firm = f.firm
-                AND p3.outcome IN ('hit','near','miss','correct','incorrect')) as accuracy
+                AND p3.outcome IN ('hit','near','miss','correct','incorrect'){_HEDGED_P3}) as accuracy
         FROM forecasters f
         WHERE f.firm IS NOT NULL AND f.firm != ''
         GROUP BY f.firm

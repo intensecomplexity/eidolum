@@ -13,6 +13,9 @@ from ticker_lookup import TICKER_INFO
 from services.ticker_display import (
     resolve_ticker_display_name, resolve_ticker_display_sector,
 )
+from routers._prediction_filters import hedged_filter_sql
+
+_HEDGED_P = hedged_filter_sql("p")
 
 router = APIRouter()
 
@@ -51,10 +54,10 @@ def upcoming_earnings(request: Request, db: Session = Depends(get_db)):
     if tickers:
         try:
             # Analyst predictions (from predictions table, not user_predictions)
-            rows = db.execute(sql_text("""
+            rows = db.execute(sql_text(f"""
                 SELECT p.ticker, p.direction, COUNT(*) as cnt
                 FROM predictions p
-                WHERE p.ticker = ANY(:tickers) AND p.outcome = 'pending'
+                WHERE p.ticker = ANY(:tickers) AND p.outcome = 'pending'{_HEDGED_P}
                 GROUP BY p.ticker, p.direction
             """), {"tickers": tickers}).fetchall()
             for r in rows:

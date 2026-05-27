@@ -14,6 +14,10 @@ from services.ticker_display import (
 from xp import get_xp_info as _get_xp_info, _level_name as _level_name_for
 from rivals import get_rival as _get_rival
 from perks import get_user_perks as _get_user_perks
+from routers._prediction_filters import hedged_filter_sql
+
+_HEDGED_P = hedged_filter_sql("p")
+_HEDGED_NA = hedged_filter_sql("predictions")
 
 
 def _get_perks(user):
@@ -735,7 +739,7 @@ def get_all_consensus(
                SUM(CASE WHEN direction = 'bearish' THEN 1 ELSE 0 END) as bearish,
                SUM(CASE WHEN direction = 'neutral' THEN 1 ELSE 0 END) as neutral
         FROM predictions
-        {where}
+        {where}{_HEDGED_NA}
         GROUP BY ticker
         HAVING COUNT(*) >= 5
         ORDER BY COUNT(*) DESC
@@ -763,13 +767,13 @@ def get_all_consensus(
     top_by_ticker = {}
     if tickers:
         try:
-            top_rows = db.execute(_consensus_text("""
+            top_rows = db.execute(_consensus_text(f"""
                 SELECT DISTINCT ON (p.ticker) p.ticker, f.id, f.name,
                        ROUND(CAST(f.accuracy_score AS numeric), 1) as acc
                 FROM predictions p
                 JOIN forecasters f ON f.id = p.forecaster_id
                 WHERE p.ticker = ANY(:tickers)
-                  AND f.accuracy_score IS NOT NULL AND f.total_predictions >= 5
+                  AND f.accuracy_score IS NOT NULL AND f.total_predictions >= 5{_HEDGED_P}
                 ORDER BY p.ticker, f.accuracy_score DESC
             """), {"tickers": tickers}).fetchall()
             for r in top_rows:

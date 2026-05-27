@@ -15,6 +15,7 @@ from services.ticker_display import (
 from services.prediction_visibility import (
     yt_visible_filter, YT_VISIBLE_FILTER_SQL,
 )
+from routers._prediction_filters import hedged_filter_sql
 
 # yt_visible is the only user-facing visibility filter:
 #   yt_visible — legacy YouTube rows missing source_timestamp_seconds
@@ -23,6 +24,8 @@ from services.prediction_visibility import (
 # 2026-05-27 since they were hiding 348K legit Wall St rating rows.
 _YT_VIS_BARE = YT_VISIBLE_FILTER_SQL
 _YT_VIS_P = yt_visible_filter("p")
+_HEDGED_P = hedged_filter_sql("p")
+_HEDGED_NA = hedged_filter_sql("predictions")
 
 router = APIRouter()
 
@@ -60,7 +63,7 @@ def _build_accuracy_trend(forecaster_id: int, db: Session, sector: str = None) -
     base_where = (
         "WHERE p.forecaster_id = :fid AND p.outcome IN "
         "('hit','near','miss','correct','incorrect') "
-        f"AND {_YT_VIS_P}"
+        f"AND {_YT_VIS_P}{_HEDGED_P}"
     )
     params = {"fid": forecaster_id}
     sector_filter = ""
@@ -219,7 +222,7 @@ def get_forecaster(
         extra = db.execute(sql_text(f"""
             SELECT MIN(prediction_date), COUNT(*)
             FROM predictions WHERE forecaster_id = :fid
-              AND {_YT_VIS_BARE}
+              AND {_YT_VIS_BARE}{_HEDGED_NA}
         """), {"fid": forecaster_id}).first()
         first_pred_date = extra[0].isoformat() if extra and extra[0] else None
         total_all = extra[1] if extra else 0
@@ -238,7 +241,7 @@ def get_forecaster(
             FROM predictions p
             LEFT JOIN ticker_sectors ts ON ts.ticker = p.ticker
             WHERE p.forecaster_id = :fid
-              AND {_YT_VIS_P}
+              AND {_YT_VIS_P}{_HEDGED_P}
         """), {"fid": forecaster_id}).fetchall()
         sector_count = len(canonical_sectors_distinct(r[0] for r in raw_sector_rows))
     except Exception:
@@ -254,7 +257,7 @@ def get_forecaster(
         src_row = db.execute(sql_text(f"""
             SELECT source_type, COUNT(*) as cnt FROM predictions
             WHERE forecaster_id = :fid AND source_type IS NOT NULL
-              AND {_YT_VIS_BARE}
+              AND {_YT_VIS_BARE}{_HEDGED_NA}
             GROUP BY source_type ORDER BY cnt DESC LIMIT 1
         """), {"fid": forecaster_id}).first()
         if src_row:
@@ -262,7 +265,7 @@ def get_forecaster(
         vb_row = db.execute(sql_text(f"""
             SELECT verified_by, COUNT(*) as cnt FROM predictions
             WHERE forecaster_id = :fid AND verified_by IS NOT NULL
-              AND {_YT_VIS_BARE}
+              AND {_YT_VIS_BARE}{_HEDGED_NA}
             GROUP BY verified_by ORDER BY cnt DESC LIMIT 1
         """), {"fid": forecaster_id}).first()
         if vb_row:
@@ -276,7 +279,7 @@ def get_forecaster(
         count_rows = db.execute(sql_text(f"""
             SELECT outcome, direction, COUNT(*) FROM predictions
             WHERE forecaster_id = :fid
-              AND {_YT_VIS_BARE}
+              AND {_YT_VIS_BARE}{_HEDGED_NA}
             GROUP BY outcome, direction
         """), {"fid": forecaster_id}).fetchall()
         for r in count_rows:
@@ -325,7 +328,7 @@ def get_forecaster(
         revisions_made = int(db.execute(sql_text(f"""
             SELECT COUNT(*) FROM predictions
             WHERE forecaster_id = :fid AND revision_of IS NOT NULL
-              AND {_YT_VIS_BARE}
+              AND {_YT_VIS_BARE}{_HEDGED_NA}
         """), {"fid": forecaster_id}).scalar() or 0)
     except Exception:
         revisions_made = 0
@@ -347,7 +350,7 @@ def get_forecaster(
             WHERE forecaster_id = :fid
               AND list_id IS NOT NULL
               AND list_rank IS NOT NULL
-              AND {_YT_VIS_BARE}
+              AND {_YT_VIS_BARE}{_HEDGED_NA}
             ORDER BY prediction_date DESC, list_id, list_rank
         """), {"fid": forecaster_id}).fetchall()
         by_list_id: dict = {}
@@ -440,7 +443,7 @@ def get_forecaster(
                             WHEN outcome = 'near' THEN 0.5 ELSE 0 END) as score,
                    COUNT(*) FILTER (WHERE outcome = 'unresolved') as unresolved
             FROM predictions WHERE forecaster_id = :fid
-              AND {_YT_VIS_BARE}
+              AND {_YT_VIS_BARE}{_HEDGED_NA}
             GROUP BY COALESCE(prediction_category, 'ticker_call')
         """), {"fid": forecaster_id}).fetchall()
         for row in cat_rows:
@@ -486,7 +489,7 @@ def get_forecaster(
             sql_text(
                 "SELECT MAX(prediction_date) FROM predictions "
                 "WHERE forecaster_id = :fid "
-                f"AND {_YT_VIS_BARE}"
+                f"AND {_YT_VIS_BARE}{_HEDGED_NA}"
             ),
             {"fid": forecaster_id},
         ).scalar()
@@ -594,7 +597,7 @@ def get_forecaster_sectors(request: Request, forecaster_id: int, db: Session = D
             WHERE p.forecaster_id = :fid
               AND COALESCE(p.sector, ts.sector) IS NOT NULL
               AND COALESCE(p.sector, ts.sector) != ''
-              AND {_YT_VIS_P}
+              AND {_YT_VIS_P}{_HEDGED_P}
             GROUP BY p.sector, ts.sector ORDER BY total DESC
         """), {"fid": forecaster_id}).fetchall()
         # Canonicalize each raw row, trying p.sector first and falling
@@ -645,7 +648,7 @@ def get_forecaster_sectors(request: Request, forecaster_id: int, db: Session = D
         count_rows = db.execute(sql_text(f"""
             SELECT outcome, COUNT(*) FROM predictions
             WHERE forecaster_id = :fid
-              AND {_YT_VIS_BARE}
+              AND {_YT_VIS_BARE}{_HEDGED_NA}
             GROUP BY outcome
         """), {"fid": forecaster_id}).fetchall()
         counts = {r[0]: r[1] for r in count_rows}
@@ -658,7 +661,7 @@ def get_forecaster_sectors(request: Request, forecaster_id: int, db: Session = D
         dir_rows = db.execute(sql_text(f"""
             SELECT direction, COUNT(*) FROM predictions
             WHERE forecaster_id = :fid AND direction IS NOT NULL
-              AND {_YT_VIS_BARE}
+              AND {_YT_VIS_BARE}{_HEDGED_NA}
             GROUP BY direction
         """), {"fid": forecaster_id}).fetchall()
         for r in dir_rows:
@@ -690,10 +693,10 @@ def get_forecaster_sectors(request: Request, forecaster_id: int, db: Session = D
 def get_accuracy_chart(request: Request, forecaster_id: int, db: Session = Depends(get_db)):
     """Lazy-loaded accuracy over time chart data."""
     try:
-        rows = db.execute(sql_text("""
+        rows = db.execute(sql_text(f"""
             SELECT prediction_date, ticker, direction, outcome
             FROM predictions
-            WHERE forecaster_id = :fid AND outcome IN ('hit','near','miss','correct','incorrect')
+            WHERE forecaster_id = :fid AND outcome IN ('hit','near','miss','correct','incorrect'){_HEDGED_NA}
             ORDER BY prediction_date ASC LIMIT 50
         """), {"fid": forecaster_id}).fetchall()
         cum_c = cum_t = 0
@@ -717,7 +720,7 @@ def _get_preds(fid, page, limit, filter_type, sector, db):
     # timestamp. The helper writes p.-aliased since the main query
     # uses "FROM predictions p". Qwen LoRA rows also hidden via
     # NON_QWEN_P during the audit phase.
-    where = f" AND {_YT_VIS_P}"
+    where = f" AND {_YT_VIS_P}{_HEDGED_P}"
     params = {"fid": fid, "lim": limit, "off": offset}
     if filter_type == "evaluated":
         where += " AND outcome IN ('hit','near','miss','correct','incorrect')"
@@ -908,7 +911,7 @@ def get_portfolio_simulator(
           AND outcome IN ('correct', 'incorrect', 'hit', 'near', 'miss')
           AND actual_return IS NOT NULL
           AND prediction_date IS NOT NULL
-          AND {_YT_VIS_BARE}
+          AND {_YT_VIS_BARE}{_HEDGED_NA}
         ORDER BY COALESCE(evaluation_date, prediction_date) ASC, prediction_date ASC
     """), {"fid": forecaster_id}).fetchall()
 

@@ -12,6 +12,7 @@ from services.ticker_display import (
 from services.prediction_visibility import (
     yt_visible_filter, YT_VISIBLE_FILTER_SQL,
 )
+from routers._prediction_filters import hedged_filter_sql
 
 # yt_visible is the only user-facing visibility filter:
 #   yt_visible — legacy YouTube rows missing source_timestamp_seconds
@@ -20,6 +21,10 @@ from services.prediction_visibility import (
 # 348K legit Wall St rating rows from the leaderboard. Dropped.
 _YT_VIS_BARE = YT_VISIBLE_FILTER_SQL
 _YT_VIS_P = yt_visible_filter("p")
+_HEDGED_P = hedged_filter_sql("p")
+_HEDGED_P2 = hedged_filter_sql("p2")
+_HEDGED_P3 = hedged_filter_sql("p3")
+_HEDGED_NA = hedged_filter_sql("predictions")
 
 router = APIRouter()
 
@@ -164,7 +169,7 @@ def _enrich_category_stats(results: list, db: Session):
                    COUNT(*) FILTER (WHERE p.outcome = 'unresolved') as unresolved
             FROM predictions p
             WHERE p.forecaster_id = ANY(:fids)
-              AND {_YT_VIS_P}
+              AND {_YT_VIS_P}{_HEDGED_P}
             GROUP BY p.forecaster_id, COALESCE(p.prediction_category, 'ticker_call')
         """), {"fids": fids}).fetchall()
     except Exception as _e:
@@ -299,7 +304,7 @@ def _enrich_ranking_stats(results: list, db: Session):
             WHERE forecaster_id = ANY(:fids)
               AND list_id IS NOT NULL
               AND list_rank IS NOT NULL
-              AND {_YT_VIS_BARE}
+              AND {_YT_VIS_BARE}{_HEDGED_NA}
         """), {"fids": fids}).fetchall()
     except Exception:
         return
@@ -385,20 +390,20 @@ def _enrich_primary_source(results: list, db: Session):
                    (SELECT source_type FROM predictions p2
                     WHERE p2.forecaster_id = p.forecaster_id
                       AND p2.source_type IS NOT NULL
-                      AND {_yt_excl}
+                      AND {_yt_excl}{_HEDGED_P2}
                     GROUP BY source_type
                     ORDER BY COUNT(*) DESC
                     LIMIT 1) as primary_source,
                    (SELECT verified_by FROM predictions p3
                     WHERE p3.forecaster_id = p.forecaster_id
                       AND p3.verified_by IS NOT NULL
-                      AND {_yt_excl}
+                      AND {_yt_excl}{_HEDGED_P3}
                     GROUP BY verified_by
                     ORDER BY COUNT(*) DESC
                     LIMIT 1) as primary_verified_by
             FROM predictions p
             WHERE p.forecaster_id IN ({fid_placeholders})
-              AND {_yt_excl}
+              AND {_yt_excl}{_HEDGED_P}
             GROUP BY p.forecaster_id
         """)).fetchall()
 
@@ -431,7 +436,7 @@ def _enrich_sector_strengths(results: list, db: Session):
             WHERE p.forecaster_id IN ({fid_placeholders})
               AND p.outcome IN ('hit','near','miss','correct','incorrect')
               AND ts.sector IS NOT NULL AND ts.sector != '' AND ts.sector != 'Other'
-              AND {_YT_VIS_P}
+              AND {_YT_VIS_P}{_HEDGED_P}
             GROUP BY p.forecaster_id, ts.sector
             HAVING COUNT(*) >= 3
             ORDER BY p.forecaster_id, score DESC
@@ -510,8 +515,8 @@ def _refresh_leaderboard(db: Session) -> list | dict:
 
     if not rows:
         # Truly empty — return stats so frontend can show a message
-        total_preds = db.execute(sql_text("SELECT COUNT(*) FROM predictions")).scalar() or 0
-        pending = db.execute(sql_text("SELECT COUNT(*) FROM predictions WHERE outcome = 'pending'")).scalar() or 0
+        total_preds = db.execute(sql_text(f"SELECT COUNT(*) FROM predictions WHERE 1=1{_HEDGED_NA}")).scalar() or 0
+        pending = db.execute(sql_text(f"SELECT COUNT(*) FROM predictions WHERE outcome = 'pending'{_HEDGED_NA}")).scalar() or 0
         print(f"[Leaderboard] WARNING: 0 forecasters qualify! {total_preds} total, {pending} pending")
         return {
             "forecasters": [],
@@ -574,11 +579,11 @@ def _refresh_leaderboard(db: Session) -> list | dict:
     if results:
         fids = [r["id"] for r in results]
         try:
-            count_rows = db.execute(sql_text("""
+            count_rows = db.execute(sql_text(f"""
                 SELECT forecaster_id, outcome, direction, COUNT(*) as cnt
                 FROM predictions
                 WHERE forecaster_id = ANY(:fids)
-                  AND NOT (source_type = 'youtube' AND source_timestamp_seconds IS NULL)
+                  AND NOT (source_type = 'youtube' AND source_timestamp_seconds IS NULL){_HEDGED_NA}
                 GROUP BY forecaster_id, outcome, direction
             """), {"fids": fids}).fetchall()
 
@@ -628,12 +633,12 @@ def _check_stats_integrity(db: Session):
     _integrity_check_time = now
 
     try:
-        sample = db.execute(sql_text("""
+        sample = db.execute(sql_text(f"""
             SELECT f.id, f.name, f.total_predictions,
                    (SELECT COUNT(*) FROM predictions p
                     WHERE p.forecaster_id = f.id
                       AND p.outcome IN ('hit','near','miss','correct','incorrect')
-                      AND NOT (p.source_type = 'youtube' AND p.source_timestamp_seconds IS NULL)
+                      AND NOT (p.source_type = 'youtube' AND p.source_timestamp_seconds IS NULL){_HEDGED_P}
                    ) as actual
             FROM forecasters f
             WHERE f.total_predictions > 0
@@ -685,7 +690,7 @@ def _week_leaderboard_impl(db: Session) -> dict:
         WHERE p.outcome IN ('hit','near','miss','correct','incorrect')
           AND COALESCE(p.evaluated_at, p.evaluation_date) >= NOW() - INTERVAL '7 days'
           AND COALESCE(p.evaluated_at, p.evaluation_date) <= NOW()
-          AND {_YT_VIS_P}
+          AND {_YT_VIS_P}{_HEDGED_P}
     """)).fetchall()
 
     # 2) Community player predictions scored this week
@@ -771,7 +776,7 @@ def _week_leaderboard_impl(db: Session) -> dict:
         FROM predictions p
         JOIN forecasters f ON f.id = p.forecaster_id
         WHERE p.prediction_date >= NOW() - INTERVAL '7 days'
-          AND {_YT_VIS_P}
+          AND {_YT_VIS_P}{_HEDGED_P}
         GROUP BY f.id, f.name, f.handle, f.platform, f.accuracy_score
         ORDER BY cnt DESC
         LIMIT 100
@@ -839,6 +844,14 @@ def _build_filtered_leaderboard(db: Session, sector=None, call_type=None, sort="
         "p.outcome IN ('hit','near','miss','correct','incorrect')",
         "NOT (p.source_type = 'youtube' AND p.source_timestamp_seconds IS NULL)",
     ]
+    # Hide hedged/hypothetical predictions from filtered leaderboard. The
+    # helper output starts with " AND " for trailing-append usage; here
+    # we strip the leading " AND " since this slot is joined by AND
+    # already. When the kill switch is off the helper returns "" and
+    # we skip the clause.
+    _hedged_clause = _HEDGED_P[5:] if _HEDGED_P else ""
+    if _hedged_clause:
+        where_clauses.append(_hedged_clause)
     params = {}
 
     if source and source != "all":
@@ -966,11 +979,11 @@ def _build_filtered_leaderboard(db: Session, sector=None, call_type=None, sort="
     if results:
         fids = [r["id"] for r in results]
         try:
-            count_rows = db.execute(sql_text("""
+            count_rows = db.execute(sql_text(f"""
                 SELECT forecaster_id, outcome, direction, COUNT(*) as cnt
                 FROM predictions
                 WHERE forecaster_id = ANY(:fids)
-                  AND NOT (source_type = 'youtube' AND source_timestamp_seconds IS NULL)
+                  AND NOT (source_type = 'youtube' AND source_timestamp_seconds IS NULL){_HEDGED_NA}
                 GROUP BY forecaster_id, outcome, direction
             """), {"fids": fids}).fetchall()
             counts_by_fid = {}
@@ -1091,7 +1104,7 @@ def get_sectors(request: Request, db: Session = Depends(get_db)):
         JOIN ticker_sectors ts ON ts.ticker = p.ticker
         WHERE ts.sector IS NOT NULL AND ts.sector != '' AND ts.sector != 'Other'
           AND p.outcome IN ('hit','near','miss','correct','incorrect')
-          AND {_YT_VIS_P}
+          AND {_YT_VIS_P}{_HEDGED_P}
         GROUP BY ts.sector
         HAVING SUM(CASE WHEN p.outcome IN ('hit','near','miss','correct','incorrect') THEN 1 ELSE 0 END) >= 5
         ORDER BY total DESC
@@ -1123,7 +1136,7 @@ def get_sectors(request: Request, db: Session = Depends(get_db)):
             JOIN ticker_sectors ts ON ts.ticker = p.ticker
             WHERE ts.sector = ANY(:sectors)
               AND p.outcome IN ('hit','near','miss','correct','incorrect')
-              AND {_YT_VIS_P}
+              AND {_YT_VIS_P}{_HEDGED_P}
             GROUP BY ts.sector, f.id, f.name
             HAVING COUNT(*) >= 3
             ORDER BY ts.sector, score DESC, evaluated DESC
@@ -1162,7 +1175,7 @@ def get_pending_predictions(request: Request, db: Session = Depends(get_db)):
         FROM predictions p
         JOIN forecasters f ON f.id = p.forecaster_id
         WHERE p.outcome = 'pending'
-          AND {_YT_VIS_P}
+          AND {_YT_VIS_P}{_HEDGED_P}
         ORDER BY p.prediction_date DESC
         LIMIT 100
     """)).fetchall()
@@ -1216,7 +1229,7 @@ def get_available_timeframes(request: Request, db: Session = Depends(get_db)):
                     SELECT forecaster_id
                     FROM predictions p
                     WHERE p.outcome IN ('hit','near','miss','correct','incorrect')
-                      AND {where}
+                      AND {where}{_HEDGED_P}
                     GROUP BY forecaster_id
                     HAVING COUNT(*) >= :min_preds
                 ) sub
@@ -1242,9 +1255,9 @@ def get_homepage_stats(request: Request, db: Session = Depends(get_db)):
 
     try:
         total_fc = db.execute(sql_text("SELECT COUNT(*) FROM forecasters WHERE COALESCE(total_predictions,0) > 0")).scalar() or 0
-        scored = db.execute(sql_text("SELECT COUNT(*) FROM predictions WHERE outcome IN ('hit','near','miss','correct','incorrect')")).scalar() or 0
-        correct_count = db.execute(sql_text("SELECT COUNT(*) FROM predictions WHERE outcome IN ('hit','correct')")).scalar() or 0
-        all_preds = db.execute(sql_text("SELECT COUNT(*) FROM predictions")).scalar() or 0
+        scored = db.execute(sql_text(f"SELECT COUNT(*) FROM predictions WHERE outcome IN ('hit','near','miss','correct','incorrect'){_HEDGED_NA}")).scalar() or 0
+        correct_count = db.execute(sql_text(f"SELECT COUNT(*) FROM predictions WHERE outcome IN ('hit','correct'){_HEDGED_NA}")).scalar() or 0
+        all_preds = db.execute(sql_text(f"SELECT COUNT(*) FROM predictions WHERE 1=1{_HEDGED_NA}")).scalar() or 0
     except Exception:
         total_fc = scored = correct_count = all_preds = 0
 
@@ -1283,7 +1296,7 @@ def get_homepage_data(request: Request, db: Session = Depends(get_db)):
     try:
         lb_rows = None
         for min_preds in [10, 5, 1]:
-            lb_rows = db.execute(sql_text("""
+            lb_rows = db.execute(sql_text(f"""
                 SELECT f.id, f.name, f.handle, f.platform, f.firm,
                        f.accuracy_score, f.total_predictions, f.correct_predictions,
                        COALESCE(f.avg_return, 0) as avg_return,
@@ -1303,7 +1316,7 @@ def get_homepage_data(request: Request, db: Session = Depends(get_db)):
                         SUM(CASE WHEN outcome = 'pending' OR outcome IS NULL THEN 1 ELSE 0 END) as pending
                     FROM predictions p
                     WHERE p.forecaster_id = f.id
-                      AND NOT (p.source_type = 'youtube' AND p.source_timestamp_seconds IS NULL)
+                      AND NOT (p.source_type = 'youtube' AND p.source_timestamp_seconds IS NULL){_HEDGED_P}
                 ) s ON true
                 WHERE COALESCE(f.total_predictions, 0) >= :min
                   AND COALESCE(f.accuracy_score, 0) > 0
@@ -1360,9 +1373,9 @@ def get_homepage_data(request: Request, db: Session = Depends(get_db)):
               AND ABS(p.actual_return) >= 5
               AND p.target_price IS NOT NULL AND p.target_price > 0
               AND p.entry_price IS NOT NULL AND p.entry_price > 0
-              AND {_YT_VIS_P}
+              AND {_YT_VIS_P}{_HEDGED_P}
               AND p.ticker IN (
-                  SELECT ticker FROM predictions GROUP BY ticker HAVING COUNT(*) >= 20
+                  SELECT ticker FROM predictions WHERE 1=1{_HEDGED_NA} GROUP BY ticker HAVING COUNT(*) >= 20
               )
             ORDER BY ABS(p.actual_return) DESC, p.id ASC
             LIMIT 5
@@ -1387,13 +1400,13 @@ def get_homepage_data(request: Request, db: Session = Depends(get_db)):
     # Most Divided: tickers with bull/bear split closest to 50/50
     most_divided = []
     try:
-        md_rows = db.execute(sql_text("""
+        md_rows = db.execute(sql_text(f"""
             SELECT ticker,
                    COUNT(*) as total,
                    SUM(CASE WHEN direction = 'bullish' THEN 1 ELSE 0 END) as bullish,
                    SUM(CASE WHEN direction = 'bearish' THEN 1 ELSE 0 END) as bearish
             FROM predictions
-            WHERE direction IN ('bullish', 'bearish')
+            WHERE direction IN ('bullish', 'bearish'){_HEDGED_NA}
             GROUP BY ticker
             HAVING COUNT(*) >= 10
             ORDER BY ABS(SUM(CASE WHEN direction='bullish' THEN 1 ELSE 0 END) * 1.0 / COUNT(*) - 0.5)
@@ -1432,26 +1445,26 @@ def get_homepage_data(request: Request, db: Session = Depends(get_db)):
            LEFT JOIN ticker_sectors ts ON ts.ticker = p.ticker"""
     _feat_queries = [
         # Tier 1: top firm, popular ticker, return 5-80%
-        _FEAT_SELECT + """
+        _FEAT_SELECT + f"""
            WHERE p.outcome IN ('hit', 'correct')
              AND p.actual_return BETWEEN 5 AND 80
              AND f.firm IN ('Goldman Sachs','Morgan Stanley','JPMorgan','Wedbush','Bank of America',
                             'Barclays','UBS','Citigroup','Wells Fargo','Deutsche Bank','Bernstein',
-                            'Piper Sandler','Raymond James','Jefferies','Evercore','BMO Capital','RBC Capital')
-             AND p.ticker IN (SELECT ticker FROM predictions GROUP BY ticker HAVING COUNT(*) >= 100)
+                            'Piper Sandler','Raymond James','Jefferies','Evercore','BMO Capital','RBC Capital'){_HEDGED_P}
+             AND p.ticker IN (SELECT ticker FROM predictions WHERE 1=1{_HEDGED_NA} GROUP BY ticker HAVING COUNT(*) >= 100)
            ORDER BY p.actual_return DESC LIMIT 1""",
         # Tier 2: any firm, popular ticker (50+), return 5-80%
-        _FEAT_SELECT + """
+        _FEAT_SELECT + f"""
            WHERE p.outcome IN ('hit', 'correct')
              AND p.actual_return BETWEEN 5 AND 80
-             AND f.firm IS NOT NULL AND f.firm != ''
-             AND p.ticker IN (SELECT ticker FROM predictions GROUP BY ticker HAVING COUNT(*) >= 50)
+             AND f.firm IS NOT NULL AND f.firm != ''{_HEDGED_P}
+             AND p.ticker IN (SELECT ticker FROM predictions WHERE 1=1{_HEDGED_NA} GROUP BY ticker HAVING COUNT(*) >= 50)
            ORDER BY p.actual_return DESC LIMIT 1""",
         # Tier 3: any firm, any ticker with 20+ predictions, return 3-80%
-        _FEAT_SELECT + """
+        _FEAT_SELECT + f"""
            WHERE p.outcome IN ('hit', 'correct')
-             AND p.actual_return BETWEEN 3 AND 80
-             AND p.ticker IN (SELECT ticker FROM predictions GROUP BY ticker HAVING COUNT(*) >= 20)
+             AND p.actual_return BETWEEN 3 AND 80{_HEDGED_P}
+             AND p.ticker IN (SELECT ticker FROM predictions WHERE 1=1{_HEDGED_NA} GROUP BY ticker HAVING COUNT(*) >= 20)
              AND p.actual_return IS NOT NULL AND p.actual_return > 0 AND p.actual_return < 200
            ORDER BY p.actual_return DESC LIMIT 1""",
     ]
@@ -1493,9 +1506,9 @@ def get_homepage_data(request: Request, db: Session = Depends(get_db)):
 @router.get("/trending-tickers")
 @limiter.limit("60/minute")
 def get_trending_tickers(request: Request, db: Session = Depends(get_db)):
-    rows = db.execute(sql_text("""
+    rows = db.execute(sql_text(f"""
         SELECT ticker, direction, COUNT(*) as cnt
-        FROM predictions WHERE outcome != 'pending'
+        FROM predictions WHERE outcome != 'pending'{_HEDGED_NA}
         GROUP BY ticker, direction
     """)).fetchall()
 
