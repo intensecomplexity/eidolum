@@ -2394,6 +2394,24 @@ def main():
             log.error(f"[finnhub_upgrades] {e}")
     sched.add_job(_standalone("finnhub_upgrades", _finnhub_upgrades), "interval", hours=8, id="finnhub_upgrades", next_run_time=t0 + timedelta(minutes=70), executor='default')
 
+    # price_bars daily increment — keeps the local EOD cache current after the
+    # Phase 4 one-shot harvest. Gated by ENABLE_PRICE_BARS_INCREMENTAL flag
+    # (default false). Designed to fit FMP Free-tier's 250/day budget once
+    # the Ultimate window ends.
+    def _price_bars_daily_increment():
+        try:
+            from jobs.price_bars_daily_increment import run_daily_increment
+            run_daily_increment()
+        except Exception as e:
+            log.error(f"[price_bars_daily_increment] {e}")
+    sched.add_job(
+        _standalone("price_bars_daily_increment", _price_bars_daily_increment),
+        "cron", hour=0, minute=30, timezone="UTC",
+        id="price_bars_daily_increment",
+        misfire_grace_time=3600, max_instances=1, coalesce=True,
+        executor='maintenance',
+    )
+
     # FMP latest grades (upgrades RSS) — requires FMP_KEY, every 4h
     def _fmp_upgrades():
         try:
