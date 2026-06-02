@@ -1292,10 +1292,13 @@ def get_homepage_data(request: Request, db: Session = Depends(get_db)):
     stats = get_homepage_stats(request, db)
 
     # Top 5 leaderboard — direct SQL with outcome + direction breakdowns
+    # min_preds=100 floor pushes out small-sample YouTube channels (a 7-for-9
+    # streak at 78% would otherwise leapfrog Wall St firms with 15K+ calls).
+    # 50-row fallback keeps the widget populated even if the universe shrinks.
     top5 = []
     try:
         lb_rows = None
-        for min_preds in [10, 5, 1]:
+        for min_preds in [100, 50]:
             lb_rows = db.execute(sql_text(f"""
                 SELECT f.id, f.name, f.handle, f.platform, f.firm,
                        f.accuracy_score, f.total_predictions, f.correct_predictions,
