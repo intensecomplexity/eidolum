@@ -52,6 +52,8 @@ const AdminSectorAliases     = lazy(() => import('./pages/AdminSectorAliases'));
 const AdminMacroConcepts     = lazy(() => import('./pages/AdminMacroConcepts'));
 const ForgotPassword         = lazy(() => import('./pages/ForgotPassword'));
 const ResetPassword          = lazy(() => import('./pages/ResetPassword'));
+const Terms                  = lazy(() => import('./pages/Terms'));
+const Privacy                = lazy(() => import('./pages/Privacy'));
 const GoogleCallback         = lazy(() => import('./pages/GoogleCallback'));
 const Profile                = lazy(() => import('./pages/Profile'));
 const SubmitCall             = lazy(() => import('./pages/SubmitCall'));
@@ -171,6 +173,9 @@ export default function App() {
         <Route path="/join" element={<Register />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/reset-password" element={<ResetPassword />} />
+        <Route path="/terms" element={<Terms />} />
+        <Route path="/privacy" element={<Privacy />} />
+        <Route path="/methodology" element={<Navigate to="/how-it-works" replace />} />
         <Route path="/auth/google/callback" element={<GoogleCallback />} />
         <Route path="/auth/callback" element={<GoogleCallback />} />
         <Route path="/profile" element={<Profile />} />
