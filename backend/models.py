@@ -377,6 +377,14 @@ class Prediction(Base):
     exclusion_flagged_at = Column(DateTime(timezone=True), nullable=True)
     exclusion_rule_version = Column(String(16), nullable=True)
 
+    # 2026-06-02 reported-speech audit. Rows flagged TRUE quote a third
+    # party ("analysts expect", "consensus price target", "<firm> says")
+    # rather than the forecaster's own conviction call. Kept in the DB
+    # for audit/retraining; hidden from user-facing surfaces by the
+    # bundled hedged_filter_sql helper.
+    is_reported_speech = Column(Boolean, nullable=False, default=False,
+                                 server_default="false")
+
     # Ship #14 — long-horizon predictions ("Tesla $500 by 2030") are
     # kept as valid training data but skipped by the evaluator until
     # their window resolves. evaluation_deferred=TRUE means the
