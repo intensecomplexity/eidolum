@@ -2144,7 +2144,14 @@ def main():
 
     # Independent jobs
     sched.add_job(_standalone("auto_evaluate", _evaluator), "interval", minutes=30, id="auto_evaluate", next_run_time=t0 + timedelta(minutes=5), executor='default')
-    sched.add_job(_standalone("refresh_stats", _refresh_stats), "interval", hours=2, id="refresh_stats", next_run_time=t0 + timedelta(minutes=10), executor='default')
+    # refresh_stats was 2h — tightened to 30min so cache staleness never
+    # exceeds the auto_evaluate cadence above (commit df25d80 spec). The
+    # function takes ~30min from a high-RTT laptop session against Railway
+    # Postgres, but runs sub-3min on the worker's internal RTT. max_instances=1
+    # + coalesce=True guarantees overlapping ticks merge cleanly if a run
+    # ever does overrun. maintenance executor so the stat sweep doesn't
+    # contend with the scrape/evaluator thread pool.
+    sched.add_job(_standalone("refresh_stats", _refresh_stats), "interval", minutes=30, id="refresh_stats", next_run_time=t0 + timedelta(minutes=10), executor='maintenance', max_instances=1, coalesce=True)
     sched.add_job(_standalone("fmp_grades", _fmp_grades), "interval", hours=24, id="fmp_grades", next_run_time=t0 + timedelta(minutes=20), executor='default')
     sched.add_job(_standalone("retry_no_data", _retry_no_data), "interval", minutes=30, id="retry_no_data", next_run_time=t0 + timedelta(minutes=5), executor='default')
     # url_backfill is a maintenance job (calls Jina/external for up to 2000 URLs per run)
