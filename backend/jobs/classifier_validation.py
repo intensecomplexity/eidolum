@@ -1,7 +1,7 @@
 """Post-classifier validation gate.
 
 Rejects garbage predictions before they become rows in `predictions`.
-Eight rules, run in order by `validate_or_reject`. Each rule is an
+Twelve rules, run in order by `validate_or_reject`. Each rule is an
 independently unit-testable function returning ``(accepted, reason)``.
 
 Schema notes (verified 2026-05-16):
@@ -17,16 +17,24 @@ detects contradictions; the caller (youtube_classifier) performs the
 `excluded_from_training` write via `contradicting_ids()`.
 
 Per-rule kill switches:
-  * CLASSIFIER_RULE_REPORTED_SPEECH (Rule 7)
-  * CLASSIFIER_RULE_HYPOTHETICAL_SCENARIO (Rule 10)
+  * CLASSIFIER_RULE_REPORTED_SPEECH (Rule 7)        default enforce
+  * CLASSIFIER_RULE_HYPOTHETICAL_SCENARIO (Rule 10) default enforce
+  * CLASSIFIER_RULE_QUESTION_RHETORICAL (Rule 11)   default shadow
+  * CLASSIFIER_RULE_DATE_PASSED (Rule 12)           default shadow
+  * CLASSIFIER_RULE_BASKET_BROAD (Rule 13)          default shadow
+  * CLASSIFIER_RULE_NEWS_RECAP (Rule 14)            default shadow
 
 Each accepts enforce / shadow / off — flip via Railway env vars without
-redeploying. Rule numbering skips 8/9 — reserved for the rest of the
+redeploying. Rules 11-14 ship in SHADOW: they log would-be rejections
+("[rule_NN_shadow] would reject ...") and let the row insert, so we can
+collect rejection telemetry for ~24h before deciding enforce per rule.
+Rule numbering skips 8/9 — reserved for the rest of the
 hypothetical-handling policy (Tier 2 hide, Tier 3 conditional).
 """
 import logging
 import os
 import re
+from datetime import date, datetime, timedelta
 from sqlalchemy import text
 
 log = logging.getLogger(__name__)
@@ -50,6 +58,22 @@ _HYPOTHETICAL_SCENARIO_MODE = os.environ.get(
     "CLASSIFIER_RULE_HYPOTHETICAL_SCENARIO", "enforce"
 ).lower()
 
+# Rules 11-14 kill switches — same enforce/shadow/off semantics, but these
+# DEFAULT TO shadow (log-only) so a fresh ship collects telemetry without
+# blocking inserts. Flip to enforce per-rule via Railway env var after review.
+_QUESTION_RHETORICAL_MODE = os.environ.get(
+    "CLASSIFIER_RULE_QUESTION_RHETORICAL", "shadow"
+).lower()
+_DATE_PASSED_MODE = os.environ.get(
+    "CLASSIFIER_RULE_DATE_PASSED", "shadow"
+).lower()
+_BASKET_BROAD_MODE = os.environ.get(
+    "CLASSIFIER_RULE_BASKET_BROAD", "shadow"
+).lower()
+_NEWS_RECAP_MODE = os.environ.get(
+    "CLASSIFIER_RULE_NEWS_RECAP", "shadow"
+).lower()
+
 # reason code -> telemetry counter key (Step 4 cycle stats line)
 TELEMETRY_KEYS = {
     "invalid_ticker": "invalid_ticker",
@@ -60,6 +84,10 @@ TELEMETRY_KEYS = {
     "context_too_short": "context_short",
     "reported_speech": "reported_speech",
     "hypothetical_scenario": "hypothetical_scenario",
+    "question_rhetorical": "question_rhetorical",
+    "prediction_date_passed": "prediction_date_passed",
+    "basket_too_broad": "basket_too_broad",
+    "news_recap_no_prediction": "news_recap",
 }
 
 _CORP_SUFFIXES = {
@@ -362,11 +390,249 @@ def check_hypothetical_scenario(quote):
     return True, None
 
 
+# ── Rule 11 ───────────────────────────────────────────────────────────────
+# A bare rhetorical question with no committed answer is not a prediction.
+# "Could AAPL break out?" on its own is musing, not a call. The moment the
+# speaker answers it ("...? Yes, here's why I think so.") a commitment marker
+# appears and the row passes.
+_RHETORICAL_START = re.compile(
+    r"^\s*(?:could|will|can|should|would|is|are|does|won't|couldn't|"
+    r"wouldn't|shouldn't|isn't|what|when|where|how)\b",
+    re.I,
+)
+_COMMITMENT_MARKERS = re.compile(
+    r"\bi\s+think\b|\bi\s+expect\b|\bi\s+see\b|\bi\s+believe\b|"
+    r"\bi\s+project\b|\bi\s+target\b|\bmy\s+target\b|\bmy\s+forecast\b|"
+    r"\bgoing\s+to\b|\bwill\s+hit\b|\bshould\s+reach\b|\bwill\s+reach\b|"
+    r"\bhere'?s\s+why\b|\byes\b",
+    re.I,
+)
+
+
+def check_question_rhetorical(quote):
+    """Reject a quote that is a bare question with no commitment.
+
+    Three conditions, all required:
+      * after stripping trailing whitespace/punctuation other than '?',
+        the quote ENDS with '?' (an answer would add text past the '?')
+      * it STARTS with an interrogative word (Could/Will/What/...)
+      * it contains NO first-person commitment marker anywhere
+
+    The end-with-'?' gate alone passes the documented negatives, e.g.
+    "Will TSLA hit 300? Yes, here's why I think so." — the answer text
+    after the '?' means the trimmed quote no longer ends with '?'.
+    """
+    if not quote or not quote.strip():
+        return True, None
+    q = quote.strip()
+    trimmed = re.sub(r"[\s.!,;:]+$", "", q)
+    if not trimmed.endswith("?"):
+        return True, None
+    if not _RHETORICAL_START.search(q):
+        return True, None
+    if _COMMITMENT_MARKERS.search(q):
+        return True, None
+    return False, "question_rhetorical"
+
+
+# ── Rule 12 ───────────────────────────────────────────────────────────────
+# timeframe_category -> representative horizon in days. We use each bucket's
+# UPPER bound (the longest horizon in the bucket) so the rule fires only when
+# even the most generous reading of the window had already expired at publish
+# time — minimizing false positives. Mirrors youtube_classifier's BUCKET
+# MAPPING table.
+_CATEGORY_DAYS = {
+    "day_trading": 1,
+    "options_short": 7,
+    "swing_trade": 21,
+    "technical_chart": 30,
+    "fundamental_quarterly": 90,
+    "cyclical_medium": 180,
+    "macro_thesis": 730,
+    "long_term_fundamental": 1825,
+}
+
+
+def _to_date(v):
+    """Coerce a date / datetime / ISO-ish string into a `date`, else None."""
+    if v is None:
+        return None
+    if isinstance(v, datetime):
+        return v.date()
+    if isinstance(v, date):
+        return v
+    if isinstance(v, str):
+        s = v.strip()
+        if not s:
+            return None
+        try:
+            return date.fromisoformat(s[:10])
+        except ValueError:
+            return None
+    return None
+
+
+def check_date_passed(prediction_date, video_published_at,
+                      window_days=None, inferred_timeframe_days=None,
+                      timeframe_category=None):
+    """Reject a call whose target window had already expired BEFORE the
+    video was published — a backward-looking recap ("BTC should have hit
+    100k by 2024" said in a 2025 video), not a forward commitment.
+
+        target_date = prediction_date + horizon_days
+        reject iff target_date < video_published_at
+
+    horizon_days precedence: window_days -> inferred_timeframe_days ->
+    timeframe_category lookup. If prediction_date or video_published_at is
+    missing, or no horizon can be resolved, SKIP (accept) — never reject on
+    insufficient data. Does NOT catch targets that are merely past relative
+    to NOW(); those score normally via the historical evaluator.
+    """
+    pd = _to_date(prediction_date)
+    vp = _to_date(video_published_at)
+    if pd is None or vp is None:
+        return True, None
+
+    days = None
+    try:
+        if window_days is not None and int(window_days) > 0:
+            days = int(window_days)
+        elif inferred_timeframe_days is not None and int(inferred_timeframe_days) > 0:
+            days = int(inferred_timeframe_days)
+    except (TypeError, ValueError):
+        days = None
+    if days is None and timeframe_category:
+        days = _CATEGORY_DAYS.get(str(timeframe_category).strip().lower())
+    if not days or days <= 0:
+        return True, None
+
+    if pd + timedelta(days=days) < vp:
+        return False, "prediction_date_passed"
+    return True, None
+
+
+# ── Rule 13 ───────────────────────────────────────────────────────────────
+# Basket-only mentions: the speaker names a basket ("the magnificent seven")
+# but never the individual ticker the classifier extracted. We reject the
+# extraction unless the ticker is named individually somewhere in the quote
+# (by symbol or by a known company name/alias). Basket phrases and ticker
+# symbols/aliases are disjoint vocabularies, so a plain whole-quote
+# individual-mention check is both correct and the safest (0-FP) reading of
+# "outside the basket-mention sentence".
+_FAANG_MEMBERS = {"META", "AAPL", "AMZN", "NFLX", "GOOGL", "GOOG", "MSFT",
+                  "TSLA", "NVDA"}
+_BIGTECH_MEMBERS = {"META", "AAPL", "AMZN", "GOOGL", "MSFT", "NVDA", "TSLA"}
+_CLOUD_MEMBERS = {"MSFT", "GOOGL", "AMZN", "ORCL", "CRM", "SNOW"}
+_CHIP_MEMBERS = {"NVDA", "AMD", "INTC", "AVGO", "TSM", "MU", "QCOM", "AMAT",
+                 "LRCX", "KLAC"}
+_AI_MEMBERS = {"NVDA", "AMD", "MSFT", "GOOGL", "META", "PLTR", "SMCI"}
+_BANK_MEMBERS = {"JPM", "BAC", "WFC", "C", "GS", "MS", "USB", "PNC"}
+_AIRLINE_MEMBERS = {"DAL", "UAL", "AAL", "LUV", "ALK", "JBLU"}
+_HOMEBUILDER_MEMBERS = {"DHI", "LEN", "NVR", "PHM", "TOL", "KBH"}
+_REIT_MEMBERS = {"AMT", "EQIX", "PSA", "SPG", "O", "PLD"}
+
+_BASKETS = [
+    (re.compile(r"\bfaangm?\b", re.I), _FAANG_MEMBERS),
+    (re.compile(r"\bmagnificent\s+(?:seven|7)\b", re.I), _FAANG_MEMBERS),
+    (re.compile(r"\bmag\s?7\b", re.I), _FAANG_MEMBERS),
+    (re.compile(r"\bbig\s+tech\s+stocks\b", re.I), _BIGTECH_MEMBERS),
+    (re.compile(r"\bthe\s+cloud\s+names\b", re.I), _CLOUD_MEMBERS),
+    (re.compile(r"\bthe\s+chip\s+stocks\b", re.I), _CHIP_MEMBERS),
+    (re.compile(r"\bsemiconductor\s+stocks\b", re.I), _CHIP_MEMBERS),
+    (re.compile(r"\bai\s+stocks\b", re.I), _AI_MEMBERS),
+    (re.compile(r"\bthe\s+banks\b", re.I), _BANK_MEMBERS),
+    (re.compile(r"\bthe\s+airlines\b", re.I), _AIRLINE_MEMBERS),
+    (re.compile(r"\bthe\s+homebuilders\b", re.I), _HOMEBUILDER_MEMBERS),
+    (re.compile(r"\bthe\s+reits\b", re.I), _REIT_MEMBERS),
+]
+
+
+def check_basket_too_broad(quote, ticker, db=None):
+    """Reject when a basket the ticker belongs to is named but the ticker
+    itself is never named individually in the quote.
+
+    Pass (accept) the moment the ticker symbol — or any of its company
+    name/aliases when `db` is provided — appears in the quote: that is an
+    individual call ("...the magnificent seven, especially NVDA which I
+    think hits 200" keeps NVDA, drops AAPL/META). With db=None only the
+    symbol is checked (used by the offline fixture runner).
+    """
+    if not quote or not quote.strip():
+        return True, None
+    t = (ticker or "").upper().strip()
+    if not t:
+        return True, None
+    members = None
+    for pat, member_set in _BASKETS:
+        if t in member_set and pat.search(quote):
+            members = member_set
+            break
+    if members is None:
+        return True, None
+    ql = quote.lower()
+    if _word_in(t, ql):
+        return True, None
+    if db is not None:
+        for name in _ticker_names(ticker, db):
+            if _word_in(name, ql):
+                return True, None
+    return False, "basket_too_broad"
+
+
+# ── Rule 14 ───────────────────────────────────────────────────────────────
+# Past-tense market reporting with zero forward commitment is a news recap,
+# not a prediction. Distinct from Rule 4 (which keys off a different, smaller
+# past/forward marker set): Rule 14 only runs when Rule 4 did not reject, and
+# requires a heavier evidentiary bar (>=2 distinct past markers, 0 forward).
+_RECAP_PAST_MARKERS = [
+    re.compile(p, re.I) for p in (
+        r"\bshares closed\b", r"\bstock fell\b", r"\brallied today\b",
+        r"\bdropped today\b", r"\breported earnings\b", r"\bannounced today\b",
+        r"\bclosed at\b", r"\bfinished the day\b", r"\btraded down\b",
+        r"\btraded up\b", r"\bwas up\b", r"\bwas down\b",
+        r"\bended the session\b",
+    )
+]
+_RECAP_FORWARD_MARKERS = [
+    re.compile(p, re.I) for p in (
+        r"\bi think\b", r"\bi expect\b", r"\bi see\b", r"\bi believe\b",
+        r"\bi project\b", r"\bi target\b", r"\bmy target\b", r"\bgoing to\b",
+        r"\bwill hit\b", r"\bshould reach\b", r"\bwill reach\b",
+        r"\bnext month\b", r"\bnext quarter\b", r"\bnext year\b",
+    )
+]
+
+
+def check_news_recap(quote, rule_4_already_rejected=False):
+    """Reject past-tense market recap with no forward-looking commitment.
+
+    Coordinates with Rule 4: if Rule 4 already rejected the quote as
+    past_tense_only, this is a no-op (the orchestrator only reaches Rule 14
+    when Rule 4 passed, so `rule_4_already_rejected` is False there; the
+    flag exists for isolated unit testing). Fires when >=2 distinct past
+    markers are present and zero forward markers.
+    """
+    if rule_4_already_rejected:
+        return True, None
+    if not quote or not quote.strip():
+        return True, None
+    past = sum(1 for p in _RECAP_PAST_MARKERS if p.search(quote))
+    if past < 2:
+        return True, None
+    if any(p.search(quote) for p in _RECAP_FORWARD_MARKERS):
+        return True, None
+    return False, "news_recap_no_prediction"
+
+
 # ── Orchestrator ──────────────────────────────────────────────────────────
 def validate_or_reject(pred, db, ref_time=None, exclude_id=None):
-    """Run all six rules in order. Returns ``(accepted, reason)``.
+    """Run all twelve rules in order. Returns ``(accepted, reason)``.
 
-    `pred` keys used: ticker, direction, source_url, source_verbatim_quote.
+    `pred` keys used: ticker, direction, source_url, source_verbatim_quote
+    (Rules 1-7,10,11,13,14) plus prediction_date, video_published_at,
+    window_days, inferred_timeframe_days, timeframe_category (Rule 12 —
+    absent from the live caller's fields dict today, so Rule 12 abstains in
+    production until that plumbing lands).
     Read-only — no writes. When this returns ``(False, "contradictory_pair")``
     the caller must also exclude `contradicting_ids(...)`.
     """
@@ -425,4 +691,72 @@ def validate_or_reject(pred, db, ref_time=None, exclude_id=None):
                     ticker, (quote or "")[:120],
                 )
                 return False, "hypothetical_scenario"
+    # Rule 11 — rhetorical-question rejection. Ships in SHADOW (default);
+    # logs would-be rejections and lets the row through until promoted.
+    if _QUESTION_RHETORICAL_MODE != "off":
+        ok, reason = check_question_rhetorical(quote)
+        if not ok:
+            if _QUESTION_RHETORICAL_MODE == "shadow":
+                log.warning(
+                    "[rule_11_shadow] would reject %s via question_rhetorical: %s",
+                    ticker, (quote or "")[:120],
+                )
+            else:  # 'enforce' (unknown values also enforce defensively)
+                log.info(
+                    "[rule_11_enforce] rejected %s via question_rhetorical: %s",
+                    ticker, (quote or "")[:120],
+                )
+                return False, "question_rhetorical"
+    # Rule 12 — target-window-expired-before-publish rejection. SHADOW
+    # default. Reads date/timeframe keys that the live caller does not yet
+    # forward, so it abstains in production until that plumbing lands.
+    if _DATE_PASSED_MODE != "off":
+        ok, reason = check_date_passed(
+            pred.get("prediction_date"), pred.get("video_published_at"),
+            pred.get("window_days"), pred.get("inferred_timeframe_days"),
+            pred.get("timeframe_category"))
+        if not ok:
+            if _DATE_PASSED_MODE == "shadow":
+                log.warning(
+                    "[rule_12_shadow] would reject %s via prediction_date_passed: %s",
+                    ticker, (quote or "")[:120],
+                )
+            else:  # 'enforce' (unknown values also enforce defensively)
+                log.info(
+                    "[rule_12_enforce] rejected %s via prediction_date_passed: %s",
+                    ticker, (quote or "")[:120],
+                )
+                return False, "prediction_date_passed"
+    # Rule 13 — basket-only-mention rejection. SHADOW default.
+    if _BASKET_BROAD_MODE != "off":
+        ok, reason = check_basket_too_broad(quote, ticker, db)
+        if not ok:
+            if _BASKET_BROAD_MODE == "shadow":
+                log.warning(
+                    "[rule_13_shadow] would reject %s via basket_too_broad: %s",
+                    ticker, (quote or "")[:120],
+                )
+            else:  # 'enforce' (unknown values also enforce defensively)
+                log.info(
+                    "[rule_13_enforce] rejected %s via basket_too_broad: %s",
+                    ticker, (quote or "")[:120],
+                )
+                return False, "basket_too_broad"
+    # Rule 14 — news-recap (past-tense, no forward commitment) rejection.
+    # SHADOW default. Only reached when Rule 4 (past_tense) did not reject,
+    # so rule_4_already_rejected is implicitly False here.
+    if _NEWS_RECAP_MODE != "off":
+        ok, reason = check_news_recap(quote)
+        if not ok:
+            if _NEWS_RECAP_MODE == "shadow":
+                log.warning(
+                    "[rule_14_shadow] would reject %s via news_recap_no_prediction: %s",
+                    ticker, (quote or "")[:120],
+                )
+            else:  # 'enforce' (unknown values also enforce defensively)
+                log.info(
+                    "[rule_14_enforce] rejected %s via news_recap_no_prediction: %s",
+                    ticker, (quote or "")[:120],
+                )
+                return False, "news_recap_no_prediction"
     return True, None

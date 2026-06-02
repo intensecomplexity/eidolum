@@ -1,0 +1,95 @@
+{
+  "_meta": {
+    "description": "Labeled fixtures for classifier_validation Rules 11-14 (shadow ship). Keys match the gate's pred dict: ticker, direction, source_verbatim_quote, prediction_date, video_published_at, window_days, inferred_timeframe_days, timeframe_category. 'synthetic'=false rows are real prod predictions (generating_model='haiku'); the rest are hand-authored. Rule 13 should_pass cases name the ticker by SYMBOL so they pass deterministically with db=None (production additionally accepts company-name aliases via db, which is strictly more lenient).",
+    "rule_versions": {
+      "rule_11": "question_rhetorical",
+      "rule_12": "prediction_date_passed",
+      "rule_13": "basket_too_broad",
+      "rule_14": "news_recap_no_prediction"
+    }
+  },
+  "rule_11_question_rhetorical": {
+    "should_reject": [
+      {"synthetic": false, "ticker": "NVDA", "direction": "bullish", "source_verbatim_quote": "Are you for the restriction, or do you sit more in Jensen Hang's camp where you feel the restrictions may lead to an eventual loss in America's AI dominance?"},
+      {"synthetic": false, "ticker": "TIP", "direction": "bearish", "source_verbatim_quote": "What if all of a sudden everything we assumed about fiscal monetary support stops? What if inflation goes up even higher?"},
+      {"synthetic": true, "ticker": "AAPL", "direction": "bullish", "source_verbatim_quote": "Could AAPL break out above 250 this year?"},
+      {"synthetic": true, "ticker": "TSLA", "direction": "bullish", "source_verbatim_quote": "Will Tesla finally reclaim its all-time high?"},
+      {"synthetic": true, "ticker": "NVDA", "direction": "bullish", "source_verbatim_quote": "Is Nvidia still a buy at these levels?"},
+      {"synthetic": true, "ticker": "MSFT", "direction": "bearish", "source_verbatim_quote": "Should investors be worried about Microsoft here?"},
+      {"synthetic": true, "ticker": "AMZN", "direction": "bullish", "source_verbatim_quote": "Would you buy Amazon ahead of earnings?"},
+      {"synthetic": true, "ticker": "PLTR", "direction": "bullish", "source_verbatim_quote": "Can Palantir keep this momentum going?"},
+      {"synthetic": true, "ticker": "JPM", "direction": "bullish", "source_verbatim_quote": "Won't the Fed just cut rates and bail out the banks?"},
+      {"synthetic": true, "ticker": "META", "direction": "bullish", "source_verbatim_quote": "How high can Meta really go from here?"}
+    ],
+    "should_pass": [
+      {"synthetic": false, "ticker": "NVDA", "direction": "bullish", "source_verbatim_quote": "Nvidia is down 16%. All of these stocks provide a much larger profit potential back to all-time highs than the overall S&P 500 does."},
+      {"synthetic": false, "ticker": "DIS", "direction": "bullish", "source_verbatim_quote": "disney's recent sell-off is presenting a pretty good buying opportunity for the next few years as this company transforms into more of a streaming and technology giant"},
+      {"synthetic": true, "ticker": "TSLA", "direction": "bullish", "source_verbatim_quote": "Will TSLA hit 300? Yes, here's why I think so."},
+      {"synthetic": true, "ticker": "TSLA", "direction": "bullish", "source_verbatim_quote": "What's my target? My target is 250."},
+      {"synthetic": true, "ticker": "AAPL", "direction": "bullish", "source_verbatim_quote": "Could AAPL break out? I think it will, breakout to 250."}
+    ]
+  },
+  "rule_12_prediction_date_passed": {
+    "should_reject": [
+      {"synthetic": true, "ticker": "BTC", "direction": "bullish", "source_verbatim_quote": "Bitcoin should have hit 100k by the end of 2023.", "prediction_date": "2023-06-01", "video_published_at": "2025-01-01T12:00:00Z", "inferred_timeframe_days": 30},
+      {"synthetic": true, "ticker": "AAPL", "direction": "bullish", "source_verbatim_quote": "Apple was on track to 200 within the quarter.", "prediction_date": "2024-01-15", "video_published_at": "2024-08-01T00:00:00Z", "window_days": 90},
+      {"synthetic": true, "ticker": "TSLA", "direction": "bullish", "source_verbatim_quote": "Tesla looked set for a quick swing to 250.", "prediction_date": "2022-03-01", "video_published_at": "2024-01-01T00:00:00Z", "timeframe_category": "swing_trade"},
+      {"synthetic": true, "ticker": "NVDA", "direction": "bullish", "source_verbatim_quote": "Nvidia was due for a one-week pop into earnings.", "prediction_date": "2023-11-01", "video_published_at": "2024-06-01T00:00:00Z", "inferred_timeframe_days": 7},
+      {"synthetic": true, "ticker": "MSFT", "direction": "bullish", "source_verbatim_quote": "Microsoft had a clear quarterly target into the print.", "prediction_date": "2024-02-01", "video_published_at": "2024-07-01T00:00:00Z", "timeframe_category": "fundamental_quarterly"},
+      {"synthetic": true, "ticker": "AMZN", "direction": "bullish", "source_verbatim_quote": "Amazon was my pick for the year ahead.", "prediction_date": "2021-12-01", "video_published_at": "2024-01-01T00:00:00Z", "window_days": 365},
+      {"synthetic": true, "ticker": "AMD", "direction": "bullish", "source_verbatim_quote": "AMD had a month-long chart target.", "prediction_date": "2023-01-01", "video_published_at": "2023-06-01T00:00:00Z", "timeframe_category": "technical_chart"},
+      {"synthetic": true, "ticker": "GOOGL", "direction": "bullish", "source_verbatim_quote": "Google was a multi-year macro story back then.", "prediction_date": "2022-06-01", "video_published_at": "2025-06-01T00:00:00Z", "timeframe_category": "macro_thesis"},
+      {"synthetic": true, "ticker": "META", "direction": "bullish", "source_verbatim_quote": "Meta had a two-week setup at the time.", "prediction_date": "2024-03-01", "video_published_at": "2024-09-01T00:00:00Z", "inferred_timeframe_days": 14},
+      {"synthetic": true, "ticker": "NFLX", "direction": "bullish", "source_verbatim_quote": "Netflix had a two-month window then.", "prediction_date": "2023-08-01", "video_published_at": "2024-02-01T00:00:00Z", "window_days": 60}
+    ],
+    "should_pass": [
+      {"synthetic": true, "ticker": "GOOGL", "direction": "bullish", "source_verbatim_quote": "Google is my long-term macro pick from here.", "prediction_date": "2024-12-01", "video_published_at": "2025-01-01T00:00:00Z", "timeframe_category": "macro_thesis"},
+      {"synthetic": true, "ticker": "AAPL", "direction": "bullish", "source_verbatim_quote": "Apple should run over the next month.", "prediction_date": null, "video_published_at": "2025-01-01T00:00:00Z", "inferred_timeframe_days": 30},
+      {"synthetic": true, "ticker": "TSLA", "direction": "bullish", "source_verbatim_quote": "Tesla has a 30-day setup here.", "prediction_date": "2024-01-01", "video_published_at": null, "window_days": 30},
+      {"synthetic": true, "ticker": "NVDA", "direction": "bullish", "source_verbatim_quote": "Nvidia is going higher but I won't put a clock on it.", "prediction_date": "2023-01-01", "video_published_at": "2025-01-01T00:00:00Z", "window_days": 0, "inferred_timeframe_days": null, "timeframe_category": null},
+      {"synthetic": true, "ticker": "MSFT", "direction": "bullish", "source_verbatim_quote": "Microsoft has a clean quarterly target from here.", "prediction_date": "2025-01-01", "video_published_at": "2025-01-15T00:00:00Z", "inferred_timeframe_days": 90}
+    ]
+  },
+  "rule_13_basket_too_broad": {
+    "should_reject": [
+      {"synthetic": true, "ticker": "META", "direction": "bullish", "source_verbatim_quote": "The magnificent seven have led this whole rally and I think they keep going."},
+      {"synthetic": true, "ticker": "AAPL", "direction": "bullish", "source_verbatim_quote": "I'm bullish on FAANG into year end."},
+      {"synthetic": true, "ticker": "MSFT", "direction": "bullish", "source_verbatim_quote": "The cloud names are where the growth is for the next decade."},
+      {"synthetic": true, "ticker": "AMD", "direction": "bullish", "source_verbatim_quote": "Semiconductor stocks should rip when the cycle turns."},
+      {"synthetic": true, "ticker": "NVDA", "direction": "bullish", "source_verbatim_quote": "AI stocks are the trade of the decade, full stop."},
+      {"synthetic": true, "ticker": "JPM", "direction": "bullish", "source_verbatim_quote": "The banks look cheap heading into earnings season."},
+      {"synthetic": true, "ticker": "DAL", "direction": "bullish", "source_verbatim_quote": "The airlines are finally turning a profit again."},
+      {"synthetic": true, "ticker": "DHI", "direction": "bullish", "source_verbatim_quote": "The homebuilders should benefit from falling rates."},
+      {"synthetic": true, "ticker": "AMT", "direction": "bullish", "source_verbatim_quote": "The REITs are my favorite income play right now."},
+      {"synthetic": true, "ticker": "TSLA", "direction": "bullish", "source_verbatim_quote": "Mag 7 names carry the index, that's the whole market now."}
+    ],
+    "should_pass": [
+      {"synthetic": true, "ticker": "NVDA", "direction": "bullish", "source_verbatim_quote": "I love the magnificent seven, especially NVDA which I think hits 200."},
+      {"synthetic": true, "ticker": "AMD", "direction": "bullish", "source_verbatim_quote": "Semiconductor stocks are hot but AMD specifically is my top pick to 250."},
+      {"synthetic": true, "ticker": "JPM", "direction": "bullish", "source_verbatim_quote": "The banks are cheap, I like JPM here at these levels."},
+      {"synthetic": true, "ticker": "AAPL", "direction": "bullish", "source_verbatim_quote": "AAPL to 300 next year, simple as that."},
+      {"synthetic": false, "ticker": "V", "direction": "bullish", "source_verbatim_quote": "visa stock is a natural hedge against inflation since they do earn a percentage off of every transaction processed by their network. for these reasons visa cdr is a great buy for 2022"}
+    ]
+  },
+  "rule_14_news_recap_no_prediction": {
+    "should_reject": [
+      {"synthetic": true, "ticker": "AAPL", "direction": "bearish", "source_verbatim_quote": "AAPL shares closed lower today and the stock fell after the earnings report."},
+      {"synthetic": true, "ticker": "NVDA", "direction": "bearish", "source_verbatim_quote": "Nvidia traded down in the morning and was down again into the close."},
+      {"synthetic": true, "ticker": "SPY", "direction": "bearish", "source_verbatim_quote": "The market rallied today and then dropped today on the Fed minutes."},
+      {"synthetic": true, "ticker": "TSLA", "direction": "bearish", "source_verbatim_quote": "Tesla reported earnings after the bell and shares closed at a new low."},
+      {"synthetic": true, "ticker": "DIS", "direction": "bearish", "source_verbatim_quote": "Disney announced today a restructuring and the stock fell hard."},
+      {"synthetic": true, "ticker": "AMZN", "direction": "bearish", "source_verbatim_quote": "Amazon was up early but traded down after the guidance update."},
+      {"synthetic": true, "ticker": "META", "direction": "bearish", "source_verbatim_quote": "Meta finished the day lower and ended the session near support."},
+      {"synthetic": true, "ticker": "NFLX", "direction": "bearish", "source_verbatim_quote": "Netflix traded up midday but was down by the close."},
+      {"synthetic": true, "ticker": "BA", "direction": "bearish", "source_verbatim_quote": "Boeing reported earnings and the stock fell on the miss."},
+      {"synthetic": true, "ticker": "GM", "direction": "bearish", "source_verbatim_quote": "GM shares closed at a record and the stock fell after hours on the outlook."}
+    ],
+    "should_pass": [
+      {"synthetic": true, "ticker": "AAPL", "direction": "bullish", "source_verbatim_quote": "AAPL shares closed lower today but I think it rebounds next quarter."},
+      {"synthetic": true, "ticker": "XYZ", "direction": "bearish", "source_verbatim_quote": "The stock fell today on no real news to speak of."},
+      {"synthetic": false, "ticker": "DIS", "direction": "bullish", "source_verbatim_quote": "disney's recent sell-off is presenting a pretty good buying opportunity for the next few years as this company transforms into more of a streaming and technology giant"},
+      {"synthetic": false, "ticker": "TSLA", "direction": "bullish", "source_verbatim_quote": "i do reaffirm my 1500 price target for the end of 2022 but now let's get into my five bullish reasons why i think tesla stock is the best growth stock to own for 2022 and beyond"},
+      {"synthetic": true, "ticker": "NVDA", "direction": "bullish", "source_verbatim_quote": "Nvidia was down today but I expect a strong bounce into next month."}
+    ]
+  }
+}
