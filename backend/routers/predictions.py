@@ -6,7 +6,7 @@ from database import get_db
 from models import Prediction, Forecaster
 from utils import append_youtube_timestamp
 from services.prediction_visibility import yt_visible_filter
-from routers._prediction_filters import hedged_filter_clause
+from routers._prediction_filters import hedged_filter_clause, reported_speech_filter_clause
 from rate_limit import limiter
 
 router = APIRouter()
@@ -21,6 +21,9 @@ _VISIBLE = text(yt_visible_filter('predictions'))
 # T2 hedged/hypothetical filter (2026-06-02 sweep completion). No-op when
 # HIDE_HEDGED_PREDICTIONS is off, so the .filter() call is unconditional.
 _HEDGED = hedged_filter_clause(Prediction.conviction_level)
+# Reported-speech filter (2026-06-02 audit). No-op when
+# HIDE_REPORTED_SPEECH is off. Chained alongside _HEDGED at each call site.
+_NOT_REPORTED = reported_speech_filter_clause(Prediction.is_reported_speech)
 
 
 @router.get("/predictions/today")
@@ -34,6 +37,7 @@ def get_today_predictions(request: Request, db: Session = Depends(get_db)):
         .filter(Prediction.prediction_date >= today_start)
         .filter(_VISIBLE)
         .filter(_HEDGED)
+        .filter(_NOT_REPORTED)
         .order_by(Prediction.prediction_date.desc())
         .limit(5)
         .all()
@@ -45,6 +49,7 @@ def get_today_predictions(request: Request, db: Session = Depends(get_db)):
             db.query(Prediction)
             .filter(_VISIBLE)
             .filter(_HEDGED)
+            .filter(_NOT_REPORTED)
             .order_by(Prediction.prediction_date.desc())
             .limit(5)
             .all()
@@ -82,7 +87,7 @@ def get_recent_predictions(
     db: Session = Depends(get_db),
 ):
     """Get all recent predictions, paginated, newest first."""
-    query = db.query(Prediction).filter(_VISIBLE).filter(_HEDGED)
+    query = db.query(Prediction).filter(_VISIBLE).filter(_HEDGED).filter(_NOT_REPORTED)
 
     if ticker:
         query = query.filter(Prediction.ticker == ticker.upper())
