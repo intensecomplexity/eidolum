@@ -48,19 +48,19 @@ export default function Footer() {
             {isAuthenticated && <FLink to="/submit">Submit</FLink>}
           </Column>
 
-          {/* Trust — "Scoring Methodology" used to be a second label
-              pointing at /how-it-works; route doesn't exist as its
-              own page, so dropped. /platforms shows the data sources
-              we track, which is the same transparency theme. */}
+          {/* Trust — methodology lives at /how-it-works (alias /methodology
+              redirects there). /platforms shows the data sources we track. */}
           <Column title="Trust">
             <FLink to="/how-it-works">How It Works</FLink>
             <FLink to="/platforms">Platforms</FLink>
+            <FLink to="/terms">Terms</FLink>
+            <FLink to="/privacy">Privacy</FLink>
           </Column>
         </div>
 
         <div className="border-t border-border mt-8 pt-6 text-center">
           <p className="text-[11px] text-muted">
-            &copy; 2025 Eidolum. All rights reserved.
+            &copy; 2026 Eidolum. All rights reserved.
           </p>
         </div>
       </div>
