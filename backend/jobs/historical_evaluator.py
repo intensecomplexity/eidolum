@@ -1034,6 +1034,13 @@ def refresh_all_forecaster_stats():
     same env var — HIDE_HEDGED_PREDICTIONS — but it must be set on the
     WORKER service (hopeful-expression) to silence the filter here;
     setting it only on the API service leaves the worker filtering.
+
+    2026-06-03: hedged_filter_sql was extended in commit c4c7e3b to also
+    AND in COALESCE(is_reported_speech, FALSE) = FALSE, gated by an
+    independent HIDE_REPORTED_SPEECH env var (default ON). Worker watch
+    paths cover this file (jobs/**), so editing the docstring here is
+    sufficient to roll out the new combined-filter semantics to the
+    refresh cron without a separate worker.py touch.
     """
     from database import BgSessionLocal as SessionLocal
     from feature_flags import x_filter_sql
