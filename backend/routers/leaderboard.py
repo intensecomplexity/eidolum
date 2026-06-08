@@ -1320,40 +1320,82 @@ def get_homepage_data(request: Request, db: Session = Depends(get_db)):
     except Exception as e:
         print(f"[HomepageData] Top analysts error: {e}")
 
-    # Biggest Calls: highest-magnitude scored predictions.
+    # Biggest Calls: the genuine, price_bars-VERIFIED top winners.
     #
-    # Ship #13B Bug 15: deterministic uncapped sort. Previously the query
-    # hard-capped ABS(actual_return) at 200 AND had no tie-breaker, so
-    # two different "200% win" rows could swap positions between requests
-    # (the homepage widget reshuffled on every reload). We now:
-    #   - drop the upper cap (the floor stays at 5% so noise doesn't
-    #     drown out real calls); the raw actual_return column is already
-    #     uncapped in storage, so no new column is needed
-    #   - add ``p.id ASC`` as a hard tiebreaker so two rows with
-    #     identical magnitudes always sort the same way, and the LIMIT 5
-    #     picks the same five rows every request
+    # The old query ranked by the STORED actual_return, which the 2026-06-08
+    # sweep capped at +200% — so the showcase returned five rows all reading
+    # exactly +200.0 (MGNI/SBNY/CCRN/VTGN/METC, whose true returns are
+    # +339/+254/+235/+240/+314%). We now rank by the TRUE return recomputed
+    # straight from price_bars and EXCLUDE anything we can't verify, rather than
+    # leaning on a cap to make junk presentable:
+    #   - candidate set is pre-filtered to stored actual_return >= 100 (every
+    #     genuinely big winner is clamped to >= its window cap >= 100), so the
+    #     LATERAL price_bars joins run over a bounded set;
+    #   - true_return = direction-signed (eval close - ref close)/ref close, NO
+    #     upper cap — a real +450% shows as +450%;
+    #   - VERIFIED = ref+eval coverage AND stored entry within 10% of the ref
+    #     close; unverified rows are dropped entirely;
+    #   - 5%..2000% band keeps it to real winners and applies the absolute
+    #     corruption backstop; id ASC is the deterministic tiebreaker.
     biggest_calls = []
     try:
         bc_rows = db.execute(sql_text(f"""
-            SELECT p.id, p.ticker, p.direction, p.target_price, p.entry_price,
-                   p.outcome, p.actual_return, p.prediction_date,
-                   f.id AS fid, f.name AS fname, f.accuracy_score,
-                   ts.logo_domain, ts.logo_url, ts.company_name,
-                   p.verified_by, p.source_type,
-                   p.evaluation_deferred, p.evaluation_deferred_reason
-            FROM predictions p
-            JOIN forecasters f ON f.id = p.forecaster_id
-            LEFT JOIN ticker_sectors ts ON ts.ticker = p.ticker
-            WHERE p.outcome IN ('hit','near','miss','correct','incorrect')
-              AND p.actual_return IS NOT NULL
-              AND ABS(p.actual_return) >= 5
-              AND p.target_price IS NOT NULL AND p.target_price > 0
-              AND p.entry_price IS NOT NULL AND p.entry_price > 0
-              AND {_YT_VIS_P}{_HEDGED_P}
-              AND p.ticker IN (
-                  SELECT ticker FROM predictions WHERE 1=1{_HEDGED_NA} GROUP BY ticker HAVING COUNT(*) >= 20
-              )
-            ORDER BY ABS(p.actual_return) DESC, p.id ASC
+            WITH cand AS (
+                SELECT p.id, p.ticker, p.direction, p.target_price, p.entry_price,
+                       p.outcome, p.prediction_date,
+                       f.id AS fid, f.name AS fname, f.accuracy_score,
+                       ts.logo_domain, ts.logo_url, ts.company_name,
+                       p.verified_by, p.source_type,
+                       p.evaluation_deferred, p.evaluation_deferred_reason,
+                       rb.close AS ref_close, eb.close AS eval_close
+                FROM predictions p
+                JOIN forecasters f ON f.id = p.forecaster_id
+                LEFT JOIN ticker_sectors ts ON ts.ticker = p.ticker
+                LEFT JOIN LATERAL (
+                    SELECT b.close FROM price_bars b
+                    WHERE b.ticker = p.ticker
+                      AND b.bar_date BETWEEN p.prediction_date::date - 10 AND p.prediction_date::date + 10
+                    ORDER BY ABS(b.bar_date - p.prediction_date::date) LIMIT 1
+                ) rb ON true
+                LEFT JOIN LATERAL (
+                    SELECT b.close FROM price_bars b
+                    WHERE b.ticker = p.ticker
+                      AND b.bar_date BETWEEN
+                          (COALESCE(p.evaluation_date, p.prediction_date::date
+                              + (COALESCE(p.window_days,90) || ' days')::interval)::date) - 10
+                          AND
+                          (COALESCE(p.evaluation_date, p.prediction_date::date
+                              + (COALESCE(p.window_days,90) || ' days')::interval)::date) + 10
+                    ORDER BY ABS(b.bar_date - COALESCE(p.evaluation_date, p.prediction_date::date
+                              + (COALESCE(p.window_days,90) || ' days')::interval)::date) LIMIT 1
+                ) eb ON true
+                WHERE p.outcome IN ('hit','near','miss','correct','incorrect')
+                  AND p.actual_return IS NOT NULL AND p.actual_return >= 100
+                  AND p.target_price IS NOT NULL AND p.target_price > 0
+                  AND p.entry_price IS NOT NULL AND p.entry_price > 0
+                  AND {_YT_VIS_P}{_HEDGED_P}
+                  AND p.ticker IN (
+                      SELECT ticker FROM predictions WHERE 1=1{_HEDGED_NA} GROUP BY ticker HAVING COUNT(*) >= 20
+                  )
+            ),
+            scored AS (
+                SELECT *,
+                    CASE WHEN direction = 'bearish'
+                         THEN -((eval_close - ref_close) / ref_close * 100.0)
+                         ELSE (eval_close - ref_close) / ref_close * 100.0 END AS true_return,
+                    ABS(entry_price - ref_close) / ref_close AS entry_dev
+                FROM cand
+                WHERE ref_close IS NOT NULL AND ref_close > 0
+                  AND eval_close IS NOT NULL AND eval_close > 0
+            )
+            SELECT id, ticker, direction, target_price, entry_price, outcome,
+                   true_return, prediction_date, fid, fname, accuracy_score,
+                   logo_domain, logo_url, company_name, verified_by, source_type,
+                   evaluation_deferred, evaluation_deferred_reason
+            FROM scored
+            WHERE entry_dev <= 0.10
+              AND true_return >= 5 AND true_return <= 2000
+            ORDER BY true_return DESC, id ASC
             LIMIT 5
         """)).fetchall()
         for r in bc_rows:

@@ -808,6 +808,8 @@ def _get_preds(fid, page, limit, filter_type, sector, db):
         except Exception:
             return []
 
+    from services.return_display import verified_true_return
+    _scored_outcomes = ("hit", "near", "miss", "correct", "incorrect")
     results = []
     for p in rows:
         pd = p[5]
@@ -815,6 +817,14 @@ def _get_preds(fid, page, limit, filter_type, sector, db):
         w = p[7] or 90
         if not ed and pd:
             ed = pd + datetime.timedelta(days=w)
+        # DISPLAY the TRUE, price_bars-verified return (no +200 cap): a scored
+        # row shows its real % when verifiable, else "—" (None). Unverifiable =
+        # no price_bars coverage, entry_price off-tolerance, an impossible long,
+        # or an extreme that fails the backstop. Stored actual_return is left
+        # untouched (Part-1 floor/guard intact; aggregates unaffected).
+        disp_return = p[9]
+        if p[8] in _scored_outcomes:
+            disp_return = verified_true_return(db, p[1], p[2], p[4], pd, ed, w)
         results.append({
             "id": p[0], "ticker": p[1], "direction": p[2],
             "target_price": p[3], "entry_price": p[4],
@@ -822,7 +832,7 @@ def _get_preds(fid, page, limit, filter_type, sector, db):
             "evaluation_date": ed.isoformat() if ed else None,
             "window_days": w,
             "time_horizon": "short" if w <= 30 else ("long" if w >= 365 else "medium"),
-            "outcome": p[8], "actual_return": p[9], "evaluation_summary": p[10],
+            "outcome": p[8], "actual_return": disp_return, "evaluation_summary": p[10],
             "sector": resolve_ticker_display_sector(p[1], p[11]), "context": p[12], "exact_quote": p[13],
             "source_url": p[14], "archive_url": p[15],
             "source_type": p[16], "source_platform_id": p[17],
