@@ -377,9 +377,8 @@ def _enrich_primary_source(results: list, db: Session):
     """Batch-fetch the primary source_type for each forecaster based on their most common prediction source."""
     if not results:
         return
-    fids = [r["id"] for r in results]
+    fids = [int(r["id"]) for r in results]
     try:
-        fid_placeholders = ",".join(str(int(f)) for f in fids)
         # Hides every YouTube row with NULL source_timestamp_seconds.
         # The Qwen-LoRA and excluded-from-training filters that used to
         # compose with this were training-data filters, not visibility
@@ -402,10 +401,10 @@ def _enrich_primary_source(results: list, db: Session):
                     ORDER BY COUNT(*) DESC
                     LIMIT 1) as primary_verified_by
             FROM predictions p
-            WHERE p.forecaster_id IN ({fid_placeholders})
+            WHERE p.forecaster_id = ANY(:fids)
               AND {_yt_excl}{_HEDGED_P}
             GROUP BY p.forecaster_id
-        """)).fetchall()
+        """), {"fids": fids}).fetchall()
 
         source_by_fid = {}
         for row in rows:
@@ -423,9 +422,8 @@ def _enrich_sector_strengths(results: list, db: Session):
     """Batch-fetch sector strengths for a list of forecaster results. Modifies in-place."""
     if not results:
         return
-    fids = [r["id"] for r in results]
+    fids = [int(r["id"]) for r in results]
     try:
-        fid_placeholders = ",".join(str(int(f)) for f in fids)
         sector_rows = db.execute(sql_text(f"""
             SELECT p.forecaster_id, ts.sector,
                    COUNT(*) as total,
@@ -433,14 +431,14 @@ def _enrich_sector_strengths(results: list, db: Session):
                             WHEN p.outcome = 'near' THEN 0.5 ELSE 0 END) as score
             FROM predictions p
             JOIN ticker_sectors ts ON ts.ticker = p.ticker
-            WHERE p.forecaster_id IN ({fid_placeholders})
+            WHERE p.forecaster_id = ANY(:fids)
               AND p.outcome IN ('hit','near','miss','correct','incorrect')
               AND ts.sector IS NOT NULL AND ts.sector != '' AND ts.sector != 'Other'
               AND {_YT_VIS_P}{_HEDGED_P}
             GROUP BY p.forecaster_id, ts.sector
             HAVING COUNT(*) >= 3
             ORDER BY p.forecaster_id, score DESC
-        """)).fetchall()
+        """), {"fids": fids}).fetchall()
 
         sector_by_fid = {}
         for row in sector_rows:
