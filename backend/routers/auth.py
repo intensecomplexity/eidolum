@@ -1,6 +1,10 @@
 import os
 import re
 import secrets
+import hmac
+import hashlib
+import base64
+import time
 from datetime import datetime, timedelta, timezone
 from urllib.parse import urlencode, quote
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
@@ -12,7 +16,7 @@ import httpx
 
 from database import get_db
 from models import User, PasswordResetToken
-from auth import hash_password, verify_password, create_token, get_current_user_dep
+from auth import hash_password, verify_password, create_token, get_current_user_dep, JWT_SECRET
 from rate_limit import limiter
 
 # Google OAuth config
@@ -121,6 +125,35 @@ def _generate_username(email: str, db: Session) -> str:
     return f"{base}{secrets.token_hex(4)}"
 
 
+# ── OAuth state (CSRF) — integrity-signed, short-lived, stateless ─────────────
+# The state value is HMAC-signed with JWT_SECRET and carries an expiry, so the
+# callback can reject tampered/expired state without server-side storage. This
+# is the round-trip scaffolding + integrity layer; full browser-binding (an
+# httponly cookie compared on return) is a follow-up — it needs withCredentials
+# + cross-domain cookie config that can't be browser-verified here.
+_OAUTH_STATE_TTL_SECONDS = 600
+
+
+def _make_oauth_state() -> str:
+    nonce = secrets.token_urlsafe(16)
+    exp = str(int(time.time()) + _OAUTH_STATE_TTL_SECONDS)
+    payload = f"{nonce}:{exp}"
+    sig = hmac.new(JWT_SECRET.encode(), payload.encode(), hashlib.sha256).hexdigest()
+    return base64.urlsafe_b64encode(f"{payload}:{sig}".encode()).decode()
+
+
+def _verify_oauth_state(state: str) -> bool:
+    try:
+        raw = base64.urlsafe_b64decode(state.encode()).decode()
+        nonce, exp, sig = raw.split(":")
+        expected = hmac.new(JWT_SECRET.encode(), f"{nonce}:{exp}".encode(), hashlib.sha256).hexdigest()
+        if not hmac.compare_digest(sig, expected):
+            return False
+        return int(exp) >= int(time.time())
+    except Exception:
+        return False
+
+
 # ── GET /api/auth/google/login ────────────────────────────────────────────────
 
 
@@ -138,6 +171,7 @@ def google_auth_url(request: Request):
         "scope": "openid email profile",
         "access_type": "offline",
         "prompt": "select_account",
+        "state": _make_oauth_state(),
     }
     url = f"https://accounts.google.com/o/oauth2/v2/auth?{urlencode(params)}"
     return {"url": url}
@@ -148,10 +182,19 @@ def google_auth_url(request: Request):
 
 @router.get("/auth/google/callback")
 @limiter.limit("20/minute")
-def google_callback(request: Request, code: str = Query(...), db: Session = Depends(get_db)):
+def google_callback(request: Request, code: str = Query(...), state: str = Query(None), db: Session = Depends(get_db)):
     """Exchange Google auth code for user info, create/login user, return JWT."""
     if not GOOGLE_CLIENT_ID or not GOOGLE_CLIENT_SECRET:
         raise HTTPException(status_code=503, detail="Google sign-in is not configured")
+
+    # CSRF state check. Reject tampered/expired state. Absent state is tolerated
+    # for now (rollout safety: a cached/old frontend may not forward it yet) —
+    # tighten to hard-require once telemetry shows ~all callbacks carry state.
+    if state:
+        if not _verify_oauth_state(state):
+            raise HTTPException(status_code=400, detail="Invalid or expired sign-in state. Please try signing in again.")
+    else:
+        print("[GoogleAuth] WARNING: callback received without OAuth state param")
 
     # Exchange code for tokens
     try:

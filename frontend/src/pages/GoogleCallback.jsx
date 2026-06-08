@@ -35,8 +35,12 @@ export default function GoogleCallback() {
       return;
     }
 
+    // Forward the OAuth state param (CSRF) so the backend can verify it.
+    const state = searchParams.get('state');
+    const stateQuery = state ? `&state=${encodeURIComponent(state)}` : '';
+
     // Use fetch directly (not axios) to avoid any interceptor/redirect issues
-    fetch(`${API_BASE}/api/auth/google/callback?code=${encodeURIComponent(code)}`)
+    fetch(`${API_BASE}/api/auth/google/callback?code=${encodeURIComponent(code)}${stateQuery}`)
       .then(res => {
         if (!res.ok) return res.json().then(d => { throw new Error(d.detail || 'Login failed'); });
         return res.json();
