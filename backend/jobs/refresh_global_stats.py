@@ -24,37 +24,45 @@ _SCORED_OUTCOMES = ("hit", "near", "miss", "correct", "incorrect")
 def refresh_global_stats(db) -> dict:
     t0 = time.time()
 
-    up_total = db.execute(sql_text(
-        "SELECT count(*) FROM user_predictions WHERE deleted_at IS NULL"
-    )).scalar() or 0
-    up_active = db.execute(sql_text(
-        "SELECT count(*) FROM user_predictions WHERE outcome = 'pending' AND deleted_at IS NULL"
-    )).scalar() or 0
-    up_scored = db.execute(sql_text(
-        "SELECT count(*) FROM user_predictions "
-        "WHERE outcome IN ('hit','near','miss','correct','incorrect') AND deleted_at IS NULL"
-    )).scalar() or 0
-    up_correct = db.execute(sql_text(
-        "SELECT count(*) FROM user_predictions WHERE outcome = 'correct' AND deleted_at IS NULL"
-    )).scalar() or 0
+    # Canonical headline population: the SAME filtered analyst-prediction set the
+    # homepage hero (routers/leaderboard.get_homepage_stats) and the leaderboard
+    # compute over — the `predictions` table with the hedged/reported-speech
+    # filter applied. This is what makes /api/stats/global and /api/homepage-data
+    # report identical totals/accuracy. The hedged filter is env-gated
+    # (HIDE_HEDGED_PREDICTIONS / HIDE_REPORTED_SPEECH) and returns "" when off.
+    from routers._prediction_filters import hedged_filter_sql
+    _h = hedged_filter_sql("predictions")
 
-    scraped_total = db.execute(sql_text("SELECT count(*) FROM predictions")).scalar() or 0
-    scraped_scored = db.execute(sql_text(
-        "SELECT count(*) FROM predictions "
-        "WHERE outcome IN ('hit','near','miss','correct','incorrect')"
+    total_predictions = db.execute(sql_text(
+        f"SELECT count(*) FROM predictions WHERE 1=1{_h}"
     )).scalar() or 0
-    scraped_correct = db.execute(sql_text(
-        "SELECT count(*) FROM predictions WHERE outcome = 'correct'"
+    total_scored = db.execute(sql_text(
+        f"SELECT count(*) FROM predictions "
+        f"WHERE outcome IN ('hit','near','miss','correct','incorrect'){_h}"
+    )).scalar() or 0
+    # Three-tier scoring, identical to the leaderboard: hit/correct = 1.0,
+    # near = 0.5, miss = 0. The OLD code divided by `outcome='correct'` only —
+    # but scraped rows score as 'hit'/'near'/'miss', so the numerator was ~0 and
+    # average_accuracy collapsed to 0.0.
+    hits = db.execute(sql_text(
+        f"SELECT count(*) FROM predictions WHERE outcome IN ('hit','correct'){_h}"
+    )).scalar() or 0
+    nears = db.execute(sql_text(
+        f"SELECT count(*) FROM predictions WHERE outcome = 'near'{_h}"
+    )).scalar() or 0
+    # Active = analyst predictions still awaiting an outcome. The OLD code
+    # reported only user_predictions pending (=1), ignoring the tens of
+    # thousands of pending scraped predictions.
+    active_predictions = db.execute(sql_text(
+        f"SELECT count(*) FROM predictions WHERE outcome = 'pending'{_h}"
     )).scalar() or 0
     total_forecasters = db.execute(sql_text(
         "SELECT count(*) FROM forecasters WHERE total_predictions > 0"
     )).scalar() or 0
     total_users = db.execute(sql_text("SELECT count(*) FROM users")).scalar() or 0
 
-    total_predictions = up_total + scraped_total
-    total_scored = up_scored + scraped_scored
-    total_correct = up_correct + scraped_correct
-    avg_accuracy = round(total_correct / total_scored * 100, 1) if total_scored > 0 else 0
+    avg_accuracy = round((hits + nears * 0.5) / total_scored * 100, 1) if total_scored > 0 else 0
+    up_active = active_predictions  # kept name for the UPSERT param below
 
     db.execute(sql_text("""
         INSERT INTO global_stats_cache (

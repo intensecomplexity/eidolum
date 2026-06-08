@@ -634,26 +634,33 @@ def get_global_stats(request: Request, db: Session = Depends(get_db)):
     if _stats_cache and (_stats_time.time() - _stats_cache_time) < _STATS_TTL:
         return _stats_cache
 
-    # User predictions
-    up_total = db.query(func.count(UserPrediction.id)).filter(UserPrediction.deleted_at.is_(None)).scalar() or 0
-    up_active = db.query(func.count(UserPrediction.id)).filter(UserPrediction.outcome == "pending", UserPrediction.deleted_at.is_(None)).scalar() or 0
-    up_scored = db.query(func.count(UserPrediction.id)).filter(UserPrediction.outcome.in_(["hit","near","miss","correct","incorrect"]), UserPrediction.deleted_at.is_(None)).scalar() or 0
-    up_correct = db.query(func.count(UserPrediction.id)).filter(UserPrediction.outcome == "correct", UserPrediction.deleted_at.is_(None)).scalar() or 0
-
-    # Also count scraped predictions from the original predictions table
+    # L2 live fallback (stale/missing global_stats_cache). Computes the SAME
+    # canonical filtered analyst-prediction population as the worker cron
+    # (jobs/refresh_global_stats) and the homepage hero, so every surface agrees:
+    #   - total/scored/active over the hedged + reported-speech filtered set,
+    #   - three-tier accuracy (hit/correct=1.0, near=0.5, miss=0) — the OLD code
+    #     divided by `outcome='correct'` only, which is ~0 for scraped rows and
+    #     collapsed average_accuracy to 0.0,
+    #   - active = pending analyst predictions (was: user_predictions pending = 1).
+    from routers._prediction_filters import hedged_filter_sql
+    _h = hedged_filter_sql("predictions")
     try:
-        from models import Prediction, Forecaster
-        scraped_total = db.query(func.count(Prediction.id)).scalar() or 0
-        scraped_scored = db.query(func.count(Prediction.id)).filter(Prediction.outcome.in_(["hit","near","miss","correct","incorrect"])).scalar() or 0
-        scraped_correct = db.query(func.count(Prediction.id)).filter(Prediction.outcome == "correct").scalar() or 0
-        total_forecasters = db.query(func.count(Forecaster.id)).filter(Forecaster.total_predictions > 0).scalar() or 0
+        total_predictions = db.execute(_stats_text(
+            f"SELECT count(*) FROM predictions WHERE 1=1{_h}")).scalar() or 0
+        total_scored = db.execute(_stats_text(
+            f"SELECT count(*) FROM predictions WHERE outcome IN ('hit','near','miss','correct','incorrect'){_h}")).scalar() or 0
+        hits = db.execute(_stats_text(
+            f"SELECT count(*) FROM predictions WHERE outcome IN ('hit','correct'){_h}")).scalar() or 0
+        nears = db.execute(_stats_text(
+            f"SELECT count(*) FROM predictions WHERE outcome = 'near'{_h}")).scalar() or 0
+        active_predictions = db.execute(_stats_text(
+            f"SELECT count(*) FROM predictions WHERE outcome = 'pending'{_h}")).scalar() or 0
+        total_forecasters = db.execute(_stats_text(
+            "SELECT count(*) FROM forecasters WHERE total_predictions > 0")).scalar() or 0
     except Exception:
-        scraped_total = scraped_scored = scraped_correct = total_forecasters = 0
+        total_predictions = total_scored = hits = nears = active_predictions = total_forecasters = 0
 
-    total_predictions = up_total + scraped_total
-    total_scored = up_scored + scraped_scored
-    total_correct = up_correct + scraped_correct
-    avg_accuracy = round(total_correct / total_scored * 100, 1) if total_scored > 0 else 0
+    avg_accuracy = round((hits + nears * 0.5) / total_scored * 100, 1) if total_scored > 0 else 0
     total_users = db.query(func.count(User.id)).scalar() or 0
 
     result = {
@@ -661,7 +668,7 @@ def get_global_stats(request: Request, db: Session = Depends(get_db)):
         "total_forecasters": total_forecasters,
         "total_users": total_users,
         "average_accuracy": avg_accuracy,
-        "active_predictions": up_active,
+        "active_predictions": active_predictions,
         "total_scored": total_scored,
     }
     _stats_cache = result

@@ -1055,7 +1055,7 @@ def get_leaderboard(
 
         cached = _filtered_cache.get(cache_key)
         if cached and (_time.time() - cached[1]) < FILTERED_CACHE_TTL:
-            return _apply_dormancy(db, list(cached[0]), _include_dormant)
+            return _apply_dormancy(db, list(cached[0]), _include_dormant)[:limit]
 
         min_preds = min_predictions or (10 if sector or call_type or timeframe or source else 35)
         results = _build_filtered_leaderboard(
@@ -1071,14 +1071,14 @@ def get_leaderboard(
                 timeframe=timeframe, source=source,
             )
         _filtered_cache[cache_key] = (results, _time.time())
-        return _apply_dormancy(db, list(results), _include_dormant)
+        return _apply_dormancy(db, list(results), _include_dormant)[:limit]
 
     # Periodic stats integrity check
     _check_stats_integrity(db)
 
     # Default all-time: use cache
     if _leaderboard_cache and (_time.time() - _cache_time) < CACHE_TTL:
-        return _apply_dormancy(db, list(_leaderboard_cache), include_dormant)
+        return _apply_dormancy(db, list(_leaderboard_cache), include_dormant)[:limit]
 
     try:
         result = _refresh_leaderboard(db)
@@ -1088,7 +1088,7 @@ def get_leaderboard(
         _cache_time = _time.time()
     except Exception as e:
         print(f"[Leaderboard] Query error: {e}")
-    return _apply_dormancy(db, list(_leaderboard_cache or []), include_dormant)
+    return _apply_dormancy(db, list(_leaderboard_cache or []), include_dormant)[:limit]
 
 
 @router.get("/sectors")
@@ -1257,11 +1257,15 @@ def get_homepage_stats(request: Request, db: Session = Depends(get_db)):
         total_fc = db.execute(sql_text("SELECT COUNT(*) FROM forecasters WHERE COALESCE(total_predictions,0) > 0")).scalar() or 0
         scored = db.execute(sql_text(f"SELECT COUNT(*) FROM predictions WHERE outcome IN ('hit','near','miss','correct','incorrect'){_HEDGED_NA}")).scalar() or 0
         correct_count = db.execute(sql_text(f"SELECT COUNT(*) FROM predictions WHERE outcome IN ('hit','correct'){_HEDGED_NA}")).scalar() or 0
+        near_count = db.execute(sql_text(f"SELECT COUNT(*) FROM predictions WHERE outcome = 'near'{_HEDGED_NA}")).scalar() or 0
         all_preds = db.execute(sql_text(f"SELECT COUNT(*) FROM predictions WHERE 1=1{_HEDGED_NA}")).scalar() or 0
     except Exception:
-        total_fc = scored = correct_count = all_preds = 0
+        total_fc = scored = correct_count = near_count = all_preds = 0
 
-    avg_acc = round(correct_count / scored * 100, 1) if scored > 0 else 0
+    # Three-tier accuracy (hit/correct=1.0, near=0.5, miss=0), identical to the
+    # per-forecaster leaderboard score and to /api/stats/global, so the homepage
+    # hero never contradicts the other surfaces.
+    avg_acc = round((correct_count + near_count * 0.5) / scored * 100, 1) if scored > 0 else 0
     _stats_cache = {
         "forecasters_tracked": total_fc,
         "verified_predictions": scored,
@@ -1291,61 +1295,30 @@ def get_homepage_data(request: Request, db: Session = Depends(get_db)):
     # Stats
     stats = get_homepage_stats(request, db)
 
-    # Top 5 leaderboard — direct SQL with outcome + direction breakdowns
-    # min_preds=100 floor pushes out small-sample YouTube channels (a 7-for-9
-    # streak at 78% would otherwise leapfrog Wall St firms with 15K+ calls).
-    # 50-row fallback keeps the widget populated even if the universe shrinks.
+    # Top analysts — must be the EXACT top of the leaderboard the user sees, for
+    # both anonymous and authenticated requests. The old bespoke query ranked by
+    # forecasters.accuracy_score with a min-100 floor and NO dormancy filter, so
+    # it surfaced high-accuracy but DORMANT names (e.g. Richard Davis 75.6%) that
+    # never appear in the leaderboard — and it silently cached [] on any error,
+    # leaving anonymous visitors with an empty widget. We now reuse the same
+    # default-leaderboard list + _apply_dormancy the /leaderboard endpoint
+    # returns, so top_analysts[0] is always leaderboard rank #1.
     top5 = []
     try:
-        lb_rows = None
-        for min_preds in [100, 50]:
-            lb_rows = db.execute(sql_text(f"""
-                SELECT f.id, f.name, f.handle, f.platform, f.firm,
-                       f.accuracy_score, f.total_predictions, f.correct_predictions,
-                       COALESCE(f.avg_return, 0) as avg_return,
-                       f.slug,
-                       COALESCE(s.hits, 0), COALESCE(s.nears, 0), COALESCE(s.misses, 0),
-                       COALESCE(s.bullish, 0), COALESCE(s.bearish, 0), COALESCE(s.neutral, 0),
-                       COALESCE(s.pending, 0)
-                FROM forecasters f
-                LEFT JOIN LATERAL (
-                    SELECT
-                        SUM(CASE WHEN outcome IN ('hit','correct') THEN 1 ELSE 0 END) as hits,
-                        SUM(CASE WHEN outcome = 'near' THEN 1 ELSE 0 END) as nears,
-                        SUM(CASE WHEN outcome IN ('miss','incorrect') THEN 1 ELSE 0 END) as misses,
-                        SUM(CASE WHEN direction = 'bullish' THEN 1 ELSE 0 END) as bullish,
-                        SUM(CASE WHEN direction = 'bearish' THEN 1 ELSE 0 END) as bearish,
-                        SUM(CASE WHEN direction = 'neutral' THEN 1 ELSE 0 END) as neutral,
-                        SUM(CASE WHEN outcome = 'pending' OR outcome IS NULL THEN 1 ELSE 0 END) as pending
-                    FROM predictions p
-                    WHERE p.forecaster_id = f.id
-                      AND NOT (p.source_type = 'youtube' AND p.source_timestamp_seconds IS NULL){_HEDGED_P}
-                ) s ON true
-                WHERE COALESCE(f.total_predictions, 0) >= :min
-                  AND COALESCE(f.accuracy_score, 0) > 0
-                ORDER BY f.accuracy_score DESC, f.total_predictions DESC
-                LIMIT 5
-            """), {"min": min_preds}).fetchall()
-            if lb_rows:
-                break
-        for i, r in enumerate(lb_rows or []):
-            top5.append({
-                "id": r[0], "name": r[1], "handle": r[2],
-                "slug": r[9] if len(r) > 9 else None,
-                "platform": r[3] or "youtube", "firm": r[4],
-                "accuracy_rate": float(r[5] or 0),
-                "total_predictions": r[6] or 0,
-                "correct_predictions": r[7] or 0,
-                "evaluated_predictions": r[6] or 0,
-                "scored_count": r[6] or 0,
-                "avg_return": round(float(r[8] or 0), 2),
-                "rank": i + 1,
-                "hits": r[10], "nears": r[11], "misses": r[12],
-                "bullish_count": r[13], "bearish_count": r[14], "neutral_count": r[15],
-                "pending_count": r[16],
-            })
+        global _leaderboard_cache, _cache_time
+        lb_list = _leaderboard_cache
+        if not (lb_list and (_time.time() - _cache_time) < CACHE_TTL):
+            refreshed = _refresh_leaderboard(db)
+            if isinstance(refreshed, list):
+                lb_list = refreshed
+                _leaderboard_cache = refreshed
+                _cache_time = _time.time()
+        ranked = _apply_dormancy(db, list(lb_list or []), include_dormant=False)
+        top5 = [dict(a) for a in ranked[:5]]
+        for i, a in enumerate(top5):
+            a["rank"] = i + 1
     except Exception as e:
-        print(f"[HomepageData] Top 5 error: {e}")
+        print(f"[HomepageData] Top analysts error: {e}")
 
     # Biggest Calls: highest-magnitude scored predictions.
     #
@@ -1495,15 +1468,20 @@ def get_homepage_data(request: Request, db: Session = Depends(get_db)):
     except Exception:
         pass
 
-    _homepage_data_cache = {
+    payload = {
         "stats": stats,
         "top_analysts": top5,
         "biggest_calls": biggest_calls,
         "most_divided": most_divided,
         "featured_prediction": featured,
     }
-    _homepage_data_cache_time = _time.time()
-    return _homepage_data_cache
+    # Only persist the 5-minute cache when top_analysts is populated. A cold
+    # worker that transiently computed an empty list must NOT freeze that empty
+    # widget in front of visitors for 5 minutes — recompute on the next request.
+    if top5:
+        _homepage_data_cache = payload
+        _homepage_data_cache_time = _time.time()
+    return payload
 
 
 @router.get("/trending-tickers")
