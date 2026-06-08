@@ -154,6 +154,13 @@ def _verify_oauth_state(state: str) -> bool:
         return False
 
 
+def _oauth_state_enforced() -> bool:
+    """Hard-reject absent/invalid OAuth state by default. Kill-switch: set
+    OAUTH_STATE_ENFORCE to a falsey value to revert to S2 soft validation
+    (log + allow) without a code change."""
+    return os.getenv("OAUTH_STATE_ENFORCE", "true").lower() not in ("0", "false", "no")
+
+
 # ── GET /api/auth/google/login ────────────────────────────────────────────────
 
 
@@ -187,14 +194,16 @@ def google_callback(request: Request, code: str = Query(...), state: str = Query
     if not GOOGLE_CLIENT_ID or not GOOGLE_CLIENT_SECRET:
         raise HTTPException(status_code=503, detail="Google sign-in is not configured")
 
-    # CSRF state check. Reject tampered/expired state. Absent state is tolerated
-    # for now (rollout safety: a cached/old frontend may not forward it yet) —
-    # tighten to hard-require once telemetry shows ~all callbacks carry state.
-    if state:
-        if not _verify_oauth_state(state):
+    # CSRF state check. With OAUTH_STATE_ENFORCE on (default), absent / invalid /
+    # expired / tampered state → 400. The kill-switch reverts to soft validation
+    # (log + allow). Browser-binding — the returned state must match the value
+    # the initiating tab stored — is enforced on the frontend (sessionStorage
+    # double-submit; login-init and this callback share the www.eidolum.com
+    # origin, so a cross-site cookie is unnecessary).
+    if not (state and _verify_oauth_state(state)):
+        if _oauth_state_enforced():
             raise HTTPException(status_code=400, detail="Invalid or expired sign-in state. Please try signing in again.")
-    else:
-        print("[GoogleAuth] WARNING: callback received without OAuth state param")
+        print("[GoogleAuth] WARNING: missing/invalid OAuth state (OAUTH_STATE_ENFORCE=false — allowing)")
 
     # Exchange code for tokens
     try:
