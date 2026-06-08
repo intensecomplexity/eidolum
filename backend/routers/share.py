@@ -1,6 +1,7 @@
 """
 Share endpoints — OG meta pages and share data for predictions and profiles.
 """
+import html
 import math
 from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -110,7 +111,13 @@ def share_card_html(request: Request, prediction_id: int, db: Session = Depends(
     if pred.outcome in ("correct", "incorrect"):
         og_description = f"{pred.outcome.upper()} \u2014 {og_description}"
 
-    html = f"""<!DOCTYPE html>
+    # Escape all dynamic values before reflecting them into HTML. price_target
+    # is free-form user input (only .strip()'d at submit) and would otherwise
+    # break out of the content="..." attribute (stored XSS).
+    og_title = html.escape(og_title)
+    og_description = html.escape(og_description)
+
+    html_doc = f"""<!DOCTYPE html>
 <html><head>
 <meta charset="utf-8">
 <title>{og_title}</title>
@@ -128,7 +135,7 @@ def share_card_html(request: Request, prediction_id: int, db: Session = Depends(
 <p>Redirecting to Eidolum...</p>
 </body></html>"""
 
-    return HTMLResponse(html)
+    return HTMLResponse(html_doc)
 
 
 # ── GET /api/profiles/{user_id}/share-data ────────────────────────────────────
@@ -314,7 +321,12 @@ def told_you_so_page(request: Request, prediction_id: int, db: Session = Depends
     og_desc = f"I TOLD YOU SO \u2014 {pred.direction.capitalize()} on {pred.ticker} at {pred.price_target}. Verified correct."
     share_url = f"{SITE_URL}/prediction/{prediction_id}/told-you-so"
 
-    html = f"""<!DOCTYPE html>
+    # Escape dynamic values (price_target is free-form user input) before
+    # reflecting into HTML attributes \u2014 prevents stored XSS.
+    og_title = html.escape(og_title)
+    og_desc = html.escape(og_desc)
+
+    html_doc = f"""<!DOCTYPE html>
 <html><head>
 <meta charset="utf-8">
 <title>{og_title}</title>
@@ -329,7 +341,7 @@ def told_you_so_page(request: Request, prediction_id: int, db: Session = Depends
 </head><body style="background:#0a0a0f;color:#e8e8e6;text-align:center;padding:40px">
 <p>Redirecting...</p>
 </body></html>"""
-    return HTMLResponse(html)
+    return HTMLResponse(html_doc)
 
 
 # ── Referral tracking ─────────────────────────────────────────────────────────
