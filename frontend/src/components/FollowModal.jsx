@@ -1,11 +1,12 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import useLockBodyScroll from '../hooks/useLockBodyScroll';
 import { X, Bell, CheckCircle } from 'lucide-react';
 import { createFollow } from '../api';
+import { useAuth } from '../context/AuthContext';
 
 export default function FollowModal({ forecaster, onClose, onFollowed }) {
   useLockBodyScroll();
-  const [email, setEmail] = useState('');
+  const { isAuthenticated } = useAuth();
   const [alerts, setAlerts] = useState({
     new_prediction: true,
     prediction_resolved: true,
@@ -15,23 +16,17 @@ export default function FollowModal({ forecaster, onClose, onFollowed }) {
   const [submitting, setSubmitting] = useState(false);
   const [done, setDone] = useState(false);
 
-  // Pre-fill email from localStorage
-  useEffect(() => {
-    const saved = localStorage.getItem('qa_email');
-    if (saved) setEmail(saved);
-  }, []);
-
   async function handleSubmit(e) {
     e.preventDefault();
-    if (!email.trim()) return;
+    if (!isAuthenticated) return;
     setSubmitting(true);
     try {
+      // Email is derived server-side from the authenticated account; alerts
+      // are scoped to the JWT user.
       await createFollow({
-        user_email: email.trim(),
         forecaster_id: forecaster.id,
         alerts,
       });
-      localStorage.setItem('qa_email', email.trim());
       // Store in followed list
       const followed = JSON.parse(localStorage.getItem('qa_followed') || '[]');
       if (!followed.includes(forecaster.id)) {
@@ -58,7 +53,7 @@ export default function FollowModal({ forecaster, onClose, onFollowed }) {
         <div className="bg-surface border border-accent/30 rounded-xl p-6 max-w-sm w-full text-center" onClick={e => e.stopPropagation()}>
           <CheckCircle className="w-12 h-12 text-accent mx-auto mb-3" />
           <p className="text-text-primary font-semibold">Now following {forecaster.name}!</p>
-          <p className="text-muted text-sm mt-1">We'll notify you at {email}</p>
+          <p className="text-muted text-sm mt-1">We'll email you at your account address.</p>
         </div>
       </div>
     );
@@ -74,7 +69,7 @@ export default function FollowModal({ forecaster, onClose, onFollowed }) {
           </button>
         </div>
 
-        <p className="text-text-secondary text-sm mb-4">Enter your email to get notified when:</p>
+        <p className="text-text-secondary text-sm mb-4">Get email alerts when this forecaster:</p>
 
         <div className="space-y-2 mb-4">
           {[
@@ -100,19 +95,14 @@ export default function FollowModal({ forecaster, onClose, onFollowed }) {
           ))}
         </div>
 
+        {!isAuthenticated && (
+          <p className="text-muted text-xs mb-3">Sign in to follow and get alerts.</p>
+        )}
         <form onSubmit={handleSubmit}>
-          <input
-            type="email"
-            value={email}
-            onChange={e => setEmail(e.target.value)}
-            placeholder="your@email.com"
-            required
-            className="w-full px-4 py-3 bg-surface-2 border border-border rounded-lg text-text-primary placeholder:text-muted focus:outline-none focus:border-accent/50 font-mono mb-3 min-h-[48px]"
-          />
           <div className="flex gap-2">
             <button
               type="submit"
-              disabled={submitting}
+              disabled={submitting || !isAuthenticated}
               className="btn-primary flex-1 text-sm"
             >
               {submitting ? 'Saving...' : 'Start Following'}
