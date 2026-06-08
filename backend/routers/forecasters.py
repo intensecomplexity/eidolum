@@ -808,8 +808,22 @@ def _get_preds(fid, page, limit, filter_type, sector, db):
         except Exception:
             return []
 
-    from services.return_display import verified_true_return
+    from services.return_display import verified_true_returns_batch
     _scored_outcomes = ("hit", "near", "miss", "correct", "incorrect")
+    # DISPLAY the TRUE, price_bars-verified return (no +200 cap): a scored row
+    # shows its real % when verifiable, else "—" (None). Unverifiable = no
+    # price_bars coverage, entry_price off-tolerance, an impossible long, or an
+    # extreme that fails the 2000% backstop. Stored actual_return is left
+    # untouched (Part-1 floor/guard intact; aggregates unaffected). All scored
+    # rows on the page are recomputed in ONE batched query (keyed by id).
+    _ret_items = []
+    for p in rows:
+        if p[8] in _scored_outcomes:
+            _pd, _ed, _w = p[5], p[6], (p[7] or 90)
+            if not _ed and _pd:
+                _ed = _pd + datetime.timedelta(days=_w)
+            _ret_items.append((p[0], p[1], p[2], p[4], _pd, _ed, _w))
+    _disp_returns = verified_true_returns_batch(db, _ret_items) if _ret_items else {}
     results = []
     for p in rows:
         pd = p[5]
@@ -817,14 +831,7 @@ def _get_preds(fid, page, limit, filter_type, sector, db):
         w = p[7] or 90
         if not ed and pd:
             ed = pd + datetime.timedelta(days=w)
-        # DISPLAY the TRUE, price_bars-verified return (no +200 cap): a scored
-        # row shows its real % when verifiable, else "—" (None). Unverifiable =
-        # no price_bars coverage, entry_price off-tolerance, an impossible long,
-        # or an extreme that fails the backstop. Stored actual_return is left
-        # untouched (Part-1 floor/guard intact; aggregates unaffected).
-        disp_return = p[9]
-        if p[8] in _scored_outcomes:
-            disp_return = verified_true_return(db, p[1], p[2], p[4], pd, ed, w)
+        disp_return = _disp_returns.get(p[0]) if p[8] in _scored_outcomes else p[9]
         results.append({
             "id": p[0], "ticker": p[1], "direction": p[2],
             "target_price": p[3], "entry_price": p[4],
