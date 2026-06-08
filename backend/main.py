@@ -4195,6 +4195,7 @@ from fastapi import Depends as _Depends
 from sqlalchemy.orm import Session as _Session
 from database import get_db as _get_db
 from middleware.auth import require_admin_user as _require_admin
+from middleware.auth import require_admin_any as _require_admin_any
 
 
 @app.get("/api/features")
@@ -5185,7 +5186,7 @@ def scheduler_status():
     }
 
 
-@app.get("/api/admin/alpha-debug")
+@app.get("/api/admin/alpha-debug", dependencies=[_Depends(_require_admin_any)])
 def alpha_debug():
     """Check exact state of alpha column in predictions table."""
     from sqlalchemy import text as _t
@@ -5230,12 +5231,12 @@ def alpha_debug():
         }
     except Exception as e:
         import traceback
-        return {"error": str(e)}
+        print(f"[admin-route] error: {e}"); return {"error": "internal error"}
     finally:
         db.close()
 
 
-@app.get("/api/admin/db-diagnostics")
+@app.get("/api/admin/db-diagnostics", dependencies=[_Depends(_require_admin_any)])
 def db_diagnostics():
     """Show prediction counts, date ranges, and breakdowns for debugging."""
     from sqlalchemy import text as _t
@@ -5274,12 +5275,12 @@ def db_diagnostics():
         }
     except Exception as e:
         import traceback
-        return {"error": str(e)}
+        print(f"[admin-route] error: {e}"); return {"error": "internal error"}
     finally:
         db.close()
 
 
-@app.post("/api/admin/run-massive-benzinga")
+@app.post("/api/admin/run-massive-benzinga", dependencies=[_Depends(_require_admin_any)])
 def run_massive_benzinga_now():
     """Run the Massive Benzinga scraper immediately and return results."""
     import traceback as _tb
@@ -5292,12 +5293,12 @@ def run_massive_benzinga_now():
         after = db.query(Prediction).filter(Prediction.verified_by == "massive_benzinga").count()
         return {"status": "ok", "before": before, "after": after, "new_predictions": after - before}
     except Exception as e:
-        return {"status": "error", "error": str(e)}
+        print(f"[admin-route] error: {e}"); return {"status": "error", "error": "internal error"}
     finally:
         db.close()
 
 
-@app.get("/api/admin/scraper-health")
+@app.get("/api/admin/scraper-health", dependencies=[_Depends(_require_admin_any)])
 def scraper_health():
     """Health check for all background jobs."""
     from sqlalchemy import text as sql_text
@@ -5361,7 +5362,7 @@ def scraper_health():
     }
 
 
-@app.get("/api/admin/db-size")
+@app.get("/api/admin/db-size", dependencies=[_Depends(_require_admin_any)])
 def db_size():
     """Show database size, table sizes, and prediction counts."""
     from sqlalchemy import text as _text
@@ -5412,7 +5413,7 @@ def db_size():
         db.close()
 
 
-@app.post("/api/admin/backfill-benzinga")
+@app.post("/api/admin/backfill-benzinga", dependencies=[_Depends(_require_admin_any)])
 def start_backfill():
     """Start the day-by-day historical backfill as a background task."""
     import threading
@@ -5426,20 +5427,20 @@ def start_backfill():
     return {"status": "started", "start_date": "2024-03-29", "end_date": str(date.today())}
 
 
-@app.get("/api/admin/backfill-status")
+@app.get("/api/admin/backfill-status", dependencies=[_Depends(_require_admin_any)])
 def backfill_status():
     from jobs.benzinga_backfill import get_backfill_status
     return get_backfill_status()
 
 
-@app.post("/api/admin/stop-backfill")
+@app.post("/api/admin/stop-backfill", dependencies=[_Depends(_require_admin_any)])
 def stop_backfill_endpoint():
     from jobs.benzinga_backfill import stop_backfill
     stop_backfill()
     return {"status": "stopping"}
 
 
-@app.post("/api/admin/backfill-fmp")
+@app.post("/api/admin/backfill-fmp", dependencies=[_Depends(_require_admin_any)])
 def start_fmp_backfill():
     """Start FMP grades backfill as a background task."""
     import threading
@@ -5457,7 +5458,7 @@ def start_fmp_backfill():
     return {"status": "started", "source": "fmp_grades", "note": "full history"}
 
 
-@app.post("/api/admin/evaluate-historical")
+@app.post("/api/admin/evaluate-historical", dependencies=[_Depends(_require_admin_any)])
 def evaluate_historical():
     """Start background evaluation of all pending historical predictions.
     Processes 50 tickers at a time with 5s breaks. Trigger once and walk away."""
@@ -5473,13 +5474,13 @@ def evaluate_historical():
     return {"status": "started"}
 
 
-@app.get("/api/admin/evaluate-status")
+@app.get("/api/admin/evaluate-status", dependencies=[_Depends(_require_admin_any)])
 def evaluate_status():
     from jobs.historical_evaluator import get_eval_status
     return get_eval_status()
 
 
-@app.get("/api/admin/evaluate-debug")
+@app.get("/api/admin/evaluate-debug", dependencies=[_Depends(_require_admin_any)])
 def evaluate_debug():
     """Show exactly what the evaluator sees — pending prediction stats."""
     from sqlalchemy import text as _t
@@ -5528,19 +5529,19 @@ def evaluate_debug():
         }
     except Exception as e:
         import traceback
-        return {"error": str(e)}
+        print(f"[admin-route] error: {e}"); return {"error": "internal error"}
     finally:
         db.close()
 
 
-@app.post("/api/admin/stop-evaluation")
+@app.post("/api/admin/stop-evaluation", dependencies=[_Depends(_require_admin_any)])
 def stop_evaluation():
     from jobs.historical_evaluator import stop_evaluation
     stop_evaluation()
     return {"status": "stopping"}
 
 
-@app.post("/api/admin/refresh-forecaster-stats")
+@app.post("/api/admin/refresh-forecaster-stats", dependencies=[_Depends(_require_admin_any)])
 def refresh_stats():
     """Recalculate ALL forecaster stats from predictions table."""
     from jobs.historical_evaluator import refresh_all_forecaster_stats
@@ -5550,13 +5551,13 @@ def refresh_stats():
 _re_eval_in_progress = False
 
 
-@app.get("/api/admin/re-evaluate-status")
+@app.get("/api/admin/re-evaluate-status", dependencies=[_Depends(_require_admin_any)])
 def re_evaluate_status():
     """Check if a re-evaluation is in progress."""
     return {"in_progress": _re_eval_in_progress}
 
 
-@app.post("/api/admin/re-evaluate-all")
+@app.post("/api/admin/re-evaluate-all", dependencies=[_Depends(_require_admin_any)])
 def re_evaluate_all():
     """Re-evaluate all scored predictions in batches — NEVER wipes the leaderboard.
     Resets 500 predictions at a time, re-evaluates them, then refreshes stats before
@@ -5649,7 +5650,7 @@ def re_evaluate_all():
     return {"status": "started", "total_to_reevaluate": total_scored}
 
 
-@app.post("/api/admin/reformat-contexts")
+@app.post("/api/admin/reformat-contexts", dependencies=[_Depends(_require_admin_any)])
 def reformat_contexts():
     """Rewrite prediction context strings to human-readable format."""
     import threading
@@ -5714,7 +5715,7 @@ def reformat_contexts():
     return {"status": "started"}
 
 
-@app.get("/api/admin/db-health")
+@app.get("/api/admin/db-health", dependencies=[_Depends(_require_admin_any)])
 def db_health():
     """Database health with connection pool stats and circuit breaker status."""
     import time as _t
@@ -5735,7 +5736,7 @@ def db_health():
     except Exception as e:
         result["status"] = "error"
         result["query_time_ms"] = round((_t.time() - start) * 1000, 1)
-        result["error"] = str(e)
+        print(f"[admin-route] error: {e}"); result["error"] = "internal error"
 
     # User pool
     try:
@@ -5763,7 +5764,7 @@ def db_health():
     return result
 
 
-@app.post("/api/admin/kill-locks")
+@app.post("/api/admin/kill-locks", dependencies=[_Depends(_require_admin_any)])
 def kill_locks():
     """Kill any long-running queries/transactions blocking the database."""
     try:
@@ -5781,10 +5782,10 @@ def kill_locks():
         db.close()
         return {"status": "killed"}
     except Exception as e:
-        return {"error": str(e)}
+        print(f"[admin-route] error: {e}"); return {"error": "internal error"}
 
 
-@app.post("/api/admin/pause-jobs")
+@app.post("/api/admin/pause-jobs", dependencies=[_Depends(_require_admin_any)])
 def pause_jobs():
     """Manually pause all background jobs for 15 minutes."""
     import circuit_breaker
@@ -5792,7 +5793,7 @@ def pause_jobs():
     return circuit_breaker.get_status()
 
 
-@app.post("/api/admin/resume-jobs")
+@app.post("/api/admin/resume-jobs", dependencies=[_Depends(_require_admin_any)])
 def resume_jobs():
     """Resume background jobs after a pause."""
     import circuit_breaker
@@ -5800,7 +5801,7 @@ def resume_jobs():
     return circuit_breaker.get_status()
 
 
-@app.post("/api/admin/backfill-alpha")
+@app.post("/api/admin/backfill-alpha", dependencies=[_Depends(_require_admin_any)])
 def backfill_alpha():
     """Calculate alpha for all evaluated predictions missing it. Runs synchronously (small batch)."""
     from sqlalchemy import text as _t
@@ -5853,12 +5854,12 @@ def backfill_alpha():
     except Exception as e:
         dbs.rollback()
         import traceback
-        return {"status": "error", "error": str(e), "traceback": traceback.format_exc()}
+        print(f"[admin-route] error: {e}\n{traceback.format_exc()}"); return {"status": "error", "error": "internal error"}
     finally:
         dbs.close()
 
 
-@app.post("/api/admin/backfill-sectors")
+@app.post("/api/admin/backfill-sectors", dependencies=[_Depends(_require_admin_any)])
 def backfill_sectors():
     """Look up and assign sectors for predictions missing sector data. 50 tickers per call."""
     import threading
@@ -5878,7 +5879,7 @@ def backfill_sectors():
     return {"status": "started"}
 
 
-@app.get("/api/admin/sector-status")
+@app.get("/api/admin/sector-status", dependencies=[_Depends(_require_admin_any)])
 def sector_status():
     """Show sector backfill progress."""
     from sqlalchemy import text as _t
@@ -5896,7 +5897,7 @@ def sector_status():
         db.close()
 
 
-@app.get("/api/admin/evaluate-test-one")
+@app.get("/api/admin/evaluate-test-one", dependencies=[_Depends(_require_admin_any)])
 def evaluate_test_one():
     """Test evaluating a single ticker to see what happens."""
     from jobs.historical_evaluator import evaluate_batch, _fetch_history, _closest_price
@@ -5967,7 +5968,7 @@ def evaluate_test_one():
     return {"status": "stopping"}
 
 
-@app.post("/api/admin/run-user-evaluator")
+@app.post("/api/admin/run-user-evaluator", dependencies=[_Depends(_require_admin_any)])
 def run_user_evaluator_now():
     """Run the user prediction evaluator immediately and return results."""
     import traceback as _tb
@@ -5977,7 +5978,7 @@ def run_user_evaluator_now():
         results = evaluate_user_predictions(db)
         return {"status": "ok", "evaluated": len(results or []), "results": results or []}
     except Exception as e:
-        return {"status": "error", "error": str(e)}
+        print(f"[admin-route] error: {e}"); return {"status": "error", "error": "internal error"}
     finally:
         db.close()
 
