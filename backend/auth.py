@@ -30,7 +30,15 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
 JWT_SECRET = os.getenv("JWT_SECRET", "")
 if not JWT_SECRET:
-    print("[SECURITY WARNING] JWT_SECRET not set — using random key (tokens will not survive restarts)")
+    if os.getenv("ENVIRONMENT", "").lower() == "production":
+        # Fail fast — an ephemeral per-process key would silently invalidate all
+        # sessions on every restart and differ across replicas. Never run prod
+        # without a configured JWT_SECRET.
+        raise RuntimeError(
+            "JWT_SECRET is not set in production. Refusing to start with an "
+            "ephemeral key. Set JWT_SECRET in the environment."
+        )
+    print("[SECURITY WARNING] JWT_SECRET not set — using random key (dev only; tokens will not survive restarts)")
     import secrets
     JWT_SECRET = secrets.token_hex(32)
 JWT_ALGORITHM = "HS256"
