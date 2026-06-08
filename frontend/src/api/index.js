@@ -1,7 +1,7 @@
 // API configuration - using Railway URL directly
 import axios from 'axios';
 
-const API_BASE = 'https://eidolum-production.up.railway.app';
+const API_BASE = import.meta.env.VITE_API_BASE;
 
 const api = axios.create({
   baseURL: `${API_BASE}/api`,
