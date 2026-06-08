@@ -374,11 +374,11 @@ export function getRareSignals() {
 }
 
 export function createFollow(data) {
-  return api.post('/follows', data).then(r => r.data);
+  return api.post('/follows', data, { headers: authHeaders() }).then(r => r.data);
 }
 
 export function removeFollow(data) {
-  return api.post('/follows/unfollow', data).then(r => r.data);
+  return api.post('/follows/unfollow', data, { headers: authHeaders() }).then(r => r.data);
 }
 
 export function getFollowerCount(forecasterId) {
