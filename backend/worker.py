@@ -31,7 +31,7 @@ from log_filter import install_key_scrubber
 install_key_scrubber()
 
 # Database
-from database import BgSessionLocal, engine, Base
+from database import BgSessionLocal, engine, Base, prime_known_columns
 
 # Circuit breaker
 from circuit_breaker import (
@@ -420,6 +420,12 @@ def main():
         log.info("[Worker] Tables OK")
     except Exception as e:
         log.error(f"[Worker] Table error: {e}")
+
+    # Deploy-safety: prime the predictions column cache so the worker's
+    # `ADD COLUMN IF NOT EXISTS` ensures below become no-ops when the columns
+    # already exist (zero DDL, no ACCESS EXCLUSIVE). lock_timeout (database.py)
+    # bounds any ALTER that genuinely runs. See database._skip_noop_add_column.
+    prime_known_columns(["predictions"])
 
     # Pillar 4: ensure predictions.tweet_id column exists on existing DBs.
     # Base.metadata.create_all does not ALTER existing tables, so we add it explicitly.

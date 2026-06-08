@@ -26,7 +26,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
-from database import engine, bg_engine, Base, SessionLocal, BgSessionLocal
+from database import engine, bg_engine, Base, SessionLocal, BgSessionLocal, prime_known_columns
 from models import Forecaster, Prediction, Config
 from rate_limit import limiter
 # Background jobs moved to worker.py (separate Railway service)
@@ -1434,6 +1434,12 @@ async def lifespan(app):
         except Exception as e:
             print(f"[Startup] Table creation error: {e}")
             return  # Can't continue without tables
+
+        # Deploy-safety: prime the predictions column cache so the column-ensure
+        # ALTERs below become no-ops (rewritten to SELECT 1) when the columns
+        # already exist — steady-state boots then issue ZERO predictions DDL and
+        # never take ACCESS EXCLUSIVE on the table. See database._skip_noop_add_column.
+        prime_known_columns(["predictions"])
 
         # ── Create processed_logos table ──────────────────────────────
         try:
