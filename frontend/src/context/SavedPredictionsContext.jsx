@@ -4,15 +4,6 @@ import { useLimitReached, getLimitReachedMessage } from './LimitReachedContext';
 
 const SavedPredictionsContext = createContext(null);
 
-function getUserId() {
-  let id = localStorage.getItem('qa_user_id');
-  if (!id) {
-    id = 'u_' + Math.random().toString(36).slice(2) + Date.now().toString(36);
-    localStorage.setItem('qa_user_id', id);
-  }
-  return id;
-}
-
 export function SavedPredictionsProvider({ children }) {
   const [savedIds, setSavedIds] = useState(() => {
     try {
@@ -20,12 +11,11 @@ export function SavedPredictionsProvider({ children }) {
     } catch { return new Set(); }
   });
   const [toast, setToast] = useState(null);
-  const userId = getUserId();
   const { show: showLimitReached } = useLimitReached();
 
-  // Sync with server on mount
+  // Sync with server on mount (scoped to the authenticated user via JWT)
   useEffect(() => {
-    getSavedIds(userId).then(ids => {
+    getSavedIds().then(ids => {
       const merged = new Set([...savedIds, ...ids]);
       setSavedIds(merged);
       localStorage.setItem('qa_saved_predictions', JSON.stringify([...merged]));
@@ -62,10 +52,10 @@ export function SavedPredictionsProvider({ children }) {
 
     try {
       if (wasSaved) {
-        await apiUnsave(userId, predictionId);
+        await apiUnsave(predictionId);
         showToast('Prediction removed from saved');
       } else {
-        await apiSave(userId, predictionId);
+        await apiSave(predictionId);
         showToast('Prediction saved!', '/saved');
       }
     } catch (err) {
@@ -84,12 +74,12 @@ export function SavedPredictionsProvider({ children }) {
         showLimitReached(limitMsg);
       }
     }
-  }, [savedIds, userId, showToast, showLimitReached]);
+  }, [savedIds, showToast, showLimitReached]);
 
   const count = savedIds.size;
 
   return (
-    <SavedPredictionsContext.Provider value={{ savedIds, isSaved, toggleSave, count, toast, userId }}>
+    <SavedPredictionsContext.Provider value={{ savedIds, isSaved, toggleSave, count, toast }}>
       {children}
     </SavedPredictionsContext.Provider>
   );

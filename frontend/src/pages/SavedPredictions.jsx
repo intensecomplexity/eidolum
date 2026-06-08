@@ -26,7 +26,7 @@ const SORTS = [
 ];
 
 export default function SavedPredictions() {
-  const { savedIds, count, userId } = useSavedPredictions();
+  const { savedIds, count } = useSavedPredictions();
   const [predictions, setPredictions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('all');
@@ -35,7 +35,7 @@ export default function SavedPredictions() {
 
   const fetchSaved = useCallback(() => {
     setLoading(true);
-    getSavedPredictions(userId)
+    getSavedPredictions()
       .then((data) => {
         setPredictions(data);
         // Check for smart notifications
@@ -43,7 +43,7 @@ export default function SavedPredictions() {
       })
       .catch(() => {})
       .finally(() => setLoading(false));
-  }, [userId]);
+  }, []);
 
   useEffect(() => {
     fetchSaved();
@@ -210,7 +210,7 @@ export default function SavedPredictions() {
             {/* Prediction cards */}
             <div className="space-y-4">
               {filtered.map(p => (
-                <SavedCard key={p.id} prediction={p} userId={userId} onUpdate={fetchSaved} />
+                <SavedCard key={p.id} prediction={p} onUpdate={fetchSaved} />
               ))}
               {filtered.length === 0 && (
                 <div className="text-center py-12 text-muted text-sm">
@@ -245,7 +245,7 @@ function EmptyState() {
   );
 }
 
-function SavedCard({ prediction: p, userId, onUpdate }) {
+function SavedCard({ prediction: p, onUpdate }) {
   const [editingNote, setEditingNote] = useState(false);
   const [noteText, setNoteText] = useState(p.personal_note || '');
   const [showTracking, setShowTracking] = useState(false);
@@ -284,7 +284,7 @@ function SavedCard({ prediction: p, userId, onUpdate }) {
   async function handleSaveNote() {
     setSaving(true);
     try {
-      await updateSavedNote(userId, p.id, noteText);
+      await updateSavedNote(p.id, noteText);
       setEditingNote(false);
       onUpdate();
     } catch {}
