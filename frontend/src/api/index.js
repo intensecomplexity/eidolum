@@ -393,28 +393,27 @@ export function generateNewsletter() {
   return api.get('/newsletter/generate').then(r => r.data);
 }
 
-// Saved-predictions calls now carry the JWT (authHeaders) so the backend can
-// scope saves to the authenticated user. user_identifier is still sent for
-// backward-compat with the pre-cutover backend; it is removed in a follow-up
-// once the auth-scoped backend is live.
-export function getSavedPredictions(userId) {
-  return api.get('/saved-predictions', { params: { user_identifier: userId }, headers: authHeaders() }).then(r => r.data);
+// Saved-predictions are scoped to the authenticated user via the JWT
+// (authHeaders). No client-supplied user_identifier — the backend derives
+// ownership from the token.
+export function getSavedPredictions() {
+  return api.get('/saved-predictions', { headers: authHeaders() }).then(r => r.data);
 }
 
-export function getSavedIds(userId) {
-  return api.get('/saved-predictions/ids', { params: { user_identifier: userId }, headers: authHeaders() }).then(r => r.data);
+export function getSavedIds() {
+  return api.get('/saved-predictions/ids', { headers: authHeaders() }).then(r => r.data);
 }
 
-export function savePrediction(userId, predictionId) {
-  return api.post('/saved-predictions', { user_identifier: userId, prediction_id: predictionId }, { headers: authHeaders() }).then(r => r.data);
+export function savePrediction(predictionId) {
+  return api.post('/saved-predictions', { prediction_id: predictionId }, { headers: authHeaders() }).then(r => r.data);
 }
 
-export function unsavePrediction(userId, predictionId) {
-  return api.delete(`/saved-predictions/${predictionId}`, { params: { user_identifier: userId }, headers: authHeaders() }).then(r => r.data);
+export function unsavePrediction(predictionId) {
+  return api.delete(`/saved-predictions/${predictionId}`, { headers: authHeaders() }).then(r => r.data);
 }
 
-export function updateSavedNote(userId, predictionId, note) {
-  return api.patch(`/saved-predictions/${predictionId}/note`, { user_identifier: userId, personal_note: note }, { headers: authHeaders() }).then(r => r.data);
+export function updateSavedNote(predictionId, note) {
+  return api.patch(`/saved-predictions/${predictionId}/note`, { personal_note: note }, { headers: authHeaders() }).then(r => r.data);
 }
 
 export function getSaveCount(predictionId) {
