@@ -442,7 +442,7 @@ export default function PortfolioSimulator({ forecasterId, forecasterName }) {
 
       {/* Disclaimer */}
       <p className="text-[10px] text-muted italic mt-3 pt-2 border-t border-border/20">
-        Simulated returns based on $1,000 invested per call. No compounding, fees, or slippage. Not investment advice.
+        Your starting amount spread equally across {forecasterName}'s scored long/short calls. Equal-weighted, no leverage, fees, or slippage. Not investment advice.
       </p>
     </div>
   );
