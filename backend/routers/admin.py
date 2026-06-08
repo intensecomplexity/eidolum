@@ -230,8 +230,12 @@ def refresh_all_stats(request: Request, admin: bool = Depends(require_admin), db
 
 @router.get("/health/detailed")
 @limiter.limit("60/minute")
-def health_detailed(request: Request, db: Session = Depends(get_db)):
-    """Detailed health check with anomaly detection."""
+def health_detailed(request: Request, admin: bool = Depends(require_admin), db: Session = Depends(get_db)):
+    """Detailed health check with anomaly detection. Admin-only — leaks DB
+    counts, pending/backlog totals, and last-prediction date. This route is
+    NOT under /api/admin/ so AdminAuthMiddleware does not cover it; the
+    require_admin dependency is what gates it. Public callers should use
+    /api/health (status only) or /api/stats/global (public totals)."""
     fc_count = db.query(Forecaster).count()
     pred_count = db.query(Prediction).count()
     evaluated = db.query(Prediction).filter(
