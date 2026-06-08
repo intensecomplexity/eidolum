@@ -14,6 +14,12 @@ dist/
 .env.local
 .env.production.local
 
+# Catch every real env file (.env.production, .env.staging, .env.development,
+# .env.*.local, etc.) so secrets can't be committed by accident. Templates are
+# kept tracked via the negation below.
+.env.*
+!.env.example
+
 # General
 .DS_Store
 *.log
