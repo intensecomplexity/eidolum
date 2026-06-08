@@ -1,6 +1,17 @@
 import os
+import re
 from sqlalchemy import create_engine, event
 from sqlalchemy.orm import sessionmaker, DeclarativeBase
+
+
+def startup_ddl_enabled() -> bool:
+    """True only when RUN_STARTUP_DDL is explicitly enabled (migration mode).
+    Default false → the DDL guard below neutralizes schema changes so the app +
+    worker boot WITHOUT any DDL and can run as a least-privilege DB role that
+    has DML only. Real schema changes run via migrate.py with
+    RUN_STARTUP_DDL=true as the owner role."""
+    return os.getenv("RUN_STARTUP_DDL", "false").lower() in ("1", "true", "yes")
+
 
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./eidolum.db")
 
@@ -99,6 +110,29 @@ else:
 
     event.listen(engine, "before_cursor_execute", _skip_noop_add_column, retval=True)
     event.listen(bg_engine, "before_cursor_execute", _skip_noop_add_column, retval=True)
+
+    # ── DDL gate: least-privilege safety ──────────────────────────────────────
+    # When RUN_STARTUP_DDL is off (default), neutralize every schema-mutating
+    # statement (CREATE/ALTER/DROP of TABLE/INDEX/SEQUENCE/VIEW/TYPE) to a no-op
+    # so the app + worker boot WITHOUT any DDL. The schema already exists in
+    # prod, so skipping these idempotent IF-NOT-EXISTS statements changes
+    # nothing — but it lets the services run as a DML-only role (app_worker)
+    # with no DDL/owner rights. Real schema changes run via migrate.py with
+    # RUN_STARTUP_DDL=true as the owner. (CREATE TEMP/TEMPORARY TABLE is NOT
+    # matched, so runtime temp tables still work for any role.)
+    _DDL_GATE_RE = re.compile(
+        r"^(CREATE|ALTER|DROP)\s+(UNIQUE\s+|CONCURRENTLY\s+)?"
+        r"(TABLE|INDEX|SEQUENCE|MATERIALIZED\s+VIEW|VIEW|TYPE)\b",
+        re.IGNORECASE,
+    )
+
+    def _gate_startup_ddl(conn, cursor, statement, parameters, context, executemany):
+        if statement and not startup_ddl_enabled() and _DDL_GATE_RE.match(statement.lstrip()):
+            return "SELECT 1", parameters
+        return statement, parameters
+
+    event.listen(engine, "before_cursor_execute", _gate_startup_ddl, retval=True)
+    event.listen(bg_engine, "before_cursor_execute", _gate_startup_ddl, retval=True)
 
 
 def prime_known_columns(tables):
