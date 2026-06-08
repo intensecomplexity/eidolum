@@ -25,43 +25,6 @@ function utcMsToLocalDate(ms) {
 
 const MONTHS_SHORT = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
-// Pick a month-step that yields ~5-8 ticks across the span, then walk
-// forward in month-aligned increments. Long spans (11y) get 24-month
-// steps → 5-6 ticks; sub-year spans get monthly → up to 12 ticks. Ticks
-// always land on the 1st of a month so labels read cleanly regardless
-// of where individual trade dates fall.
-function buildTimeTicks(minMs, maxMs) {
-  if (!isFinite(minMs) || !isFinite(maxMs) || maxMs <= minMs) return { ticks: undefined, stepMonths: 12 };
-  const monthMs = 30.44 * 86400000;
-  const spanMonths = (maxMs - minMs) / monthMs;
-  const candidates = [1, 2, 3, 6, 12, 24, 36, 60];
-  let stepMonths = candidates[candidates.length - 1];
-  for (const s of candidates) {
-    if (spanMonths / s <= 7) { stepMonths = s; break; }
-  }
-  const start = new Date(minMs);
-  let y = start.getUTCFullYear();
-  let m = start.getUTCMonth();
-  if (start.getUTCDate() > 1) m += 1;
-  while (m >= 12) { m -= 12; y += 1; }
-  const ticks = [];
-  let cursor = Date.UTC(y, m, 1);
-  while (cursor <= maxMs) {
-    ticks.push(cursor);
-    m += stepMonths;
-    while (m >= 12) { m -= 12; y += 1; }
-    cursor = Date.UTC(y, m, 1);
-  }
-  // Drop ticks whose label would clip the plot edges. Apply symmetrically
-  // on both ends so the rightmost tick gets the same treatment as the
-  // leftmost. Fall back to the unfiltered list if filtering would leave
-  // too few ticks to read the axis.
-  const pad = stepMonths * monthMs * 0.35;
-  const filtered = ticks.filter(t => t - minMs >= pad && maxMs - t >= pad);
-  const finalTicks = filtered.length >= 2 ? filtered : (ticks.length >= 2 ? ticks : undefined);
-  return { ticks: finalTicks, stepMonths };
-}
-
 function SimTooltip({ active, payload }) {
   if (!active || !payload?.length) return null;
   const d = payload[0].payload;
@@ -153,7 +116,13 @@ export default function PortfolioSimulator({ forecasterId, forecasterName }) {
     // axis domain reflects the visible series, not the API's padding.
     let last = parsed.length - 1;
     while (last >= 0 && !Number.isFinite(parsed[last].value)) last -= 1;
-    return last < parsed.length - 1 ? parsed.slice(0, last + 1) : parsed;
+    const trimmed = last < parsed.length - 1 ? parsed.slice(0, last + 1) : parsed;
+    // The equity curve is plotted by TRADE SEQUENCE (idx), not calendar date —
+    // annual stock-pick forecasters resolve dozens of calls on the same year-end
+    // date, which stacks on one calendar x and makes the line jump vertically.
+    // One evenly-spaced step per resolved call gives a clean left-to-right curve.
+    // `ts`/`date` stay on each point for the tooltip and the date-labelled ticks.
+    return trimmed.map((p, i) => ({ ...p, idx: i }));
   }, [data]);
 
   // Track viewport width so mobile gets fewer ticks. Recharts will print
@@ -167,25 +136,17 @@ export default function PortfolioSimulator({ forecasterId, forecasterName }) {
     return () => window.removeEventListener('resize', handler);
   }, []);
 
-  const { ticks: rawTimeTicks, stepMonths } = useMemo(() => {
-    if (sourceTimeline.length < 2) return { ticks: undefined, stepMonths: 12 };
-    const min = sourceTimeline[0].ts;
-    const max = sourceTimeline[sourceTimeline.length - 1].ts;
-    return buildTimeTicks(min, max);
-  }, [sourceTimeline]);
-
+  // X-axis ticks are a handful of evenly-spaced SEQUENCE indices (0..N-1); each
+  // is labelled with the date of the call at that position, so the time context
+  // still reads without collapsing same-date calls onto one x.
   const xAxisTicks = useMemo(() => {
-    if (!rawTimeTicks || rawTimeTicks.length === 0) return undefined;
-    // Defense in depth — buildTimeTicks already clamps to [min,max], but
-    // after trimming trailing nulls the data range can shrink, so drop
-    // any tick that now sits outside the trimmed series.
-    const minTs = sourceTimeline.length ? sourceTimeline[0].ts : -Infinity;
-    const maxTs = sourceTimeline.length ? sourceTimeline[sourceTimeline.length - 1].ts : Infinity;
-    let clamped = rawTimeTicks.filter(t => t >= minTs && t <= maxTs);
-    if (clamped.length === 0) clamped = rawTimeTicks;
-    if (!isMobile || clamped.length <= 4) return clamped;
-    return clamped.filter((_, i) => i % 2 === 0);
-  }, [rawTimeTicks, isMobile, sourceTimeline]);
+    const n = sourceTimeline.length;
+    if (n < 2) return undefined;
+    const count = Math.min(isMobile ? 4 : 6, n);
+    const ticks = [];
+    for (let k = 0; k < count; k++) ticks.push(Math.round((k / (count - 1)) * (n - 1)));
+    return [...new Set(ticks)];
+  }, [sourceTimeline, isMobile]);
 
   // When the whole simulation lives inside one calendar year, drop the
   // year suffix on the X-axis to avoid clutter — "May 21" beats
@@ -248,6 +209,15 @@ export default function PortfolioSimulator({ forecasterId, forecasterName }) {
 
   const isPositive = total_return_pct >= 0;
   const timeline = scaledTimeline;
+
+  // Fit the Y domain to the (scaled) series with a little headroom so a dip
+  // below the starting capital isn't clipped (Recharts' auto domain was
+  // flooring above the trough). Pad 8% of the range on each side.
+  const _vals = timeline.map(p => p.value).filter(Number.isFinite);
+  const _lo = _vals.length ? Math.min(..._vals) : 0;
+  const _hi = _vals.length ? Math.max(..._vals) : 0;
+  const _pad = _hi > _lo ? (_hi - _lo) * 0.08 : Math.max(1, _hi * 0.05);
+  const yDomain = _vals.length ? [Math.floor(_lo - _pad), Math.ceil(_hi + _pad)] : ['auto', 'auto'];
 
   return (
     <div className="card mb-6 sm:mb-8 overflow-hidden">
@@ -312,21 +282,17 @@ export default function PortfolioSimulator({ forecasterId, forecasterName }) {
               </defs>
               <CartesianGrid strokeDasharray="3 3" stroke="rgba(128,128,128,0.15)" />
               <XAxis
-                dataKey="ts"
+                dataKey="idx"
                 type="number"
-                domain={[timeline[0].ts, timeline[timeline.length - 1].ts]}
+                domain={[0, timeline.length - 1]}
                 ticks={xAxisTicks}
-                tickFormatter={(ms) => {
-                  // Compact labels — full-month-name "August 17, 2025"
-                  // smears together on ~380px mobile. Multi-year + year-
-                  // aligned step (≥12mo) → year only ("2017"). Multi-
-                  // year + sub-year step → "Mon 'YY" so 6-month ticks
-                  // don't collapse into duplicate-year labels. Same-
-                  // year sims keep day-of-month for finer reading.
-                  if (ms == null || !isFinite(ms)) return '';
-                  const d = utcMsToLocalDate(ms);
+                tickFormatter={(i) => {
+                  // Label the sequence position with the call's date. Same-year
+                  // sims keep day-of-month; cross-year sims show "Mon 'YY".
+                  const p = timeline[i];
+                  if (!p || p.ts == null || !isFinite(p.ts)) return '';
+                  const d = utcMsToLocalDate(p.ts);
                   if (allSameYear) return `${MONTHS_SHORT[d.getMonth()]} ${d.getDate()}`;
-                  if (stepMonths >= 12) return String(d.getFullYear());
                   return `${MONTHS_SHORT[d.getMonth()]} '${String(d.getFullYear() % 100).padStart(2, '0')}`;
                 }}
                 tick={{ fill: '#8b8f9a', fontSize: 10 }}
@@ -339,6 +305,8 @@ export default function PortfolioSimulator({ forecasterId, forecasterName }) {
                 axisLine={false}
                 tickLine={false}
                 tickFormatter={v => `$${(v / 1000).toFixed(0)}k`}
+                domain={yDomain}
+                allowDataOverflow={false}
                 width={60}
               />
               <Tooltip content={<SimTooltip />} cursor={{ stroke: 'rgba(255,255,255,0.1)' }} />
