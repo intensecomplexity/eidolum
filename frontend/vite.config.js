@@ -15,6 +15,10 @@ export default defineConfig({
   },
   build: {
     outDir: 'dist',
+    // Never ship sourcemaps to production — they expose original source,
+    // module structure, and comments. (Vite's default is already false;
+    // this makes the intent explicit and pins it against future changes.)
+    sourcemap: false,
     chunkSizeWarningLimit: 600,
     rollupOptions: {
       output: {
