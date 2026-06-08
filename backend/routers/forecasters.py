@@ -941,33 +941,54 @@ def get_portfolio_simulator(
     # X-axis the frontend renders, which uses each row's emitted `date`
     # = evaluation_date. Tiebreak on prediction_date so same-day evals
     # are deterministic across runs.
+    # A portfolio follows long/short positions. A neutral "stays flat" call is
+    # not an investable position (its raw underlying move is not a tradeable
+    # P&L), so the simulator scopes to DIRECTIONAL (bullish/bearish) scored
+    # calls. Ordered by when P&L lands (evaluation_date) so the cumulative curve
+    # is monotone vs the X-axis the frontend renders.
     rows = db.execute(sql_text(f"""
-        SELECT ticker, direction, prediction_date, evaluation_date,
-               entry_price, target_price, actual_return, outcome, window_days
+        SELECT id, ticker, direction, prediction_date, evaluation_date,
+               entry_price, target_price, outcome, window_days
         FROM predictions
         WHERE forecaster_id = :fid
           AND outcome IN ('correct', 'incorrect', 'hit', 'near', 'miss')
+          AND direction IN ('bullish', 'bearish')
           AND actual_return IS NOT NULL
           AND prediction_date IS NOT NULL
           AND {_YT_VIS_BARE}{_HEDGED_NA}
         ORDER BY COALESCE(evaluation_date, prediction_date) ASC, prediction_date ASC
     """), {"fid": forecaster_id}).fetchall()
 
-    if len(rows) < 5:
+    # TRUE per-call returns from the SAME source the prediction list + Avg Return
+    # use (services.return_display) — so the simulator never shows a different
+    # number for the same call (no separate +200 cap). The -100% floor for longs
+    # is kept by that helper. Unverifiable calls (price_bars can't confirm the
+    # entry) return None and are dropped, matching the list.
+    from services.return_display import verified_true_returns_batch
+    _items = []
+    for r in rows:
+        _pd, _ed, _wd = r[3], r[4], (r[8] or 90)
+        if not _ed and _pd:
+            _ed = _pd + datetime.timedelta(days=_wd)
+        _items.append((r[0], r[1], r[2], r[5], _pd, _ed, _wd))
+    true_ret = verified_true_returns_batch(db, _items) if _items else {}
+    calls = [r for r in rows if true_ret.get(r[0]) is not None]
+
+    if len(calls) < 5:
         result = {"forecaster_id": forecaster_id, "forecaster_name": f.name,
-                  "insufficient_data": True, "total_predictions": len(rows)}
+                  "insufficient_data": True, "total_predictions": len(calls)}
         _sim_cache[forecaster_id] = (result, _time.time())
         return result
 
-    # Bug 7: caps moved into services/eval_caps so the historical evaluator
-    # and the portfolio simulator share one source of truth. Old data still
-    # benefits because we apply the cap defensively at every render — the
-    # evaluator's stamped value will already be clipped for new rows.
-    from services.eval_caps import max_return_pct as _max_return
-
-    # Simulate portfolio: $1,000 per trade, compounding portfolio value
+    # Honest equal-weight model (bankroll-independent): the starting capital is
+    # spread EQUALLY across the N calls (slice = starting / N) — no fixed $/call,
+    # no leverage. So total_return_pct = Σrᵢ / N (the equal-weighted average
+    # per-call return) and final = starting × (1 + avg). A -100% call is just
+    # 1/N of the book and can't dominate. Switching the Starting button changes
+    # only the dollar axis, never the percentage.
     starting = 10000
-    per_trade = 1000
+    N = len(calls)
+    slice_amt = starting / N
     portfolio = starting
     timeline = []
     trades = []
@@ -976,30 +997,24 @@ def get_portfolio_simulator(
     first_date = None
     last_date = None
 
-    for r in rows:
-        ticker, direction, pred_date, eval_date, entry, target, ret, outcome, window = r
-        if ret is None:
-            continue
-
-        ret_pct = float(ret)
-
-        # Cap returns at reasonable bounds for the evaluation window
-        cap = _max_return(window)
-        ret_pct = max(-cap, min(cap, ret_pct))
-
-        pnl = per_trade * (ret_pct / 100)
+    for r in calls:
+        rid, ticker, direction, pred_date, eval_date, entry, target, outcome, window = r
+        ret_pct = true_ret[rid]  # TRUE return — same value the prediction list shows
+        pnl = slice_amt * (ret_pct / 100)
         portfolio += pnl
 
-        date_str = eval_date.strftime("%Y-%m-%d") if eval_date else (pred_date.strftime("%Y-%m-%d") if pred_date else None)
-        pred_str = pred_date.strftime("%Y-%m-%d") if pred_date else None
-        if not first_date and pred_str:
-            first_date = pred_str
-        if pred_str:
-            last_date = pred_str
+        # One date basis for BOTH the curve and the time_period label:
+        # evaluation_date (when P&L lands), falling back to prediction_date.
+        basis = eval_date or pred_date
+        date_str = basis.strftime("%Y-%m-%d") if basis else None
+        if date_str:
+            if not first_date:
+                first_date = date_str
+            last_date = date_str
 
         trade = {
             "date": date_str,
-            "pred_date": pred_str,
+            "pred_date": pred_date.strftime("%Y-%m-%d") if pred_date else None,
             "ticker": ticker,
             "direction": direction,
             "entry": float(entry) if entry else None,
@@ -1057,7 +1072,7 @@ def get_portfolio_simulator(
         "forecaster_name": f.name,
         "insufficient_data": False,
         "starting_capital": starting,
-        "per_trade": per_trade,
+        "per_call": round(slice_amt, 2),  # equal-weight allocation = starting / N
         "current_value": round(portfolio, 2),
         "total_return_pct": total_return,
         "total_predictions": len(trades),
