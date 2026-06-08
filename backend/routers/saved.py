@@ -7,10 +7,22 @@ from database import get_db
 from models import SavedPrediction, Prediction, Forecaster
 from utils import append_youtube_timestamp
 from rate_limit import limiter
+from auth import get_current_user
 from services.ticker_display import resolve_ticker_display_sector
 from services.limits import MAX_SAVED_PREDICTIONS_PER_USER, SAVED_LIMIT_MESSAGE
 
 router = APIRouter()
+
+
+def _require_user_id(request: Request) -> int:
+    """Resolve the authenticated user's id from the JWT (401 if missing/invalid).
+    Saves are owned by this id — any client-supplied user_identifier is ignored
+    for ownership, closing the IDOR where saves were keyed by a client token."""
+    auth = request.headers.get("Authorization", "")
+    if not auth.lower().startswith("bearer "):
+        raise HTTPException(status_code=401, detail="Authentication required")
+    data = get_current_user(auth[7:].strip())  # raises 401 on invalid/expired
+    return data["user_id"]
 
 
 def _prediction_to_dict(p, f, save_record=None):
@@ -75,12 +87,13 @@ def save_prediction(
     request: Request,
     data: dict,
     db: Session = Depends(get_db),
+    auth_user_id: int = Depends(_require_user_id),
 ):
-    """Save a prediction for a user."""
-    user_id = data.get("user_identifier")
+    """Save a prediction for the authenticated user."""
+    user_id = str(auth_user_id)  # ownership derived from JWT, not the client
     prediction_id = data.get("prediction_id")
-    if not user_id or not prediction_id:
-        raise HTTPException(status_code=400, detail="user_identifier and prediction_id required")
+    if not prediction_id:
+        raise HTTPException(status_code=400, detail="prediction_id required")
 
     # Check prediction exists
     pred = db.query(Prediction).filter(Prediction.id == prediction_id).first()
@@ -128,10 +141,11 @@ def save_prediction(
 def unsave_prediction(
     request: Request,
     prediction_id: int,
-    user_identifier: str = Query(...),
     db: Session = Depends(get_db),
+    auth_user_id: int = Depends(_require_user_id),
 ):
-    """Remove a saved prediction."""
+    """Remove a saved prediction owned by the authenticated user."""
+    user_identifier = str(auth_user_id)
     save = (
         db.query(SavedPrediction)
         .filter(SavedPrediction.user_identifier == user_identifier)
@@ -150,10 +164,11 @@ def unsave_prediction(
 @limiter.limit("60/minute")
 def get_saved_predictions(
     request: Request,
-    user_identifier: str = Query(...),
     db: Session = Depends(get_db),
+    auth_user_id: int = Depends(_require_user_id),
 ):
-    """Get all saved predictions for a user."""
+    """Get all saved predictions for the authenticated user."""
+    user_identifier = str(auth_user_id)
     saves = (
         db.query(SavedPrediction)
         .filter(SavedPrediction.user_identifier == user_identifier)
@@ -181,9 +196,10 @@ def update_note(
     prediction_id: int,
     data: dict,
     db: Session = Depends(get_db),
+    auth_user_id: int = Depends(_require_user_id),
 ):
-    """Update the personal note on a saved prediction."""
-    user_id = data.get("user_identifier")
+    """Update the personal note on the authenticated user's saved prediction."""
+    user_id = str(auth_user_id)
     note = data.get("personal_note", "")
 
     save = (
@@ -231,10 +247,11 @@ def get_save_count(request: Request, prediction_id: int, db: Session = Depends(g
 @limiter.limit("60/minute")
 def get_saved_ids(
     request: Request,
-    user_identifier: str = Query(...),
     db: Session = Depends(get_db),
+    auth_user_id: int = Depends(_require_user_id),
 ):
-    """Get just the prediction IDs that a user has saved (for bulk state check)."""
+    """Get just the prediction IDs the authenticated user has saved."""
+    user_identifier = str(auth_user_id)
     saves = (
         db.query(SavedPrediction.prediction_id)
         .filter(SavedPrediction.user_identifier == user_identifier)
