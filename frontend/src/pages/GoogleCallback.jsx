@@ -35,12 +35,21 @@ export default function GoogleCallback() {
       return;
     }
 
-    // Forward the OAuth state param (CSRF) so the backend can verify it.
+    // Browser-binding (CSRF): the returned state MUST equal the value this tab
+    // stored at sign-in init (sessionStorage double-submit, same www origin).
+    // Read + clear it (single-use), then fail closed on absent/mismatch — a
+    // forged or cross-browser callback won't carry our stored value. The backend
+    // additionally HMAC-validates the state signature + expiry.
     const state = searchParams.get('state');
-    const stateQuery = state ? `&state=${encodeURIComponent(state)}` : '';
+    const storedState = sessionStorage.getItem('eidolum_oauth_state');
+    sessionStorage.removeItem('eidolum_oauth_state');
+    if (!state || !storedState || state !== storedState) {
+      setError('Sign-in could not be verified. Please try signing in again.');
+      return;
+    }
 
     // Use fetch directly (not axios) to avoid any interceptor/redirect issues
-    fetch(`${API_BASE}/api/auth/google/callback?code=${encodeURIComponent(code)}${stateQuery}`)
+    fetch(`${API_BASE}/api/auth/google/callback?code=${encodeURIComponent(code)}&state=${encodeURIComponent(state)}`)
       .then(res => {
         if (!res.ok) return res.json().then(d => { throw new Error(d.detail || 'Login failed'); });
         return res.json();

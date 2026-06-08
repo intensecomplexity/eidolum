@@ -17,6 +17,14 @@ export default function GoogleSignInButton({ label = 'Sign in with Google' }) {
     setLoading(true);
     try {
       const { url } = await getGoogleAuthUrl();
+      // Bind the OAuth state to this browser tab: store the issued state so the
+      // callback (same www.eidolum.com origin, same tab) can confirm Google
+      // returned the value WE initiated — blocks login-CSRF/fixation. The
+      // backend separately HMAC-validates the state's signature + expiry.
+      try {
+        const st = new URL(url).searchParams.get('state');
+        if (st) sessionStorage.setItem('eidolum_oauth_state', st);
+      } catch { /* if state can't be parsed, callback will fail closed */ }
       window.location.href = url;
     } catch {
       setLoading(false);
