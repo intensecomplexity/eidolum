@@ -923,8 +923,8 @@ def _build_filtered_leaderboard(db: Session, sector=None, call_type=None, sort="
                    ROUND((SUM(CASE WHEN p.outcome IN ('hit','correct') THEN 1.0 ELSE 0 END)
                          + SUM(CASE WHEN p.outcome = 'near' THEN 0.5 ELSE 0 END))
                          / NULLIF(COUNT(*), 0) * 100, 1) as accuracy,
-                   COALESCE(AVG(p.alpha), 0) as avg_alpha,
-                   COALESCE(AVG(p.actual_return), 0) as avg_return
+                   COALESCE(AVG(p.alpha) FILTER (WHERE p.direction IN ('bullish','bearish')), 0) as avg_alpha,
+                   COALESCE(AVG(p.actual_return) FILTER (WHERE p.direction IN ('bullish','bearish')), 0) as avg_return
             FROM predictions p
             JOIN forecasters f ON f.id = p.forecaster_id
             WHERE {where_sql}
