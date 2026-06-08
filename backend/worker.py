@@ -31,7 +31,7 @@ from log_filter import install_key_scrubber
 install_key_scrubber()
 
 # Database
-from database import BgSessionLocal, engine, Base, prime_known_columns
+from database import BgSessionLocal, engine, Base, prime_known_columns, startup_ddl_enabled
 
 # Circuit breaker
 from circuit_breaker import (
@@ -414,12 +414,17 @@ def main():
     # next monitor cycle is less likely to hit a cold-start 524.
     threading.Thread(target=_classifier_warmup_loop, daemon=True).start()
 
-    # Tables
-    try:
-        Base.metadata.create_all(bind=engine)
-        log.info("[Worker] Tables OK")
-    except Exception as e:
-        log.error(f"[Worker] Table error: {e}")
+    # Tables — only in migration mode (RUN_STARTUP_DDL=true). Normally the
+    # schema exists; gating create_all + the DDL guard in database.py let the
+    # worker boot with no DDL rights so it can run as a least-privilege role.
+    if startup_ddl_enabled():
+        try:
+            Base.metadata.create_all(bind=engine)
+            log.info("[Worker] Tables OK")
+        except Exception as e:
+            log.error(f"[Worker] Table error: {e}")
+    else:
+        log.info("[Worker] RUN_STARTUP_DDL=false — skipping create_all (schema exists)")
 
     # Deploy-safety: prime the predictions column cache so the worker's
     # `ADD COLUMN IF NOT EXISTS` ensures below become no-ops when the columns

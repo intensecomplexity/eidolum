@@ -26,7 +26,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
-from database import engine, bg_engine, Base, SessionLocal, BgSessionLocal, prime_known_columns
+from database import engine, bg_engine, Base, SessionLocal, BgSessionLocal, prime_known_columns, startup_ddl_enabled
 from models import Forecaster, Prediction, Config
 from rate_limit import limiter
 # Background jobs moved to worker.py (separate Railway service)
@@ -1427,13 +1427,18 @@ async def lifespan(app):
         from sqlalchemy import text as sql_text
         _t2.sleep(10)  # Let app bind port first
 
-        # STEP 1: Create all tables
-        try:
-            Base.metadata.create_all(bind=engine)
-            print("[Startup] All tables created")
-        except Exception as e:
-            print(f"[Startup] Table creation error: {e}")
-            return  # Can't continue without tables
+        # STEP 1: Create all tables — only in migration mode. Normally the
+        # schema already exists; gating create_all (plus the DDL guard in
+        # database.py) lets the app boot with no DDL rights (least-privilege role).
+        if startup_ddl_enabled():
+            try:
+                Base.metadata.create_all(bind=engine)
+                print("[Startup] All tables created")
+            except Exception as e:
+                print(f"[Startup] Table creation error: {e}")
+                return  # Can't continue without tables
+        else:
+            print("[Startup] RUN_STARTUP_DDL=false — skipping create_all (schema already exists)")
 
         # Deploy-safety: prime the predictions column cache so the column-ensure
         # ALTERs below become no-ops (rewritten to SELECT 1) when the columns
