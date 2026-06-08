@@ -425,7 +425,10 @@ def main():
     # `ADD COLUMN IF NOT EXISTS` ensures below become no-ops when the columns
     # already exist (zero DDL, no ACCESS EXCLUSIVE). lock_timeout (database.py)
     # bounds any ALTER that genuinely runs. See database._skip_noop_add_column.
-    prime_known_columns(["predictions"])
+    prime_known_columns([
+        "predictions", "scraper_runs", "forecasters",
+        "disclosures", "youtube_channels", "users",
+    ])
 
     # Pillar 4: ensure predictions.tweet_id column exists on existing DBs.
     # Base.metadata.create_all does not ALTER existing tables, so we add it explicitly.
@@ -1850,13 +1853,26 @@ def main():
     # tracking. Column add is independent from the FK constraint so an
     # old Postgres (or SQLite dev) still gets the column. Partial index
     # keeps it small.
+    # Each statement on its own connection/transaction so a failure can't abort
+    # a sibling. Column routes through the skip-if-exists rewrite.
     try:
         with engine.connect() as conn:
             conn.execute(sql_text(
                 "ALTER TABLE predictions ADD COLUMN IF NOT EXISTS "
                 "revision_of INTEGER"
             ))
-            try:
+            conn.commit()
+    except Exception as e:
+        log.warning(f"[Worker] revision_of column: {e}")
+    # FK — Postgres has no ADD CONSTRAINT IF NOT EXISTS, so check the catalog and
+    # only add when absent (a bare ADD CONSTRAINT aborted the txn on every
+    # re-boot and poisoned the CREATE INDEX). Definition unchanged.
+    try:
+        with engine.connect() as conn:
+            _have_fk = conn.execute(sql_text(
+                "SELECT 1 FROM pg_constraint WHERE conname = 'fk_predictions_revision_of'"
+            )).first()
+            if not _have_fk:
                 conn.execute(sql_text("""
                     ALTER TABLE predictions
                     ADD CONSTRAINT fk_predictions_revision_of
@@ -1864,8 +1880,12 @@ def main():
                     REFERENCES predictions(id)
                     ON DELETE SET NULL
                 """))
-            except Exception:
-                pass
+                conn.commit()
+                log.info("[Worker] predictions.fk_predictions_revision_of added")
+    except Exception as e:
+        log.warning(f"[Worker] revision_of FK: {e}")
+    try:
+        with engine.connect() as conn:
             conn.execute(sql_text(
                 "CREATE INDEX IF NOT EXISTS idx_predictions_revision_of "
                 "ON predictions(revision_of) WHERE revision_of IS NOT NULL"
@@ -1873,7 +1893,7 @@ def main():
             conn.commit()
         log.info("[Worker] predictions.revision_of ready")
     except Exception as e:
-        log.warning(f"[Worker] revision_of migration: {e}")
+        log.warning(f"[Worker] revision_of index: {e}")
 
     # scraper_runs + youtube_scraper_rejections — belt-and-braces migration.
     # Base.metadata.create_all above is the primary creator (the SQLAlchemy
