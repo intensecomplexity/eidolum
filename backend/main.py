@@ -4029,20 +4029,25 @@ app.add_middleware(RequestTimeoutMiddleware)
 # Security headers
 app.add_middleware(SecurityHeadersMiddleware)
 
-# CORS — strict origin whitelist
+# CORS — strict origin whitelist. Localhost dev origins are included only
+# outside production. Methods/headers are explicit (no wildcards) but cover
+# everything the SPA sends (Authorization + JSON Content-Type) plus the admin
+# automation header.
+_cors_origins = [
+    "https://www.eidolum.com",
+    "https://eidolum.com",
+    "https://eidolum.vercel.app",
+    "https://api.eidolum.com",
+]
+if os.getenv("ENVIRONMENT", "").lower() != "production":
+    _cors_origins += ["http://localhost:5173", "http://localhost:3000"]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "https://www.eidolum.com",
-        "https://eidolum.com",
-        "https://eidolum.vercel.app",
-        "https://api.eidolum.com",
-        "http://localhost:5173",
-        "http://localhost:3000",
-    ],
+    allow_origins=_cors_origins,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type", "X-Admin-Secret"],
 )
 
 # Serve archived screenshots
