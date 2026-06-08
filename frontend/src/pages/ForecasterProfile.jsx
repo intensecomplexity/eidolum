@@ -237,7 +237,7 @@ export default function ForecasterProfile() {
     title: data ? `${data.name}'s Vault — ${data.accuracy_rate?.toFixed(1)}% on ${data.total_predictions || 0} predictions | Eidolum` : 'The Vault | Eidolum',
     description: data ? `${data.name}${data.firm ? ` at ${data.firm}` : ''}: ${data.accuracy_rate?.toFixed(1)}% accuracy on ${data.total_predictions || 0} predictions scored against real market data.` : undefined,
     url: `https://www.eidolum.com/forecaster/${id}`,
-    image: data ? `https://eidolum-production.up.railway.app/api/og-image/forecaster/${id}` : undefined,
+    image: data ? `${import.meta.env.VITE_API_BASE}/api/og-image/forecaster/${id}` : undefined,
     jsonLd: forecasterJsonLd,
   });
 
@@ -1103,7 +1103,7 @@ function ImpliedPortfolioPanel({ snapshot, loading }) {
 
 const HORIZON_LABELS = { short: '30d', medium: '90d', long: '1y', custom: 'Custom' };
 
-const FP_API_BASE = 'https://eidolum-production.up.railway.app';
+const FP_API_BASE = import.meta.env.VITE_API_BASE;
 
 function ProofBlock({ p }) {
   const [showVideo, setShowVideo] = useState(false);

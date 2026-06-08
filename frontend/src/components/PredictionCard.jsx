@@ -15,7 +15,7 @@ import ScoringBreakdown from './ScoringBreakdown';
 import TickerLogo from './TickerLogo';
 import { InlinePlayer, extractYouTubeVideoId } from './EvidenceCard';
 
-const API_BASE = 'https://eidolum-production.up.railway.app';
+const API_BASE = import.meta.env.VITE_API_BASE;
 
 function getDomainLabel(url) {
   if (!url) return null;
