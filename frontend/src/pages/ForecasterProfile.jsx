@@ -33,6 +33,9 @@ import DisclosureCard from '../components/DisclosureCard';
 import { annotateContext, ExplainerLine, ratingChangeLabel } from '../utils/predictionExplainer';
 import { formatDate } from '../utils/formatDate';
 
+// Kill switch — single named gate for the Ranked Lists card (only render site).
+const SHOW_RANKED_LISTS = false; // temporarily hidden 2026-06-08 — top-5 list dropping rank #1; restore after fixing list_rank bug
+
 function SectorScroller({ sectors, activeSector, setActiveSector, totalPredictions }) {
   const scrollRef = useRef(null);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
@@ -468,7 +471,7 @@ export default function ForecasterProfile() {
             each list with the original speaker order alongside the
             actual-return order, plus the pairwise accuracy diff.
             Kept separate from the main accuracy number. */}
-        {data.ranked_lists && data.ranked_lists.length > 0 && (
+        {SHOW_RANKED_LISTS && data.ranked_lists && data.ranked_lists.length > 0 && (
           <div className="card mb-4 sm:mb-6">
             <div className="flex items-start justify-between flex-wrap gap-2 mb-4">
               <div>
