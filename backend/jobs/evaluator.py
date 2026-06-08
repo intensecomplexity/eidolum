@@ -477,7 +477,8 @@ def _evaluate_prediction(p: Prediction, price: float, now: datetime):
     if not p.entry_price or p.entry_price <= 0:
         return False
 
-    actual_return = round(((price - p.entry_price) / p.entry_price) * 100, 2)
+    # Raw underlying move (bullish frame): positive = price rose.
+    raw_move = round(((price - p.entry_price) / p.entry_price) * 100, 2)
     window = p.window_days or 30
     tolerance = _get_threshold(window, _TOLERANCE)
     min_movement = _get_threshold(window, _MIN_MOVEMENT)
@@ -488,6 +489,12 @@ def _evaluate_prediction(p: Prediction, price: float, now: datetime):
     p_direction = classify_direction(
         p.direction, entry_price=p.entry_price, target_price=p.target_price,
     ) or "bullish"
+
+    # Outcome scoring below keys off the RAW move (raw_move) exactly like
+    # historical_evaluator, so the variable name `actual_return` is kept
+    # pointing at the raw move through the scoring block and the stored,
+    # direction-signed + bounded value is computed at the end.
+    actual_return = raw_move
 
     if p_direction == "bullish":
         if p.target_price and p.target_price > 0:
@@ -528,7 +535,14 @@ def _evaluate_prediction(p: Prediction, price: float, now: datetime):
     else:
         return False
 
-    p.actual_return = actual_return
+    # Store the canonical P&L-frame return: direction-signed (a winning bear
+    # call is POSITIVE) then bounded to [-100, +window cap]. This matches
+    # historical_evaluator exactly so the two scorers never disagree on a row's
+    # sign or magnitude, and a long can never store a value below -100%.
+    from services.eval_caps import bounded_return
+    signed_return = -raw_move if p_direction == "bearish" else raw_move
+    stored_return = bounded_return(signed_return, window)
+    p.actual_return = stored_return
     p.evaluated_at = now
 
     # Calculate alpha vs S&P 500 benchmark
@@ -537,7 +551,7 @@ def _evaluate_prediction(p: Prediction, price: float, now: datetime):
         spy_ret = _calc_spy_return(p.prediction_date, now)
         if spy_ret is not None:
             p.sp500_return = spy_ret
-            p.alpha = round(actual_return - spy_ret, 2)
+            p.alpha = round(stored_return - spy_ret, 2)
     except Exception:
         pass
 

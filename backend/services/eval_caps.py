@@ -49,4 +49,19 @@ def clamp_return(ret_pct: float, window_days: int | None) -> float:
     return ret_pct
 
 
-__all__ = ["max_return_pct", "clamp_return"]
+# A displayed/stored P&L return can never sensibly go below -100%: no long can
+# lose more than its capital, and we present short/hold returns in the same
+# capital-loss frame for the user. The window cap (50/100/150/200) bounds the
+# UPSIDE; this floor bounds the DOWNSIDE. Both sides are therefore clamped —
+# the asymmetry (-100 floor vs up-to-+200 cap) is the real-world bound, not an
+# arbitrary one-sided clip. Use this at every scoring site and the data-repair
+# pass so a long can NEVER show a return below -100%.
+RETURN_FLOOR = -100.0
+
+
+def bounded_return(ret_pct: float, window_days: int | None) -> float:
+    """Window-clamp a signed return, then floor it at -100%."""
+    return max(RETURN_FLOOR, clamp_return(ret_pct, window_days))
+
+
+__all__ = ["max_return_pct", "clamp_return", "bounded_return", "RETURN_FLOOR"]

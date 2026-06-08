@@ -9,6 +9,7 @@ import CredibilityBadge from './CredibilityBadge';
 import { annotateContext, ExplainerLine, ratingChangeLabel } from '../utils/predictionExplainer';
 import { getSourceBadgeKey } from '../utils/getSourceBadgeKey';
 import { formatDate } from '../utils/formatDate';
+import { formatReturn } from '../utils/formatReturn';
 import CommentSection from './CommentSection';
 import ScoringBreakdown from './ScoringBreakdown';
 import TickerLogo from './TickerLogo';
@@ -834,11 +835,14 @@ export default function PredictionCard({ prediction: p, showForecaster = false, 
 
       {/* Line 4: Return + timeframe + timing */}
       <div className="flex items-center gap-2 text-xs mb-2 flex-wrap">
-        {p.actual_return != null && (
-          <span className={`font-mono font-semibold ${p.actual_return >= 0 ? 'text-positive' : 'text-negative'}`}>
-            {p.actual_return >= 0 ? '+' : ''}{p.actual_return.toFixed(1)}% return
-          </span>
-        )}
+        {(() => {
+          const r = formatReturn(p.actual_return, { decimals: 1 });
+          return r && (
+            <span className={`font-mono font-semibold ${r.positive ? 'text-positive' : 'text-negative'}`}>
+              {r.text} return
+            </span>
+          );
+        })()}
         {isPending && p.entry_price != null && p.current_price != null && (
           <span className={`font-mono font-semibold ${
             parseFloat(p.current_price) >= p.entry_price ? 'text-positive' : 'text-negative'
