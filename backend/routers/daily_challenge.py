@@ -275,7 +275,7 @@ def admin_create_challenge(
     db: Session = Depends(get_db),
 ):
     # Check admin auth via query param or header
-    secret = request.headers.get("X-Admin-Secret", "") or request.query_params.get("secret", "")
+    secret = request.headers.get("X-Admin-Secret", "")
     if not ADMIN_SECRET or secret != ADMIN_SECRET:
         raise HTTPException(status_code=403, detail="Forbidden")
 
@@ -289,7 +289,7 @@ def admin_create_challenge(
 @router.post("/admin/daily-challenge/score")
 @limiter.limit("5/minute")
 def admin_score_challenge(request: Request, db: Session = Depends(get_db)):
-    secret = request.headers.get("X-Admin-Secret", "") or request.query_params.get("secret", "")
+    secret = request.headers.get("X-Admin-Secret", "")
     if not ADMIN_SECRET or secret != ADMIN_SECRET:
         raise HTTPException(status_code=403, detail="Forbidden")
 
@@ -307,7 +307,7 @@ def is_daily_challenge_enabled(request: Request, db: Session = Depends(get_db)):
 @router.post("/admin/daily-challenge/toggle")
 @limiter.limit("5/minute")
 def toggle_daily_challenge(request: Request, db: Session = Depends(get_db)):
-    secret = request.headers.get("X-Admin-Secret", "") or request.query_params.get("secret", "")
+    secret = request.headers.get("X-Admin-Secret", "")
     if not ADMIN_SECRET or secret != ADMIN_SECRET:
         raise HTTPException(status_code=403, detail="Forbidden")
 

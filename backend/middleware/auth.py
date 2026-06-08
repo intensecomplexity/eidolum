@@ -1,5 +1,5 @@
 import os
-from fastapi import HTTPException, Security, Depends
+from fastapi import HTTPException, Security, Depends, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
 from auth import get_current_user, JWT_SECRET, JWT_ALGORITHM  # noqa: re-export
@@ -8,32 +8,63 @@ security = HTTPBearer()
 ADMIN_SECRET = os.getenv("ADMIN_SECRET", "")
 
 
-def require_admin(credentials: HTTPAuthorizationCredentials = Security(security)):
-    """Admin auth. Accepts either the legacy ADMIN_SECRET (shared secret)
-    OR a JWT token from an is_admin=1 user. Same pattern as AdminAuthMiddleware."""
-    token = credentials.credentials
+def _is_admin_request(request: Request) -> bool:
+    """True if the request carries valid admin auth.
 
-    # Try legacy ADMIN_SECRET first
-    if ADMIN_SECRET and token == ADMIN_SECRET:
+    Two accepted transports ONLY:
+      1. the X-Admin-Secret request header matching ADMIN_SECRET, or
+      2. a Bearer JWT belonging to an is_admin=1 user (live DB lookup).
+
+    The admin secret is NO LONGER accepted via a ?secret= query string
+    (leaks into access logs / browser history / Referer) NOR as a raw
+    Authorization: Bearer <secret> (folded into the header transport).
+    In-repo automation already sends the X-Admin-Secret header.
+    """
+    admin_secret = os.getenv("ADMIN_SECRET", "")
+
+    # 1) X-Admin-Secret header
+    header_secret = request.headers.get("X-Admin-Secret", "")
+    if admin_secret and header_secret and header_secret == admin_secret:
         return True
 
-    # Try JWT-based admin auth
-    try:
-        data = get_current_user(token)
-        uid = data.get("user_id")
-        if uid:
-            from database import SessionLocal
-            from models import User
-            db = SessionLocal()
-            try:
-                user = db.query(User).filter(User.id == uid).first()
-                if user and getattr(user, 'is_admin', 0):
-                    return True
-            finally:
-                db.close()
-    except Exception:
-        pass
+    # 2) Admin JWT (is_admin verified against the DB, not trusted from the token)
+    auth = request.headers.get("Authorization", "")
+    if auth.lower().startswith("bearer "):
+        token = auth[7:].strip()
+        try:
+            data = get_current_user(token)
+            uid = data.get("user_id")
+            if uid:
+                from database import SessionLocal
+                from models import User
+                db = SessionLocal()
+                try:
+                    user = db.query(User).filter(User.id == uid).first()
+                    if user and getattr(user, "is_admin", 0):
+                        return True
+                finally:
+                    db.close()
+        except Exception:
+            pass
 
+    return False
+
+
+def require_admin(request: Request):
+    """Admin auth dependency. Accepts the X-Admin-Secret header OR an admin JWT.
+    (Header-only secret as of S2 — query-string and bearer-secret removed.)"""
+    if _is_admin_request(request):
+        return True
+    raise HTTPException(status_code=403, detail="Forbidden")
+
+
+def require_admin_any(request: Request):
+    """Unified admin dependency for defense-in-depth on routes already behind
+    AdminAuthMiddleware. Authorizes on EITHER an admin JWT OR the X-Admin-Secret
+    header — matching exactly what the middleware accepts, so adding it cannot
+    reject a request the middleware already allowed."""
+    if _is_admin_request(request):
+        return True
     raise HTTPException(status_code=403, detail="Forbidden")
 
 

@@ -74,14 +74,13 @@ class AdminAuthMiddleware(BaseHTTPMiddleware):
         if request.url.path.startswith("/api/admin/"):
             admin_secret = os.getenv("ADMIN_SECRET", "")
             bearer = request.headers.get("Authorization", "").replace("Bearer ", "").strip()
-            query_secret = request.query_params.get("secret", "")
             header_secret = request.headers.get("X-Admin-Secret", "")
 
-            # Try legacy ADMIN_SECRET first
-            provided_secret = header_secret or query_secret
-            if admin_secret and provided_secret == admin_secret:
-                return await call_next(request)
-            if admin_secret and bearer == admin_secret:
+            # Admin secret accepted ONLY via the X-Admin-Secret header — never
+            # a ?secret= query string (leaks into access logs / browser history
+            # / Referer) and no longer as a raw Bearer <secret> (folded into the
+            # header transport). The admin-JWT path below is unchanged.
+            if admin_secret and header_secret and header_secret == admin_secret:
                 return await call_next(request)
 
             # Try JWT-based admin auth
