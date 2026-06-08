@@ -26,6 +26,11 @@ router = APIRouter()
 _USERNAME_RE = re.compile(r"^[a-zA-Z0-9_]{3,30}$")
 _EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
+# Pre-computed bcrypt hash used to equalize login response time on the
+# unknown-email and Google-only paths so timing can't reveal whether an
+# account exists. The plaintext is irrelevant — it only needs to be valid bcrypt.
+_DUMMY_PW_HASH = hash_password("eidolum_timing_equalizer_v1")
+
 
 class RegisterRequest(BaseModel):
     username: str
@@ -333,15 +338,21 @@ def register(request: Request, req: RegisterRequest, db: Session = Depends(get_d
 def login(request: Request, req: LoginRequest, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.email == req.email).first()
     if not user:
+        # Run a dummy bcrypt check so the no-user path costs the same as the
+        # real path — otherwise response timing reveals whether the email exists.
+        verify_password(req.password, _DUMMY_PW_HASH)
         raise HTTPException(status_code=401, detail="Invalid email or password")
 
     if getattr(user, 'is_banned', 0):
         raise HTTPException(status_code=403, detail="Your account has been suspended. Contact support.")
 
-    # Google-only user trying password login
+    # Google-only user trying password login — return the SAME generic 401 (and
+    # do a dummy bcrypt) so neither the message nor the timing confirms that the
+    # account exists or that it is a Google account.
     auth_provider = getattr(user, 'auth_provider', 'email') or 'email'
     if auth_provider == 'google' and not _has_real_password(user):
-        raise HTTPException(status_code=401, detail="This account uses Google sign-in. Please use the Google button.")
+        verify_password(req.password, _DUMMY_PW_HASH)
+        raise HTTPException(status_code=401, detail="Invalid email or password")
 
     if not user.password_hash or not verify_password(req.password, user.password_hash):
         raise HTTPException(status_code=401, detail="Invalid email or password")
