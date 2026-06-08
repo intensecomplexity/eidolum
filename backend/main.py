@@ -41,14 +41,28 @@ from routers.admin_panel import router as admin_v2_router
 
 
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):
+    # Paths whose responses must never be cached by browsers/proxies/CDNs —
+    # auth, admin, and authenticated per-user routes carry private data.
+    NO_STORE_PREFIXES = (
+        "/api/auth/",
+        "/api/admin/",
+        "/api/settings/",
+        "/api/notifications",
+        "/api/saved-predictions",
+        "/api/watchlist",
+    )
+
     async def dispatch(self, request: Request, call_next):
         response = await call_next(request)
         response.headers["X-Content-Type-Options"] = "nosniff"
         response.headers["X-Frame-Options"] = "DENY"
         response.headers["X-XSS-Protection"] = "1; mode=block"
-        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+        response.headers["Referrer-Policy"] = "no-referrer"
         response.headers["Permissions-Policy"] = "geolocation=(), microphone=(), camera=()"
-        response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+        response.headers["Strict-Transport-Security"] = "max-age=63072000; includeSubDomains"
+        path = request.url.path
+        if any(path.startswith(p) for p in self.NO_STORE_PREFIXES):
+            response.headers["Cache-Control"] = "no-store"
         return response
 
 
