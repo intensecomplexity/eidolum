@@ -756,7 +756,11 @@ export default function ForecasterProfile() {
                       <div className="w-full h-1.5 bg-surface-2 rounded-full overflow-hidden">
                         <div className={`h-full rounded-full ${s.accuracy >= 60 ? 'bg-positive' : 'bg-negative'}`} style={{ width: `${Math.min(s.accuracy, 100)}%` }} />
                       </div>
-                      <div className="text-muted text-xs mt-0.5">{s.count} predictions</div>
+                      {/* Show the SCORED count (the accuracy % denominator),
+                          matching the filter tab so a sector reads one number
+                          everywhere on the page — not the raw total that
+                          includes pending/unscored rows. */}
+                      <div className="text-muted text-xs mt-0.5">{s.scored ?? s.count} scored</div>
                     </div>
                   ))}
                   {allSectors.length === 0 && (

@@ -276,9 +276,18 @@ def get_forecaster(
     # Prediction counts by outcome + direction (single query)
     pred_counts = {"all": 0, "evaluated": 0, "pending": 0, "hits": 0, "nears": 0, "misses": 0, "correct": 0, "incorrect": 0, "bullish": 0, "bearish": 0, "neutral": 0}
     try:
+        # Restrict to the DISPLAYABLE population — scored (hit/near/miss/
+        # correct/incorrect) + pending — so every section on the profile counts
+        # the same rows. Without this, the direction buckets below counted
+        # unresolved/no_data rows (outcome NULL / 'no_data') that the outcome
+        # buckets skip, so Direction Mix totalled MORE than the Accuracy
+        # Breakdown (224 vs 218) for the same forecaster. Now both sum to
+        # evaluated + pending, and "X Scored" (evaluated) + pending fully
+        # accounts for the displayed total.
         count_rows = db.execute(sql_text(f"""
             SELECT outcome, direction, COUNT(*) FROM predictions
             WHERE forecaster_id = :fid
+              AND outcome IN ('hit','near','miss','correct','incorrect','pending')
               AND {_YT_VIS_BARE}{_HEDGED_NA}
             GROUP BY outcome, direction
         """), {"fid": forecaster_id}).fetchall()
