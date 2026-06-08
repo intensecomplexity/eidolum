@@ -1439,7 +1439,10 @@ async def lifespan(app):
         # ALTERs below become no-ops (rewritten to SELECT 1) when the columns
         # already exist — steady-state boots then issue ZERO predictions DDL and
         # never take ACCESS EXCLUSIVE on the table. See database._skip_noop_add_column.
-        prime_known_columns(["predictions"])
+        prime_known_columns([
+            "predictions", "scraper_runs", "forecasters",
+            "disclosures", "youtube_channels", "users",
+        ])
 
         # ── Create processed_logos table ──────────────────────────────
         try:
@@ -2908,34 +2911,51 @@ async def lifespan(app):
         # prediction just severs the link, never cascades. Partial
         # index keeps the index small: only revised rows get indexed.
         # No backfill: historical predictions have no revision metadata.
+        # Each statement runs on its own connection/transaction so a failure
+        # can't abort a sibling. The column routes through the 37c3747
+        # skip-if-exists rewrite (predictions is primed), so it's a no-op here.
         try:
             with engine.connect() as _rv_c:
                 _rv_c.execute(sql_text(
                     "ALTER TABLE predictions ADD COLUMN IF NOT EXISTS "
                     "revision_of INTEGER"
                 ))
-                # Attempt to add the FK constraint separately so failure
-                # on an old Postgres (or SQLite dev) doesn't block the
-                # column add. Idempotent: catch and ignore if the
-                # constraint is already present.
-                try:
-                    _rv_c.execute(sql_text("""
+                _rv_c.commit()
+        except Exception as _rve:
+            print(f"[Startup] revision_of column error: {_rve}")
+        # FK constraint — Postgres has no ADD CONSTRAINT IF NOT EXISTS, so check
+        # the catalog first and only add it when absent. A bare ADD CONSTRAINT
+        # threw "already exists" on every re-boot, aborting the transaction and
+        # then poisoning the CREATE INDEX with InFailedSqlTransaction. Definition
+        # unchanged; a fresh DB still gets the FK.
+        try:
+            with engine.connect() as _rv_fk:
+                _have_fk = _rv_fk.execute(sql_text(
+                    "SELECT 1 FROM pg_constraint WHERE conname = 'fk_predictions_revision_of'"
+                )).first()
+                if not _have_fk:
+                    _rv_fk.execute(sql_text("""
                         ALTER TABLE predictions
                         ADD CONSTRAINT fk_predictions_revision_of
                         FOREIGN KEY (revision_of)
                         REFERENCES predictions(id)
                         ON DELETE SET NULL
                     """))
-                except Exception:
-                    pass
-                _rv_c.execute(sql_text(
+                    _rv_fk.commit()
+                    print("[Startup] predictions.fk_predictions_revision_of added")
+        except Exception as _rvfe:
+            print(f"[Startup] revision_of FK error: {_rvfe}")
+        # Partial index — idempotent.
+        try:
+            with engine.connect() as _rv_ix:
+                _rv_ix.execute(sql_text(
                     "CREATE INDEX IF NOT EXISTS idx_predictions_revision_of "
                     "ON predictions(revision_of) WHERE revision_of IS NOT NULL"
                 ))
-                _rv_c.commit()
+                _rv_ix.commit()
                 print("[Startup] predictions.revision_of ready")
-        except Exception as _rve:
-            print(f"[Startup] revision_of migration error: {_rve}")
+        except Exception as _rvie:
+            print(f"[Startup] revision_of index error: {_rvie}")
 
         # ── ENABLE_YOUTUBE_SECTOR_CALLS flag seed ─────────────────────────
         # Seed at 0 (feature OFF) on first boot. Idempotent: only inserts
