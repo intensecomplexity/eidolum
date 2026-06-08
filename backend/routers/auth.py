@@ -188,6 +188,16 @@ def google_callback(request: Request, code: str = Query(...), db: Session = Depe
     if not google_email:
         raise HTTPException(status_code=400, detail="Google account has no email")
 
+    # Require a Google-verified email before linking/creating a local account
+    # (prevents linking an existing Eidolum account via an unverified Google
+    # email). The v2 userinfo endpoint returns this as `verified_email`; OIDC
+    # id_tokens use `email_verified`. Reject only when EXPLICITLY false so a
+    # missing field never blocks a legitimate, already-verified Google login.
+    email_verified = guser.get("verified_email", guser.get("email_verified"))
+    if email_verified is False:
+        print(f"[GoogleAuth] Rejected unverified Google email: {google_email}")
+        raise HTTPException(status_code=403, detail="Your Google email address is not verified.")
+
     google_name = guser.get("name", "")
     google_picture = guser.get("picture", "")
 
