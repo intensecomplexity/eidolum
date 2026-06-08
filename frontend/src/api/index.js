@@ -7,6 +7,34 @@ const api = axios.create({
   baseURL: `${API_BASE}/api`,
 });
 
+// In-flight GET coalescing. When the same GET (same URL + params + auth state)
+// is requested again before the first resolves, return the SAME promise instead
+// of firing a second network request. This collapses the duplicate requests
+// that fire on mount when a card renders in two responsive layout slots
+// (mobile + desktop) or two components fetch the same endpoint — e.g.
+// /notifications, /weekly-challenge/current, /rivals/mine, /homepage-data,
+// /daily-challenge/*. It is NOT a cache: the entry clears the moment the
+// request settles, so navigation still triggers a fresh fetch.
+const _inflightGets = new Map();
+const _rawGet = api.get.bind(api);
+api.get = (url, config = {}) => {
+  // Don't coalesce abortable requests (e.g. search-as-you-type): one caller's
+  // abort would cancel the shared request for the others.
+  if (config.signal) return _rawGet(url, config);
+  let key;
+  try {
+    const auth = config.headers && config.headers.Authorization ? '1' : '0';
+    key = `${url}|${JSON.stringify(config.params || {})}|${auth}`;
+  } catch {
+    return _rawGet(url, config);
+  }
+  const existing = _inflightGets.get(key);
+  if (existing) return existing;
+  const p = _rawGet(url, config).finally(() => _inflightGets.delete(key));
+  _inflightGets.set(key, p);
+  return p;
+};
+
 // Simple response cache to prevent re-fetches on navigation (2 min TTL)
 const _responseCache = {};
 function cachedGet(url, ttlMs = 120000) {

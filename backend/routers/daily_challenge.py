@@ -71,7 +71,13 @@ def get_today_challenge(
     credentials: Optional[HTTPAuthorizationCredentials] = Depends(_optional_bearer),
     db: Session = Depends(get_db),
 ):
-    _require_enabled(db)
+    # /today is polled on every page load by the homepage card. When the daily
+    # challenge feature is off (its default), return a graceful 200 "inactive"
+    # payload instead of a 404 — the card renders nothing on {active: False} and
+    # we avoid a failed request app-wide. (The mutating routes still 404 via
+    # _require_enabled, since you can't enter a disabled challenge.)
+    if not _daily_challenge_enabled(db):
+        return {"active": False}
     today = datetime.date.today()
 
     challenge = db.query(DailyChallenge).filter(DailyChallenge.challenge_date == today).first()
