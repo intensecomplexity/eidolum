@@ -9,6 +9,7 @@ import ConflictBadge from '../components/ConflictBadge';
 import DisclosedPositions from '../components/DisclosedPositions';
 import PlatformBadge from '../components/PlatformBadge';
 import { getSourceBadgeKey } from '../utils/getSourceBadgeKey';
+import { formatReturn } from '../utils/formatReturn';
 import StreakBadge from '../components/StreakBadge';
 import PredictionCard from '../components/PredictionCard';
 import SourceBadge from '../components/SourceBadge';
@@ -385,9 +386,14 @@ export default function ForecasterProfile() {
                 </div>
               </div>
               <div className="text-center p-3 sm:p-0">
-                <div className={`font-mono text-xl sm:text-2xl font-bold ${(data.avg_return ?? 0) >= 0 ? 'text-positive' : 'text-negative'}`}>
-                  {(data.avg_return ?? 0) >= 0 ? '+' : ''}{(data.avg_return ?? 0).toFixed(2)}%
-                </div>
+                {(() => {
+                  const r = formatReturn(data.avg_return ?? 0, { decimals: 2, capLabel: false });
+                  return (
+                    <div className={`font-mono text-xl sm:text-2xl font-bold ${r && r.positive ? 'text-positive' : r ? 'text-negative' : 'text-muted'}`}>
+                      {r ? r.text : '—'}
+                    </div>
+                  );
+                })()}
                 <div className="text-muted text-[11px] sm:text-xs">Avg Return</div>
               </div>
               <div className="text-center p-3 sm:p-0">
@@ -537,13 +543,14 @@ export default function ForecasterProfile() {
                           <div key={`sp-${it.rank}-${it.ticker}`} className="flex items-center gap-2 text-xs font-mono">
                             <span className="text-muted w-4 text-right">#{it.rank}</span>
                             <span className="text-text-primary flex-1 truncate">{it.ticker}</span>
-                            <span className={`text-[11px] ${
-                              it.actual_return == null ? 'text-muted' :
-                              it.actual_return > 0 ? 'text-positive' : 'text-negative'
-                            }`}>
-                              {it.actual_return == null ? '—' :
-                                `${it.actual_return > 0 ? '+' : ''}${it.actual_return.toFixed(2)}%`}
-                            </span>
+                            {(() => {
+                              const r = formatReturn(it.actual_return, { decimals: 2 });
+                              return (
+                                <span className={`text-[11px] ${r ? (r.positive ? 'text-positive' : 'text-negative') : 'text-muted'}`}>
+                                  {r ? r.text : '—'}
+                                </span>
+                              );
+                            })()}
                           </div>
                         ))}
                       </div>
@@ -557,11 +564,14 @@ export default function ForecasterProfile() {
                               <span className="text-muted w-4 text-right">#{idx + 1}</span>
                               <span className="text-text-primary flex-1 truncate">{it.ticker}</span>
                               <span className="text-[11px] text-muted">(spoke #{it.rank})</span>
-                              <span className={`text-[11px] ${
-                                it.actual_return > 0 ? 'text-positive' : 'text-negative'
-                              }`}>
-                                {it.actual_return > 0 ? '+' : ''}{it.actual_return.toFixed(2)}%
-                              </span>
+                              {(() => {
+                                const r = formatReturn(it.actual_return, { decimals: 2 });
+                                return (
+                                  <span className={`text-[11px] ${r ? (r.positive ? 'text-positive' : 'text-negative') : 'text-muted'}`}>
+                                    {r ? r.text : '—'}
+                                  </span>
+                                );
+                              })()}
                             </div>
                           ))}
                         </div>
@@ -1422,9 +1432,12 @@ function PredictionRow({ p, forecaster: fc }) {
         <td className="px-3 py-3 text-right font-mono text-sm text-text-secondary">{p.entry_price ? `$${p.entry_price.toFixed(2)}` : '-'}</td>
         <td className="px-3 py-3 text-center"><PredictionBadge outcome={p.outcome} evaluationDeferred={p.evaluation_deferred} evaluationDeferredReason={p.evaluation_deferred_reason} /></td>
         <td className="px-3 py-3 text-right font-mono text-sm">
-          {p.actual_return !== null ? (
-            <span className={p.actual_return >= 0 ? 'text-positive' : 'text-negative'}>{p.actual_return >= 0 ? '+' : ''}{p.actual_return.toFixed(1)}%</span>
-          ) : <span className="text-muted">-</span>}
+          {(() => {
+            const r = formatReturn(p.actual_return, { decimals: 1 });
+            return r
+              ? <span className={r.positive ? 'text-positive' : 'text-negative'}>{r.text}</span>
+              : <span className="text-muted">—</span>;
+          })()}
         </td>
         <td className="px-3 py-3 text-center font-mono text-sm hidden md:table-cell">
           {evalDate ? (

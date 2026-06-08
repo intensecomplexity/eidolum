@@ -445,8 +445,10 @@ def evaluate_batch(max_tickers: int | None = None) -> dict:
             # leaderboard's accuracy / avg_return / alpha and the portfolio
             # simulator both render off the same numbers. The simulator
             # used to clamp on its own, which made the two views diverge.
-            from services.eval_caps import clamp_return
-            ret = clamp_return(ret, p.get("window_days"))
+            # bounded_return also floors at -100% so a long can never store a
+            # return below -100% (impossible — a position can't lose >100%).
+            from services.eval_caps import bounded_return
+            ret = bounded_return(ret, p.get("window_days"))
 
             # Three-tier scoring: hit / near / miss
             window = p.get("window_days") or 90
