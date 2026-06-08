@@ -3512,12 +3512,11 @@ async def lifespan(app):
         except Exception as _ue:
             print(f"[Startup] Source URL fix error: {_ue}")
 
-        # ── Bulk fix: generate real Benzinga URLs from external_id ────
-        try:
-            from jobs.enrich_urls import bulk_fix_benzinga_urls
-            bulk_fix_benzinga_urls()
-        except Exception as _bf:
-            print(f"[Startup] Bulk URL fix error: {_bf}")
+        # (Removed) Benzinga "Bulk URL fix": jobs.enrich_urls.bulk_fix_benzinga_urls
+        # was deleted — Benzinga article URLs are unreconstructable (Massive only
+        # exposes generic ticker-page URLs). The vestigial call raised ImportError
+        # on every boot. Live URL enrichment (enrich_source_urls) still runs hourly
+        # in the worker and is unaffected.
 
         # ── Reclassify hold/neutral predictions ────────────────────────
         # Phase 1: Context says "Neutral —" (sentiment function got it right)
