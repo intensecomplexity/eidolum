@@ -3984,7 +3984,18 @@ async def lifespan(app):
     yield
 
 
-app = FastAPI(title="Eidolum API", version="1.0.0", lifespan=lifespan)
+# Interactive API docs + OpenAPI schema are disabled in production. They leak
+# the full route surface, request/response shapes, and auth scheme to anyone.
+# Set EXPOSE_API_DOCS=true locally to re-enable /docs, /redoc, /openapi.json.
+_expose_docs = os.getenv("EXPOSE_API_DOCS", "false").lower() in ("1", "true", "yes")
+app = FastAPI(
+    title="Eidolum API",
+    version="1.0.0",
+    lifespan=lifespan,
+    docs_url="/docs" if _expose_docs else None,
+    redoc_url="/redoc" if _expose_docs else None,
+    openapi_url="/openapi.json" if _expose_docs else None,
+)
 
 # Rate limiting
 app.state.limiter = limiter
