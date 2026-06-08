@@ -5,12 +5,13 @@ import RankNumber from '../components/RankNumber';
 import MiniPieChart from '../components/MiniPieChart';
 import PlatformBadge from '../components/PlatformBadge';
 import Footer from '../components/Footer';
-import { getHomepageData } from '../api';
+import { getHomepageData, getGlobalStats } from '../api';
+import { formatPlus } from '../utils/formatNumber';
 
 export default function LandingPublic() {
   useSEO({
     title: 'Eidolum — Who Should You Actually Listen To? Analyst Accuracy Scored by Reality',
-    description: 'Track 6,000+ financial analysts. 274,000+ predictions scored against real stock prices. See who actually gets it right.',
+    description: 'Track thousands of financial analysts. Every prediction scored against real stock prices. See who actually gets it right.',
     url: 'https://www.eidolum.com',
     jsonLd: {
       '@context': 'https://schema.org',
@@ -18,7 +19,7 @@ export default function LandingPublic() {
       name: 'Eidolum',
       alternateName: 'Eidolum — Analyst Accuracy Scored by Reality',
       url: 'https://eidolum.com',
-      description: 'Track 6,000+ financial analysts. 274,000+ predictions scored against real stock prices.',
+      description: 'Track thousands of financial analysts. Every prediction scored against real stock prices.',
       potentialAction: {
         '@type': 'SearchAction',
         target: 'https://eidolum.com/discover?q={search_term_string}',
@@ -31,6 +32,10 @@ export default function LandingPublic() {
   const [top5, setTop5] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
+  // Headline stats come from the SAME live source as the logged-in hero
+  // (getGlobalStats → /api/stats/global) and are formatted with the SAME shared
+  // formatPlus — so the two surfaces can never diverge and no number is hardcoded.
+  const [stats, setStats] = useState(null);
 
   useEffect(() => {
     getHomepageData()
@@ -43,6 +48,14 @@ export default function LandingPublic() {
         setError(true);
         setLoading(false);
       });
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+    getGlobalStats()
+      .then(s => { if (active) setStats(s); })
+      .catch(() => {});
+    return () => { active = false; };
   }, []);
 
   return (
@@ -60,7 +73,7 @@ export default function LandingPublic() {
             Who Should You Actually Listen To?
           </h1>
           <p className="text-text-secondary text-base sm:text-lg leading-relaxed max-w-2xl mx-auto">
-            274,000+ predictions. 6,000 analysts. Every call scored against real market data.
+            {formatPlus(stats?.total_predictions)} predictions. {formatPlus(stats?.total_forecasters)} analysts. Every call scored against real market data.
           </p>
         </div>
       </section>
@@ -223,17 +236,17 @@ export default function LandingPublic() {
         <div className="max-w-4xl mx-auto px-4 sm:px-6">
           <div className="flex flex-col sm:flex-row items-center justify-center gap-8 sm:gap-0 text-center">
             <div className="flex-1">
-              <div className="font-mono text-[28px] sm:text-[32px] font-bold text-accent">274,000+</div>
+              <div className="font-mono text-[28px] sm:text-[32px] font-bold text-accent">{formatPlus(stats?.total_predictions)}</div>
               <div className="text-[13px] mt-1 text-muted">Predictions Tracked</div>
             </div>
             <div className="hidden sm:block w-px h-10 self-center bg-border" />
             <div className="flex-1">
-              <div className="font-mono text-[28px] sm:text-[32px] font-bold text-accent">6,000+</div>
+              <div className="font-mono text-[28px] sm:text-[32px] font-bold text-accent">{formatPlus(stats?.total_forecasters)}</div>
               <div className="text-[13px] mt-1 text-muted">Analysts Monitored</div>
             </div>
             <div className="hidden sm:block w-px h-10 self-center bg-border" />
             <div className="flex-1">
-              <div className="font-mono text-[28px] sm:text-[32px] font-bold text-accent">31,000+</div>
+              <div className="font-mono text-[28px] sm:text-[32px] font-bold text-accent">{formatPlus(stats?.total_scored)}</div>
               <div className="text-[13px] mt-1 text-muted">Predictions Scored</div>
             </div>
           </div>

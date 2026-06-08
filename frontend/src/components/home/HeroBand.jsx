@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { getGlobalStats } from '../../api';
+import { formatPlus } from '../../utils/formatNumber';
 
 // Ship #13. Hero band at the top of `/` when ENABLE_HOMEPAGE_HERO is on.
 // Stat numbers come from /api/stats/global (NOT hardcoded). Until the
@@ -22,16 +23,6 @@ function StatTile({ value, label }) {
       </div>
     </div>
   );
-}
-
-function formatPlus(n) {
-  if (n == null || Number.isNaN(n)) return '—';
-  if (n >= 1000) {
-    // 274013 -> 274K+, 6012 -> 6K+, 31421 -> 31K+
-    const rounded = Math.floor(n / 1000);
-    return `${rounded.toLocaleString()}K+`;
-  }
-  return `${n.toLocaleString()}+`;
 }
 
 export default function HeroBand() {

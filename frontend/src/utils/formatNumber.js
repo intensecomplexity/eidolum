@@ -18,3 +18,17 @@ export default function formatRoundNumber(n) {
   const rounded = Math.floor(n / step) * step;
   return rounded.toLocaleString() + '+';
 }
+
+/**
+ * Compact "K+" display for headline stats (homepage hero + logged-out landing).
+ *   274013 → "274K+", 6012 → "6K+", 31421 → "31K+". null/NaN → "—".
+ * Shared so the hero and the landing can never diverge on data OR format.
+ */
+export function formatPlus(n) {
+  if (n == null || Number.isNaN(n)) return '—';
+  if (n >= 1000) {
+    const rounded = Math.floor(n / 1000);
+    return `${rounded.toLocaleString()}K+`;
+  }
+  return `${n.toLocaleString()}+`;
+}
