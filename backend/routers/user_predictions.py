@@ -583,7 +583,7 @@ def admin_evaluate_predictions(request: Request, db: Session = Depends(get_db)):
     """Manually trigger user prediction evaluation. Returns detailed results."""
     from middleware.auth import require_admin as _ra
     import os as _os
-    secret = request.headers.get("X-Admin-Secret", "") or request.query_params.get("secret", "")
+    secret = request.headers.get("X-Admin-Secret", "")
     admin_secret = _os.getenv("ADMIN_SECRET", "")
     if not admin_secret or secret != admin_secret:
         raise HTTPException(status_code=403, detail="Unauthorized")
