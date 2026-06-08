@@ -1076,13 +1076,18 @@ def refresh_all_forecaster_stats():
             f"SELECT DISTINCT forecaster_id FROM predictions WHERE outcome IN {_SCORED_OUTCOMES} AND actual_return IS NOT NULL{x_filter} {yt_visible}{_hedged_na}"
         )).fetchall()]
         print(f"[StatsRefresh] Refreshing {len(fids)} forecasters with scored predictions (x_filter={'on' if x_filter else 'off'})")
+        # avg_return + alpha are computed over DIRECTIONAL (long/short) calls
+        # only, from the TRUE returns (services.return_display — the same source
+        # the portfolio simulator and prediction list use), NOT the capped
+        # stored values. A neutral/hold call isn't a directional position; its
+        # raw underlying move (e.g. a hold where the stock ran +428%) would
+        # inflate the average. accuracy still counts every scored call.
+        from services.return_display import verified_true_returns_batch
         for fid in fids:
             row = db.execute(sql_text(f"""
                 SELECT COUNT(*),
                        SUM(CASE WHEN outcome IN {_HIT_OUTCOMES} THEN 1 ELSE 0 END),
-                       SUM(CASE WHEN outcome = 'near' THEN 1 ELSE 0 END),
-                       AVG(alpha),
-                       AVG(actual_return)
+                       SUM(CASE WHEN outcome = 'near' THEN 1 ELSE 0 END)
                 FROM predictions
                 WHERE forecaster_id = :f AND outcome IN {_SCORED_OUTCOMES}
                   AND actual_return IS NOT NULL
@@ -1093,8 +1098,38 @@ def refresh_all_forecaster_stats():
             total = row[0] or 0
             hits = row[1] or 0
             nears = row[2] or 0
-            avg_alpha = row[3]
-            avg_ret = row[4]
+
+            # Directional scored calls + true per-call returns; alpha per call is
+            # true_return − the call's stored SPY return over the same window.
+            drows = db.execute(sql_text(f"""
+                SELECT id, ticker, direction, prediction_date, evaluation_date,
+                       entry_price, window_days, sp500_return
+                FROM predictions
+                WHERE forecaster_id = :f AND outcome IN {_SCORED_OUTCOMES}
+                  AND direction IN ('bullish','bearish')
+                  AND actual_return IS NOT NULL
+                  {x_filter}
+                  {yt_visible}
+                  {_hedged_na}
+            """), {"f": fid}).fetchall()
+            _items = []
+            for dr in drows:
+                _pd, _ed, _wd = dr[3], dr[4], (dr[6] or 90)
+                if not _ed and _pd:
+                    _ed = _pd + timedelta(days=_wd)
+                _items.append((dr[0], dr[1], dr[2], dr[5], _pd, _ed, _wd))
+            _true = verified_true_returns_batch(db, _items) if _items else {}
+            _rets, _alphas = [], []
+            for dr in drows:
+                _tr = _true.get(dr[0])
+                if _tr is None:
+                    continue
+                _rets.append(_tr)
+                if dr[7] is not None:
+                    _alphas.append(_tr - float(dr[7]))
+            avg_ret = (sum(_rets) / len(_rets)) if _rets else None
+            avg_alpha = (sum(_alphas) / len(_alphas)) if _alphas else None
+
             if total > 0:
                 acc = round((hits + nears * 0.5) / total * 100, 1)
                 alp = round(float(avg_alpha), 2) if avg_alpha is not None else 0
