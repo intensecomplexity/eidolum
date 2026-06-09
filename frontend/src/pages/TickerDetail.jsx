@@ -76,13 +76,11 @@ export default function TickerDetail() {
     </div>
   );
 
-  if (loading) return (
-    <div className="flex items-center justify-center min-h-[60vh]">
-      <LoadingSpinner size="lg" />
-    </div>
-  );
-
-  if (error || !data) return (
+  // Consensus failure/empty keeps the original full-page message — but ONLY
+  // after the fetch resolves. While it's in flight we render the page shell
+  // so StockChart / StockPrice / Discussion fire their fetches in PARALLEL
+  // with consensus instead of waterfalling behind it (~3.3s late before).
+  if (!loading && (error || !data)) return (
     <div className="max-w-7xl mx-auto px-4 py-20 text-center">
       <p className="text-text-secondary text-lg">{error ? `Could not load data for ${ticker}.` : `Nothing on file for ${ticker} \u2014 the book is empty here.`}</p>
       {error && <p className="text-muted text-sm mt-1">The request timed out or the server returned an error.</p>}
@@ -92,11 +90,11 @@ export default function TickerDetail() {
     </div>
   );
 
-  const cc = data.current_consensus || {};
-  const hist = data.historical || {};
-  const stats = data.stats || {};
+  const cc = data?.current_consensus || {};
+  const hist = data?.historical || {};
+  const stats = data?.stats || {};
 
-  const scored = data.recent_evaluated || [];
+  const scored = data?.recent_evaluated || [];
 
   return (
     <div>
@@ -111,20 +109,20 @@ export default function TickerDetail() {
         <div className="card mb-6">
           <div>
             <div className="flex items-center gap-3 mb-1">
-              <TickerLogo ticker={ticker} logoUrl={data.logo_url} size={40} />
+              <TickerLogo ticker={ticker} logoUrl={data?.logo_url} size={40} />
               <span className="font-mono text-3xl sm:text-4xl font-bold tracking-wider text-text-primary">{ticker}</span>
               <StockPrice ticker={ticker} size="large" autoRefresh />
             </div>
-            {data.company_name && (
+            {data?.company_name && (
               <div className="text-text-primary text-base sm:text-lg font-medium mt-1">{data.company_name}</div>
             )}
-            {data.description && data.description !== data.company_name && (
+            {data?.description && data.description !== data.company_name && (
               <div className="text-muted text-sm mt-1 leading-relaxed max-w-xl" title={data.description}>{data.description}</div>
             )}
-            {(!data.description || data.description === data.company_name) && data.industry && (
+            {(!data?.description || data.description === data.company_name) && data?.industry && (
               <div className="text-muted text-sm mt-0.5">{data.industry}</div>
             )}
-            {data.sector && (
+            {data?.sector && (
               <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-accent/10 text-accent border border-accent/20 inline-block mt-2">
                 {data.sector}
               </span>
@@ -133,6 +131,7 @@ export default function TickerDetail() {
         </div>
 
         {/* ── STATS BAR ─────────────────────────────────────────────────── */}
+        {data && (
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
           <div className="card py-3 text-center">
             <div className="text-lg font-mono font-bold text-text-primary">{data.total_predictions}</div>
@@ -153,9 +152,18 @@ export default function TickerDetail() {
             <div className="text-[10px] text-muted uppercase tracking-wider">Hist. Accuracy</div>
           </div>
         </div>
+        )}
 
         {/* ── PRICE CHART WITH PREDICTION MARKERS ──────────────────── */}
         <StockChart ticker={ticker} />
+
+        {/* Consensus-dependent sections load in while the chart/price/
+            discussion are already up. */}
+        {loading && (
+          <div className="flex items-center justify-center py-10">
+            <LoadingSpinner size="lg" />
+          </div>
+        )}
 
         {stats.top_forecaster && stats.top_forecaster.name && (() => {
           // Require ≥5 evaluated calls before promoting anyone as "top analyst on TICKER".

@@ -466,27 +466,27 @@ export default function Dashboard() {
         {search}
         {firstCallCta}
 
-        {isNewcomer ? (
-          <>
-            {top5Block}
-            {mostDividedBlock}
-            {personalStats}
-            {challenges}
-            {yourOpenCalls}
-            {watchlistBlock}
-            {expiringBlock}
-          </>
-        ) : (
-          <>
-            {personalStats}
-            {challenges}
-            {yourOpenCalls}
-            {top5Block}
-            {mostDividedBlock}
-            {watchlistBlock}
-            {expiringBlock}
-          </>
-        )}
+        {/* Keyed fragments so the isNewcomer flip (profile loads ~100ms after
+            mount) REORDERS sections instead of remounting them. The old
+            unkeyed ternary branches made React unmount/remount the challenge
+            cards on the flip, double-firing daily-challenge/today,
+            weekly-challenge/current and rivals/mine on every homepage load. */}
+        {(isNewcomer
+          ? ['top5', 'mostDivided', 'personalStats', 'challenges', 'yourOpenCalls', 'watchlist', 'expiring']
+          : ['personalStats', 'challenges', 'yourOpenCalls', 'top5', 'mostDivided', 'watchlist', 'expiring']
+        ).map((k) => (
+          <React.Fragment key={k}>
+            {{
+              top5: top5Block,
+              mostDivided: mostDividedBlock,
+              personalStats,
+              challenges,
+              yourOpenCalls,
+              watchlist: watchlistBlock,
+              expiring: expiringBlock,
+            }[k]}
+          </React.Fragment>
+        ))}
 
         <HowEidolumScores />
       </div>
