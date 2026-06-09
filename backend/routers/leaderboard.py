@@ -1,4 +1,5 @@
 import datetime
+import json as _json_mod
 import time as _time
 from fastapi import APIRouter, Depends, Query, Request
 from sqlalchemy.orm import Session
@@ -1302,13 +1303,10 @@ def get_available_timeframes(request: Request, db: Session = Depends(get_db)):
 _stats_cache = None
 _stats_cache_time: float = 0
 
-@router.get("/homepage-stats")
-@limiter.limit("60/minute")
-def get_homepage_stats(request: Request, db: Session = Depends(get_db)):
-    global _stats_cache, _stats_cache_time
-    if _stats_cache and (_time.time() - _stats_cache_time) < 300:
-        return _stats_cache
 
+def _homepage_stats_payload(db: Session) -> dict:
+    """The /homepage-stats compute, callable without a Request so the worker
+    cron (jobs/refresh_homepage_data) can run it off the request path."""
     try:
         total_fc = db.execute(sql_text("SELECT COUNT(*) FROM forecasters WHERE COALESCE(total_predictions,0) > 0")).scalar() or 0
         scored = db.execute(sql_text(f"SELECT COUNT(*) FROM predictions WHERE outcome IN ('hit','near','miss','correct','incorrect'){_HEDGED_NA}")).scalar() or 0
@@ -1322,13 +1320,23 @@ def get_homepage_stats(request: Request, db: Session = Depends(get_db)):
     # per-forecaster leaderboard score and to /api/stats/global, so the homepage
     # hero never contradicts the other surfaces.
     avg_acc = round((correct_count + near_count * 0.5) / scored * 100, 1) if scored > 0 else 0
-    _stats_cache = {
+    return {
         "forecasters_tracked": total_fc,
         "verified_predictions": scored,
         "total_predictions": all_preds,
         "avg_accuracy": avg_acc,
         "months_of_data": 24,
     }
+
+
+@router.get("/homepage-stats")
+@limiter.limit("60/minute")
+def get_homepage_stats(request: Request, db: Session = Depends(get_db)):
+    global _stats_cache, _stats_cache_time
+    if _stats_cache and (_time.time() - _stats_cache_time) < 300:
+        return _stats_cache
+
+    _stats_cache = _homepage_stats_payload(db)
     _stats_cache_time = _time.time()
     return _stats_cache
 
@@ -1339,17 +1347,13 @@ _homepage_data_cache = None
 _homepage_data_cache_time = 0
 
 
-@router.get("/homepage-data")
-@limiter.limit("60/minute")
-def get_homepage_data(request: Request, db: Session = Depends(get_db)):
-    """Combined endpoint for the homepage. Returns stats, trending, top 5, recent calls,
-    and expiring predictions in one response. Cached for 5 minutes."""
-    global _homepage_data_cache, _homepage_data_cache_time
-    if _homepage_data_cache and (_time.time() - _homepage_data_cache_time) < 300:
-        return _homepage_data_cache
-
+def compute_homepage_payload(db: Session) -> dict:
+    """Full /homepage-data payload compute (stats, top 5, biggest calls, most
+    divided, featured). Runs in the worker cron (jobs/refresh_homepage_data)
+    every 5 min; on the request path ONLY as the last-resort fallback when both
+    the precomputed table row and the in-process dict are cold/stale."""
     # Stats
-    stats = get_homepage_stats(request, db)
+    stats = _homepage_stats_payload(db)
 
     # Top analysts — must be the EXACT top of the leaderboard the user sees, for
     # both anonymous and authenticated requests. The old bespoke query ranked by
@@ -1566,17 +1570,60 @@ def get_homepage_data(request: Request, db: Session = Depends(get_db)):
     except Exception:
         pass
 
-    payload = {
+    return {
         "stats": stats,
         "top_analysts": top5,
         "biggest_calls": biggest_calls,
         "most_divided": most_divided,
         "featured_prediction": featured,
     }
+
+
+# How old a homepage_data_cache row may be before the request path stops
+# trusting it. The cron refreshes every 5 min; 30 min of slack covers worker
+# restarts/redeploys without flapping to the slow live compute.
+_HOMEPAGE_TABLE_MAX_AGE_MIN = 30
+
+
+@router.get("/homepage-data")
+@limiter.limit("60/minute")
+def get_homepage_data(request: Request, db: Session = Depends(get_db)):
+    """Combined endpoint for the homepage.
+
+    L1: homepage_data_cache row precomputed by the worker cron — a PK lookup,
+        never recomputed on the request path (per the 2026-05-25 pool-outage
+        rule: cache refresh belongs to the worker ONLY).
+    L2: per-worker in-process dict (5 min) — survives a stale/missing table.
+    L3: live compute, identical to the pre-cache behavior, including the same
+        empty/error semantics — no invented values.
+    """
+    global _homepage_data_cache, _homepage_data_cache_time
+
+    try:
+        row = db.execute(sql_text(
+            "SELECT payload FROM homepage_data_cache "
+            "WHERE id = 1 AND refreshed_at > NOW() - make_interval(mins => :max_age)"
+        ), {"max_age": _HOMEPAGE_TABLE_MAX_AGE_MIN}).first()
+        if row is not None and row[0]:
+            payload = row[0] if isinstance(row[0], dict) else _json_mod.loads(row[0])
+            if payload.get("top_analysts"):
+                return payload
+    except Exception:
+        # Missing table (pre-DDL env) aborts the txn — roll back so the
+        # fallback queries below run on a clean session.
+        try:
+            db.rollback()
+        except Exception:
+            pass
+
+    if _homepage_data_cache and (_time.time() - _homepage_data_cache_time) < 300:
+        return _homepage_data_cache
+
+    payload = compute_homepage_payload(db)
     # Only persist the 5-minute cache when top_analysts is populated. A cold
     # worker that transiently computed an empty list must NOT freeze that empty
     # widget in front of visitors for 5 minutes — recompute on the next request.
-    if top5:
+    if payload.get("top_analysts"):
         _homepage_data_cache = payload
         _homepage_data_cache_time = _time.time()
     return payload

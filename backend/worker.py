@@ -2455,6 +2455,30 @@ def main():
         executor='maintenance',
     )
 
+    # /api/homepage-data precompute — UPSERTs the full homepage payload into
+    # homepage_data_cache (one row, id=1). The endpoint reads that row with a
+    # PK lookup, eliminating the per-worker cold-start cost (2.2–4.3s) of the
+    # live compute. Refresh runs HERE ONLY — never on the request path.
+    def _refresh_homepage_data():
+        try:
+            from jobs.refresh_homepage_data import refresh_homepage_data
+            db = BgSessionLocal()
+            try:
+                refresh_homepage_data(db)
+                db.commit()
+            finally:
+                db.close()
+        except Exception as e:
+            log.error(f"[refresh_homepage_data] {e}")
+    sched.add_job(
+        _standalone("refresh_homepage_data", _refresh_homepage_data),
+        "interval", minutes=5,
+        id="refresh_homepage_data",
+        max_instances=1, coalesce=True,
+        next_run_time=t0 + timedelta(minutes=3),
+        executor='maintenance',
+    )
+
     # price_bars daily increment — keeps the local EOD cache current after the
     # Phase 4 one-shot harvest. Gated by ENABLE_PRICE_BARS_INCREMENTAL flag
     # (default false). Designed to fit FMP Free-tier's 250/day budget once
