@@ -7,7 +7,7 @@ import TickerLogo from '../components/TickerLogo';
 import TickerLink from '../components/TickerLink';
 import Footer from '../components/Footer';
 import PageHeader from '../components/PageHeader';
-import { getAllConsensus } from '../api';
+import { getAllConsensus, getThemes } from '../api';
 import { pluralize } from '../utils/pluralize';
 import useSEO from '../hooks/useSEO';
 import { usePublicFlag } from '../hooks/usePublicFlag';
@@ -56,9 +56,28 @@ export default function Consensus() {
     const fromUrl = searchParams.get('sector');
     return fromUrl && SECTORS.includes(fromUrl) ? fromUrl : 'All Sectors';
   });
+  // Product-theme filter (?theme=<slug>). The slug list comes from
+  // /api/themes (empty while ENABLE_PRODUCT_THEMES is off, which also
+  // hides the dropdown). URL value is validated once the list loads.
+  const [themes, setThemes] = useState([]);
+  const [theme, setTheme] = useState(() => searchParams.get('theme') || '');
   const [sort, setSort] = useState('count');
   const [search, setSearch] = useState('');
   const [tab, setTab] = useState('all');
+
+  useEffect(() => {
+    getThemes()
+      .then(t => setThemes(Array.isArray(t) ? t : []))
+      .catch(() => setThemes([]));
+  }, []);
+
+  // Drop a garbage/disabled ?theme= once the real slug list is known.
+  useEffect(() => {
+    if (theme && themes.length > 0 && !themes.some(t => t.slug === theme)) {
+      setTheme('');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [themes]);
 
   // Keep the URL in sync when the user changes the dropdown — makes
   // the filtered view linkable, refresh-stable, and back-button-aware.
@@ -67,19 +86,22 @@ export default function Consensus() {
     const next = new URLSearchParams(searchParams);
     if (sector === 'All Sectors') next.delete('sector');
     else next.set('sector', sector);
+    if (!theme) next.delete('theme');
+    else next.set('theme', theme);
     if (next.toString() !== searchParams.toString()) {
       setSearchParams(next, { replace: true });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sector]);
+  }, [sector, theme]);
 
   useEffect(() => {
     setLoading(true);
     const params = {};
     if (sector !== 'All Sectors') params.sector = sector;
+    if (theme) params.theme = theme;
     if (sort !== 'count') params.sort = sort;
     getAllConsensus(params).then(setData).catch(() => setData([])).finally(() => setLoading(false));
-  }, [sector, sort]);
+  }, [sector, theme, sort]);
 
   // Filter by search + tab
   let display = data;
@@ -122,6 +144,18 @@ export default function Consensus() {
             </select>
             <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-muted pointer-events-none" />
           </div>
+
+          {/* Product dropdown — only when themes exist (flag on + seeded) */}
+          {themes.length > 0 && (
+            <div className="relative">
+              <select value={theme} onChange={e => setTheme(e.target.value)}
+                className="appearance-none bg-surface border border-border rounded-lg px-3 py-2 pr-8 text-sm text-text-primary focus:outline-none focus:border-accent/50 cursor-pointer">
+                <option value="">All Products</option>
+                {themes.map(t => <option key={t.slug} value={t.slug}>{t.name}</option>)}
+              </select>
+              <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-muted pointer-events-none" />
+            </div>
+          )}
 
           {/* Sort dropdown */}
           <div className="relative">
