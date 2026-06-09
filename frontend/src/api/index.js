@@ -80,11 +80,11 @@ export function getAvailableTimeframes() {
 }
 
 export function getFirm(slug) {
-  return api.get(`/firm/${slug}`).then(r => r.data);
+  return api.get(`/firm/${slug}`, _edgeConfig()).then(r => r.data);
 }
 
 export function getFirms() {
-  return cachedGet('/firms').then(r => r.data);
+  return cachedGet('/firms', 120000, _edgeConfig()).then(r => r.data);
 }
 
 export function getForecaster(id, params = {}) {
@@ -165,7 +165,7 @@ export function getForecasterImpliedPortfolio(id) {
 }
 
 export function getActivityDisclosures(limit = 50) {
-  return api.get('/activity/disclosures', { params: { limit } }).then(r => r.data);
+  return api.get('/activity/disclosures', _edgeConfig({ params: { limit } })).then(r => r.data);
 }
 
 export function getFollowThroughLeaderboard({ window = '3m', limit = 50, minDisclosures = 5 } = {}) {
@@ -336,7 +336,7 @@ export function getYouTubeRunDetailsAdmin(runId) {
 }
 
 export function getTrendingTickers() {
-  return api.get('/trending-tickers').then(r => r.data);
+  return api.get('/trending-tickers', _edgeConfig()).then(r => r.data);
 }
 
 export function getTickerDetail(ticker) {
@@ -739,7 +739,7 @@ export function getNudges() {
 // ——— Earnings ———
 
 export function getUpcomingEarnings() {
-  return api.get('/earnings/upcoming').then(r => r.data);
+  return api.get('/earnings/upcoming', _edgeConfig()).then(r => r.data);
 }
 
 export function isEarningsEnabled() {
@@ -925,15 +925,15 @@ export function getFollowingFeed(before) {
 // ——— Activity Hub ———
 
 export function getActivityRecentCalls(limit = 50, offset = 0) {
-  return api.get('/activity/recent-predictions', { params: { limit, offset } }).then(r => r.data);
+  return api.get('/activity/recent-predictions', _edgeConfig({ params: { limit, offset } })).then(r => r.data);
 }
 
 export function getActivityScoredCalls(limit = 50, offset = 0) {
-  return api.get('/activity/recently-scored', { params: { limit, offset } }).then(r => r.data);
+  return api.get('/activity/recently-scored', _edgeConfig({ params: { limit, offset } })).then(r => r.data);
 }
 
 export function getActivityExpiring(limit = 50, offset = 0) {
-  return api.get('/activity/expiring', { params: { limit, offset } }).then(r => r.data);
+  return api.get('/activity/expiring', _edgeConfig({ params: { limit, offset } })).then(r => r.data);
 }
 
 export function getActivityFriendsCalls(limit = 50, offset = 0) {
@@ -1065,7 +1065,7 @@ export function getAllConsensus(params = {}) {
 }
 
 export function getExpiringPredictions() {
-  return api.get('/predictions/expiring').then(r => r.data);
+  return api.get('/predictions/expiring', _edgeConfig()).then(r => r.data);
 }
 
 // (Activity Hub endpoints defined above in "Activity Hub" section)
@@ -1145,7 +1145,7 @@ export function reactivateYouTubeChannel(channelId) {
 // ——— Smart Money ———
 
 export function getSmartMoney(params = {}) {
-  return api.get('/smart-money', { params }).then(r => r.data);
+  return api.get('/smart-money', _edgeConfig({ params })).then(r => r.data);
 }
 
 // ——— JWT-based Admin Panel API ———

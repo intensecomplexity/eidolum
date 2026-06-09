@@ -38,25 +38,30 @@ function useTheme() {
   return theme;
 }
 
+function LetterAvatar({ letter, size }) {
+  return (
+    <div style={{
+      width: size, height: size, borderRadius: '50%',
+      backgroundColor: '#1e2028', display: 'flex',
+      alignItems: 'center', justifyContent: 'center',
+      color: '#D4A843', fontWeight: 700,
+      fontSize: size * 0.45, flexShrink: 0,
+      border: '1px solid rgba(212,168,67,0.2)',
+    }}>
+      {letter}
+    </div>
+  );
+}
+
 export default function TickerLogo({ ticker, logoUrl, size = 32 }) {
   const [failed, setFailed] = useState(false);
+  const [loaded, setLoaded] = useState(false);
   const theme = useTheme();
   const letter = ticker?.[0] || '?';
   const processedUrl = `/api/logo/${ticker}.png`;
 
   if (failed || !ticker) {
-    return (
-      <div style={{
-        width: size, height: size, borderRadius: '50%',
-        backgroundColor: '#1e2028', display: 'flex',
-        alignItems: 'center', justifyContent: 'center',
-        color: '#D4A843', fontWeight: 700,
-        fontSize: size * 0.45, flexShrink: 0,
-        border: '1px solid rgba(212,168,67,0.2)',
-      }}>
-        {letter}
-      </div>
-    );
+    return <LetterAvatar letter={letter} size={size} />;
   }
 
   const shouldInvert =
@@ -64,23 +69,36 @@ export default function TickerLogo({ ticker, logoUrl, size = 32 }) {
     (theme === 'dark' && INVERT_ON_DARK.has(ticker));
   const scale = SIZE_OVERRIDE[ticker];
 
+  // The letter avatar renders IMMEDIATELY as the base layer and the logo
+  // <img> sits absolutely on top, cross-fading in on load — cards never
+  // show an empty square while logo requests are in flight (they were
+  // taking 300-980ms each on edge MISSes). onError keeps the avatar.
+  // Container is fixed-size either way, so no layout shift.
   return (
-    <div style={{
-      width: size, height: size, borderRadius: 8,
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
-      overflow: 'hidden', flexShrink: 0,
-    }}>
-      <img
-        src={processedUrl}
-        alt={ticker}
-        style={{
-          width: '100%', height: '100%', objectFit: 'contain',
-          filter: shouldInvert ? 'invert(1)' : 'none',
-          transform: scale ? `scale(${scale})` : undefined,
-        }}
-        onError={() => setFailed(true)}
-        loading="lazy"
-      />
+    <div style={{ position: 'relative', width: size, height: size, flexShrink: 0 }}>
+      <div style={{ opacity: loaded ? 0 : 1, transition: 'opacity 150ms ease' }}>
+        <LetterAvatar letter={letter} size={size} />
+      </div>
+      <div style={{
+        position: 'absolute', inset: 0, borderRadius: 8,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        overflow: 'hidden',
+      }}>
+        <img
+          src={processedUrl}
+          alt={ticker}
+          style={{
+            width: '100%', height: '100%', objectFit: 'contain',
+            filter: shouldInvert ? 'invert(1)' : 'none',
+            transform: scale ? `scale(${scale})` : undefined,
+            opacity: loaded ? 1 : 0,
+            transition: 'opacity 150ms ease',
+          }}
+          onLoad={() => setLoaded(true)}
+          onError={() => setFailed(true)}
+          loading="lazy"
+        />
+      </div>
     </div>
   );
 }
