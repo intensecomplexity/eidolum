@@ -22,67 +22,67 @@ from psycopg2.extras import execute_values
 # (slug, name, description, [(ticker, is_primary), ...])
 THEMES = [
     ("phones", "Phones",
-     "Smartphone makers and the chip suppliers behind every handset.",
+     "Smartphone makers and the chip and component suppliers inside the handset.",
      [("AAPL", True), ("CRUS", False), ("QCOM", False), ("QRVO", False),
       ("SWKS", False)]),
     ("ai-chips", "AI Chips",
-     "The silicon powering the AI buildout — GPUs, accelerators, memory, and the foundry.",
+     "Designers and makers of the GPUs and accelerators powering AI workloads.",
      [("NVDA", True), ("AMD", True), ("AVGO", False), ("TSM", True),
       ("ARM", False), ("MRVL", False), ("MU", False), ("SMCI", False)]),
     ("ev", "EVs",
-     "Electric vehicle makers, pure-play and legacy.",
+     "Electric-vehicle makers and the pure-play challengers to legacy autos.",
      [("TSLA", True), ("RIVN", False), ("LCID", False), ("NIO", False),
       ("LI", False), ("GM", False), ("F", False)]),
     ("cloud", "Cloud",
-     "Hyperscalers and the cloud-native infrastructure layer.",
+     "Hyperscale platforms and the software running infrastructure in the cloud.",
      [("MSFT", True), ("AMZN", True), ("GOOGL", True), ("ORCL", False),
       ("SNOW", False), ("NET", False), ("DDOG", False)]),
     ("cybersecurity", "Cybersecurity",
-     "Endpoint, network, and identity security platforms.",
+     "Companies defending networks, endpoints, and identity from attack.",
      [("PANW", True), ("CRWD", True), ("ZS", False), ("FTNT", False),
       ("S", False), ("OKTA", False)]),
     ("streaming", "Streaming",
-     "Video and audio streaming platforms fighting for screen time.",
+     "Video and audio streaming platforms competing for subscriber time.",
      [("NFLX", True), ("DIS", True), ("WBD", False), ("SPOT", False),
       ("ROKU", False)]),
     ("ecommerce", "E-Commerce",
-     "Online retail platforms and marketplaces.",
+     "Online marketplaces and the platforms powering digital retail.",
      [("AMZN", True), ("SHOP", True), ("MELI", False), ("ETSY", False),
       ("SE", False)]),
     ("social-media", "Social Media",
-     "Ad-driven social platforms.",
+     "Platforms built on user-generated content and the attention economy.",
      [("META", True), ("SNAP", False), ("PINS", False), ("RDDT", False)]),
     ("fintech-payments", "Fintech & Payments",
-     "Payment rails, networks, and consumer fintech.",
+     "Card networks, processors, and the digital-payment disruptors.",
      [("V", True), ("MA", True), ("PYPL", False), ("SQ", False),
       ("AXP", False)]),
     ("gaming", "Gaming",
-     "Game publishers, platforms, and the hardware they run on.",
+     "Video-game publishers and interactive-entertainment platforms.",
      [("EA", True), ("TTWO", True), ("RBLX", False), ("U", False)]),
     ("semiconductors-equip", "Chip Equipment",
-     "The toolmakers every fab depends on — lithography, deposition, etch, test.",
+     "The toolmakers that build chip-fabrication lines.",
      [("ASML", True), ("AMAT", True), ("LRCX", False), ("KLAC", False)]),
     ("clean-energy", "Solar",
-     "Solar, storage, and residential energy.",
+     "Solar manufacturers, inverters, and residential installers.",
      [("ENPH", True), ("FSLR", True), ("SEDG", False), ("RUN", False)]),
     ("space", "Space",
-     "Launch, lunar, and aerospace-defense exposure to the space economy.",
+     "Launch providers and the aerospace names reaching orbit.",
      [("RKLB", True), ("LUNR", False), ("BA", False), ("LMT", False)]),
     ("weight-loss-glp1", "Weight Loss (GLP-1)",
-     "The GLP-1 obesity-drug wave and its challengers.",
+     "Drugmakers behind GLP-1 obesity and diabetes treatments.",
      [("LLY", True), ("NVO", True), ("VKTX", False)]),
     ("robotics-automation", "Robotics & Automation",
-     "Industrial automation, surgical robotics, and test systems.",
+     "Industrial robotics, factory automation, and surgical-robot makers.",
      [("ISRG", True), ("ABB", False), ("ROK", False), ("TER", False)]),
     ("ride-delivery", "Ride & Delivery",
-     "Ride-hailing and on-demand delivery networks.",
+     "Rideshare and on-demand delivery platforms.",
      [("UBER", True), ("LYFT", False), ("DASH", False), ("GRAB", False)]),
     ("crypto-equities", "Crypto Equities",
-     "Exchanges, miners, and balance-sheet bitcoin proxies.",
+     "Public stocks levered to crypto — exchanges, miners, and holders.",
      [("COIN", True), ("MSTR", True), ("MARA", False), ("RIOT", False),
       ("HOOD", False)]),
     ("ad-tech", "Ad Tech",
-     "The programmatic advertising stack and the walled gardens.",
+     "The platforms and exchanges that buy, sell, and target digital ads.",
      [("TTD", True), ("GOOGL", False), ("META", False), ("APP", False),
       ("PUBM", False)]),
 ]
@@ -102,14 +102,15 @@ def main():
         (slug, name, desc, (i + 1) * 10)
         for i, (slug, name, desc, _members) in enumerate(THEMES)
     ]
-    # DO UPDATE on name (only) so a re-run reconciles display renames
-    # ("Clean Energy" → "Solar") instead of silently keeping stale text.
+    # DO UPDATE on name + description so a re-run reconciles display
+    # copy (renames, explainer text) instead of silently keeping stale text.
     # Membership stays DO NOTHING — the script never deletes, so admin
     # removals survive as long as this seed list mirrors prod.
     execute_values(cur, """
         INSERT INTO themes (slug, name, description, display_order)
         VALUES %s
-        ON CONFLICT (slug) DO UPDATE SET name = EXCLUDED.name
+        ON CONFLICT (slug) DO UPDATE SET name = EXCLUDED.name,
+                                 description = EXCLUDED.description
     """, theme_rows)
 
     cur.execute("SELECT id, slug FROM themes")

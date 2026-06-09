@@ -1108,12 +1108,15 @@ def get_sectors(request: Request, db: Session = Depends(get_db)):
         ORDER BY total DESC
     """)).fetchall()
 
+    from utils.sector import SECTOR_META
+
     sectors = []
     sector_names = []
     for r in sector_rows:
         accuracy = round(float(r[2]) / r[3] * 100, 1) if r[3] > 0 else 0.0
         sectors.append({
             "sector": r[0],
+            "description": SECTOR_META.get(r[0], ""),
             "total_predictions": r[1],
             "evaluated": r[3],
             "correct": int(float(r[2])),

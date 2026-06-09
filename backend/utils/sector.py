@@ -254,3 +254,27 @@ def canonical_sectors_distinct(raws) -> set[str]:
         if c != UNKNOWN_SECTOR:
             out.add(c)
     return out
+
+
+# One-line user-facing explainers for the canonical sector set, surfaced
+# on /api/sectors and the Verdict/Consensus header. Keyed by the EXACT
+# strings that flow through ?sector= (the 11 Morningstar names + the
+# 'Crypto' bucket the dropdown uses). Raw/leaked sector values not in
+# this dict get an empty description — never a placeholder.
+SECTOR_META: dict[str, str] = {
+    "Technology": "Hardware, software, semiconductors, and IT services — the companies building computing and the internet.",
+    "Financial Services": "Banks, insurers, asset managers, and payment networks that move and lend money.",
+    "Healthcare": "Drugmakers, biotech, medical devices, insurers, and care providers.",
+    "Consumer Cyclical": "Discretionary spending — retail, autos, travel, apparel, and restaurants that rise and fall with the economy.",
+    "Consumer Defensive": "Staples people buy in any economy — food, beverages, household goods, and discount retail.",
+    "Industrials": "Machinery, aerospace and defense, transportation, and construction — the backbone of the physical economy.",
+    "Energy": "Oil and gas producers, refiners, and the pipelines and equipment that serve them.",
+    "Basic Materials": "Miners, chemicals, metals, and forestry — the raw inputs for everything else.",
+    "Real Estate": "REITs and property companies that own, develop, and manage buildings and land.",
+    "Utilities": "Regulated electric, gas, and water providers — steady, income-oriented, rate-driven.",
+    "Communication Services": "Telecom, media, streaming, social, and interactive entertainment.",
+    # The dropdown/DB value is 'Crypto' (not 'Cryptocurrency') — keyed
+    # to what actually flows through ?sector=.
+    "Crypto": "Digital assets and tokens — Bitcoin, Ethereum, and the broader crypto market.",
+    "Other": "Tickers that don't map cleanly to a single sector.",
+}
