@@ -335,10 +335,10 @@ def build_cc_prompt(transcripts: dict) -> str:
     return f"""You are classifying stock predictions from YouTube finance video transcripts. Return JSON only — no prose, no markdown fences.
 
 For each video, extract every valid stock prediction. A valid prediction has ALL of:
-- ticker: a real US-tradable symbol (e.g. AAPL, TSLA, NVDA). NOT macro words (MACRO, SPY500), NOT indices described loosely.
+- ticker: a real, exchange-listed symbol from ANY market worldwide, OR a real cryptocurrency. Keep every genuine call regardless of country. Storage convention (so non-US is never confused with a US ticker): US stocks bare (AAPL, TSLA, NVDA); non-US stocks take the Yahoo-Finance exchange suffix — London .L (BARC.L), Toronto .TO (SHOP.TO), Hong Kong .HK (0700.HK), Australia .AX (BHP.AX), Frankfurt .DE/.F, Paris .PA, Swiss .SW, Tokyo .T, Amsterdam .AS, India NSE .NS (RELIANCE.NS), BSE .BO; crypto bare (BTC, ETH, SOL, XRP). The symbol MUST be real — NOT macro words (MACRO, SPY500), NOT loosely-described indices, NOT hallucinated/invented symbols.
 - direction: "bullish" or "bearish" — NEVER "neutral" (a non-directional call is not a prediction; drop it).
 - forward-looking language ("I think", "will", "target", "by Q3", "headed to").
-- verbatim_quote: the exact words spoken, ~30-150 chars, copied byte-for-byte from the transcript. It MUST be an exact substring of the transcript text — it is matched against transcript timing. Do not paraphrase or fix grammar.
+- verbatim_quote: the exact words spoken, copied byte-for-byte from the transcript — an exact substring (it is matched against transcript timing to resolve the source timestamp). Copy as many words as the prediction spans; there is NO minimum and NO maximum length — never drop a real prediction for being short. Include enough words to locate it uniquely in the transcript. Do not paraphrase or fix grammar.
 
 EVERY prediction object MUST also carry these three fields (predictions missing any of them are discarded downstream):
 - timeframe_days: integer 1-2000 — the horizon the call should play out over. If the speaker states one ("by Friday", "this quarter", "by year end"), convert it to days. If they give none, infer a sensible default from the call's nature (a chart/swing setup ≈ 21, an earnings call ≈ 90, a long-term thesis ≈ 365). Never 0, never null.
@@ -365,7 +365,9 @@ Output — a JSON array, exactly this shape, nothing else:
   {{
     "video_id": "<the id from the --- VIDEO <id> --- header>",
     "predictions": [
-      {{"ticker": "AAPL", "direction": "bullish", "price_target": 250, "timeframe_days": 90, "timeframe_category": "fundamental_quarterly", "conviction_level": "moderate", "verbatim_quote": "<exact transcript words>"}}
+      {{"ticker": "AAPL", "direction": "bullish", "price_target": 250, "timeframe_days": 90, "timeframe_category": "fundamental_quarterly", "conviction_level": "moderate", "verbatim_quote": "<exact transcript words>"}},
+      {{"ticker": "BTC", "direction": "bullish", "price_target": 100000, "timeframe_days": 180, "timeframe_category": "cyclical_medium", "conviction_level": "strong", "verbatim_quote": "<exact transcript words>"}},
+      {{"ticker": "BARC.L", "direction": "bearish", "price_target": null, "timeframe_days": 30, "timeframe_category": "technical_chart", "conviction_level": "moderate", "verbatim_quote": "<exact transcript words>"}}
     ]
   }}
 ]
