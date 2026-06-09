@@ -744,6 +744,30 @@ def get_ticker_consensus(request: Request, ticker: str, db: Session = Depends(ge
 import time as _consensus_time
 from sqlalchemy import text as _consensus_text
 
+# Distinct raw predictions.sector values, cached 5 min. Used to expand a
+# canonical ?sector= filter into the raw strings that canonicalize to it
+# (read-time canonicalization — stored values are never rewritten). Before
+# this, ?sector= matched raw equality, so rows whose sector held a leaked
+# SIC/GICS string ('Professional Services', ...) were invisible in every
+# filtered view.
+_SECTOR_RAWS_CACHE: dict = {"raws": None, "fetched_at": 0.0}
+_SECTOR_RAWS_TTL = 300
+
+
+def _raw_sectors_for(db, canonical_name: str) -> list:
+    from utils.sector import display_sector
+    now = _consensus_time.time()
+    if (_SECTOR_RAWS_CACHE["raws"] is None
+            or (now - _SECTOR_RAWS_CACHE["fetched_at"]) > _SECTOR_RAWS_TTL):
+        rows = db.execute(_consensus_text(
+            "SELECT DISTINCT sector FROM predictions "
+            "WHERE sector IS NOT NULL AND sector != ''"
+        )).fetchall()
+        _SECTOR_RAWS_CACHE["raws"] = [r[0] for r in rows]
+        _SECTOR_RAWS_CACHE["fetched_at"] = now
+    return [r for r in _SECTOR_RAWS_CACHE["raws"]
+            if display_sector(r) == canonical_name]
+
 _consensus_cache = None
 _consensus_cache_time: float = 0
 _CONSENSUS_TTL = 600  # 10 minutes
@@ -781,8 +805,15 @@ def get_all_consensus(
     where = "WHERE direction IN ('bullish', 'bearish', 'neutral')"
     params = {}
     if sector:
-        where += " AND sector = :sector"
-        params["sector"] = sector
+        # Canonical filter: expand to every raw sector string that maps
+        # to the requested canonical name, so e.g. ?sector=Industrials
+        # includes rows stored as 'Professional Services'. Unknown
+        # canonical name → no raws → honest empty result.
+        sector_raws = _raw_sectors_for(db, sector)
+        if not sector_raws:
+            return []
+        where += " AND sector = ANY(:sector_raws)"
+        params["sector_raws"] = sector_raws
     if theme:
         # ANDed with ?sector= when both are given (a ticker must match
         # both axes). Slug stays a bound param via the shared helper.
