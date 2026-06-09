@@ -10,10 +10,18 @@ from rate_limit import limiter
 from services.ticker_display import (
     resolve_ticker_display_name, resolve_ticker_display_sector,
 )
-from routers._prediction_filters import hedged_filter_sql
+from routers._prediction_filters import (
+    hedged_filter_sql, ambiguous_symbol_filter_sql,
+    ambiguous_symbol_filter_clause,
+)
 
 _HEDGED_P = hedged_filter_sql("p")
 _HEDGED_NA = hedged_filter_sql("predictions")
+# /asset/{ticker}/consensus historically renders ALL rows (no hedged/
+# reported filtering — full-transparency surface), but unattributable
+# symbols (ticker reuse, dead-equity collisions) are factual noise, not
+# transparency — they're hidden here too.
+_AMBIG_NA = ambiguous_symbol_filter_sql("predictions")
 
 router = APIRouter()
 
@@ -398,7 +406,7 @@ def get_asset_consensus(
                COUNT(*) FILTER (WHERE direction = 'neutral') AS neutral,
                COUNT(*) FILTER (WHERE outcome = 'pending') AS pending
         FROM predictions
-        WHERE ticker = :t
+        WHERE ticker = :t{_AMBIG_NA}
     """), {"t": ticker}).first()
     total = int(cnt[0] or 0)
     bull_count = int(cnt[1] or 0)
@@ -436,14 +444,16 @@ def get_asset_consensus(
     # 50 most recent pending (same ordering the old full load used).
     recent_scored_preds = (
         db.query(Prediction)
-        .filter(Prediction.ticker == ticker, Prediction.outcome.in_(scored_outcomes))
+        .filter(Prediction.ticker == ticker, Prediction.outcome.in_(scored_outcomes),
+                ambiguous_symbol_filter_clause(Prediction.is_ambiguous_symbol))
         .order_by(Prediction.prediction_date.desc())
         .limit(20)
         .all()
     )
     pending_preds = (
         db.query(Prediction)
-        .filter(Prediction.ticker == ticker, Prediction.outcome == "pending")
+        .filter(Prediction.ticker == ticker, Prediction.outcome == "pending",
+                ambiguous_symbol_filter_clause(Prediction.is_ambiguous_symbol))
         .order_by(Prediction.prediction_date.desc())
         .limit(50)
         .all()
@@ -455,7 +465,7 @@ def get_asset_consensus(
         SELECT forecaster_id, COUNT(*) AS total,
                COUNT(*) FILTER (WHERE outcome IN ('hit','correct')) AS correct
         FROM predictions
-        WHERE ticker = :t AND outcome IN {str(tuple(scored_outcomes))}
+        WHERE ticker = :t AND outcome IN {str(tuple(scored_outcomes))}{_AMBIG_NA}
         GROUP BY forecaster_id
     """), {"t": ticker}).fetchall()
 
