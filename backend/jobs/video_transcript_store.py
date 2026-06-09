@@ -117,6 +117,44 @@ def capture_transcript(
         return False
 
 
+def persist_transcript(
+    db,
+    video_id: str,
+    transcript_text: str,
+    *,
+    transcript_format: str = "text",
+    channel_name: str | None = None,
+    video_title: str | None = None,
+    video_publish_date=None,
+) -> bool:
+    """Persist a transcript the MOMENT it is fetched, on EVERY fetch path,
+    BEFORE classification and INDEPENDENT of the classification outcome.
+    A video that later becomes classifier_error / ok_no_predictions /
+    ok_inserted therefore ALWAYS keeps its transcript and never re-pays
+    the Webshare proxy on retry.
+
+    Thin wrapper over capture_transcript for fetch sites that only have
+    (video_id, text). Idempotent — first capture wins via ON CONFLICT
+    DO NOTHING; never overwrites an existing transcript (stored rows are
+    NOT NULL, so a "missing" transcript is simply an absent row → a plain
+    INSERT, never an empty overwrite). Never raises.
+
+    PERSISTENT STORE — transcripts are evidence and are NEVER deleted.
+    No code path may DELETE/TRUNCATE video_transcripts (persist-external-
+    data rule). If a storage/cleanup job needs space, it must skip this
+    table, not prune it.
+    """
+    return capture_transcript(
+        db,
+        video_id=video_id,
+        channel_name=channel_name,
+        video_title=video_title,
+        video_publish_date=video_publish_date,
+        transcript_text=transcript_text,
+        transcript_format=transcript_format,
+    )
+
+
 def excerpt_around_quote(transcript_text: str, quote: str, window: int = 250) -> str:
     """Return a ~window*2 char excerpt centered on the quote's position
     in the transcript. Falls back to the first window*2 chars if the

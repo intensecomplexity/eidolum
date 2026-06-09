@@ -226,6 +226,15 @@ def _run(db, *, apply: bool, limit: int, delay: float) -> int:
               f"{seg_count} segments, word_level="
               f"{'yes' if has_words else 'no'}", flush=True)
 
+        # Evidence preservation — persist on every successful fetch so this
+        # re-resolve pass never throws the transcript away (idempotent;
+        # first capture wins; never raises).
+        try:
+            from jobs.video_transcript_store import persist_transcript
+            persist_transcript(db, video_id, text_payload, transcript_format="json3")
+        except Exception as _e:
+            print(f"{TAG}   transcript capture failed for {video_id}: {_e}", flush=True)
+
         stats["videos_processed"] += 1
 
         updates_this_video = []

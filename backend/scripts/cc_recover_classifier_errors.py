@@ -620,6 +620,24 @@ def main() -> int:
                     "segments": [], "words": None, "has_word_level": False,
                     "is_generated": False, "fetched_at": datetime.utcnow(),
                 }
+            # Persist the transcript the moment it's fetched, BEFORE
+            # classification — so re-fetching the classifier_error backlog
+            # saves the text and this is the LAST time we ever pay the proxy
+            # for it. Idempotent (first capture wins); never raises.
+            _d = _TRANSCRIPT_CACHE.get(vid) or {}
+            if _d.get("status") == "ok" and _d.get("text"):
+                try:
+                    from jobs.video_transcript_store import persist_transcript
+                    _m = meta.get(vid, {})
+                    persist_transcript(
+                        db, vid, _d["text"],
+                        transcript_format="json3",
+                        channel_name=_m.get("channel_name"),
+                        video_title=_m.get("title"),
+                        video_publish_date=_m.get("publish"),
+                    )
+                except Exception as _pe:
+                    _log(f"[recover] transcript persist failed for {vid}: {_pe}")
             # Pace the live fetches — hammering YouTube back-to-back trips
             # Google's /sorry anti-bot block even through the proxy.
             time.sleep(TRANSCRIPT_FETCH_PACING)
