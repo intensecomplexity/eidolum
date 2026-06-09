@@ -53,10 +53,27 @@ const ALLOWLIST = [
   /^asset\/[A-Za-z0-9.^-]{1,12}\/consensus$/,
   /^public\/flags$/,
   /^features$/,
+  // Perf ship 3 (2026-06-12) — verified anon/auth byte-identical (the two
+  // activity feeds differ only in row ORDER, identically for anon-vs-anon —
+  // unstable sort, not personalization). /activity/friends is personalized
+  // and stays direct; /analysts excluded until its backend 504 is fixed.
+  /^smart-money$/,
+  /^activity\/recent-predictions$/,
+  /^activity\/recently-scored$/,
+  /^activity\/expiring$/,
+  /^activity\/disclosures$/,
+  /^trending-tickers$/,
+  /^predictions\/expiring$/,
+  /^firms$/,
+  /^firm\/[a-z0-9-]{1,100}$/,
+  /^earnings\/upcoming$/,
 ];
 
 const LONG = 'public, s-maxage=600, stale-while-revalidate=1200';
 const MED = 'public, s-maxage=120, stale-while-revalidate=300';
+// List feeds: generous SWR so quiet-traffic visitors get instant-stale +
+// background revalidate instead of paying a full MISS.
+const FEED = 'public, s-maxage=120, stale-while-revalidate=600';
 const SHORT_FAIL = 'public, s-maxage=30';
 const CRON = 'public, s-maxage=300, stale-while-revalidate=600';
 
@@ -70,6 +87,14 @@ function cacheControlFor(path, ok) {
     path === 'public/flags' ||
     path === 'features'
   ) return LONG;
+  if (
+    path === 'smart-money' ||
+    path.startsWith('activity/') ||
+    path === 'trending-tickers' ||
+    path === 'predictions/expiring' ||
+    path === 'firms' || path.startsWith('firm/') ||
+    path === 'earnings/upcoming'
+  ) return FEED;
   return MED;
 }
 
