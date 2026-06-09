@@ -9,12 +9,15 @@ import LivePnL from '../components/LivePnL';
 import ReactionBar from '../components/ReactionBar';
 import Countdown from '../components/Countdown';
 import CommentSection from '../components/CommentSection';
+import useCommentCounts from '../hooks/useCommentCounts';
 import { getExpiringPredictions, getLivePrices } from '../api';
 
 export default function Expiring() {
   const [preds, setPreds] = useState([]);
   const [prices, setPrices] = useState({});
   const [loading, setLoading] = useState(true);
+  // One bulk request for every card's comment count instead of one per card.
+  const commentCounts = useCommentCounts(preds.map(p => p.id), 'user');
 
   const fetchData = useCallback(() => {
     getExpiringPredictions().then(data => {
@@ -100,7 +103,7 @@ export default function Expiring() {
                     </div>
                   )}
                   <ReactionBar predictionId={p.id} source="user" outcome={p.outcome} />
-                  <CommentSection predictionId={p.id} source="user" />
+                  <CommentSection predictionId={p.id} source="user" initialCount={commentCounts ? (commentCounts[p.id] ?? 0) : null} />
                 </div>
               );
             })}

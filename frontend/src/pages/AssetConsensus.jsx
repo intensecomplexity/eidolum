@@ -14,6 +14,7 @@ import StockPrice from '../components/StockPrice';
 import SourceBadge from '../components/SourceBadge';
 import Footer from '../components/Footer';
 import { getAssetConsensus } from '../api';
+import useCommentCounts from '../hooks/useCommentCounts';
 import { pluralize } from '../utils/pluralize';
 import { formatDate } from '../utils/formatDate';
 
@@ -23,6 +24,12 @@ export default function AssetConsensus() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  // One bulk request for the recent-predictions cards' comment counts
+  // instead of one per card. These cards carry a forecaster → 'analyst'.
+  const commentCounts = useCommentCounts(
+    (data?.recent_predictions || []).map(p => p.prediction_id || p.id),
+    'analyst'
+  );
 
   useEffect(() => {
     setLoading(true);
@@ -218,7 +225,12 @@ export default function AssetConsensus() {
             <div className="lg:hidden space-y-3 mb-6">
               <h2 className="text-base font-semibold mb-2">Recent Predictions</h2>
               {(data.recent_predictions || []).map((p) => (
-                <PredictionCard key={p.prediction_id} prediction={p} showForecaster />
+                <PredictionCard
+                  key={p.prediction_id}
+                  prediction={p}
+                  showForecaster
+                  commentCount={commentCounts ? (commentCounts[p.prediction_id || p.id] ?? 0) : null}
+                />
               ))}
             </div>
 

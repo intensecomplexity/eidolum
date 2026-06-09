@@ -37,28 +37,46 @@ api.get = (url, config = {}) => {
 
 // Simple response cache to prevent re-fetches on navigation (2 min TTL)
 const _responseCache = {};
-function cachedGet(url, ttlMs = 120000) {
+function cachedGet(url, ttlMs = 120000, config = undefined) {
   const now = Date.now();
   const entry = _responseCache[url];
   if (entry && (now - entry.time) < ttlMs) {
     return Promise.resolve({ data: entry.data });
   }
-  return api.get(url).then(r => {
+  return api.get(url, config).then(r => {
     _responseCache[url] = { data: r.data, time: now };
     return r;
   });
 }
 
+// ── Vercel edge cache routing (perf ship 2) ──────────────────────────────────
+// Public, non-personalized GETs go through the same-origin edge proxy
+// (frontend/api/edge/[...path].js) so they're served from the nearest Vercel
+// POP instead of paying the Railway round-trip every time. The edge function
+// holds the authoritative allowlist (anything else 404s); _edgeConfig is the
+// frontend's single switch for which calls opt in. These requests never carry
+// Authorization — the proxied endpoints are public by verified construction.
+//
+// ROLLBACK LEVER: set USE_EDGE_CACHE = false to send every call back to
+// api.eidolum.com directly. No edge-function change or backend change needed.
+// Local dev: edge functions don't run under `npm run dev`, so DEV always
+// falls back to VITE_API_BASE.
+const USE_EDGE_CACHE = true;
+function _edgeConfig(config = {}) {
+  if (!USE_EDGE_CACHE || import.meta.env.DEV) return config;
+  return { ...config, baseURL: '/api/edge' };
+}
+
 export function getLeaderboard(params = {}) {
   // Cache default leaderboard (no filters) for 2 minutes
   if (Object.keys(params).length === 0) {
-    return cachedGet('/leaderboard').then(r => r.data);
+    return cachedGet('/leaderboard', 120000, _edgeConfig()).then(r => r.data);
   }
-  return api.get('/leaderboard', { params }).then(r => r.data);
+  return api.get('/leaderboard', _edgeConfig({ params })).then(r => r.data);
 }
 
 export function getAvailableTimeframes() {
-  return cachedGet('/leaderboard/available-timeframes').then(r => r.data);
+  return cachedGet('/leaderboard/available-timeframes', 120000, _edgeConfig()).then(r => r.data);
 }
 
 export function getFirm(slug) {
@@ -86,7 +104,7 @@ export function getForecasterSimulator(id, options = {}) {
 }
 
 export function getSectors() {
-  return api.get('/sectors').then(r => r.data);
+  return api.get('/sectors', _edgeConfig()).then(r => r.data);
 }
 
 // ── Product Themes (v1 — filter + tag only) ────────────────────────────
@@ -94,11 +112,11 @@ export function getSectors() {
 // gate rendering on data presence alone — no separate flag fetch.
 
 export function getThemes() {
-  return api.get('/themes').then(r => r.data);
+  return api.get('/themes', _edgeConfig()).then(r => r.data);
 }
 
 export function getThemeDetail(slug) {
-  return api.get(`/themes/${slug}`).then(r => r.data);
+  return api.get(`/themes/${slug}`, _edgeConfig()).then(r => r.data);
 }
 
 export function adminListThemes() {
@@ -157,7 +175,7 @@ export function getFollowThroughLeaderboard({ window = '3m', limit = 50, minDisc
 }
 
 export function getAssetConsensus(ticker, days = 90) {
-  return api.get(`/asset/${ticker}/consensus`, { params: { days } }).then(r => r.data);
+  return api.get(`/asset/${ticker}/consensus`, _edgeConfig({ params: { days } })).then(r => r.data);
 }
 
 export function getPendingPredictions() {
@@ -173,14 +191,17 @@ export function getHomepageStats() {
 }
 
 export function getHomepageData() {
-  return cachedGet('/homepage-data').then(r => r.data);
+  return cachedGet('/homepage-data', 120000, _edgeConfig()).then(r => r.data);
 }
 
 export function getFeatureFlags({ fresh = false } = {}) {
   // Admin toggle handlers pass fresh:true so the post-toggle refetch
   // bypasses the 5-minute in-memory cache and reflects the new value.
   if (fresh) delete _responseCache['/features'];
-  return cachedGet('/features', 300000).then(r => r.data);
+  // fresh:true also bypasses the EDGE cache (direct origin) so an admin's
+  // post-toggle refetch reflects the new value immediately — the edge TTL
+  // would otherwise reintroduce the /features stuck-UI landmine.
+  return cachedGet('/features', 300000, fresh ? undefined : _edgeConfig()).then(r => r.data);
 }
 
 export function getPublicFlags({ fresh = false } = {}) {
@@ -188,7 +209,8 @@ export function getPublicFlags({ fresh = false } = {}) {
   // Distinct from /features so the public home page doesn't fetch
   // the full Haiku-internal flag bundle.
   if (fresh) delete _responseCache['/public/flags'];
-  return cachedGet('/public/flags', 300000).then(r => r.data);
+  // Same fresh:true edge bypass as getFeatureFlags.
+  return cachedGet('/public/flags', 300000, fresh ? undefined : _edgeConfig()).then(r => r.data);
 }
 
 export function toggleHomepageHeroAdmin() {
@@ -323,7 +345,7 @@ export function getTrendingTickers() {
 
 export function getTickerDetail(ticker) {
   // Use the consensus endpoint directly — it always works and has all the data
-  return api.get(`/asset/${ticker}/consensus`).then(c => _mergeConsensus(ticker, c.data)).catch(() => null);
+  return api.get(`/asset/${ticker}/consensus`, _edgeConfig()).then(c => _mergeConsensus(ticker, c.data)).catch(() => null);
 }
 
 function _mergeConsensus(ticker, c) {
@@ -394,7 +416,7 @@ export function getPlatforms() {
 }
 
 export function getPlatformDetail(platformId, params = {}) {
-  return api.get(`/platforms/${platformId}`, { params }).then(r => r.data);
+  return api.get(`/platforms/${platformId}`, _edgeConfig({ params })).then(r => r.data);
 }
 
 export function triggerSync() {
@@ -473,11 +495,11 @@ export function getConflictPredictions() {
 }
 
 export function getTodayPredictions() {
-  return api.get('/predictions/today').then(r => r.data);
+  return api.get('/predictions/today', _edgeConfig()).then(r => r.data);
 }
 
 export function getRecentPredictions(params = {}) {
-  return api.get('/predictions/recent', { params }).then(r => r.data);
+  return api.get('/predictions/recent', _edgeConfig({ params })).then(r => r.data);
 }
 
 export function getContrarianSignals() {
@@ -886,7 +908,7 @@ export function trackReferral(ref, predictionId) {
 // ——— Global Stats ———
 
 export function getGlobalStats() {
-  return api.get('/stats/global').then(r => r.data);
+  return api.get('/stats/global', _edgeConfig()).then(r => r.data);
 }
 
 // ——— Activity Feed ———
@@ -1043,7 +1065,7 @@ export function getTickerConsensus(ticker) {
 }
 
 export function getAllConsensus(params = {}) {
-  return api.get('/consensus', { params }).then(r => r.data);
+  return api.get('/consensus', _edgeConfig({ params })).then(r => r.data);
 }
 
 export function getExpiringPredictions() {
