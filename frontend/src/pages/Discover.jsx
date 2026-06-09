@@ -227,14 +227,14 @@ export default function Discover() {
               {sectors.filter(s => (s.sector || s.name) !== 'Other').slice(0, 9).map(s => {
                 const name = s.sector || s.name;
                 const count = s.total_predictions || s.prediction_count || s.count || 0;
-                const topName = s.top_forecasters?.[0]?.name;
+                const top = s.top_forecasters?.[0];
                 return (
                   <Link key={name} to={`/consensus?sector=${encodeURIComponent(name)}`}
                     className="card py-3 text-center hover:bg-surface-2 transition-colors">
                     <div className="text-sm font-medium text-text-primary">{formatSectorName(name)}</div>
                     <div className="text-[10px] text-muted font-mono">{count.toLocaleString()} predictions</div>
                     {s.accuracy > 0 && <div className="text-[10px] text-accent font-mono">{s.accuracy}% accuracy</div>}
-                    {topName && <div className="text-[10px] text-text-secondary mt-0.5 truncate">Top: {topName}</div>}
+                    {top && <div className="text-[10px] text-text-secondary mt-0.5 truncate">Top: {top.name} — {top.accuracy}% · {pluralize(top.count, 'call')}</div>}
                   </Link>
                 );
               })}

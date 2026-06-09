@@ -7,6 +7,7 @@ import PageHeader from '../components/PageHeader';
 import useSEO from '../hooks/useSEO';
 import { getSectors } from '../api';
 import { formatSectorName } from '../utils/formatSectorName';
+import { pluralize } from '../utils/pluralize';
 
 export default function AllSectors() {
   useSEO({
@@ -50,7 +51,7 @@ export default function AllSectors() {
             {visible.map(s => {
               const name = s.sector || s.name;
               const count = s.total_predictions || s.prediction_count || s.count || 0;
-              const topName = s.top_forecasters?.[0]?.name;
+              const top = s.top_forecasters?.[0];
               return (
                 <Link
                   key={name}
@@ -62,8 +63,10 @@ export default function AllSectors() {
                   {s.accuracy > 0 && (
                     <div className="text-[10px] text-accent font-mono">{s.accuracy}% accuracy</div>
                   )}
-                  {topName && (
-                    <div className="text-[10px] text-text-secondary mt-0.5 truncate">Top: {topName}</div>
+                  {top && (
+                    <div className="text-[10px] text-text-secondary mt-0.5 truncate">
+                      Top: {top.name} — {top.accuracy}% · {pluralize(top.count, 'call')}
+                    </div>
                   )}
                 </Link>
               );
