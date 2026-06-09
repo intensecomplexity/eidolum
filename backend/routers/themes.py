@@ -127,30 +127,42 @@ def get_theme_detail(request: Request, slug: str, db: Session = Depends(get_db))
     total = int(consensus[0] or 0)
 
     # Top forecasters — mirrors /api/sectors (leaderboard.get_sectors):
-    # ranked by ACCURACY (canonical (hits + nears*0.5)/scored formula),
-    # volume as tiebreak, floored at THEME_SECTOR_MIN_SCORED (default 5)
-    # scored predictions within the theme. Raw-score ordering let high-
-    # volume/mediocre names outrank high-accuracy/decent-sample ones.
-    from feature_flags import get_theme_sector_min_scored
+    # Bayesian-shrunk accuracy rank, adjusted = (points + C*m)/(scored + C)
+    # with m = the theme's pooled mean accuracy over qualifying
+    # forecasters and C = THEME_SECTOR_SHRINKAGE_C (default 20). Small
+    # samples shrink toward the theme mean; large samples converge to
+    # raw accuracy. `adjusted` is an internal SORT KEY only — the
+    # response carries raw accuracy + n. Floor THEME_SECTOR_MIN_SCORED
+    # (default 3) just trims 1-2-call records.
+    from feature_flags import (
+        get_theme_sector_min_scored, get_theme_sector_shrinkage_c,
+    )
     min_scored = get_theme_sector_min_scored(db)
+    shrink_c = get_theme_sector_shrinkage_c(db)
     top_rows = db.execute(sql_text(f"""
-        SELECT f.id, f.name,
-               SUM(CASE WHEN p.outcome IN ('hit','correct') THEN 1.0
-                        WHEN p.outcome = 'near' THEN 0.5 ELSE 0 END) AS score,
-               COUNT(*) AS evaluated
-        FROM predictions p
-        JOIN forecasters f ON f.id = p.forecaster_id
-        WHERE p.ticker IN (SELECT ticker FROM theme_tickers WHERE theme_id = :tid)
-          AND p.outcome IN ('hit','near','miss','correct','incorrect')
-          AND {_YT_VIS_P}{_HEDGED_P}
-        GROUP BY f.id, f.name
-        HAVING COUNT(*) >= :min_scored
-        ORDER BY SUM(CASE WHEN p.outcome IN ('hit','correct') THEN 1.0
-                          WHEN p.outcome = 'near' THEN 0.5 ELSE 0 END)
-                   / COUNT(*) DESC,
-                 COUNT(*) DESC, f.id ASC
+        WITH per_f AS (
+            SELECT f.id, f.name,
+                   SUM(CASE WHEN p.outcome IN ('hit','correct') THEN 1.0
+                            WHEN p.outcome = 'near' THEN 0.5 ELSE 0 END) AS score,
+                   COUNT(*) AS evaluated
+            FROM predictions p
+            JOIN forecasters f ON f.id = p.forecaster_id
+            WHERE p.ticker IN (SELECT ticker FROM theme_tickers WHERE theme_id = :tid)
+              AND p.outcome IN ('hit','near','miss','correct','incorrect')
+              AND {_YT_VIS_P}{_HEDGED_P}
+            GROUP BY f.id, f.name
+            HAVING COUNT(*) >= :min_scored
+        )
+        SELECT id, name, score, evaluated,
+               (score + :shrink_c * COALESCE(
+                    SUM(score) OVER () / NULLIF(SUM(evaluated) OVER (), 0),
+                    0.5))
+                 / (evaluated + :shrink_c) AS adjusted
+        FROM per_f
+        ORDER BY adjusted DESC, evaluated DESC, id ASC
         LIMIT 10
-    """), {"tid": theme_id, "min_scored": min_scored}).fetchall()
+    """), {"tid": theme_id, "min_scored": min_scored,
+           "shrink_c": shrink_c}).fetchall()
     top_forecasters = [
         {
             "id": r[0],

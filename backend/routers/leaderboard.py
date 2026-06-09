@@ -1123,33 +1123,47 @@ def get_sectors(request: Request, db: Session = Depends(get_db)):
         sector_names.append(r[0])
 
     # Fetch top forecasters per sector in a single query. Ranked by
-    # ACCURACY (the canonical (hits + nears*0.5)/scored three-tier
-    # formula, same as refresh_all_forecaster_stats), volume as the
-    # tiebreak — NOT by raw score, which let 43%/90-call analysts
-    # outrank 88%/37-call ones. Floor: THEME_SECTOR_MIN_SCORED config
-    # key (default 5) scored predictions within the sector.
+    # Bayesian-shrunk accuracy: adjusted = (points + C*m) / (scored + C)
+    # where points = hits + 0.5*nears (canonical three-tier numerator),
+    # m = the sector's pooled mean accuracy over qualifying forecasters,
+    # and C = THEME_SECTOR_SHRINKAGE_C (default 20) pseudo-calls of
+    # "average" blended into every record. Small samples shrink toward
+    # the sector mean (100%-on-6 can't top the list on a coin flip);
+    # large samples converge to their raw accuracy. `adjusted` is an
+    # internal SORT KEY only — the response carries raw accuracy + n.
+    # Floor: THEME_SECTOR_MIN_SCORED (default 3) just trims 1-2-call
+    # records; shrinkage is the real small-sample guard.
     if sector_names:
-        from feature_flags import get_theme_sector_min_scored
+        from feature_flags import (
+            get_theme_sector_min_scored, get_theme_sector_shrinkage_c,
+        )
         min_scored = get_theme_sector_min_scored(db)
+        shrink_c = get_theme_sector_shrinkage_c(db)
         forecaster_rows = db.execute(sql_text(f"""
-            SELECT ts.sector, f.id, f.name,
-                   SUM(CASE WHEN p.outcome IN ('hit','correct') THEN 1.0
-                            WHEN p.outcome = 'near' THEN 0.5 ELSE 0 END) as score,
-                   COUNT(*) as evaluated
-            FROM predictions p
-            JOIN forecasters f ON f.id = p.forecaster_id
-            JOIN ticker_sectors ts ON ts.ticker = p.ticker
-            WHERE ts.sector = ANY(:sectors)
-              AND p.outcome IN ('hit','near','miss','correct','incorrect')
-              AND {_YT_VIS_P}{_HEDGED_P}
-            GROUP BY ts.sector, f.id, f.name
-            HAVING COUNT(*) >= :min_scored
-            ORDER BY ts.sector,
-                     SUM(CASE WHEN p.outcome IN ('hit','correct') THEN 1.0
-                              WHEN p.outcome = 'near' THEN 0.5 ELSE 0 END)
-                       / COUNT(*) DESC,
-                     COUNT(*) DESC, f.id ASC
-        """), {"sectors": sector_names, "min_scored": min_scored}).fetchall()
+            WITH per_f AS (
+                SELECT ts.sector, f.id, f.name,
+                       SUM(CASE WHEN p.outcome IN ('hit','correct') THEN 1.0
+                                WHEN p.outcome = 'near' THEN 0.5 ELSE 0 END) as score,
+                       COUNT(*) as evaluated
+                FROM predictions p
+                JOIN forecasters f ON f.id = p.forecaster_id
+                JOIN ticker_sectors ts ON ts.ticker = p.ticker
+                WHERE ts.sector = ANY(:sectors)
+                  AND p.outcome IN ('hit','near','miss','correct','incorrect')
+                  AND {_YT_VIS_P}{_HEDGED_P}
+                GROUP BY ts.sector, f.id, f.name
+                HAVING COUNT(*) >= :min_scored
+            )
+            SELECT sector, id, name, score, evaluated,
+                   (score + :shrink_c * COALESCE(
+                        SUM(score) OVER (PARTITION BY sector)
+                          / NULLIF(SUM(evaluated) OVER (PARTITION BY sector), 0),
+                        0.5))
+                     / (evaluated + :shrink_c) AS adjusted
+            FROM per_f
+            ORDER BY sector, adjusted DESC, evaluated DESC, id ASC
+        """), {"sectors": sector_names, "min_scored": min_scored,
+               "shrink_c": shrink_c}).fetchall()
 
         # Group by sector and keep top 3
         top_by_sector = {}

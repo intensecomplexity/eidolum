@@ -729,18 +729,18 @@ def invalidate_product_themes_flag_cache() -> None:
 #
 # Minimum SCORED predictions a forecaster needs WITHIN a sector/theme to
 # appear in that slice's "top forecasters" ranking (/api/sectors and
-# /api/themes/{slug}). Default 5 — deliberately below the global
-# leaderboard's sliced-view floor of 10 because these are narrow slices;
-# 10 would empty out small themes (weight-loss-glp1 etc.). Trade-off:
-# raise it for stricter/fewer names, lower it for noisier lists.
+# /api/themes/{slug}). Default 3: with Bayesian shrinkage doing the
+# small-sample skepticism (see THEME_SECTOR_SHRINKAGE_C below), the
+# floor's only job is to drop trivially-small 1-2-call records — it is
+# no longer the main guard against coin-flip toppers.
 
-_THEME_SECTOR_MIN_SCORED_CACHE: dict = {"val": 5, "fetched_at": 0.0}
+_THEME_SECTOR_MIN_SCORED_CACHE: dict = {"val": 3, "fetched_at": 0.0}
 _THEME_SECTOR_MIN_SCORED_TTL = 60  # seconds
-THEME_SECTOR_MIN_SCORED_DEFAULT = 5
+THEME_SECTOR_MIN_SCORED_DEFAULT = 3
 
 
 def get_theme_sector_min_scored(db) -> int:
-    """Return the THEME_SECTOR_MIN_SCORED config value (default 5).
+    """Return the THEME_SECTOR_MIN_SCORED config value (default 3).
     Cached 60s. Clamped to >= 1 so a bad config value can never divide
     the ranking into an unfloored free-for-all."""
     now = time.time()
@@ -751,4 +751,36 @@ def get_theme_sector_min_scored(db) -> int:
         val = 1
     _THEME_SECTOR_MIN_SCORED_CACHE["val"] = val
     _THEME_SECTOR_MIN_SCORED_CACHE["fetched_at"] = now
+    return val
+
+
+# ── Sector/theme top-forecaster shrinkage weight ────────────────────────────
+#
+# C = pseudo-count weight for the Bayesian shrinkage rank on /api/sectors
+# and /api/themes/{slug}: adjusted = (points + C*m) / (scored + C), where
+# m is the slice's pooled mean accuracy and points = hits + 0.5*nears.
+# Blends C "average" calls into every record: small samples get pulled
+# toward the slice mean (100%-on-6 can't top the list on a coin-flip),
+# large samples converge to their true accuracy. Higher C = more
+# skeptical of small samples; lower C = closer to raw accuracy order.
+# Internal SORT KEY ONLY — never displayed; cards keep showing raw
+# accuracy + sample size.
+
+_THEME_SECTOR_SHRINKAGE_C_CACHE: dict = {"val": 20, "fetched_at": 0.0}
+_THEME_SECTOR_SHRINKAGE_C_TTL = 60  # seconds
+THEME_SECTOR_SHRINKAGE_C_DEFAULT = 20
+
+
+def get_theme_sector_shrinkage_c(db) -> int:
+    """Return the THEME_SECTOR_SHRINKAGE_C config value (default 20).
+    Cached 60s. Clamped to >= 1 — C=0 would disable shrinkage entirely
+    and reintroduce the tiny-sample-tops-the-list failure mode."""
+    now = time.time()
+    if (now - _THEME_SECTOR_SHRINKAGE_C_CACHE["fetched_at"]) < _THEME_SECTOR_SHRINKAGE_C_TTL:
+        return int(_THEME_SECTOR_SHRINKAGE_C_CACHE["val"])
+    val = _read_int(db, "THEME_SECTOR_SHRINKAGE_C", default=THEME_SECTOR_SHRINKAGE_C_DEFAULT)
+    if val < 1:
+        val = 1
+    _THEME_SECTOR_SHRINKAGE_C_CACHE["val"] = val
+    _THEME_SECTOR_SHRINKAGE_C_CACHE["fetched_at"] = now
     return val
