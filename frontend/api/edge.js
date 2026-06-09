@@ -67,6 +67,10 @@ const ALLOWLIST = [
   /^firms$/,
   /^firm\/[a-z0-9-]{1,100}$/,
   /^earnings\/upcoming$/,
+  // Perf ship 4 — eligible after the e832e3e backend rewrite (was a
+  // guaranteed 504). Exact match only: /analysts/subscriptions and the
+  // other personalized sub-paths stay direct.
+  /^analysts$/,
 ];
 
 const LONG = 'public, s-maxage=600, stale-while-revalidate=1200';
@@ -93,7 +97,8 @@ function cacheControlFor(path, ok) {
     path === 'trending-tickers' ||
     path === 'predictions/expiring' ||
     path === 'firms' || path.startsWith('firm/') ||
-    path === 'earnings/upcoming'
+    path === 'earnings/upcoming' ||
+    path === 'analysts'
   ) return FEED;
   return MED;
 }
