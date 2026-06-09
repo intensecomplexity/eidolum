@@ -29,6 +29,7 @@ import {
   getReportCards,
   getForecasterDisclosures,
   getForecasterImpliedPortfolio,
+  getCommentCounts,
 } from '../api';
 import DisclosureCard from '../components/DisclosureCard';
 import { annotateContext, ExplainerLine, ratingChangeLabel } from '../utils/predictionExplainer';
@@ -137,6 +138,12 @@ export default function ForecasterProfile() {
   const [nextPage, setNextPage] = useState(2);
   const [hasMore, setHasMore] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
+  // Comment counts for the visible prediction cards, bulk-fetched once per
+  // page of predictions (was: 25 separate /comments/count requests per view).
+  // null = first bulk fetch not resolved yet — cards render without firing
+  // their own per-id fallback fetch.
+  const [commentCounts, setCommentCounts] = useState(null);
+  const requestedCountIdsRef = useRef(new Set());
   // Map forecaster platform to platformId for routing
   const PLATFORM_ID_MAP = { youtube: 'youtube', x: 'twitter', reddit: 'reddit', congress: 'congress', institutional: 'institutional' };
 
@@ -195,6 +202,25 @@ export default function ForecasterProfile() {
       setData(d);
     }).catch(() => {});
   }, [activeSector]);
+
+  // Bulk comment counts — one request per page of prediction cards. Only
+  // fetches ids not already requested (pagination appends new pages).
+  useEffect(() => {
+    const preds = [...(data?.predictions || []), ...extraPreds];
+    const ids = preds.map(p => p.id || p.prediction_id).filter(Boolean);
+    const missing = ids.filter(pid => !requestedCountIdsRef.current.has(pid));
+    if (missing.length === 0) return;
+    missing.forEach(pid => requestedCountIdsRef.current.add(pid));
+    getCommentCounts(missing, 'analyst')
+      .then(d => {
+        const c = d?.counts || {};
+        setCommentCounts(prev => ({
+          ...(prev || {}),
+          ...Object.fromEntries(missing.map(pid => [pid, c[pid] ?? c[String(pid)] ?? 0])),
+        }));
+      })
+      .catch(() => setCommentCounts(prev => prev || {}));
+  }, [data, extraPreds]);
 
   // Lazy-fetch disclosures the first time the Holdings tab activates.
   // Reuses the same forecaster id resolved by the slug or route param.
@@ -914,7 +940,11 @@ export default function ForecasterProfile() {
           <h2 className="text-base font-semibold mb-2">Prediction History</h2>
           {displayedPredictions.map((p) => (
             <div key={p.id} className="bg-surface border border-border rounded-xl overflow-hidden p-4" style={{ wordBreak: 'break-word' }}>
-              <PredictionCard prediction={p} forecaster={data} />
+              <PredictionCard
+                prediction={p}
+                forecaster={data}
+                commentCount={commentCounts ? (commentCounts[p.id || p.prediction_id] ?? 0) : null}
+              />
             </div>
           ))}
         </div>

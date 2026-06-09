@@ -639,6 +639,13 @@ export function getCommentCount(predictionId, source) {
   return api.get(`/comments/count/${predictionId}/${source}`).then(r => r.data);
 }
 
+// Bulk replacement for the per-card count N+1: one request per page of cards.
+// Returns { counts: { "<predictionId>": n, ... } } — absent id means 0.
+export function getCommentCounts(ids, source = 'analyst') {
+  if (!ids || ids.length === 0) return Promise.resolve({ counts: {} });
+  return api.get('/comments/counts', { params: { ids: ids.slice(0, 100).join(','), type: source } }).then(r => r.data);
+}
+
 // ——— Credibility ———
 
 export function getUserCredibility(userId) {

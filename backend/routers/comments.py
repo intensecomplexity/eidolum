@@ -206,6 +206,37 @@ def delete_comment(
     return {"status": "deleted"}
 
 
+# ── GET /api/comments/counts?ids=1,2,3&type=analyst ──────────────────────────
+# Bulk replacement for the per-card /comments/count N+1 (25 requests per
+# profile page → 1). Missing ids are simply absent from the map — the
+# frontend treats absence as 0.
+
+
+@router.get("/comments/counts")
+@limiter.limit("120/minute")
+def comment_counts_bulk(
+    request: Request,
+    ids: str = Query(..., description="Comma-separated prediction ids, max 100"),
+    type: str = Query("analyst", description="Prediction source: analyst | user"),
+    db: Session = Depends(get_db),
+):
+    try:
+        id_list = [int(x) for x in ids.split(",") if x.strip()][:100]
+    except ValueError:
+        raise HTTPException(status_code=422, detail="ids must be comma-separated integers")
+    if not id_list:
+        return {"counts": {}}
+
+    from sqlalchemy import text as sql_text
+    rows = db.execute(sql_text("""
+        SELECT prediction_id, COUNT(*)
+        FROM prediction_comments
+        WHERE prediction_id = ANY(:ids) AND prediction_source = :src
+        GROUP BY prediction_id
+    """), {"ids": id_list, "src": type}).fetchall()
+    return {"counts": {str(r[0]): r[1] for r in rows}}
+
+
 # ── GET /api/comments/count/{prediction_id}/{prediction_source} ───────────────
 
 
