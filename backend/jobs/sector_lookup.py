@@ -78,6 +78,18 @@ TICKER_SECTOR_OVERRIDES: dict[str, str] = {
     "LYB": "Basic Materials",
     "SPWR": "Technology",
     "RUN": "Technology",
+    # Round 5 (2026-06-10, flagged-tail closeout). Deliberately NOT
+    # overridden: ROP/ATI/DASH (genuinely ambiguous), BTU (reference is
+    # wrong but the stamps already say Energy — correct as-is).
+    "GRPN": "Consumer Cyclical",
+    "IAC": "Communication Services",
+    "RBLX": "Communication Services",
+    "TWLO": "Technology",
+    "FISV": "Technology",
+    "GPN": "Technology",
+    "KMT": "Industrials",
+    "TREX": "Industrials",
+    "AWI": "Industrials",
 }
 
 # Every override must be one of the 13 display buckets — fail loudly at
