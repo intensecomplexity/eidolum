@@ -36,3 +36,4 @@ backend/scripts/flag_smoke_test_results.json
 
 # Classifier-error recovery — checkpoint + progress artifacts, local-only
 backend/scripts/_artifacts/
+.x_probe_ckpt/
