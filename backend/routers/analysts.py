@@ -87,27 +87,73 @@ def list_analysts(
         f"SELECT COUNT(*) FROM forecasters f {where}"
     ), params).scalar() or 0
 
-    rows = db.execute(sql_text(f"""
-        SELECT f.id, f.name, f.handle, f.platform,
-               f.total_predictions, f.correct_predictions,
-               COALESCE(agg.total_all, 0) AS total_all,
-               COALESCE(agg.scored, 0) AS scored,
-               COALESCE(agg.correct, 0) AS correct,
-               agg.last_pred
-        FROM forecasters f
-        LEFT JOIN (
-            SELECT forecaster_id,
-                   COUNT(*) AS total_all,
-                   COUNT(*) FILTER (WHERE outcome IN ('hit','near','miss','correct','incorrect')) AS scored,
-                   COUNT(*) FILTER (WHERE outcome IN ('hit','correct')) AS correct,
-                   MAX(prediction_date) AS last_pred
-            FROM predictions
-            GROUP BY forecaster_id
-        ) agg ON agg.forecaster_id = f.id
-        {where}
-        ORDER BY {order_by}
-        LIMIT :limit OFFSET :offset
-    """), params).fetchall()
+    if sort not in ("accuracy", "recent"):
+        # FAST PATH (default 'volume' sort): the sort key is the cached
+        # f.total_predictions column, so the page can be selected FIRST and
+        # the predictions aggregation runs only for the <=limit rows on it
+        # (LATERAL MAX via idx_pred_forecaster_date — manual DDL 2026-06-13 —
+        # plus a counts lateral that short-circuits for cached rows).
+        # ~5ms vs the ~112ms whole-table GROUP BY.
+        rows = db.execute(sql_text(f"""
+            WITH page AS (
+                SELECT f.id, f.name, f.handle, f.platform,
+                       f.total_predictions, f.correct_predictions
+                FROM forecasters f
+                {where}
+                ORDER BY f.total_predictions DESC NULLS LAST, f.id ASC
+                LIMIT :limit OFFSET :offset
+            )
+            SELECT page.id, page.name, page.handle, page.platform,
+                   page.total_predictions, page.correct_predictions,
+                   COALESCE(ag.total_all, 0) AS total_all,
+                   COALESCE(ag.scored, 0) AS scored,
+                   COALESCE(ag.correct, 0) AS correct,
+                   lp.last_pred
+            FROM page
+            LEFT JOIN LATERAL (
+                SELECT MAX(p.prediction_date) AS last_pred
+                FROM predictions p WHERE p.forecaster_id = page.id
+            ) lp ON true
+            LEFT JOIN LATERAL (
+                -- Counts only matter for rows WITHOUT cached stats (the
+                -- response uses cached columns otherwise); the constant
+                -- predicate makes this a no-op index probe for cached rows.
+                SELECT COUNT(*) AS total_all,
+                       COUNT(*) FILTER (WHERE p.outcome IN ('hit','near','miss','correct','incorrect')) AS scored,
+                       COUNT(*) FILTER (WHERE p.outcome IN ('hit','correct')) AS correct
+                FROM predictions p
+                WHERE p.forecaster_id = page.id
+                  AND COALESCE(page.total_predictions, 0) = 0
+            ) ag ON true
+            ORDER BY page.total_predictions DESC NULLS LAST, page.id ASC
+        """), params).fetchall()
+    else:
+        # FULL-AGGREGATE PATH: 'accuracy' needs per-forecaster prediction
+        # counts for its sort key on the 563 zero-cached-but-has-predictions
+        # rows, and 'recent' sorts on MAX(prediction_date) — neither key is
+        # cached, so ordering globally requires aggregating before LIMIT.
+        # Identical to the pre-restructure query.
+        rows = db.execute(sql_text(f"""
+            SELECT f.id, f.name, f.handle, f.platform,
+                   f.total_predictions, f.correct_predictions,
+                   COALESCE(agg.total_all, 0) AS total_all,
+                   COALESCE(agg.scored, 0) AS scored,
+                   COALESCE(agg.correct, 0) AS correct,
+                   agg.last_pred
+            FROM forecasters f
+            LEFT JOIN (
+                SELECT forecaster_id,
+                       COUNT(*) AS total_all,
+                       COUNT(*) FILTER (WHERE outcome IN ('hit','near','miss','correct','incorrect')) AS scored,
+                       COUNT(*) FILTER (WHERE outcome IN ('hit','correct')) AS correct,
+                       MAX(prediction_date) AS last_pred
+                FROM predictions
+                GROUP BY forecaster_id
+            ) agg ON agg.forecaster_id = f.id
+            {where}
+            ORDER BY {order_by}
+            LIMIT :limit OFFSET :offset
+        """), params).fetchall()
 
     results = []
     for r in rows:
