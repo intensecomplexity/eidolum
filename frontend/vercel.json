@@ -3,9 +3,9 @@
   "outputDirectory": "dist",
   "framework": "vite",
   "rewrites": [
-    { "source": "/sitemap.xml", "destination": "https://eidolum-production.up.railway.app/sitemap.xml" },
-    { "source": "/robots.txt", "destination": "https://eidolum-production.up.railway.app/robots.txt" },
-    { "source": "/api/og-image/:path*", "destination": "https://eidolum-production.up.railway.app/api/og-image/:path*" },
+    { "source": "/sitemap.xml", "destination": "https://api.eidolum.com/sitemap.xml" },
+    { "source": "/robots.txt", "destination": "https://api.eidolum.com/robots.txt" },
+    { "source": "/api/og-image/:path*", "destination": "https://api.eidolum.com/api/og-image/:path*" },
     { "source": "/api/edge/:path*", "destination": "/api/edge?path=:path*" },
     { "source": "/((?!api/).*)", "destination": "/index.html" }
   ],
@@ -45,7 +45,7 @@
         },
         {
           "key": "Content-Security-Policy-Report-Only",
-          "value": "default-src 'self'; connect-src 'self' https://eidolum-production.up.railway.app https://api.eidolum.com; img-src 'self' data:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; script-src 'self'; frame-ancestors 'self'; base-uri 'self'; object-src 'none'"
+          "value": "default-src 'self'; connect-src 'self' https://api.eidolum.com; img-src 'self' data:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; script-src 'self'; frame-ancestors 'self'; base-uri 'self'; object-src 'none'"
         },
         {
           "key": "Permissions-Policy",
