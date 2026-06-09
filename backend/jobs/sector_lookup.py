@@ -66,6 +66,18 @@ TICKER_SECTOR_OVERRIDES: dict[str, str] = {
     "IP": "Consumer Cyclical",
     "SLGN": "Consumer Cyclical",
     "GEF": "Consumer Cyclical",
+    # Round 4 (2026-06-10, final): references provably wrong by company
+    # identity — Stanley Black & Decker is not "Technology", Vail
+    # Resorts / Planet Fitness / GameStop are not "Industrials"/"Tech",
+    # LyondellBasell is chemicals, SunPower/Sunrun = solar Technology
+    # (same call as FSLR/ENPH/SEDG).
+    "SWK": "Industrials",
+    "MTN": "Consumer Cyclical",
+    "PLNT": "Consumer Cyclical",
+    "GME": "Consumer Cyclical",
+    "LYB": "Basic Materials",
+    "SPWR": "Technology",
+    "RUN": "Technology",
 }
 
 # Every override must be one of the 13 display buckets — fail loudly at
