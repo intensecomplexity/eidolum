@@ -28,20 +28,64 @@ def _accuracy(correct: int, total: int) -> float:
 # ── GET /api/analysts ─────────────────────────────────────────────────────────
 
 
+# Allowlisted ORDER BY expressions — the sort key is NEVER interpolated
+# from user input, only used to select one of these fixed strings. The
+# accuracy expression mirrors the Python source-precedence below (cached
+# forecaster columns when populated, predictions aggregate otherwise).
+# Deterministic id tiebreak so paginated/edge-cached pages never shuffle.
+_ANALYST_SORTS = {
+    "volume": "f.total_predictions DESC NULLS LAST, f.id ASC",
+    "accuracy": (
+        "(CASE WHEN COALESCE(f.total_predictions, 0) > 0 "
+        "      THEN COALESCE(f.correct_predictions, 0)::float / NULLIF(f.total_predictions, 0) "
+        "      ELSE COALESCE(agg.correct, 0)::float / NULLIF(agg.scored, 0) END) "
+        "DESC NULLS LAST, f.id ASC"
+    ),
+    "recent": "agg.last_pred DESC NULLS LAST, f.id ASC",
+}
+
+
+def _like_escape(s: str) -> str:
+    """Escape LIKE wildcards in user input (used with ESCAPE '\\')."""
+    return s.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+
+
 @router.get("/analysts")
 @limiter.limit("60/minute")
-def list_analysts(request: Request, q: str = Query(""), db: Session = Depends(get_db)):
-    """ONE aggregate query (platforms.py recipe, c47827b). The old code
-    loaded every forecaster via ORM and then ran a MAX(prediction_date)
-    query PER forecaster (~6,300 sequential queries, +3 more counts for
-    zero-stat rows) — 8.4s and a gateway 504 on every call."""
+def list_analysts(
+    request: Request,
+    q: str = Query(""),
+    platform: str = Query(None),
+    sort: str = Query("volume"),
+    limit: int = Query(100, ge=1, le=500),
+    offset: int = Query(0, ge=0),
+    db: Session = Depends(get_db),
+):
+    """ONE aggregate query (platforms.py recipe, c47827b), now paginated —
+    the full list is 6,300+ rows / ~1.3MB, and transfer dominated latency.
+    Response body stays a bare array (per-row shape unchanged); the grand
+    total rides in the X-Total-Count header so the pre-pagination frontend
+    keeps working during the deploy gap."""
+    from fastapi.responses import JSONResponse
     from sqlalchemy import text as sql_text
 
-    where = ""
-    params: dict = {}
+    clauses = []
+    params: dict = {"limit": limit, "offset": offset}
     if q.strip():
-        where = "WHERE LOWER(f.name) LIKE :pattern"
-        params["pattern"] = f"%{q.strip().lower()}%"
+        clauses.append(
+            "(LOWER(f.name) LIKE :pattern ESCAPE '\\' "
+            "OR LOWER(COALESCE(f.handle, '')) LIKE :pattern ESCAPE '\\')"
+        )
+        params["pattern"] = f"%{_like_escape(q.strip().lower())}%"
+    if platform:
+        clauses.append("f.platform = :platform")
+        params["platform"] = platform
+    where = ("WHERE " + " AND ".join(clauses)) if clauses else ""
+    order_by = _ANALYST_SORTS.get(sort, _ANALYST_SORTS["volume"])
+
+    total = db.execute(sql_text(
+        f"SELECT COUNT(*) FROM forecasters f {where}"
+    ), params).scalar() or 0
 
     rows = db.execute(sql_text(f"""
         SELECT f.id, f.name, f.handle, f.platform,
@@ -61,7 +105,8 @@ def list_analysts(request: Request, q: str = Query(""), db: Session = Depends(ge
             GROUP BY forecaster_id
         ) agg ON agg.forecaster_id = f.id
         {where}
-        ORDER BY f.total_predictions DESC NULLS LAST
+        ORDER BY {order_by}
+        LIMIT :limit OFFSET :offset
     """), params).fetchall()
 
     results = []
@@ -70,11 +115,11 @@ def list_analysts(request: Request, q: str = Query(""), db: Session = Depends(ge
         # columns when populated, the predictions aggregate otherwise.
         cached_total = r[4] or 0
         if cached_total > 0:
-            total = cached_total
+            row_total = cached_total
             scored = cached_total  # cached stats are for scored predictions
             correct = r[5] or 0
         else:
-            total = int(r[6])
+            row_total = int(r[6])
             scored = int(r[7])
             correct = int(r[8])
 
@@ -83,52 +128,14 @@ def list_analysts(request: Request, q: str = Query(""), db: Session = Depends(ge
             "name": r[1],
             "handle": r[2],
             "platform": r[3],
-            "total_predictions": total,
+            "total_predictions": row_total,
             "scored_predictions": scored,
             "correct_predictions": correct,
             "accuracy": _accuracy(correct, scored),
             "most_recent": r[9].isoformat() if r[9] else None,
         })
 
-    return results
-
-
-# ── GET /api/analysts/rankings ────────────────────────────────────────────────
-
-
-@router.get("/analysts/rankings")
-@limiter.limit("60/minute")
-def analyst_rankings(request: Request, db: Session = Depends(get_db)):
-    forecasters = db.query(Forecaster).all()
-
-    results = []
-    for f in forecasters:
-        scored = db.query(func.count(Prediction.id)).filter(
-            Prediction.forecaster_id == f.id,
-            Prediction.outcome.in_(["hit","near","miss","correct","incorrect"]),
-        ).scalar() or 0
-        if scored < 10:
-            continue
-        correct = db.query(func.count(Prediction.id)).filter(
-            Prediction.forecaster_id == f.id,
-            Prediction.outcome.in_(("hit", "correct")),
-        ).scalar() or 0
-
-        results.append({
-            "id": f.id,
-            "name": f.name,
-            "platform": f.platform,
-            "scored_predictions": scored,
-            "correct_predictions": correct,
-            "accuracy": _accuracy(correct, scored),
-            "streak": f.streak or 0,
-        })
-
-    results.sort(key=lambda x: (x["accuracy"], x["scored_predictions"]), reverse=True)
-    for i, r in enumerate(results):
-        r["rank"] = i + 1
-
-    return results[:50]
+    return JSONResponse(content=results, headers={"X-Total-Count": str(total)})
 
 
 # ── GET /api/analysts/subscriptions ───────────────────────────────────────────

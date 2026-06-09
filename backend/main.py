@@ -4119,6 +4119,10 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["Authorization", "Content-Type", "X-Admin-Secret"],
+    # Pagination totals (e.g. /api/analysts) ride in a response header so
+    # the body can stay a bare array; expose it or cross-origin JS can't
+    # read it.
+    expose_headers=["X-Total-Count"],
 )
 
 # Serve archived screenshots
