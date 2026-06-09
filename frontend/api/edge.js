@@ -134,12 +134,18 @@ export default async function handler(request) {
     });
   }
 
+  const headers = {
+    'content-type': upstream.headers.get('content-type') || 'application/json',
+    'cache-control': cacheControlFor(path, upstream.ok),
+    'x-edge-proxy': 'eidolum-public-get',
+  };
+  // Pagination totals (e.g. /analysts) ride in this header — forward it,
+  // since we build the response with explicit headers only.
+  const totalCount = upstream.headers.get('x-total-count');
+  if (totalCount) headers['x-total-count'] = totalCount;
+
   return new Response(upstream.body, {
     status: upstream.status,
-    headers: {
-      'content-type': upstream.headers.get('content-type') || 'application/json',
-      'cache-control': cacheControlFor(path, upstream.ok),
-      'x-edge-proxy': 'eidolum-public-get',
-    },
+    headers,
   });
 }
