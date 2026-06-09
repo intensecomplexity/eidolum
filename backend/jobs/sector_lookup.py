@@ -31,6 +31,35 @@ FINNHUB_KEY = os.getenv("FINNHUB_KEY", "").strip()
 # In-memory cache (survives within a process, rebuilt on restart from DB)
 _mem_cache: dict[str, str] = {}
 
+# Hand-verified per-ticker overrides (2026-06-10 Round 2) for tickers
+# whose ticker_sectors/company_profiles reference rows are WRONG —
+# bad-source classifications (PFG "Healthcare", COTY "Energy"), alias
+# side-effects (TMO via 'measuring & controlling devices'), and share-
+# class inconsistencies (Z vs ZG). TOP-PRIORITY rule in get_sector,
+# checked before crypto/ETF/reference, so the writer can never re-drift
+# these even if a harvest refreshes the reference tables with bad data.
+TICKER_SECTOR_OVERRIDES: dict[str, str] = {
+    "TMO": "Healthcare",
+    "MRNA": "Healthcare",
+    "PFG": "Financial Services",
+    "COTY": "Consumer Defensive",
+    "ADM": "Consumer Defensive",
+    "ETSY": "Consumer Cyclical",
+    "AKAM": "Technology",
+    "WCC": "Industrials",
+    "CNK": "Communication Services",
+    "Z": "Communication Services",
+    "ZG": "Communication Services",
+}
+
+# Every override must be one of the 13 display buckets — fail loudly at
+# import time, not silently at stamp time.
+from utils.sector import MORNINGSTAR_SECTORS as _MS  # noqa: E402
+
+_DISPLAY_BUCKETS = set(_MS) | {"Crypto", "Other"}
+assert all(v in _DISPLAY_BUCKETS for v in TICKER_SECTOR_OVERRIDES.values()), \
+    "TICKER_SECTOR_OVERRIDES contains a non-display-bucket value"
+
 # is_etf lookups (company_profiles), cached per process.
 _etf_cache: dict[str, bool] = {}
 
@@ -110,6 +139,14 @@ def get_sector(ticker: str, db=None, source_sector: str | None = None) -> str:
     """
     ticker = ticker.upper().strip()
     from utils.sector import display_sector
+
+    # -1. Hand-verified override — beats everything, including crypto/
+    # ETF guards and the reference tables (which are wrong for exactly
+    # these tickers).
+    override = TICKER_SECTOR_OVERRIDES.get(ticker)
+    if override:
+        _mem_cache[ticker] = override
+        return override
 
     # 0. Crypto short-circuit (highest priority).
     from services.price_fetch import is_crypto
@@ -211,6 +248,10 @@ def _cache_to_db(ticker: str, sector: str, db=None, company_name: str = "", indu
     """Cache sector, company name, industry, description, logo_url, and logo_domain to DB table."""
     if not db:
         return
+    # Overridden tickers keep their hand-verified sector no matter what
+    # the fetching source (FMP/Finnhub) claims — otherwise a description
+    # refresh could re-corrupt the reference row.
+    sector = TICKER_SECTOR_OVERRIDES.get(ticker.upper().strip(), sector)
     # Always ensure a logo_url — fall back to FMP CDN pattern
     if not logo_url:
         logo_url = f"https://financialmodelingprep.com/image-stock/{ticker.upper()}.png"
