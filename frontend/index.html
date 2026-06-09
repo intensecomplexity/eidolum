@@ -18,6 +18,11 @@
         }
       })();
     </script>
+    <!-- Warm the API connection during page load: saves DNS+TLS (~100-300ms)
+         on the first direct api.eidolum.com call of every session. Edge-cached
+         calls are same-origin and need nothing. -->
+    <link rel="preconnect" href="https://api.eidolum.com" crossorigin />
+    <link rel="dns-prefetch" href="https://api.eidolum.com" />
     <link rel="icon" href="/favicon.ico?v=4" sizes="any" />
     <link rel="icon" href="/favicon.svg?v=4" type="image/svg+xml" />
     <link rel="icon" href="/favicon-16x16.png?v=4" type="image/png" sizes="16x16" />
