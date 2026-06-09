@@ -85,7 +85,11 @@ GENERATING_MODEL = "cc_sonnet_recovery_2026_05_17"  # cohort tag — DO NOT CHAN
 MAX_BATCH_VIDEOS = 10              # ~9-min `claude -p` call; 20 ran ~20min+
 MAX_BATCH_CHARS = 220_000          # ~55k input tokens — safe inside Sonnet ctx
 CONSECUTIVE_FAILURE_ABORT = 5      # abort after N consecutive CC-level failures
-MAX_VIDEO_ATTEMPTS = 5             # give up on a video after N failed attempts
+MAX_VIDEO_ATTEMPTS = 20            # give up on a video after N failed attempts
+                                   # (raised 5->20 alongside FETCH_TIMEOUT 120->30 so
+                                   # per-video fetch budget stays 30*20=600s == old
+                                   # 120*5: a degraded proxy can't exhaust+lose videos
+                                   # any faster, but each batch churns 4x quicker)
 PROGRESS_EVERY = 200               # videos between progress snapshots
 CLAUDE_TIMEOUT = 1800              # seconds per `claude -p` call (30min headroom)
 USAGE_LIMIT_BACKOFF = 1800         # seconds to sleep when CC usage-limited
@@ -94,8 +98,11 @@ TRANSCRIPT_FETCH_PACING = 4.0      # seconds between live YouTube transcript fet
                                    # 4s/worker keeps the aggregate ~2s across the 2
                                    # parallel workers (avoids the /sorry anti-bot block)
 BATCH_PACING = 15.0                # seconds between batches
-FETCH_TIMEOUT = 120                # hard cap (s) on one live transcript fetch —
-                                   # youtube_transcript_api has no socket timeout
+FETCH_TIMEOUT = 30                 # hard cap (s) on one live transcript fetch —
+                                   # youtube_transcript_api has no socket timeout.
+                                   # 30s = ~4x a healthy fetch (~7s observed); a
+                                   # degraded proxy fails fast instead of burning
+                                   # 120s/video. See MAX_VIDEO_ATTEMPTS (budget held).
 
 # Terminal transcript_status values — nothing more to do, mark the video done.
 # Anything else (classifier_error, transient "error: ..." network/anti-bot
