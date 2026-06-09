@@ -106,6 +106,15 @@ FETCH_TIMEOUT = 30                 # hard cap (s) on one live transcript fetch �
                                    # degraded proxy fails fast instead of burning
                                    # 120s/video. See MAX_VIDEO_ATTEMPTS (budget held).
 
+# ── Continuous / live-queue mode ────────────────────────────────────────────
+IDLE_POLL_SECONDS = 300            # when no classifier_error videos are ready,
+                                   # idle this long then re-query (never exit)
+EXHAUSTED_BACKOFF_HOURS = 12       # a video that hit MAX_VIDEO_ATTEMPTS is held
+                                   # out of the live queue this long, then becomes
+                                   # eligible again — so a permanently-failing
+                                   # video can't starve the rest yet isn't
+                                   # abandoned forever (in case it was transient)
+
 # Terminal transcript_status values — nothing more to do, mark the video done.
 # Anything else (classifier_error, transient "error: ..." network/anti-bot
 # blocks, cc_classify_missing) is RETRIABLE: leave the video pending so a
@@ -234,6 +243,18 @@ def _handle_sigterm(signum, frame):
 
 def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
+
+
+def _within_hours(iso_str, hours: float) -> bool:
+    """True if iso_str (an _now() timestamp) is within `hours` of now. None or
+    unparseable => False (treated as 'not recent', so the video is eligible)."""
+    if not iso_str:
+        return False
+    try:
+        ts = datetime.fromisoformat(iso_str)
+    except Exception:
+        return False
+    return (datetime.now(timezone.utc) - ts).total_seconds() < hours * 3600
 
 
 def _log(msg: str) -> None:
@@ -553,29 +574,17 @@ def main() -> int:
         cp = init_checkpoint(db)
     else:
         done = sum(1 for v in cp["videos"] if v["status"] == "done")
-        _log(f"[recover] resuming: {done}/{cp['total']} done, "
-             f"{cp['total'] - done} pending")
+        _log(f"[recover] continuous mode: checkpoint tracks {len(cp['videos'])} "
+             f"videos ({done} historically done); the work queue is now the LIVE "
+             f"classifier_error set (random order), not the checkpoint")
 
-    # Video metadata + channel id map (re-queried each run, not checkpointed).
-    # Keyed by the checkpoint's video_ids — NOT by transcript_status. A
-    # retried video's status may have flipped to a transient "error: ..."
-    # value, which would drop it from a status-filtered query and strand it.
-    all_ids = [v["video_id"] for v in cp["videos"]]
-    meta = {
-        r[0]: {"channel_name": r[1], "title": r[2] or "",
-               "description": r[3] or "", "publish": r[4]}
-        for r in db.execute(sql_text(
-            "SELECT youtube_video_id, channel_name, title, description, "
-            "publish_date FROM youtube_videos "
-            "WHERE youtube_video_id = ANY(:ids)"
-        ), {"ids": all_ids}).fetchall()
-    }
-    chan_id = {
-        r[0]: r[1] for r in db.execute(sql_text(
-            "SELECT channel_name, youtube_channel_id FROM youtube_channels"
-        )).fetchall()
-    }
-
+    # The work QUEUE is the LIVE DB set (transcript_status='classifier_error'),
+    # queried fresh and in RANDOM order each batch so old backlog and freshly
+    # discovered videos interleave — the run never "drains all old first" and
+    # never finishes. The checkpoint (cp["videos"]) is now an ATTEMPT-TRACKING /
+    # telemetry store keyed by video_id, NOT the queue: a successfully
+    # reclassified video leaves classifier_error and is naturally excluded by
+    # the live query, so a stale checkpoint can never re-add a done video.
     by_id = {v["video_id"]: v for v in cp["videos"]}
     start = time.time()
     consecutive_failures = 0
@@ -584,28 +593,71 @@ def main() -> int:
     inserted_total = 0
     processed_since_log = 0
     processed_this_run = 0
-
-    def pending_videos():
-        return [v for v in cp["videos"]
-                if v["status"] == "pending"
-                and v["video_id"] in meta
-                and v["attempts"] < MAX_VIDEO_ATTEMPTS]
+    q_lim = MAX_BATCH_VIDEOS if limit is None else max(1, min(limit, MAX_BATCH_VIDEOS))
 
     while True:
         if _stop["flag"]:
-            _log("[recover] stop flag set — exiting cleanly; re-run to resume")
+            _log("[recover] stop flag set — exiting cleanly")
             break
 
-        pend = pending_videos()
-        if not pend:
-            break
+        # Hold out videos that hit MAX_VIDEO_ATTEMPTS within the backoff window
+        # so a permanently-failing video can't starve the queue; after the
+        # window it becomes eligible again in case the failure was transient.
+        excl = [vid for vid, v in by_id.items()
+                if v["attempts"] >= MAX_VIDEO_ATTEMPTS
+                and _within_hours(v.get("attempted_at"), EXHAUSTED_BACKOFF_HOURS)]
 
-        # Build a batch bounded by video count (and, after fetch, by total
-        # transcript chars). --limit caps the whole run to one small batch.
-        if limit is not None:
-            pend = pend[:limit]
-        batch = pend[:MAX_BATCH_VIDEOS]
+        # Live + RANDOM queue (skip the exclusion clause when empty so an empty
+        # array can't trip "cannot determine type of empty array").
+        q = ("SELECT youtube_video_id FROM youtube_videos "
+             "WHERE transcript_status = 'classifier_error' ")
+        params = {"lim": q_lim}
+        if excl:
+            q += "AND NOT (youtube_video_id = ANY(:excl)) "
+            params["excl"] = excl
+        q += "ORDER BY RANDOM() LIMIT :lim"
+        batch_ids = [r[0] for r in db.execute(sql_text(q), params).fetchall()]
+
+        # CONTINUOUS: never exit on an empty set — idle + re-poll. Only the stop
+        # flag (watchdog STOP-file / SIGTERM) ends the run.
+        if not batch_ids:
+            _log(f"[recover] idle: 0 classifier_error videos ready "
+                 f"({len(excl)} held out as exhausted); re-poll in {IDLE_POLL_SECONDS}s")
+            for _ in range(max(1, IDLE_POLL_SECONDS // 5)):
+                if _stop["flag"]:
+                    break
+                time.sleep(5)
+            continue
+
+        # Track an attempt record for every (possibly brand-new) id.
+        for vid in batch_ids:
+            if vid not in by_id:
+                rec = {"video_id": vid, "status": "pending", "attempts": 0,
+                       "attempted_at": None, "result": None}
+                cp["videos"].append(rec)
+                by_id[vid] = rec
+        cp["total"] = len(cp["videos"])   # keep log_progress telemetry sane
+
+        # Per-batch metadata + channel map — re-queried live so newly discovered
+        # videos and channels resolve (these are NOT fixed at startup anymore).
+        meta = {
+            r[0]: {"channel_name": r[1], "title": r[2] or "",
+                   "description": r[3] or "", "publish": r[4]}
+            for r in db.execute(sql_text(
+                "SELECT youtube_video_id, channel_name, title, description, "
+                "publish_date FROM youtube_videos "
+                "WHERE youtube_video_id = ANY(:ids)"
+            ), {"ids": batch_ids}).fetchall()
+        }
+        chan_id = {
+            r[0]: r[1] for r in db.execute(sql_text(
+                "SELECT channel_name, youtube_channel_id FROM youtube_channels"
+            )).fetchall()
+        }
+        batch = [by_id[vid] for vid in batch_ids if vid in meta]
         batch_ids = [v["video_id"] for v in batch]
+        if not batch_ids:
+            continue
 
         # ── 1. Live re-fetch transcripts (real fetch, hard-timeout-guarded) ─
         _TRANSCRIPT_CACHE.clear()
