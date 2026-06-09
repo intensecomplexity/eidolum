@@ -206,7 +206,10 @@ def phase_fetch():
           f"of {BATCH_SIZE} ($0 API — Max plan)", flush=True)
 
 
+CLASSIFY_WORKERS = 6
+
 def phase_classify():
+    import threading
     tweets_ckpt = load_json(TWEETS_CKPT, {})
     class_ckpt = load_json(CLASS_CKPT, {})
     # gather survivors not yet classified
@@ -220,18 +223,58 @@ def phase_classify():
             if ok:
                 pending.append((tid, tw["body"]))
     print(f"[classify] {len(pending)} survivors pending classification", flush=True)
-    nb = (len(pending) + BATCH_SIZE - 1) // BATCH_SIZE
-    for i in range(0, len(pending), BATCH_SIZE):
-        batch = pending[i:i+BATCH_SIZE]
+    batches = [pending[i:i+BATCH_SIZE] for i in range(0, len(pending), BATCH_SIZE)]
+    nb = len(batches)
+    lock = threading.Lock()
+    done = {"n": 0}
+
+    def work(idx_batch):
+        idx, batch = idx_batch
         res, err = classify_batch(batch)
-        if err:
-            print(f"[classify] batch {i//BATCH_SIZE+1}/{nb} ERROR: {err}", flush=True)
-        for tid, _txt in batch:
-            class_ckpt[tid] = res.get(tid, {"is_prediction": False, "_unparsed": True})
-        save_json(CLASS_CKPT, class_ckpt)
-        print(f"[classify] batch {i//BATCH_SIZE+1}/{nb} done "
-              f"(+{len(res)} classified, total cached {len(class_ckpt)})", flush=True)
+        with lock:
+            if err:
+                print(f"[classify] batch {idx+1}/{nb} ERROR: {err}", flush=True)
+            for tid, _txt in batch:
+                class_ckpt[tid] = res.get(tid, {"is_prediction": False, "_unparsed": True})
+            save_json(CLASS_CKPT, class_ckpt)
+            done["n"] += 1
+            print(f"[classify] batch {idx+1}/{nb} done "
+                  f"({done['n']}/{nb} complete, +{len(res)}, cached {len(class_ckpt)})", flush=True)
+
+    with ThreadPoolExecutor(max_workers=CLASSIFY_WORKERS) as ex:
+        list(ex.map(work, list(enumerate(batches))))
     print("[classify] DONE", flush=True)
+
+
+def phase_recover():
+    """Re-classify tweets cached as _unparsed (batch-20 prose-split/timeout
+    casualties) at a small batch size that the model handles reliably."""
+    import threading
+    SMALL = 5
+    tweets_ckpt = load_json(TWEETS_CKPT, {})
+    class_ckpt = load_json(CLASS_CKPT, {})
+    body_by_id = {tw["id"]: tw["body"] for raw in tweets_ckpt.values() for tw in raw}
+    bad = [(tid, body_by_id.get(tid, "")) for tid, v in class_ckpt.items()
+           if v.get("_unparsed") and body_by_id.get(tid)]
+    print(f"[recover] {len(bad)} unparsed tweets to retry at batch={SMALL}", flush=True)
+    batches = [bad[i:i+SMALL] for i in range(0, len(bad), SMALL)]
+    nb = len(batches); lock = threading.Lock(); done = {"n": 0, "fixed": 0}
+
+    def work(idx_batch):
+        idx, batch = idx_batch
+        res, err = classify_batch(batch)
+        with lock:
+            for tid, _ in batch:
+                if tid in res:
+                    class_ckpt[tid] = res[tid]; done["fixed"] += 1
+            save_json(CLASS_CKPT, class_ckpt)
+            done["n"] += 1
+            print(f"[recover] batch {idx+1}/{nb} ({done['n']}/{nb}, err={err}, fixed_total={done['fixed']})", flush=True)
+
+    with ThreadPoolExecutor(max_workers=CLASSIFY_WORKERS) as ex:
+        list(ex.map(work, list(enumerate(batches))))
+    still = sum(1 for v in class_ckpt.values() if v.get("_unparsed"))
+    print(f"[recover] DONE. still_unparsed={still}", flush=True)
 
 
 def phase_report():
@@ -340,11 +383,14 @@ if __name__ == "__main__":
     ap = argparse.ArgumentParser()
     ap.add_argument("--fetch", action="store_true")
     ap.add_argument("--classify", action="store_true")
+    ap.add_argument("--recover", action="store_true")
     ap.add_argument("--report", action="store_true")
     a = ap.parse_args()
     if a.fetch:
         phase_fetch()
     if a.classify:
         phase_classify()
+    if a.recover:
+        phase_recover()
     if a.report:
         phase_report()
