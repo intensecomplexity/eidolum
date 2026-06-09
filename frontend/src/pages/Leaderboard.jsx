@@ -342,6 +342,27 @@ export default function Leaderboard() {
                 </div>
               )}
 
+              {/* Metric selector (mobile/tablet only — desktop ≥1024px uses the
+                  table's column-header dropdown). Same control/markup/styling
+                  as the min-calls dropdown to its left, so the two sit on one
+                  row and look identical. Reads/writes the SAME URL-driven
+                  `metric` state: Avg Return → ?metric=avg_return, Alpha →
+                  ?metric=alpha, Hit Rate → canonical URL (param dropped). */}
+              {activeTab !== 'week' && (
+                <div className="relative shrink-0 lg:hidden">
+                  <select
+                    value={metric}
+                    onChange={(e) => setMetric(e.target.value)}
+                    className="appearance-none bg-surface border border-border rounded-lg px-3 py-1.5 pr-8 text-sm text-text-primary focus:outline-none focus:border-accent/50 cursor-pointer"
+                  >
+                    {METRICS.map(m => (
+                      <option key={m.key} value={m.key}>{m.pillLabel}</option>
+                    ))}
+                  </select>
+                  <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-muted pointer-events-none" />
+                </div>
+              )}
+
               {/* Source filter */}
               {activeTab !== 'week' && (
                 <div className="flex gap-1 shrink-0">
@@ -391,30 +412,6 @@ export default function Leaderboard() {
                           : 'bg-surface-2 text-muted border border-border'
                       }`}>
                       {tf.label}
-                    </button>
-                  ))}
-                </div>
-              )}
-
-              {/* Mobile/tablet metric selector. The desktop sort control lives
-                  in the table's column header (hidden lg:block), which is gone
-                  below 1024px — so phone/tablet users get an equivalent
-                  segmented pill here. It reads/writes the SAME `metric` state,
-                  so changing it drives ?metric= via the state->URL effect and
-                  desktop↔mobile stay consistent. Hidden at lg+ (desktop uses
-                  the header dropdown). Gated off the 'week' tab like the other
-                  filters. */}
-              {activeTab !== 'week' && (
-                <div className="flex lg:hidden items-center gap-1 shrink-0">
-                  <span className="text-[10px] uppercase tracking-wider text-muted mr-1 hidden sm:inline">Sort:</span>
-                  {METRICS.map(m => (
-                    <button key={m.key} onClick={() => setMetric(m.key)}
-                      className={`inline-flex items-center justify-center px-3 min-h-[40px] rounded text-[11px] font-semibold transition-colors ${
-                        metric === m.key
-                          ? 'bg-accent/15 text-accent border border-accent/30'
-                          : 'bg-surface-2 text-muted border border-border'
-                      }`}>
-                      {m.pillLabel}
                     </button>
                   ))}
                 </div>
