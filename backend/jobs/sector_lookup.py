@@ -2,6 +2,24 @@
 Ticker-to-sector mapping with DB cache.
 Uses Finnhub for sector lookup (yfinance blocked on cloud).
 Falls back to a hardcoded map for major tickers.
+
+2026-06-10 sector-cache reconciliation: get_sector is THE shared stamp
+helper for predictions.sector (massive_benzinga / fmp_scraper /
+benzinga_backfill via _get_sector_safe, youtube_classifier directly,
+and backfill_sectors_batch for rows inserted without a stamp). It now
+resolves to a CANONICAL display sector:
+
+    Crypto                          if is_crypto(ticker)
+    source_sector or 'Other'        if is_etf(ticker) — reference tables
+                                    class every ETF as 'Financial
+                                    Services', so the reference must
+                                    never override a pipeline-provided
+                                    stamp (sector calls stamp their own)
+    display_sector(ticker_sectors.sector,
+                   fallback company_profiles.sector)   otherwise
+
+so a stamped sector is always one of the 13 display buckets and cannot
+re-drift into raw SIC/GICS strings or bad ETF/crypto references.
 """
 import os
 import time
@@ -13,16 +31,40 @@ FINNHUB_KEY = os.getenv("FINNHUB_KEY", "").strip()
 # In-memory cache (survives within a process, rebuilt on restart from DB)
 _mem_cache: dict[str, str] = {}
 
+# is_etf lookups (company_profiles), cached per process.
+_etf_cache: dict[str, bool] = {}
+
+
+def _is_etf(ticker: str, db=None) -> bool:
+    if ticker in _etf_cache:
+        return _etf_cache[ticker]
+    val = False
+    if db:
+        try:
+            row = db.execute(
+                sql_text("SELECT is_etf FROM company_profiles WHERE ticker = :t"),
+                {"t": ticker},
+            ).first()
+            val = bool(row and row[0])
+        except Exception:
+            val = False
+    _etf_cache[ticker] = val
+    return val
+
 # Hardcoded fallback for the most common tickers
 KNOWN_SECTORS = {
-    "AAPL": "Technology", "MSFT": "Technology", "GOOGL": "Technology", "GOOG": "Technology",
-    "META": "Technology", "AMZN": "Consumer Cyclical", "NVDA": "Technology", "AMD": "Technology",
+    "AAPL": "Technology", "MSFT": "Technology",
+    # Morningstar classes the ad platforms under Communication Services
+    # (aligned with the 2026-06-10 Phase B reconciliation).
+    "GOOGL": "Communication Services", "GOOG": "Communication Services",
+    "META": "Communication Services",
+    "AMZN": "Consumer Cyclical", "NVDA": "Technology", "AMD": "Technology",
     "INTC": "Technology", "QCOM": "Technology", "AVGO": "Technology", "CRM": "Technology",
     "ORCL": "Technology", "ADBE": "Technology", "NOW": "Technology", "PLTR": "Technology",
     "ARM": "Technology", "SMCI": "Technology", "MU": "Technology", "NFLX": "Communication Services",
     "DIS": "Communication Services", "CMCSA": "Communication Services",
     "TSLA": "Consumer Cyclical", "NKE": "Consumer Cyclical", "SBUX": "Consumer Cyclical",
-    "HD": "Consumer Cyclical", "LULU": "Consumer Cyclical", "MCD": "Consumer Defensive",
+    "HD": "Consumer Cyclical", "LULU": "Consumer Cyclical", "MCD": "Consumer Cyclical",
     "WMT": "Consumer Defensive", "COST": "Consumer Defensive", "PG": "Consumer Defensive",
     "KO": "Consumer Defensive", "PEP": "Consumer Defensive",
     "JPM": "Financial Services", "GS": "Financial Services", "MS": "Financial Services",
@@ -45,8 +87,13 @@ KNOWN_SECTORS = {
 }
 
 
-def get_sector(ticker: str, db=None) -> str:
-    """Get sector for a ticker. Checks: crypto → memory → DB → Finnhub → hardcoded → 'Other'.
+def get_sector(ticker: str, db=None, source_sector: str | None = None) -> str:
+    """Get the canonical display sector to STAMP for a ticker.
+
+    Resolution order: crypto → memory → ETF guard → reference tables
+    (ticker_sectors, fallback company_profiles, both through
+    display_sector) → hardcoded → Finnhub → 'Other'. Always returns one
+    of the 13 display buckets (11 Morningstar + Crypto + Other).
 
     Bug 1: crypto tickers MUST resolve to "Crypto" before any other source
     has a chance to override them. Several crypto symbols (BTC, ETH, …)
@@ -54,8 +101,15 @@ def get_sector(ticker: str, db=None) -> str:
     around $3) and the Finnhub fallback / DB cache will happily return
     those equity sectors, after which the price fetcher locks the wrong
     instrument and the prediction is corrupted forever.
+
+    ETF guard: reference tables class every ETF as 'Financial Services',
+    which is a classification of the WRAPPER, not the exposure. For ETFs
+    we keep the caller's pipeline-provided sector (``source_sector``,
+    e.g. the sector-call mapping) and otherwise return the honest
+    'Other' — never the bogus reference value.
     """
     ticker = ticker.upper().strip()
+    from utils.sector import display_sector
 
     # 0. Crypto short-circuit (highest priority).
     from services.price_fetch import is_crypto
@@ -63,28 +117,43 @@ def get_sector(ticker: str, db=None) -> str:
         _mem_cache[ticker] = "Crypto"
         return "Crypto"
 
-    # 1. Memory cache
-    if ticker in _mem_cache:
+    # 1. Memory cache (skipped when a source stamp is provided for ETFs;
+    #    the ETF guard below must see source_sector each call).
+    if ticker in _mem_cache and not (source_sector and _is_etf(ticker, db)):
         return _mem_cache[ticker]
 
-    # 2. DB cache
+    # 2. ETF guard — keep the pipeline stamp, never the reference value.
+    if _is_etf(ticker, db):
+        if source_sector:
+            return source_sector
+        _mem_cache[ticker] = "Other"
+        return "Other"
+
+    # 3. Reference tables, canonicalized.
     if db:
         try:
-            row = db.execute(sql_text("SELECT sector FROM ticker_sectors WHERE ticker = :t"), {"t": ticker}).first()
-            if row and row[0]:
-                _mem_cache[ticker] = row[0]
-                return row[0]
+            row = db.execute(sql_text(
+                "SELECT sector FROM ticker_sectors WHERE ticker = :t"), {"t": ticker}).first()
+            sector = display_sector(row[0]) if row and row[0] else "Other"
+            if sector == "Other":
+                row = db.execute(sql_text(
+                    "SELECT sector FROM company_profiles WHERE ticker = :t"), {"t": ticker}).first()
+                sector = display_sector(row[0]) if row and row[0] else "Other"
+            if sector != "Other":
+                _mem_cache[ticker] = sector
+                return sector
         except Exception:
             pass
 
-    # 3. Hardcoded
+    # 4. Hardcoded (canonicalized — e.g. legacy 'Index' entries -> Other).
     if ticker in KNOWN_SECTORS:
-        sector = KNOWN_SECTORS[ticker]
-        _mem_cache[ticker] = sector
-        _cache_to_db(ticker, sector, db)
-        return sector
+        sector = display_sector(KNOWN_SECTORS[ticker])
+        if sector != "Other":
+            _mem_cache[ticker] = sector
+            _cache_to_db(ticker, sector, db)
+            return sector
 
-    # 4. Finnhub company profile
+    # 5. Finnhub company profile (canonicalized).
     if FINNHUB_KEY:
         try:
             r = httpx.get(
@@ -96,14 +165,15 @@ def get_sector(ticker: str, db=None) -> str:
             industry = data.get("finnhubIndustry", "")
             company_name = data.get("name", "")
             if industry:
-                sector = _normalize_sector(industry)
-                _mem_cache[ticker] = sector
-                _cache_to_db(ticker, sector, db, company_name=company_name, industry=industry)
-                return sector
+                sector = display_sector(_normalize_sector(industry))
+                if sector != "Other":
+                    _mem_cache[ticker] = sector
+                    _cache_to_db(ticker, sector, db, company_name=company_name, industry=industry)
+                    return sector
         except Exception:
             pass
 
-    # 5. Fallback
+    # 6. Fallback
     _mem_cache[ticker] = "Other"
     return "Other"
 
