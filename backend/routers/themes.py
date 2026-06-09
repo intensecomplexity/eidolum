@@ -126,8 +126,13 @@ def get_theme_detail(request: Request, slug: str, db: Session = Depends(get_db))
     """), {"tid": theme_id}).first()
     total = int(consensus[0] or 0)
 
-    # Top forecasters — same score expression and thresholds as
-    # /api/sectors (leaderboard.get_sectors), restricted to members.
+    # Top forecasters — mirrors /api/sectors (leaderboard.get_sectors):
+    # ranked by ACCURACY (canonical (hits + nears*0.5)/scored formula),
+    # volume as tiebreak, floored at THEME_SECTOR_MIN_SCORED (default 5)
+    # scored predictions within the theme. Raw-score ordering let high-
+    # volume/mediocre names outrank high-accuracy/decent-sample ones.
+    from feature_flags import get_theme_sector_min_scored
+    min_scored = get_theme_sector_min_scored(db)
     top_rows = db.execute(sql_text(f"""
         SELECT f.id, f.name,
                SUM(CASE WHEN p.outcome IN ('hit','correct') THEN 1.0
@@ -139,10 +144,13 @@ def get_theme_detail(request: Request, slug: str, db: Session = Depends(get_db))
           AND p.outcome IN ('hit','near','miss','correct','incorrect')
           AND {_YT_VIS_P}{_HEDGED_P}
         GROUP BY f.id, f.name
-        HAVING COUNT(*) >= 3
-        ORDER BY score DESC, evaluated DESC
+        HAVING COUNT(*) >= :min_scored
+        ORDER BY SUM(CASE WHEN p.outcome IN ('hit','correct') THEN 1.0
+                          WHEN p.outcome = 'near' THEN 0.5 ELSE 0 END)
+                   / COUNT(*) DESC,
+                 COUNT(*) DESC, f.id ASC
         LIMIT 10
-    """), {"tid": theme_id}).fetchall()
+    """), {"tid": theme_id, "min_scored": min_scored}).fetchall()
     top_forecasters = [
         {
             "id": r[0],

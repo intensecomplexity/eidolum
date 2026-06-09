@@ -1122,8 +1122,15 @@ def get_sectors(request: Request, db: Session = Depends(get_db)):
         })
         sector_names.append(r[0])
 
-    # Fetch top forecasters per sector in a single query
+    # Fetch top forecasters per sector in a single query. Ranked by
+    # ACCURACY (the canonical (hits + nears*0.5)/scored three-tier
+    # formula, same as refresh_all_forecaster_stats), volume as the
+    # tiebreak — NOT by raw score, which let 43%/90-call analysts
+    # outrank 88%/37-call ones. Floor: THEME_SECTOR_MIN_SCORED config
+    # key (default 5) scored predictions within the sector.
     if sector_names:
+        from feature_flags import get_theme_sector_min_scored
+        min_scored = get_theme_sector_min_scored(db)
         forecaster_rows = db.execute(sql_text(f"""
             SELECT ts.sector, f.id, f.name,
                    SUM(CASE WHEN p.outcome IN ('hit','correct') THEN 1.0
@@ -1136,9 +1143,13 @@ def get_sectors(request: Request, db: Session = Depends(get_db)):
               AND p.outcome IN ('hit','near','miss','correct','incorrect')
               AND {_YT_VIS_P}{_HEDGED_P}
             GROUP BY ts.sector, f.id, f.name
-            HAVING COUNT(*) >= 3
-            ORDER BY ts.sector, score DESC, evaluated DESC
-        """), {"sectors": sector_names}).fetchall()
+            HAVING COUNT(*) >= :min_scored
+            ORDER BY ts.sector,
+                     SUM(CASE WHEN p.outcome IN ('hit','correct') THEN 1.0
+                              WHEN p.outcome = 'near' THEN 0.5 ELSE 0 END)
+                       / COUNT(*) DESC,
+                     COUNT(*) DESC, f.id ASC
+        """), {"sectors": sector_names, "min_scored": min_scored}).fetchall()
 
         # Group by sector and keep top 3
         top_by_sector = {}

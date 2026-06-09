@@ -723,3 +723,32 @@ def invalidate_product_themes_flag_cache() -> None:
     """Reset the 60-second cache so a config flip takes effect on the
     next request instead of waiting out the TTL."""
     _PRODUCT_THEMES_FLAG_CACHE["fetched_at"] = 0.0
+
+
+# ── Sector/theme top-forecaster ranking floor ───────────────────────────────
+#
+# Minimum SCORED predictions a forecaster needs WITHIN a sector/theme to
+# appear in that slice's "top forecasters" ranking (/api/sectors and
+# /api/themes/{slug}). Default 5 — deliberately below the global
+# leaderboard's sliced-view floor of 10 because these are narrow slices;
+# 10 would empty out small themes (weight-loss-glp1 etc.). Trade-off:
+# raise it for stricter/fewer names, lower it for noisier lists.
+
+_THEME_SECTOR_MIN_SCORED_CACHE: dict = {"val": 5, "fetched_at": 0.0}
+_THEME_SECTOR_MIN_SCORED_TTL = 60  # seconds
+THEME_SECTOR_MIN_SCORED_DEFAULT = 5
+
+
+def get_theme_sector_min_scored(db) -> int:
+    """Return the THEME_SECTOR_MIN_SCORED config value (default 5).
+    Cached 60s. Clamped to >= 1 so a bad config value can never divide
+    the ranking into an unfloored free-for-all."""
+    now = time.time()
+    if (now - _THEME_SECTOR_MIN_SCORED_CACHE["fetched_at"]) < _THEME_SECTOR_MIN_SCORED_TTL:
+        return int(_THEME_SECTOR_MIN_SCORED_CACHE["val"])
+    val = _read_int(db, "THEME_SECTOR_MIN_SCORED", default=THEME_SECTOR_MIN_SCORED_DEFAULT)
+    if val < 1:
+        val = 1
+    _THEME_SECTOR_MIN_SCORED_CACHE["val"] = val
+    _THEME_SECTOR_MIN_SCORED_CACHE["fetched_at"] = now
+    return val
