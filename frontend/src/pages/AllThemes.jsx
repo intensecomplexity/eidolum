@@ -56,6 +56,9 @@ export default function AllThemes() {
                 className="card py-3 text-center hover:bg-surface-2 transition-colors"
               >
                 <div className="text-sm font-medium text-text-primary">{t.name}</div>
+                {t.description && (
+                  <p className="text-[10px] text-muted mt-0.5 mb-1 line-clamp-2 px-2">{t.description}</p>
+                )}
                 <div className="text-[10px] text-muted font-mono">{t.prediction_count.toLocaleString()} predictions</div>
                 <div className="text-[10px] text-text-secondary mt-0.5">{pluralize(t.ticker_count, 'ticker')}</div>
               </Link>

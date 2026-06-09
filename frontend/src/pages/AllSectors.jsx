@@ -59,6 +59,9 @@ export default function AllSectors() {
                   className="card py-3 text-center hover:bg-surface-2 transition-colors"
                 >
                   <div className="text-sm font-medium text-text-primary">{formatSectorName(name)}</div>
+                  {s.description && (
+                    <p className="text-[10px] text-muted mt-0.5 mb-1 line-clamp-2 px-2">{s.description}</p>
+                  )}
                   <div className="text-[10px] text-muted font-mono">{count.toLocaleString()} predictions</div>
                   {s.accuracy > 0 && (
                     <div className="text-[10px] text-accent font-mono">{s.accuracy}% accuracy</div>
