@@ -1283,6 +1283,45 @@ class MacroConceptAlias(Base):
                         server_default=func.now())
 
 
+class Theme(Base):
+    """Product theme — the second, overlapping navigation axis alongside
+    sectors ('Phones', 'AI Chips', 'EVs'). Unlike sectors, themes are
+    MANY-TO-MANY with tickers: QCOM belongs to both Phones and AI Chips.
+    Membership is hand-curated via /admin/themes (mirrors the
+    sector_etf_aliases admin pattern). v1 is filter + tag only — no
+    scoring; a future scored axis aggregates predictions over member
+    tickers at query time, so no schema churn is needed to add it.
+    """
+    __tablename__ = "themes"
+
+    id = Column(Integer, primary_key=True, index=True)
+    slug = Column(String(48), nullable=False, unique=True)
+    name = Column(String(80), nullable=False)
+    description = Column(Text, nullable=True)
+    display_order = Column(Integer, nullable=False, default=100,
+                           server_default="100")
+    is_active = Column(Boolean, nullable=False, default=True,
+                       server_default="true")
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+
+class ThemeTicker(Base):
+    """Membership row linking a theme to a ticker. is_primary marks the
+    flagship members shown first in the theme detail view (AAPL for
+    Phones, NVDA for AI Chips). Composite PK so a ticker appears at most
+    once per theme; ON DELETE CASCADE so deleting a theme cleans up its
+    membership."""
+    __tablename__ = "theme_tickers"
+
+    theme_id = Column(Integer,
+                      ForeignKey("themes.id", ondelete="CASCADE"),
+                      primary_key=True)
+    ticker = Column(String(20), primary_key=True)
+    is_primary = Column(Boolean, nullable=False, default=False,
+                        server_default="false")
+    added_at = Column(DateTime(timezone=True), server_default=func.now())
+
+
 class YouTubeChannelMeta(Base):
     """Admin-facing metadata for YouTube channels. FK'd to forecasters so
     the admin page can tier/toggle/annotate the YouTube leaderboard without
