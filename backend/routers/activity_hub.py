@@ -46,7 +46,7 @@ def recent_predictions(request: Request, db: Session = Depends(get_db)):
         JOIN forecasters f ON f.id = p.forecaster_id
         LEFT JOIN ticker_sectors ts ON ts.ticker = p.ticker
         WHERE {_YT_VIS_P}{_HEDGED_P}
-        ORDER BY COALESCE(p.prediction_date, p.created_at) DESC
+        ORDER BY COALESCE(p.prediction_date, p.created_at) DESC, p.id DESC
         LIMIT 20
     """)).fetchall()
 
@@ -96,7 +96,7 @@ def recently_scored(request: Request, db: Session = Depends(get_db)):
           AND p.actual_return != 0
           AND COALESCE(p.evaluated_at, p.evaluation_date) > NOW() - INTERVAL '30 days'
           AND {_YT_VIS_P}{_HEDGED_P}
-        ORDER BY COALESCE(p.evaluated_at, p.evaluation_date) DESC NULLS LAST
+        ORDER BY COALESCE(p.evaluated_at, p.evaluation_date) DESC NULLS LAST, p.id DESC
         LIMIT 30
     """)).fetchall()
 
@@ -118,7 +118,7 @@ def recently_scored(request: Request, db: Session = Depends(get_db)):
               AND p.actual_return IS NOT NULL
               AND p.actual_return != 0
               AND {_YT_VIS_P}{_HEDGED_P}
-            ORDER BY COALESCE(p.evaluated_at, p.evaluation_date) DESC NULLS LAST
+            ORDER BY COALESCE(p.evaluated_at, p.evaluation_date) DESC NULLS LAST, p.id DESC
             LIMIT 30
         """)).fetchall()
 
