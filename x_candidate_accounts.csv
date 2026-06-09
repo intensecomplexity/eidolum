@@ -1,0 +1,154 @@
+rank,forecaster_name,platform,predictions_all,predictions_scored,accuracy_score,last_prediction_date,x_handle,handle_confidence,handle_evidence_url,already_in_db
+1,Ales World of Stocks,youtube,808,373,63.8,2026-06-09,AlesWorldStocks,high,https://x.com/alesworldstocks,no
+2,Chip Stock Investor,youtube,700,414,68.0,2026-06-03,nrossolillo,high,https://chipstockinvestor.com/,no
+3,Let's Talk Money,youtube,675,132,39.8,2026-06-09,StockMarketJ,high,https://x.com/stockmarketj,no
+4,Meet Kevin,youtube,643,275,46.0,2026-06-09,realMeetKevin,high,https://twitter.com/realmeetkevin,no
+5,Parkev Tatevosian CFA,youtube,638,114,59.2,2026-06-09,TMFParkev,high,https://x.com/TMFParkev,no
+6,The Patient Investor,youtube,631,301,58.8,2026-06-08,,none,https://www.youtube.com/channel/UCowj3bHIz47dMIe8n37qTlw,no
+7,Dividendology,youtube,573,291,52.9,2026-06-08,dividendology,high,https://x.com/dividendology,no
+8,Joseph Carlson,youtube,477,341,66.3,2026-05-18,joecarlsonshow,high,https://x.com/joecarlsonshow,no
+9,Everything Money,youtube,472,105,56.2,2026-06-09,EMoneyYouTube,high,https://everythingmoney.com/,no
+10,Financial Education,youtube,462,109,52.8,2026-06-03,HolySmokas,high,https://x.com/HolySmokas,no
+11,Stock Moe,youtube,374,201,39.8,2026-06-09,RealStockMoe,high,https://twitter.com/RealStockMoe,no
+12,Dividend Talks,youtube,341,3,66.7,2026-06-09,DividendTalks,high,https://x.com/DividendTalks,no
+13,Tom Nash,youtube,323,92,50.5,2026-06-08,iamtomnash,high,https://x.com/iamtomnash,no
+14,The Quality Investor,youtube,314,140,61.4,2026-06-03,QualityInvest5,high,https://linktr.ee/qualityinvest5,no
+15,Sven Carlin,youtube,299,80,42.5,2026-06-08,SvenCarlin,high,https://x.com/SvenCarlin,no
+16,Dividend Data,youtube,294,156,64.4,2026-06-08,dividend_data,high,https://dividenddata.com/youtube-channel,no
+17,BWB - Business With Brian,youtube,242,57,70.2,2026-06-08,BrianFeroldi,high,https://twitter.com/BrianFeroldi,no
+18,Minority Mindset,youtube,197,26,42.3,2026-05-18,minoritym1ndset,high,https://theminoritymindset.com/about-us/,no
+19,The Investor Channel,youtube,194,146,61.3,2026-06-03,InvestorVideos_,high,https://x.com/InvestorVideos_,no
+20,Invest with Henry,youtube,188,45,45.6,2026-06-08,InvestwHenry,medium,https://x.com/InvestwHenry,no
+21,Stock Curry,youtube,179,68,46.3,2026-06-08,RealScottCurry,medium,https://x.com/RealScottCurry,no
+22,Trade Brigade,youtube,172,56,48.2,2026-06-09,TradeBrigadeCo,high,https://tradebrigade.co/,no
+23,PensionCraft,youtube,169,82,54.9,2026-05-16,ramincharles,high,https://x.com/ramincharles,no
+24,Heresy Financial,youtube,158,36,50.0,2026-06-03,heresyfinancial,high,https://www.heresy.financial/,no
+25,Brian Shannon AlphaTrends,youtube,133,71,53.5,2026-06-09,alphatrends,high,https://alphatrends.net/,no
+26,Richard Moglen,youtube,131,20,80.0,2026-06-09,RichardMoglen,high,https://x.com/RichardMoglen,no
+27,MarketBeat,youtube,123,0,,2026-06-09,MarketBeatCom,high,https://www.marketbeat.com/about/,no
+28,Fast Graphs,youtube,113,31,66.1,2026-06-03,FASTGraphs,high,https://twitter.com/fastgraphs,no
+29,Adam Khoo,youtube,112,1,100.0,2026-06-03,adamkhootrader,high,https://x.com/adamkhootrader,no
+30,Andrei Jikh,youtube,110,52,53.8,2026-05-15,andreijikh,high,https://x.com/andreijikh,no
+31,Ticker Symbol YOU,youtube,98,0,,2026-06-09,TickerSymbolYOU,high,https://x.com/TickerSymbolYOU,no
+32,New Money,youtube,84,49,58.2,2026-04-10,Brandomaaate,medium,https://twitter.com/brandomaaate,no
+33,Proactive Investors,youtube,79,8,62.5,2026-06-08,proactive_x,high,https://www.proactiveinvestors.com/,no
+34,Nanalyze,youtube,78,8,31.2,2026-06-02,nanalyzetweets,medium,https://x.com/nanalyzetweets,no
+35,Daniel Pronk,youtube,76,0,0.0,2026-06-09,PronkDaniel,high,https://x.com/PronkDaniel,no
+36,PPCIAN,youtube,73,25,56.0,2026-06-09,ianlopuch,high,https://x.com/ianlopuch,no
+37,TraderTV Live,youtube,72,10,10.0,2026-06-08,traderTVLIVE,high,https://x.com/traderTVLIVE,no
+38,Marko WhiteBoard Finance,youtube,69,35,51.4,2026-04-10,WhiteBoardFin,high,https://x.com/WhiteBoardFin,no
+39,Graham Stephan,youtube,68,11,36.4,2026-04-14,GrahamStephan,high,https://x.com/GrahamStephan,no
+40,Cooper Academy,youtube,55,0,,2026-06-09,cooperacademy1,high,https://x.com/cooperacademy1,no
+41,Unrivaled Investing,youtube,52,16,50.0,2026-05-18,UnrivaledInvest,high,https://www.unrivaledinvesting.com/,no
+42,Sasha Yanshin,youtube,51,33,42.4,2026-05-04,sashayanshin,high,https://x.com/sashayanshin,no
+43,Stock Compounder,youtube,49,39,29.5,2023-04-19,bkaellner,high,https://x.com/bkaellner,no
+44,Dividend Bull,youtube,44,1,100.0,2026-06-03,TheDividendBull,low,https://x.com/thedividendbull,no
+45,Hamish Hodder,youtube,43,22,45.5,2026-04-11,hamish_hodder,high,https://hamishhodder.com/,no
+46,Mark Moss,youtube,43,0,,2026-06-09,1MarkMoss,high,https://x.com/1MarkMoss,no
+47,Learn to Invest,youtube,41,23,54.3,2026-06-09,,none,https://investorsgrow.com,no
+48,The Compounding Investor,youtube,38,20,45.0,2026-05-18,,none,https://www.youtube.com/channel/UC1RCPO3_VpMfHxQ4iI9QuPQ,no
+49,Wall Street Millennial,youtube,38,18,55.6,2026-06-09,wallstreetmil,high,https://x.com/wallstreetmil,no
+50,Simply Wall St,youtube,36,24,58.3,2026-06-09,simplywallst,high,https://twitter.com/simplywallst,no
+51,Dividends And Income,youtube,35,0,,2026-06-03,JasonFieber,medium,https://dividendsandincome.com/about-us/,no
+52,Nick Peitsch Investing,youtube,34,31,16.1,2022-08-08,NickPeitsch,high,https://www.nickpeitsch.com/,no
+53,The Long-Term Investor,youtube,32,8,87.5,2026-05-20,PeterLazaroff,high,https://peterlazaroff.com/,no
+54,The Ramsey Show Highlights,youtube,32,0,,2026-05-16,RamseyShow,high,https://x.com/RamseyShow,no
+55,InvestAnswers,youtube,31,0,,2026-06-09,invest_answers,high,https://x.com/Investanswers,no
+56,Money Talks Beavis Wealth,youtube,29,20,45.0,2026-05-14,BB_Investing,medium,https://x.com/bb_investing,no
+57,MoneyShow,youtube,29,0,,2026-06-09,MoneyShow,high,https://www.moneyshow.com/about-us/contact-us/,no
+58,Alex Thompson,x,28,14,57.1,2026-05-06,sierrastrades,high,https://x.com/sierrastrades/status/2040995416708407355,yes
+59,tastylive,youtube,28,1,0.0,2026-06-08,tastyliveshow,high,https://tastylive.com/,no
+60,Pranjal Kamra,youtube,27,1,100.0,2026-05-16,pranjalkamra,high,https://x.com/pranjalkamra,no
+61,GenExDividendInvestor,youtube,24,0,,2026-05-21,GenExDividend,high,https://x.com/GenExDividend,no
+62,Rational Investing with Cameron Stewart,youtube,24,6,50.0,2026-04-13,cstewartcfa,high,https://x.com/cstewartcfa,no
+63,Patrick Boyle,youtube,23,11,90.9,2026-05-16,PatrickEBoyle,high,https://x.com/PatrickEBoyle,no
+64,LevelFields AI,youtube,21,10,50.0,2026-06-09,levelfieldsAI,high,https://www.levelfields.ai/contact,no
+65,Wall St Engine,x,13,2,75.0,2026-04-05,wallstengine,high,https://x.com/wallstengine/status/2041087613159997863,yes
+66,Echo Analysis,x,4,0,,2026-04-05,EchoAnalysis,high,https://x.com/EchoAnalysis/status/2040852468184301622,yes
+67,The Inner Circle Trading Group DP David Prince,x,4,1,0.0,2026-04-05,epictrades1,high,https://x.com/epictrades1/status/2038949639185965390,yes
+68,Ari Wallet Chain,x,3,2,100.0,2026-04-05,AriWalletChain,high,https://x.com/AriWalletChain/status/2040349087892222136,yes
+69,Chris Ray,x,3,0,,1900-04-06,itschrisray,high,https://x.com/itschrisray/status/2041162320257114485,yes
+70,Crypto Joe,x,3,0,,2026-04-05,CryptoJoeReal,high,https://x.com/CryptoJoeReal/status/2037977712514482316,yes
+71,Ehrmantraut Capital,x,3,0,,1900-04-06,EhrmantrautCap_,high,https://x.com/EhrmantrautCap_/status/2041170454316990617,yes
+72,Evan | Investments,x,3,0,,1900-04-06,NotA_Bull,high,https://x.com/NotA_Bull/status/2041001772940972402,yes
+73,ImNotHarsh | 📈💸,x,3,0,,1900-04-06,imnotharsh,high,https://x.com/imnotharsh/status/2041127869359821293,yes
+74,James Woolley,x,3,0,,1900-04-02,steady_profits,high,https://x.com/steady_profits/status/2039683661138739210,yes
+75,Julius Elum,x,3,0,,1900-04-06,JuliusElum,high,https://x.com/JuliusElum/status/2040945919873388929,yes
+76,Peter Bordes,x,3,0,,1900-03-31,PeterBordes,high,https://x.com/PeterBordes/status/2038963412021940284,yes
+77,Rackham Rishel,x,3,3,100.0,2026-04-05,RackhamRishel,high,https://x.com/RackhamRishel/status/2040746410497175765,yes
+78,Stock Snipa,x,3,0,0.0,1900-04-06,stocksnipa,high,https://x.com/stocksnipa/status/2039705369325298032,yes
+79,Victor Renard,x,3,0,,1900-03-31,VictorRenajlj,high,https://x.com/VictorRenajlj/status/2039022928767954954,yes
+80,Wicked Stocks,x,3,0,,1900-04-06,wickedstocks,high,https://x.com/wickedstocks/status/2041134856520749371,yes
+81,Yousuf 💎,x,3,0,,1900-04-01,YousufTrades,high,https://x.com/YousufTrades/status/2039415239670735233,yes
+82,100% Strategy,x,2,0,,1900-04-06,StrategyMaxi,high,https://x.com/StrategyMaxi/status/2040986767999086707,yes
+83,Altcoin Sherpa,x,2,0,,1900-04-06,AltcoinSherpa,high,https://x.com/AltcoinSherpa/status/2041147876844208202,yes
+84,April Bat 🖤 - 1/28/2021,x,2,0,,1900-04-06,StonksBatman,high,https://x.com/StonksBatman/status/2041162628093919308,yes
+85,Asaf Naamani,x,2,0,,1900-04-06,AsafNaamani,high,https://x.com/AsafNaamani/status/2041132243301609618,yes
+86,Carlos Garcia Tapia,x,2,0,,1900-04-06,CAGThe3rd,high,https://x.com/CAGThe3rd/status/2040943760469643414,yes
+87,ENO Crypto,x,2,0,,2026-04-05,Eno_Crypto5,high,https://x.com/Eno_Crypto5/status/2040886184982012257,yes
+88,Etienne Breton,x,2,0,,1900-04-06,etienne_breton,high,https://x.com/etienne_breton/status/2040996588806418839,yes
+89,Eva McMillan ♥️,x,2,0,,1900-03-31,EvasTeslaSPlaid,high,https://x.com/EvasTeslaSPlaid/status/2038613103668031535,yes
+90,Ghost X Swings,x,2,0,,1900-04-06,GhostxSwings,high,https://x.com/GhostxSwings/status/2039382698158854511,yes
+91,Hardik Shah,x,2,0,,1900-04-06,AIStockSavvy,high,https://x.com/AIStockSavvy/status/2041107396328571124,yes
+92,John Quakes,x,2,0,,2026-04-05,quakes99,high,https://x.com/quakes99/status/2039339850969804889,yes
+93,Kris Kay | 🎲 444 Capital,x,2,0,,1900-03-30,thekriskay,high,https://x.com/thekriskay/status/2038633524475900040,yes
+94,Sun Liao,x,2,0,,1900-04-06,sunxliao,high,https://x.com/sunxliao/status/2041148717890449536,yes
+95,The AI Investor,x,2,0,0.0,1900-04-02,The_AI_Investor,high,https://x.com/The_AI_Investor/status/2039736035262029937,yes
+96,The Great Mattsby,x,2,0,,1900-04-06,matthughes13,high,https://x.com/matthughes13/status/2041227685129564355,yes
+97,The Rock Trading Group,x,2,0,,1900-04-06,The_RockTrading,high,https://x.com/The_RockTrading/status/2041127355343855730,yes
+98,The Value Trader,x,2,1,100.0,2026-04-05,TheValueTrade,high,https://x.com/TheValueTrade/status/2040733937081758201,yes
+99,Ticker Wire,x,2,0,0.0,,Tickerwire,high,https://x.com/Tickerwire/status/2039044093033304381,yes
+100,TOP GAINER TODAY,x,2,0,,1900-04-06,RoccobullboTTom,high,https://x.com/RoccobullboTTom/status/2040983383401181596,yes
+101,Vaughn STV,x,2,1,100.0,2026-04-05,OuterMutant,high,https://x.com/OuterMutant/status/2040819955780747362,yes
+102,𝗦𝗮𝗳𝗶𝗻 𝗢𝗳𝗳𝗶𝗰𝗶𝗮𝗹 𝗬𝗧,x,2,0,,1900-04-06,AirdropwithSafu,high,https://x.com/AirdropwithSafu/status/2040948241743937572,yes
+103,"Aksel Kibar, CMT",x,1,0,,1900-03-31,TechCharts,high,https://x.com/TechCharts/status/2039040724650401895,yes
+104,ALGO DADDY,x,1,0,,1900-04-06,BestTrader01,high,https://x.com/BestTrader01/status/2041191734114222269,yes
+105,Audit The Herd,x,1,0,,1900-04-06,AuditTheHerd,high,https://x.com/AuditTheHerd/status/2041153652568568231,yes
+106,Celal Kucuker,x,1,0,,1900-04-06,CelalKucuker,high,https://x.com/CelalKucuker/status/2041155376939216964,yes
+107,Christ the Solid Rock I Stand,x,1,0,,1900-04-06,Notofworks7,high,https://x.com/Notofworks7/status/2040949687193342234,yes
+108,Christian Fromhertz 🇺🇸,x,1,0,,1900-04-06,cfromhertz,high,https://x.com/cfromhertz/status/2041133140538716482,yes
+109,CK Capital,x,1,0,,1900-04-05,CKCapitalxx,high,https://x.com/CKCapitalxx/status/2040834926128349447,yes
+110,Crypto Patel,x,1,1,0.0,2026-04-05,CryptoPatel,high,https://x.com/CryptoPatel/status/2040753314816827535,yes
+111,Cute Baby,x,1,1,100.0,2026-04-05,nachunja,high,https://x.com/nachunja/status/2040632805797843400,yes
+112,Czai ₿,x,1,0,,1900-04-06,Its_Czai,high,https://x.com/Its_Czai/status/2041131221326205146,yes
+113,Dan ⚡️,x,1,0,,1900-04-06,DanBTC916,high,https://x.com/DanBTC916/status/2041163754000523749,yes
+114,DeFi Decoder,x,1,0,,1900-04-06,DeFiDecoder_,high,https://x.com/DeFiDecoder_/status/2041163412575756626,yes
+115,DONG | BNB,x,1,0,,1900-04-06,DongBnb,high,https://x.com/DongBnb/status/2041158666343358473,yes
+116,EMEBOK 🥷🕸️,x,1,0,,1900-04-06,EMEBOK_,high,https://x.com/EMEBOK_/status/2041159258801119683,yes
+117,Endless Capit🅰️l,x,1,0,,1900-04-06,endless_frank,high,https://x.com/endless_frank/status/2041160291774329191,yes
+118,FEXIR | CRYPTO ♟️🎯,x,1,0,,1900-04-06,fexir1,high,https://x.com/fexir1/status/2041146991003291666,yes
+119,Han Akamatsu 赤松,x,1,1,100.0,2026-04-05,Han_Akamatsu,high,https://x.com/Han_Akamatsu/status/2040861676120027394,yes
+120,Heart Rate Trader,x,1,0,,1900-04-06,HeartRateTrader,high,https://x.com/HeartRateTrader/status/2040971170816626747,yes
+121,Herbert Ong,x,1,0,,1900-04-06,herbertong,high,https://x.com/herbertong/status/2041156251825185015,yes
+122,James DePorre,x,1,0,0.0,,RevShark,high,https://x.com/RevShark/status/2038570571424780435,yes
+123,Joe MM,x,1,0,,1900-04-05,Evilisrising,high,https://x.com/Evilisrising/status/2040897338508464238,yes
+124,Jonny 👾,x,1,0,,1900-04-06,Hustlepedia,high,https://x.com/Hustlepedia/status/2041158771917939138,yes
+125,Kira Barr,x,1,0,,1900-04-06,KirasEpicTrades,high,https://x.com/KirasEpicTrades/status/2040989557974344101,yes
+126,LADE BACKK,x,1,0,,1900-04-06,LadeBackk,high,https://x.com/LadeBackk/status/2041159494856474664,yes
+127,Markets & Mayhem,x,1,0,,1900-04-06,Mayhem4Markets,high,https://x.com/Mayhem4Markets/status/2041154240609976601,yes
+128,Marty Chargin,x,1,0,,1900-03-30,MartyChargin,high,https://x.com/MartyChargin/status/2038586282780352622,yes
+129,Massive Moats,x,1,0,,1900-04-06,massivemoats,high,https://x.com/massivemoats/status/2041185005188096355,yes
+130,MCmasters 🐸,x,1,0,,1900-04-06,MCmastersCrypto,high,https://x.com/MCmastersCrypto/status/2040993601250066631,yes
+131,McNallie Money,x,1,0,,1900-04-06,McnallieM,high,https://x.com/McnallieM/status/2040989648894476388,yes
+132,Onur 🍌🦍,x,1,0,,1900-04-06,0xc06,high,https://x.com/0xc06/status/2041147942657032510,yes
+133,Paper Bozz,x,1,0,,1900-04-06,PaperBozz,high,https://x.com/PaperBozz/status/2041211489739264239,yes
+134,POW Group,x,1,0,0.0,,GroupPow,high,https://x.com/GroupPow/status/2039861291997925526,yes
+135,Quality Compounders,x,1,1,100.0,2026-04-05,QualCompounders,high,https://x.com/QualCompounders/status/2040414093207904697,yes
+136,Ray Myers,x,1,0,0.0,,TheRayMyers,high,https://x.com/TheRayMyers/status/2039028793319313733,yes
+137,Reformed Tr🅰️der,x,1,0,,1900-04-06,Reformed_Trader,high,https://x.com/Reformed_Trader/status/2041158321348984978,yes
+138,Rosa Parks 🇮🇱,x,1,0,,1900-04-05,FakeRosaParkXBT,high,https://x.com/FakeRosaParkXBT/status/2040933159429403135,yes
+139,S A I ™️,x,1,0,,1900-04-06,WallStSai,high,https://x.com/WallStSai/status/2040986306797334927,yes
+140,Sniper paji,x,1,0,,1900-04-06,Teamsniperpaji,high,https://x.com/Teamsniperpaji/status/2040946932101906626,yes
+141,Space Investor,x,1,1,0.0,2026-04-05,SpaceInvestor_D,high,https://x.com/SpaceInvestor_D/status/2039301519393075364,yes
+142,Spencer (ZTRADEZ),x,1,0,,1900-04-06,zoptionstrading,high,https://x.com/zoptionstrading/status/2041147541819998547,yes
+143,stock goat,x,1,0,0.0,,kylewhitegoat,high,https://x.com/kylewhitegoat/status/2041153728598671503,yes
+144,Tee Kudos 🐾,x,1,0,,1900-03-30,Tee_Kudos,high,https://x.com/Tee_Kudos/status/2038650194351304972,yes
+145,The Bullion Duster,x,1,0,,1900-04-02,VJLvEekhout,high,https://x.com/VJLvEekhout/status/2039696258164523412,yes
+146,The Market Matrix,x,1,0,0.0,,MarketMatrixs,high,https://x.com/MarketMatrixs/status/2040477304636543352,yes
+147,The Swing Trader,x,1,0,,1900-04-06,TheSwingTraderr,high,https://x.com/TheSwingTraderr/status/2040957139154313451,yes
+148,Tristan Cornely 𓄀,x,1,0,,1900-04-01,WhiteMillions,high,https://x.com/WhiteMillions/status/2039213340753265063,yes
+149,UNKNOWN TRADER,x,1,0,,1900-04-06,Learnernoearner,high,https://x.com/Learnernoearner/status/2040974635257180424,yes
+150,Wolf Of Dubai 💲,x,1,0,,1900-03-31,realwolfofdubai,high,https://x.com/realwolfofdubai/status/2039117996984004929,yes
+151,Yiannis Zourmpanos,x,1,0,,1900-04-06,yianisz,high,https://x.com/yianisz/status/2041139222715703514,yes
+152,Zachary Markovich,x,1,0,,1900-04-06,Zac_Markovich,high,https://x.com/Zac_Markovich/status/2040948614730523027,yes
+153,⚔️The ₿itcoin Knight⚔️,x,1,0,,1900-04-06,TheBTCKnight,high,https://x.com/TheBTCKnight/status/2041153954906800619,yes
