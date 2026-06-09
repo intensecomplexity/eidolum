@@ -61,7 +61,7 @@ function cachedGet(url, ttlMs = 120000, config = undefined) {
 // api.eidolum.com directly. No edge-function change or backend change needed.
 // Local dev: edge functions don't run under `npm run dev`, so DEV always
 // falls back to VITE_API_BASE.
-const USE_EDGE_CACHE = true;
+const USE_EDGE_CACHE = false;
 function _edgeConfig(config = {}) {
   if (!USE_EDGE_CACHE || import.meta.env.DEV) return config;
   return { ...config, baseURL: '/api/edge' };
