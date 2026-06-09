@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import text as sql_text
 from database import get_db
 from models import Prediction, Forecaster, format_timestamp, get_youtube_timestamp_url
-from utils import compute_forecaster_stats, append_youtube_timestamp
+from utils import append_youtube_timestamp
 from utils.ticker import ticker_is_known
 from rate_limit import limiter
 from services.ticker_display import (
@@ -389,14 +389,24 @@ def get_asset_consensus(
         from ticker_lookup import TICKER_INFO
         _company = TICKER_INFO.get(ticker)
 
-    all_predictions = (
-        db.query(Prediction)
-        .filter(Prediction.ticker == ticker)
-        .order_by(Prediction.prediction_date.desc())
-        .all()
-    )
+    # Counts in ONE aggregate instead of loading every prediction row into the
+    # ORM (popular tickers have thousands; this was most of the 2.6s).
+    cnt = db.execute(sql_text("""
+        SELECT COUNT(*) AS total,
+               COUNT(*) FILTER (WHERE direction = 'bullish') AS bull,
+               COUNT(*) FILTER (WHERE direction = 'bearish') AS bear,
+               COUNT(*) FILTER (WHERE direction = 'neutral') AS neutral,
+               COUNT(*) FILTER (WHERE outcome = 'pending') AS pending
+        FROM predictions
+        WHERE ticker = :t
+    """), {"t": ticker}).first()
+    total = int(cnt[0] or 0)
+    bull_count = int(cnt[1] or 0)
+    bear_count = int(cnt[2] or 0)
+    neutral_count = int(cnt[3] or 0)
+    pending_count = int(cnt[4] or 0)
 
-    if not all_predictions:
+    if total == 0:
         return {
             "ticker": ticker,
             "company_name": resolve_ticker_display_name(ticker, _company),
@@ -420,21 +430,53 @@ def get_asset_consensus(
             "bears": [],
         }
 
-    scored_outcomes = {"hit", "near", "miss", "correct", "incorrect"}
-    predictions = [p for p in all_predictions if p.outcome in scored_outcomes]
-    pending_preds = [p for p in all_predictions if p.outcome == "pending"]
-    bull = [p for p in all_predictions if p.direction == "bullish"]
-    bear = [p for p in all_predictions if p.direction == "bearish"]
-    neutral = [p for p in all_predictions if p.direction == "neutral"]
-    total = len(all_predictions)
+    scored_outcomes = ("hit", "near", "miss", "correct", "incorrect")
 
-    # Enrich with forecaster info
+    # Only the rows the response actually renders: 20 most recent scored +
+    # 50 most recent pending (same ordering the old full load used).
+    recent_scored_preds = (
+        db.query(Prediction)
+        .filter(Prediction.ticker == ticker, Prediction.outcome.in_(scored_outcomes))
+        .order_by(Prediction.prediction_date.desc())
+        .limit(20)
+        .all()
+    )
+    pending_preds = (
+        db.query(Prediction)
+        .filter(Prediction.ticker == ticker, Prediction.outcome == "pending")
+        .order_by(Prediction.prediction_date.desc())
+        .limit(50)
+        .all()
+    )
+
+    # Per-forecaster record on THIS ticker — one GROUP BY instead of a Python
+    # loop over every scored row.
+    fc_stat_rows = db.execute(sql_text(f"""
+        SELECT forecaster_id, COUNT(*) AS total,
+               COUNT(*) FILTER (WHERE outcome IN ('hit','correct')) AS correct
+        FROM predictions
+        WHERE ticker = :t AND outcome IN {str(tuple(scored_outcomes))}
+        GROUP BY forecaster_id
+    """), {"t": ticker}).fetchall()
+
+    # ONE bulk forecaster fetch for everything below (was: a query per row,
+    # plus compute_forecaster_stats loading each forecaster's entire history).
+    needed_fids = {p.forecaster_id for p in recent_scored_preds}
+    needed_fids |= {p.forecaster_id for p in pending_preds}
+    needed_fids |= {r[0] for r in fc_stat_rows if r[1] >= 3}
+    fc_map = {}
+    if needed_fids:
+        for f in db.query(Forecaster).filter(Forecaster.id.in_(needed_fids)).all():
+            fc_map[f.id] = f
+
+    # Enrich with forecaster info. accuracy_rate now comes from the cached
+    # three-tier forecasters.accuracy_score — the same number the leaderboard
+    # and profile pages show.
     recent = []
-    for p in predictions[:20]:
-        f = db.query(Forecaster).filter(Forecaster.id == p.forecaster_id).first()
+    for p in recent_scored_preds:
+        f = fc_map.get(p.forecaster_id)
         if not f:
             continue
-        stats = compute_forecaster_stats(f, db)
         recent.append({
             "prediction_id": p.id,
             "ticker": p.ticker,
@@ -460,19 +502,9 @@ def get_asset_consensus(
                 "name": f.name,
                 "handle": f.handle,
                 "channel_url": f.channel_url,
-                "accuracy_rate": stats["accuracy_rate"],
+                "accuracy_rate": round(float(f.accuracy_score), 1) if f.accuracy_score else 0.0,
             },
         })
-
-    # Top forecasters on this ticker by accuracy
-    forecaster_stats = {}
-    for p in predictions:
-        fid = p.forecaster_id
-        if fid not in forecaster_stats:
-            forecaster_stats[fid] = {"correct": 0, "total": 0}
-        forecaster_stats[fid]["total"] += 1
-        if p.outcome in ("correct", "hit"):
-            forecaster_stats[fid]["correct"] += 1
 
     # Ship #13 Bug I: require a real sample before crowning someone the
     # "Top analyst on {ticker}". With the old `< 1` gate a single 100%
@@ -482,18 +514,19 @@ def get_asset_consensus(
     # filters out the single-call noise.
     MIN_TICKER_SCORED = 3
     top = []
-    for fid, s in forecaster_stats.items():
-        if s["total"] < MIN_TICKER_SCORED:
+    for r in fc_stat_rows:
+        fid, s_total, s_correct = r[0], int(r[1]), int(r[2])
+        if s_total < MIN_TICKER_SCORED:
             continue
-        f = db.query(Forecaster).filter(Forecaster.id == fid).first()
+        f = fc_map.get(fid)
         if not f:
             continue
         top.append({
             "id": f.id,
             "name": f.name,
             "handle": f.handle,
-            "ticker_accuracy": round(s["correct"] / s["total"] * 100, 1),
-            "ticker_predictions": s["total"],
+            "ticker_accuracy": round(s_correct / s_total * 100, 1),
+            "ticker_predictions": s_total,
         })
 
     top.sort(key=lambda x: x["ticker_accuracy"], reverse=True)
@@ -502,12 +535,8 @@ def get_asset_consensus(
     pending_list = []
     bulls_list = []
     bears_list = []
-    fid_cache = {}
-    for p in pending_preds[:50]:
-        if p.forecaster_id not in fid_cache:
-            f = db.query(Forecaster).filter(Forecaster.id == p.forecaster_id).first()
-            fid_cache[p.forecaster_id] = f
-        f = fid_cache.get(p.forecaster_id)
+    for p in pending_preds:
+        f = fc_map.get(p.forecaster_id)
         if not f:
             continue
         acc = float(f.accuracy_score) if f.accuracy_score else 0
@@ -541,14 +570,14 @@ def get_asset_consensus(
         "description": _description,
         "sector": resolve_ticker_display_sector(ticker, _sector),
         "total_predictions": total,
-        "total_all_predictions": len(all_predictions),
-        "bullish_count": len(bull),
-        "bearish_count": len(bear),
-        "neutral_count": len(neutral),
-        "bullish_pct": round(len(bull) / total * 100, 1) if total else 0.0,
-        "bearish_pct": round(len(bear) / total * 100, 1) if total else 0.0,
-        "neutral_pct": round(len(neutral) / total * 100, 1) if total else 0.0,
-        "pending_count": len(pending_preds),
+        "total_all_predictions": total,
+        "bullish_count": bull_count,
+        "bearish_count": bear_count,
+        "neutral_count": neutral_count,
+        "bullish_pct": round(bull_count / total * 100, 1) if total else 0.0,
+        "bearish_pct": round(bear_count / total * 100, 1) if total else 0.0,
+        "neutral_pct": round(neutral_count / total * 100, 1) if total else 0.0,
+        "pending_count": pending_count,
         "recent_predictions": recent,
         "top_accurate_forecasters": top[:5],
         "pending_predictions": pending_list,
