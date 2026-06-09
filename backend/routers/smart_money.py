@@ -147,33 +147,92 @@ def get_smart_money(
     bullish_list = []
     bearish_list = []
 
-    # Resolve the real live price for each unique ticker so upside_pct
-    # reflects today's reality. Falling back to entries[-1] would re-use
-    # a stale entry price from an old prediction and is exactly why
-    # SNOW/MSFT were appearing on Bullish Bets with negative upside.
+    # Resolve a current price for each unique ticker so upside_pct
+    # reflects reality. Falling back to entries[-1] would re-use a stale
+    # entry price from an old prediction and is exactly why SNOW/MSFT
+    # were appearing on Bullish Bets with negative upside.
     #
-    # Parallelized with ThreadPoolExecutor (max_workers=10) — the old
-    # sequential loop over 300+ surviving tickers at ~100ms per provider
-    # call was the dominant cost (~30s+, blowing past the 8s frontend
-    # timeout). 10 concurrent fetches drops worst case to ~3s while
-    # staying under the price provider's polite-client threshold.
-    try:
-        from routers.ticker_detail import _fetch_price_data
-    except Exception:
-        _fetch_price_data = None  # type: ignore
+    # Prices come from the LOCAL price_bars asset (20M+ EOD rows, kept
+    # current by the daily incremental cron) in ONE batched indexed
+    # query — the previous per-ticker external HTTP fanout (ThreadPool
+    # over 300+ tickers) cost ~8.4s on a fully cold worker and 504'd at
+    # the gateway. EOD close is acceptable for this surface: it ranks
+    # calls, it isn't a trading terminal.
+    all_tickers = list(ticker_data.keys())
     live_prices: dict = {}
-    if _fetch_price_data is not None:
-        def _fetch_one(t):
+    stale_closes: dict = {}
+    try:
+        bar_rows = db.execute(sql_text("""
+            SELECT DISTINCT ON (ticker) ticker, close, bar_date
+            FROM price_bars
+            WHERE ticker = ANY(:tickers)
+            ORDER BY ticker, bar_date DESC
+        """), {"tickers": all_tickers}).fetchall()
+        import datetime as _dt
+        fresh_floor = _dt.date.today() - _dt.timedelta(days=5)
+        for br in bar_rows:
+            if br[1] is None or float(br[1]) <= 0:
+                continue
+            if br[2] >= fresh_floor:
+                live_prices[br[0]] = float(br[1])
+            else:
+                # Last KNOWN close — real historical data, used only if the
+                # live refresh below doesn't beat the deadline.
+                stale_closes[br[0]] = float(br[1])
+    except Exception:
+        pass
+
+    # Live-fetch fallback ONLY for tickers with no local bar in the last
+    # 5 days. The daily incremental cron refreshes 200 tickers/day, so
+    # long-tail names age out — each successful live fetch is persisted
+    # back into price_bars (write-through, source='live'), making the
+    # miss set self-healing AND shared across workers. The pool is
+    # DEADLINED at 2.5s: permanently-dead tickers walk the full provider
+    # cascade and must never hold the response hostage (the old unbounded
+    # fanout is what 504'd cold workers). Stragglers fall back to their
+    # last known close.
+    missing = [t for t in all_tickers if t not in live_prices]
+    if missing:
+        try:
+            from routers.ticker_detail import _fetch_price_data
+        except Exception:
+            _fetch_price_data = None  # type: ignore
+        if _fetch_price_data is not None:
+            from concurrent.futures import as_completed
+            def _fetch_one(t):
+                try:
+                    d = _fetch_price_data(t)
+                    lp = d.get("current_price") if d else None
+                    return t, (float(lp) if lp and lp > 0 else None)
+                except Exception:
+                    return t, None
+            fetched = []
+            pool = ThreadPoolExecutor(max_workers=10)
+            futures = [pool.submit(_fetch_one, t) for t in missing]
             try:
-                d = _fetch_price_data(t)
-                lp = d.get("current_price") if d else None
-                return t, (float(lp) if lp and lp > 0 else None)
+                for fut in as_completed(futures, timeout=2.5):
+                    ticker, price = fut.result()
+                    if price is not None:
+                        live_prices[ticker] = price
+                        fetched.append((ticker, price))
             except Exception:
-                return t, None
-        with ThreadPoolExecutor(max_workers=10) as pool:
-            for ticker, price in pool.map(_fetch_one, list(ticker_data.keys())):
-                if price is not None:
-                    live_prices[ticker] = price
+                pass  # deadline hit — stragglers use stale_closes below
+            finally:
+                pool.shutdown(wait=False, cancel_futures=True)
+            if fetched:
+                try:
+                    import datetime as _dt
+                    from services.price_store import persist_bar
+                    today = _dt.date.today()
+                    for ticker, price in fetched:
+                        persist_bar(ticker, today, price, source="live")
+                except Exception:
+                    pass
+
+    # Anything still unresolved uses its last known close (better than the
+    # old behavior of silently reusing a years-old entry_price).
+    for t, c in stale_closes.items():
+        live_prices.setdefault(t, c)
 
     for ticker, td in ticker_data.items():
         bull_ids = list(set(td["bullish"]))
