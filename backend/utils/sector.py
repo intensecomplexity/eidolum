@@ -143,6 +143,12 @@ RAW_SECTOR_ALIASES: dict[str, str] = {
     "sugar & confectionery products": "Consumer Defensive",
     "grain mill products": "Consumer Defensive",
     "cigarettes": "Consumer Defensive",
+    # 2026-06-10 follow-up: the four values left to Other in 4cc3989,
+    # now reviewed and placed.
+    "distributors": "Industrials",
+    "measuring & controlling devices, nec": "Technology",
+    "optical instruments & lenses": "Technology",
+    "plastics products, nec": "Basic Materials",
 
     # Non-Morningstar bucket labels the pipeline sometimes emits
     "crypto": UNKNOWN_SECTOR,
