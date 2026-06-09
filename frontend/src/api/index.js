@@ -787,7 +787,7 @@ export function getAnalystAccuracyHistory(name) {
 export function getAnalysts(q) {
   const params = {};
   if (q) params.q = q;
-  return api.get('/analysts', { params }).then(r => r.data);
+  return api.get('/analysts', _edgeConfig({ params })).then(r => r.data);
 }
 
 export function getAnalystProfile(name) {
