@@ -11,6 +11,7 @@ import ReactionBar from '../components/ReactionBar';
 import ToldYouSoModal from '../components/ToldYouSoModal';
 import PnLBadge from '../components/PnLBadge';
 import CommentSection from '../components/CommentSection';
+import useCommentCounts from '../hooks/useCommentCounts';
 import { getUserPredictions, deletePrediction, getDeletionStatus } from '../api';
 import { formatDate } from '../utils/formatDate';
 
@@ -31,6 +32,8 @@ export default function MyCalls() {
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState(null);
   const [deletionStatus, setDeletionStatus] = useState(null);
+  // One bulk request for every card's comment count instead of one per card.
+  const commentCounts = useCommentCounts(predictions.map(p => p.id), 'user');
 
   const loadData = useCallback(() => {
     if (!isAuthenticated || !user) return;
@@ -115,7 +118,7 @@ export default function MyCalls() {
         {/* Mobile cards */}
         <div className="lg:hidden space-y-3">
           {predictions.map(p => (
-            <PredictionCard key={p.id} p={p} onDelete={handleDelete} />
+            <PredictionCard key={p.id} p={p} onDelete={handleDelete} commentCount={commentCounts ? (commentCounts[p.id] ?? 0) : null} />
           ))}
         </div>
 
@@ -214,7 +217,7 @@ function DeleteButton({ prediction, onDelete }) {
 
 // ── Mobile card ──────────────────────────────────────────────────────────────
 
-function PredictionCard({ p, onDelete }) {
+function PredictionCard({ p, onDelete, commentCount = undefined }) {
   const remaining = p.outcome === 'pending' ? daysRemaining(p.created_at, p.evaluation_window_days) : null;
   const canDelete = isDeletable(p);
   const [showBrag, setShowBrag] = useState(false);
@@ -250,7 +253,7 @@ function PredictionCard({ p, onDelete }) {
         {(() => { const tl = timeLeft(p.expires_at || remaining); return tl.expired ? <span className="font-mono text-muted">Evaluating</span> : remaining > 0 ? <span className={`font-mono ${tl.urgent ? 'text-warning' : 'text-muted'}`}>{tl.text}</span> : null; })()}
       </div>
       <ReactionBar predictionId={p.id} source="user" isOwn={true} outcome={p.outcome} />
-      <CommentSection predictionId={p.id} source="user" />
+      <CommentSection predictionId={p.id} source="user" initialCount={commentCount} />
       {p.outcome === 'correct' && (
         <button onClick={() => setShowBrag(true)} className="mt-2 text-xs text-warning/70 hover:text-warning transition-colors font-medium">
           Drop the Receipt
