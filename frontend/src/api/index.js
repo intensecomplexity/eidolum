@@ -798,10 +798,6 @@ export function getAnalystPredictions(name, params = {}) {
   return api.get(`/analysts/${encodeURIComponent(name)}/predictions`, { params }).then(r => r.data);
 }
 
-export function getAnalystRankings() {
-  return api.get('/analysts/rankings').then(r => r.data);
-}
-
 export function getAnalystSubscriptionStatus(name) {
   const token = localStorage.getItem('eidolum_token');
   const config = token ? { headers: { Authorization: `Bearer ${token}` } } : {};

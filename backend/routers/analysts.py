@@ -93,44 +93,6 @@ def list_analysts(request: Request, q: str = Query(""), db: Session = Depends(ge
     return results
 
 
-# ── GET /api/analysts/rankings ────────────────────────────────────────────────
-
-
-@router.get("/analysts/rankings")
-@limiter.limit("60/minute")
-def analyst_rankings(request: Request, db: Session = Depends(get_db)):
-    forecasters = db.query(Forecaster).all()
-
-    results = []
-    for f in forecasters:
-        scored = db.query(func.count(Prediction.id)).filter(
-            Prediction.forecaster_id == f.id,
-            Prediction.outcome.in_(["hit","near","miss","correct","incorrect"]),
-        ).scalar() or 0
-        if scored < 10:
-            continue
-        correct = db.query(func.count(Prediction.id)).filter(
-            Prediction.forecaster_id == f.id,
-            Prediction.outcome.in_(("hit", "correct")),
-        ).scalar() or 0
-
-        results.append({
-            "id": f.id,
-            "name": f.name,
-            "platform": f.platform,
-            "scored_predictions": scored,
-            "correct_predictions": correct,
-            "accuracy": _accuracy(correct, scored),
-            "streak": f.streak or 0,
-        })
-
-    results.sort(key=lambda x: (x["accuracy"], x["scored_predictions"]), reverse=True)
-    for i, r in enumerate(results):
-        r["rank"] = i + 1
-
-    return results[:50]
-
-
 # ── GET /api/analysts/subscriptions ───────────────────────────────────────────
 #
 # Lists the current authenticated user's followed analysts. Powers the
