@@ -31,43 +31,63 @@ def _accuracy(correct: int, total: int) -> float:
 @router.get("/analysts")
 @limiter.limit("60/minute")
 def list_analysts(request: Request, q: str = Query(""), db: Session = Depends(get_db)):
-    query = db.query(Forecaster)
+    """ONE aggregate query (platforms.py recipe, c47827b). The old code
+    loaded every forecaster via ORM and then ran a MAX(prediction_date)
+    query PER forecaster (~6,300 sequential queries, +3 more counts for
+    zero-stat rows) — 8.4s and a gateway 504 on every call."""
+    from sqlalchemy import text as sql_text
 
+    where = ""
+    params: dict = {}
     if q.strip():
-        pattern = f"%{q.strip().lower()}%"
-        query = query.filter(func.lower(Forecaster.name).like(pattern))
+        where = "WHERE LOWER(f.name) LIKE :pattern"
+        params["pattern"] = f"%{q.strip().lower()}%"
 
-    forecasters = query.order_by(Forecaster.total_predictions.desc().nullslast()).all()
+    rows = db.execute(sql_text(f"""
+        SELECT f.id, f.name, f.handle, f.platform,
+               f.total_predictions, f.correct_predictions,
+               COALESCE(agg.total_all, 0) AS total_all,
+               COALESCE(agg.scored, 0) AS scored,
+               COALESCE(agg.correct, 0) AS correct,
+               agg.last_pred
+        FROM forecasters f
+        LEFT JOIN (
+            SELECT forecaster_id,
+                   COUNT(*) AS total_all,
+                   COUNT(*) FILTER (WHERE outcome IN ('hit','near','miss','correct','incorrect')) AS scored,
+                   COUNT(*) FILTER (WHERE outcome IN ('hit','correct')) AS correct,
+                   MAX(prediction_date) AS last_pred
+            FROM predictions
+            GROUP BY forecaster_id
+        ) agg ON agg.forecaster_id = f.id
+        {where}
+        ORDER BY f.total_predictions DESC NULLS LAST
+    """), params).fetchall()
 
     results = []
-    for f in forecasters:
-        total = f.total_predictions or 0
-        correct = f.correct_predictions or 0
-        scored = total  # cached stats are for scored predictions
-        if total == 0:
-            # Compute from predictions table
-            scored = db.query(func.count(Prediction.id)).filter(
-                Prediction.forecaster_id == f.id,
-                Prediction.outcome.in_(["hit","near","miss","correct","incorrect"]),
-            ).scalar() or 0
-            correct = db.query(func.count(Prediction.id)).filter(
-                Prediction.forecaster_id == f.id,
-                Prediction.outcome.in_(("hit", "correct")),
-            ).scalar() or 0
-            total = db.query(func.count(Prediction.id)).filter(Prediction.forecaster_id == f.id).scalar() or 0
-
-        last_pred = db.query(func.max(Prediction.prediction_date)).filter(Prediction.forecaster_id == f.id).scalar()
+    for r in rows:
+        # Same source-of-truth precedence as before: the cached forecaster
+        # columns when populated, the predictions aggregate otherwise.
+        cached_total = r[4] or 0
+        if cached_total > 0:
+            total = cached_total
+            scored = cached_total  # cached stats are for scored predictions
+            correct = r[5] or 0
+        else:
+            total = int(r[6])
+            scored = int(r[7])
+            correct = int(r[8])
 
         results.append({
-            "id": f.id,
-            "name": f.name,
-            "handle": f.handle,
-            "platform": f.platform,
+            "id": r[0],
+            "name": r[1],
+            "handle": r[2],
+            "platform": r[3],
             "total_predictions": total,
             "scored_predictions": scored,
             "correct_predictions": correct,
             "accuracy": _accuracy(correct, scored),
-            "most_recent": last_pred.isoformat() if last_pred else None,
+            "most_recent": r[9].isoformat() if r[9] else None,
         })
 
     return results
