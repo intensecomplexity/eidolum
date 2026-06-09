@@ -10,7 +10,7 @@ from utils import append_youtube_timestamp
 from models import (
     Forecaster, Prediction, Disclosure, TrackedXAccount, SuggestedXAccount,
     XScraperRejection, YouTubeChannelMeta, SectorEtfAlias,
-    MacroConceptAlias, Config,
+    MacroConceptAlias, Config, Theme, ThemeTicker,
 )
 from middleware.auth import require_admin, require_admin_user
 from rate_limit import limiter
@@ -1922,4 +1922,298 @@ def youtube_training_progress(
         "daily_rate": daily_rate,
         "estimated_days_remaining": est_days,
         "auto_stop_active": auto_stop,
+    }
+
+
+# --------------------------------------------------------------------------
+# Product Themes admin CRUD (Product Themes v1 ship)
+#
+# Hand-curated theme → ticker membership, mirroring the shape of the
+# sector-aliases admin endpoints above. Backs the "Product Themes" panel
+# in AdminDashboard.jsx. NOT gated on ENABLE_PRODUCT_THEMES so the seed
+# can be reviewed/curated while the public surfaces stay dark.
+# --------------------------------------------------------------------------
+
+import re as _theme_re
+
+_THEME_SLUG_RE = _theme_re.compile(r"^[a-z0-9][a-z0-9-]{1,47}$")
+
+
+def _serialize_theme(t: Theme, members: list | None = None) -> dict:
+    out = {
+        "id": t.id,
+        "slug": t.slug,
+        "name": t.name,
+        "description": t.description,
+        "display_order": t.display_order,
+        "is_active": bool(t.is_active),
+        "created_at": t.created_at.isoformat() if t.created_at else None,
+    }
+    if members is not None:
+        out["tickers"] = [
+            {"ticker": m.ticker, "is_primary": bool(m.is_primary)}
+            for m in members
+        ]
+    return out
+
+
+@router.get("/admin/themes")
+@limiter.limit("30/minute")
+def list_themes_admin(
+    request: Request,
+    admin: bool = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    """List ALL themes (including inactive) with their member tickers,
+    ordered by display_order then name."""
+    themes = db.query(Theme).order_by(
+        Theme.display_order.asc(), Theme.name.asc()
+    ).all()
+    members = db.query(ThemeTicker).order_by(
+        ThemeTicker.is_primary.desc(), ThemeTicker.ticker.asc()
+    ).all()
+    by_theme: dict = {}
+    for m in members:
+        by_theme.setdefault(m.theme_id, []).append(m)
+    return [_serialize_theme(t, by_theme.get(t.id, [])) for t in themes]
+
+
+@router.post("/admin/themes")
+@limiter.limit("30/minute")
+async def create_theme(
+    request: Request,
+    admin_id: int = Depends(require_admin_user),
+    db: Session = Depends(get_db),
+):
+    """Create a theme. Body: {slug, name, description?, display_order?}.
+    Slug is lowercase kebab-case, unique (409 on collision)."""
+    body = _json.loads(await request.body())
+    slug = (body.get("slug") or "").strip().lower()
+    name = (body.get("name") or "").strip()
+    description = (body.get("description") or "").strip() or None
+    display_order = body.get("display_order", 100)
+
+    if not _THEME_SLUG_RE.match(slug):
+        raise HTTPException(
+            status_code=400,
+            detail="slug must be 2-48 chars of lowercase letters, digits, hyphens",
+        )
+    if not name:
+        raise HTTPException(status_code=400, detail="name is required")
+    if len(name) > 80:
+        raise HTTPException(status_code=400, detail="name max length 80")
+    try:
+        display_order = int(display_order)
+    except (ValueError, TypeError):
+        raise HTTPException(status_code=400, detail="display_order must be an integer")
+
+    if db.query(Theme).filter(Theme.slug == slug).first():
+        raise HTTPException(status_code=409, detail=f"theme '{slug}' already exists")
+
+    row = Theme(slug=slug, name=name, description=description,
+                display_order=display_order)
+    db.add(row)
+    db.commit()
+    db.refresh(row)
+
+    _log_yt_action(
+        db, admin_id, "theme_add", target_id=row.id,
+        details={"slug": slug, "name": name},
+        request=request,
+    )
+    return _serialize_theme(row, [])
+
+
+@router.patch("/admin/themes/{theme_id}")
+@limiter.limit("30/minute")
+async def update_theme(
+    request: Request,
+    theme_id: int,
+    admin_id: int = Depends(require_admin_user),
+    db: Session = Depends(get_db),
+):
+    """Update name / description / display_order / is_active. Body fields
+    all optional; unspecified fields stay unchanged. Slug is immutable
+    (it's the public URL key)."""
+    row = db.query(Theme).filter(Theme.id == theme_id).first()
+    if not row:
+        raise HTTPException(status_code=404, detail="theme not found")
+
+    body = _json.loads(await request.body())
+    if "name" in body:
+        new_name = (body.get("name") or "").strip()
+        if not new_name:
+            raise HTTPException(status_code=400, detail="name cannot be empty")
+        if len(new_name) > 80:
+            raise HTTPException(status_code=400, detail="name max length 80")
+        row.name = new_name
+    if "description" in body:
+        row.description = (body.get("description") or "").strip() or None
+    if "display_order" in body:
+        try:
+            row.display_order = int(body.get("display_order"))
+        except (ValueError, TypeError):
+            raise HTTPException(status_code=400, detail="display_order must be an integer")
+    if "is_active" in body:
+        row.is_active = bool(body.get("is_active"))
+    db.commit()
+    db.refresh(row)
+
+    _log_yt_action(
+        db, admin_id, "theme_update", target_id=row.id,
+        details={"slug": row.slug, "is_active": bool(row.is_active)},
+        request=request,
+    )
+    members = db.query(ThemeTicker).filter(
+        ThemeTicker.theme_id == row.id
+    ).order_by(ThemeTicker.is_primary.desc(), ThemeTicker.ticker.asc()).all()
+    return _serialize_theme(row, members)
+
+
+@router.delete("/admin/themes/{theme_id}")
+@limiter.limit("30/minute")
+def delete_theme(
+    request: Request,
+    theme_id: int,
+    admin_id: int = Depends(require_admin_user),
+    db: Session = Depends(get_db),
+):
+    """Delete a theme. theme_tickers rows cascade via the FK. Predictions
+    are untouched — themes never write to the predictions table."""
+    row = db.query(Theme).filter(Theme.id == theme_id).first()
+    if not row:
+        raise HTTPException(status_code=404, detail="theme not found")
+    snapshot = {"slug": row.slug, "name": row.name}
+    db.delete(row)
+    db.commit()
+
+    _log_yt_action(
+        db, admin_id, "theme_delete", target_id=theme_id,
+        details=snapshot, request=request,
+    )
+    return {"deleted": True, "id": theme_id}
+
+
+@router.post("/admin/themes/{theme_id}/tickers")
+@limiter.limit("60/minute")
+async def add_theme_ticker(
+    request: Request,
+    theme_id: int,
+    admin_id: int = Depends(require_admin_user),
+    db: Session = Depends(get_db),
+):
+    """Add (or update is_primary on) a member ticker.
+    Body: {ticker, is_primary?}."""
+    theme = db.query(Theme).filter(Theme.id == theme_id).first()
+    if not theme:
+        raise HTTPException(status_code=404, detail="theme not found")
+
+    body = _json.loads(await request.body())
+    ticker = (body.get("ticker") or "").strip().upper()
+    is_primary = bool(body.get("is_primary", False))
+    if not ticker or len(ticker) > 20:
+        raise HTTPException(status_code=400, detail="ticker required (max 20 chars)")
+
+    existing = db.query(ThemeTicker).filter(
+        ThemeTicker.theme_id == theme_id, ThemeTicker.ticker == ticker
+    ).first()
+    if existing:
+        existing.is_primary = is_primary
+        status = "updated"
+    else:
+        db.add(ThemeTicker(theme_id=theme_id, ticker=ticker,
+                           is_primary=is_primary))
+        status = "added"
+    db.commit()
+
+    _log_yt_action(
+        db, admin_id, "theme_ticker_add", target_id=theme_id,
+        details={"slug": theme.slug, "ticker": ticker,
+                 "is_primary": is_primary, "status": status},
+        request=request,
+    )
+    return {"status": status, "theme_id": theme_id, "ticker": ticker,
+            "is_primary": is_primary}
+
+
+@router.delete("/admin/themes/{theme_id}/tickers/{ticker}")
+@limiter.limit("60/minute")
+def remove_theme_ticker(
+    request: Request,
+    theme_id: int,
+    ticker: str,
+    admin_id: int = Depends(require_admin_user),
+    db: Session = Depends(get_db),
+):
+    """Remove a member ticker from a theme."""
+    ticker = ticker.strip().upper()
+    row = db.query(ThemeTicker).filter(
+        ThemeTicker.theme_id == theme_id, ThemeTicker.ticker == ticker
+    ).first()
+    if not row:
+        raise HTTPException(status_code=404, detail="membership not found")
+    theme = db.query(Theme).filter(Theme.id == theme_id).first()
+    db.delete(row)
+    db.commit()
+
+    _log_yt_action(
+        db, admin_id, "theme_ticker_remove", target_id=theme_id,
+        details={"slug": theme.slug if theme else None, "ticker": ticker},
+        request=request,
+    )
+    return {"deleted": True, "theme_id": theme_id, "ticker": ticker}
+
+
+@router.get("/admin/themes/{theme_id}/suggest")
+@limiter.limit("30/minute")
+def suggest_theme_tickers(
+    request: Request,
+    theme_id: int,
+    admin: bool = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    """Suggest candidate members from stock_peers: peers of the current
+    members (primary-weighted by frequency), excluding tickers already in
+    the theme, enriched with company_profiles name/industry. READ-ONLY —
+    suggestions are never auto-added; the admin picks from the list."""
+    theme = db.query(Theme).filter(Theme.id == theme_id).first()
+    if not theme:
+        raise HTTPException(status_code=404, detail="theme not found")
+
+    members = [
+        m.ticker for m in db.query(ThemeTicker).filter(
+            ThemeTicker.theme_id == theme_id
+        ).all()
+    ]
+    if not members:
+        return {"theme_id": theme_id, "slug": theme.slug, "suggestions": []}
+
+    rows = db.execute(sql_text("""
+        SELECT sp.peer_ticker,
+               COUNT(*) AS via_count,
+               MAX(cp.company_name) AS company_name,
+               MAX(cp.industry) AS industry,
+               MAX(cp.sector) AS sector
+        FROM stock_peers sp
+        LEFT JOIN company_profiles cp ON cp.ticker = sp.peer_ticker
+        WHERE sp.ticker = ANY(:members)
+          AND sp.peer_ticker != ALL(:members)
+        GROUP BY sp.peer_ticker
+        ORDER BY via_count DESC, sp.peer_ticker ASC
+        LIMIT 30
+    """), {"members": members}).fetchall()
+
+    return {
+        "theme_id": theme_id,
+        "slug": theme.slug,
+        "suggestions": [
+            {
+                "ticker": r[0],
+                "peer_of_count": r[1],
+                "company_name": r[2],
+                "industry": r[3],
+                "sector": r[4],
+            }
+            for r in rows
+        ],
     }
