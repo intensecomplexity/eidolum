@@ -7,7 +7,7 @@ import TickerLogo from '../components/TickerLogo';
 import TickerLink from '../components/TickerLink';
 import Footer from '../components/Footer';
 import PageHeader from '../components/PageHeader';
-import { getAllConsensus, getThemes } from '../api';
+import { getAllConsensus, getThemes, getSectors } from '../api';
 import { pluralize } from '../utils/pluralize';
 import useSEO from '../hooks/useSEO';
 import { usePublicFlag } from '../hooks/usePublicFlag';
@@ -71,6 +71,15 @@ export default function Consensus() {
       .catch(() => setThemes([]));
   }, []);
 
+  // Sector explainers for the dynamic header. Non-blocking: until the
+  // list loads the header shows just the sector name (no placeholder).
+  const [sectorsList, setSectorsList] = useState([]);
+  useEffect(() => {
+    getSectors()
+      .then(s => setSectorsList(Array.isArray(s) ? s : []))
+      .catch(() => setSectorsList([]));
+  }, []);
+
   // Drop a garbage/disabled ?theme= once the real slug list is known.
   useEffect(() => {
     if (theme && themes.length > 0 && !themes.some(t => t.slug === theme)) {
@@ -115,13 +124,33 @@ export default function Consensus() {
     display = display.filter(c => c.bullish_percentage >= 80 || c.bullish_percentage <= 20);
   }
 
+  // Dynamic header: an active Product filter retitles the page to the
+  // theme name + its explainer; else an active Sector does the same;
+  // else the generic Verdict header. Product wins over Sector when both
+  // are selected (more specific — the data is ANDed either way).
+  // No-fake-data: a missing description just omits the subtitle.
+  const activeTheme = theme ? themes.find(t => t.slug === theme) : null;
+  const activeSectorName = !activeTheme && sector !== 'All Sectors' ? sector : null;
+  const activeSectorDesc = activeSectorName
+    ? (sectorsList.find(s => s.sector === activeSectorName)?.description || '')
+    : '';
+
   return (
     <div>
       <PageHeader
-        title={heroEnabled ? 'The Verdict' : 'Consensus'}
-        subtitle={heroEnabled
-          ? 'Bull, bear, hold. Where the analyst community has landed on every ticker.'
-          : 'What Wall Street thinks about every stock.'}
+        eyebrow={activeTheme ? 'Product' : activeSectorName ? 'Sector' : undefined}
+        title={activeTheme
+          ? activeTheme.name
+          : activeSectorName
+            ? activeSectorName
+            : (heroEnabled ? 'The Verdict' : 'Consensus')}
+        subtitle={activeTheme
+          ? (activeTheme.description || undefined)
+          : activeSectorName
+            ? (activeSectorDesc || undefined)
+            : (heroEnabled
+                ? 'Bull, bear, hold. Where the analyst community has landed on every ticker.'
+                : 'What Wall Street thinks about every stock.')}
         watermark={heroEnabled}
       />
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-6 sm:pb-10">

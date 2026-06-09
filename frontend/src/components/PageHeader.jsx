@@ -6,9 +6,12 @@
  * Usage:
  *   <PageHeader title="Consensus" subtitle="What Wall Street thinks." />
  */
-export default function PageHeader({ title, subtitle, children }) {
+export default function PageHeader({ title, subtitle, eyebrow, children }) {
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6 sm:pt-10">
+      {eyebrow && (
+        <div className="text-[10px] uppercase tracking-[0.2em] text-muted font-medium mb-1">{eyebrow}</div>
+      )}
       <h1 className="headline-serif mb-1" style={{ fontSize: 'clamp(28px, 5vw, 42px)', color: '#D4A843' }}>
         {title}
       </h1>
