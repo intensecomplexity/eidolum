@@ -2,10 +2,13 @@
 seed_product_themes.py — seed the Product Themes v1 starter set.
 
 18 hand-curated themes, US-listed tickers first (that's where prediction
-coverage lives). Idempotent: ON CONFLICT DO NOTHING on both tables, so
-re-running never duplicates and never clobbers admin edits made via
-/admin/themes. Also ensures the ENABLE_PRODUCT_THEMES config row exists
-(value 'false') so the flip is a single UPDATE.
+coverage lives). Rosters mirror the CURATED prod state (2026-06-09 review:
+phones/gaming/glp1/fintech/ev trims, clean-energy renamed "Solar") so a
+re-run is a no-op, not a regression. Idempotent: themes upsert reconciles
+name on conflict; memberships are ON CONFLICT DO NOTHING and the script
+never deletes — KEEP THIS LIST IN SYNC with admin removals, or a re-run
+silently re-adds removed tickers. Also ensures the ENABLE_PRODUCT_THEMES
+config row exists (value 'false') so the flip is a single UPDATE.
 
 Run locally against the Railway DB:
     DATABASE_PUBLIC_URL=postgres://... python backend/scripts/seed_product_themes.py
@@ -20,8 +23,8 @@ from psycopg2.extras import execute_values
 THEMES = [
     ("phones", "Phones",
      "Smartphone makers and the chip suppliers behind every handset.",
-     [("AAPL", True), ("GOOGL", True), ("QCOM", False), ("AVGO", False),
-      ("SWKS", False), ("QRVO", False)]),
+     [("AAPL", True), ("CRUS", False), ("QCOM", False), ("QRVO", False),
+      ("SWKS", False)]),
     ("ai-chips", "AI Chips",
      "The silicon powering the AI buildout — GPUs, accelerators, memory, and the foundry.",
      [("NVDA", True), ("AMD", True), ("AVGO", False), ("TSM", True),
@@ -29,7 +32,7 @@ THEMES = [
     ("ev", "EVs",
      "Electric vehicle makers, pure-play and legacy.",
      [("TSLA", True), ("RIVN", False), ("LCID", False), ("NIO", False),
-      ("BYDDY", False), ("GM", False), ("F", False)]),
+      ("LI", False), ("GM", False), ("F", False)]),
     ("cloud", "Cloud",
      "Hyperscalers and the cloud-native infrastructure layer.",
      [("MSFT", True), ("AMZN", True), ("GOOGL", True), ("ORCL", False),
@@ -52,15 +55,14 @@ THEMES = [
     ("fintech-payments", "Fintech & Payments",
      "Payment rails, networks, and consumer fintech.",
      [("V", True), ("MA", True), ("PYPL", False), ("SQ", False),
-      ("COIN", False), ("AXP", False)]),
+      ("AXP", False)]),
     ("gaming", "Gaming",
      "Game publishers, platforms, and the hardware they run on.",
-     [("NVDA", False), ("MSFT", False), ("EA", True), ("TTWO", True),
-      ("RBLX", False), ("U", False)]),
+     [("EA", True), ("TTWO", True), ("RBLX", False), ("U", False)]),
     ("semiconductors-equip", "Chip Equipment",
      "The toolmakers every fab depends on — lithography, deposition, etch, test.",
      [("ASML", True), ("AMAT", True), ("LRCX", False), ("KLAC", False)]),
-    ("clean-energy", "Clean Energy",
+    ("clean-energy", "Solar",
      "Solar, storage, and residential energy.",
      [("ENPH", True), ("FSLR", True), ("SEDG", False), ("RUN", False)]),
     ("space", "Space",
@@ -68,7 +70,7 @@ THEMES = [
      [("RKLB", True), ("LUNR", False), ("BA", False), ("LMT", False)]),
     ("weight-loss-glp1", "Weight Loss (GLP-1)",
      "The GLP-1 obesity-drug wave and its challengers.",
-     [("LLY", True), ("NVO", True), ("VKTX", False), ("AMGN", False)]),
+     [("LLY", True), ("NVO", True), ("VKTX", False)]),
     ("robotics-automation", "Robotics & Automation",
      "Industrial automation, surgical robotics, and test systems.",
      [("ISRG", True), ("ABB", False), ("ROK", False), ("TER", False)]),
@@ -100,10 +102,14 @@ def main():
         (slug, name, desc, (i + 1) * 10)
         for i, (slug, name, desc, _members) in enumerate(THEMES)
     ]
+    # DO UPDATE on name (only) so a re-run reconciles display renames
+    # ("Clean Energy" → "Solar") instead of silently keeping stale text.
+    # Membership stays DO NOTHING — the script never deletes, so admin
+    # removals survive as long as this seed list mirrors prod.
     execute_values(cur, """
         INSERT INTO themes (slug, name, description, display_order)
         VALUES %s
-        ON CONFLICT (slug) DO NOTHING
+        ON CONFLICT (slug) DO UPDATE SET name = EXCLUDED.name
     """, theme_rows)
 
     cur.execute("SELECT id, slug FROM themes")
