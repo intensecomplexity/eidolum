@@ -692,3 +692,34 @@ def invalidate_homepage_hero_flag_cache() -> None:
     """Reset the 60-second cache — called from the admin toggle endpoint
     so the new value takes effect immediately."""
     _HOMEPAGE_HERO_FLAG_CACHE["fetched_at"] = 0.0
+
+
+# ── Product Themes (Phones / AI Chips / EVs ... navigation axis) ───────────
+#
+# ENABLE_PRODUCT_THEMES gates the public /api/themes endpoints and the
+# ?theme= filter on /api/consensus. Default false: the seed is reviewed
+# by an admin before the surfaces go live. Flip via:
+#   UPDATE config SET value = 'true' WHERE key = 'ENABLE_PRODUCT_THEMES';
+# Admin CRUD (/api/admin/themes) is NOT gated so curation can happen
+# while the public surfaces stay dark.
+
+_PRODUCT_THEMES_FLAG_CACHE: dict = {"enabled": False, "fetched_at": 0.0}
+_PRODUCT_THEMES_FLAG_TTL = 60  # seconds
+
+
+def is_product_themes_enabled(db) -> bool:
+    """Return True if ENABLE_PRODUCT_THEMES is 'true' in the config table.
+    Default False. Cached 60s."""
+    now = time.time()
+    if (now - _PRODUCT_THEMES_FLAG_CACHE["fetched_at"]) < _PRODUCT_THEMES_FLAG_TTL:
+        return bool(_PRODUCT_THEMES_FLAG_CACHE["enabled"])
+    enabled = _read_bool(db, "ENABLE_PRODUCT_THEMES", default=False)
+    _PRODUCT_THEMES_FLAG_CACHE["enabled"] = enabled
+    _PRODUCT_THEMES_FLAG_CACHE["fetched_at"] = now
+    return enabled
+
+
+def invalidate_product_themes_flag_cache() -> None:
+    """Reset the 60-second cache so a config flip takes effect on the
+    next request instead of waiting out the TTL."""
+    _PRODUCT_THEMES_FLAG_CACHE["fetched_at"] = 0.0
