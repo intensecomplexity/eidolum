@@ -32,7 +32,6 @@ import NotFound from './pages/NotFound';
 // its own vendor chunk via vite.config.js manualChunks — pages that import
 // charts pull from that shared chunk instead of duplicating chart code.
 const ForecasterProfile      = lazy(() => import('./pages/ForecasterProfile'));
-const AssetConsensus         = lazy(() => import('./pages/AssetConsensus'));
 const Platforms              = lazy(() => import('./pages/Platforms'));
 const PlatformDetail         = lazy(() => import('./pages/PlatformDetail'));
 const SavedPredictions       = lazy(() => import('./pages/SavedPredictions'));
