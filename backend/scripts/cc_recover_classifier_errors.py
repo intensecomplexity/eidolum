@@ -125,6 +125,98 @@ _stop = {"flag": False}
 _TRANSCRIPT_CACHE: dict = {}
 _PRED_CACHE: dict = {}
 
+# Connect-args shared by the initial engine and every rebuild after a
+# mid-run password rotation. Kept in one place so the rebuilt engine is
+# byte-for-byte identical to the original (TCP keepalives + connect_timeout
+# + statement_timeout=0 across multi-minute `claude -p` idle gaps).
+_ENGINE_CONNECT_ARGS = {
+    "options": "-c statement_timeout=0",
+    "connect_timeout": 30,
+    "keepalives": 1,
+    "keepalives_idle": 30,
+    "keepalives_interval": 10,
+    "keepalives_count": 5,
+}
+# Holds the live engine so the rotation-recovery path can dispose the stale
+# one. {"engine": Engine, "session": Session}.
+_DB = {"engine": None, "session": None}
+DB_REBUILD_MAX = 6          # max engine rebuilds for one write before giving up
+DB_REBUILD_BACKOFF = 20     # seconds between rebuild attempts (let rotation settle)
+
+
+class _HollowWrite(Exception):
+    """Raised when a commit reports success but the expected row is absent —
+    the signature of an OperationalError swallowed by the prod insert path
+    during a credential rotation."""
+
+
+def _current_db_url() -> str:
+    """Resolve the DB URL FRESH from the environment on every call. After a
+    Railway password rotation, the launching shell's env is stale, but a
+    re-read of RECOVERY_DATABASE_URL / DATABASE_URL picks up a value that an
+    operator (or a future auto-refresh hook) has exported into this process.
+    Re-reading is the cheap, dependency-free option vs shelling out to
+    `railway variables -s Postgres --json` (which needs the Railway CLI +
+    network + correct linked service and can itself hang)."""
+    return os.environ.get("RECOVERY_DATABASE_URL") or os.environ["DATABASE_URL"]
+
+
+def _build_engine_and_session():
+    """(Re)create the engine + session from the CURRENT env URL. Disposes any
+    previous engine first so rotated-out connections aren't leaked."""
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import sessionmaker
+    old = _DB.get("engine")
+    if old is not None:
+        try:
+            old.dispose()
+        except Exception:
+            pass
+    engine = create_engine(
+        _current_db_url(),
+        connect_args=dict(_ENGINE_CONNECT_ARGS),
+        pool_pre_ping=True,
+        pool_recycle=600,
+    )
+    session = sessionmaker(bind=engine)()
+    _DB["engine"] = engine
+    _DB["session"] = session
+    return engine, session
+
+
+def _is_auth_failure(exc: Exception) -> bool:
+    """True if exc is (or wraps) a Postgres password-auth failure — the
+    signature of a mid-run credential rotation. Matches on message text so it
+    catches the error whether it surfaces as a bare psycopg2.OperationalError
+    or wrapped in sqlalchemy.exc.OperationalError."""
+    from sqlalchemy.exc import OperationalError as SAOperationalError
+    msg = str(getattr(exc, "orig", exc)) + " " + str(exc)
+    low = msg.lower()
+    looks_auth = (
+        "password authentication failed" in low
+        or "authentication failed for user" in low
+    )
+    is_op = isinstance(exc, SAOperationalError)
+    try:
+        import psycopg2
+        is_op = is_op or isinstance(getattr(exc, "orig", exc), psycopg2.OperationalError)
+    except Exception:
+        pass
+    return looks_auth and is_op
+
+
+def _rebuild_session_after_rotation(label: str):
+    """Re-read the env URL, rebuild the engine/session, return the new session.
+    Sleeps a short backoff first so a still-in-flight rotation can settle."""
+    _log(f"[recover] {label}: password auth failed — rotation suspected; "
+         f"re-reading env URL and rebuilding engine in {DB_REBUILD_BACKOFF}s")
+    for _ in range(DB_REBUILD_BACKOFF // 5):
+        if _stop["flag"]:
+            break
+        time.sleep(5)
+    _, session = _build_engine_and_session()
+    return session
+
 
 def _handle_sigterm(signum, frame):
     _stop["flag"] = True
@@ -430,8 +522,7 @@ def main() -> int:
     signal.signal(signal.SIGTERM, _handle_sigterm)
     signal.signal(signal.SIGINT, _handle_sigterm)
 
-    from sqlalchemy import create_engine, text as sql_text
-    from sqlalchemy.orm import sessionmaker
+    from sqlalchemy import text as sql_text
     from jobs.youtube_channel_monitor import _process_one_video, _record_processed_video
 
     install_monkeypatches()
@@ -440,24 +531,13 @@ def main() -> int:
     # RECOVERY_DATABASE_URL lets a local run point at the Railway public
     # proxy host (postgres.railway.internal isn't resolvable off-network);
     # it survives `railway run`, which would otherwise override DATABASE_URL.
-    db_url = os.environ.get("RECOVERY_DATABASE_URL") or os.environ["DATABASE_URL"]
-    # TCP keepalives + connect_timeout + pool_recycle: the run idles its DB
-    # connection across multi-minute `claude -p` calls; without these the
-    # Railway public proxy silently drops it (observed SSL-closed errors).
-    engine = create_engine(
-        db_url,
-        connect_args={
-            "options": "-c statement_timeout=0",
-            "connect_timeout": 30,
-            "keepalives": 1,
-            "keepalives_idle": 30,
-            "keepalives_interval": 10,
-            "keepalives_count": 5,
-        },
-        pool_pre_ping=True,
-        pool_recycle=600,
-    )
-    db = sessionmaker(bind=engine)()
+    # The engine is built via _build_engine_and_session so the same code path
+    # can rebuild it from a freshly-read env URL after a mid-run password
+    # rotation (TCP keepalives + connect_timeout + pool_recycle live in
+    # _ENGINE_CONNECT_ARGS — the run idles its DB connection across
+    # multi-minute `claude -p` calls; without them the Railway public proxy
+    # silently drops it, observed SSL-closed errors).
+    engine, db = _build_engine_and_session()
 
     cp = load_checkpoint()
     if cp is None:
@@ -589,35 +669,104 @@ def main() -> int:
             publish_str = m["publish"].isoformat() if m["publish"] else ""
             v["attempts"] += 1
             v["attempted_at"] = _now()
-            try:
-                inserted, tchars, status = _process_one_video(
-                    db, m["channel_name"], chan_id.get(m["channel_name"]),
-                    vid, m["title"], publish_str, defaultdict(int),
-                )
-                _record_processed_video(
-                    db, vid, m["channel_name"], m["title"],
-                    m["description"], publish_str, status, tchars, inserted,
-                )
-                new_ids = []
-                if inserted > 0:
-                    rows = db.execute(sql_text(
-                        "UPDATE predictions SET generating_model = :gm "
-                        "WHERE transcript_video_id = :vid "
-                        "AND generating_model IS NULL RETURNING id"
-                    ), {"gm": GENERATING_MODEL, "vid": vid[:11]}).fetchall()
-                    new_ids = [r[0] for r in rows]
-                db.commit()
-            except Exception as e:
+            # Rotation-resilient write: try the full write+commit; on a
+            # password-auth failure (rotation) rebuild the engine from a
+            # freshly-read env URL and retry the SAME video. A write that
+            # never persists must NOT mark the video done — it stays
+            # pending/retry so the data isn't silently lost ("hollow-done").
+            write_ok = False
+            auth_blocked = False   # True => failure was a rotation, don't burn the attempt
+            last_exc = None
+            rebuilds = 0
+            while True:
+                if _stop["flag"]:
+                    break
                 try:
-                    db.rollback()
-                except Exception:
-                    pass
-                _log(f"[recover] exception on video={vid}: {type(e).__name__}: {e}")
-                # Leave pending unless attempts exhausted.
+                    inserted, tchars, status = _process_one_video(
+                        db, m["channel_name"], chan_id.get(m["channel_name"]),
+                        vid, m["title"], publish_str, defaultdict(int),
+                    )
+                    _record_processed_video(
+                        db, vid, m["channel_name"], m["title"],
+                        m["description"], publish_str, status, tchars, inserted,
+                    )
+                    new_ids = []
+                    if inserted > 0:
+                        rows = db.execute(sql_text(
+                            "UPDATE predictions SET generating_model = :gm "
+                            "WHERE transcript_video_id = :vid "
+                            "AND generating_model IS NULL RETURNING id"
+                        ), {"gm": GENERATING_MODEL, "vid": vid[:11]}).fetchall()
+                        new_ids = [r[0] for r in rows]
+                    db.commit()
+                    # _process_one_video / _record_processed_video swallow
+                    # OperationalError internally (shared prod code) and
+                    # rollback, so a rotation can make them return a clean
+                    # status while NOTHING persisted. The youtube_videos row
+                    # ALWAYS pre-exists (these are existing classifier_error
+                    # rows), so an absence check is useless — instead verify
+                    # transcript_status was actually re-stamped to the status
+                    # we just wrote. If it still reads the old value (e.g. it
+                    # is still 'classifier_error'), the UPDATE was rolled back
+                    # inside the swallow and the write was hollow.
+                    persisted = db.execute(sql_text(
+                        "SELECT transcript_status FROM youtube_videos "
+                        "WHERE youtube_video_id = :vid"
+                    ), {"vid": vid}).fetchone()
+                    got = persisted[0] if persisted else None
+                    if persisted is None or got != status:
+                        raise _HollowWrite(
+                            f"hollow_write: transcript_status did not persist "
+                            f"(want {status!r}, got {got!r}) — write swallowed "
+                            "inside prod code, likely password rotation"
+                        )
+                    write_ok = True
+                    break
+                except Exception as e:
+                    last_exc = e
+                    try:
+                        db.rollback()
+                    except Exception:
+                        pass
+                    # A hollow write is the fingerprint of a rotation whose
+                    # OperationalError was swallowed deeper down: the prod
+                    # insert path caught it, rolled back, and returned a clean
+                    # status, so nothing persisted. Treat it like an auth
+                    # failure — refund the attempt and rebuild the engine.
+                    if _is_auth_failure(e) or isinstance(e, _HollowWrite):
+                        auth_blocked = True
+                        if rebuilds < DB_REBUILD_MAX:
+                            rebuilds += 1
+                            db = _rebuild_session_after_rotation(
+                                f"video={vid} (rebuild {rebuilds}/{DB_REBUILD_MAX})")
+                            continue  # retry this video on the fresh session
+                    _log(f"[recover] exception on video={vid}: {type(e).__name__}: {e}")
+                    break
+
+            if not write_ok:
+                if auth_blocked:
+                    # Failure was a password rotation, not a bad video. Refund
+                    # the attempt and leave the video pending so a later loop /
+                    # re-run retries it once credentials are fresh. NEVER mark
+                    # done here — marking-done-on-swallowed-write was the
+                    # data-loss bug that lost ~188 videos.
+                    v["attempts"] -= 1
+                    save_checkpoint(cp)
+                    if _stop["flag"]:
+                        break
+                    continue
+                # Genuine (non-auth) DB error or hollow write. Keep the attempt
+                # so a permanently-broken video can eventually exhaust and let
+                # the run finish — but only mark done once attempts are spent.
                 if v["attempts"] >= MAX_VIDEO_ATTEMPTS:
                     v["status"] = "done"
-                    v["result"] = {"inserted": 0, "error": f"exhausted: {type(e).__name__}"}
+                    v["result"] = {
+                        "inserted": 0,
+                        "error": f"exhausted: {type(last_exc).__name__ if last_exc else 'unknown'}",
+                    }
                 save_checkpoint(cp)
+                if _stop["flag"]:
+                    break
                 continue
 
             if new_ids:
