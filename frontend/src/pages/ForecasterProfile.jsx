@@ -917,7 +917,7 @@ export default function ForecasterProfile() {
             (under the quote) replaces the previous EvidenceCard compact
             teaser; the teaser was duplicating the quote and its green
             Watch link was competing with the red CTA. Same dedup pattern
-            applied to AssetConsensus in commit c903c6a. */}
+            was applied to the old asset consensus page in commit c903c6a. */}
         {activeTab === 'predictions' && <>
         <div className="lg:hidden space-y-3 mb-6 mx-0">
           <h2 className="text-base font-semibold mb-2">Prediction History</h2>

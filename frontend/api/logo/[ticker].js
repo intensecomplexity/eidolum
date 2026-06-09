@@ -21,7 +21,7 @@
 
 export const config = { runtime: 'edge' };
 
-const ORIGIN = 'https://eidolum-production.up.railway.app';
+const ORIGIN = 'https://api.eidolum.com';
 
 export default async function handler(request) {
   const { pathname } = new URL(request.url);

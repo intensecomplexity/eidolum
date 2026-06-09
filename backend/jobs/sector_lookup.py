@@ -50,6 +50,22 @@ TICKER_SECTOR_OVERRIDES: dict[str, str] = {
     "CNK": "Communication Services",
     "Z": "Communication Services",
     "ZG": "Communication Services",
+    # Round 3 (2026-06-10): solar = Morningstar Technology (also resolves
+    # the theme=Solar vs sector=Energy quirk); Packaging & Containers =
+    # Morningstar Consumer Cyclical; TTD/MSTR = Technology.
+    "FSLR": "Technology",
+    "SEDG": "Technology",
+    "ENPH": "Technology",
+    "TTD": "Technology",
+    "MSTR": "Technology",
+    "OI": "Consumer Cyclical",
+    "CCK": "Consumer Cyclical",
+    "PKG": "Consumer Cyclical",
+    "SEE": "Consumer Cyclical",
+    "SON": "Consumer Cyclical",
+    "IP": "Consumer Cyclical",
+    "SLGN": "Consumer Cyclical",
+    "GEF": "Consumer Cyclical",
 }
 
 # Every override must be one of the 13 display buckets — fail loudly at

@@ -174,10 +174,6 @@ export function getFollowThroughLeaderboard({ window = '3m', limit = 50, minDisc
   }).then(r => r.data);
 }
 
-export function getAssetConsensus(ticker, days = 90) {
-  return api.get(`/asset/${ticker}/consensus`, _edgeConfig({ params: { days } })).then(r => r.data);
-}
-
 export function getPendingPredictions() {
   return api.get('/pending-predictions').then(r => r.data);
 }
