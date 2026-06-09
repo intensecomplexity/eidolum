@@ -1092,38 +1092,57 @@ def get_leaderboard(
 @router.get("/sectors")
 @limiter.limit("30/minute")
 def get_sectors(request: Request, db: Session = Depends(get_db)):
-    """Return a summary of all sectors for the 'By Sector' tab."""
-    sector_rows = db.execute(sql_text(f"""
+    """Return a summary of all sectors for the 'By Sector' tab.
+
+    Groups by display_sector(raw) at READ time, so the response is
+    always a subset of {11 Morningstar, Crypto, Other}: leaked raw SIC/
+    GICS strings ('Consumer products', 'SERVICES-BUSINESS SERVICES,
+    NEC', ...) merge into their canonical bucket via the alias map, and
+    anything unrecognized collapses into "Other". Stored sector values
+    are never rewritten."""
+    raw_rows = db.execute(sql_text(f"""
         SELECT ts.sector, COUNT(*) as total,
                SUM(CASE WHEN p.outcome IN ('hit','correct') THEN 1.0
-                        WHEN p.outcome = 'near' THEN 0.5 ELSE 0 END) as score,
-               SUM(CASE WHEN p.outcome IN ('hit','near','miss','correct','incorrect') THEN 1 ELSE 0 END) as evaluated
+                        WHEN p.outcome = 'near' THEN 0.5 ELSE 0 END) as score
         FROM predictions p
         JOIN ticker_sectors ts ON ts.ticker = p.ticker
-        WHERE ts.sector IS NOT NULL AND ts.sector != '' AND ts.sector != 'Other'
+        WHERE ts.sector IS NOT NULL AND ts.sector != ''
           AND p.outcome IN ('hit','near','miss','correct','incorrect')
           AND {_YT_VIS_P}{_HEDGED_P}
         GROUP BY ts.sector
-        HAVING SUM(CASE WHEN p.outcome IN ('hit','near','miss','correct','incorrect') THEN 1 ELSE 0 END) >= 5
-        ORDER BY total DESC
     """)).fetchall()
 
-    from utils.sector import SECTOR_META
+    from utils.sector import SECTOR_META, display_sector
+
+    # Merge raw groups into canonical display buckets. The WHERE clause
+    # already restricts to evaluated outcomes, so total == evaluated.
+    raw_to_canon: dict = {}
+    buckets: dict = {}
+    for raw, total, score in raw_rows:
+        canon = display_sector(raw)
+        raw_to_canon[raw] = canon
+        b = buckets.setdefault(canon, {"total": 0, "score": 0.0})
+        b["total"] += total
+        b["score"] += float(score or 0)
 
     sectors = []
-    sector_names = []
-    for r in sector_rows:
-        accuracy = round(float(r[2]) / r[3] * 100, 1) if r[3] > 0 else 0.0
+    for canon, b in sorted(buckets.items(), key=lambda kv: -kv[1]["total"]):
+        if b["total"] < 5:  # same ≥5-evaluated gate as before, post-merge
+            continue
         sectors.append({
-            "sector": r[0],
-            "description": SECTOR_META.get(r[0], ""),
-            "total_predictions": r[1],
-            "evaluated": r[3],
-            "correct": int(float(r[2])),
-            "accuracy": accuracy,
+            "sector": canon,
+            "description": SECTOR_META.get(canon, ""),
+            "total_predictions": b["total"],
+            "evaluated": b["total"],
+            "correct": int(b["score"]),
+            "accuracy": round(b["score"] / b["total"] * 100, 1),
             "top_forecasters": [],
         })
-        sector_names.append(r[0])
+
+    shown = {s["sector"] for s in sectors}
+    # Other is the residual bucket — listed with its description, but no
+    # top-forecaster ranking (frontends filter it from the card grids).
+    sector_names = sorted(shown - {"Other"})
 
     # Fetch top forecasters per sector in a single query. Ranked by
     # Bayesian-shrunk accuracy: adjusted = (points + C*m) / (scored + C)
@@ -1136,25 +1155,36 @@ def get_sectors(request: Request, db: Session = Depends(get_db)):
     # internal SORT KEY only — the response carries raw accuracy + n.
     # Floor: THEME_SECTOR_MIN_SCORED (default 3) just trims 1-2-call
     # records; shrinkage is the real small-sample guard.
-    if sector_names:
+    # Map every raw sector string that canonicalizes into a displayed
+    # bucket; the VALUES join aggregates per CANONICAL sector, so a
+    # forecaster's 'Professional Services' calls count under Industrials.
+    pairs = [(raw, canon) for raw, canon in raw_to_canon.items()
+             if canon in sector_names]
+    if pairs:
         from feature_flags import (
             get_theme_sector_min_scored, get_theme_sector_shrinkage_c,
         )
         min_scored = get_theme_sector_min_scored(db)
         shrink_c = get_theme_sector_shrinkage_c(db)
+        values_clause = ", ".join(f"(:mr{i}, :mc{i})" for i in range(len(pairs)))
+        map_params = {}
+        for i, (raw, canon) in enumerate(pairs):
+            map_params[f"mr{i}"] = raw
+            map_params[f"mc{i}"] = canon
         forecaster_rows = db.execute(sql_text(f"""
             WITH per_f AS (
-                SELECT ts.sector, f.id, f.name,
+                SELECT m.canon AS sector, f.id, f.name,
                        SUM(CASE WHEN p.outcome IN ('hit','correct') THEN 1.0
                                 WHEN p.outcome = 'near' THEN 0.5 ELSE 0 END) as score,
                        COUNT(*) as evaluated
                 FROM predictions p
                 JOIN forecasters f ON f.id = p.forecaster_id
                 JOIN ticker_sectors ts ON ts.ticker = p.ticker
-                WHERE ts.sector = ANY(:sectors)
-                  AND p.outcome IN ('hit','near','miss','correct','incorrect')
+                JOIN (VALUES {values_clause}) AS m(raw_sector, canon)
+                  ON m.raw_sector = ts.sector
+                WHERE p.outcome IN ('hit','near','miss','correct','incorrect')
                   AND {_YT_VIS_P}{_HEDGED_P}
-                GROUP BY ts.sector, f.id, f.name
+                GROUP BY m.canon, f.id, f.name
                 HAVING COUNT(*) >= :min_scored
             )
             SELECT sector, id, name, score, evaluated,
@@ -1165,7 +1195,7 @@ def get_sectors(request: Request, db: Session = Depends(get_db)):
                      / (evaluated + :shrink_c) AS adjusted
             FROM per_f
             ORDER BY sector, adjusted DESC, evaluated DESC, id ASC
-        """), {"sectors": sector_names, "min_scored": min_scored,
+        """), {**map_params, "min_scored": min_scored,
                "shrink_c": shrink_c}).fetchall()
 
         # Group by sector and keep top 3

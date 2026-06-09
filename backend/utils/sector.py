@@ -111,6 +111,39 @@ RAW_SECTOR_ALIASES: dict[str, str] = {
     "utility": "Utilities",
     "household products": "Consumer Defensive",
 
+    # 2026-06-10 stray-sector sweep: raw values observed surfacing in
+    # /api/sectors that the map/substring rules didn't route. Mapped per
+    # Morningstar taxonomy; genuinely ambiguous values (bare
+    # "Distributors", "MEASURING & CONTROLLING DEVICES", etc.) are
+    # deliberately NOT here — they fall to Unknown/Other.
+    "finance services": "Financial Services",
+    "investment advice": "Financial Services",
+    "savings institution, federally chartered": "Financial Services",
+    "road & rail": "Industrials",
+    "trading companies & distributors": "Industrials",
+    "wholesale-durable goods": "Industrials",
+    "engines & turbines": "Industrials",
+    "pumps & pumping equipment": "Industrials",
+    "ball & roller bearings": "Industrials",
+    "ship & boat building & repairing": "Industrials",
+    "aircraft & parts": "Industrials",
+    "guided missiles & space vehicles & parts": "Industrials",
+    "motors & generators": "Industrials",
+    "hazardous waste management": "Industrials",
+    "drawing & insulating of nonferrous wire": "Industrials",
+    "operative builders": "Consumer Cyclical",
+    "carpets & rugs": "Consumer Cyclical",
+    "motorcycles, bicycles & parts": "Consumer Cyclical",
+    "lumber & wood products (no furniture)": "Basic Materials",
+    "in vitro & in vivo diagnostic substances": "Healthcare",
+    "dental equipment & supplies": "Healthcare",
+    "laboratory analytical instruments": "Healthcare",
+    "poultry slaughtering and processing": "Consumer Defensive",
+    "canned, fruits, veg, preserves, jams & jellies": "Consumer Defensive",
+    "sugar & confectionery products": "Consumer Defensive",
+    "grain mill products": "Consumer Defensive",
+    "cigarettes": "Consumer Defensive",
+
     # Non-Morningstar bucket labels the pipeline sometimes emits
     "crypto": UNKNOWN_SECTOR,
     "index": UNKNOWN_SECTOR,
@@ -278,3 +311,24 @@ SECTOR_META: dict[str, str] = {
     "Crypto": "Digital assets and tokens — Bitcoin, Ethereum, and the broader crypto market.",
     "Other": "Tickers that don't map cleanly to a single sector.",
 }
+
+
+DISPLAY_OTHER = "Other"
+
+
+def display_sector(raw: str | None) -> str:
+    """Read-time canonicalization for sector-GROUPED user surfaces
+    (/api/sectors, the consensus ?sector= filter expansion).
+
+    Differs from :func:`canonical_sector` in two display-layer ways:
+      - raw 'Crypto' stays its own bucket (the dropdown/SECTOR_META
+        treat it as a pseudo-sector, even though it's not Morningstar)
+      - anything unrecognized collapses to "Other" instead of
+        "Unknown", matching the user-facing residual bucket.
+
+    Stored sector values are never rewritten — this is query-layer only.
+    """
+    if raw is not None and str(raw).strip().lower() == "crypto":
+        return "Crypto"
+    c = canonical_sector(raw)
+    return DISPLAY_OTHER if c == UNKNOWN_SECTOR else c
