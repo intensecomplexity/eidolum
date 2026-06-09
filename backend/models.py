@@ -385,6 +385,16 @@ class Prediction(Base):
     is_reported_speech = Column(Boolean, nullable=False, default=False,
                                  server_default="false")
 
+    # 2026-06-10 symbol disambiguation. TRUE = the row cannot be
+    # reliably attributed to a tradeable asset: ticker-reuse stale eras
+    # (LB = L Brands pre-2021, APC = Anadarko) and dead-equity crypto
+    # collisions (SOL = Emeren, SAND = Sandstorm, ETH = Ethan Allen,
+    # ARB = Arbitron analyst rows). Kept for audit; hidden from user
+    # surfaces via the bundled hedged_filter_sql helper. See
+    # crypto_prices.KNOWN_TICKER_REASSIGNMENTS / COLLISION_SYMBOLS.
+    is_ambiguous_symbol = Column(Boolean, nullable=False, default=False,
+                                 server_default="false")
+
     # Ship #14 — long-horizon predictions ("Tesla $500 by 2030") are
     # kept as valid training data but skipped by the evaluator until
     # their window resolves. evaluation_deferred=TRUE means the

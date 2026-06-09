@@ -352,6 +352,10 @@ def _process_rating(rating: dict, db: Session) -> bool:
         context=context[:500], exact_quote=context,
         outcome="pending", verified_by="massive_benzinga",
         call_type=call_type,
+        # Forward guard: rows dated before a known ticker reassignment
+        # belong to the OLD company — flagged at ingest, hidden from
+        # user surfaces (crypto_prices.KNOWN_TICKER_REASSIGNMENTS).
+        is_ambiguous_symbol=_is_stale_reassigned_safe(ticker, pred_date),
     )
     db.add(pred)
     db.flush()  # Get the prediction ID
@@ -379,12 +383,23 @@ def _get_call_type(action_lower: str, rating_lower: str, pt_current) -> str:
     return "rating"
 
 
-def _get_sector_safe(ticker: str, db) -> str:
+def _get_sector_safe(ticker: str, db, source: str = "massive_benzinga") -> str:
+    # `source` feeds the crypto-equity collision guard so analyst rows
+    # resolve to the EQUITY's sector (LTC -> LTC Properties/Real Estate,
+    # not Litecoin/Crypto). See crypto_prices.COLLISION_SYMBOLS.
     try:
         from jobs.sector_lookup import get_sector
-        return get_sector(ticker, db)
+        return get_sector(ticker, db, source=source)
     except Exception:
         return "Other"
+
+
+def _is_stale_reassigned_safe(ticker, pred_date) -> bool:
+    try:
+        from crypto_prices import is_stale_reassigned
+        return is_stale_reassigned(ticker, pred_date)
+    except Exception:
+        return False
 
 
 _NEUTRAL_RATINGS = ["hold", "neutral", "market perform", "market_perform", "equal weight",

@@ -148,7 +148,7 @@ def _process_fmp_rating(item: dict, db: Session) -> bool:
         evaluation_date=pred_date + timedelta(days=window_days),
         window_days=window_days, source_url=source_url, archive_url=None,
         source_type="article", source_platform_id=source_id,
-        sector=_get_sector_safe(ticker, db),
+        sector=_get_sector_safe(ticker, db, source="fmp_ratings"),
         context=context[:500], exact_quote=context,
         outcome="pending", verified_by="fmp_ratings",
         call_type=call_type,
