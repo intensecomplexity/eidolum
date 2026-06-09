@@ -784,10 +784,21 @@ export function getAnalystAccuracyHistory(name) {
 
 // ——— Analysts ———
 
-export function getAnalysts(q) {
-  const params = {};
+// Paginated: returns { analysts, total }. total comes from the
+// X-Total-Count header (body stays a bare array for shape stability);
+// null when the header is unreadable — callers degrade to
+// stop-on-short-page.
+export function getAnalysts({ q, sort, platform, limit = 100, offset = 0 } = {}) {
+  const params = { limit, offset };
   if (q) params.q = q;
-  return api.get('/analysts', _edgeConfig({ params })).then(r => r.data);
+  if (sort) params.sort = sort;
+  if (platform) params.platform = platform;
+  return api.get('/analysts', _edgeConfig({ params })).then(r => ({
+    analysts: r.data,
+    total: Number.isFinite(parseInt(r.headers?.['x-total-count'], 10))
+      ? parseInt(r.headers['x-total-count'], 10)
+      : null,
+  }));
 }
 
 export function getAnalystProfile(name) {

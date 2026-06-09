@@ -13,20 +13,57 @@ const SORTS = [
   { key: 'recent', label: 'Most Recent' },
 ];
 
+const PAGE_SIZE = 100;
+
 export default function Analysts() {
   const [analysts, setAnalysts] = useState([]);
+  const [total, setTotal] = useState(null);
+  const [hasMore, setHasMore] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [sort, setSort] = useState('volume');
 
+  // Debounce keystrokes so server-side search doesn't fire per character
+  // (the old per-keystroke fetch pulled the FULL 1.3MB list each time).
   useEffect(() => {
-    setLoading(true);
-    getAnalysts(search || undefined).then(setAnalysts).catch(() => {}).finally(() => setLoading(false));
+    const t = setTimeout(() => setDebouncedSearch(search), 300);
+    return () => clearTimeout(t);
   }, [search]);
 
-  let displayed = [...analysts];
-  if (sort === 'accuracy') displayed.sort((a, b) => b.accuracy - a.accuracy);
-  else if (sort === 'recent') displayed.sort((a, b) => (b.most_recent || '').localeCompare(a.most_recent || ''));
+  // Page 1 on mount and whenever the query/sort changes — search and sort
+  // are server-side now; results arrive pre-filtered and pre-ordered.
+  useEffect(() => {
+    setLoading(true);
+    getAnalysts({ q: debouncedSearch || undefined, sort, limit: PAGE_SIZE, offset: 0 })
+      .then(({ analysts: page, total: t }) => {
+        setAnalysts(page);
+        setTotal(t);
+        setHasMore(t != null ? page.length < t : page.length === PAGE_SIZE);
+      })
+      .catch(() => { setAnalysts([]); setTotal(null); setHasMore(false); })
+      .finally(() => setLoading(false));
+  }, [debouncedSearch, sort]);
+
+  function loadMore() {
+    if (loadingMore || !hasMore) return;
+    setLoadingMore(true);
+    getAnalysts({ q: debouncedSearch || undefined, sort, limit: PAGE_SIZE, offset: analysts.length })
+      .then(({ analysts: page, total: t }) => {
+        setAnalysts(prev => {
+          const next = [...prev, ...page];
+          setHasMore(t != null ? next.length < t : page.length === PAGE_SIZE);
+          return next;
+        });
+        if (t != null) setTotal(t);
+      })
+      .catch(() => {})
+      .finally(() => setLoadingMore(false));
+  }
+
+  const displayed = analysts;
+  const remaining = total != null ? Math.max(0, total - analysts.length) : null;
 
   return (
     <div>
@@ -86,6 +123,24 @@ export default function Analysts() {
                 )}
               </Link>
             ))}
+          </div>
+        )}
+
+        {/* Load more — server-paginated, same pattern as ForecasterProfile's
+            Prediction History. */}
+        {!loading && hasMore && (
+          <div className="flex justify-center mt-6">
+            <button
+              onClick={loadMore}
+              disabled={loadingMore}
+              className="px-5 py-2.5 bg-surface border border-border rounded-lg text-sm font-medium text-text-primary hover:border-accent/40 transition-colors disabled:opacity-50"
+            >
+              {loadingMore
+                ? 'Loading…'
+                : remaining != null
+                  ? `Load ${Math.min(PAGE_SIZE, remaining)} more (${remaining.toLocaleString()} remaining)`
+                  : `Load ${PAGE_SIZE} more`}
+            </button>
           </div>
         )}
       </div>
