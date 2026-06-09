@@ -67,9 +67,12 @@ const TABS = [
 ];
 
 const METRICS = [
-  { key: 'avg_return', label: 'Avg Return', shortLabel: 'avg return' },
-  { key: 'alpha', label: 'Alpha vs S&P 500', shortLabel: 'alpha vs S&P 500' },
-  { key: 'hit_rate', label: 'Hit Rate', shortLabel: 'hit rate' },
+  // `label` is the full desktop column-header label; `pillLabel` is the short
+  // form used by the mobile segmented selector (the desktop dropdown still
+  // renders `label`, so "Alpha vs S&P 500" stays intact there).
+  { key: 'avg_return', label: 'Avg Return', shortLabel: 'avg return', pillLabel: 'Avg Return' },
+  { key: 'alpha', label: 'Alpha vs S&P 500', shortLabel: 'alpha vs S&P 500', pillLabel: 'Alpha' },
+  { key: 'hit_rate', label: 'Hit Rate', shortLabel: 'hit rate', pillLabel: 'Hit Rate' },
 ];
 
 function getMetricValue(f, metricKey) {
@@ -388,6 +391,30 @@ export default function Leaderboard() {
                           : 'bg-surface-2 text-muted border border-border'
                       }`}>
                       {tf.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {/* Mobile/tablet metric selector. The desktop sort control lives
+                  in the table's column header (hidden lg:block), which is gone
+                  below 1024px — so phone/tablet users get an equivalent
+                  segmented pill here. It reads/writes the SAME `metric` state,
+                  so changing it drives ?metric= via the state->URL effect and
+                  desktop↔mobile stay consistent. Hidden at lg+ (desktop uses
+                  the header dropdown). Gated off the 'week' tab like the other
+                  filters. */}
+              {activeTab !== 'week' && (
+                <div className="flex lg:hidden items-center gap-1 shrink-0">
+                  <span className="text-[10px] uppercase tracking-wider text-muted mr-1 hidden sm:inline">Sort:</span>
+                  {METRICS.map(m => (
+                    <button key={m.key} onClick={() => setMetric(m.key)}
+                      className={`inline-flex items-center justify-center px-3 min-h-[40px] rounded text-[11px] font-semibold transition-colors ${
+                        metric === m.key
+                          ? 'bg-accent/15 text-accent border border-accent/30'
+                          : 'bg-surface-2 text-muted border border-border'
+                      }`}>
+                      {m.pillLabel}
                     </button>
                   ))}
                 </div>
