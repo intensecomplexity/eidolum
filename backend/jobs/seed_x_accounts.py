@@ -15,49 +15,14 @@ for inspection only. To permanently add an account, edit this file.
 from sqlalchemy import text as sql_text
 
 
-SEED_ACCOUNTS = [
-    # Tier 1 — Core high-volume scoreable accounts
-    ("unusual_whales",  "Unusual Whales",      1, "options flow alerts"),
-    # Removed @DeItaone — verified Apr 9 forensics: posted ~2,400 geopolitical
-    # headlines in 30h, all correctly rejected by Haiku as non-predictions, but
-    # each rejection cost ~$0.0046. Single-handed driver of ~80% of April
-    # Anthropic spend. seed_tracked_x_accounts() deactivates all rows and
-    # re-activates only SEED_ACCOUNTS, so dropping this line here deactivates
-    # the existing row in production on the next scraper cycle.
-    ("markflowchatter", "Mark Flow Chatter",   1, "dark pool + options flow"),
-    ("ripster47",       "Ripster",             1, "chart setups entry/target/stop"),
-    ("traderstewie",    "Stewie",              1, "daily picks with targets"),
-    ("hkuppy",          "HKuppy",              1, "long-form thesis with targets"),
-    ("stocksinplay",    "Stocks In Play",      1, "pre-market gap plays"),
-    ("WallStJesus",     "WallStJesus",         1, "options strike plays"),
-    ("OphirGottlieb",   "Ophir Gottlieb",      1, "pre-earnings vol plays"),
-    ("BrianFeroldi",    "Brian Feroldi",       1, "fundamental long-term"),
-
-    # Tier 2 — Specialists
-    ("bethkindig",      "Beth Kindig",         2, "semis AI infrastructure"),
-    ("DanNiles",        "Dan Niles",           2, "tech semis shorts"),
-    ("GeneMunster",     "Gene Munster",        2, "Loup Apple megacap"),
-    # Removed @mahaney — the real Mark Mahaney of Evercore does not tweet
-    # under that handle; the account producing our rejections is unrelated.
-    # seed_tracked_x_accounts() deactivates all rows and re-activates only
-    # SEED_ACCOUNTS entries, so dropping this line here deactivates the
-    # existing row in production on the next scraper cycle.
-    ("canuck2usa",      "Canuck2USA",          2, "swing trade setups"),
-    ("DayTradeWarrior", "Day Trade Warrior",   2, "day trade setups"),
-    ("Ksidiii",         "Ksidiii",             2, "earnings plays"),
-    ("MrTopStep",       "Mr Top Step",         2, "ES futures levels"),
-    ("steverrauch",     "Steve Rauch",         2, "energy sector"),
-    ("PeterLBrandt",    "Peter Brandt",        2, "long-term technical"),
-
-    # Tier 3 — Broad macro + stats
-    ("bespokeinvest",   "Bespoke",             3, "data-driven directional"),
-    ("RyanDetrick",     "Ryan Detrick",        3, "stats-driven index calls"),
-    ("pierce_crosby",   "Pierce Crosby",       3, "macro to equity"),
-    # Removed @zerohedge — same news-firehose pattern as @DeItaone. Posts
-    # headline-shaped tweets that match the all-caps ticker regex (TRUMP,
-    # NATO, IRAN) and reach Haiku as false positives. No real predictions.
-    ("BradGerstner",    "Brad Gerstner",       3, "Altimeter growth tech"),
-]
+# DISABLED 2026-06-10 — the worker's Groq-based X scraper is retired. X
+# ingestion now runs LOCALLY via backend/scripts/x_ingest.py (claude -p /
+# Sonnet, Max plan), scoped to the 17 yield-proven accounts only. An empty
+# SEED_ACCOUNTS makes seed_tracked_x_accounts() deactivate ALL tracked rows
+# and activate none, so run_x_scraper() loads 0 active accounts and no-ops —
+# no Apify spend, no Groq calls, no junk predictions. The old broad list is
+# preserved in git history (pre-2026-06-10) if it ever needs restoring.
+SEED_ACCOUNTS = []
 
 
 def seed_tracked_x_accounts(db):
