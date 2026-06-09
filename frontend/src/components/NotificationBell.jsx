@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { Bell, Check, X, Trophy, Swords, UserPlus, Flame, Calendar, CheckCircle } from 'lucide-react';
 import { getNotifications, markNotificationRead, markAllNotificationsRead } from '../api';
@@ -27,6 +28,22 @@ export default function NotificationBell() {
   const [toast, setToast] = useState(null);
   const prevUnreadRef = useRef(0);
   const wrapperRef = useRef(null);
+  const panelRef = useRef(null);
+  // On mobile the panel is a `fixed` full-screen sheet that must position
+  // against the viewport. Because it lives under the nav's `backdrop-blur-md`
+  // (which makes the nav the containing block for fixed descendants), an inline
+  // mobile sheet collapses to the ~56px nav height. So at <640px we portal it
+  // to <body>; at ≥640px the desktop dropdown stays inline (its `sm:absolute`
+  // anchors to the bell's relative wrapper and would break if portaled).
+  const [isMobile, setIsMobile] = useState(
+    () => typeof window !== 'undefined' && window.innerWidth < 640,
+  );
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const onResize = () => setIsMobile(window.innerWidth < 640);
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
 
   const fetchNotifications = useCallback(() => {
     if (!isAuthenticated) return;
@@ -66,10 +83,14 @@ export default function NotificationBell() {
     }
   }, [open]);
 
-  // Close on click outside
+  // Close on click outside. The panel is portaled to <body> on mobile, so it's
+  // NOT a descendant of wrapperRef — check panelRef too, otherwise a tap inside
+  // the portaled sheet would read as "outside" and close it mid-interaction.
   useEffect(() => {
     function handle(e) {
-      if (wrapperRef.current && !wrapperRef.current.contains(e.target)) setOpen(false);
+      const inWrapper = wrapperRef.current && wrapperRef.current.contains(e.target);
+      const inPanel = panelRef.current && panelRef.current.contains(e.target);
+      if (!inWrapper && !inPanel) setOpen(false);
     }
     document.addEventListener('mousedown', handle);
     return () => document.removeEventListener('mousedown', handle);
@@ -97,25 +118,8 @@ export default function NotificationBell() {
 
   if (!isAuthenticated) return null;
 
-  return (
-    <>
-      <div className="relative" ref={wrapperRef}>
-        <button
-          type="button"
-          onClick={(e) => { e.stopPropagation(); setOpen(!open); }}
-          className="relative flex items-center justify-center w-11 h-11 sm:w-9 sm:h-9 rounded-lg text-text-secondary hover:text-accent active:text-accent transition-colors"
-          style={{ WebkitTapHighlightColor: 'transparent', touchAction: 'manipulation' }}
-        >
-          <Bell className={`w-[18px] h-[18px] ${unreadCount > 0 ? 'animate-[bell-ring_0.5s_ease-out]' : ''}`} />
-          {unreadCount > 0 && (
-            <span className="absolute -top-0.5 -right-0.5 bg-negative text-bg text-[9px] font-bold min-w-[16px] h-[16px] flex items-center justify-center rounded-full px-1">
-              {unreadCount > 99 ? '99+' : unreadCount}
-            </span>
-          )}
-        </button>
-
-        {open && (
-          <div className="fixed inset-x-0 top-14 bottom-0 sm:absolute sm:inset-auto sm:right-0 sm:top-full sm:mt-2 sm:w-96 sm:bottom-auto sm:max-h-[70vh] sm:rounded-lg border-t sm:border border-border shadow-lg overflow-hidden z-[60] flex flex-col bg-surface">
+  const panel = open ? (
+          <div ref={panelRef} className="fixed inset-x-0 top-14 bottom-0 sm:absolute sm:inset-auto sm:right-0 sm:top-full sm:mt-2 sm:w-96 sm:bottom-auto sm:max-h-[70vh] sm:rounded-lg border-t sm:border border-border shadow-lg overflow-hidden z-[60] flex flex-col bg-surface">
             {/* Header */}
             <div className="flex items-center justify-between px-4 py-3 border-b border-border">
               <span className="text-sm font-semibold text-text-primary">Notifications</span>
@@ -165,11 +169,37 @@ export default function NotificationBell() {
               See all notifications
             </button>
           </div>
-        )}
-      </div>
+  ) : null;
 
-      {/* Toast */}
-      {toast && (
+  return (
+    <>
+      <div className="relative" ref={wrapperRef}>
+        <button
+          type="button"
+          onClick={(e) => { e.stopPropagation(); setOpen(!open); }}
+          className="relative flex items-center justify-center w-11 h-11 sm:w-9 sm:h-9 rounded-lg text-text-secondary hover:text-accent active:text-accent transition-colors"
+          style={{ WebkitTapHighlightColor: 'transparent', touchAction: 'manipulation' }}
+        >
+          <Bell className={`w-[18px] h-[18px] ${unreadCount > 0 ? 'animate-[bell-ring_0.5s_ease-out]' : ''}`} />
+          {unreadCount > 0 && (
+            <span className="absolute -top-0.5 -right-0.5 bg-negative text-bg text-[9px] font-bold min-w-[16px] h-[16px] flex items-center justify-center rounded-full px-1">
+              {unreadCount > 99 ? '99+' : unreadCount}
+            </span>
+          )}
+        </button>
+        {/* Desktop (≥640px): dropdown stays inline so its `sm:absolute` anchors
+            to this relative wrapper. */}
+        {!isMobile && panel}
+      </div>
+      {/* Mobile (<640px): the fixed full-screen sheet is portaled to <body> so
+          it positions against the viewport, not the nav's backdrop-filter
+          containing block (which collapsed it to the ~56px nav height). */}
+      {isMobile && panel && createPortal(panel, document.body)}
+
+      {/* Toast — also portaled to <body>: it's `fixed`, and inside the blurred
+          nav its bottom-right anchor resolved against the nav (top of screen)
+          instead of the viewport. */}
+      {toast && createPortal(
         <div className="fixed bottom-20 sm:bottom-6 right-4 z-[70] max-w-xs bg-surface border border-border rounded-lg shadow-lg p-3 toast-slide-up cursor-pointer"
           onClick={() => { setToast(null); const cfg = TYPE_CONFIG[toast.type] || {}; navigate(cfg.nav || '/notifications'); }}>
           <div className="flex items-start gap-2">
@@ -181,7 +211,8 @@ export default function NotificationBell() {
               <X className="w-3.5 h-3.5" />
             </button>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </>
   );
