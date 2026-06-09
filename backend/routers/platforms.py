@@ -1,9 +1,9 @@
 import datetime
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from sqlalchemy import text as sql_text
 from sqlalchemy.orm import Session
 from database import get_db
-from models import Forecaster, Prediction
-from utils import compute_forecaster_stats, compute_streak, compute_rank_movement
+from utils import compute_rank_movement
 from rate_limit import limiter
 
 router = APIRouter()
@@ -28,9 +28,9 @@ PLATFORM_META = {
     "congress": {
         "id": "congress",
         "name": "Congressional Trades",
-        "icon": "\U0001f3db\ufe0f",
+        "icon": "\U0001f3db️",
         "color": "#FFD700",
-        "tagline": "Congressional trade trackers \u2014 following the money in Washington",
+        "tagline": "Congressional trade trackers — following the money in Washington",
         "note": "Congressional trades are legally required to be disclosed within 45 days. These trackers follow those disclosures in real time.",
     },
     "reddit": {
@@ -60,76 +60,195 @@ PLATFORM_TO_DB = {
     "institutional": ["institutional"],
 }
 
-
-def _get_platform_forecasters(db: Session, platform_id: str):
-    """Get all forecasters matching a platform ID."""
-    db_values = PLATFORM_TO_DB.get(platform_id, [platform_id])
-    return db.query(Forecaster).filter(Forecaster.platform.in_(db_values)).all()
+_SCORED = "('hit','near','miss','correct','incorrect')"
 
 
-def _compute_platform_stats(forecasters, db: Session):
-    """Compute aggregate stats for a list of forecasters."""
-    if not forecasters:
-        return {
-            "avg_accuracy": 0,
-            "avg_alpha": 0,
-            "total_predictions": 0,
-            "top_performer": None,
-            "best_streak": 0,
-            "best_accuracy": 0,
-            "most_predictions": 0,
-            "highest_alpha": 0,
+def _streak_from_cached(streak) -> dict:
+    """Map the cached forecasters.streak int (+hot/-cold run length) to the
+    {type, count} shape compute_streak used to return. Same >=3 threshold."""
+    s = int(streak or 0)
+    if s >= 3:
+        return {"type": "hot", "count": s}
+    if s <= -3:
+        return {"type": "cold", "count": -s}
+    return {"type": "none", "count": 0}
+
+
+def _platform_cached_aggregates(db: Session) -> dict:
+    """Per-platformId aggregates from the CACHED forecaster columns (the same
+    three-tier accuracy_score the leaderboard shows). One small scan of the
+    forecasters table — replaces the per-forecaster compute loops that made
+    this router time out (8s+ → 504)."""
+    rows = db.execute(sql_text("""
+        SELECT COALESCE(platform, 'youtube') AS platform,
+               COUNT(*) AS fc_count,
+               COUNT(*) FILTER (WHERE COALESCE(total_predictions, 0) > 0) AS active_count,
+               SUM(accuracy_score) FILTER (WHERE COALESCE(total_predictions, 0) > 0) AS acc_sum,
+               SUM(alpha) FILTER (WHERE COALESCE(total_predictions, 0) > 0) AS alpha_sum,
+               MAX(accuracy_score) FILTER (WHERE COALESCE(total_predictions, 0) > 0) AS best_acc,
+               MAX(alpha) FILTER (WHERE COALESCE(total_predictions, 0) > 0) AS best_alpha,
+               MAX(streak) AS best_streak
+        FROM forecasters
+        GROUP BY COALESCE(platform, 'youtube')
+    """)).fetchall()
+    by_db_value = {r[0]: r for r in rows}
+
+    out = {}
+    for pid, db_values in PLATFORM_TO_DB.items():
+        fc_count = active = 0
+        acc_sum = alpha_sum = 0.0
+        best_acc = best_alpha = None
+        best_streak = 0
+        for v in db_values:
+            r = by_db_value.get(v)
+            if not r:
+                continue
+            fc_count += r[1]
+            active += r[2]
+            acc_sum += float(r[3] or 0)
+            alpha_sum += float(r[4] or 0)
+            if r[5] is not None:
+                best_acc = max(best_acc, float(r[5])) if best_acc is not None else float(r[5])
+            if r[6] is not None:
+                best_alpha = max(best_alpha, float(r[6])) if best_alpha is not None else float(r[6])
+            best_streak = max(best_streak, int(r[7] or 0))
+        out[pid] = {
+            "forecaster_count": fc_count,
+            "avg_accuracy": round(acc_sum / active, 1) if active else 0,
+            "avg_alpha": round(alpha_sum / active, 2) if active else 0,
+            "best_accuracy": round(best_acc, 1) if best_acc is not None else 0,
+            "highest_alpha": round(best_alpha, 2) if best_alpha is not None else 0,
+            "best_streak": best_streak,
         }
+    return out
 
-    stats_list = []
-    for f in forecasters:
-        s = compute_forecaster_stats(f, db)
-        streak = compute_streak(f.id, db)
-        stats_list.append({
-            "forecaster": f,
-            "stats": s,
-            "streak": streak,
-        })
 
-    # Averages (only from forecasters with evaluated predictions)
-    accuracies = [s["stats"]["accuracy_rate"] for s in stats_list if s["stats"]["evaluated_predictions"] > 0]
-    alphas = [s["stats"]["alpha"] for s in stats_list if s["stats"]["evaluated_predictions"] > 0]
-    total_preds = sum(s["stats"]["total_predictions"] for s in stats_list)
+def _leaderboard_rows(db: Session, db_values, sector=None, period_days=None, direction=None):
+    """ONE aggregate query over predictions GROUP BY forecaster — replaces the
+    Python loop that ran compute_forecaster_stats per forecaster (full
+    prediction-history load each). Prediction filters live in the JOIN ON so
+    forecasters with zero matching rows still appear with zeroed stats.
+    Accuracy is three-tier (hit/correct=1, near=0.5), matching the leaderboard."""
+    join_extra = ""
+    params = {"vals": list(db_values)}
+    if sector:
+        join_extra += " AND p.sector ILIKE :sector"
+        params["sector"] = sector
+    if direction:
+        join_extra += " AND p.direction = :direction"
+        params["direction"] = direction
+    if period_days:
+        join_extra += " AND p.prediction_date >= :cutoff"
+        params["cutoff"] = datetime.datetime.utcnow() - datetime.timedelta(days=int(period_days))
 
-    avg_accuracy = round(sum(accuracies) / len(accuracies), 1) if accuracies else 0
-    avg_alpha = round(sum(alphas) / len(alphas), 1) if alphas else 0
+    return db.execute(sql_text(f"""
+        SELECT f.id, f.name, f.handle, COALESCE(f.platform, 'youtube') AS platform,
+               f.channel_url, f.subscriber_count, f.profile_image_url,
+               f.streak AS cached_streak, f.rank_last_week,
+               COUNT(p.id) AS total,
+               COUNT(p.id) FILTER (WHERE p.outcome IN {_SCORED}) AS evaluated,
+               COUNT(p.id) FILTER (WHERE p.outcome IN ('hit','correct')) AS hits,
+               COUNT(p.id) FILTER (WHERE p.outcome = 'near') AS nears,
+               AVG(p.alpha) FILTER (WHERE p.outcome IN {_SCORED}) AS avg_alpha,
+               AVG(p.actual_return) FILTER (WHERE p.outcome IN {_SCORED}) AS avg_return
+        FROM forecasters f
+        LEFT JOIN predictions p ON p.forecaster_id = f.id{join_extra}
+        WHERE f.platform = ANY(:vals)
+        GROUP BY f.id
+    """), params).fetchall()
 
-    # Top performer
-    best = max(stats_list, key=lambda s: s["stats"]["accuracy_rate"]) if stats_list else None
-    top_performer = None
-    if best and best["stats"]["evaluated_predictions"] > 0:
-        top_performer = {
-            "id": best["forecaster"].id,
-            "name": best["forecaster"].name,
-            "accuracy": best["stats"]["accuracy_rate"],
-        }
 
-    # Best streak
-    best_streak = max((s["streak"]["count"] for s in stats_list if s["streak"]["type"] == "hot"), default=0)
+def _sector_strengths(db: Session, db_values, sector=None, period_days=None, direction=None) -> dict:
+    """Per-forecaster sector breakdown in one GROUP BY — top 4 sectors with 2+
+    evaluated calls, three-tier accuracy."""
+    where_extra = ""
+    params = {"vals": list(db_values)}
+    if sector:
+        where_extra += " AND p.sector ILIKE :sector"
+        params["sector"] = sector
+    if direction:
+        where_extra += " AND p.direction = :direction"
+        params["direction"] = direction
+    if period_days:
+        where_extra += " AND p.prediction_date >= :cutoff"
+        params["cutoff"] = datetime.datetime.utcnow() - datetime.timedelta(days=int(period_days))
 
-    # Best accuracy
-    best_accuracy = max(accuracies) if accuracies else 0
+    rows = db.execute(sql_text(f"""
+        SELECT p.forecaster_id, COALESCE(p.sector, 'Other') AS sector,
+               COUNT(*) AS total,
+               COUNT(*) FILTER (WHERE p.outcome IN ('hit','correct')) AS hits,
+               COUNT(*) FILTER (WHERE p.outcome = 'near') AS nears
+        FROM predictions p
+        JOIN forecasters f ON f.id = p.forecaster_id
+        WHERE f.platform = ANY(:vals)
+          AND p.outcome IN {_SCORED}{where_extra}
+        GROUP BY p.forecaster_id, COALESCE(p.sector, 'Other')
+        HAVING COUNT(*) >= 2
+    """), params).fetchall()
 
-    # Most predictions
-    most_preds = max((s["stats"]["total_predictions"] for s in stats_list), default=0)
+    by_fid = {}
+    for r in rows:
+        acc = round((r[3] + r[4] * 0.5) / r[2] * 100, 1) if r[2] else 0.0
+        by_fid.setdefault(r[0], []).append({"sector": r[1], "accuracy": acc, "count": r[2]})
+    for fid in by_fid:
+        by_fid[fid] = sorted(by_fid[fid], key=lambda x: x["accuracy"], reverse=True)[:4]
+    return by_fid
 
-    # Highest alpha
-    highest_alpha = max(alphas) if alphas else 0
 
+def _overall_rank_map(db: Session) -> dict:
+    """Overall ranks from CACHED columns — replaces loading every forecaster's
+    full prediction history (the worst offender in the old code)."""
+    rows = db.execute(sql_text("""
+        SELECT id, ROW_NUMBER() OVER (
+            ORDER BY COALESCE(accuracy_score, 0) DESC, COALESCE(alpha, 0) DESC, id ASC
+        ) AS rnk
+        FROM forecasters
+    """)).fetchall()
+    return {r[0]: int(r[1]) for r in rows}
+
+
+def _row_to_entry(r, strengths_map):
+    evaluated = int(r[10] or 0)
+    hits = int(r[11] or 0)
+    nears = int(r[12] or 0)
+    accuracy = round((hits + nears * 0.5) / evaluated * 100, 1) if evaluated else 0.0
     return {
-        "avg_accuracy": avg_accuracy,
-        "avg_alpha": avg_alpha,
-        "total_predictions": total_preds,
-        "top_performer": top_performer,
-        "best_streak": best_streak,
-        "best_accuracy": best_accuracy,
-        "most_predictions": most_preds,
-        "highest_alpha": highest_alpha,
+        "id": r[0],
+        "name": r[1],
+        "handle": r[2],
+        "platform": r[3],
+        "channel_url": r[4],
+        "subscriber_count": r[5],
+        "profile_image_url": r[6],
+        "streak": _streak_from_cached(r[7]),
+        "accuracy_rate": accuracy,
+        "total_predictions": int(r[9] or 0),
+        "evaluated_predictions": evaluated,
+        "correct_predictions": hits,
+        "alpha": round(float(r[13]), 2) if r[13] is not None else 0.0,
+        "avg_return": round(float(r[14]), 2) if r[14] is not None else 0.0,
+        "sector_strengths": strengths_map.get(r[0], []),
+        "_rank_last_week": r[8],
+    }
+
+
+def _pstats_from_results(results) -> dict:
+    """Aggregate platform stats from the per-forecaster leaderboard rows."""
+    with_eval = [x for x in results if x["evaluated_predictions"] > 0]
+    accuracies = [x["accuracy_rate"] for x in with_eval]
+    alphas = [x["alpha"] for x in with_eval]
+    top = max(with_eval, key=lambda x: x["accuracy_rate"]) if with_eval else None
+    return {
+        "avg_accuracy": round(sum(accuracies) / len(accuracies), 1) if accuracies else 0,
+        "avg_alpha": round(sum(alphas) / len(alphas), 2) if alphas else 0,
+        "total_predictions": sum(x["total_predictions"] for x in results),
+        "top_performer": {
+            "id": top["id"], "name": top["name"], "accuracy": top["accuracy_rate"],
+        } if top else None,
+        "best_streak": max((x["streak"]["count"] for x in results if x["streak"]["type"] == "hot"), default=0),
+        "best_accuracy": max(accuracies) if accuracies else 0,
+        "most_predictions": max((x["total_predictions"] for x in results), default=0),
+        "highest_alpha": max(alphas) if alphas else 0,
     }
 
 
@@ -137,19 +256,56 @@ def _compute_platform_stats(forecasters, db: Session):
 @limiter.limit("60/minute")
 def get_platforms(request: Request, db: Session = Depends(get_db)):
     """Return overview stats for all platforms."""
+    cached = _platform_cached_aggregates(db)
+
+    # Per-platform prediction counts (total incl. pending + per-forecaster max)
+    # in one pass over predictions.
+    cnt_rows = db.execute(sql_text("""
+        SELECT platform, SUM(cnt) AS total, MAX(cnt) AS max_cnt FROM (
+            SELECT COALESCE(f.platform, 'youtube') AS platform, f.id, COUNT(p.id) AS cnt
+            FROM forecasters f
+            LEFT JOIN predictions p ON p.forecaster_id = f.id
+            GROUP BY COALESCE(f.platform, 'youtube'), f.id
+        ) s GROUP BY platform
+    """)).fetchall()
+    counts = {r[0]: (int(r[1] or 0), int(r[2] or 0)) for r in cnt_rows}
+
+    # Top performer per db-platform value from cached columns.
+    top_rows = db.execute(sql_text("""
+        SELECT DISTINCT ON (COALESCE(platform, 'youtube'))
+               COALESCE(platform, 'youtube') AS platform, id, name, accuracy_score
+        FROM forecasters
+        WHERE COALESCE(total_predictions, 0) > 0 AND accuracy_score IS NOT NULL
+        ORDER BY COALESCE(platform, 'youtube'), accuracy_score DESC, id ASC
+    """)).fetchall()
+    tops = {r[0]: r for r in top_rows}
+
     platforms = []
-
     for pid, meta in PLATFORM_META.items():
-        forecasters = _get_platform_forecasters(db, pid)
-        pstats = _compute_platform_stats(forecasters, db)
-
+        agg = cached[pid]
+        total_preds = sum(counts.get(v, (0, 0))[0] for v in PLATFORM_TO_DB[pid])
+        most_preds = max((counts.get(v, (0, 0))[1] for v in PLATFORM_TO_DB[pid]), default=0)
+        best_top = None
+        for v in PLATFORM_TO_DB[pid]:
+            t = tops.get(v)
+            if t is not None and (best_top is None or float(t[3]) > float(best_top[3])):
+                best_top = t
         platforms.append({
             **meta,
-            "forecaster_count": len(forecasters),
-            **pstats,
+            "forecaster_count": agg["forecaster_count"],
+            "avg_accuracy": agg["avg_accuracy"],
+            "avg_alpha": agg["avg_alpha"],
+            "total_predictions": total_preds,
+            "top_performer": {
+                "id": best_top[1], "name": best_top[2],
+                "accuracy": round(float(best_top[3]), 1),
+            } if best_top is not None else None,
+            "best_streak": agg["best_streak"],
+            "best_accuracy": agg["best_accuracy"],
+            "most_predictions": most_preds,
+            "highest_alpha": agg["highest_alpha"],
         })
 
-    # Sort by avg accuracy descending
     platforms.sort(key=lambda p: p["avg_accuracy"], reverse=True)
     return platforms
 
@@ -170,78 +326,53 @@ def get_platform_detail(
         raise HTTPException(status_code=404, detail="Platform not found")
 
     meta = PLATFORM_META[platform_id]
-    forecasters = _get_platform_forecasters(db, platform_id)
+    db_values = PLATFORM_TO_DB[platform_id]
 
-    # Compute stats for platform
-    pstats = _compute_platform_stats(forecasters, db)
-
-    # Build leaderboard for this platform
     effective_period = period_days
     if tab == "week":
         effective_period = 7
 
-    results = []
-    for f in forecasters:
-        stats = compute_forecaster_stats(
-            f, db, sector=sector, period_days=effective_period, direction=direction
-        )
-        streak = compute_streak(f.id, db)
-        results.append({
-            "id": f.id,
-            "name": f.name,
-            "handle": f.handle,
-            "platform": f.platform or "youtube",
-            "channel_url": f.channel_url,
-            "subscriber_count": f.subscriber_count,
-            "profile_image_url": f.profile_image_url,
-            "streak": streak,
-            **stats,
-        })
+    rows = _leaderboard_rows(db, db_values, sector=sector, period_days=effective_period, direction=direction)
+    strengths_map = _sector_strengths(db, db_values, sector=sector, period_days=effective_period, direction=direction)
 
-    # Sort by accuracy descending
+    results = [_row_to_entry(r, strengths_map) for r in rows]
     results.sort(key=lambda x: (x["accuracy_rate"], x["alpha"]), reverse=True)
 
-    # Platform-specific ranks
+    overall_rank_map = _overall_rank_map(db)
+
+    class _RankShim:
+        __slots__ = ("rank_last_week",)
+        def __init__(self, rlw):
+            self.rank_last_week = rlw
+
     for i, r in enumerate(results):
         r["platform_rank"] = i + 1
-
-    # Overall ranks - compute for ALL forecasters
-    all_forecasters = db.query(Forecaster).all()
-    all_results = []
-    for f in all_forecasters:
-        s = compute_forecaster_stats(f, db)
-        all_results.append({"id": f.id, "accuracy_rate": s["accuracy_rate"], "alpha": s["alpha"]})
-    all_results.sort(key=lambda x: (x["accuracy_rate"], x["alpha"]), reverse=True)
-    overall_rank_map = {r["id"]: i + 1 for i, r in enumerate(all_results)}
-
-    for r in results:
+        r["rank"] = i + 1
         r["overall_rank"] = overall_rank_map.get(r["id"], 0)
-        r["rank"] = r["platform_rank"]
-        # Rank movement
-        f = next(fc for fc in forecasters if fc.id == r["id"])
-        r["rank_movement"] = compute_rank_movement(f, r["platform_rank"])
+        r["rank_movement"] = compute_rank_movement(_RankShim(r.pop("_rank_last_week")), i + 1)
 
-    # Generate insight
-    insight = _generate_insight(platform_id, meta, pstats, results, db)
+    pstats = _pstats_from_results(results)
 
-    # Cross-platform comparison
+    # Cross-platform comparison + insight share ONE cached-column aggregate
+    # (the old code recomputed every platform's stats three times per request).
+    cached = _platform_cached_aggregates(db)
     comparison = []
     for pid, pmeta in PLATFORM_META.items():
-        pf = _get_platform_forecasters(db, pid)
-        ps = _compute_platform_stats(pf, db)
         comparison.append({
             "id": pid,
             "name": pmeta["name"],
             "icon": pmeta["icon"],
             "color": pmeta["color"],
-            "avg_accuracy": ps["avg_accuracy"],
+            "avg_accuracy": cached[pid]["avg_accuracy"],
             "is_current": pid == platform_id,
         })
     comparison.sort(key=lambda x: x["avg_accuracy"], reverse=True)
 
+    insight = _generate_insight(platform_id, meta, pstats, results, cached)
+
     return {
         **meta,
-        "forecaster_count": len(forecasters),
+        "forecaster_count": len(results),
         **pstats,
         "leaderboard": results,
         "insight": insight,
@@ -249,21 +380,16 @@ def get_platform_detail(
     }
 
 
-def _generate_insight(platform_id, meta, pstats, results, db):
+def _generate_insight(platform_id, meta, pstats, results, cached):
     """Generate auto-insight text for a platform."""
     if not results:
         return f"No forecasters tracked yet on {meta['name']}."
 
     top = results[0] if results else None
 
-    # Compare to other platforms
-    all_platforms_acc = {}
-    for pid, pmeta in PLATFORM_META.items():
-        pf = _get_platform_forecasters(db, pid)
-        ps = _compute_platform_stats(pf, db)
-        if ps["avg_accuracy"] > 0:
-            all_platforms_acc[pid] = ps["avg_accuracy"]
-
+    all_platforms_acc = {
+        pid: agg["avg_accuracy"] for pid, agg in cached.items() if agg["avg_accuracy"] > 0
+    }
     sorted_platforms = sorted(all_platforms_acc.items(), key=lambda x: x[1], reverse=True)
     platform_rank = next((i + 1 for i, (pid, _) in enumerate(sorted_platforms) if pid == platform_id), 0)
 
@@ -272,7 +398,7 @@ def _generate_insight(platform_id, meta, pstats, results, db):
         if lead > 0:
             insight = (
                 f"\U0001f4ca {top['name']} leads {meta['name']} investors with "
-                f"{top['accuracy_rate']:.1f}% accuracy \u2014 {lead} points above the "
+                f"{top['accuracy_rate']:.1f}% accuracy — {lead} points above the "
                 f"platform average of {pstats['avg_accuracy']:.1f}%"
             )
         else:
@@ -283,7 +409,6 @@ def _generate_insight(platform_id, meta, pstats, results, db):
     else:
         insight = f"\U0001f4ca {meta['name']} investors average {pstats['avg_accuracy']:.1f}% accuracy."
 
-    # Add cross-platform context
     if len(sorted_platforms) > 1 and platform_rank == 1:
         second = sorted_platforms[1]
         diff = round(pstats["avg_accuracy"] - second[1], 1)

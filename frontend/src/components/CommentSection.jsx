@@ -9,8 +9,12 @@ import { formatDate } from '../utils/formatDate';
  * Props:
  *  - predictionId: number
  *  - source: "user" | "analyst"
+ *  - initialCount: number | null | undefined — bulk-fetched count from the
+ *    parent page. undefined = legacy self-fetch on mount; null = a bulk fetch
+ *    is in flight, do NOT fire the per-id request (prevents the 25-call N+1
+ *    on profile pages); number = use it directly.
  */
-export default function CommentSection({ predictionId, source = 'user' }) {
+export default function CommentSection({ predictionId, source = 'user', initialCount = undefined }) {
   const { isAuthenticated, user } = useAuth();
   const [open, setOpen] = useState(false);
   const [comments, setComments] = useState([]);
@@ -19,10 +23,13 @@ export default function CommentSection({ predictionId, source = 'user' }) {
   const [sending, setSending] = useState(false);
   const [hasMore, setHasMore] = useState(false);
 
-  // Fetch count on mount
+  // Count: prefer the parent's bulk-fetched value; only self-fetch when no
+  // parent provides one (initialCount === undefined).
   useEffect(() => {
+    if (typeof initialCount === 'number') { setCount(initialCount); return; }
+    if (initialCount === null) return; // bulk fetch pending — never fire per-id
     getCommentCount(predictionId, source).then(d => setCount(d.count)).catch(() => {});
-  }, [predictionId, source]);
+  }, [predictionId, source, initialCount]);
 
   // Fetch comments when expanded
   useEffect(() => {

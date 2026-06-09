@@ -289,7 +289,7 @@ function MobileWatchCTA({ p }) {
   );
 }
 
-function PairCallCard({ prediction: p, forecaster: fc, showForecaster, compact }) {
+function PairCallCard({ prediction: p, forecaster: fc, showForecaster, compact, commentCount = undefined }) {
   // Dedicated layout for prediction_category === 'pair_call'. Pair
   // calls have two tickers (long / short) and are scored on the
   // spread between them, so the card shows both symbols side by side,
@@ -394,7 +394,7 @@ function PairCallCard({ prediction: p, forecaster: fc, showForecaster, compact }
       <ProofLinks p={p} />
 
       {!compact && predId && (
-        <CommentSection predictionId={predId} source={fc ? 'analyst' : 'user'} />
+        <CommentSection predictionId={predId} source={fc ? 'analyst' : 'user'} initialCount={commentCount} />
       )}
       {!compact && (
         <p className="text-muted/50 text-[9px] italic mt-2 pt-1.5 border-t border-border/20 leading-relaxed">
@@ -405,7 +405,7 @@ function PairCallCard({ prediction: p, forecaster: fc, showForecaster, compact }
   );
 }
 
-function BinaryEventCard({ prediction: p, forecaster: fc, showForecaster, compact }) {
+function BinaryEventCard({ prediction: p, forecaster: fc, showForecaster, compact, commentCount = undefined }) {
   // Dedicated layout for prediction_category === 'binary_event_call'.
   // Binary events are yes/no calls on discrete checkable events
   // ("Fed will cut 50bps in March", "AAPL will split by end of 2026").
@@ -522,7 +522,7 @@ function BinaryEventCard({ prediction: p, forecaster: fc, showForecaster, compac
       <ProofLinks p={p} />
 
       {!compact && predId && (
-        <CommentSection predictionId={predId} source={fc ? 'analyst' : 'user'} />
+        <CommentSection predictionId={predId} source={fc ? 'analyst' : 'user'} initialCount={commentCount} />
       )}
       {!compact && (
         <p className="text-muted/50 text-[9px] italic mt-2 pt-1.5 border-t border-border/20 leading-relaxed">
@@ -577,7 +577,7 @@ function formatMetricValue(metricType, value) {
   return n.toString();
 }
 
-function MetricForecastCard({ prediction: p, forecaster: fc, showForecaster, compact }) {
+function MetricForecastCard({ prediction: p, forecaster: fc, showForecaster, compact, commentCount = undefined }) {
   // Dedicated layout for prediction_category === 'metric_forecast_call'.
   // Numerical metric predictions scored against actual released values.
   // Shows TARGET / ACTUAL (when scored) / ERROR with a hit/near/miss
@@ -695,7 +695,7 @@ function MetricForecastCard({ prediction: p, forecaster: fc, showForecaster, com
       <ProofLinks p={p} />
 
       {!compact && predId && (
-        <CommentSection predictionId={predId} source={fc ? 'analyst' : 'user'} />
+        <CommentSection predictionId={predId} source={fc ? 'analyst' : 'user'} initialCount={commentCount} />
       )}
       {!compact && (
         <p className="text-muted/50 text-[9px] italic mt-2 pt-1.5 border-t border-border/20 leading-relaxed">
@@ -706,7 +706,7 @@ function MetricForecastCard({ prediction: p, forecaster: fc, showForecaster, com
   );
 }
 
-export default function PredictionCard({ prediction: p, showForecaster = false, forecaster = null, compact = false }) {
+export default function PredictionCard({ prediction: p, showForecaster = false, forecaster = null, compact = false, commentCount = undefined }) {
   const predId = p.id || p.prediction_id;
   const evalDate = p.evaluation_date || p.resolution_date;
   const windowDays = p.window_days || p.evaluation_window_days;
@@ -721,6 +721,7 @@ export default function PredictionCard({ prediction: p, showForecaster = false, 
         forecaster={fc}
         showForecaster={showForecaster}
         compact={compact}
+        commentCount={commentCount}
       />
     );
   }
@@ -732,6 +733,7 @@ export default function PredictionCard({ prediction: p, showForecaster = false, 
         forecaster={fc}
         showForecaster={showForecaster}
         compact={compact}
+        commentCount={commentCount}
       />
     );
   }
@@ -743,6 +745,7 @@ export default function PredictionCard({ prediction: p, showForecaster = false, 
         forecaster={fc}
         showForecaster={showForecaster}
         compact={compact}
+        commentCount={commentCount}
       />
     );
   }
@@ -916,7 +919,7 @@ export default function PredictionCard({ prediction: p, showForecaster = false, 
 
       {/* Comments (only in expanded mode) */}
       {!compact && predId && (
-        <CommentSection predictionId={predId} source={fc ? 'analyst' : 'user'} />
+        <CommentSection predictionId={predId} source={fc ? 'analyst' : 'user'} initialCount={commentCount} />
       )}
 
       {/* Disclaimer — Wall St rows have no extracted quote (structured
