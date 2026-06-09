@@ -399,7 +399,7 @@ def get_asset_consensus(
 
     # Counts in ONE aggregate instead of loading every prediction row into the
     # ORM (popular tickers have thousands; this was most of the 2.6s).
-    cnt = db.execute(sql_text("""
+    cnt = db.execute(sql_text(f"""
         SELECT COUNT(*) AS total,
                COUNT(*) FILTER (WHERE direction = 'bullish') AS bull,
                COUNT(*) FILTER (WHERE direction = 'bearish') AS bear,
