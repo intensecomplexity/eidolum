@@ -152,3 +152,76 @@ def get_crypto_price_data(ticker: str) -> dict | None:
     except Exception:
         pass
     return None
+
+
+# ── Symbol disambiguation (2026-06-10 ship) ─────────────────────────────────
+#
+# Two "same symbol, two companies" problems:
+#
+# 1. CRYPTO-EQUITY COLLISIONS — coin symbols that also identify a real
+#    equity. Disambiguated BY SOURCE: equity-analyst scrapers (Benzinga
+#    ratings, FMP grades) publish price targets on the EQUITY, never the
+#    coin, so rows from those sources get equity treatment (sector +
+#    price); every other source means the coin. ETH is the documented
+#    exception and is NOT in COLLISION_SYMBOLS: its equity era (Ethan
+#    Allen, renamed ETD in 2019) is dead, and 2 analyst-source rows from
+#    May 2021 are verifiably Ethereum (entry ~$3,485) — ETH stays
+#    always-coin; the Ethan-Allen-era rows are flagged is_ambiguous_symbol.
+#
+# 2. TICKER REUSE — a symbol reassigned to a new company. Old-era rows
+#    can't be reliably re-scored (company delisted/renamed), so they are
+#    flagged is_ambiguous_symbol (hidden from user surfaces, kept for
+#    admin/audit). KNOWN_TICKER_REASSIGNMENTS is the forward guard: the
+#    Benzinga ingest paths flag any new row whose prediction_date falls
+#    in the old era.
+#
+# TO EXTEND: new collision -> add the symbol to COLLISION_SYMBOLS (only
+# if a real equity actively trades under it). New reuse -> add a
+# KNOWN_TICKER_REASSIGNMENTS entry with the cutover date; rows dated
+# before the cutover get flagged at ingest. Then run a
+# scripts/disambiguate_symbols.py-style backfill for existing rows.
+
+EQUITY_ANALYST_SOURCES = {
+    "massive_benzinga", "benzinga_api", "benzinga_rss", "benzinga_web",
+    "fmp_grades", "fmp_ratings", "fmp_pt", "fmp_daily_grades",
+    "fmp_upgrades", "marketbeat_rss", "yfinance", "alphavantage", "finnhub",
+}
+
+# Coin symbols with a real equity identity (audited 2026-06-10):
+# LTC=LTC Properties, SOL=Emeren, SAND=Sandstorm Gold, BCH=Banco de
+# Chile, TRX=TRX Gold, ARB=Arbitron (historical), ATOM=Atomera.
+COLLISION_SYMBOLS = {"LTC", "SOL", "SAND", "BCH", "TRX", "ARB", "ATOM"}
+
+# symbol -> (cutover ISO date, old identity, new identity). Rows dated
+# BEFORE the cutover belong to the old company and are flagged.
+KNOWN_TICKER_REASSIGNMENTS = {
+    "LB": ("2021-08-02", "L Brands", "LandBridge Company"),
+    "APC": ("2019-08-08", "Anadarko Petroleum", "ARKO Petroleum"),
+    "ARB": ("2014-01-01", "Arbitron", "AltShares ETF / Arbitrum coin"),
+    "ETH": ("2019-08-19", "Ethan Allen Interiors (now ETD)", "Ethereum / ETF"),
+}
+
+
+def is_crypto_for_source(ticker: str, source: str | None = None) -> bool:
+    """Source-aware is_crypto. For COLLISION_SYMBOLS, crypto treatment
+    applies ONLY when the row does NOT come from an equity-analyst
+    source. Non-collision coins (BTC, ETH, DOGE, ...) are crypto
+    regardless of source — identical to is_crypto()."""
+    t = (ticker or "").upper().strip()
+    if t not in CRYPTO_TICKERS:
+        return False
+    if t in COLLISION_SYMBOLS and source and source in EQUITY_ANALYST_SOURCES:
+        return False
+    return True
+
+
+def is_stale_reassigned(ticker: str, prediction_date) -> bool:
+    """True when a prediction on a reused symbol is dated before the
+    reassignment cutover — i.e. it belongs to the OLD company and must
+    be flagged is_ambiguous_symbol at ingest."""
+    entry = KNOWN_TICKER_REASSIGNMENTS.get((ticker or "").upper().strip())
+    if not entry or prediction_date is None:
+        return False
+    cutover = entry[0]
+    d = prediction_date.date() if hasattr(prediction_date, "date") else prediction_date
+    return d.isoformat() < cutover

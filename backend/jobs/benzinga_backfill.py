@@ -505,16 +505,30 @@ def _insert_rating(rating: dict, db) -> bool:
         context=context[:500], exact_quote=context,
         outcome="pending", verified_by="massive_benzinga",
         call_type=call_type,
+        # Forward guard: the backfill is the main path inserting
+        # historical dates — old-era rows on reused symbols (LB/APC/...)
+        # are flagged at ingest. See KNOWN_TICKER_REASSIGNMENTS.
+        is_ambiguous_symbol=_is_stale_reassigned_safe(ticker, pred_date),
     ))
     return True
 
 
-def _get_sector_safe(ticker, db):
+def _get_sector_safe(ticker, db, source: str = "massive_benzinga"):
+    # source -> crypto-equity collision guard routes analyst rows to the
+    # equity (see crypto_prices.COLLISION_SYMBOLS).
     try:
         from jobs.sector_lookup import get_sector
-        return get_sector(ticker, db)
+        return get_sector(ticker, db, source=source)
     except Exception:
         return "Other"
+
+
+def _is_stale_reassigned_safe(ticker, pred_date) -> bool:
+    try:
+        from crypto_prices import is_stale_reassigned
+        return is_stale_reassigned(ticker, pred_date)
+    except Exception:
+        return False
 
 
 NEUTRAL_RATINGS = {"hold", "neutral", "equal weight", "equal-weight", "market perform",

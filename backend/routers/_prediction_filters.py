@@ -32,6 +32,40 @@ HIDE_REPORTED_SPEECH = (
     in ("on", "true", "1", "yes")
 )
 
+# 2026-06-10 symbol disambiguation: rows that can't be reliably
+# attributed to a tradeable asset (ticker-reuse stale eras, dead-equity
+# crypto collisions). Same visibility class as reported speech: kept in
+# the DB, hidden from user surfaces, independent kill switch.
+HIDE_AMBIGUOUS_SYMBOLS = (
+    os.environ.get("HIDE_AMBIGUOUS_SYMBOLS", "on").lower()
+    in ("on", "true", "1", "yes")
+)
+
+
+def ambiguous_symbol_filter_sql(table_alias: str = "p") -> str:
+    """Return an ``AND``-prefixed SQL fragment that excludes rows flagged
+    is_ambiguous_symbol (unattributable asset — see models.Prediction).
+
+    Shape (active):
+        AND COALESCE(<alias>.is_ambiguous_symbol, FALSE) = FALSE
+    """
+    if not HIDE_AMBIGUOUS_SYMBOLS:
+        return ""
+    return (
+        f" AND COALESCE({table_alias}.is_ambiguous_symbol, FALSE) = FALSE"
+    )
+
+
+def ambiguous_symbol_filter_clause(ambiguous_attr):
+    """ORM equivalent of ``ambiguous_symbol_filter_sql``. Pass the model
+    attribute (``Prediction.is_ambiguous_symbol``). Returns a ``true``
+    clause when the kill switch is off."""
+    if not HIDE_AMBIGUOUS_SYMBOLS:
+        from sqlalchemy import true
+        return true()
+    from sqlalchemy import or_
+    return or_(ambiguous_attr.is_(False), ambiguous_attr.is_(None))
+
 
 def reported_speech_filter_sql(table_alias: str = "p") -> str:
     """Return an ``AND``-prefixed SQL fragment that excludes rows flagged
@@ -77,6 +111,10 @@ def hedged_filter_sql(table_alias: str = "p") -> str:
     if HIDE_REPORTED_SPEECH:
         parts.append(
             f" AND COALESCE({table_alias}.is_reported_speech, FALSE) = FALSE"
+        )
+    if HIDE_AMBIGUOUS_SYMBOLS:
+        parts.append(
+            f" AND COALESCE({table_alias}.is_ambiguous_symbol, FALSE) = FALSE"
         )
     return "".join(parts)
 

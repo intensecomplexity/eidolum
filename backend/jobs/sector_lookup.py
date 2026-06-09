@@ -156,7 +156,8 @@ KNOWN_SECTORS = {
 }
 
 
-def get_sector(ticker: str, db=None, source_sector: str | None = None) -> str:
+def get_sector(ticker: str, db=None, source_sector: str | None = None,
+               source: str | None = None) -> str:
     """Get the canonical display sector to STAMP for a ticker.
 
     Resolution order: crypto → memory → ETF guard → reference tables
@@ -188,15 +189,21 @@ def get_sector(ticker: str, db=None, source_sector: str | None = None) -> str:
         _mem_cache[ticker] = override
         return override
 
-    # 0. Crypto short-circuit (highest priority).
-    from services.price_fetch import is_crypto
-    if is_crypto(ticker):
+    # 0. Crypto short-circuit (highest priority) — source-aware for
+    # COLLISION_SYMBOLS (LTC the REIT vs LTC the coin): equity-analyst
+    # sources fall through to the equity resolution below.
+    from crypto_prices import is_crypto_for_source, COLLISION_SYMBOLS
+    if is_crypto_for_source(ticker, source):
         _mem_cache[ticker] = "Crypto"
         return "Crypto"
 
-    # 1. Memory cache (skipped when a source stamp is provided for ETFs;
-    #    the ETF guard below must see source_sector each call).
-    if ticker in _mem_cache and not (source_sector and _is_etf(ticker, db)):
+    # 1. Memory cache. Skipped for ETFs with a source stamp (the ETF
+    #    guard must see source_sector each call) and for collision
+    #    symbols (the same ticker resolves differently per source, so
+    #    a cached 'Crypto' must never serve an equity-source call and
+    #    vice versa).
+    if (ticker in _mem_cache and ticker not in COLLISION_SYMBOLS
+            and not (source_sector and _is_etf(ticker, db))):
         return _mem_cache[ticker]
 
     # 2. ETF guard — keep the pipeline stamp, never the reference value.

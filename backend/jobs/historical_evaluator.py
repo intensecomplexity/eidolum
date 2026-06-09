@@ -170,7 +170,8 @@ def evaluate_batch(max_tickers: int | None = None) -> dict:
             SELECT p.id, p.ticker, p.direction, p.target_price, p.entry_price,
                    p.evaluation_date, p.prediction_date, p.forecaster_id, p.window_days,
                    p.prediction_type, p.position_closed_at,
-                   COALESCE(p.prediction_category, 'ticker_call') as prediction_category
+                   COALESCE(p.prediction_category, 'ticker_call') as prediction_category,
+                   p.verified_by
             FROM predictions p
             WHERE (p.outcome = 'pending' OR p.outcome IS NULL OR p.outcome = '')
               AND p.evaluation_date IS NOT NULL
@@ -213,9 +214,17 @@ def evaluate_batch(max_tickers: int | None = None) -> dict:
         return {"tickers_processed": 0, "predictions_scored": 0, "remaining_tickers": 0, "correct": 0, "incorrect": 0}
 
     # ── STEP 2: Group by ticker ─────────────────────────────────────────
+    # Crypto-equity collision rows (LTC/SOL/... from equity-analyst
+    # sources) group under a "<ticker>|EQ" key so they fetch and score
+    # against the EQUITY price series while coin-source rows of the same
+    # symbol keep the coin series. Non-collision tickers are unaffected.
+    from crypto_prices import COLLISION_SYMBOLS, EQUITY_ANALYST_SOURCES
     ticker_preds = defaultdict(list)
     for r in rows:
-        ticker_preds[r[1]].append({
+        group_key = r[1]
+        if r[1] in COLLISION_SYMBOLS and (r[12] or "") in EQUITY_ANALYST_SOURCES:
+            group_key = f"{r[1]}|EQ"
+        ticker_preds[group_key].append({
             "id": r[0], "ticker": r[1], "direction": r[2],
             "target_price": float(r[3]) if r[3] else None,
             "entry_price": float(r[4]) if r[4] else None,
@@ -243,7 +252,10 @@ def evaluate_batch(max_tickers: int | None = None) -> dict:
         if FMP_IS_PRIMARY and _fmp_calls_today >= _FMP_DAILY_LIMIT and not FINNHUB_KEY:
             print(f"[HistEval] FMP daily cap reached at ticker {i}/{len(tickers)}")
             break
-        prices = _fetch_history(ticker, None, None)
+        # "<sym>|EQ" group keys force the equity series for collision rows.
+        real_ticker, _, eq_suffix = ticker.partition("|")
+        prices = _fetch_history(real_ticker, None, None,
+                                force_equity=(eq_suffix == "EQ"))
         if prices:
             all_prices[ticker] = prices
         # Rate limit: 50/sec on Ultimate (0.02s), ~3/sec on Starter (0.3s)
@@ -323,7 +335,7 @@ def evaluate_batch(max_tickers: int | None = None) -> dict:
                     skipped_no_eval_price += 1
                     continue
                 summary = build_sector_summary(
-                    p["direction"], ticker, None,
+                    p["direction"], p["ticker"], None,
                     etf_return, spy_return, spread, outcome,
                 )
                 updates.append({
@@ -891,7 +903,7 @@ def _try_finnhub(ticker: str) -> dict:
     return {}
 
 
-def _fetch_history(ticker: str, start, end) -> dict:
+def _fetch_history(ticker: str, start, end, force_equity: bool = False) -> dict:
     """Fetch historical daily prices for a ticker. Returns {date_str: close_price, ...}.
 
     Crypto tickers (BTC, ETH, etc.) are routed to Polygon's X:{SYMBOL}USD
@@ -910,13 +922,20 @@ def _fetch_history(ticker: str, start, end) -> dict:
     is persisted to price_bars so the next caller for the same ticker
     gets the cached value forever after.
     """
-    if ticker in _history_cache:
-        return _history_cache[ticker]
+    # force_equity: crypto-equity collision rows from equity-analyst
+    # sources (LTC = LTC Properties, not Litecoin) must price as the
+    # EQUITY. Cache key carries the routing so a coin series fetched for
+    # crypto-source rows can never serve equity-source rows of the same
+    # symbol (and vice versa) within a batch. For every non-collision
+    # call force_equity is False and behavior is byte-identical.
+    cache_key = f"{ticker}|EQ" if force_equity else ticker
+    if cache_key in _history_cache:
+        return _history_cache[cache_key]
 
     # Crypto branch — exclusive. Bug 1: never let a crypto ticker fall
     # through to an equity fetcher.
     from services.price_fetch import is_crypto, fetch_crypto_history
-    if is_crypto(ticker):
+    if is_crypto(ticker) and not force_equity:
         prices = fetch_crypto_history(ticker)
         if prices:
             _history_cache[ticker] = prices
@@ -928,7 +947,7 @@ def _fetch_history(ticker: str, start, end) -> dict:
         from services.price_store import get_history as _local_history
         prices = _local_history(ticker, start, end)
         if prices:
-            _history_cache[ticker] = prices
+            _history_cache[cache_key] = prices
             return prices
     except Exception as e:
         print(f"[HistEval] price_store read failed for {ticker}: {e}", flush=True)
@@ -941,7 +960,7 @@ def _fetch_history(ticker: str, start, end) -> dict:
     for fetch in sources:
         prices = fetch(ticker)
         if prices:
-            _history_cache[ticker] = prices
+            _history_cache[cache_key] = prices
             # Write-through to price_bars so future calls hit the L2 cache.
             try:
                 from services.price_store import persist_bars_bulk
