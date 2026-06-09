@@ -445,6 +445,23 @@ def _process_one_video(db, channel_name, channel_id, video_id, title, publish_st
 
     publish_dt = _parse_publish_date(publish_str) or datetime.utcnow()
 
+    # Evidence preservation (ship #13 parity) — persist the transcript the
+    # moment it's fetched, BEFORE classify and independent of outcome, so
+    # classifier_error / ok_no_predictions videos keep their transcript and
+    # never re-pay the Webshare proxy on retry. The live monitor already
+    # does this; this inlined backfill copy was missing it — the cause of
+    # the 64% of fetched-but-unsaved transcripts. Idempotent; never raises.
+    try:
+        from jobs.video_transcript_store import persist_transcript
+        persist_transcript(
+            db, video_id, text,
+            transcript_format="json3" if transcript_data else "text",
+            channel_name=channel_name, video_title=title,
+            video_publish_date=publish_dt,
+        )
+    except Exception as _e:
+        print(f"[YT-Backfill] transcript capture failed for {video_id}: {_e}", flush=True)
+
     preds, telem = classify_video(
         channel_name, title,
         publish_str[:10] if publish_str else "",
