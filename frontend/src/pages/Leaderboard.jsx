@@ -102,7 +102,12 @@ export default function Leaderboard() {
   const [emptyMessage, setEmptyMessage] = useState(null);
   const [sector, setSector] = useState(() => searchParams.get('sector') || 'All');
   const [direction, setDirection] = useState(() => searchParams.get('direction') || 'All');
-  const [metric, setMetric] = useState(() => searchParams.get('metric') || localStorage.getItem('eidolum_metric') || 'avg_return');
+  // The Eidolum 100 is canonically ranked by accuracy. The metric is driven
+  // ONLY by the URL (?metric=) so a shared link is reproducible and every
+  // device defaults identically — never from per-device localStorage, which
+  // made one browser open on hit_rate and another on avg_return (different
+  // rankings for the same list). Default: hit_rate.
+  const [metric, setMetric] = useState(() => searchParams.get('metric') || 'hit_rate');
   const [metricOpen, setMetricOpen] = useState(false);
   const [expandedId, setExpandedId] = useState(null);
   const metricRef = useRef(null);
@@ -149,7 +154,7 @@ export default function Leaderboard() {
     if (activeTab !== 'alltime') next.tab = activeTab;
     if (sector !== 'All') next.sector = sector;
     if (direction !== 'All') next.direction = direction;
-    if (metric !== 'avg_return') next.metric = metric;
+    if (metric !== 'hit_rate') next.metric = metric;
     if (timeframe !== 'all') next.timeframe = timeframe;
     if (source !== 'all') next.source = source;
     if (minPreds !== 10) next.min_preds = String(minPreds);
@@ -260,11 +265,6 @@ export default function Leaderboard() {
     }, 30000);
     return () => clearInterval(timer);
   }, [emptyMessage, loading, activeTab, sector, direction, metric, timeframe, source]);
-
-  // Persist metric choice
-  useEffect(() => {
-    localStorage.setItem('eidolum_metric', metric);
-  }, [metric]);
 
   // Close metric dropdown on outside click
   useEffect(() => {
