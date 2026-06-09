@@ -2328,6 +2328,47 @@ async def lifespan(app):
         except Exception as _sae:
             print(f"[Startup] sector_etf_aliases migration error: {_sae}")
 
+        # ── Product Themes v1 (themes + theme_tickers) ──
+        # Second, overlapping "by product" navigation axis alongside
+        # sectors. MANY-TO-MANY with tickers; hand-curated via
+        # /admin/themes. No seed here — the starter set ships via
+        # backend/scripts/seed_product_themes.py so membership stays
+        # admin-controlled. Mirrors backend/migrations/0019_product_themes.sql.
+        try:
+            with engine.connect() as _th_c:
+                _th_c.execute(sql_text("""
+                    CREATE TABLE IF NOT EXISTS themes (
+                        id            SERIAL PRIMARY KEY,
+                        slug          VARCHAR(48) UNIQUE NOT NULL,
+                        name          VARCHAR(80) NOT NULL,
+                        description   TEXT,
+                        display_order INT NOT NULL DEFAULT 100,
+                        is_active     BOOLEAN NOT NULL DEFAULT TRUE,
+                        created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
+                    )
+                """))
+                _th_c.execute(sql_text("""
+                    CREATE TABLE IF NOT EXISTS theme_tickers (
+                        theme_id   INT NOT NULL REFERENCES themes(id) ON DELETE CASCADE,
+                        ticker     VARCHAR(20) NOT NULL,
+                        is_primary BOOLEAN NOT NULL DEFAULT FALSE,
+                        added_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                        PRIMARY KEY (theme_id, ticker)
+                    )
+                """))
+                _th_c.execute(sql_text(
+                    "CREATE INDEX IF NOT EXISTS ix_theme_tickers_ticker "
+                    "ON theme_tickers(ticker)"
+                ))
+                _th_c.execute(sql_text(
+                    "CREATE INDEX IF NOT EXISTS ix_theme_tickers_theme "
+                    "ON theme_tickers(theme_id)"
+                ))
+                _th_c.commit()
+                print("[Startup] themes + theme_tickers tables ready")
+        except Exception as _the:
+            print(f"[Startup] product themes migration error: {_the}")
+
         # ── predictions.prediction_category (ticker_call | sector_call) ──
         # Default ticker_call preserves all existing row semantics — every
         # prediction already in the table is a ticker call. New sector_call
@@ -4158,6 +4199,9 @@ from routers.logo_serve import router as logo_serve_router
 app.include_router(logo_serve_router, prefix="/api")
 from routers.company_data import router as company_data_router
 app.include_router(company_data_router, prefix="/api")
+
+from routers import themes as themes_router  # Product Themes v1 (gated on ENABLE_PRODUCT_THEMES)
+app.include_router(themes_router.router, prefix="/api")
 
 
 @app.get("/health")

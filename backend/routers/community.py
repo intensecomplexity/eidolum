@@ -756,11 +756,20 @@ def get_all_consensus(
     db: Session = Depends(get_db),
     sector: str = Query(None),
     sort: str = Query(None),
+    theme: str = Query(None),
 ):
     global _consensus_cache, _consensus_cache_time
 
+    # Product-theme filter is gated on ENABLE_PRODUCT_THEMES. While the
+    # flag is off a ?theme= request returns [] rather than silently
+    # ignoring the filter — never show unfiltered data as if filtered.
+    if theme:
+        from feature_flags import is_product_themes_enabled
+        if not is_product_themes_enabled(db):
+            return []
+
     # Use cache only for unfiltered default requests
-    if not sector and not sort and _consensus_cache and (_consensus_time.time() - _consensus_cache_time) < _CONSENSUS_TTL:
+    if not sector and not sort and not theme and _consensus_cache and (_consensus_time.time() - _consensus_cache_time) < _CONSENSUS_TTL:
         return _consensus_cache
 
     # Merge share-class duplicates: normalize tickers before querying
@@ -774,6 +783,12 @@ def get_all_consensus(
     if sector:
         where += " AND sector = :sector"
         params["sector"] = sector
+    if theme:
+        # ANDed with ?sector= when both are given (a ticker must match
+        # both axes). Slug stays a bound param via the shared helper.
+        from services.themes import theme_ticker_filter_sql
+        where += theme_ticker_filter_sql(alias="", slug_param="theme_slug")
+        params["theme_slug"] = theme
 
     rows = db.execute(_consensus_text(f"""
         SELECT ticker,
@@ -887,7 +902,7 @@ def get_all_consensus(
     elif sort == "divided":
         results.sort(key=lambda x: abs(x["bullish_percentage"] - 50))
 
-    if not sector and not sort:
+    if not sector and not sort and not theme:
         _consensus_cache = results
         _consensus_cache_time = _consensus_time.time()
     return results
