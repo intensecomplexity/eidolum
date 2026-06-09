@@ -89,6 +89,46 @@ export function getSectors() {
   return api.get('/sectors').then(r => r.data);
 }
 
+// ── Product Themes (v1 — filter + tag only) ────────────────────────────
+// /themes returns [] while ENABLE_PRODUCT_THEMES is off, so callers
+// gate rendering on data presence alone — no separate flag fetch.
+
+export function getThemes() {
+  return api.get('/themes').then(r => r.data);
+}
+
+export function getThemeDetail(slug) {
+  return api.get(`/themes/${slug}`).then(r => r.data);
+}
+
+export function adminListThemes() {
+  return api.get('/admin/themes', { headers: authHeaders() }).then(r => r.data);
+}
+
+export function adminCreateTheme(data) {
+  return api.post('/admin/themes', data, { headers: authHeaders() }).then(r => r.data);
+}
+
+export function adminUpdateTheme(id, data) {
+  return api.patch(`/admin/themes/${id}`, data, { headers: authHeaders() }).then(r => r.data);
+}
+
+export function adminDeleteTheme(id) {
+  return api.delete(`/admin/themes/${id}`, { headers: authHeaders() }).then(r => r.data);
+}
+
+export function adminAddThemeTicker(id, data) {
+  return api.post(`/admin/themes/${id}/tickers`, data, { headers: authHeaders() }).then(r => r.data);
+}
+
+export function adminRemoveThemeTicker(id, ticker) {
+  return api.delete(`/admin/themes/${id}/tickers/${encodeURIComponent(ticker)}`, { headers: authHeaders() }).then(r => r.data);
+}
+
+export function adminSuggestThemeTickers(id) {
+  return api.get(`/admin/themes/${id}/suggest`, { headers: authHeaders() }).then(r => r.data);
+}
+
 export function getForecasterSectors(id) {
   return api.get(`/forecaster/${id}/sectors`).then(r => r.data);
 }

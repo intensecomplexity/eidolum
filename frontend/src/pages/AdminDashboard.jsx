@@ -24,8 +24,9 @@ import {
   getYouTubeTrainingProgress,
 } from '../api';
 import YouTubeRunsInspector from '../components/admin/YouTubeRunsInspector';
+import ProductThemesPanel from '../components/admin/ProductThemesPanel';
 
-const TABS = ['Overview', 'Users', 'Forecasters', 'Predictions', 'Audit Log', 'YouTube Runs', 'Training Exclusions'];
+const TABS = ['Overview', 'Users', 'Forecasters', 'Predictions', 'Audit Log', 'YouTube Runs', 'Training Exclusions', 'Product Themes'];
 
 export default function AdminDashboard() {
   const navigate = useNavigate();
@@ -94,6 +95,7 @@ export default function AdminDashboard() {
       {tab === 'Audit Log' && <AuditTab />}
       {tab === 'YouTube Runs' && <YouTubeRunsInspector />}
       {tab === 'Training Exclusions' && <TrainingExclusionsTab showToast={showToast} />}
+      {tab === 'Product Themes' && <ProductThemesPanel showToast={showToast} />}
 
       {toast && (
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[70] px-4 py-2.5 rounded-xl text-xs font-medium bg-surface border border-border shadow-lg">

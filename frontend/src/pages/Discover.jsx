@@ -1,14 +1,14 @@
 import { useEffect, useState } from 'react';
 import LoadingSpinner from '../components/LoadingSpinner';
 import { Link, useNavigate } from 'react-router-dom';
-import { Search, TrendingUp, TrendingDown, Flame, AlertTriangle, Clock, BarChart3, Star, ArrowRight } from 'lucide-react';
+import { Search, TrendingUp, TrendingDown, Flame, AlertTriangle, Clock, BarChart3, Star, ArrowRight, Package } from 'lucide-react';
 import Footer from '../components/Footer';
 import PageHeader from '../components/PageHeader';
 import SectionHeader from '../components/SectionHeader';
 import { useFeatures } from '../context/FeatureContext';
 import { usePublicFlag } from '../hooks/usePublicFlag';
 import TickerLogo from '../components/TickerLogo';
-import { searchTickers, getTrendingTickers, getSectors, getExpiringPredictions, getLeaderboard, getHomepageData } from '../api';
+import { searchTickers, getTrendingTickers, getSectors, getThemes, getExpiringPredictions, getLeaderboard, getHomepageData } from '../api';
 import { pluralize } from '../utils/pluralize';
 import { formatSectorName } from '../utils/formatSectorName';
 
@@ -28,6 +28,7 @@ export default function Discover() {
   const [searching, setSearching] = useState(false);
   const [trending, setTrending] = useState([]);
   const [sectors, setSectors] = useState([]);
+  const [themes, setThemes] = useState([]);
   const [expiring, setExpiring] = useState([]);
   const [risingStar, setRisingStar] = useState([]);
   const [mostDivided, setMostDivided] = useState([]);
@@ -40,9 +41,11 @@ export default function Discover() {
       getExpiringPredictions().catch(() => []),
       getLeaderboard({ sort: 'accuracy', limit: 100 }).catch(() => []),
       getHomepageData().catch(() => null),
-    ]).then(([t, s, e, lb, hp]) => {
+      getThemes().catch(() => []),
+    ]).then(([t, s, e, lb, hp, th]) => {
       setTrending(t);
       setSectors(s);
+      setThemes(Array.isArray(th) ? th : []);
       setExpiring(e.slice(0, 10));
       // Rising stars: high accuracy, fewer than 20 predictions
       const stars = (Array.isArray(lb) ? lb : [])
@@ -241,6 +244,32 @@ export default function Discover() {
                 View all sectors <ArrowRight className="w-3 h-3" />
               </Link>
             </div>
+          </div>
+        )}
+
+        {/* ── SECTION 5b: Browse by Product (themes — flag-gated by data) ── */}
+        {themes.filter(t => t.prediction_count > 0).length > 0 && (
+          <div className="mb-8">
+            <SectionHeader subtitle="The product battlegrounds — who's actually right about phones, AI chips, EVs?">
+              <span className="inline-flex items-center gap-1.5"><Package className="w-4 h-4 text-accent" /> Browse by Product</span>
+            </SectionHeader>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+              {themes.filter(t => t.prediction_count > 0).slice(0, 9).map(t => (
+                <Link key={t.slug} to={`/consensus?theme=${encodeURIComponent(t.slug)}`}
+                  className="card py-3 text-center hover:bg-surface-2 transition-colors">
+                  <div className="text-sm font-medium text-text-primary">{t.name}</div>
+                  <div className="text-[10px] text-muted font-mono">{t.prediction_count.toLocaleString()} predictions</div>
+                  <div className="text-[10px] text-text-secondary mt-0.5">{pluralize(t.ticker_count, 'ticker')}</div>
+                </Link>
+              ))}
+            </div>
+            {themes.filter(t => t.prediction_count > 0).length > 9 && (
+              <div className="text-center mt-3">
+                <Link to="/themes" className="text-accent text-xs font-medium inline-flex items-center gap-1">
+                  View all products <ArrowRight className="w-3 h-3" />
+                </Link>
+              </div>
+            )}
           </div>
         )}
 
