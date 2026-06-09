@@ -82,8 +82,10 @@ CC_CWD = f"/tmp/cc_recovery_cwd{_SUFFIX}"  # empty dir => `claude -p` finds no C
 
 # ── Tuning ──────────────────────────────────────────────────────────────────
 GENERATING_MODEL = "cc_sonnet_recovery_2026_05_17"  # cohort tag — DO NOT CHANGE
-MAX_BATCH_VIDEOS = 10              # ~9-min `claude -p` call; 20 ran ~20min+
-MAX_BATCH_CHARS = 220_000          # ~55k input tokens — safe inside Sonnet ctx
+MAX_BATCH_VIDEOS = 4               # smaller `claude -p` generation: a full 10-video
+                                   # batch of multi-stock videos pushed claude past the
+                                   # 1800s timeout (2026-06-09); 4 keeps calls well under
+MAX_BATCH_CHARS = 90_000           # ~22k input tokens — bounds per-call generation len
 CONSECUTIVE_FAILURE_ABORT = 5      # abort after N consecutive CC-level failures
 MAX_VIDEO_ATTEMPTS = 20            # give up on a video after N failed attempts
                                    # (raised 5->20 alongside FETCH_TIMEOUT 120->30 so
