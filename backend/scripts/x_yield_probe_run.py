@@ -41,12 +41,14 @@ PER_ACCOUNT = 40
 APIFY_PER_TWEET = 0.0004          # measured in pre-flight
 FETCH_WORKERS = 8
 BATCH_SIZE = 20                   # tweets per claude -p call
-# REVERTED to sonnet 2026-06-10: Haiku+X_ADDENDUM passed the 60/60 gate
-# (96.7% recall) but FAILED the 150/150 held-out confirmation at 93.3%
-# recall (gate >=95) — it drops real calls (position rolls, PT relays,
-# conviction-buy declarations). Do not flip to haiku without a fresh
-# held-out sample clearing >=95% recall and >=90% agreement.
-CLAUDE_MODEL = "sonnet"
+# haiku since 2026-06-10 (addendum v2): v1 failed the held-out gate at
+# 93.3% recall; v2 (analyst-relays, position management, conviction
+# declarations, fundamental projections, valuation-gap rules) cleared
+# the gate on 223 pos + 200 neg with tuning examples excluded:
+# recall 98.2%, ticker+direction agreement 97.7%, skip 84%. Do not
+# change model or addendum without re-running the gate
+# (>=95% recall, >=90% agreement vs cached-Sonnet ground truth).
+CLAUDE_MODEL = "haiku"
 CLAUDE_TIMEOUT = 600
 CC_CWD = "/tmp/x_probe_cc_cwd"    # empty dir => no CLAUDE.md picked up
 USAGE_BACKOFF = 600
@@ -91,20 +93,28 @@ def _subprocess_env():
 
 
 # Appended AFTER HAIKU_SYSTEM (additive — never edit HAIKU_SYSTEM in place).
-# Closes Haiku's gaps on X phrasing: imperative calls, option-position
-# disclosures, conditional calls, and direction flips on negated phrasing.
-# Eval-gated 2026-06-10; without it Haiku recall was 93.3% (below the gate).
+# v2 (2026-06-10): closes Haiku's gaps on X phrasing — imperative calls,
+# position management, analyst-action relays, conviction declarations,
+# fundamental projections, conditionals, and direction care. Gate-cleared
+# at 98.2% recall / 97.7% agreement (see CLAUDE_MODEL comment above).
 X_ADDENDUM = """
 === X/TWITTER ADDENDUM (additive — all rules above still apply) ===
 Tweets are terse. The following ALL count as predictions (is_prediction=true):
 - IMPERATIVE calls with a ticker: "buy the dip $SPY", "load up on $X", "sell $Y here".
-- POSITION DISCLOSURES, including options: "sold one $AMZN call", "long $BTC",
-  "$ETH long taken", entry/TP/SL setups, leverage trades. Direction = the position's
-  market view (long/calls/buying = bullish; short/puts/selling = bearish; SELLING a
-  call you hold = closing = follow the stated sentiment, default bullish exit -> use
-  the tweet's overall stance).
-- CONDITIONAL calls: "if $SPY loses 745, expect selling" -> is_prediction=true with
-  the direction of the PREDICTED CONSEQUENCE (here bearish).
+- POSITION DISCLOSURES AND MANAGEMENT, including options: "long $BTC", "$ETH long
+  taken", "sold one $AMZN call", "rolled my $X short", adding/trimming/closing a
+  position, entry/TP/SL setups, leverage trades. Direction = the position's market
+  view (long/calls/buying/holding = bullish; short/puts = bearish; closing/exiting =
+  the tweet's overall stance on the ticker).
+- ANALYST-ACTION RELAYS: "Morningstar raises $AVGO PT to $650", "Citizens maintains
+  Outperform on $MDGL" — on this platform these COUNT as predictions; direction
+  follows the rating/PT change (raise/Buy/Outperform = bullish, cut/Sell = bearish).
+- CONVICTION DECLARATIONS: "my highest conviction buy right now is $META" -> bullish.
+- FUNDAMENTAL PROJECTIONS implying direction: "Q2 will be a monster quarter, 40%
+  growth", revenue run-rate projections, "estimated fair value $277 vs price $386"
+  (fair value below price = bearish, above = bullish).
+- CONDITIONAL calls: "if $SPY loses 745, expect selling" -> direction of the
+  PREDICTED CONSEQUENCE (here bearish).
 - LEVEL calls with a stated stance: "this level has to hold" + a downside warning ->
   the warned direction.
 DIRECTION CARE: re-read negations and conditionals before assigning direction; the
@@ -116,13 +126,11 @@ When a tweet is a borderline call-vs-commentary case, lean is_prediction=true.
 
 
 def build_batch_prompt(items):
-    """items: list of (tweet_id, text). Uses production HAIKU_SYSTEM verbatim,
-    wrapped for batch output. X_ADDENDUM is NOT included on the sonnet path —
-    it exists for the (currently reverted) haiku experiment; ground truth was
-    sonnet-without-addendum, so the baseline stays exact."""
+    """items: list of (tweet_id, text). Uses production HAIKU_SYSTEM verbatim
+    plus the gate-cleared X_ADDENDUM (v2), wrapped for batch output."""
     blocks = [f"--- TWEET {tid} ---\n{txt}" for tid, txt in items]
     body = "\n\n".join(blocks)
-    return (HAIKU_SYSTEM + """
+    return (HAIKU_SYSTEM + X_ADDENDUM + """
 
 === BATCH MODE ===
 You will classify MULTIPLE tweets below. Apply the rules above to EACH tweet
