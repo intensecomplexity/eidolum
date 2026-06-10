@@ -2498,6 +2498,25 @@ def main():
         executor='maintenance',
     )
 
+    # YouTube API metadata refresh — rolling 30-day re-fetch/blank of stored
+    # YouTube Data API metadata (compliance retention policy). Quota-capped
+    # per run (default 100 units). Kill switch: ENABLE_YT_METADATA_REFRESH
+    # env var, default true.
+    def _yt_metadata_refresh():
+        try:
+            from jobs.youtube_api_data_refresh import run_youtube_api_data_refresh
+            result = run_youtube_api_data_refresh()
+            log.info(f"[yt_metadata_refresh] Done: {result}")
+        except Exception as e:
+            log.error(f"[yt_metadata_refresh] {e}", exc_info=True)
+    sched.add_job(
+        _standalone("yt_metadata_refresh", _yt_metadata_refresh),
+        "cron", hour=1, minute=40, timezone="UTC",
+        id="yt_metadata_refresh",
+        misfire_grace_time=3600, max_instances=1, coalesce=True,
+        executor='maintenance',
+    )
+
     # FMP latest grades (upgrades RSS) — requires FMP_KEY, every 4h
     def _fmp_upgrades():
         try:
