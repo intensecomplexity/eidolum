@@ -500,10 +500,15 @@ export default function Leaderboard() {
                             <td className="px-3 py-4"><RankBadge rank={f.rank} movement={f.rank_movement} /></td>
                             <td className="px-3 py-3">
                               <div className="flex items-center gap-1.5 flex-wrap">
-                                <Link to={f.slug ? `/analyst/${f.slug}` : `/forecaster/${f.id}`} className="font-medium text-[0.93rem] hover:text-accent transition-colors">
-                                  {f.name}
-                                </Link>
-                                <PlatformBadge platform={getSourceBadgeKey(f)} />
+                                {/* Name + platform badge wrap as ONE unit: the
+                                    badge labels the person, not the metric
+                                    columns to the right. */}
+                                <span className="inline-flex items-center gap-1.5 whitespace-nowrap">
+                                  <Link to={f.slug ? `/analyst/${f.slug}` : `/forecaster/${f.id}`} className="font-medium text-[0.93rem] hover:text-accent transition-colors">
+                                    {f.name}
+                                  </Link>
+                                  <PlatformBadge platform={getSourceBadgeKey(f)} />
+                                </span>
                                 <DormantBadge visible={f.is_dormant} />
                               </div>
                               {f.firm ? (
@@ -671,10 +676,12 @@ function WeekView({ weekData, data }) {
                       <span className="font-mono font-bold text-text-secondary">{f.rank}</span>
                     </td>
                     <td className="px-5 py-3">
-                      <Link to={f.source === 'player' ? `/profile/${f.handle}` : `/forecaster/${f.id}`} className="font-medium text-sm hover:text-accent transition-colors">
-                        {f.name}
-                      </Link>
-                      <PlatformBadge platform={getSourceBadgeKey(f)} showLabel />
+                      <span className="inline-flex items-center gap-1.5">
+                        <Link to={f.source === 'player' ? `/profile/${f.handle}` : `/forecaster/${f.id}`} className="font-medium text-sm hover:text-accent transition-colors">
+                          {f.name}
+                        </Link>
+                        <PlatformBadge platform={getSourceBadgeKey(f)} showLabel />
+                      </span>
                     </td>
                     <td className="px-5 py-3 text-right">
                       <span className={`font-mono tnum font-semibold ${f.accuracy_rate >= 60 ? 'text-positive' : 'text-negative'}`}>
@@ -702,9 +709,11 @@ function WeekView({ weekData, data }) {
               <Link key={`${f.source || 'analyst'}_${f.id}`} to={f.source === 'player' ? `/profile/${f.handle}` : `/forecaster/${f.id}`}
                 className="card py-3 flex items-center justify-between hover:border-accent/20 transition-colors">
                 <div>
-                  <span className="text-sm font-medium">{f.name}</span>
-                  <PlatformBadge platform={getSourceBadgeKey(f)} showLabel />
-                  <span className="text-muted text-xs ml-1.5 font-mono">({(f.alltime_accuracy || 0).toFixed(0)}% acc)</span>
+                  <span className="inline-flex items-center gap-1.5">
+                    <span className="text-sm font-medium">{f.name}</span>
+                    <PlatformBadge platform={getSourceBadgeKey(f)} showLabel />
+                  </span>
+                  <span className="text-muted text-xs ml-3 font-mono">({(f.alltime_accuracy || 0).toFixed(0)}% acc)</span>
                 </div>
                 <span className="font-mono text-accent text-sm font-semibold">{f.new_predictions} new</span>
               </Link>
