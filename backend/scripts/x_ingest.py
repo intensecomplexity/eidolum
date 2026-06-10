@@ -297,7 +297,9 @@ def main(commit):
     inserted = {h: 0 for h in HANDLES}; errors = 0
     for r in would:
         try:
-            ok = _insert_prediction(db, r["ticker"], r["direction"], r["target"], r["tf_days"],
+            # r["window"] carries the type-specific horizon (price_target=tf_days,
+            # position_disclosure=365, vibes=30) exactly as the x_scraper run loop sets it.
+            ok = _insert_prediction(db, r["ticker"], r["direction"], r["target"], r["window"],
                                     r["handle"], r["body"], r["tid"], r["url"], r["date"],
                                     prediction_type=r["kind"] if r["kind"] != "price_target" else "price_target",
                                     position_action=r["paction"], confidence_tier=r["conf"])
