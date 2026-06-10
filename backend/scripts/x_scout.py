@@ -429,6 +429,33 @@ def main(live):
         if ok:
             would_promote.append((h, m))
 
+    # ---- carry over would-promotes from earlier runs ----
+    # A handle probed in a prior dry-run (or before a crash) sits at status=
+    # "probed" with would_promote=true; discover() only yields "candidate"s,
+    # so without this it would never reach the promote phase. Re-fetch a probe-
+    # depth window (claude classifications are CLASS_CKPT-cached — only Apify
+    # cost) and feed it into the same promote path.
+    carried = [h for h, rec in state["handles"].items()
+               if rec.get("status") == "probed" and rec.get("would_promote")
+               and h not in {x for x, _ in would_promote}]
+    for h in carried:
+        if budget_left(state) <= PROBE_DEPTH * APIFY_PER_TWEET:
+            print("  budget cap — stopping carry-over re-fetch", flush=True); break
+        items, _ = apify_run({"twitterHandles": [h], "maxItems": PROBE_DEPTH, "sort": "Latest"}, PROBE_DEPTH, state)
+        tweets = [trim(t) for t in items]
+        surv = [(t["id"], t["body"]) for t in tweets if t["id"] and prefilter(t["body"] or "", t["is_rt"])[0]]
+        cc = classify_survivors(surv)
+        rows = []
+        for t in tweets:
+            cl = cc.get(t["id"])
+            if not cl or not cl.get("is_prediction"):
+                continue
+            ok, _ = validate_haiku_result(cl, t["body"] or "")
+            if ok:
+                rows.append((t, cl))
+        would_promote.append((h, {"rows": rows}))
+        print(f"  carried-over would-promote @{h}: {len(rows)} call tweets", flush=True)
+
     # ---- PROMOTE + ingest newly-promoted (reuse probe fetch; no new spend) ----
     # Reopen the DB: the probe phase can run ~1h with no DB activity, during which
     # the public-proxy SSL connection goes stale (a long-held Session isn't saved
