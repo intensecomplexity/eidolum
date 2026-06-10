@@ -10,26 +10,8 @@
     <priority>0.9</priority>
     <changefreq>daily</changefreq>
   </url>
-  <url>
-    <loc>https://www.eidolum.com/platforms</loc>
-    <priority>0.8</priority>
-    <changefreq>weekly</changefreq>
-  </url>
-  <url>
-    <loc>https://www.eidolum.com/platforms/youtube</loc>
-    <priority>0.7</priority>
-    <changefreq>weekly</changefreq>
-  </url>
-  <url>
-    <loc>https://www.eidolum.com/platforms/twitter</loc>
-    <priority>0.7</priority>
-    <changefreq>weekly</changefreq>
-  </url>
-  <url>
-    <loc>https://www.eidolum.com/platforms/congress</loc>
-    <priority>0.7</priority>
-    <changefreq>weekly</changefreq>
-  </url>
+  <!-- /platforms URLs removed while SHOW_PLATFORM_PAGES=false
+       (frontend/src/config/uiSwitches.js) — restore together with the switch. -->
   <url>
     <loc>https://www.eidolum.com/saved</loc>
     <priority>0.6</priority>
