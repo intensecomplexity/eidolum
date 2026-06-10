@@ -87,6 +87,7 @@ const FirmProfile            = lazy(() => import('./pages/FirmProfile'));
 
 import { useAuth } from './context/AuthContext';
 import { useFeatures } from './context/FeatureContext';
+import usePresenceHeartbeat from './hooks/usePresenceHeartbeat';
 import { CompareProvider } from './context/CompareContext';
 import { SubscriptionsProvider } from './context/SubscriptionsContext';
 
@@ -123,6 +124,7 @@ function RouteFallback() {
 export default function App() {
   const { isAuthenticated } = useAuth();
   const features = useFeatures();
+  usePresenceHeartbeat();
   const [showOnboarding, setShowOnboarding] = useState(() => {
     return !localStorage.getItem('eidolum_token') && !localStorage.getItem('eidolum_onboarding_complete');
   });
