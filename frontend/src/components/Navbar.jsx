@@ -255,6 +255,9 @@ export default function Navbar() {
                         <DropdownItem to="/saved" icon={Bookmark} label="Saved Predictions" onClick={() => setUserDropdown(false)} />
                         <DropdownItem to="/profile" icon={CircleUser} label="Profile" onClick={() => setUserDropdown(false)} />
                         <DropdownItem to="/settings" icon={Settings} label="Settings" onClick={() => setUserDropdown(false)} />
+                        {user?.is_admin && (
+                          <DropdownItem to="/admin/dashboard" icon={Wrench} label="Admin" onClick={() => setUserDropdown(false)} />
+                        )}
                       </div>
                       <div className="border-t border-border py-1">
                         <button onClick={() => { setUserDropdown(false); logout(); navigate('/'); }}

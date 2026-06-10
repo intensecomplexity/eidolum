@@ -114,10 +114,10 @@ export default function ProductThemesPanel({ showToast }) {
             </button>
             <div className="flex items-center gap-2">
               <button onClick={() => toggleActive(t)}
-                className="px-2 py-1 rounded text-xs border border-border text-text-secondary">
+                className="px-2.5 py-2 min-h-[40px] rounded text-xs border border-border text-text-secondary">
                 {t.is_active ? 'Deactivate' : 'Activate'}
               </button>
-              <button onClick={() => deleteTheme(t)} className="p-1.5 rounded text-negative border border-border">
+              <button onClick={() => deleteTheme(t)} className="p-2.5 min-h-[40px] rounded text-negative border border-border">
                 <Trash2 className="w-3.5 h-3.5" />
               </button>
             </div>
