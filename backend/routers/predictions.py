@@ -6,7 +6,9 @@ from database import get_db
 from models import Prediction, Forecaster
 from utils import append_youtube_timestamp
 from services.prediction_visibility import yt_visible_filter
-from routers._prediction_filters import hedged_filter_clause, reported_speech_filter_clause
+from routers._prediction_filters import (
+    hedged_filter_clause, reported_speech_filter_clause, weak_basket_filter_clause,
+)
 from rate_limit import limiter
 
 router = APIRouter()
@@ -24,6 +26,9 @@ _HEDGED = hedged_filter_clause(Prediction.conviction_level)
 # Reported-speech filter (2026-06-02 audit). No-op when
 # HIDE_REPORTED_SPEECH is off. Chained alongside _HEDGED at each call site.
 _NOT_REPORTED = reported_speech_filter_clause(Prediction.is_reported_speech)
+# Weak-basket filter (2026-06-10 audit). No-op when
+# HIDE_WEAK_BASKET_CALLS is off. Chained alongside _HEDGED at each call site.
+_NOT_WEAK_BASKET = weak_basket_filter_clause(Prediction.is_weak_basket_call)
 
 
 @router.get("/predictions/today")
@@ -38,6 +43,7 @@ def get_today_predictions(request: Request, db: Session = Depends(get_db)):
         .filter(_VISIBLE)
         .filter(_HEDGED)
         .filter(_NOT_REPORTED)
+        .filter(_NOT_WEAK_BASKET)
         .order_by(Prediction.prediction_date.desc())
         .limit(5)
         .all()
@@ -50,6 +56,7 @@ def get_today_predictions(request: Request, db: Session = Depends(get_db)):
             .filter(_VISIBLE)
             .filter(_HEDGED)
             .filter(_NOT_REPORTED)
+            .filter(_NOT_WEAK_BASKET)
             .order_by(Prediction.prediction_date.desc())
             .limit(5)
             .all()
@@ -87,7 +94,7 @@ def get_recent_predictions(
     db: Session = Depends(get_db),
 ):
     """Get all recent predictions, paginated, newest first."""
-    query = db.query(Prediction).filter(_VISIBLE).filter(_HEDGED).filter(_NOT_REPORTED)
+    query = db.query(Prediction).filter(_VISIBLE).filter(_HEDGED).filter(_NOT_REPORTED).filter(_NOT_WEAK_BASKET)
 
     if ticker:
         query = query.filter(Prediction.ticker == ticker.upper())
