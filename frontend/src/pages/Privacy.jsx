@@ -103,7 +103,7 @@ export default function Privacy() {
           </ul>
           <p className="text-sm text-text-secondary leading-relaxed mt-3">
             To exercise any of these, email{' '}
-            <a href="mailto:privacy@eidolum.com" className="text-accent">privacy@eidolum.com</a>.
+            <a href="mailto:nimrodryder@gmail.com" className="text-accent">nimrodryder@gmail.com</a>.
             We respond within 30 days.
           </p>
         </section>
@@ -166,7 +166,7 @@ export default function Privacy() {
             <strong>Refresh, deletion, and revocation.</strong> Stored YouTube API
             data is refreshed or deleted on a rolling 30-day basis. To request
             deletion of data we obtained via YouTube API Services, email{' '}
-            <a href="mailto:privacy@eidolum.com" className="text-accent">privacy@eidolum.com</a>{' '}
+            <a href="mailto:nimrodryder@gmail.com" className="text-accent">nimrodryder@gmail.com</a>{' '}
             — emailing us is the deletion mechanism, and we respond within 30 days.
             You can also review and revoke any access you have granted to third-party
             applications (including via your Google account) at the{' '}
@@ -188,7 +188,7 @@ export default function Privacy() {
             The Service is not directed to children under 13 and we do not knowingly
             collect personal data from them. If you believe a child has provided us
             personal data, email{' '}
-            <a href="mailto:privacy@eidolum.com" className="text-accent">privacy@eidolum.com</a>
+            <a href="mailto:nimrodryder@gmail.com" className="text-accent">nimrodryder@gmail.com</a>
             {' '}and we'll delete it.
           </p>
         </section>
@@ -205,10 +205,8 @@ export default function Privacy() {
         <section>
           <h2 className="font-bold text-lg mb-3">11. Contact</h2>
           <p className="text-sm text-text-secondary leading-relaxed">
-            Privacy questions:{' '}
-            <a href="mailto:privacy@eidolum.com" className="text-accent">privacy@eidolum.com</a>.
-            General inquiries:{' '}
-            <a href="mailto:hello@eidolum.com" className="text-accent">hello@eidolum.com</a>.
+            Privacy questions and general inquiries:{' '}
+            <a href="mailto:nimrodryder@gmail.com" className="text-accent">nimrodryder@gmail.com</a>.
           </p>
         </section>
       </div>

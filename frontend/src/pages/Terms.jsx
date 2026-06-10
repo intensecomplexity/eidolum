@@ -169,7 +169,7 @@ export default function Terms() {
           <h2 className="font-bold text-lg mb-3">13. Contact</h2>
           <p className="text-sm text-text-secondary leading-relaxed">
             Questions about these Terms? Email{' '}
-            <a href="mailto:hello@eidolum.com" className="text-accent">hello@eidolum.com</a>.
+            <a href="mailto:nimrodryder@gmail.com" className="text-accent">nimrodryder@gmail.com</a>.
           </p>
         </section>
       </div>

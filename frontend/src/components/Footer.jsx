@@ -57,7 +57,7 @@ export default function Footer() {
             <FLink to="/terms">Terms</FLink>
             <FLink to="/privacy">Privacy</FLink>
             <a
-              href="mailto:hello@eidolum.com"
+              href="mailto:nimrodryder@gmail.com"
               className="text-xs text-text-secondary hover:text-accent transition-colors"
             >
               Contact
