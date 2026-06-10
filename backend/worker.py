@@ -2,6 +2,7 @@
 Eidolum Background Worker
 Runs all scheduled jobs independently from the API server.
 Deploy as a separate Railway service so API pushes don't restart jobs.
+Redeploy trigger 2026-06-10: pick up crypto_prices.py PEPE/WIF/TAO/HYPE/CORE additions.
 
 Start: python worker.py
 Health: GET http://localhost:$PORT/health
