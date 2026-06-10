@@ -1049,14 +1049,20 @@ def get_leaderboard(
     has_filter = sector or call_type or direction or timeframe or source or (sort and sort != "accuracy") or (min_predictions and min_predictions > 10)
     if has_filter:
         cache_key = f"{sector}|{call_type}|{sort}|{limit}|{min_predictions}|{direction}|{timeframe}|{source}"
-        # YouTube has too few forecasters to hide dormant ones — show all.
-        _include_dormant = include_dormant or source == "youtube"
+        # YouTube and X have too few forecasters to hide dormant ones — show all.
+        _include_dormant = include_dormant or source in ("youtube", "x")
 
         cached = _filtered_cache.get(cache_key)
         if cached and (_time.time() - cached[1]) < FILTERED_CACHE_TTL:
             return _apply_dormancy(db, list(cached[0]), _include_dormant)[:limit]
 
-        min_preds = min_predictions or (10 if sector or call_type or timeframe or source else 35)
+        # X went live 2026-06-10: the cohort is brand-new and most of its
+        # predictions are still pending evaluation, so a 10-scored-preds
+        # floor guarantees an empty tab. Floor at 1 until coverage builds.
+        min_preds = min_predictions or (
+            1 if source == "x"
+            else 10 if sector or call_type or timeframe or source
+            else 35)
         results = _build_filtered_leaderboard(
             db, sector=sector, call_type=call_type, sort=sort or "accuracy",
             limit=limit, min_predictions=min_preds, direction=direction,
