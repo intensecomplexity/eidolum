@@ -39,7 +39,7 @@ export default function LivePresencePanel() {
 
       {data && (
         <>
-          <div className="flex items-baseline gap-3">
+          <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
             <div className="text-3xl font-bold text-text-primary tabular-nums">
               {data.online_total.toLocaleString()}
             </div>

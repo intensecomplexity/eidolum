@@ -64,27 +64,27 @@ export default function AdminDashboard() {
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-1 mb-6 overflow-x-auto pills-scroll">
+      <div className="flex flex-wrap gap-1.5 mb-6">
         {TABS.map(t => (
           <button key={t} onClick={() => setTab(t)}
-            className={`px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-colors ${
+            className={`px-4 py-2 min-h-[40px] rounded-lg text-sm font-medium whitespace-nowrap transition-colors ${
               tab === t ? 'bg-accent/10 text-accent border border-accent/20' : 'text-text-secondary border border-border'
             }`}>{t}</button>
         ))}
         <Link to="/admin/x-accounts"
-          className="px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap text-text-secondary border border-border hover:text-accent transition-colors">
+          className="px-4 py-2 min-h-[40px] inline-flex items-center rounded-lg text-sm font-medium whitespace-nowrap text-text-secondary border border-border hover:text-accent transition-colors">
           X Accounts
         </Link>
         <Link to="/admin/youtube-channels"
-          className="px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap text-text-secondary border border-border hover:text-accent transition-colors">
+          className="px-4 py-2 min-h-[40px] inline-flex items-center rounded-lg text-sm font-medium whitespace-nowrap text-text-secondary border border-border hover:text-accent transition-colors">
           YouTube Channels
         </Link>
         <Link to="/admin/sector-aliases"
-          className="px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap text-text-secondary border border-border hover:text-accent transition-colors">
+          className="px-4 py-2 min-h-[40px] inline-flex items-center rounded-lg text-sm font-medium whitespace-nowrap text-text-secondary border border-border hover:text-accent transition-colors">
           Sector Aliases
         </Link>
         <Link to="/admin/macro-concepts"
-          className="px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap text-text-secondary border border-border hover:text-accent transition-colors">
+          className="px-4 py-2 min-h-[40px] inline-flex items-center rounded-lg text-sm font-medium whitespace-nowrap text-text-secondary border border-border hover:text-accent transition-colors">
           Macro Concepts
         </Link>
       </div>
@@ -1139,8 +1139,8 @@ function UsersTab({ showToast, isSuperAdmin }) {
         <button onClick={load} className="text-muted"><RefreshCw className="w-4 h-4" /></button>
       </div>
 
-      <div className="bg-surface border border-border rounded-xl overflow-x-auto">
-        <table className="w-full text-sm">
+      <ScrollTable>
+        <table className="w-full min-w-[640px] text-sm">
           <thead>
             <tr className="text-left text-muted text-[10px] uppercase tracking-wider border-b border-border">
               <th className="px-3 py-2">ID</th>
@@ -1187,7 +1187,7 @@ function UsersTab({ showToast, isSuperAdmin }) {
             ))}
           </tbody>
         </table>
-      </div>
+      </ScrollTable>
       {users && <Paginator page={page} totalPages={users.total_pages} setPage={setPage} total={users.total} />}
     </div>
   );
@@ -1220,8 +1220,8 @@ function ForecastersTab({ showToast }) {
         </div>
       </div>
 
-      <div className="bg-surface border border-border rounded-xl overflow-x-auto">
-        <table className="w-full text-sm">
+      <ScrollTable>
+        <table className="w-full min-w-[640px] text-sm">
           <thead>
             <tr className="text-left text-muted text-[10px] uppercase tracking-wider border-b border-border">
               <th className="px-3 py-2">ID</th>
@@ -1249,7 +1249,7 @@ function ForecastersTab({ showToast }) {
             ))}
           </tbody>
         </table>
-      </div>
+      </ScrollTable>
       {data && <Paginator page={page} totalPages={data.total_pages} setPage={setPage} total={data.total} />}
     </div>
   );
@@ -1282,8 +1282,8 @@ function PredictionsTab({ showToast }) {
         </div>
       </div>
 
-      <div className="bg-surface border border-border rounded-xl overflow-x-auto">
-        <table className="w-full text-sm">
+      <ScrollTable>
+        <table className="w-full min-w-[640px] text-sm">
           <thead>
             <tr className="text-left text-muted text-[10px] uppercase tracking-wider border-b border-border">
               <th className="px-3 py-2">ID</th>
@@ -1315,7 +1315,7 @@ function PredictionsTab({ showToast }) {
             ))}
           </tbody>
         </table>
-      </div>
+      </ScrollTable>
       {data && <Paginator page={page} totalPages={data.total_pages} setPage={setPage} total={data.total} />}
     </div>
   );
@@ -1357,8 +1357,8 @@ function AuditTab() {
 
   return (
     <div>
-      <div className="bg-surface border border-border rounded-xl overflow-x-auto">
-        <table className="w-full text-sm">
+      <ScrollTable>
+        <table className="w-full min-w-[640px] text-sm">
           <thead>
             <tr className="text-left text-muted text-[10px] uppercase tracking-wider border-b border-border">
               <th className="px-3 py-2">Time</th>
@@ -1382,8 +1382,24 @@ function AuditTab() {
             ))}
           </tbody>
         </table>
-      </div>
+      </ScrollTable>
       <Paginator page={page} totalPages={data.total_pages} setPage={setPage} total={data.total} />
+    </div>
+  );
+}
+
+
+// Wrapper for the wide admin data tables. The table keeps a real min-width
+// and scrolls sideways INSIDE the card; on phones a visible "swipe" hint
+// replaces the auto-hidden scrollbar so the extra columns are discoverable
+// instead of silently clipped. Desktop (sm+) renders exactly as before.
+function ScrollTable({ children }) {
+  return (
+    <div className="bg-surface border border-border rounded-xl overflow-hidden">
+      <div className="sm:hidden flex items-center justify-end gap-1 px-3 py-1.5 text-[10px] uppercase tracking-wider text-muted border-b border-border/50">
+        swipe for all columns <ChevronRight className="w-3 h-3" />
+      </div>
+      <div className="overflow-x-auto">{children}</div>
     </div>
   );
 }
@@ -1394,12 +1410,12 @@ function Paginator({ page, totalPages, setPage, total }) {
   return (
     <div className="flex items-center justify-center gap-4 mt-4">
       <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page <= 1}
-        className="inline-flex items-center gap-1 text-sm text-accent disabled:text-muted">
+        className="inline-flex items-center gap-1 px-3 py-2 min-h-[40px] text-sm text-accent disabled:text-muted">
         <ChevronLeft className="w-4 h-4" /> Prev
       </button>
       <span className="text-muted text-sm font-mono">{page} / {totalPages} ({total})</span>
       <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page >= totalPages}
-        className="inline-flex items-center gap-1 text-sm text-accent disabled:text-muted">
+        className="inline-flex items-center gap-1 px-3 py-2 min-h-[40px] text-sm text-accent disabled:text-muted">
         Next <ChevronRight className="w-4 h-4" />
       </button>
     </div>
@@ -1516,8 +1532,8 @@ function TrainingExclusionsTab({ showToast }) {
       </div>
 
       {/* Recent table */}
-      <div className="bg-surface border border-border rounded-xl overflow-x-auto">
-        <table className="w-full text-sm">
+      <ScrollTable>
+        <table className="w-full min-w-[640px] text-sm">
           <thead>
             <tr className="text-left text-muted text-[10px] uppercase tracking-wider border-b border-border">
               <th className="px-3 py-2">ID</th>
@@ -1569,7 +1585,7 @@ function TrainingExclusionsTab({ showToast }) {
             )}
           </tbody>
         </table>
-      </div>
+      </ScrollTable>
     </div>
   );
 }
