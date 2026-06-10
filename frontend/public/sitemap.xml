@@ -10,8 +10,8 @@
     <priority>0.9</priority>
     <changefreq>daily</changefreq>
   </url>
-  <!-- /platforms URLs removed while SHOW_PLATFORM_PAGES=false
-       (frontend/src/config/uiSwitches.js) — restore together with the switch. -->
+  <!-- Entries removed while SHOW_PLATFORM_PAGES=false
+       (frontend/src/config/uiSwitches.js); restore together with the switch. -->
   <url>
     <loc>https://www.eidolum.com/saved</loc>
     <priority>0.6</priority>
