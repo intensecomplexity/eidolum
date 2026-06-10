@@ -7,6 +7,7 @@ import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianG
 import PredictionBadge from '../components/PredictionBadge';
 import ConflictBadge from '../components/ConflictBadge';
 import YouTubeMetricsDisclaimer from '../components/YouTubeMetricsDisclaimer';
+import { SHOW_PLATFORM_PAGES } from '../config/uiSwitches';
 import DisclosedPositions from '../components/DisclosedPositions';
 import PlatformBadge from '../components/PlatformBadge';
 import { getSourceBadgeKey } from '../utils/getSourceBadgeKey';
@@ -156,21 +157,24 @@ export default function ForecasterProfile() {
     fetchFn()
       .then((d) => {
         setData(d);
-        // Fetch platform ranking
-        const pid = PLATFORM_ID_MAP[d.platform] || d.platform;
-        getPlatformDetail(pid)
-          .then((pd) => {
-            const entry = pd.leaderboard?.find(f => f.id === d.id);
-            if (entry) {
-              setPlatformInfo({
-                platformId: pid,
-                platformName: pd.name,
-                platformRank: entry.platform_rank,
-                totalOnPlatform: pd.forecaster_count,
-              });
-            }
-          })
-          .catch(() => {});
+        // Fetch platform ranking — only when the platform pages are visible;
+        // the rank badge links there and must not render (or fetch) otherwise.
+        if (SHOW_PLATFORM_PAGES) {
+          const pid = PLATFORM_ID_MAP[d.platform] || d.platform;
+          getPlatformDetail(pid)
+            .then((pd) => {
+              const entry = pd.leaderboard?.find(f => f.id === d.id);
+              if (entry) {
+                setPlatformInfo({
+                  platformId: pid,
+                  platformName: pd.name,
+                  platformRank: entry.platform_rank,
+                  totalOnPlatform: pd.forecaster_count,
+                });
+              }
+            })
+            .catch(() => {});
+        }
         // Fetch report card
         getReportCards()
           .then((rc) => {
@@ -346,7 +350,7 @@ export default function ForecasterProfile() {
                   </Link>
                 </div>
               )}
-              {platformInfo && (
+              {SHOW_PLATFORM_PAGES && platformInfo && (
                 <Link
                   to={`/platforms/${platformInfo.platformId}`}
                   className="inline-flex items-center gap-1.5 text-sm text-text-secondary hover:text-accent transition-colors mt-2"

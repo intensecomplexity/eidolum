@@ -17,6 +17,7 @@ import OnboardingOverlay from './components/OnboardingOverlay';
 import VaultDoorSplash from './components/VaultDoorSplash';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { ScrollToTop } from './components/ScrollToTop';
+import { SHOW_PLATFORM_PAGES } from './config/uiSwitches';
 import LoadingSpinner from './components/LoadingSpinner';
 import Landing from './pages/Landing';
 import LandingPublic from './pages/LandingPublic';
@@ -150,8 +151,14 @@ export default function App() {
         <Route path="/home" element={<Landing />} />
         <Route path="/leaderboard" element={<Leaderboard />} />
         <Route path="/leaderboard/report-cards" element={<ReportCards />} />
-        <Route path="/platforms" element={<Platforms />} />
-        <Route path="/platforms/:platformId" element={<PlatformDetail />} />
+        {SHOW_PLATFORM_PAGES ? (
+          <>
+            <Route path="/platforms" element={<Platforms />} />
+            <Route path="/platforms/:platformId" element={<PlatformDetail />} />
+          </>
+        ) : (
+          <Route path="/platforms/*" element={<Navigate to="/leaderboard" replace />} />
+        )}
         <Route path="/forecaster/:id" element={<ForecasterProfile />} />
         <Route path="/analyst/:slug" element={<ForecasterProfile />} />
         <Route path="/asset/:ticker" element={<TickerDetail />} />

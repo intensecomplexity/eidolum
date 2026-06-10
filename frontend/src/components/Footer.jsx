@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import EidolumLogo from './EidolumLogo';
 import { useAuth } from '../context/AuthContext';
+import { SHOW_PLATFORM_PAGES } from '../config/uiSwitches';
 
 function FLink({ to, children }) {
   return (
@@ -52,7 +53,7 @@ export default function Footer() {
               redirects there). /platforms shows the data sources we track. */}
           <Column title="Trust">
             <FLink to="/how-it-works">How It Works</FLink>
-            <FLink to="/platforms">Platforms</FLink>
+            {SHOW_PLATFORM_PAGES && <FLink to="/platforms">Platforms</FLink>}
             <FLink to="/terms">Terms</FLink>
             <FLink to="/privacy">Privacy</FLink>
             <a
