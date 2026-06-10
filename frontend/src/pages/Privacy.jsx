@@ -14,7 +14,7 @@ export default function Privacy() {
     <div>
       <div className="max-w-3xl mx-auto px-4 sm:px-6 py-10 sm:py-16">
         <h1 className="font-bold text-2xl sm:text-3xl mb-2">Privacy Policy</h1>
-        <p className="text-text-secondary text-xs mb-8">Last updated: June 2, 2026</p>
+        <p className="text-text-secondary text-xs mb-8">Last updated: June 10, 2026</p>
 
         <section className="mb-8">
           <p className="text-text-secondary text-sm leading-relaxed">
@@ -41,10 +41,16 @@ export default function Privacy() {
             on your profile.
           </p>
           <p className="text-sm text-text-secondary leading-relaxed">
-            <strong>Cookies.</strong> We use first-party cookies for authentication and
-            preference storage. We may use a small number of strictly-necessary
-            third-party cookies (e.g., for sign-in via OAuth providers). We do not run
-            advertising trackers.
+            <strong>Cookies &amp; device storage.</strong> We store data in your
+            browser's localStorage and sessionStorage. This is limited to: (1)
+            authentication and session data (your sign-in token and basic account
+            info, so you stay signed in); (2) interface preferences (your theme
+            choice, dismissed banners, and onboarding state); and (3) cached
+            application data (your follows, watchlist, and saved predictions, so
+            pages load faster). Third-party providers may set strictly-necessary
+            cookies during sign-in (e.g., Google OAuth). We do not run advertising
+            trackers or third-party analytics, and we do not use cookies or device
+            storage to track you across other sites.
           </p>
         </section>
 
@@ -122,7 +128,62 @@ export default function Privacy() {
         </section>
 
         <section className="mb-8">
-          <h2 className="font-bold text-lg mb-3">8. Children</h2>
+          <h2 className="font-bold text-lg mb-3">8. YouTube API Services</h2>
+          <p className="text-sm text-text-secondary leading-relaxed mb-3">
+            Eidolum uses YouTube API Services. In addition to this policy, Google's
+            handling of data is described in the{' '}
+            <a
+              href="http://www.google.com/policies/privacy"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-accent"
+            >
+              Google Privacy Policy
+            </a>{' '}
+            (http://www.google.com/policies/privacy).
+          </p>
+          <p className="text-sm text-text-secondary leading-relaxed mb-3">
+            <strong>What we access, collect, and store.</strong> Through YouTube API
+            Services we access, collect, and store public channel metadata (channel
+            name, channel ID, and handle) and public video metadata (video ID, title,
+            and publish date) from the channels we track. We use this data to
+            attribute public market predictions to the creators who made them and to
+            display accuracy statistics for those predictions.
+          </p>
+          <p className="text-sm text-text-secondary leading-relaxed mb-3">
+            <strong>How it is used, processed, and shared.</strong> This data is
+            displayed publicly on eidolum.com as part of forecaster profiles and
+            leaderboards. It is processed on the infrastructure providers we use to
+            run the Service (hosting and database). It is not sold, and it is not
+            shared with third parties beyond those infrastructure processors.
+          </p>
+          <p className="text-sm text-text-secondary leading-relaxed mb-3">
+            <strong>No private YouTube data.</strong> Eidolum does not request or
+            access private or authorized YouTube user data. We do not ask you to
+            connect a YouTube or Google account, and we only process public metadata.
+          </p>
+          <p className="text-sm text-text-secondary leading-relaxed">
+            <strong>Refresh, deletion, and revocation.</strong> Stored YouTube API
+            data is refreshed or deleted on a rolling 30-day basis. To request
+            deletion of data we obtained via YouTube API Services, email{' '}
+            <a href="mailto:privacy@eidolum.com" className="text-accent">privacy@eidolum.com</a>{' '}
+            — emailing us is the deletion mechanism, and we respond within 30 days.
+            You can also review and revoke any access you have granted to third-party
+            applications (including via your Google account) at the{' '}
+            <a
+              href="https://myaccount.google.com/connections?filters=3,4"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-accent"
+            >
+              Google security settings page
+            </a>{' '}
+            (https://myaccount.google.com/connections?filters=3,4).
+          </p>
+        </section>
+
+        <section className="mb-8">
+          <h2 className="font-bold text-lg mb-3">9. Children</h2>
           <p className="text-sm text-text-secondary leading-relaxed">
             The Service is not directed to children under 13 and we do not knowingly
             collect personal data from them. If you believe a child has provided us
@@ -133,7 +194,7 @@ export default function Privacy() {
         </section>
 
         <section className="mb-8">
-          <h2 className="font-bold text-lg mb-3">9. Changes to this policy</h2>
+          <h2 className="font-bold text-lg mb-3">10. Changes to this policy</h2>
           <p className="text-sm text-text-secondary leading-relaxed">
             We may update this policy. Material changes will be announced on the
             Service or via email. The "Last updated" date above always reflects the
@@ -142,7 +203,7 @@ export default function Privacy() {
         </section>
 
         <section>
-          <h2 className="font-bold text-lg mb-3">10. Contact</h2>
+          <h2 className="font-bold text-lg mb-3">11. Contact</h2>
           <p className="text-sm text-text-secondary leading-relaxed">
             Privacy questions:{' '}
             <a href="mailto:privacy@eidolum.com" className="text-accent">privacy@eidolum.com</a>.
