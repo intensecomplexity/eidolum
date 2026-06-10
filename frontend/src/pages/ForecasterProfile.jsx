@@ -314,17 +314,15 @@ export default function ForecasterProfile() {
         <div className="card mb-6 sm:mb-8">
           <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 sm:gap-6">
             <div>
-              <div className="flex items-center gap-2 sm:gap-3 mb-1 flex-wrap">
+              <div className="mb-1">
                 <div className="text-[10px] text-accent/60 uppercase tracking-widest font-mono mb-0.5">The Vault</div>
-                {/* Name + platform badge form ONE visual unit so the badge
-                    labels the forecaster's identity, clearly apart from the
-                    metric tiles to the right. Action buttons sit in their
-                    own cluster with extra separation. */}
-                <span className="inline-flex items-center gap-2 sm:gap-2.5 flex-wrap">
-                  <h1 className="headline-serif" style={{ fontSize: 'clamp(24px, 5vw, 36px)' }}>{data.name}</h1>
-                  {/* PlatformBadge — when the source has a public channel
-                      URL (YouTube / X / Reddit), wrap the badge in an
-                      external link so the pill itself opens the channel. */}
+                <h1 className="headline-serif" style={{ fontSize: 'clamp(24px, 5vw, 36px)' }}>{data.name}</h1>
+                {/* Identity label: the platform badge sits alone directly
+                    under the name so it reads as part of the forecaster's
+                    identity, clearly apart from the metric tiles and the
+                    action buttons. When the source has a public channel URL
+                    (YouTube / X / Reddit) the badge links to the channel. */}
+                <div className="mt-1.5">
                   {data.channel_url ? (
                     <a
                       href={data.channel_url}
@@ -339,12 +337,12 @@ export default function ForecasterProfile() {
                   ) : (
                     <PlatformBadge platform={getSourceBadgeKey(data)} size={20} showLabel />
                   )}
-                </span>
-                <span className="inline-flex items-center gap-2 sm:gap-3 sm:ml-2">
+                </div>
+                <div className="flex items-center gap-2 sm:gap-3 flex-wrap mt-2.5">
                   <StreakBadge streak={data.streak} />
                   <FollowButton forecaster={data} />
                   <CompareButton forecaster={data} />
-                </span>
+                </div>
               </div>
               {/* Wall Street firm link — institutional sources only. The
                   former YouTube/X/Reddit "external link" row was deleted
