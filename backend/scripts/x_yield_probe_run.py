@@ -41,7 +41,12 @@ PER_ACCOUNT = 40
 APIFY_PER_TWEET = 0.0004          # measured in pre-flight
 FETCH_WORKERS = 8
 BATCH_SIZE = 20                   # tweets per claude -p call
-CLAUDE_MODEL = "sonnet"
+# haiku since 2026-06-10: X tweets are short/structural enough that Haiku
+# matches Sonnet on the gated eval (recall 96.7%, ticker+direction agreement
+# 91.4%, skip 85% on a 60/60 cached-Sonnet ground-truth sample). Requires
+# X_ADDENDUM below; do not flip the model without re-running the recall
+# gate (>=95% recall, >=90% agreement).
+CLAUDE_MODEL = "haiku"
 CLAUDE_TIMEOUT = 600
 CC_CWD = "/tmp/x_probe_cc_cwd"    # empty dir => no CLAUDE.md picked up
 USAGE_BACKOFF = 600
@@ -85,12 +90,37 @@ def _subprocess_env():
     return env
 
 
+# Appended AFTER HAIKU_SYSTEM (additive — never edit HAIKU_SYSTEM in place).
+# Closes Haiku's gaps on X phrasing: imperative calls, option-position
+# disclosures, conditional calls, and direction flips on negated phrasing.
+# Eval-gated 2026-06-10; without it Haiku recall was 93.3% (below the gate).
+X_ADDENDUM = """
+=== X/TWITTER ADDENDUM (additive — all rules above still apply) ===
+Tweets are terse. The following ALL count as predictions (is_prediction=true):
+- IMPERATIVE calls with a ticker: "buy the dip $SPY", "load up on $X", "sell $Y here".
+- POSITION DISCLOSURES, including options: "sold one $AMZN call", "long $BTC",
+  "$ETH long taken", entry/TP/SL setups, leverage trades. Direction = the position's
+  market view (long/calls/buying = bullish; short/puts/selling = bearish; SELLING a
+  call you hold = closing = follow the stated sentiment, default bullish exit -> use
+  the tweet's overall stance).
+- CONDITIONAL calls: "if $SPY loses 745, expect selling" -> is_prediction=true with
+  the direction of the PREDICTED CONSEQUENCE (here bearish).
+- LEVEL calls with a stated stance: "this level has to hold" + a downside warning ->
+  the warned direction.
+DIRECTION CARE: re-read negations and conditionals before assigning direction; the
+direction is what the author expects PRICE to do, not the emotional tone. For
+multi-ticker tweets, pick the ticker the call is actually about (the one carrying the
+price/level/position); if the call applies equally to two index tickers, pick the first.
+When a tweet is a borderline call-vs-commentary case, lean is_prediction=true.
+"""
+
+
 def build_batch_prompt(items):
-    """items: list of (tweet_id, text). Uses production HAIKU_SYSTEM verbatim,
-    wrapped for batch output."""
+    """items: list of (tweet_id, text). Uses production HAIKU_SYSTEM verbatim
+    plus the eval-gated X_ADDENDUM, wrapped for batch output."""
     blocks = [f"--- TWEET {tid} ---\n{txt}" for tid, txt in items]
     body = "\n\n".join(blocks)
-    return (HAIKU_SYSTEM + """
+    return (HAIKU_SYSTEM + X_ADDENDUM + """
 
 === BATCH MODE ===
 You will classify MULTIPLE tweets below. Apply the rules above to EACH tweet
