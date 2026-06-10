@@ -1342,6 +1342,28 @@ class ThemeTicker(Base):
     added_at = Column(DateTime(timezone=True), server_default=func.now())
 
 
+class PresenceSession(Base):
+    """Live-presence heartbeat row — one per active visitor session.
+
+    Anonymous visitors use a client-random session_key (sessionStorage);
+    signed-in users collapse to 'u:<user_id>' so multiple tabs of the same
+    account count once. Refreshed by POST /api/presence/ping; "online" =
+    last_seen within the last 2 minutes, computed at read time in
+    GET /api/admin/presence. No IP stored. Created in prod by migration
+    0021 (RUN_STARTUP_DDL is false there)."""
+    __tablename__ = "presence_sessions"
+
+    session_key = Column(String(64), primary_key=True)
+    user_id = Column(BigInteger, nullable=True)
+    username = Column(String(50), nullable=True)
+    is_authenticated = Column(Boolean, nullable=False, default=False,
+                              server_default="false")
+    first_seen = Column(DateTime(timezone=True), server_default=func.now(),
+                        nullable=False)
+    last_seen = Column(DateTime(timezone=True), server_default=func.now(),
+                       nullable=False, index=True)
+
+
 class YouTubeChannelMeta(Base):
     """Admin-facing metadata for YouTube channels. FK'd to forecasters so
     the admin page can tier/toggle/annotate the YouTube leaderboard without

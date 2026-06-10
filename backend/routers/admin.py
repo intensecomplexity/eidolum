@@ -1,7 +1,8 @@
 import datetime
 import json as _json
+import re as _re
 import threading
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import func, text as sql_text
@@ -12,7 +13,7 @@ from models import (
     XScraperRejection, YouTubeChannelMeta, SectorEtfAlias,
     MacroConceptAlias, Config, Theme, ThemeTicker,
 )
-from middleware.auth import require_admin, require_admin_user
+from middleware.auth import require_admin, require_admin_user, get_current_user
 from rate_limit import limiter
 
 router = APIRouter()
@@ -2215,5 +2216,136 @@ def suggest_theme_tickers(
                 "sector": r[4],
             }
             for r in rows
+        ],
+    }
+
+
+# ─────────────────────────── Live presence ───────────────────────────
+# "Who's on the site right now" for the admin Overview tab. The shared
+# store is the presence_sessions Postgres table (migration 0021) — NEVER
+# an in-process dict, which would not aggregate across Railway workers.
+# Online = last_seen within the last 2 minutes.
+
+_PRESENCE_ANON_RE = _re.compile(r"^[A-Za-z0-9_-]{8,64}$")
+_PRESENCE_UPSERT = sql_text("""
+    INSERT INTO presence_sessions
+        (session_key, user_id, username, is_authenticated, last_seen)
+    VALUES (:key, :uid, :uname, :authed, NOW())
+    ON CONFLICT (session_key) DO UPDATE SET
+        last_seen        = NOW(),
+        user_id          = EXCLUDED.user_id,
+        username         = EXCLUDED.username,
+        is_authenticated = EXCLUDED.is_authenticated
+""")
+
+
+@router.post("/presence/ping", status_code=204)
+@limiter.limit("120/minute")
+async def presence_ping(request: Request, db: Session = Depends(get_db)):
+    """Public heartbeat — NO auth required; anonymous visitors ping too.
+
+    With a valid JWT the session collapses to key 'u:<user_id>' (and any
+    anon row from before the login is deleted so the visitor flips to
+    authenticated instead of double-counting). Without one, the client's
+    random anon id from sessionStorage is the key. Always 204, even on
+    bad input or DB trouble — a failed ping must never break page load.
+    No IP is stored.
+    """
+    try:
+        try:
+            payload = await request.json()
+        except Exception:
+            payload = {}
+        anon_id = payload.get("anon_id") if isinstance(payload, dict) else None
+        if not (isinstance(anon_id, str) and _PRESENCE_ANON_RE.match(anon_id)):
+            anon_id = None
+
+        user = None
+        auth = request.headers.get("Authorization", "")
+        if auth.lower().startswith("bearer "):
+            try:
+                user = get_current_user(auth[7:].strip())
+            except Exception:
+                user = None  # expired/garbage token → treat as anonymous
+
+        if user and user.get("user_id"):
+            uid = user["user_id"]
+            uname = user.get("username")
+            if not uname:
+                row = db.execute(
+                    sql_text("SELECT username FROM users WHERE id = :uid"),
+                    {"uid": uid},
+                ).fetchone()
+                uname = row[0] if row else None
+            db.execute(_PRESENCE_UPSERT, {
+                "key": f"u:{uid}", "uid": uid, "uname": uname, "authed": True,
+            })
+            if anon_id:  # logged in mid-session — retire the anon row
+                db.execute(
+                    sql_text("DELETE FROM presence_sessions WHERE session_key = :key"),
+                    {"key": anon_id},
+                )
+        elif anon_id:
+            db.execute(_PRESENCE_UPSERT, {
+                "key": anon_id, "uid": None, "uname": None, "authed": False,
+            })
+        db.commit()
+    except Exception:
+        try:
+            db.rollback()
+        except Exception:
+            pass
+    return Response(status_code=204)
+
+
+@router.get("/admin/presence")
+@limiter.limit("60/minute")
+def admin_presence(
+    request: Request,
+    admin: bool = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    """Live presence snapshot for the admin dashboard.
+
+    Counts sessions seen in the last 2 minutes plus the active signed-in
+    usernames, most recent first. Doubles as the cleanup path: rows idle
+    for over an hour are deleted here (table stays tiny, no worker job —
+    and therefore no worker redeploy — needed).
+    """
+    db.execute(sql_text(
+        "DELETE FROM presence_sessions WHERE last_seen < NOW() - INTERVAL '1 hour'"
+    ))
+    db.commit()
+
+    counts = db.execute(sql_text("""
+        SELECT COUNT(*),
+               COUNT(*) FILTER (WHERE is_authenticated)
+        FROM presence_sessions
+        WHERE last_seen > NOW() - INTERVAL '2 minutes'
+    """)).fetchone()
+    total, authed = int(counts[0] or 0), int(counts[1] or 0)
+
+    users = db.execute(sql_text("""
+        SELECT username, last_seen,
+               EXTRACT(EPOCH FROM (NOW() - last_seen))::int AS seconds_since
+        FROM presence_sessions
+        WHERE is_authenticated
+          AND last_seen > NOW() - INTERVAL '2 minutes'
+        ORDER BY last_seen DESC
+        LIMIT 200
+    """)).fetchall()
+
+    return {
+        "online_total": total,
+        "online_authenticated": authed,
+        "online_anonymous": total - authed,
+        "window_seconds": 120,
+        "active_users": [
+            {
+                "username": r[0],
+                "last_seen": r[1].isoformat() if r[1] else None,
+                "seconds_since": int(r[2] or 0),
+            }
+            for r in users
         ],
     }
