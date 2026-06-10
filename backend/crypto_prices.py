@@ -33,6 +33,14 @@ CRYPTO_TICKERS = {
     "HBAR": "hedera-hashgraph",
     "BCH": "bitcoin-cash",
     "SAND": "the-sandbox",
+    # 2026-06-10 X-launch additions — all verified priceable on Tiingo
+    # (Polygon crypto is not authed on our key): PEPE 1124d, WIF 859d,
+    # TAO 694d, HYPE 385d, CORE 517d of history at add time.
+    "PEPE": "pepe",
+    "WIF": "dogwifcoin",
+    "TAO": "bittensor",
+    "HYPE": "hyperliquid",
+    "CORE": "coredaoorg",
 }
 
 # Canonical human-readable name for every crypto ticker we recognize.
@@ -67,6 +75,11 @@ CRYPTO_NAMES = {
     "ARB": "Arbitrum",
     "OP": "Optimism",
     "FIL": "Filecoin",
+    "PEPE": "Pepe",
+    "WIF": "dogwifhat",
+    "TAO": "Bittensor",
+    "HYPE": "Hyperliquid",
+    "CORE": "Core DAO",
 }
 
 # Cache: {ticker: (price, timestamp)}
@@ -189,8 +202,10 @@ EQUITY_ANALYST_SOURCES = {
 
 # Coin symbols with a real equity identity (audited 2026-06-10):
 # LTC=LTC Properties, SOL=Emeren, SAND=Sandstorm Gold, BCH=Banco de
-# Chile, TRX=TRX Gold, ARB=Arbitron (historical), ATOM=Atomera.
-COLLISION_SYMBOLS = {"LTC", "SOL", "SAND", "BCH", "TRX", "ARB", "ATOM"}
+# Chile, TRX=TRX Gold, ARB=Arbitron (historical), ATOM=Atomera,
+# CORE=Core-Mark Holding (acquired 2021; 31 scored analyst rows keep
+# equity treatment via source routing).
+COLLISION_SYMBOLS = {"LTC", "SOL", "SAND", "BCH", "TRX", "ARB", "ATOM", "CORE"}
 
 # symbol -> (cutover ISO date, old identity, new identity). Rows dated
 # BEFORE the cutover belong to the old company and are flagged.
