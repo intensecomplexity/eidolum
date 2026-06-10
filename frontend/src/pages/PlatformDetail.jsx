@@ -7,6 +7,7 @@ import PlatformBadge from '../components/PlatformBadge';
 import RankBadge from '../components/RankBadge';
 import StreakBadge from '../components/StreakBadge';
 import LeaderboardCard from '../components/LeaderboardCard';
+import YouTubeMetricsDisclaimer from '../components/YouTubeMetricsDisclaimer';
 import { getPlatformDetail } from '../api';
 
 const SECTORS = ['All', 'Technology', 'Finance', 'Energy', 'Healthcare', 'Consumer', 'Index'];
@@ -118,6 +119,10 @@ export default function PlatformDetail() {
             <div className="mt-4 p-3 bg-surface-2 border border-border rounded-lg text-text-secondary text-xs leading-relaxed">
               {data.note}
             </div>
+          )}
+
+          {platformId === 'youtube' && (
+            <YouTubeMetricsDisclaimer className="mt-3" />
           )}
         </div>
 

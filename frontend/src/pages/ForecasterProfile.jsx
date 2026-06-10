@@ -6,6 +6,7 @@ import useSEO from '../hooks/useSEO';
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, ReferenceLine } from 'recharts';
 import PredictionBadge from '../components/PredictionBadge';
 import ConflictBadge from '../components/ConflictBadge';
+import YouTubeMetricsDisclaimer from '../components/YouTubeMetricsDisclaimer';
 import DisclosedPositions from '../components/DisclosedPositions';
 import PlatformBadge from '../components/PlatformBadge';
 import { getSourceBadgeKey } from '../utils/getSourceBadgeKey';
@@ -477,6 +478,9 @@ export default function ForecasterProfile() {
             </div>
           </div>
 
+          {data.platform === 'youtube' && (
+            <YouTubeMetricsDisclaimer className="mt-3" />
+          )}
         </div>
 
         {/* Ranked Lists section — rendered only when this forecaster has
