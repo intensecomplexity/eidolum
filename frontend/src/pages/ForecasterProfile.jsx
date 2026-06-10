@@ -316,27 +316,35 @@ export default function ForecasterProfile() {
             <div>
               <div className="flex items-center gap-2 sm:gap-3 mb-1 flex-wrap">
                 <div className="text-[10px] text-accent/60 uppercase tracking-widest font-mono mb-0.5">The Vault</div>
-                <h1 className="headline-serif" style={{ fontSize: 'clamp(24px, 5vw, 36px)' }}>{data.name}</h1>
-                {/* PlatformBadge — when the source has a public channel
-                    URL (YouTube / X / Reddit), wrap the badge in an
-                    external link so the pill itself opens the channel. */}
-                {data.channel_url ? (
-                  <a
-                    href={data.channel_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex"
-                    aria-label={`Open ${platformLabel} channel`}
-                    title={`Open on ${platformLabel}`}
-                  >
+                {/* Name + platform badge form ONE visual unit so the badge
+                    labels the forecaster's identity, clearly apart from the
+                    metric tiles to the right. Action buttons sit in their
+                    own cluster with extra separation. */}
+                <span className="inline-flex items-center gap-2 sm:gap-2.5">
+                  <h1 className="headline-serif" style={{ fontSize: 'clamp(24px, 5vw, 36px)' }}>{data.name}</h1>
+                  {/* PlatformBadge — when the source has a public channel
+                      URL (YouTube / X / Reddit), wrap the badge in an
+                      external link so the pill itself opens the channel. */}
+                  {data.channel_url ? (
+                    <a
+                      href={data.channel_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex"
+                      aria-label={`Open ${platformLabel} channel`}
+                      title={`Open on ${platformLabel}`}
+                    >
+                      <PlatformBadge platform={getSourceBadgeKey(data)} size={20} showLabel />
+                    </a>
+                  ) : (
                     <PlatformBadge platform={getSourceBadgeKey(data)} size={20} showLabel />
-                  </a>
-                ) : (
-                  <PlatformBadge platform={getSourceBadgeKey(data)} size={20} showLabel />
-                )}
-                <StreakBadge streak={data.streak} />
-                <FollowButton forecaster={data} />
-                <CompareButton forecaster={data} />
+                  )}
+                </span>
+                <span className="inline-flex items-center gap-2 sm:gap-3 sm:ml-2">
+                  <StreakBadge streak={data.streak} />
+                  <FollowButton forecaster={data} />
+                  <CompareButton forecaster={data} />
+                </span>
               </div>
               {/* Wall Street firm link — institutional sources only. The
                   former YouTube/X/Reddit "external link" row was deleted

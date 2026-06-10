@@ -57,10 +57,12 @@ export default function LeaderboardCard({ forecaster: f, metric = 'avg_return', 
             <RankBadge rank={f.rank} movement={f.rank_movement} />
             <div>
               <div className="flex items-center gap-1.5 flex-wrap">
-                <Link to={f.slug ? `/analyst/${f.slug}` : `/forecaster/${f.id}`} className="font-medium text-[15px] hover:text-accent transition-colors">
-                  {f.name}
-                </Link>
-                <PlatformBadge platform={getSourceBadgeKey(f)} />
+                <span className="inline-flex items-center gap-1.5 whitespace-nowrap">
+                  <Link to={f.slug ? `/analyst/${f.slug}` : `/forecaster/${f.id}`} className="font-medium text-[15px] hover:text-accent transition-colors">
+                    {f.name}
+                  </Link>
+                  <PlatformBadge platform={getSourceBadgeKey(f)} />
+                </span>
               </div>
               {f.firm ? (
                 <div className="text-muted text-xs">{f.firm}</div>
