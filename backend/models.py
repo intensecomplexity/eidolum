@@ -395,6 +395,16 @@ class Prediction(Base):
     is_ambiguous_symbol = Column(Boolean, nullable=False, default=False,
                                  server_default="false")
 
+    # 2026-06-10 weak-basket audit. TRUE = the ticker is merely one name
+    # in an enumerated company list with no explicit forward-looking call
+    # on it — the direction was only inferred from sector/mechanism talk
+    # (exemplar: 616182, BWB→AA bearish from a tariff-mechanics basket).
+    # LLM-judged per row by scripts/hide_weak_basket_calls.py. Kept for
+    # audit; hidden from user surfaces via the bundled hedged_filter_sql
+    # helper (kill switch HIDE_WEAK_BASKET_CALLS).
+    is_weak_basket_call = Column(Boolean, nullable=False, default=False,
+                                 server_default="false")
+
     # Ship #14 — long-horizon predictions ("Tesla $500 by 2030") are
     # kept as valid training data but skipped by the evaluator until
     # their window resolves. evaluation_deferred=TRUE means the

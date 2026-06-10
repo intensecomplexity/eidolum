@@ -41,6 +41,44 @@ HIDE_AMBIGUOUS_SYMBOLS = (
     in ("on", "true", "1", "yes")
 )
 
+# 2026-06-10 weak-basket audit: rows whose ticker is merely one name in
+# an enumerated company list with no explicit forward call on it (the
+# direction was inferred from sector/mechanism talk — the BWB→AA tariff
+# basket exemplar, id 616182). LLM-judged per row, flagged by
+# scripts/hide_weak_basket_calls.py. Same visibility class as reported
+# speech: kept in the DB, hidden from user surfaces, independent kill
+# switch.
+HIDE_WEAK_BASKET_CALLS = (
+    os.environ.get("HIDE_WEAK_BASKET_CALLS", "on").lower()
+    in ("on", "true", "1", "yes")
+)
+
+
+def weak_basket_filter_sql(table_alias: str = "p") -> str:
+    """Return an ``AND``-prefixed SQL fragment that excludes rows flagged
+    is_weak_basket_call (basket mention with inferred direction — see
+    models.Prediction).
+
+    Shape (active):
+        AND COALESCE(<alias>.is_weak_basket_call, FALSE) = FALSE
+    """
+    if not HIDE_WEAK_BASKET_CALLS:
+        return ""
+    return (
+        f" AND COALESCE({table_alias}.is_weak_basket_call, FALSE) = FALSE"
+    )
+
+
+def weak_basket_filter_clause(weak_basket_attr):
+    """ORM equivalent of ``weak_basket_filter_sql``. Pass the model
+    attribute (``Prediction.is_weak_basket_call``). Returns a ``true``
+    clause when the kill switch is off."""
+    if not HIDE_WEAK_BASKET_CALLS:
+        from sqlalchemy import true
+        return true()
+    from sqlalchemy import or_
+    return or_(weak_basket_attr.is_(False), weak_basket_attr.is_(None))
+
 
 def ambiguous_symbol_filter_sql(table_alias: str = "p") -> str:
     """Return an ``AND``-prefixed SQL fragment that excludes rows flagged
@@ -115,6 +153,10 @@ def hedged_filter_sql(table_alias: str = "p") -> str:
     if HIDE_AMBIGUOUS_SYMBOLS:
         parts.append(
             f" AND COALESCE({table_alias}.is_ambiguous_symbol, FALSE) = FALSE"
+        )
+    if HIDE_WEAK_BASKET_CALLS:
+        parts.append(
+            f" AND COALESCE({table_alias}.is_weak_basket_call, FALSE) = FALSE"
         )
     return "".join(parts)
 
