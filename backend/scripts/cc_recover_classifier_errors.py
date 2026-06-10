@@ -96,6 +96,11 @@ PROGRESS_EVERY = 200               # videos between progress snapshots
 CLAUDE_TIMEOUT = 1800              # seconds per `claude -p` call (30min headroom)
 USAGE_LIMIT_BACKOFF = 1800         # seconds to sleep when CC usage-limited
 CLAUDE_MODEL = "sonnet"
+PREFILTER_MODEL = "haiku"          # cheap yes/no screen before the Sonnet call —
+                                   # ~74% of videos have zero predictions; skipping
+                                   # Sonnet for them is the Max-budget win
+PREFILTER_ENABLED = (os.environ.get("RECOVERY_PREFILTER", "on").lower()
+                     in ("on", "true", "1", "yes"))  # kill switch: RECOVERY_PREFILTER=off
 TRANSCRIPT_FETCH_PACING = 4.0      # seconds between live YouTube transcript fetches —
                                    # 4s/worker keeps the aggregate ~2s across the 2
                                    # parallel workers (avoids the /sorry anti-bot block)
@@ -405,17 +410,17 @@ def _extract_json_array(s: str):
     return None
 
 
-def run_cc_classifier(prompt: str) -> tuple[list | None, str | None]:
-    """Run one `claude -p` classification. Returns (entries, error).
+def _run_cc_text(prompt: str, model: str) -> tuple[str | None, str | None]:
+    """Run one `claude -p` call and return (result_text, error).
 
     On CC usage-limit, sleeps and retries indefinitely (limits reset) —
     a usage-limit pause is never reported as a failure. Returns (None, tag)
-    only on a genuine error the caller should count toward the abort guard.
+    only on a genuine error the caller should handle.
     """
     cmd = [
         _claude_bin(), "-p",
         "--output-format", "json",
-        "--model", CLAUDE_MODEL,
+        "--model", model,
         "--strict-mcp-config",        # ignore all MCP servers — faster startup
         "--no-session-persistence",   # don't litter session files
     ]
@@ -436,8 +441,8 @@ def run_cc_classifier(prompt: str) -> tuple[list | None, str | None]:
         low = blob.lower()
         if ("usage limit" in low or "rate limit" in low
                 or "limit reached" in low or "limit will reset" in low):
-            _log(f"[recover] CC usage limit hit — sleeping {USAGE_LIMIT_BACKOFF}s "
-                 f"then retrying this batch")
+            _log(f"[recover] CC usage limit hit ({model}) — sleeping "
+                 f"{USAGE_LIMIT_BACKOFF}s then retrying this batch")
             for _ in range(USAGE_LIMIT_BACKOFF // 10):
                 if _stop["flag"]:
                     return None, "stopped"
@@ -452,12 +457,82 @@ def run_cc_classifier(prompt: str) -> tuple[list | None, str | None]:
             return None, f"claude_envelope_unparseable: {e}: {(proc.stdout or '')[:200]}"
         if env_obj.get("is_error"):
             return None, f"claude_is_error: {str(env_obj.get('result'))[:200]}"
-        result_text = env_obj.get("result") or ""
-        entries = _extract_json_array(result_text)
-        if entries is None:
-            return None, f"cc_output_unparseable: {result_text[:200]}"
-        run_cc_classifier.last_latency = latency  # type: ignore[attr-defined]
-        return entries, None
+        _run_cc_text.last_latency = latency  # type: ignore[attr-defined]
+        return env_obj.get("result") or "", None
+
+
+def run_cc_classifier(prompt: str) -> tuple[list | None, str | None]:
+    """Run one `claude -p` Sonnet classification. Returns (entries, error)."""
+    result_text, err = _run_cc_text(prompt, CLAUDE_MODEL)
+    if err:
+        return None, err
+    entries = _extract_json_array(result_text)
+    if entries is None:
+        return None, f"cc_output_unparseable: {result_text[:200]}"
+    run_cc_classifier.last_latency = _run_cc_text.last_latency  # type: ignore[attr-defined]
+    return entries, None
+
+
+# ── Haiku pre-filter — cheap yes/no screen before the Sonnet extraction ─────
+def build_prefilter_prompt(transcripts: dict) -> str:
+    """transcripts: {video_id: transcript_text}. Tuned for HIGH RECALL —
+    a false 'no' drops a real prediction forever; a false 'yes' just costs
+    one Sonnet call. When in doubt the screen must say yes."""
+    blocks = []
+    for vid, text in transcripts.items():
+        blocks.append(f'--- VIDEO {vid} ---\n{text}')
+    body = "\n\n".join(blocks)
+    return f"""You are a cheap HIGH-RECALL screen in front of a careful prediction extractor. For EACH video below answer ONE question: might this transcript contain ANY forward-looking view on a SPECIFIC named stock, company, ETF, or cryptocurrency — its future price, value, growth, or whether to buy/sell/hold/avoid it?
+
+Count ALL of these as "yes":
+- explicit directional calls ("I think X goes up", "bearish on Y") and ANY price target, fair-value estimate, or upside/downside scenario ("the middle ground shows us 244", "$300 by 2027")
+- HEDGED or soft calls ("might be a good buy", "could see upside", "I'd consider adding")
+- buy/sell/hold/avoid/accumulate/trim statements, including the speaker's own actions ("I'm still buying Nvidia")
+- valuation or thesis statements implying future direction ("it's undervalued here", "the hypergrowth days are over", "it's a mature business now")
+- company names count even without ticker symbols; ONE such statement anywhere in the video is enough
+Your job is NOT to judge whether a call is high-quality or explicit enough — the extractor downstream applies the strict rules. Your ONLY failure mode is missing a video that had a call. If there is ANY chance, or the transcript is garbled or ambiguous, answer "yes".
+
+Answer "no" ONLY when you are confident the ENTIRE video contains nothing of the above — e.g. pure news recaps with no opinion, personal-finance/budgeting education, tutorials, interviews with zero asset views, pure backward-looking performance reviews with no view on the future, or ads.
+
+Output ONLY a JSON object mapping every video id to "yes" or "no", nothing else:
+{{"<video_id>": "yes", "<video_id_2>": "no"}}
+Every one of the {len(transcripts)} video ids MUST appear exactly once.
+
+VIDEOS TO SCREEN:
+
+{body}
+"""
+
+
+def run_cc_prefilter(transcripts: dict, fail_open: bool = True) -> dict | None:
+    """Haiku screen over {video_id: text}. Returns {video_id: bool} where True
+    means SEND TO SONNET. FAIL-OPEN by design: on any error, unparseable
+    output, or a missing id, that video goes to Sonnet — recall over savings.
+    With fail_open=False (eval harness) returns None on error instead."""
+    all_yes = {vid: True for vid in transcripts}
+    result_text, err = _run_cc_text(build_prefilter_prompt(transcripts),
+                                    PREFILTER_MODEL)
+    if err:
+        _log(f"[recover] prefilter error ({err}) — "
+             f"{'failing open, full batch to Sonnet' if fail_open else 'eval abort'}")
+        return all_yes if fail_open else None
+    s = (result_text or "").strip()
+    s = re.sub(r"^```[a-zA-Z]*\n?", "", s)
+    s = re.sub(r"\n?```\s*$", "", s).strip()
+    try:
+        # raw_decode: parse the FIRST JSON object and ignore trailing prose —
+        # Haiku sometimes appends "**Reasoning:** ..." after the verdict dict.
+        verdicts, _ = json.JSONDecoder().raw_decode(s[s.index("{"):])
+        assert isinstance(verdicts, dict)
+    except Exception as e:
+        _log(f"[recover] prefilter output unparseable ({e}) — "
+             f"{'failing open' if fail_open else 'eval abort'}: {s[:150]}")
+        return all_yes if fail_open else None
+    out = {}
+    for vid in transcripts:
+        v = str(verdicts.get(vid, "yes")).strip().lower()  # missing id -> yes
+        out[vid] = (v != "no")
+    return out
 
 
 # ── Monkeypatch shims — make _process_one_video use this batch's caches ─────
@@ -712,6 +787,23 @@ def main() -> int:
                 good[vid] = t
                 chars += len(t)
 
+        # ── 1.5 Haiku pre-filter: skip Sonnet for prediction-free videos ───
+        # A "no" verdict short-circuits to ok_no_predictions via the normal
+        # production path (_PRED_CACHE[vid] = [] == classified, zero preds).
+        # Fail-open: any prefilter error sends the full batch to Sonnet.
+        prefilter_skipped: list = []
+        if good and PREFILTER_ENABLED and not _stop["flag"]:
+            verdicts = run_cc_prefilter(good)
+            for vid, send in (verdicts or {}).items():
+                if not send:
+                    _PRED_CACHE[vid] = []
+                    prefilter_skipped.append(vid)
+                    good.pop(vid, None)
+            if verdicts:
+                _log(f"[recover] prefilter: {len(prefilter_skipped)}/"
+                     f"{len(verdicts)} screened out (no prediction) — "
+                     f"Sonnet sees {len(good)}")
+
         # ── 2. Classify the good transcripts via `claude -p` ───────────────
         if good:
             entries, err = run_cc_classifier(build_cc_prompt(good))
@@ -740,7 +832,7 @@ def main() -> int:
         # the rest stay pending (char-budget deferral) or get a transcript
         # status (fetch failure). A video classified but absent from
         # _PRED_CACHE stays classifier_error and is retried.
-        process_ids = list(good.keys()) + [
+        process_ids = list(good.keys()) + prefilter_skipped + [
             vid for vid in batch_ids
             if (_TRANSCRIPT_CACHE.get(vid) or {}).get("status") != "ok"
         ]
