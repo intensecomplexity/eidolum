@@ -26,6 +26,7 @@ import {
 import YouTubeRunsInspector from '../components/admin/YouTubeRunsInspector';
 import ProductThemesPanel from '../components/admin/ProductThemesPanel';
 import LivePresencePanel from '../components/admin/LivePresencePanel';
+import PlatformHitRatePanel from '../components/admin/PlatformHitRatePanel';
 
 const TABS = ['Overview', 'Users', 'Forecasters', 'Predictions', 'Audit Log', 'YouTube Runs', 'Training Exclusions', 'Product Themes'];
 
@@ -89,7 +90,7 @@ export default function AdminDashboard() {
         </Link>
       </div>
 
-      {tab === 'Overview' && <><LivePresencePanel /><OverviewTab dashboard={dashboard} /></>}
+      {tab === 'Overview' && <><LivePresencePanel /><PlatformHitRatePanel /><OverviewTab dashboard={dashboard} /></>}
       {tab === 'Users' && <UsersTab showToast={showToast} isSuperAdmin={user.email === 'nimrodryder@gmail.com'} />}
       {tab === 'Forecasters' && <ForecastersTab showToast={showToast} />}
       {tab === 'Predictions' && <PredictionsTab showToast={showToast} />}
