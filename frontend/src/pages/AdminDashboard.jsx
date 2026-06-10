@@ -1070,10 +1070,10 @@ function OverviewTab({ dashboard }) {
           <h3 className="text-sm font-semibold text-muted uppercase tracking-wider mb-3">Current Admins</h3>
           <div className="space-y-2">
             {d.admins.map(a => (
-              <div key={a.id} className="flex items-center gap-2 text-sm">
-                <Shield className="w-3.5 h-3.5 text-accent" />
+              <div key={a.id} className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-sm">
+                <Shield className="w-3.5 h-3.5 text-accent shrink-0" />
                 <span className="font-medium">{a.username}</span>
-                <span className="text-muted text-xs font-mono">{a.email}</span>
+                <span className="text-muted text-xs font-mono break-all">{a.email}</span>
               </div>
             ))}
           </div>
@@ -1086,11 +1086,11 @@ function OverviewTab({ dashboard }) {
           <h3 className="text-sm font-semibold text-muted uppercase tracking-wider mb-3">Recent Actions</h3>
           <div className="space-y-2">
             {d.recent_actions.map(a => (
-              <div key={a.id} className="flex items-center gap-2 text-xs">
+              <div key={a.id} className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs">
                 <span className="text-muted font-mono shrink-0">{a.created_at?.slice(0, 16)}</span>
-                <span className="text-text-secondary">{a.admin_email}</span>
-                <span className="text-accent">{a.action}</span>
-                {a.details && <span className="text-muted truncate">{a.details}</span>}
+                <span className="text-text-secondary break-all">{a.admin_email}</span>
+                <span className="text-accent break-all">{a.action}</span>
+                {a.details && <span className="text-muted truncate max-w-full">{a.details}</span>}
               </div>
             ))}
           </div>
