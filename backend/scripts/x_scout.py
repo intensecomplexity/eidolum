@@ -190,6 +190,15 @@ def trim(t):
             "is_rt": bool(t.get("isRetweet") or t.get("retweeted") or body.startswith("RT @"))}
 
 
+# SPAM_PATTERNS misses adjective-padded promos ("join my PRIVATE group today")
+# — the signature of signal-selling rings. Checked over CALL tweets at promotion.
+PROMO_RE = re.compile(
+    r'join\s+(my|our|the)\s+\w*\s*(group|channel|discord|telegram)'
+    r'|private\s+(group|channel)|vip\s+(group|channel|signals?)'
+    r'|signals?\s+(group|channel|service)|whop\.com|patreon\.com', re.I)
+MAX_PROMO_RATIO = 0.30
+
+
 def spam_ratio(tweets):
     if not tweets:
         return 0.0
@@ -226,9 +235,10 @@ def probe_account(handle, state, depth=PROBE_DEPTH):
     est = round(xnat / (span / 7.0), 2) if span > 0 else (float(xnat) if xnat else 0.0)
     foll = max((t["followers"] for t in tweets), default=0)
     sr = spam_ratio(tweets)
+    pr = (sum(1 for t, _ in rows if PROMO_RE.search(t["body"] or "")) / len(rows)) if rows else 0.0
     return {"handle": handle, "fetched": fetched, "xnative": xnat, "crypto": crypto,
             "yield_net": yield_net, "est_per_week": est, "span_days": span,
-            "followers": foll, "spam_ratio": round(sr, 2),
+            "followers": foll, "spam_ratio": round(sr, 2), "promo_ratio": round(pr, 2),
             "sample": [(c.get("ticker"), c.get("direction"), (t["body"] or "")[:80]) for t, c in rows[:3]],
             "rows": rows}
 
@@ -240,6 +250,8 @@ def decide(m):
         return False, f"low_followers({m['followers']})"
     if m["spam_ratio"] > MAX_SPAM_RATIO:
         return False, f"spammy({m['spam_ratio']})"
+    if m.get("promo_ratio", 0) > MAX_PROMO_RATIO:
+        return False, f"promo_signal_seller({m['promo_ratio']})"
     if m["xnative"] < PROMOTE_MIN_PREDS:
         return False, f"few_preds({m['xnative']})"
     if m["yield_net"] < PROMOTE_YIELD:
@@ -418,7 +430,8 @@ def main(live):
         ok, reason = decide(m)
         state["handles"][h].update(status="probed", yield_net=m["yield_net"], xnative=m["xnative"],
                                    est_per_week=m["est_per_week"], followers=m["followers"],
-                                   spam_ratio=m["spam_ratio"], last_probed=datetime.now(timezone.utc).isoformat(),
+                                   spam_ratio=m["spam_ratio"], promo_ratio=m["promo_ratio"],
+                                   last_probed=datetime.now(timezone.utc).isoformat(),
                                    would_promote=ok, decision=reason)
         save_json(STATE_PATH, state)   # persist each probe so a crash never re-probes/re-spends
         review.append(["probe", h, "WOULD_PROMOTE" if ok else "REJECT", reason,
@@ -462,6 +475,7 @@ def main(live):
     # by pool_pre_ping). Commit any live priority-1 inserts first so they aren't lost.
     if live:
         db.commit()
+    db.close()
     db = db_session()
     print(f"\n[C] WOULD-PROMOTE: {len(would_promote)}", flush=True)
     for h, m in would_promote:
@@ -502,12 +516,13 @@ def main(live):
     try:
         import shutil
         if os.path.isdir(os.path.dirname(DRIVE_OUT)):
-            shutil.copy(CSV_OUT, DRIVE_OUT)
+            shutil.copyfile(CSV_OUT, DRIVE_OUT)  # copyfile: drvfs rejects copy()'s chmod
     except Exception as e:
         print(f"[scout] drive copy skipped: {e}", flush=True)
 
     save_state_path = STATE_PATH
     save_json(save_state_path, state)
+    db.close()
     print("\n===== SUMMARY =====", flush=True)
     print(f"  mode: {mode}")
     print(f"  Apify spent today: ${spent_today(state):.3f} / ${DAILY_APIFY_CAP}")
