@@ -175,6 +175,10 @@ export function adminGetPresence() {
   return api.get('/admin/presence', { headers: authHeaders() }).then(r => r.data);
 }
 
+export function adminGetGlobalHitRate() {
+  return api.get('/admin/global-hit-rate', { headers: authHeaders() }).then(r => r.data);
+}
+
 export function getForecasterSectors(id) {
   return api.get(`/forecaster/${id}/sectors`).then(r => r.data);
 }

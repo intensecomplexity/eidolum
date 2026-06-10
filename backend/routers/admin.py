@@ -2349,3 +2349,68 @@ def admin_presence(
             for r in users
         ],
     }
+
+
+# ─────────────────────── Platform-wide hit rate ───────────────────────
+# Admin Overview card: the global outcome split across ALL forecasters,
+# computed over the SAME user-visible scored set the public site shows
+# (hedged_filter_sql bundles hedged + reported_speech + is_ambiguous_symbol).
+# Outcome enum is mixed-era: hit bucket = ('hit','correct'), miss bucket =
+# ('miss','incorrect'); the three buckets partition the scored set exactly,
+# so hits + nears + misses == evaluated. Request-time, no worker, no cache.
+
+@router.get("/admin/global-hit-rate")
+@limiter.limit("60/minute")
+def global_hit_rate(
+    request: Request,
+    admin: bool = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    from routers._prediction_filters import hedged_filter_sql
+    _h = hedged_filter_sql("predictions")
+
+    row = db.execute(sql_text(f"""
+        SELECT
+            count(*) FILTER (WHERE outcome IN ('hit','near','miss','correct','incorrect')) AS evaluated,
+            count(*) FILTER (WHERE outcome IN ('hit','correct'))                           AS hits,
+            count(*) FILTER (WHERE outcome = 'near')                                       AS nears,
+            count(*) FILTER (WHERE outcome IN ('miss','incorrect'))                        AS misses
+        FROM predictions
+        WHERE 1=1{_h}
+    """)).fetchone()
+
+    evaluated = int(row[0] or 0)
+    hits = int(row[1] or 0)
+    nears = int(row[2] or 0)
+    misses = int(row[3] or 0)
+
+    def pct(n):
+        return round(n / evaluated * 100, 1) if evaluated > 0 else 0.0
+
+    # Mean of per-forecaster (hits/evaluated) for forecasters with >=10 scored.
+    fc = db.execute(sql_text(f"""
+        SELECT AVG(hr) * 100 AS avg_hr, COUNT(*) AS n
+        FROM (
+            SELECT
+                count(*) FILTER (WHERE outcome IN ('hit','correct'))::float
+                    / NULLIF(count(*), 0) AS hr
+            FROM predictions
+            WHERE outcome IN ('hit','near','miss','correct','incorrect')
+              AND forecaster_id IS NOT NULL{_h}
+            GROUP BY forecaster_id
+            HAVING count(*) >= 10
+        ) sub
+    """)).fetchone()
+
+    return {
+        "evaluated": evaluated,
+        "hits": hits,
+        "nears": nears,
+        "misses": misses,
+        "hit_rate_pct": pct(hits),
+        "near_rate_pct": pct(nears),
+        "miss_rate_pct": pct(misses),
+        "three_tier_accuracy_pct": round((hits + 0.5 * nears) / evaluated * 100, 1) if evaluated > 0 else 0.0,
+        "avg_forecaster_hit_rate_pct": round(float(fc[0]), 1) if fc and fc[0] is not None else 0.0,
+        "forecasters_counted": int(fc[1] or 0) if fc else 0,
+    }
