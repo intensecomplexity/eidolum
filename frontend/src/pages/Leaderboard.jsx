@@ -370,12 +370,13 @@ export default function Leaderboard() {
                     { key: 'all', label: 'All Sources' },
                     { key: 'wallst', label: 'Wall St', color: '#3b82f6' },
                     { key: 'youtube', label: 'YouTube', color: '#FF0000' },
+                    // X brand is black/white; neutral gray stays visible in
+                    // both themes (black pill vanishes on dark, white on light).
+                    { key: 'x', label: 'X', color: '#8b98a5' },
                     { key: 'community', label: 'Community', color: '#34d399' },
-                    // X and StockTwits intentionally hidden pre-launch: X is
-                    // paused on Anthropic credits (~161 preds DB-wide) and
-                    // StockTwits coverage is too sparse to surface. URL params
-                    // ?source=x and ?source=stocktwits still work — the
-                    // backend filter logic is untouched, only the pills go.
+                    // StockTwits intentionally hidden: coverage too sparse to
+                    // surface. ?source=stocktwits still works — the backend
+                    // filter is untouched, only the pill is hidden.
                   ].map(s => (
                     <button key={s.key} onClick={() => setSource(s.key)}
                       className={`px-2.5 py-1 rounded text-[11px] font-semibold transition-colors ${
