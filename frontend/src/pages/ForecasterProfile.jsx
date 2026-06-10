@@ -314,9 +314,7 @@ export default function ForecasterProfile() {
                 <h1 className="headline-serif" style={{ fontSize: 'clamp(24px, 5vw, 36px)' }}>{data.name}</h1>
                 {/* PlatformBadge — when the source has a public channel
                     URL (YouTube / X / Reddit), wrap the badge in an
-                    external link so the pill itself opens the channel.
-                    No visual change: the badge already provides its own
-                    background + label. */}
+                    external link so the pill itself opens the channel. */}
                 {data.channel_url ? (
                   <a
                     href={data.channel_url}

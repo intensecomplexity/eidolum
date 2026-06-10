@@ -1,25 +1,31 @@
 import { FaReddit } from 'react-icons/fa';
 import { FaXTwitter } from 'react-icons/fa6';
+import ytIconUrl from '../assets/youtube-icon.svg';
 
-// Wrapper span already provides the red rounded rect via bg + border-radius,
-// so the SVG only needs the white play triangle. Sized 8x10 in the 24x24
-// viewBox (~33% wide, ~42% tall) to match YouTube's official play-button
-// proportions instead of looking like a speck.
-function YouTubeGlyph({ size = 16 }) {
+// Official YouTube icon asset (full-color red rounded rect + white play
+// triangle, downloaded unmodified from YouTube's brand resources).
+// YouTube branding rules: never recolor, crop, or redraw it; render at
+// >= 20px height; no colored wrapper behind it — the icon sits directly
+// on the card/row background. This intentionally overrides the internal
+// "2-color inline SVG" badge convention for YouTube specifically.
+const YT_MIN_HEIGHT = 20;
+const YT_ASPECT = 158 / 110; // official asset viewBox ratio
+
+function YouTubeIcon({ size = 16 }) {
+  const h = Math.max(size, YT_MIN_HEIGHT);
+  const w = Math.round(h * YT_ASPECT);
   return (
-    <svg
-      width={size} height={size} viewBox="0 0 24 24"
-      xmlns="http://www.w3.org/2000/svg"
-      aria-label="YouTube" role="img"
-      style={{ display: 'block' }}
-    >
-      <path d="M9.5 7v10l8-5z" fill="#fff"/>
-    </svg>
+    <img
+      src={ytIconUrl}
+      alt="YouTube"
+      height={h}
+      width={w}
+      style={{ display: 'block', height: `${h}px`, width: `${w}px` }}
+    />
   );
 }
 
 const PLATFORM_CONFIG = {
-  youtube:       { Icon: YouTubeGlyph, iconColor: '#FF0000', label: 'YouTube', bg: '#FF0000', text: '#ffffff' },
   twitter:       { Icon: FaXTwitter, iconColor: '#ffffff', label: 'X', bg: '#000000', text: '#ffffff' },
   x:             { Icon: FaXTwitter, iconColor: '#ffffff', label: 'X', bg: '#000000', text: '#ffffff' },
   reddit:        { Icon: FaReddit, iconColor: '#FF4500', label: 'Reddit', bg: '#FF4500', text: '#ffffff' },
@@ -32,7 +38,23 @@ const PLATFORM_CONFIG = {
 
 export default function PlatformBadge({ platform, size = 16, showLabel = false }) {
   if (!platform) return null;
-  const config = PLATFORM_CONFIG[platform.toLowerCase()];
+  const key = platform.toLowerCase();
+
+  if (key === 'youtube') {
+    if (!showLabel) return <YouTubeIcon size={size} />;
+    return (
+      <span style={{
+        display: 'inline-flex', alignItems: 'center', gap: '5px',
+        color: 'inherit', fontSize: '10px', fontWeight: 700,
+        lineHeight: 1.5, verticalAlign: 'middle', whiteSpace: 'nowrap',
+      }}>
+        <YouTubeIcon size={size} />
+        YouTube
+      </span>
+    );
+  }
+
+  const config = PLATFORM_CONFIG[key];
   if (!config) return null;
   const { Icon, iconColor, label, bg, text } = config;
 
