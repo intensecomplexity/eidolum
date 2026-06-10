@@ -147,6 +147,33 @@ export function adminSuggestThemeTickers(id) {
   return api.get(`/admin/themes/${id}/suggest`, { headers: authHeaders() }).then(r => r.data);
 }
 
+// ——— Live presence ———
+
+// Fire-and-forget heartbeat. Signed-in: the JWT collapses the session to
+// 'u:<user_id>' server-side. Anonymous: a random per-tab-session id from
+// sessionStorage is the key. Never throws — a failed ping must never
+// break page load.
+export function pingPresence() {
+  try {
+    let anonId = sessionStorage.getItem('eidolum_presence_id');
+    if (!anonId) {
+      anonId = window.crypto?.randomUUID
+        ? window.crypto.randomUUID()
+        : `${Math.random().toString(36).slice(2)}${Math.random().toString(36).slice(2)}`;
+      sessionStorage.setItem('eidolum_presence_id', anonId);
+    }
+    const token = localStorage.getItem('eidolum_token');
+    const headers = token ? { Authorization: `Bearer ${token}` } : {};
+    return api.post('/presence/ping', { anon_id: anonId }, { headers }).catch(() => {});
+  } catch {
+    return Promise.resolve();
+  }
+}
+
+export function adminGetPresence() {
+  return api.get('/admin/presence', { headers: authHeaders() }).then(r => r.data);
+}
+
 export function getForecasterSectors(id) {
   return api.get(`/forecaster/${id}/sectors`).then(r => r.data);
 }
