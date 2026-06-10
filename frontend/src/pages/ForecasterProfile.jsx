@@ -320,7 +320,7 @@ export default function ForecasterProfile() {
                     labels the forecaster's identity, clearly apart from the
                     metric tiles to the right. Action buttons sit in their
                     own cluster with extra separation. */}
-                <span className="inline-flex items-center gap-2 sm:gap-2.5">
+                <span className="inline-flex items-center gap-2 sm:gap-2.5 flex-wrap">
                   <h1 className="headline-serif" style={{ fontSize: 'clamp(24px, 5vw, 36px)' }}>{data.name}</h1>
                   {/* PlatformBadge — when the source has a public channel
                       URL (YouTube / X / Reddit), wrap the badge in an
