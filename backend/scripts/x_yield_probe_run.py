@@ -41,12 +41,12 @@ PER_ACCOUNT = 40
 APIFY_PER_TWEET = 0.0004          # measured in pre-flight
 FETCH_WORKERS = 8
 BATCH_SIZE = 20                   # tweets per claude -p call
-# haiku since 2026-06-10: X tweets are short/structural enough that Haiku
-# matches Sonnet on the gated eval (recall 96.7%, ticker+direction agreement
-# 91.4%, skip 85% on a 60/60 cached-Sonnet ground-truth sample). Requires
-# X_ADDENDUM below; do not flip the model without re-running the recall
-# gate (>=95% recall, >=90% agreement).
-CLAUDE_MODEL = "haiku"
+# REVERTED to sonnet 2026-06-10: Haiku+X_ADDENDUM passed the 60/60 gate
+# (96.7% recall) but FAILED the 150/150 held-out confirmation at 93.3%
+# recall (gate >=95) — it drops real calls (position rolls, PT relays,
+# conviction-buy declarations). Do not flip to haiku without a fresh
+# held-out sample clearing >=95% recall and >=90% agreement.
+CLAUDE_MODEL = "sonnet"
 CLAUDE_TIMEOUT = 600
 CC_CWD = "/tmp/x_probe_cc_cwd"    # empty dir => no CLAUDE.md picked up
 USAGE_BACKOFF = 600
@@ -116,11 +116,13 @@ When a tweet is a borderline call-vs-commentary case, lean is_prediction=true.
 
 
 def build_batch_prompt(items):
-    """items: list of (tweet_id, text). Uses production HAIKU_SYSTEM verbatim
-    plus the eval-gated X_ADDENDUM, wrapped for batch output."""
+    """items: list of (tweet_id, text). Uses production HAIKU_SYSTEM verbatim,
+    wrapped for batch output. X_ADDENDUM is NOT included on the sonnet path —
+    it exists for the (currently reverted) haiku experiment; ground truth was
+    sonnet-without-addendum, so the baseline stays exact."""
     blocks = [f"--- TWEET {tid} ---\n{txt}" for tid, txt in items]
     body = "\n\n".join(blocks)
-    return (HAIKU_SYSTEM + X_ADDENDUM + """
+    return (HAIKU_SYSTEM + """
 
 === BATCH MODE ===
 You will classify MULTIPLE tweets below. Apply the rules above to EACH tweet
