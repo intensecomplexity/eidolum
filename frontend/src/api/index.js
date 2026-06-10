@@ -150,17 +150,18 @@ export function adminSuggestThemeTickers(id) {
 // ——— Live presence ———
 
 // Fire-and-forget heartbeat. Signed-in: the JWT collapses the session to
-// 'u:<user_id>' server-side. Anonymous: a random per-tab-session id from
-// sessionStorage is the key. Never throws — a failed ping must never
-// break page load.
+// 'u:<user_id>' server-side. Anonymous: a random per-browser id from
+// localStorage is the key, so multiple tabs of one browser count as ONE
+// anonymous visitor ("how many people", not "how many tabs"). Never
+// throws — a failed ping must never break page load.
 export function pingPresence() {
   try {
-    let anonId = sessionStorage.getItem('eidolum_presence_id');
+    let anonId = localStorage.getItem('eidolum_presence_id');
     if (!anonId) {
       anonId = window.crypto?.randomUUID
         ? window.crypto.randomUUID()
         : `${Math.random().toString(36).slice(2)}${Math.random().toString(36).slice(2)}`;
-      sessionStorage.setItem('eidolum_presence_id', anonId);
+      localStorage.setItem('eidolum_presence_id', anonId);
     }
     const token = localStorage.getItem('eidolum_token');
     const headers = token ? { Authorization: `Bearer ${token}` } : {};
