@@ -14,7 +14,7 @@ export default function Terms() {
     <div>
       <div className="max-w-3xl mx-auto px-4 sm:px-6 py-10 sm:py-16">
         <h1 className="font-bold text-2xl sm:text-3xl mb-2">Terms of Service</h1>
-        <p className="text-text-secondary text-xs mb-8">Last updated: June 2, 2026</p>
+        <p className="text-text-secondary text-xs mb-8">Last updated: June 10, 2026</p>
 
         <section className="prose prose-invert mb-8">
           <p className="text-text-secondary leading-relaxed">
@@ -138,8 +138,35 @@ export default function Terms() {
           </p>
         </section>
 
+        <section className="mb-8">
+          <h2 className="font-bold text-lg mb-3">12. YouTube API Services</h2>
+          <p className="text-sm text-text-secondary leading-relaxed">
+            Eidolum uses YouTube API Services. By using Eidolum, you agree to be bound
+            by the{' '}
+            <a
+              href="https://www.youtube.com/t/terms"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-accent"
+            >
+              YouTube Terms of Service
+            </a>{' '}
+            (https://www.youtube.com/t/terms). For information about how Google handles
+            data, see the{' '}
+            <a
+              href="http://www.google.com/policies/privacy"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-accent"
+            >
+              Google Privacy Policy
+            </a>. Our own handling of data obtained via YouTube API Services is
+            described in our <a href="/privacy" className="text-accent">Privacy Policy</a>.
+          </p>
+        </section>
+
         <section>
-          <h2 className="font-bold text-lg mb-3">12. Contact</h2>
+          <h2 className="font-bold text-lg mb-3">13. Contact</h2>
           <p className="text-sm text-text-secondary leading-relaxed">
             Questions about these Terms? Email{' '}
             <a href="mailto:hello@eidolum.com" className="text-accent">hello@eidolum.com</a>.
