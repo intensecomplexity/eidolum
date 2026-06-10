@@ -198,8 +198,61 @@ KNOWN_TICKER_REASSIGNMENTS = {
     "LB": ("2021-08-02", "L Brands", "LandBridge Company"),
     "APC": ("2019-08-08", "Anadarko Petroleum", "ARKO Petroleum"),
     "ARB": ("2014-01-01", "Arbitron", "AltShares ETF / Arbitrum coin"),
-    "ETH": ("2019-08-19", "Ethan Allen Interiors (now ETD)", "Ethereum / ETF"),
+    # Corrected 2026-06-11: Ethan Allen kept the ETH ticker until
+    # 2021-08-16 (NYSE change to ETD) — the original 2019 date was wrong
+    # and mislabeled two May-2021 analyst rows as Ethereum.
+    "ETH": ("2021-08-16", "Ethan Allen Interiors (now ETD)", "Ethereum / ETF"),
 }
+
+# ── Recovery layer (2026-06-11): price paths for recovered identities ──────
+#
+# PRICE_TICKER_OVERRIDES is consumed ONLY by the evaluator's equity
+# branch (historical_evaluator._fetch_history with force_equity=True).
+# Display keeps the original ticker. Three shapes:
+#   {"fetch_as": "ETD"}                      — clean rename continuity:
+#       fetch the current symbol's series (providers backfill the full
+#       history under the new ticker).
+#   {"terminal": {"after": "YYYY-MM-DD", "stock": ("RGLD", 0.0625)}}
+#       — acquisition paid in stock: real bars up to the close, then
+#       synthetic post-event points = ratio x acquirer close (verified
+#       deal terms; never fabricates in-era prices).
+#   {"terminal": {"after": "YYYY-MM-DD", "cash": 1.95}}
+#       — cash-out (going private): flat realized value after the event.
+#
+# TO EXTEND for a future rename/acquisition: add the entry here, add the
+# symbol to EQUITY_ERA_ROUTES (or COLLISION_SYMBOLS if it also collides
+# with a coin), then run a scripts/recover_ambiguous_predictions.py-style
+# re-evaluation for the affected rows.
+PRICE_TICKER_OVERRIDES = {
+    "ETH": {"fetch_as": "ETD"},  # Ethan Allen -> ETD (renamed 2021-08-16)
+    "SAND": {"terminal": {"after": "2025-10-20", "stock": ("RGLD", 0.0625)}},
+    "SOL": {"terminal": {"after": "2025-12-12", "cash": 1.95}},  # $2.00/ADS - $0.05 fee
+}
+
+# Symbols whose EQUITY identity is era-bound rather than coexisting:
+# analyst-source rows dated before the cutover route to the equity.
+# (ETH can't live in COLLISION_SYMBOLS — post-2021 the symbol means the
+# coin/ETF even for analyst sources.)
+EQUITY_ERA_ROUTES = {"ETH": "2021-08-16"}
+
+
+def equity_route_for_row(ticker: str, source: str | None,
+                         prediction_date=None) -> bool:
+    """True when a prediction ROW should be priced as the equity despite
+    its symbol also meaning a coin. Collision symbols route purely by
+    source; era-bound symbols (ETH/Ethan Allen) additionally require the
+    row to predate the reassignment cutover."""
+    t = (ticker or "").upper().strip()
+    if not source or source not in EQUITY_ANALYST_SOURCES:
+        return False
+    if t in COLLISION_SYMBOLS:
+        return True
+    era = EQUITY_ERA_ROUTES.get(t)
+    if era and prediction_date is not None:
+        d = (prediction_date.date() if hasattr(prediction_date, "date")
+             else prediction_date)
+        return d.isoformat() < era
+    return False
 
 
 def is_crypto_for_source(ticker: str, source: str | None = None) -> bool:

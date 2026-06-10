@@ -217,12 +217,14 @@ def evaluate_batch(max_tickers: int | None = None) -> dict:
     # Crypto-equity collision rows (LTC/SOL/... from equity-analyst
     # sources) group under a "<ticker>|EQ" key so they fetch and score
     # against the EQUITY price series while coin-source rows of the same
-    # symbol keep the coin series. Non-collision tickers are unaffected.
-    from crypto_prices import COLLISION_SYMBOLS, EQUITY_ANALYST_SOURCES
+    # symbol keep the coin series. Era-bound symbols (ETH = Ethan Allen
+    # before 2021-08-16) additionally gate on prediction_date. Non-
+    # collision tickers are unaffected.
+    from crypto_prices import equity_route_for_row
     ticker_preds = defaultdict(list)
     for r in rows:
         group_key = r[1]
-        if r[1] in COLLISION_SYMBOLS and (r[12] or "") in EQUITY_ANALYST_SOURCES:
+        if equity_route_for_row(r[1], r[12], r[6]):
             group_key = f"{r[1]}|EQ"
         ticker_preds[group_key].append({
             "id": r[0], "ticker": r[1], "direction": r[2],
@@ -903,6 +905,54 @@ def _try_finnhub(ticker: str) -> dict:
     return {}
 
 
+def _fetch_override_series(ticker: str, override: dict, start, end) -> dict:
+    """Build the price series for a recovered identity (see
+    crypto_prices.PRICE_TICKER_OVERRIDES). NO fabricated in-era prices:
+    the base is always real bars; only post-event dates get synthetic
+    points derived from verified deal terms (cash-out value, or
+    exchange-ratio x the acquirer's real closes)."""
+    # NOTE: price_store.get_history returns {} on a None start/end, so
+    # all reads here use an explicit full range — the recovered symbols'
+    # bars are already in price_bars (audited 2026-06-11).
+    _full_start = "1990-01-01"
+    _full_end = datetime.utcnow().date().isoformat()
+
+    # Rename continuity: the current symbol's series IS the entity's
+    # history (providers backfill under the new ticker).
+    fetch_as = override.get("fetch_as")
+    if fetch_as:
+        return _fetch_history(fetch_as, _full_start, _full_end)
+
+    # Acquisition: real bars through the close...
+    try:
+        from services.price_store import get_history as _local_history
+        prices = dict(_local_history(ticker, _full_start, _full_end) or {})
+    except Exception as e:
+        print(f"[HistEval] override base fetch failed for {ticker}: {e}", flush=True)
+        return {}
+    if not prices:
+        return {}
+
+    # ...then verified terminal values strictly AFTER the event date.
+    terminal = override.get("terminal") or {}
+    after = terminal.get("after")
+    if after:
+        if "cash" in terminal:
+            val = float(terminal["cash"])
+            d = datetime.strptime(after, "%Y-%m-%d").date() + timedelta(days=7)
+            today = datetime.utcnow().date()
+            while d <= today:
+                prices[d.isoformat()] = val
+                d += timedelta(days=7)
+        elif "stock" in terminal:
+            acq, ratio = terminal["stock"]
+            acq_prices = _fetch_history(acq, _full_start, _full_end) or {}
+            for ds, close in acq_prices.items():
+                if not ds.startswith("_") and ds > after:
+                    prices[ds] = round(float(close) * float(ratio), 4)
+    return prices
+
+
 def _fetch_history(ticker: str, start, end, force_equity: bool = False) -> dict:
     """Fetch historical daily prices for a ticker. Returns {date_str: close_price, ...}.
 
@@ -940,6 +990,19 @@ def _fetch_history(ticker: str, start, end, force_equity: bool = False) -> dict:
         if prices:
             _history_cache[ticker] = prices
         return prices
+
+    # Recovered-identity price paths (equity routing only): renames
+    # fetch the current symbol's series; acquisitions use real bars up
+    # to the close plus verified deal-terminal values after it. See
+    # crypto_prices.PRICE_TICKER_OVERRIDES.
+    if force_equity:
+        from crypto_prices import PRICE_TICKER_OVERRIDES
+        override = PRICE_TICKER_OVERRIDES.get(ticker)
+        if override:
+            prices = _fetch_override_series(ticker, override, start, end)
+            if prices:
+                _history_cache[cache_key] = prices
+            return prices
 
     # L2 cache: local price_bars table. Sub-ms PK index lookup. No live
     # API call. Hit short-circuits the FMP/Tiingo/Finnhub chain.
