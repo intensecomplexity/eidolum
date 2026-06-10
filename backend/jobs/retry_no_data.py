@@ -576,12 +576,17 @@ def retry_no_data_batch(db, max_tickers: int | None = None):
     # with the legacy 1900 prediction_date bug, and other unreachable
     # symbols. retry_count is incremented per provider phase, not per
     # run, so 5 attempts ≈ 1-2 runs of a true zombie.
+    # Crypto is EXCLUDED: a coin can't be delisted by equity-staleness
+    # logic, and a transient Tiingo failure + stale retry_count made
+    # this rule terminally kill priceable coins (PEPE, 2026-06-10).
+    from services.price_fetch import CRYPTO_TICKERS as _CT
     res_c = db.execute(sql_text("""
         UPDATE predictions
         SET outcome='delisted',
             evaluation_summary='Ticker unreachable via FMP/Tiingo/Polygon after 5 retry attempts'
         WHERE outcome='no_data' AND retry_count >= 5
-    """))
+          AND ticker NOT IN :crypto
+    """), {"crypto": tuple(_CT)})
     retry_zombies = res_c.rowcount or 0
 
     db.commit()

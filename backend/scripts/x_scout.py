@@ -413,6 +413,71 @@ def main(live):
                     ok, _ = validate_haiku_result(cl, t["body"] or "")
                     if ok and prefilter(t["body"] or "", t["is_rt"])[0]:
                         do_insert(h, fc_id, t, cl)
+            # commit per handle: inserts must never sit in a transaction
+            # across the (hours-long) probe phase — two runs died to a
+            # stale-SSL rollback at a deferred commit.
+            db.commit()
+
+    def promote_and_ingest(pairs, label):
+        """Promote handles + ingest their call tweets, committing per
+        handle on a FRESH session so nothing rides a long-idle txn."""
+        nonlocal db, would_ingest_total
+        if not pairs:
+            return
+        db.close()
+        db = db_session()
+        print(f"\n[{label}] PROMOTE: {len(pairs)}", flush=True)
+        for h, m in pairs:
+            fc_id, would_create = get_or_create_forecaster(db, h, state["handles"][h].get("display", h), live)
+            wi = 0
+            for t, cl in m["rows"]:
+                tid = str(t["id"]); body = t["body"] or ""
+                d = tweet_id_to_datetime(tid)
+                url = t["url"] or f"https://x.com/{h}/status/{tid}"
+                row, _ = build_row(cl, body, h, tid, url, d)
+                if not row:
+                    continue
+                sid = f"x_{tid}_{row['ticker']}"
+                if db.execute(text("SELECT 1 FROM predictions WHERE source_platform_id=:s LIMIT 1"), {"s": sid}).first():
+                    continue
+                wi += 1
+                review.append(["promote_ingest", h, "WOULD_INSERT", row["ticker"], row["direction"],
+                               row["kind"], row["target"], d.date().isoformat() if d else "", (body or "")[:120]])
+                if live and fc_id:
+                    do_insert(h, fc_id, t, cl)
+            would_ingest_total += wi
+            if live and fc_id:
+                db.commit()
+                state["handles"][h].update(status="promoted", forecaster_id=fc_id, promoted_at=today_key())
+                save_json(STATE_PATH, state)
+            print(f"  @{h}: would-create_forecaster={would_create} would-ingest={wi}", flush=True)
+
+    # ---- PRIORITY 1b: carried-over would-promotes (earlier runs) ----
+    # Runs BEFORE discovery/probe: promotion+ingest is spend priority 1,
+    # and must not be starved by probe spend or stranded by a probe-phase
+    # crash. Re-fetch a probe-depth window (classifications are
+    # CLASS_CKPT-cached — only Apify cost).
+    carried = [h for h, rec in state["handles"].items()
+               if rec.get("status") == "probed" and rec.get("would_promote")]
+    carried_pairs = []
+    for h in carried:
+        if budget_left(state) <= PROBE_DEPTH * APIFY_PER_TWEET:
+            print("  budget cap — stopping carry-over re-fetch", flush=True); break
+        items, _ = apify_run({"twitterHandles": [h], "maxItems": PROBE_DEPTH, "sort": "Latest"}, PROBE_DEPTH, state)
+        tweets = [trim(t) for t in items]
+        surv = [(t["id"], t["body"]) for t in tweets if t["id"] and prefilter(t["body"] or "", t["is_rt"])[0]]
+        cc = classify_survivors(surv)
+        rows = []
+        for t in tweets:
+            cl = cc.get(t["id"])
+            if not cl or not cl.get("is_prediction"):
+                continue
+            ok, _ = validate_haiku_result(cl, t["body"] or "")
+            if ok:
+                rows.append((t, cl))
+        carried_pairs.append((h, {"rows": rows}))
+        print(f"  carried-over would-promote @{h}: {len(rows)} call tweets", flush=True)
+    promote_and_ingest(carried_pairs, "1b")
 
     # ---- PRIORITY 3 (bounded): discovery ----
     print("\n[3] DISCOVERY (sub-cap $%.2f)..." % DISCOVERY_SUBCAP, flush=True)
@@ -442,70 +507,9 @@ def main(live):
         if ok:
             would_promote.append((h, m))
 
-    # ---- carry over would-promotes from earlier runs ----
-    # A handle probed in a prior dry-run (or before a crash) sits at status=
-    # "probed" with would_promote=true; discover() only yields "candidate"s,
-    # so without this it would never reach the promote phase. Re-fetch a probe-
-    # depth window (claude classifications are CLASS_CKPT-cached — only Apify
-    # cost) and feed it into the same promote path.
-    carried = [h for h, rec in state["handles"].items()
-               if rec.get("status") == "probed" and rec.get("would_promote")
-               and h not in {x for x, _ in would_promote}]
-    for h in carried:
-        if budget_left(state) <= PROBE_DEPTH * APIFY_PER_TWEET:
-            print("  budget cap — stopping carry-over re-fetch", flush=True); break
-        items, _ = apify_run({"twitterHandles": [h], "maxItems": PROBE_DEPTH, "sort": "Latest"}, PROBE_DEPTH, state)
-        tweets = [trim(t) for t in items]
-        surv = [(t["id"], t["body"]) for t in tweets if t["id"] and prefilter(t["body"] or "", t["is_rt"])[0]]
-        cc = classify_survivors(surv)
-        rows = []
-        for t in tweets:
-            cl = cc.get(t["id"])
-            if not cl or not cl.get("is_prediction"):
-                continue
-            ok, _ = validate_haiku_result(cl, t["body"] or "")
-            if ok:
-                rows.append((t, cl))
-        would_promote.append((h, {"rows": rows}))
-        print(f"  carried-over would-promote @{h}: {len(rows)} call tweets", flush=True)
-
-    # ---- PROMOTE + ingest newly-promoted (reuse probe fetch; no new spend) ----
-    # Reopen the DB: the probe phase can run ~1h with no DB activity, during which
-    # the public-proxy SSL connection goes stale (a long-held Session isn't saved
-    # by pool_pre_ping). Commit any live priority-1 inserts first so they aren't lost.
-    if live:
-        db.commit()
-    db.close()
-    db = db_session()
-    print(f"\n[C] WOULD-PROMOTE: {len(would_promote)}", flush=True)
-    for h, m in would_promote:
-        fc_id, would_create = get_or_create_forecaster(db, h, state["handles"][h].get("display", h), live)
-        wi = 0
-        for t, cl in m["rows"]:   # already-fetched + classified probe tweets (no new spend)
-            tid = str(t["id"]); body = t["body"] or ""
-            d = tweet_id_to_datetime(tid)
-            url = t["url"] or f"https://x.com/{h}/status/{tid}"
-            row, _ = build_row(cl, body, h, tid, url, d)
-            if not row:
-                continue
-            sid = f"x_{tid}_{row['ticker']}"
-            if db.execute(text("SELECT 1 FROM predictions WHERE source_platform_id=:s LIMIT 1"), {"s": sid}).first():
-                continue
-            wi += 1
-            review.append(["promote_ingest", h, "WOULD_INSERT", row["ticker"], row["direction"],
-                           row["kind"], row["target"], d.date().isoformat() if d else "", (body or "")[:120]])
-            if live and fc_id:
-                do_insert(h, fc_id, t, cl)
-        would_ingest_total += wi
-        if live and fc_id:
-            state["handles"][h].update(status="promoted", forecaster_id=fc_id, promoted_at=today_key())
-        print(f"  @{h}: would-create_forecaster={would_create} would-ingest={wi}", flush=True)
-
-    if live:
-        ns.find_forecaster = ns_orig
-        db.commit()
-    else:
-        ns.find_forecaster = ns_orig
+    # ---- PROMOTE + ingest this run's finds (reuse probe fetch; no new spend) ----
+    promote_and_ingest(would_promote, "C")
+    ns.find_forecaster = ns_orig
 
     # ---- output ----
     with open(CSV_OUT, "w", newline="") as f:
