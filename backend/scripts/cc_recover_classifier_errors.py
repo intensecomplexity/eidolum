@@ -845,7 +845,14 @@ def main() -> int:
 
         # ── 2. Classify the good transcripts via `claude -p` ───────────────
         if good:
-            entries, err = run_cc_classifier(build_cc_prompt(good))
+            # conditional=True LIVE since 2026-06-11 (Phase-1 sign-off): "if X
+            # then Y" calls now extract as conditional_call (structured trigger)
+            # instead of a flat directional call — the CLF/steel false-MISS fix.
+            # Eval: 50 transcripts / ~45 channels, acceptance parity (7==7,
+            # 11==11), 0 spurious conditionals, no real normal-call regression
+            # (the one AMZN drop was LLM noise — live drops it too). conditional=
+            # False stays byte-identical for an instant rollback.
+            entries, err = run_cc_classifier(build_cc_prompt(good, conditional=True))
             if err == "stopped":
                 _log("[recover] stopped during classification — exiting cleanly")
                 break
