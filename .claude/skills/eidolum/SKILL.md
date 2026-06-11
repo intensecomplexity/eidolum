@@ -1,14 +1,62 @@
 # Eidolum — Financial Prediction Accuracy Platform
 
-**Last updated:** June 3, 2026
+**Last updated:** June 12, 2026
 
-**Current state 2026-06-03:** launch-ready. Leaderboard accurate, price_bars asset built, reported-speech filter live, OG image deployed, BWB at 70.5% (down from 73.1% after the integrity ships). Outstanding: launch date, YouTube revival, FMP downgrade. `main=897d7c7`.
+**Current state 2026-06-12:** live (~580K predictions). **The classifier is laptop-driven `claude -p`** — Pavilion/Qwen RETIRED, Groq ruled out, RunPod gone. YouTube = `cc_recover_classifier_errors.py` (continuous Sonnet extraction + Haiku pre-filter, reboot-durable via `~/eidolum-ops`); X = `x_yield_probe_run.py` (Haiku + gate-cleared X_ADDENDUM v2). See **Classifier architecture (CURRENT)** below. Also live: sector+symbol resolution unified through one stamp helper (`jobs/sector_lookup.get_sector`); Product Themes; admin Live Presence + **Platform Hit Rate** card; **flag-not-delete classifier gate** (Rule 15 basket_enumeration→`is_weak_basket_call`, Rule 7→`is_reported_speech`, both flag-on-insert since `da6f245`); **conditional predictions live** (checkable triggers scored, vague→`unresolved`); 4 macro tables (`fmp_commodities/forex/economic_indicators/treasury_rates`). `/platforms` hidden (`SHOW_PLATFORM_PAGES=false`, compliance). OPEN BUG: evaluator bypasses `price_bars` (live FMP per call). See the dated **Current State (2026-06-12)** section below. `main≈a363f11`.
 
 Eidolum tracks Wall Street analyst predictions and scores them against real market data. The platform ingests predictions from multiple sources (Benzinga, FMP, X/Twitter, StockTwits, YouTube, RSS feeds), timestamps them immutably, then evaluates them against actual stock performance.
 
 **Repo:** `/home/nimroddd/quantanalytics`
 **Stack:** FastAPI (Python) backend on Railway, React (Vite) frontend on Vercel, PostgreSQL on Railway
 **URL:** https://www.eidolum.com
+
+---
+
+## Classifier architecture (CURRENT — 2026-06-12)
+
+**The classifier is `claude -p` (headless Claude Code) running on this laptop**, driven from `~/quantanalytics`, billed to the Claude Max plan ($0 API spend). Everything else is retired:
+
+- **Pavilion/Qwen (self-hosted) — RETIRED.** The HTTP-530 tunnel era is over; do not repoint or revive it.
+- **Groq — ruled out** as the classifier (free-tier TPM wall, ~26 classifications/day on X). `GROQ_API_KEY` may linger in env; nothing live uses it for classification.
+- **RunPod — gone** (Qwen serverless was migrated off 2026-04-24, then the whole path retired). `USE_FINETUNED_MODEL` / `RUNPOD_*` env vars are dead knobs.
+- **Haiku is NOT the sole classifier** — it is the X classifier and the YouTube pre-filter, with Sonnet doing YouTube extraction.
+
+### YouTube — `backend/scripts/cc_recover_classifier_errors.py`
+
+- **CONTINUOUS + RANDOM live queue.** Each batch re-queries `youtube_videos WHERE transcript_status = 'classifier_error' ORDER BY RANDOM()` — old backlog and freshly-erroring videos interleave. On an empty set it **idles and re-polls; it never exits** — only the watchdog STOP-file or SIGTERM ends the run. Permanently-failing videos are held out after `MAX_VIDEO_ATTEMPTS` within a backoff window, then become eligible again.
+- **Two-stage model use:** a **Haiku pre-filter** (`run_cc_prefilter`, fail-open) screens each batch with a cheap yes/no "any predictions here?" pass — **~74% of videos have zero predictions**, and skipping Sonnet for them is the Max-weekly-budget win. Survivors go to one **Sonnet** extraction call (`build_cc_prompt(good, conditional=True)` — the conditional_call block IS live). `MAX_BATCH_VIDEOS = 4`.
+- **Cohort tag** `GENERATING_MODEL = "cc_sonnet_recovery_2026_05_17"` — DO NOT CHANGE.
+- Transcripts are live re-fetched per batch (the timestamp gate needs timing data) and **persisted via `persist_transcript()` the moment they arrive**, before classification — never delete `video_transcripts`.
+- `claude -p` is invoked with API-routing env vars scrubbed so it bills the Max plan, from an empty cwd so it finds no CLAUDE.md.
+
+### X — `backend/scripts/x_yield_probe_run.py`
+
+- **Haiku** (`claude -p --model haiku`) with **`X_ADDENDUM` v2** appended to `HAIKU_SYSTEM` at call time (additive, never edited in place). v2 **passed the held-out gate: 98.2% recall, 97.7% ticker+direction agreement, 84% skip** (223 pos + 200 neg, tuning examples excluded). v1 failed at 93.3% recall. **Do not change the model or addendum without re-running the gate** (bar: ≥95% recall, ≥90% agreement vs cached-Sonnet ground truth).
+- Validation goes through X-native `validate_haiku_result` (production path); the YouTube classifier_validation gate is informational only on X.
+- X scout runs as a daily 07:30 cron (`~/eidolum-ops/x_scout_daily.sh`), commit-per-handle.
+
+### Extraction rules (the live Sonnet prompt, verified in code)
+
+- **ACCEPT all real tickers worldwide + crypto** — US stocks bare (AAPL), non-US with the Yahoo-Finance exchange suffix (BARC.L, SHOP.TO, 0700.HK, RELIANCE.NS…), crypto bare (BTC, ETH). **No minimum verbatim_quote length** — never drop a real prediction for being short. Direction must be bullish/bearish, never neutral.
+- **REJECT at classify time:** past-tense reporting; **inferred direction** (direction derived from sector/mechanism talk rather than an explicit forward call on THAT ticker); ad reads; pronoun-only context; wrong-ticker attribution; contradictory pairs; hallucinated tickers.
+- **Baskets are NOT prompt-rejected** — the classify-time basket REJECT was deliberately removed (`c992f51`). Enumerated multi-ticker baskets are extracted normally and **Rule 15 flags them `is_weak_basket_call=TRUE` post-insert** (hidden, auditable, reversible). Genuine multi-buys flow through (Rule 15 exempts them). Do not re-add a basket REJECT to the prompt.
+- Every prediction must carry `timeframe_days` + `timeframe_category` + `conviction_level` or the gate discards it downstream.
+
+### Reboot durability + controlled restart (`~/eidolum-ops`)
+
+The run survives reboots via a no-sudo supervision chain: **`launch.ps1`** (HKCU Run key + Startup `.lnk` at logon, plus the `EidolumRecoveryKeepalive` Task-Scheduler task every 15 min) → **`ensure.sh`** (idempotent; the trailing `sleep 3` is mandatory or session teardown reaps the detached child) → **`supervise.sh`** (flock singleton, restarts the watchdog) → **`recovery_watchdog.py`** (on start: **adopts** an already-running worker or launches one — never duplicates; then guards against worker death, checkpoint stall, and mid-run Postgres password rotation, backing up the checkpoint before every mutation).
+
+Touch-file controls: `recovery_watchdog.pause` (monitor-only, take no action), `recovery_watchdog.stop` (watchdog exits), **`recovery.disabled` = the real master kill** — a stop file alone is resurrected by the 15-min keepalive.
+
+**Controlled-restart playbook** (e.g. to pick up a new prompt):
+1. `touch ~/eidolum-ops/recovery_watchdog.pause` — watchdog observes but won't act.
+2. Back up the checkpoint (`backend/scripts/_artifacts/_recovery_checkpoint.json`).
+3. Kill the worker chain by **interpreter-based match** (e.g. `pgrep -f 'python3 .*cc_recover_classifier_errors'` then kill those PIDs and their `claude` children). **Never bare `pkill -f`** — it self-matches the invoking shell.
+4. Relaunch the worker (or let the watchdog do it at the next poll).
+5. `rm ~/eidolum-ops/recovery_watchdog.pause`.
+6. Verify the watchdog **re-adopts** the new worker and exactly ONE instance is running.
+
+The checkpoint is SACRED — never reset/deleted; only hollow-done rows are reverted to pending after a verified password rotation.
 
 ---
 
@@ -31,6 +79,25 @@ Rejecting matches at insert time:
 | 10 | `hypothetical_scenario` | "if X then Y" framing, not a conviction call |
 | 11 | `question_rhetorical` | rhetorical question, not a statement (**flipped to enforce 2026-06-08**) |
 | 13 | `basket_too_broad` | whole-sector/index basket too broad to score (**flipped to enforce 2026-06-08**) |
+| 15 | `basket_enumeration` | quote names ≥3 companies + soft framing + NO first-person buy-conviction (the CLF/AA enumerated-basket; **ENFORCE 2026-06-11**) → sets `is_weak_basket_call` |
+
+### Gate operating model (2026-06-11) — master is SHADOW; flag-not-delete
+
+The master env `CLASSIFIER_VALIDATION_GATE` is **`shadow`** on the worker — so the gate does **NOT block inserts**. The model is **flag-not-delete**: flag-backed rules set their visibility flag at insert *regardless* of master mode, so the row inserts but is hidden via `hedged_filter_sql`. `_classifier_validation_gate` (`youtube_classifier.py`) maps:
+- **Rule 15 `basket_enumeration` → `is_weak_basket_call`** (ticker_call only; the quote-text signal above; per-rule `CLASSIFIER_RULE_BASKET_ENUMERATION=enforce`).
+- **Rule 7 `reported_speech` → `is_reported_speech`**.
+Structural rules (`invalid_ticker`, etc.) only log under the shadow master.
+
+**Concurrent-session guards (do not regress these):**
+- **Keep `CLASSIFIER_VALIDATION_GATE=shadow`. NEVER flip the master to `enforce`** — enforce = hard-block/delete at insert, which destroys the flag-not-delete audit trail. Flag-backed rules already act under shadow; flipping the master buys nothing and loses data.
+- **Don't "fix" hidden baskets.** Rows with `is_weak_basket_call=TRUE` are *intentionally* inserted-and-hidden (via the `hedged_filter_sql` bundle). Finding flagged basket rows in the DB is the system working, not a bug — do not unflag, delete, or "rescue" them.
+- Rule 15 known blind spot: it misses narrowed-quote basket members (the BWB sweep `a363f11` hand-flagged 10 such rows that Rule 15's quote-text signal can't catch). Sweeps fix history; the rule covers the common forward case.
+
+**X ingest** (`x_scraper._insert_prediction`, the single funnel for x_ingest/x_scout/requeue) is wired through the same `validate_or_reject` but **SHADOW-ONLY**: it logs `[x_gate_shadow]` and **flags nothing**. **X STAYS LOOSE BY PRODUCT DECISION** — R7 reported-speech OFF, R6 min-length OFF, R1 invalid_ticker MUST pass crypto (equity-only ticker table would false-reject ~85 crypto/ETF). Any X enforcement must be **X-scoped**, never the shared gate. **Structured paths (Benzinga/FMP/RSS/upgrade) are NOT gated** — structured ratings with no quote; the speech rules would only false-reject.
+
+### Conditional predictions (LIVE 2026-06-11)
+
+The live claude -p prompt (`build_cc_prompt(conditional=True)` in `scripts/cc_recover_classifier_errors.py`) emits `conditional_call` with a STRUCTURED **checkable** trigger (`trigger_type` ∈ price_break/price_hold/fed_decision/economic_data/market_event/other + trigger_ticker/price/deadline). VAGUE triggers → `trigger_type=other` → scored `unresolved`, **never a flat MISS**. The whole pipeline (validator `conditional_call` branch → `insert_youtube_conditional_prediction` → evaluator) was already wired; this was prompt-only. The evaluator `_process_conditional_calls` (`jobs/historical_evaluator.py`) fires **price** triggers (price_bars) + **rate** (`fmp_treasury_rates`/`fmp_economic_indicators` federalFunds) + **commodity/index** (`fmp_commodities`) via `_check_macro_trigger`; unfired-by-deadline or vague → `unresolved`. The **"inferred direction" REJECT in the prompt STAYS** (drops vague single-ticker over-inferences going forward). **214 historical flat-scored conditionals/over-inferences were re-marked `unresolved`** (51 clean price-conditionals + 163 LLM-judged vague/explanatory; 135 genuine calls deliberately kept).
 
 ### Rule 12 `prediction_date_passed` — MATHEMATICALLY DEAD
 All live YouTube inserts set `prediction_date == video.publish_date`, so `target_date < publish_date` is impossible by construction. The rule can never fire in prod. **Do NOT ship the caller-plumbing change** to feed it a separate target date — it's wasted work against a condition that cannot occur.
@@ -70,7 +137,7 @@ See memories `[[reference_cc_recover_hang_signature]]` and `[[reference_railway_
 
 ## Environment Variables (Railway)
 
-`DATABASE_URL`, `DATABASE_PUBLIC_URL` (monorail.proxy.rlwy.net), `JWT_SECRET`, `MASSIVE_API_KEY` (Benzinga + Polygon), `FMP_KEY`, `TIINGO_API_KEY`, `YOUTUBE_API_KEY`, `JINA_API_KEY`, `APIFY_API_TOKEN`, `GOOGLE_CLIENT_ID/SECRET`, `RESEND_API_KEY`, `FINNHUB_KEY`, `ANTHROPIC_API_KEY`, `GROQ_API_KEY`, `RUNPOD_API_KEY`, `RUNPOD_ENDPOINT_ID`, `USE_FINETUNED_MODEL` (true=Qwen primary, false=Haiku primary), `ENABLE_EVALUATOR`
+`DATABASE_URL`, `DATABASE_PUBLIC_URL` (monorail.proxy.rlwy.net), `JWT_SECRET`, `MASSIVE_API_KEY` (Benzinga + Polygon), `FMP_KEY`, `TIINGO_API_KEY`, `YOUTUBE_API_KEY`, `JINA_API_KEY`, `APIFY_API_TOKEN`, `GOOGLE_CLIENT_ID/SECRET`, `RESEND_API_KEY`, `FINNHUB_KEY`, `ANTHROPIC_API_KEY`, `ENABLE_EVALUATOR`. **Dead knobs still present:** `GROQ_API_KEY` (Groq ruled out as classifier), `RUNPOD_API_KEY`/`RUNPOD_ENDPOINT_ID`/`USE_FINETUNED_MODEL` (RunPod/Qwen path retired — classification runs via laptop `claude -p`, see Classifier architecture).
 
 ---
 
@@ -88,8 +155,8 @@ See memories `[[reference_cc_recover_hang_signature]]` and `[[reference_railway_
 - **After backfill:** Downgrade to Starter plan
 - **Key:** `FMP_KEY` env var on Railway
 
-### X/Twitter — ~172 predictions
-- **X/Twitter scraper** (`x_scraper.py`): every 6h, uses Apify ($29/mo Starter) to scrape tweets with cashtags. Haiku classifier with Groq fallback. Blocklisted news firehose handles: @DeItaone, @zerohedge, @unusual_whales. Currently failing — Anthropic credit balance too low (400 errors as of 2026-04-16). Needs either credits topped up or migration to Qwen/Groq.
+### X/Twitter
+- **X scout** (`x_yield_probe_run.py`, daily 07:30 cron via `~/eidolum-ops/x_scout_daily.sh`): Haiku via `claude -p` with the gate-cleared X_ADDENDUM v2 — see **Classifier architecture** above. Inserts funnel through `x_scraper._insert_prediction` (shadow-gated, flags nothing — X stays loose by product decision). Blocklisted news firehose handles: @DeItaone, @zerohedge, @unusual_whales. Apify $29/mo Starter fetches tweets.
 
 ### StockTwits — 0 predictions (NEEDS DEBUGGING)
 - **Scraper:** `stocktwits_scraper.py` via Apify (`shahidirfan~stocktwits-sentiment-scraper`)
@@ -111,9 +178,11 @@ See memories `[[reference_cc_recover_hang_signature]]` and `[[reference_railway_
 - **Scraper:** `scrape_finnhub_upgrades()` in `upgrade_scrapers.py`
 - **Key:** `FINNHUB_KEY` env var (not set)
 
-### YouTube — ~8,354 predictions (7-day window as of April 16)
-- **V1:** `youtube_scraper.py` — every 8h, quota-limited
-- **YouTube V2 Channel Monitor** (`youtube_channel_monitor.py`): every 12h, targets 45 specific finance YouTuber channels. Full transcript classification via AI. Primary classifier: fine-tuned Qwen 2.5 7B on RunPod Serverless (deployed 2026-04-16). Automatic fallback to Haiku if RunPod fails. Feature flag: `USE_FINETUNED_MODEL` env var. Backend function: `call_runpod_vllm()` in `backend/jobs/youtube_classifier.py`. RunPod endpoint: `um17arzngz2g4b`, vLLM v2.14.0, OpenAI-compatible API. Network volume: `eidolum-model` (US-TX-3). Model path: `/runpod-volume/eidolum-qwen-merged`. Cost: ~$0.0012/call (~$11/mo) vs ~$36/mo Haiku — 70% reduction. `verified_by` tag: `youtube_qwen_v1` (Qwen) or `youtube_haiku_v1` (Haiku fallback). ~8,354 YouTube predictions over 7 days as of 2026-04-16.
+### YouTube
+- **V1:** `youtube_scraper.py` — every 8h, quota-limited (title parsing).
+- **Channel Monitor** (`youtube_channel_monitor.py`): every 12h on the Railway worker, discovers new videos from the `TARGET_CHANNELS` code list (DB `is_active` toggles auto-revert — drop channels by editing the code list). Videos that fail classification land in `transcript_status = 'classifier_error'`.
+- **Classification** happens on the laptop via `cc_recover_classifier_errors.py` (continuous Sonnet + Haiku pre-filter — see **Classifier architecture** above). The old Qwen/RunPod path (`call_runpod_vllm()` in `youtube_classifier.py`) is RETIRED dead code; `verified_by` cohort for the current run is `cc_sonnet_recovery_2026_05_17`.
+- Per-(video,ticker) dedup: the pipeline keeps at most ONE prediction per video+ticker — multi-target calls collapse (intentional).
 
 ---
 
@@ -147,6 +216,35 @@ Wave 2 harvest populated 9 additional FMP-sourced reference tables totalling ~65
 
 Per-ticker autoretry drivers live in `backend/scripts/`. The bulk harvest is in `backend/scripts/run_fmp_bulk_harvest.py` + `backend/jobs/fmp_bulk_harvest.py`.
 
+### FMP local data — broader inventory (2026-06-11)
+
+The FMP Ultimate harvest is essentially COMPLETE: **~25 `fmp_*` tables** already local — financial statements (`fmp_income_statements`/`balance_sheets`/`cash_flows` ~1.37M each), `fmp_insider_trades`, `fmp_dividends`, `fmp_splits`, `fmp_analyst_estimates`, `fmp_grades_*`, `fmp_earnings`, etc. — PLUS 4 NEW macro tables harvested 2026-06-11: **`fmp_commodities`** (40 futures, 1970→), **`fmp_forex`** (20 majors), **`fmp_economic_indicators`** (GDP/CPI/federalFunds/unemployment/…), **`fmp_treasury_rates`** (full curve). Reusable driver: `backend/scripts/harvest_fmp_macro.py` (idempotent, storage-guarded). **DON'T re-harvest** — FMP's plan/data is largely "drunk" (downgrade pending) and the local tables are the source of truth; persist-once. **Steel is NOT an FMP commodity** — use steel stocks / `SLX` / copper (`HGUSD`) as macro proxies for steel theses. New tables created manually via `DATABASE_PUBLIC_URL` (RUN_STARTUP_DDL false).
+
+---
+
+## Sector & symbol resolution (2026-06-10)
+
+The SINGLE sector-stamp helper for EVERY ingest path is `backend/jobs/sector_lookup.py::get_sector(ticker, db=None, source_sector=None, source=None)`. Precedence: `TICKER_SECTOR_OVERRIDES` (40 hand-verified entries for bad reference data) → crypto (`is_crypto_for_source` for `COLLISION_SYMBOLS`: analyst-source ⇒ the equity, else the coin) → ETF guard (`_is_etf` ⇒ keep the source-provided stamp, never the FinServ reference row) → `display_sector()` (ticker_sectors → company_profiles → Finnhub). Always returns one of the **13 display buckets** (`MORNINGSTAR_SECTORS` 11 + `Crypto` + `Other`).
+
+- **SACRED:** never group/filter a USER surface by raw `predictions.sector` or `ticker_sectors.sector` — always go through `display_sector()` (`utils/sector.py`). New bad-reference fixes go into `TICKER_SECTOR_OVERRIDES`, NEVER an ad-hoc UPDATE.
+- `crypto_prices.py` (at **`backend/crypto_prices.py`**, not `services/`) holds: `COLLISION_SYMBOLS` {LTC,SOL,SAND,BCH,TRX,ARB,ATOM,CORE}, `is_crypto_for_source`, `PRICE_TICKER_OVERRIDES` (`fetch_as` rename / `terminal.stock` / `terminal.cash` — evaluator equity branch only), `KNOWN_TICKER_REASSIGNMENTS` + `is_stale_reassigned` (ticker-reuse-era flagging).
+- **Filter bundle:** `hedged_filter_sql`/`hedged_filter_clause` (`routers/_prediction_filters.py`) now ANDs **hedged + reported_speech + is_ambiguous_symbol + is_weak_basket_call** — use it on EVERY user-facing + leaderboard + worker-cached-stats surface. Kill switches `HIDE_AMBIGUOUS_SYMBOLS` / `HIDE_REPORTED_SPEECH` / `HIDE_WEAK_BASKET_CALLS` (all default on). `is_weak_basket_call` = the basket/over-inference hide flag (set by Rule 15 forward + backfilled). **Leak landmine:** `/asset/{ticker}/consensus` (`routers/assets.py`) and the profile prediction-history (`_get_preds`, `routers/forecasters.py`) were each rendering flagged rows because they used standalone/partial filters — both now apply the bundle (patched 2026-06-11). When adding a surface that lists predictions, apply the bundle.
+
+---
+
+## Product Themes (LIVE 2026-06-09)
+
+A second, overlapping "by product" axis alongside the exclusive sector axis. `themes` + `theme_tickers` tables (migration `0019`, `models.Theme`/`ThemeTicker`, **many-to-many** — a ticker can be in N themes), flag `ENABLE_PRODUCT_THEMES` (ON, config table). Helpers in `services/themes.py` (`get_theme_tickers`, `get_ticker_themes`, `theme_ticker_filter_sql`). Routes: `/api/themes`, `/api/themes/{slug}` (return `[]`/404 while the flag is off), `/api/consensus?theme=`. Admin CRUD in `routers/admin.py` (`/admin/themes*`) + the Product Themes tab in `AdminDashboard.jsx`.
+
+- **Theme/sector top-forecaster lists rank by SHRINKAGE**, not raw accuracy: `adjusted = (points + C*m) / (scored + C)`, config `THEME_SECTOR_SHRINKAGE_C` (default 20) + floor `THEME_SECTOR_MIN_SCORED` (default 3); in `routers/themes.py` + `routers/leaderboard.py`. Display raw accuracy + n only; **never surface the adjusted score.**
+- Sector/theme explainer copy: `SECTOR_META` (`utils/sector.py`) + `themes.description`.
+
+---
+
+## Admin — Live Presence + responsive admin (2026-06-10)
+
+`presence_sessions` table (migration `0021`, `models.PresenceSession`). `POST /api/presence/ping` is PUBLIC (anonymous visitors ping too), returns 204, all errors swallowed (a failed ping must never break page load). `GET /api/admin/presence` (`require_admin`) reports the 2-minute online window and does inline >1h-stale cleanup — **no worker job**. Anon id is per-browser (`localStorage 'eidolum_presence_id'`, minted in `pingPresence`, `frontend/src/api/index.js`); signed-in sessions collapse to `u:<user_id>`. `LivePresencePanel` (heartbeat `hooks/usePresenceHeartbeat.js`) sits on the admin Overview tab. **Platform Hit Rate card** — `GET /api/admin/global-hit-rate` (`require_admin`): platform-wide hit rate / three-tier accuracy / per-forecaster mean over the filtered scored set; `LivePresencePanel` + `PlatformHitRatePanel` on the Overview tab. The admin dashboard is now responsive (usable at phone width — wrapped tab bar, ScrollTable wrappers with a visible swipe hint).
+
 ---
 
 ## Evaluator Status (April 2026)
@@ -165,9 +263,10 @@ Per-ticker autoretry drivers live in `backend/scripts/`. The bulk harvest is in 
 ## Feature Flags
 
 ### Classifier flags (Railway worker env vars)
-- `USE_FINETUNED_MODEL` — `true` (Qwen primary) / `false` (Haiku primary). **Currently TRUE.**
+- `USE_FINETUNED_MODEL` — **DEAD** (Qwen/RunPod retired; classification runs on the laptop via `claude -p`)
 - `ENABLE_EVALUATOR` — enables/disables the evaluator job
-- `USE_GROQ_PREFILTER` — Groq Layer 3 pre-filter, default OFF
+- `USE_GROQ_PREFILTER` — **DEAD** (Groq ruled out; the pre-filter is Haiku inside `cc_recover_classifier_errors.py`)
+- `CLASSIFIER_VALIDATION_GATE` — **`shadow`, never flip to enforce** (see gate section); per-rule `CLASSIFIER_RULE_*` shadow switches exist
 
 ### ENABLE_* flags (config table, all ON as of April 13 2026)
 All 13 `ENABLE_*` flags confirmed ON. Stored in config table (key/value VARCHAR pairs).
@@ -190,8 +289,8 @@ If any link breaks, the prediction is SKIPPED, not inserted incomplete. This is 
 ### Two-admin-files landmine
 New admin code MUST go in `backend/routers/admin.py` + `frontend/src/AdminDashboard.jsx` using `authHeaders()`. Placing admin endpoints anywhere else breaks the auth flow.
 
-### Haiku prompt stack is additive
-Never edit `HAIKU_SYSTEM` in place. Append new `YOUTUBE_HAIKU_*_INSTRUCTIONS` constants at call time.
+### Haiku prompt stack is additive — SACRED
+**Never touch `HAIKU_SYSTEM` or the 14 instruction blocks** (`youtube_classifier.py`). Never edit in place — append new `YOUTUBE_HAIKU_*_INSTRUCTIONS` constants at call time. The X classifier follows the same pattern: `X_ADDENDUM` is appended to `HAIKU_SYSTEM` in `x_yield_probe_run.py`, never merged into it. Every classifier prompt change is eval-gated before it ships (TPR/FPR/parse-rate fixture; >5pp TPR drop = no merge).
 
 ### Predictions column gotchas
 `target_price`, `context`, `source_type`, `verified_by`; `entry_price` is NULL at insert (evaluator fills from price history at scoring time).
@@ -269,6 +368,47 @@ Polygon, Tiingo, Benzinga, FMP, MarketBeat, Alpha Vantage, NewsAPI, Massive, Api
 
 **How to apply:** Genericize copy ("licensed real-time market data"); collapse provider-named source badges to platform-neutral labels ("Wall St" for analyst-aggregator-derived rows). DO touch JSX text, button labels, SEO meta, source badges. DO NOT touch: backend code, `verified_by` DB values, code comments, URL allowlist arrays, admin pages, env vars, log lines. Default scope expansion: if a new vendor name appears in the same UI surface as a scrubbed one, apply the same treatment.
 
+### `backdrop-filter` traps `position:fixed` (2026-06-09)
+The sticky `<nav>` uses `backdrop-blur-md` (a backdrop-filter), which makes it the containing block for any `position:fixed` descendant. A full-screen `fixed` mobile overlay rendered *inside* the nav collapses to the nav's box → invisible on mobile (desktop `absolute`-anchored variants are unaffected). This broke the notifications bell + toast, fixed by portaling them to `document.body` (commit `56c09bc`). **Rule:** portal ANY `fixed` overlay / dropdown / modal that lives inside the nav to `document.body`.
+
+### Shared UI state via URL, not localStorage (2026-06-09)
+The leaderboard sort metric was persisted in localStorage (`eidolum_metric`) and used as the load default → PC and mobile showed different rankings. Now URL-driven (`?metric=hit_rate|avg_return|alpha`, default `hit_rate`; localStorage default removed, commit `abf051d`). **Rule:** canonical/shared UI state belongs in the URL with a fixed default; only per-device cosmetic prefs belong in localStorage. **Corollary:** the leaderboard renders a desktop `<table>` (`hidden lg:block`) AND a mobile card list (`lg:hidden`) sharing one state — when adding or auditing a leaderboard control, make BOTH branches render it (the metric selector was desktop-only until `87fc5a4` / `1b1173c` added a mobile `<select>` beside the "10+ calls" dropdown).
+
+### RUN_STARTUP_DDL is FALSE in prod — new tables/columns need a MANUAL migration
+Boot DDL is neutralized in prod (engine guard in `database.py`, `startup_ddl_enabled()` default false). `Base.metadata.create_all` and inline `ADD COLUMN`/`CREATE INDEX` do NOT run at app boot — a new table/column will be MISSING in prod until the migration is run manually as the owner (`RUN_STARTUP_DDL=true python backend/migrate.py`, or run the `migrations/00NN_*.sql` directly against `DATABASE_PUBLIC_URL`). **First thing to check on any "column/table missing in prod" bug.**
+
+### Space out production deploys
+A ~10-deploy burst in minutes caused a stale-bundle scare — the site looked unstyled in the dev's own browser but was fine in incognito (cached old chunk vs new index; NOT an outage). Don't fire many prod pushes within a few minutes; let each settle before the next.
+
+### Full forecaster-stats refresh = server-side endpoint, not a local proxy run
+To recompute cached leaderboard/profile stats after a data change (flagging, re-marking, target fixes), POST **`/api/admin/refresh-forecaster-stats`** (require_admin) — it runs `refresh_all_forecaster_stats` on the API over the INTERNAL network in ~60–90s (5,677 forecasters). A transient `502` at ~20s then a clean `200` retry is normal. Do NOT run `refresh_all_forecaster_stats` locally against `DATABASE_PUBLIC_URL` — every query round-trips the public proxy and it crawls (~28 min).
+
+### outcome enum is mixed-era
+`predictions.outcome` mixes legacy + current values. The **HIT bucket = `outcome IN ('hit','correct')`**, **MISS = `('miss','incorrect')`**, plus `near`. Scored set = those five. `unresolved` / `pending` / `no_data` / NULL are excluded from accuracy (numerator AND denominator). Always use the full enum sets in scoring/stat SQL or you silently miscount.
+
+## Security posture (2026-06-08)
+
+Standing rules for all future Eidolum work. Do not regress these.
+
+- **ADMIN_SECRET is HEADER-ONLY (`X-Admin-Secret`).** NEVER accept it via a `?secret=` query param — query params land in logs, browser history, and `Referer` headers. Admin auth is a live `User.is_admin` DB lookup; every inline `@app` admin route carries the `require_admin_any` dependency (admin-JWT **OR** `X-Admin-Secret` header).
+- **saved-predictions + legacy follows endpoints are JWT-scoped (`require_user`, owner derived from the JWT).** NEVER reintroduce client-supplied `user_identifier` / `qa_user_id` (saved) or typed `user_email` keying (follows). `FollowModal.jsx` is DEAD CODE — the live follow path is `FollowButton` → `SubscriptionsContext`.
+- **OAuth Google `state` is signed + validated**; the `OAUTH_STATE_ENFORCE` env var toggles hard-reject. Client-side state binding (browser `sessionStorage` or cookie) is **FORBIDDEN** — it broke Google login on 2026-06-08 (stale-bundle / deploy-window fail-close). Any state↔browser binding MUST be SERVER-SIDE (single-use state in a short-TTL store, consumed at the callback).
+- **DB de-privilege:** the app is moving to a least-privilege `app_worker` role (no DDL rights). Boot-time DDL is gated behind `RUN_STARTUP_DDL` (default false) via an engine-level guard in `database.py`; schema changes run via `RUN_STARTUP_DDL=true python backend/migrate.py` AS OWNER, never at app boot. Do NOT add ungated `create_all` / `ALTER` / `CREATE INDEX` at startup.
+- **Frontend API base = `api.eidolum.com` via `VITE_API_BASE`.** Do NOT hardcode `eidolum-production.up.railway.app` anywhere in frontend code.
+- **Prod security baseline (don't regress):** `/docs` `/redoc` `/openapi.json` are disabled in prod (`EXPOSE_API_DOCS=false`); security headers live in `frontend/vercel.json` + an API-side middleware; CSP is report-only.
+- **Verification rule:** a browser-round-trip auth change (OAuth / cookies / SameSite / sessionStorage) is NOT verified by server-side `curl` — only a real browser sign-in confirms it.
+
+---
+
+## 2026-06-09 session updates
+
+- **Returns — canonical source.** `backend/services/return_display.py` (`verified_true_returns_batch` + single-row) is the ONE source for every per-call return shown to users: it validates `entry_price` against `price_bars` (~±10%), shows the TRUE return for verified rows, floors longs at −100%, and treats `|return| > ~2000%` or unverifiable (no `price_bars` coverage) as untrustworthy → renders "—" in detail views and EXCLUDES the row from showcases (`biggest_calls`). The old blanket +200% display cap is GONE. Reuse `return_display` for any new surface that shows a return, so the same call shows the same number everywhere.
+- **`avg_return` / `alpha` semantics (leaderboard-wide).** Both now = equal-weighted average over DIRECTIONAL (bullish/bearish) scored calls only, using `return_display` TRUE returns — neutral/hold calls are EXCLUDED (a hold isn't an investable position). Computed in `refresh_all_forecaster_stats` (`backend/jobs/historical_evaluator.py`), cached on `forecasters`, consumed by profile tiles + the default leaderboard. **OPEN SEAM:** the live filtered/sorted leaderboard query (`backend/routers/leaderboard.py`) still uses the capped-stored `AVG(actual_return) FILTER (WHERE direction IN bull/bear)`, so a sorted/filtered Avg-Return can differ slightly from the profile tile for big-winner forecasters. Clean fix (deferred): persist a `true_return` column on `predictions` so all paths read one value.
+- **Portfolio Simulator model.** `/api/forecaster/<id>/simulator` is an honest equal-weight model: starting capital split equally across N scored directional calls (`per_call = starting/N`), so `total_return_pct` = the equal-weighted avg per-call return = the profile's Avg Return — bankroll-independent. Chart x-axis is by trade SEQUENCE (date-labeled ticks), not calendar date, to avoid vertical "walls" when many calls share an evaluation date. best/worst = true max/min distinct calls.
+- **Cowork verification limit.** The Cowork sandbox browser is clamped at ~1280px with no headless mobile renderer — mobile (`<lg`) renders cannot be screenshotted there. Verify mobile via DOM/CSS reasoning, by clicking CSS-hidden elements (React handlers still fire), or on a real phone. Claude Code on the machine can use devtools device mode.
+
+See also the two 2026-06-09 frontend landmines above (`backdrop-filter` / shared-URL-state).
+
 ---
 
 ## Sacred patterns added 2026-05-27 → 2026-06-03
@@ -289,7 +429,20 @@ Polygon, Tiingo, Benzinga, FMP, MarketBeat, Alpha Vantage, NewsAPI, Massive, Api
 
 ---
 
-## Current State (April 18, 2026)
+## Current State (2026-06-12)
+
+- **~580K predictions.** Platform is live at eidolum.com. `main ≈ a363f11`.
+- **YouTube classifier is RUNNING continuously on this laptop** — `cc_recover_classifier_errors.py` via `claude -p` (Sonnet extraction + Haiku pre-filter), supervised reboot-durably from `~/eidolum-ops`. Pavilion/Qwen retired, Groq ruled out, RunPod gone. **Do NOT touch the running worker** — use the controlled-restart playbook (Classifier architecture section) for any change.
+- **X classifier is Haiku-only, eval-gated** (X_ADDENDUM v2, 98.2% recall; the X Groq path is retired). The X ingest gate is SHADOW-only and X stays loose by product decision (see the gate section).
+- **Recent data-integrity ships:** BWB basket sweep (`a363f11`, 10 weak-basket + 6 reported-speech hand-flags), 5 target errors fixed (`3e33270`), 214 flat-scored conditionals/over-inferences re-marked `unresolved`. Horizon-mismatch audit found ~126 said-long-term-scored-90d rows (~1%); fix is prompt-rule-first (`_LONG_HORIZON_BLOCK`, eval-gated, drafted but not live).
+- **`SHOW_PLATFORM_PAGES = false`** (`frontend/src/config/uiSwitches.js`) — `/platforms` pages, every link to them, and the profile "#N on <platform>" rank badge are hidden for a YouTube-API audit review window. Flip to `true` to restore everything in one line.
+- **OPEN BUG (flag only — don't fix unless asked): evaluator bypasses `price_bars`.** The main scoring callers do `_fetch_history(ticker, None, None)` (`jobs/historical_evaluator.py` ≈ lines 259 / 1322 / 1477 / 1720); `price_store.get_history` returns `{}` for a None range, so the local 20.3M-row L2 cache is skipped and every evaluation hits LIVE FMP. Only `_fetch_override_series` was fixed (explicit full range, 2026-06-11). High-ROI cleanup: pass a real `[publish_date−ε, today]` range so the price_bars hit lands.
+
+See the dedicated **Sector & symbol resolution**, **Product Themes**, and **Admin — Live Presence** sections above for the architecture shipped since launch.
+
+---
+
+## Earlier state (April 18, 2026)
 
 - **~558K predictions**, ~6,000+ forecasters
 - **Fine-tuned Qwen 2.5 7B DEPLOYED** to RunPod Serverless — replaces Haiku for YouTube classification
@@ -343,7 +496,7 @@ Maps `verified_by` field to human-readable provider name:
 
 | Service | Cost | Notes |
 |---------|------|-------|
-| Claude Pro | $200 | Development |
+| Claude Max | $200 | Development + classifier (`claude -p` bills here, $0 API) |
 | Benzinga Massive | $99 | API access |
 | FMP Ultimate | $139 | TEMPORARY — downgrade after backfill |
 | Tiingo Power | $30 | Price data, 100K req/day |
