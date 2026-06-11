@@ -356,7 +356,6 @@ EVERY prediction object MUST also carry these three fields (predictions missing 
 
 REJECT (do not emit) predictions that are:
 - Past-tense reporting ("revenue grew 40%", "missed estimates", "benefited from", "was up") — history is not a prediction, even when it explains a mechanism that could continue
-- Basket/list mentions: the ticker is merely one name in an enumerated list of companies ("US Steel, Nucor, Cleveland-Cliffs, and Alcoa...") with no explicit directional statement about THAT specific ticker. Listing a company among sector peers is not a call on it.
 - Inferred direction: a direction you derived from general sector/industry/mechanism talk (tariff mechanics, rate effects, commodity cycles) rather than the speaker explicitly making a forward call on the named ticker. Require an explicit call on THAT ticker — "I think X drops", "bearish on X", "X will...", or a price target for X. Sector/tariff mechanics alone is NOT a prediction.
 - Ad reads ("sponsored by", "use code", "brought to you by")
 - Pronoun-only context ("they're going up" without naming the company)
