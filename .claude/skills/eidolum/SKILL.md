@@ -2,7 +2,7 @@
 
 **Last updated:** June 12, 2026
 
-**Current state 2026-06-12:** live (~580K predictions). **The classifier is laptop-driven `claude -p`** — Pavilion/Qwen RETIRED, Groq ruled out, RunPod gone. YouTube = `cc_recover_classifier_errors.py` (continuous Sonnet extraction + Haiku pre-filter, reboot-durable via `~/eidolum-ops`); X = `x_yield_probe_run.py` (Haiku + gate-cleared X_ADDENDUM v2). See **Classifier architecture (CURRENT)** below. Also live: sector+symbol resolution unified through one stamp helper (`jobs/sector_lookup.get_sector`); Product Themes; admin Live Presence + **Platform Hit Rate** card; **flag-not-delete classifier gate** (Rule 15 basket_enumeration→`is_weak_basket_call`, Rule 7→`is_reported_speech`, both flag-on-insert since `da6f245`); **conditional predictions live** (checkable triggers scored, vague→`unresolved`); 4 macro tables (`fmp_commodities/forex/economic_indicators/treasury_rates`). `/platforms` hidden (`SHOW_PLATFORM_PAGES=false`, compliance). OPEN BUG: evaluator bypasses `price_bars` (live FMP per call). See the dated **Current State (2026-06-12)** section below. `main≈a363f11`.
+**Current state 2026-06-12:** live (~580K predictions). **The classifier is laptop-driven `claude -p`** — Pavilion/Qwen RETIRED, Groq ruled out, RunPod gone. YouTube = `cc_recover_classifier_errors.py` (continuous Sonnet extraction + Haiku pre-filter, reboot-durable via `~/eidolum-ops`); X = REVIVED for proven accounts via the local scout (`x_scout.py` daily cron, Haiku + gate-cleared X_ADDENDUM v2). See **Classifier architecture (CURRENT)** below. Also live: sector+symbol resolution unified through one stamp helper (`jobs/sector_lookup.get_sector`); Product Themes; admin Live Presence + **Platform Hit Rate** card; **flag-not-delete classifier gate** (Rule 15 basket_enumeration→`is_weak_basket_call`, Rule 7→`is_reported_speech`, both flag-on-insert since `da6f245`); **conditional predictions live** (checkable triggers scored, vague→`unresolved`); 4 macro tables (`fmp_commodities/forex/economic_indicators/treasury_rates`). `/platforms` hidden (`SHOW_PLATFORM_PAGES=false`, compliance). OPEN BUG: evaluator bypasses `price_bars` (live FMP per call). See the dated **Current State (2026-06-12)** section below. `main≈a363f11`.
 
 Eidolum tracks Wall Street analyst predictions and scores them against real market data. The platform ingests predictions from multiple sources (Benzinga, FMP, X/Twitter, StockTwits, YouTube, RSS feeds), timestamps them immutably, then evaluates them against actual stock performance.
 
@@ -29,11 +29,12 @@ Eidolum tracks Wall Street analyst predictions and scores them against real mark
 - Transcripts are live re-fetched per batch (the timestamp gate needs timing data) and **persisted via `persist_transcript()` the moment they arrive**, before classification — never delete `video_transcripts`.
 - `claude -p` is invoked with API-routing env vars scrubbed so it bills the Max plan, from an empty cwd so it finds no CLAUDE.md.
 
-### X — `backend/scripts/x_yield_probe_run.py`
+### X — REVIVED for PROVEN accounts only (`backend/scripts/x_*.py`)
 
-- **Haiku** (`claude -p --model haiku`) with **`X_ADDENDUM` v2** appended to `HAIKU_SYSTEM` at call time (additive, never edited in place). v2 **passed the held-out gate: 98.2% recall, 97.7% ticker+direction agreement, 84% skip** (223 pos + 200 neg, tuning examples excluded). v1 failed at 93.3% recall. **Do not change the model or addendum without re-running the gate** (bar: ≥95% recall, ≥90% agreement vs cached-Sonnet ground truth).
-- Validation goes through X-native `validate_haiku_result` (production path); the YouTube classifier_validation gate is informational only on X.
-- X scout runs as a daily 07:30 cron (`~/eidolum-ops/x_scout_daily.sh`), commit-per-handle.
+- **Classifier = Haiku** (`claude -p --model haiku`, LOCAL, bills the Max plan — **run with `ANTHROPIC_API_KEY` unset**) with **`X_ADDENDUM` v2** appended to `HAIKU_SYSTEM` at call time (additive, never edited in place). v2 **passed the held-out gate: 98.2% recall, 97.7% ticker+direction agreement, 84% skip** (223 pos + 200 neg, tuning examples excluded). v1 failed at 93.3% recall. **Do not change the model or addendum without re-running the gate** (bar: ≥95% recall, ≥90% agreement vs cached-Sonnet ground truth). NOT Groq, NOT Haiku-via-API, NOT Sonnet.
+- **File roster:** `x_yield_probe.py` + `x_yield_probe_run.py` (per-account yield probe + classify harness), `x_ingest.py` (seed/manual ingest), `x_scout.py` (daily auto pipeline: **discover → probe → promote → ingest**; dry-run by default, `--live` for prod writes; promote bar ≈ yield ≥0.10, ≥3 preds, ≥1/week, ≥300 followers, spam ≤30%).
+- **Shared insert funnel:** ALL X writes go through `jobs/x_scraper.py::_insert_prediction` — dedup on `source_platform_id`; `source_type='x'`, `verified_by='x_scraper'`, `source_verbatim_quote`=tweet body, `entry_price` NULL at insert. The real X gate is `validate_haiku_result` (LOOSE — see the gate section); the shared `validate_or_reject` (`jobs/classifier_validation.py`) also runs but in SHADOW only (`[x_gate_shadow]` log, blocks nothing, fail-open).
+- **Daily run:** `~/eidolum-ops/x_scout_daily.sh` via WSL cron `30 7 * * *` — flock against overlap, pulls fresh DB/Apify creds from Railway (cached fallback), `unset ANTHROPIC_API_KEY`, hard `DAILY_APIFY_CAP = $1.00`. **Kill switch:** `~/quantanalytics/.x_scout_enabled` must contain `1`/`true` for `--live` to run — **remove the file (or write `0`) to stop**; absent = off before any spend. State: `~/quantanalytics/.x_scout_state.json` (LOCAL, never a prod table).
 
 ### Extraction rules (the live Sonnet prompt, verified in code)
 
@@ -155,8 +156,8 @@ See memories `[[reference_cc_recover_hang_signature]]` and `[[reference_railway_
 - **After backfill:** Downgrade to Starter plan
 - **Key:** `FMP_KEY` env var on Railway
 
-### X/Twitter
-- **X scout** (`x_yield_probe_run.py`, daily 07:30 cron via `~/eidolum-ops/x_scout_daily.sh`): Haiku via `claude -p` with the gate-cleared X_ADDENDUM v2 — see **Classifier architecture** above. Inserts funnel through `x_scraper._insert_prediction` (shadow-gated, flags nothing — X stays loose by product decision). Blocklisted news firehose handles: @DeItaone, @zerohedge, @unusual_whales. Apify $29/mo Starter fetches tweets.
+### X/Twitter — REVIVED (proven accounts only)
+- **X scout** (`x_scout.py` daily 07:30 cron via `~/eidolum-ops/x_scout_daily.sh`; `x_ingest.py` for seed/manual): Haiku via local `claude -p` with the gate-cleared X_ADDENDUM v2 — see **Classifier architecture** above for the full roster, kill switch (`.x_scout_enabled`), and state file. Inserts funnel through `x_scraper._insert_prediction` (shadow-gated, flags nothing — X stays loose by product decision). Blocklisted news firehose handles: @DeItaone, @zerohedge, @unusual_whales. Apify $29/mo Starter fetches tweets ($1/day scout cap).
 
 ### StockTwits — 0 predictions (NEEDS DEBUGGING)
 - **Scraper:** `stocktwits_scraper.py` via Apify (`shahidirfan~stocktwits-sentiment-scraper`)
@@ -291,6 +292,15 @@ New admin code MUST go in `backend/routers/admin.py` + `frontend/src/AdminDashbo
 
 ### Haiku prompt stack is additive — SACRED
 **Never touch `HAIKU_SYSTEM` or the 14 instruction blocks** (`youtube_classifier.py`). Never edit in place — append new `YOUTUBE_HAIKU_*_INSTRUCTIONS` constants at call time. The X classifier follows the same pattern: `X_ADDENDUM` is appended to `HAIKU_SYSTEM` in `x_yield_probe_run.py`, never merged into it. Every classifier prompt change is eval-gated before it ships (TPR/FPR/parse-rate fixture; >5pp TPR drop = no merge).
+
+### X pipeline landmines (2026-06-12)
+
+- **X gate stays LOOSE by PRODUCT decision** — capture every prediction. Do NOT enforce Rule 7 (reported_speech), Rule 6 (min-length), or Rule 1 (invalid_ticker — equity-only table, would kill ~85 crypto/ETF rows; **crypto COUNTS on X**). The YouTube gate's 40-char `context_too_short` destroys X yield. Full wiring in the gate section above.
+- **`jobs/classifier_validation.py` is SHARED with YouTube** — any rule change there affects both pipelines. Keep X tuning X-scoped (the `x_scraper` side / `validate_haiku_result`); coordinate before touching the shared file.
+- **`claude -p` classification runs LOCAL only** (this laptop, never the Railway worker) and bills the Max plan — **never export `ANTHROPIC_API_KEY` into its env** (the Anthropic API balance is $0; Max ≠ API credit, and credit errors surface as HTTP 400 not 402). Groq free tier was ruled out at ~26 classifications/day.
+- **Leaderboard floor: source-scoped leaderboards (incl. X) require 10 graded predictions to appear** (global default floor is 35; `routers/leaderboard.py`). NEVER lower the floor to 1 — a 1/1 forecaster shows 100% accuracy, which is fake data.
+- **Small-sample eval gates are unreliable.** Confirm classifier recall on a held-out set of 150+ per class before trusting it: Haiku passed a 60+60 gate at 96.7% recall, then FAILED the 150+150 gate at 93.3% (fixed by X_ADDENDUM v2 → 98.2%).
+- **The scout's self-reported $/day ledger UNDERCOUNTS real Apify spend** (per-run fan-out isn't fully attributed), so its `DAILY_APIFY_CAP=$1.00` is not a reliable ceiling — verify actual spend against Apify billing (`users/me/limits`), especially on the free $5/mo cap (exhaustion = HTTP 403 platform-feature-disabled).
 
 ### Predictions column gotchas
 `target_price`, `context`, `source_type`, `verified_by`; `entry_price` is NULL at insert (evaluator fills from price history at scoring time).
@@ -570,7 +580,7 @@ Pattern: `rows_by_pk = {(r['ticker'], r['date']): r for r in rows}` then write `
 | alphavantage | 8h | +65min | News sentiment |
 | finnhub_upgrades | 8h | +70min | Needs API key |
 | channel_monitor | 12h | +90min | YouTube channels |
-| x_scraper | 6h | immediate | Apify Twitter |
+| x_scraper | 6h | immediate | LEGACY — Groq→Haiku-API chain, effectively dead (Groq ruled out, API balance $0); real X path = local scout |
 | stocktwits_scraper | 6h | immediate | Apify StockTwits |
 | process_logos | 24h | +5min | Logo pipeline |
 | fmp_ultimate | 24h | immediate | One-time backfill |
