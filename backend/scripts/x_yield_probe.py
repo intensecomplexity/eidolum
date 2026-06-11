@@ -18,7 +18,7 @@ ticker_sectors / company_name_aliases lookups only.
 Checkpoints to JSON so an interrupted/limit-hit run resumes without
 re-spending Apify.
 """
-import os, sys, json, re, time, argparse
+import os, sys, json, re, time, argparse, fcntl
 from datetime import datetime, timezone
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
@@ -106,6 +106,28 @@ def save_json(p, obj):
     with open(tmp, "w") as f:
         json.dump(obj, f)
     os.replace(tmp, p)
+
+
+def merge_class_ckpt(new_entries):
+    """Cross-process-safe ADD-ONLY merge into the shared classification cache.
+
+    Every writer (x_scout, x_ingest, x_yield_probe, x_yield_probe_run) used
+    to load->mutate->save its own whole snapshot; two overlapping processes
+    then last-writer-wins'd each other (2026-06-10: ~2,400 cached entries
+    wiped). Under an exclusive flock on a sidecar lock file we re-load the
+    CURRENT file, fold in only THIS writer's new entries (keyed by immutable
+    tweet id, so the merge is commutative), and save with the same
+    tmp+rename atomicity. Returns the merged dict.
+    """
+    if not new_entries:
+        return load_json(CLASS_CKPT, {})
+    os.makedirs(os.path.dirname(CLASS_CKPT), exist_ok=True)
+    with open(CLASS_CKPT + ".lock", "w") as lk:
+        fcntl.flock(lk, fcntl.LOCK_EX)
+        cur = load_json(CLASS_CKPT, {})
+        cur.update(new_entries)
+        save_json(CLASS_CKPT, cur)
+    return cur
 
 
 def db_session():
@@ -247,10 +269,11 @@ if __name__ == "__main__":
     db = db_session()
     tweets_ckpt = load_json(TWEETS_CKPT, {})
     class_ckpt = load_json(CLASS_CKPT, {})
+    _class_before = set(class_ckpt)
     if args.test:
         budget = [1000]
         rec = run_account(args.test, args.n, db, tweets_ckpt, class_ckpt,
                           do_classify=True, groq_budget=budget, verbose=True)
         save_json(TWEETS_CKPT, tweets_ckpt)
-        save_json(CLASS_CKPT, class_ckpt)
+        merge_class_ckpt({k: class_ckpt[k] for k in set(class_ckpt) - _class_before})
         print(json.dumps(rec, indent=2, default=str))

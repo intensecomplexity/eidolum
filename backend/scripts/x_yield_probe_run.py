@@ -28,7 +28,8 @@ sys.path.insert(0, HERE)            # x_yield_probe
 sys.path.insert(0, os.path.join(HERE, ".."))  # backend root
 
 from x_yield_probe import (prefilter, trim_tweet, CRYPTO_TICKERS, db_session,
-                           load_json, save_json, TWEETS_CKPT, CLASS_CKPT, CKPT_DIR)
+                           load_json, save_json, merge_class_ckpt,
+                           TWEETS_CKPT, CLASS_CKPT, CKPT_DIR)
 from jobs.x_scraper import _fetch_user_tweets, tweet_id_to_datetime, validate_haiku_result, HAIKU_SYSTEM
 from jobs.classifier_validation import validate_or_reject
 
@@ -274,9 +275,10 @@ def phase_classify():
         with lock:
             if err:
                 print(f"[classify] batch {idx+1}/{nb} ERROR: {err}", flush=True)
-            for tid, _txt in batch:
-                class_ckpt[tid] = res.get(tid, {"is_prediction": False, "_unparsed": True})
-            save_json(CLASS_CKPT, class_ckpt)
+            batch_new = {tid: res.get(tid, {"is_prediction": False, "_unparsed": True})
+                         for tid, _txt in batch}
+            class_ckpt.update(batch_new)
+            merge_class_ckpt(batch_new)
             done["n"] += 1
             print(f"[classify] batch {idx+1}/{nb} done "
                   f"({done['n']}/{nb} complete, +{len(res)}, cached {len(class_ckpt)})", flush=True)
@@ -304,10 +306,10 @@ def phase_recover():
         idx, batch = idx_batch
         res, err = classify_batch(batch)
         with lock:
-            for tid, _ in batch:
-                if tid in res:
-                    class_ckpt[tid] = res[tid]; done["fixed"] += 1
-            save_json(CLASS_CKPT, class_ckpt)
+            batch_new = {tid: res[tid] for tid, _ in batch if tid in res}
+            done["fixed"] += len(batch_new)
+            class_ckpt.update(batch_new)
+            merge_class_ckpt(batch_new)
             done["n"] += 1
             print(f"[recover] batch {idx+1}/{nb} ({done['n']}/{nb}, err={err}, fixed_total={done['fixed']})", flush=True)
 

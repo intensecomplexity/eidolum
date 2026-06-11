@@ -27,7 +27,8 @@ sys.path.insert(0, os.path.join(HERE, ".."))
 
 from sqlalchemy import text, create_engine
 from sqlalchemy.orm import sessionmaker
-from x_yield_probe import prefilter, trim_tweet, CRYPTO_TICKERS, load_json, save_json
+from x_yield_probe import (prefilter, trim_tweet, CRYPTO_TICKERS, load_json,
+                           save_json, merge_class_ckpt, CLASS_CKPT)
 from x_yield_probe_run import classify_batch
 import jobs.x_scraper as xs
 import jobs.news_scraper as ns
@@ -61,7 +62,7 @@ WORKERS = 6
 CKPT_DIR = os.path.expanduser("~/quantanalytics/.x_ingest_ckpt")
 os.makedirs(CKPT_DIR, exist_ok=True)
 TWEETS_CKPT = os.path.join(CKPT_DIR, "tweets.json")
-CLASS_CKPT = os.path.expanduser("~/quantanalytics/.x_probe_ckpt/classifications.json")  # shared
+# CLASS_CKPT imported from x_yield_probe — single shared definition
 CSV_OUT = os.path.expanduser("~/quantanalytics/x_ingest_dryrun.csv")
 DRIVE_OUT = "/mnt/g/My Drive/eidolum.prompts/x_ingest_dryrun.csv"
 
@@ -157,10 +158,11 @@ def classify_phase(tw):
     lock = threading.Lock(); done = {"n": 0}
     def work(b):
         res, err = classify_batch(b)
+        batch_new = {tid: res.get(tid, {"is_prediction": False, "_unparsed": True})
+                     for tid, _ in b}
         with lock:
-            for tid, _ in b:
-                cc[tid] = res.get(tid, {"is_prediction": False, "_unparsed": True})
-            save_json(CLASS_CKPT, cc); done["n"] += 1
+            cc.update(batch_new)
+            merge_class_ckpt(batch_new); done["n"] += 1
             if done["n"] % 5 == 0 or done["n"] == len(batches):
                 print(f"[ingest] classify {done['n']}/{len(batches)} (err={err})", flush=True)
     if batches:
