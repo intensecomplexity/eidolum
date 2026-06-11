@@ -56,9 +56,9 @@ export default function StockPrice({ ticker, size = 'medium', showChange = true,
 
   return (
     <Tag className={inline ? 'inline-flex items-baseline gap-0.5' : 'flex items-baseline gap-0.5'}>
-      <span className={`font-mono text-accent ${cls.price}`}>${price.toFixed(2)}</span>
+      <span className={`font-mono leading-none text-accent ${cls.price}`}>${price.toFixed(2)}</span>
       {showChange && changePct !== 0 && (
-        <span className={`font-mono ${cls.change} ${isUp ? 'text-positive' : 'text-negative'}`}>
+        <span className={`font-mono leading-none ${cls.change} ${isUp ? 'text-positive' : 'text-negative'}`}>
           {isUp ? '+' : ''}{changePct.toFixed(2)}%
         </span>
       )}
