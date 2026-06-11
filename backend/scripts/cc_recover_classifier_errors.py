@@ -359,8 +359,23 @@ _CONDITIONAL_EXAMPLE = """,
       {{"derived_from": "conditional_call", "trigger_condition": "NVDA closes above 200", "trigger_type": "price_break", "trigger_ticker": "NVDA", "trigger_price": 200, "trigger_deadline": null, "ticker": "NVDA", "direction": "bullish", "price_target": 250, "timeframe_days": 90, "timeframe_category": "fundamental_quarterly", "conviction_level": "moderate", "verbatim_quote": "if NVDA breaks 200 it runs to 250"}},
       {{"derived_from": "conditional_call", "trigger_condition": "tariffs on imported steel rise", "trigger_type": "other", "trigger_ticker": null, "trigger_price": null, "trigger_deadline": null, "ticker": "CLF", "direction": "bullish", "price_target": null, "timeframe_days": 180, "timeframe_category": "cyclical_medium", "conviction_level": "moderate", "verbatim_quote": "if tariffs go up Cleveland Cliffs is a winner"}}"""
 
+# Long-horizon hard rule (eval-gated; injected only when
+# build_cc_prompt(long_horizon_rule=True)). Fix for the "said long-term,
+# scored 90 days" class (2026-06-12 audit: est. ~126 historical rows; the
+# soft "long-term thesis ≈ 365" guideline alone assigned 180d to 616174's
+# explicit longer-story framing). Additive only — False stays byte-identical.
+_LONG_HORIZON_BLOCK = """
 
-def build_cc_prompt(transcripts: dict, conditional: bool = False) -> str:
+TIMEFRAME — HARD RULE (overrides the inferred defaults above):
+- If the speaker frames THIS SPECIFIC call with long-horizon language — "long term", "long-term hold/position/play", "multi-year", "for years", "years to come", "secular", "be patient", "buy and hold", "this decade", "don't expect overnight moves", "a longer story", "not a short-term trade" — then timeframe_days MUST be >= 365. The same applies when the call rests on a multi-year projection or a fair-value/intrinsic-value thesis (a 5-year CAGR, a DCF fair value, "worth $X per share") with no nearer dated exit.
+- EXCEPTION: if the speaker ALSO ties THIS call's payoff to an explicit nearer catalyst or date ("$X into earnings", "by Friday", "sell by March", "this quarter it rebounds"), use the stated nearer horizon — an explicitly dated call beats inferred framing. Merely MENTIONING earnings, a quarter, or a date in passing does NOT invoke this exception.
+- SCOPE GUARD: the long-horizon language must be about THIS call. Generic channel philosophy ("I'm a long-term investor") near a clearly short-term trade does NOT trigger the rule.
+- Long-horizon framing with no other signal -> timeframe_days = 365, timeframe_category = "long_term_fundamental".
+- This rule adjusts ONLY timeframe_days and timeframe_category. It never changes which predictions you extract, their direction, conviction_level, or price_target."""
+
+
+def build_cc_prompt(transcripts: dict, conditional: bool = False,
+                    long_horizon_rule: bool = False) -> str:
     """transcripts: {video_id: transcript_text}.
 
     conditional=False (default) is the CURRENT live prompt, byte-for-byte.
@@ -370,6 +385,11 @@ def build_cc_prompt(transcripts: dict, conditional: bool = False) -> str:
     The downstream pipeline (validator conditional_call branch ->
     _kind/_trigger_* -> insert_youtube_conditional_prediction -> evaluator
     trigger scoring) is already wired, so this prompt change is sufficient.
+
+    long_horizon_rule=True appends the TIMEFRAME hard rule (long-horizon
+    language => timeframe_days >= 365, with explicit-date exception and
+    scope guard). Eval-gated like conditional; False is byte-identical —
+    flipping the arg back is the rollback.
     """
     blocks = []
     for vid, text in transcripts.items():
@@ -377,6 +397,7 @@ def build_cc_prompt(transcripts: dict, conditional: bool = False) -> str:
     body = "\n\n".join(blocks)
     _cond_rules = _CONDITIONAL_BLOCK if conditional else ""
     _cond_example = _CONDITIONAL_EXAMPLE if conditional else ""
+    _horizon_rules = _LONG_HORIZON_BLOCK if long_horizon_rule else ""
     return f"""You are classifying stock predictions from YouTube finance video transcripts. Return JSON only — no prose, no markdown fences.
 
 For each video, extract every valid stock prediction. A valid prediction has ALL of:
@@ -392,7 +413,7 @@ EVERY prediction object MUST also carry these three fields (predictions missing 
     <=90 -> "fundamental_quarterly" ; <=180 -> "cyclical_medium" ;
     <=730 -> "macro_thesis" ; >730 -> "long_term_fundamental"
 - conviction_level: one of exactly "strong" (emphatic, high-confidence), "moderate" (a normal call), "hedged" ("might", "could", "if X then"), "hypothetical" (a speculative what-if scenario), "unknown" (tone unclear).
-- price_target: a number if the speaker names one, otherwise null.
+- price_target: a number if the speaker names one, otherwise null.{_horizon_rules}
 
 REJECT (do not emit) predictions that are:
 - Past-tense reporting ("revenue grew 40%", "missed estimates", "benefited from", "was up") — history is not a prediction, even when it explains a mechanism that could continue
@@ -852,7 +873,15 @@ def main() -> int:
             # 11==11), 0 spurious conditionals, no real normal-call regression
             # (the one AMZN drop was LLM noise — live drops it too). conditional=
             # False stays byte-identical for an instant rollback.
-            entries, err = run_cc_classifier(build_cc_prompt(good, conditional=True))
+            # long_horizon_rule=True LIVE since 2026-06-12: long-horizon language
+            # => timeframe_days >= 365 (the "said long-term, scored 90 days" fix,
+            # audit est. ~126 historical rows). Eval (3 attempts, 50 real windows):
+            # 12/12 decidable long-horizon fixtures >= 365 incl. 616174 AMZN
+            # (180 -> 365) and TMO fair-value (365 -> 1825); 0/15 short-term
+            # drift in ALL attempts; extraction parity within the measured
+            # old-vs-old noise floor. False = instant rollback, byte-identical.
+            entries, err = run_cc_classifier(build_cc_prompt(good, conditional=True,
+                                                             long_horizon_rule=True))
             if err == "stopped":
                 _log("[recover] stopped during classification — exiting cleanly")
                 break

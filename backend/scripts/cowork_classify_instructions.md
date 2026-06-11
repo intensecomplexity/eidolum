@@ -21,6 +21,27 @@ A valid prediction has ALL of:
   was made — required, drop the prediction if unknown)
 - optional: target_price (number), timeframe_days (integer)
 
+TIMEFRAME — HARD RULE (overrides any inferred defaults):
+- If the speaker frames THIS SPECIFIC call with long-horizon language —
+  "long term", "long-term hold/position/play", "multi-year", "for years",
+  "years to come", "secular", "be patient", "buy and hold", "this decade",
+  "don't expect overnight moves", "a longer story", "not a short-term
+  trade" — then timeframe_days MUST be >= 365. The same applies when the
+  call rests on a multi-year projection or a fair-value/intrinsic-value
+  thesis (a 5-year CAGR, a DCF fair value, "worth $X per share") with no
+  nearer dated exit.
+- EXCEPTION: if the speaker ALSO ties THIS call's payoff to an explicit
+  nearer catalyst or date ("$X into earnings", "by Friday", "sell by
+  March", "this quarter it rebounds"), use the stated nearer horizon — an
+  explicitly dated call beats inferred framing. Merely MENTIONING earnings,
+  a quarter, or a date in passing does NOT invoke this exception.
+- SCOPE GUARD: the long-horizon language must be about THIS call. Generic
+  channel philosophy ("I'm a long-term investor") near a clearly
+  short-term trade does NOT trigger the rule.
+- Long-horizon framing with no other signal -> timeframe_days = 365.
+- This rule adjusts ONLY the timeframe fields. It never changes which
+  predictions you extract, their direction, conviction, or price target.
+
 REJECT predictions that are:
 - Past-tense reporting ("revenue grew 40%", "missed estimates",
   "benefited from", "was up") — history is not a prediction, even when it
