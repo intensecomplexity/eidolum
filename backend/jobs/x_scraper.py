@@ -1296,6 +1296,28 @@ def _insert_prediction(db, ticker: str, direction: str, target_price, timeframe_
             tweet_id_int = None
 
         context = f"@{author}: {body[:300]}"
+
+        # Classifier validation gate — SHADOW on X (audit 2026-06-11). We route
+        # the same validate_or_reject the YouTube path uses, populating
+        # source_verbatim_quote=body so the speech rules can actually evaluate
+        # (X rows had none → every speech rule no-opped). On X we ONLY LOG
+        # would-rejects (telemetry prefix "x_gate_shadow") and set NO flag /
+        # block NOTHING: the dry-run showed real X false positives (R1
+        # invalid_ticker wrongly rejects ~85 crypto/ETF; R15 mis-flags
+        # sector-ETF tweets like "$SMH semiconductors showing exhaustion").
+        # No X rule acts until we have X precision numbers + sign-off.
+        try:
+            from jobs.classifier_validation import validate_or_reject as _vor
+            _acc, _rsn = _vor({
+                "ticker": ticker, "direction": direction,
+                "source_url": tweet_url, "source_verbatim_quote": body,
+            }, db)
+            if not _acc:
+                log.info("[x_gate_shadow] would_reject reason=%s ticker=%s author=%s",
+                         _rsn, ticker, author)
+        except Exception:
+            pass  # fail-open: the gate must never break an X insert
+
         from models import Prediction
         db.add(Prediction(
             forecaster_id=forecaster.id, ticker=ticker, direction=direction,
@@ -1307,6 +1329,7 @@ def _insert_prediction(db, ticker: str, direction: str, target_price, timeframe_
             source_type="x", source_platform_id=source_id,
             tweet_id=tweet_id_int,
             context=context[:500], exact_quote=body[:500],
+            source_verbatim_quote=body,
             outcome="pending", verified_by="x_scraper",
             prediction_type=prediction_type,
             position_action=position_action,
