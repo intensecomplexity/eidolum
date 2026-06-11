@@ -6,6 +6,7 @@ Pattern: read → close → fetch prices → open → write → close
 Runs as background task, processes 50 tickers at a time with 5s breaks.
 """
 import os
+import re
 import time
 from datetime import datetime, timedelta, date as _date
 from collections import defaultdict
@@ -1385,6 +1386,134 @@ def _check_price_trigger(trigger_ticker: str, threshold: float, trigger_type: st
     return None, "unsupported_trigger_type"
 
 
+# Phase 2 (2026-06-11): fire RATE / COMMODITY / INDEX conditional triggers from
+# the local fmp macro feeds. STRICTLY ADDITIVE — only ever returns a fire date
+# for fed_decision / economic_data / market_event rows that price triggers never
+# touched; price_hold/price_break and type='other' are unchanged. Precision-
+# first: parses the free-text trigger_condition (trigger_ticker/price are NULL
+# for non-price types), and returns (None, ...) on ANY ambiguity so the row
+# stays pending → 'unresolved' rather than firing on a guess.
+_COMMODITY_KEYWORDS = [
+    (("brent",), "BZUSD"), (("wti", "crude", "oil"), "CLUSD"),
+    (("gold",), "GCUSD"), (("copper",), "HGUSD"), (("silver",), "SIUSD"),
+    (("natural gas", "natgas", "nat gas"), "NGUSD"),
+    (("palladium",), "PAUSD"), (("platinum",), "PLUSD"),
+]
+_TREASURY_TENORS = [
+    (("30 year", "30-year", "30yr", "30 yr", "thirty year"), "year30"),
+    (("10 year", "10-year", "10yr", "10 yr", "ten year"), "year10"),
+    (("5 year", "5-year", "5yr", "5 yr", "five year"), "year5"),
+    (("2 year", "2-year", "2yr", "2 yr", "two year"), "year2"),
+]
+
+
+def _macro_series(db, sql, params):
+    try:
+        rows = db.execute(sql_text(sql), params).fetchall()
+    except Exception:
+        return []
+    out = []
+    for d, v in rows:
+        if v is None:
+            continue
+        try:
+            dd = d if hasattr(d, "year") and not hasattr(d, "hour") else (d.date() if hasattr(d, "date") else d)
+            out.append((dd, float(v)))
+        except (TypeError, ValueError):
+            continue
+    out.sort(key=lambda x: x[0])
+    return out
+
+
+def _extract_level(text_l):
+    """The threshold number, anchored to a comparator/$ so a tenor word like
+    '10 year' isn't mistaken for the level. Returns None if no clear threshold
+    (precision-first → the row stays unresolved)."""
+    m = re.search(
+        r"(?:above|below|over|under|tops?|hits?|reaches?|exceeds?|past|"
+        r"breaks?(?:\s+(?:above|below|past))?|north of|south of|\$|>|<)\s*"
+        r"\$?\s*([0-9][0-9,\.]*)\s*%?", text_l)
+    if not m:
+        m = re.search(r"\$\s*([0-9][0-9,\.]*)", text_l)  # bare "$4000"
+    if not m:
+        return None
+    try:
+        return float(m.group(1).replace(",", ""))
+    except ValueError:
+        return None
+
+
+def _cross_dir(text_l, anchor, level):
+    if any(w in text_l for w in ("above", "over", "tops", "exceed", "breaks above",
+                                 "reclaim", "rip past", "north of", ">")):
+        return "up"
+    if any(w in text_l for w in ("below", "under", "beneath", "drops below",
+                                 "falls below", "south of", "<")):
+        return "down"
+    return "up" if anchor < level else "down"  # bare "breaks X": infer from anchor
+
+
+def _walk_cross(series, level, direction):
+    for d, v in series[1:]:
+        if direction == "up" and v >= level:
+            return d
+        if direction == "down" and v <= level:
+            return d
+    return None
+
+
+def _check_macro_trigger(trigger_type, condition, since, until, db):
+    """(fired_date|None, reason) for a rate/commodity/index conditional trigger.
+    Reads fmp_economic_indicators / fmp_treasury_rates / fmp_commodities."""
+    if not condition:
+        return None, "no_condition"
+    c = condition.lower()
+    sd = since.date() if hasattr(since, "date") else since
+    ud = until.date() if hasattr(until, "date") else until
+    p = {"sd": sd, "ud": ud}
+
+    # Fed cut/hike → federalFunds direction move.
+    if trigger_type == "fed_decision":
+        cut = any(w in c for w in ("cut", "lower", "ease", "reduc"))
+        hike = any(w in c for w in ("hike", "raise", "rais", "increase", "tighten"))
+        if not (cut or hike):
+            return None, "fed_direction_unparseable"
+        s = _macro_series(db, "SELECT date, value FROM fmp_economic_indicators "
+                           "WHERE name='federalFunds' AND date BETWEEN :sd AND :ud ORDER BY date", p)
+        if len(s) < 2:
+            return None, "no_data"
+        anchor = s[0][1]
+        for d, v in s[1:]:
+            if cut and v < anchor - 0.01:
+                return d, "fed_cut"
+            if hike and v > anchor + 0.01:
+                return d, "fed_hike"
+        return None, "fed_not_fired"
+
+    # economic_data / market_event → commodity level, treasury level, else skip.
+    level = _extract_level(c)
+    # Commodity level cross.
+    for kws, sym in _COMMODITY_KEYWORDS:
+        if any(k in c for k in kws) and level is not None:
+            s = _macro_series(db, "SELECT date, close FROM fmp_commodities "
+                              "WHERE symbol=:sym AND date BETWEEN :sd AND :ud ORDER BY date",
+                              {**p, "sym": sym})
+            if len(s) < 2:
+                return None, "no_data"
+            d = _walk_cross(s, level, _cross_dir(c, s[0][1], level))
+            return (d, f"commodity_cross_{sym}") if d else (None, "commodity_not_fired")
+    # Treasury tenor level cross.
+    for kws, tenor in _TREASURY_TENORS:
+        if any(k in c for k in kws) and level is not None:
+            s = _macro_series(db, f"SELECT date, {tenor} FROM fmp_treasury_rates "
+                              "WHERE date BETWEEN :sd AND :ud ORDER BY date", p)
+            if len(s) < 2:
+                return None, "no_data"
+            d = _walk_cross(s, level, _cross_dir(c, s[0][1], level))
+            return (d, f"treasury_cross_{tenor}") if d else (None, "treasury_not_fired")
+    return None, "macro_unparseable_skip"  # precision-first: stay unresolved
+
+
 def _process_conditional_calls(now: datetime) -> dict:
     """Phase-based scoring pass for conditional_call rows. Handles
     three states: (1) trigger pending + deadline expired → unresolved,
@@ -1463,7 +1592,28 @@ def _process_conditional_calls(now: datetime) -> dict:
                                     f"trigger_fired ({reason})"))
                     counters["triggers_fired"] += 1
                     continue
-            # Non-price triggers or price triggers still pending: skip
+
+            # Phase 2 (additive): rate / commodity / index triggers via the
+            # local fmp macro feeds. Only fed_decision / economic_data /
+            # market_event reach here (price types continued above); 'other'
+            # and 'corporate_action' fall through to the skip below and stay
+            # pending → 'unresolved' at deadline, exactly as before.
+            elif trigger_type in ("fed_decision", "economic_data", "market_event"):
+                fired_at, reason = _check_macro_trigger(
+                    trigger_type, trigger_condition,
+                    since=created_at or prediction_date,
+                    until=min(now, trigger_deadline) if trigger_deadline else now,
+                    db=db,
+                )
+                if fired_at is not None:
+                    fired_dt = datetime.combine(fired_at, datetime.min.time()) \
+                        if hasattr(fired_at, "isoformat") and not hasattr(fired_at, "hour") else fired_at
+                    updates.append((pid, "pending", fired_dt, None,
+                                    f"trigger_fired ({reason})"))
+                    counters["triggers_fired"] += 1
+                    continue
+            # Non-price/unfired triggers (incl. 'other', 'corporate_action'):
+            # skip → stays pending until the deadline marks it 'unresolved'.
             continue
 
         # Phase 2: trigger has fired, check outcome window
