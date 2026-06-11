@@ -19,7 +19,8 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE); sys.path.insert(0, os.path.join(HERE, ".."))
 
 from sqlalchemy import text
-from x_yield_probe import prefilter, CRYPTO_TICKERS, load_json, save_json
+from x_yield_probe import (prefilter, CRYPTO_TICKERS, load_json, save_json,
+                           merge_class_ckpt)
 from x_yield_probe_run import classify_batch
 from x_ingest import db_session, build_row, CLASS_CKPT
 import jobs.news_scraper as ns
@@ -173,10 +174,11 @@ def classify_survivors(pending):
     lock = threading.Lock()
     def work(b):
         res, _ = classify_batch(b)
+        batch_new = {tid: res.get(tid, {"is_prediction": False, "_unparsed": True})
+                     for tid, _b in b}
         with lock:
-            for tid, _b in b:
-                cc[tid] = res.get(tid, {"is_prediction": False, "_unparsed": True})
-            save_json(CLASS_CKPT, cc)
+            cc.update(batch_new)
+            merge_class_ckpt(batch_new)
     with ThreadPoolExecutor(max_workers=WORKERS) as ex:
         list(ex.map(work, batches))
     return cc
