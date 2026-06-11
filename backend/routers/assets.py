@@ -13,15 +13,21 @@ from services.ticker_display import (
 from routers._prediction_filters import (
     hedged_filter_sql, ambiguous_symbol_filter_sql,
     ambiguous_symbol_filter_clause,
+    weak_basket_filter_sql, weak_basket_filter_clause,
 )
 
 _HEDGED_P = hedged_filter_sql("p")
 _HEDGED_NA = hedged_filter_sql("predictions")
 # /asset/{ticker}/consensus historically renders ALL rows (no hedged/
-# reported filtering — full-transparency surface), but unattributable
-# symbols (ticker reuse, dead-equity collisions) are factual noise, not
-# transparency — they're hidden here too.
+# reported filtering — full-transparency surface), but two classes are
+# factual NOISE rather than transparency and are hidden here too:
+#   - unattributable symbols (ticker reuse, dead-equity collisions), and
+#   - weak-basket members (the row's ticker is just one name in an
+#     enumerated group comment, not an individual call — e.g. the BWB→AA
+#     tariff basket). Without this the flagged basket rows still rendered
+#     on the mobile asset card despite is_weak_basket_call=TRUE.
 _AMBIG_NA = ambiguous_symbol_filter_sql("predictions")
+_WEAK_NA = weak_basket_filter_sql("predictions")
 
 router = APIRouter()
 
@@ -406,7 +412,7 @@ def get_asset_consensus(
                COUNT(*) FILTER (WHERE direction = 'neutral') AS neutral,
                COUNT(*) FILTER (WHERE outcome = 'pending') AS pending
         FROM predictions
-        WHERE ticker = :t{_AMBIG_NA}
+        WHERE ticker = :t{_AMBIG_NA}{_WEAK_NA}
     """), {"t": ticker}).first()
     total = int(cnt[0] or 0)
     bull_count = int(cnt[1] or 0)
@@ -445,7 +451,8 @@ def get_asset_consensus(
     recent_scored_preds = (
         db.query(Prediction)
         .filter(Prediction.ticker == ticker, Prediction.outcome.in_(scored_outcomes),
-                ambiguous_symbol_filter_clause(Prediction.is_ambiguous_symbol))
+                ambiguous_symbol_filter_clause(Prediction.is_ambiguous_symbol),
+                weak_basket_filter_clause(Prediction.is_weak_basket_call))
         .order_by(Prediction.prediction_date.desc())
         .limit(20)
         .all()
@@ -453,7 +460,8 @@ def get_asset_consensus(
     pending_preds = (
         db.query(Prediction)
         .filter(Prediction.ticker == ticker, Prediction.outcome == "pending",
-                ambiguous_symbol_filter_clause(Prediction.is_ambiguous_symbol))
+                ambiguous_symbol_filter_clause(Prediction.is_ambiguous_symbol),
+                weak_basket_filter_clause(Prediction.is_weak_basket_call))
         .order_by(Prediction.prediction_date.desc())
         .limit(50)
         .all()
@@ -465,7 +473,7 @@ def get_asset_consensus(
         SELECT forecaster_id, COUNT(*) AS total,
                COUNT(*) FILTER (WHERE outcome IN ('hit','correct')) AS correct
         FROM predictions
-        WHERE ticker = :t AND outcome IN {str(tuple(scored_outcomes))}{_AMBIG_NA}
+        WHERE ticker = :t AND outcome IN {str(tuple(scored_outcomes))}{_AMBIG_NA}{_WEAK_NA}
         GROUP BY forecaster_id
     """), {"t": ticker}).fetchall()
 
