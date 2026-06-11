@@ -4260,6 +4260,33 @@ def _classifier_validation_gate(pred, db, stats):
         vr[rule_key] = vr.get(rule_key, 0) + 1
         stats["validation_by_channel"][channel]["rejected"] += 1
 
+    # Insert-but-flag (flag-not-delete): flag-backed rules HIDE the row via the
+    # hedged_filter visibility bundle instead of deleting/blocking it — and do
+    # so REGARDLESS of the master gate mode, so forward baskets / reported
+    # speech get hidden even while CLASSIFIER_VALIDATION_GATE stays 'shadow'.
+    #   Rule 15 basket_enumeration -> is_weak_basket_call  (ticker_call only —
+    #     sector/macro/pair calls are legitimately multi-name baskets)
+    #   Rule 7  reported_speech    -> is_reported_speech    (any category)
+    # Structural reasons (invalid_ticker, etc.) fall through to the existing
+    # log-only / enforce-block path below — unchanged.
+    _cat = getattr(pred, "prediction_category", None)
+    _flag_attr = None
+    if reason == "basket_enumeration" and _cat in (None, "ticker_call"):
+        _flag_attr = "is_weak_basket_call"
+    elif reason == "reported_speech":
+        _flag_attr = "is_reported_speech"
+    if _flag_attr is not None:
+        try:
+            setattr(pred, _flag_attr, True)
+            log.info("[validation] insert_but_flag %s ticker=%s reason=%s",
+                     _flag_attr, fields["ticker"], reason)
+            if stats is not None:
+                fk = stats.setdefault("validation_flagged", {})
+                fk[reason] = fk.get(reason, 0) + 1
+        except Exception as _e:
+            log.warning("[validation] flag-set failed (inserting unflagged): %s", _e)
+        return False  # insert WITH the flag — hidden via the visibility bundle
+
     if mode != "enforce":
         return False  # shadow: log only, never block
 
