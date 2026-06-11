@@ -25,10 +25,6 @@ REJECT predictions that are:
 - Past-tense reporting ("revenue grew 40%", "missed estimates",
   "benefited from", "was up") — history is not a prediction, even when it
   explains a mechanism that could continue
-- Basket/list mentions: the ticker is merely one name in an enumerated
-  list of companies ("US Steel, Nucor, Cleveland-Cliffs, and Alcoa...")
-  with no explicit directional statement about THAT specific ticker.
-  Listing a company among sector peers is not a call on it.
 - Inferred direction: a direction derived from general sector/industry/
   mechanism talk (tariff mechanics, rate effects, commodity cycles) rather
   than the speaker explicitly making a forward call on the named ticker.
