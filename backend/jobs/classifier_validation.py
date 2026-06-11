@@ -73,6 +73,14 @@ _BASKET_BROAD_MODE = os.environ.get(
 _NEWS_RECAP_MODE = os.environ.get(
     "CLASSIFIER_RULE_NEWS_RECAP", "shadow"
 ).lower()
+# Rule 15 — basket-enumeration. Same enforce/shadow/off semantics; DEFAULT
+# shadow. Catches "enumerated multi-ticker group comment split into
+# individual ticker_calls" (the pattern Rule 13 misses: Rule 13 only knows
+# GENERIC baskets like FAANG, this catches an ad-hoc enumerated list like
+# "steel names: US Steel, Nucor, Cleveland Cliffs, Alcoa").
+_BASKET_ENUMERATION_MODE = os.environ.get(
+    "CLASSIFIER_RULE_BASKET_ENUMERATION", "shadow"
+).lower()
 
 # reason code -> telemetry counter key (Step 4 cycle stats line)
 TELEMETRY_KEYS = {
@@ -88,6 +96,7 @@ TELEMETRY_KEYS = {
     "prediction_date_passed": "prediction_date_passed",
     "basket_too_broad": "basket_too_broad",
     "news_recap_no_prediction": "news_recap",
+    "basket_enumeration": "basket_enumeration",
 }
 
 _CORP_SUFFIXES = {
@@ -624,6 +633,193 @@ def check_news_recap(quote, rule_4_already_rejected=False):
     return False, "news_recap_no_prediction"
 
 
+# ── Rule 15 ───────────────────────────────────────────────────────────────
+# Basket-enumeration: the speaker names ≥3 distinct companies as a GROUP /
+# sector comment ("domestic steel names like US Steel, Nucor, Cleveland
+# Cliffs, and Alcoa") and the classifier split it into individual
+# ticker_calls. Distinct from Rule 13: Rule 13 matches a fixed vocabulary of
+# generic baskets (FAANG, the chip stocks); Rule 15 catches an AD-HOC
+# enumerated list of specific names with soft/group framing and no
+# first-person buy conviction.
+#
+# Precision over recall (a false positive HIDES A REAL CALL): we require
+# THREE independent conditions and bail toward PASS on any doubt —
+#   (c) NO first-person buy-conviction anywhere (load-bearing exemption —
+#       genuine multi-buys "the stocks I would buy: X, Y, Z" must pass),
+#   (a) the quote enumerates >=3 items (comma/conjunction series, a numeric
+#       collective like "fab five … companies", or >=3 cashtags), AND
+#   (b) group/soft framing is present ("names like", "such as", third-person
+#       "these companies/stocks", a sector/"names" group noun, or a
+#       price-recap "up/down X%").
+# Counting is structural rather than a per-row scan of every company name in
+# the corpus (infeasible at gate time); the extracted ticker's own presence
+# in the quote is already guaranteed by Rule 2.
+
+# (c) First-person buy-conviction — ANY hit exempts the row (it is a genuine
+# individual call set, not a basket comment). Curated so NONE appear in the
+# basket positives and EACH genuine-multi-buy negative trips one.
+_CONVICTION_EXEMPT = [
+    re.compile(p, re.I) for p in (
+        r"\bi(?:'| a)?m? ?would buy\b", r"\bi['’]?d buy\b", r"\bi would buy\b",
+        r"\bstocks i would\b", r"\bstocks i['’]?d\b",
+        r"\bi['’]?m buying\b", r"\bi am buying\b", r"\bim buying\b",
+        r"\bi bought\b", r"\bi['’]?ve been buying\b", r"\bi['’]?m adding\b",
+        r"\bi own\b", r"\bi hold\b", r"\bi['’]?m long\b", r"\bi am long\b",
+        r"\bi['’]?m not selling\b", r"\bnot selling\b",
+        r"\bwant to (?:buy|own|add)\b", r"\b(?:investing|invested) in\b",
+        r"\bi invest in\b",
+        r"\bmy (?:own )?portfolio\b", r"\bin my portfolio\b",
+        r"\bbullish on\b", r"\bi['’]?m bullish\b", r"\bi am bullish\b",
+        r"\bmy (?:top )?picks\b", r"\bi like\b",
+        # single-stock valuation/target framing (a real one-name call that
+        # happens to name peers/comps): never a basket
+        r"\bper share\b", r"\bprice target\b", r"\bfair value\b",
+        r"\bvalue of this business\b", r"\bi see the value\b",
+        # single-name conviction framings that mimic a list but pick ONE
+        r"\bmy favorite\b", r"\bfavorite\b", r"\bthis one\b",
+        r"\bon my list\b", r"\bstock number\b", r"\bnumber (?:one|two|three|four|five)\b",
+        r"\bfocus(?:ing|ed)? on\b", r"\bi['’]?d focus\b", r"\bi would focus\b",
+        r"\bbest stocks to buy\b", r"\bstocks to buy\b", r"\bto buy now\b",
+        r"\bbetter than\b",  # relative preference ("I like X better than…")
+    )
+]
+
+# (b) Group / soft framing — at least one required.
+_BASKET_FRAMING = [
+    re.compile(p, re.I) for p in (
+        r"\bnames like\b", r"\bsuch as\b", r"\bstocks like\b", r"\blike\b\s+\w+,",
+        r"\b(?:these|those|the)\s+\w*\s*(?:stocks|companies|names|tickers|equities|producers|players|plays)\b",
+        r"\b\w+\s+(?:names|companies|stocks|producers|players)\b",
+        r"\b(?:sector|space|industry|industries)\b",
+        r"\b(?:up|down|gained|lost|rose|fell|jumped)\s+\d",  # price-recap framing
+    )
+]
+
+# (a-collective) NAMED collectives that inherently denote >=3 specific names
+# ("the fab five … companies", "the magnificent seven"). Generic numeric
+# collectives ("three stocks") are deliberately NOT here — they fire on
+# single-stock metric talk and macro asides, tanking precision.
+_COLLECTIVE_RE = re.compile(
+    r"\b(?:fab\s+(?:four|five|six)|magnificent\s+(?:seven|7))\b", re.I)
+_CASHTAG_RE = re.compile(r"\$[A-Za-z]{1,5}\b")
+# A list ITEM counts toward the enumeration only if it actually NAMES a
+# company: a Title-Case proper noun (>=3 letters, so "Up"/"AI"/"US" don't
+# qualify) OR a cashtag. This separates a real multi-NAME basket
+# ("Nvidia up 3%, Broadcom up 5%, Intel up 3%") from a single stock's
+# metric SERIES ("up 25%, 188%, 97% last quarter"), which names nothing.
+_PROPER_NOUN = re.compile(r"\b[A-Z][a-z]{2,}")
+# Title-Case words that are NOT companies — months, weekdays, and the
+# injected "Video title:/Channel:/…/Transcript:" metadata header tokens.
+# Without this, "March, April, May" and title boilerplate count as a basket.
+_NAME_STOP = {
+    "january", "february", "march", "april", "may", "june", "july",
+    "august", "september", "october", "november", "december",
+    "jan", "feb", "mar", "apr", "jun", "jul", "aug", "sep", "sept",
+    "oct", "nov", "dec",
+    "monday", "tuesday", "wednesday", "thursday", "friday", "saturday",
+    "sunday", "video", "title", "channel", "published", "transcript",
+}
+
+
+def _is_name_item(part):
+    if _CASHTAG_RE.search(part):
+        return True
+    for m in _PROPER_NOUN.finditer(part):
+        if m.group(0).lower() not in _NAME_STOP:
+            return True
+    return False
+
+
+def _strip_meta(quote):
+    """Drop the injected 'Video title: … Transcript:' metadata header some
+    YouTube rows carry — only the spoken body should be judged."""
+    if not quote:
+        return quote
+    i = quote.rfind("Transcript:")
+    return quote[i + len("Transcript:"):] if i != -1 else quote
+
+
+def _enumeration_items(quote):
+    """The longest run of >=1 DISTINCT name-bearing items in a comma/
+    conjunction series (or the distinct cashtag set, if larger). Returns the
+    item strings. Precision-first: numeric/percentage items don't count, so a
+    single stock's quarter-over-quarter series can't masquerade as a basket.
+    A named collective ('magnificent seven') is deliberately NOT counted on
+    its own — it is usually mere CONTEXT for a single-stock call."""
+    if not quote:
+        return []
+    # comma/conjunction series of short, NAME-bearing items. Normalize the
+    # connector (eating an optional preceding comma so "X, and Y" -> "X,Y",
+    # not "X,,Y"), collapse doubled commas, sentence-split but NOT on a
+    # decimal point ("3.2%").
+    s = re.sub(r"\s*,?\s+(?:and|&|or)\s+", ",", quote, flags=re.I)
+    s = re.sub(r",\s*,+", ",", s)
+    best = []
+    for run in re.split(r"(?<!\d)[.;:!?]+", s):
+        cur = []
+        seen = set()
+        for part in run.split(","):
+            p = part.strip()
+            if p and len(p.split()) <= 5 and len(p) <= 40 and _is_name_item(p):
+                key = p.lower()
+                if key not in seen:        # distinct items only
+                    seen.add(key)
+                    cur.append(p)
+                    if len(cur) > len(best):
+                        best = list(cur)
+            else:
+                cur = []
+                seen = set()
+    tags = sorted({t.upper() for t in _CASHTAG_RE.findall(quote)})
+    return tags if len(tags) > len(best) else best
+
+
+def _ticker_is_member(ticker, items, db):
+    """True if the extracted ticker (symbol or any company name/alias) is one
+    of the enumerated items — i.e. the row is a basket MEMBER, not the SUBJECT
+    being compared to a peer/customer/comp list ("Microsoft … like Apple,
+    Amazon, Meta, Google"). Only decisive when db is available to resolve
+    names; with db=None the caller skips this gate."""
+    if not ticker or not items:
+        return False
+    blob = " | ".join(items).lower()
+    if re.search(r"\b" + re.escape(ticker.lower().strip()) + r"\b", blob):
+        return True
+    if db is not None:
+        for name in _ticker_names(ticker, db):
+            if name in blob:
+                return True
+    return False
+
+
+def check_basket_enumeration(quote, ticker=None, db=None):
+    """Reject ticker_call rows extracted from an enumerated GROUP comment.
+
+    PASS (accept) on any doubt. The order encodes precision-over-recall:
+    a first-person buy-conviction marker exempts immediately; otherwise the
+    quote must BOTH enumerate >=3 items AND carry group/soft framing.
+    """
+    if not quote or not quote.strip():
+        return True, None
+    body = _strip_meta(quote)
+    # (c) genuine multi-buy / single-name conviction → never flag
+    if any(p.search(body) for p in _CONVICTION_EXEMPT):
+        return True, None
+    # (a) enumerates >=3 distinct named items
+    items = _enumeration_items(body)
+    if len(items) < 3:
+        return True, None
+    # (a') the row's ticker must be a MEMBER of that list — not the subject
+    # being compared to a peer/customer/comp list. Only enforced when db can
+    # resolve company names (the live gate + backfill always pass db).
+    if db is not None and ticker and not _ticker_is_member(ticker, items, db):
+        return True, None
+    # (b) group / soft framing present
+    if not any(p.search(body) for p in _BASKET_FRAMING):
+        return True, None
+    return False, "basket_enumeration"
+
+
 # ── Orchestrator ──────────────────────────────────────────────────────────
 def validate_or_reject(pred, db, ref_time=None, exclude_id=None):
     """Run all twelve rules in order. Returns ``(accepted, reason)``.
@@ -759,4 +955,20 @@ def validate_or_reject(pred, db, ref_time=None, exclude_id=None):
                     ticker, (quote or "")[:120],
                 )
                 return False, "news_recap_no_prediction"
+    # Rule 15 — basket-enumeration (ad-hoc multi-ticker group comment).
+    # SHADOW default. Precision-first; exempts genuine multi-buys.
+    if _BASKET_ENUMERATION_MODE != "off":
+        ok, reason = check_basket_enumeration(quote, ticker, db)
+        if not ok:
+            if _BASKET_ENUMERATION_MODE == "shadow":
+                log.warning(
+                    "[rule_15_shadow] would reject %s via basket_enumeration: %s",
+                    ticker, (quote or "")[:120],
+                )
+            else:  # 'enforce' (unknown values also enforce defensively)
+                log.info(
+                    "[rule_15_enforce] rejected %s via basket_enumeration: %s",
+                    ticker, (quote or "")[:120],
+                )
+                return False, "basket_enumeration"
     return True, None
