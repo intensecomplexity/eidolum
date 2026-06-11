@@ -331,12 +331,52 @@ def _subprocess_env() -> dict:
     return env
 
 
-def build_cc_prompt(transcripts: dict) -> str:
-    """transcripts: {video_id: transcript_text}."""
+# Phase-1 conditional-call extraction block (eval-gated; injected only when
+# build_cc_prompt(conditional=True)). The downstream validator branch requires
+# trigger_type in this exact set and demands trigger_ticker+trigger_price for
+# the price_* types — kept in sync here.
+_CONDITIONAL_BLOCK = """
+CONDITIONAL CALLS ("if <trigger> then <call>"): when a directional call on a ticker is CONTINGENT on a separate trigger event firing first — "if NVDA breaks 200 it runs to 250", "as long as SPY holds 450, semis stay bullish", "if the Fed cuts, small caps rip", "if it breaks that low it undercuts" — DO NOT emit it as a flat prediction. A flat MISS for a call whose trigger never fired is wrong. Emit it as a conditional with a STRUCTURED trigger. Keep the normal outcome fields (ticker, direction, price_target, timeframe_days, timeframe_category, conviction_level, verbatim_quote) and ADD:
+- "derived_from": "conditional_call"
+- "trigger_condition": the precondition in plain words ("NVDA closes above 200", "Fed cuts 50bps")
+- "trigger_type": exactly one of —
+    "price_break"  : a ticker crossing a level ("if X breaks/closes above/below $N"). REQUIRES trigger_ticker + a positive trigger_price.
+    "price_hold"   : a ticker staying above/below a level ("as long as X holds $N"). REQUIRES trigger_ticker + a positive trigger_price.
+    "fed_decision" : a Fed rate cut or hike.
+    "economic_data": a macro print (CPI, jobs, GDP, a rate level).
+    "market_event" : an index or commodity level, or a market event ("if oil tops $100", "if VIX > 40", "if a recession hits").
+    "other"        : a real but NON-numeric trigger you cannot reduce to a checkable number ("if the economy slows", "if tariffs go up", "if foreign steel gets cheaper"). Keep it — it will be scored unresolved, NEVER a hit or miss.
+- "trigger_ticker": the watched symbol (price_break/price_hold only; null otherwise). For an index/VIX/commodity use market_event, not price_break.
+- "trigger_price": the numeric threshold (price_break/price_hold only; null otherwise).
+- "trigger_deadline": ISO date (YYYY-MM-DD) the trigger must fire by if stated, else null.
+
+Conditional rules:
+- The OUTCOME side MUST be an EXPLICIT directional call on a named ticker. If the consequent direction is itself only inferred from sector/mechanism talk, REJECT it — the inferred-direction rule still applies; do not invent a direction.
+- A vague trigger with an EXPLICIT consequent → capture as conditional with trigger_type "other" (scored unresolved). NEVER downgrade a conditional into a flat directional call.
+- A flat, non-contingent call stays a normal prediction (no derived_from)."""
+
+_CONDITIONAL_EXAMPLE = """,
+      {{"derived_from": "conditional_call", "trigger_condition": "NVDA closes above 200", "trigger_type": "price_break", "trigger_ticker": "NVDA", "trigger_price": 200, "trigger_deadline": null, "ticker": "NVDA", "direction": "bullish", "price_target": 250, "timeframe_days": 90, "timeframe_category": "fundamental_quarterly", "conviction_level": "moderate", "verbatim_quote": "if NVDA breaks 200 it runs to 250"}},
+      {{"derived_from": "conditional_call", "trigger_condition": "tariffs on imported steel rise", "trigger_type": "other", "trigger_ticker": null, "trigger_price": null, "trigger_deadline": null, "ticker": "CLF", "direction": "bullish", "price_target": null, "timeframe_days": 180, "timeframe_category": "cyclical_medium", "conviction_level": "moderate", "verbatim_quote": "if tariffs go up Cleveland Cliffs is a winner"}}"""
+
+
+def build_cc_prompt(transcripts: dict, conditional: bool = False) -> str:
+    """transcripts: {video_id: transcript_text}.
+
+    conditional=False (default) is the CURRENT live prompt, byte-for-byte.
+    conditional=True adds the conditional_call extraction block + schema
+    example — the Phase-1 candidate, eval-gated. Held out of the live loop
+    (build_cc_prompt(good)) until sign-off; the swap is flipping this arg.
+    The downstream pipeline (validator conditional_call branch ->
+    _kind/_trigger_* -> insert_youtube_conditional_prediction -> evaluator
+    trigger scoring) is already wired, so this prompt change is sufficient.
+    """
     blocks = []
     for vid, text in transcripts.items():
         blocks.append(f'--- VIDEO {vid} ---\n{text}')
     body = "\n\n".join(blocks)
+    _cond_rules = _CONDITIONAL_BLOCK if conditional else ""
+    _cond_example = _CONDITIONAL_EXAMPLE if conditional else ""
     return f"""You are classifying stock predictions from YouTube finance video transcripts. Return JSON only — no prose, no markdown fences.
 
 For each video, extract every valid stock prediction. A valid prediction has ALL of:
@@ -362,7 +402,7 @@ REJECT (do not emit) predictions that are:
 - Wrong-ticker attribution (ticker named but context is a different company)
 - Contradictory pairs (same video bullish AND bearish on the same ticker — drop both)
 - Hallucinated / made-up tickers
-
+{_cond_rules}
 For a video with no valid predictions, return an entry with "predictions": [].
 Return an entry for EVERY video listed below, even if empty.
 
@@ -373,7 +413,7 @@ Output — a JSON array, exactly this shape, nothing else:
     "predictions": [
       {{"ticker": "AAPL", "direction": "bullish", "price_target": 250, "timeframe_days": 90, "timeframe_category": "fundamental_quarterly", "conviction_level": "moderate", "verbatim_quote": "<exact transcript words>"}},
       {{"ticker": "BTC", "direction": "bullish", "price_target": 100000, "timeframe_days": 180, "timeframe_category": "cyclical_medium", "conviction_level": "strong", "verbatim_quote": "<exact transcript words>"}},
-      {{"ticker": "BARC.L", "direction": "bearish", "price_target": null, "timeframe_days": 30, "timeframe_category": "technical_chart", "conviction_level": "moderate", "verbatim_quote": "<exact transcript words>"}}
+      {{"ticker": "BARC.L", "direction": "bearish", "price_target": null, "timeframe_days": 30, "timeframe_category": "technical_chart", "conviction_level": "moderate", "verbatim_quote": "<exact transcript words>"}}{_cond_example}
     ]
   }}
 ]
