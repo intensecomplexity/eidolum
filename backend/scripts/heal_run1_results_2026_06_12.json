@@ -1,0 +1,3997 @@
+{
+ "generated": "2026-06-12",
+ "ship": "heal pass run 1 \u2014 unverified_quote_2026_06_12 cohort",
+ "method": "live timed transcript (Webshare, persisted) -> wide-window (\u00b190s around company-name mentions) -> one-row-per-call claude -p Sonnet -> code-validated byte-exact substring -> timestamp via substring->segment",
+ "fetch": {
+  "attempted": 400,
+  "ok": 366,
+  "transient": 34,
+  "terminal": 0,
+  "worklist_beyond_cap": 67,
+  "known_unrecoverable_videos": 15
+ },
+ "run2_unjudged_prediction_ids": [
+  607272,
+  607874,
+  607875,
+  607959,
+  608214,
+  608215,
+  608218,
+  608234,
+  608261,
+  608262,
+  608354,
+  608378,
+  608379,
+  608939,
+  608940,
+  609093,
+  609094,
+  609102,
+  609668,
+  610151,
+  610357,
+  610795,
+  610798,
+  610799,
+  610800,
+  610802,
+  605933,
+  606327,
+  606440,
+  606557,
+  607021,
+  607022,
+  607068,
+  607069,
+  607070,
+  608687,
+  608688,
+  608718,
+  610359,
+  610362,
+  610363,
+  610805,
+  610806,
+  615111,
+  615587,
+  615588,
+  615597,
+  615602,
+  615605,
+  615608,
+  615609,
+  615611,
+  615612,
+  615614,
+  615615,
+  615616,
+  615617,
+  615618,
+  615622,
+  615652,
+  615699,
+  615700,
+  615701,
+  615704,
+  615705,
+  615706,
+  615707,
+  615712,
+  615716,
+  615718,
+  615720,
+  615721,
+  615722,
+  615729,
+  615730,
+  615731,
+  615732,
+  615733,
+  615734,
+  615735,
+  615738,
+  615739,
+  615747,
+  615748,
+  616372,
+  616400,
+  616417,
+  616438,
+  616447,
+  616448,
+  616475,
+  616476,
+  616497,
+  616542,
+  616544,
+  616562,
+  616576,
+  616647,
+  616749,
+  616767,
+  616811,
+  617133,
+  616137,
+  616213,
+  616256,
+  616520,
+  616530,
+  616538,
+  616539,
+  616540,
+  616541,
+  616547,
+  616551,
+  616587,
+  616806,
+  616868,
+  616890,
+  616956,
+  616979,
+  617042
+ ],
+ "verdicts": {
+  "607170": {
+   "verdict": "UNHEALABLE",
+   "why": "transcript terminal: known_unrecoverable"
+  },
+  "607173": {
+   "verdict": "UNHEALABLE",
+   "why": "transcript terminal: known_unrecoverable"
+  },
+  "607583": {
+   "verdict": "UNHEALABLE",
+   "why": "transcript terminal: known_unrecoverable"
+  },
+  "607584": {
+   "verdict": "UNHEALABLE",
+   "why": "transcript terminal: known_unrecoverable"
+  },
+  "607705": {
+   "verdict": "UNHEALABLE",
+   "why": "transcript terminal: known_unrecoverable"
+  },
+  "607706": {
+   "verdict": "UNHEALABLE",
+   "why": "transcript terminal: known_unrecoverable"
+  },
+  "607707": {
+   "verdict": "UNHEALABLE",
+   "why": "transcript terminal: known_unrecoverable"
+  },
+  "607709": {
+   "verdict": "UNHEALABLE",
+   "why": "transcript terminal: known_unrecoverable"
+  },
+  "607711": {
+   "verdict": "UNHEALABLE",
+   "why": "transcript terminal: known_unrecoverable"
+  },
+  "607712": {
+   "verdict": "UNHEALABLE",
+   "why": "transcript terminal: known_unrecoverable"
+  },
+  "607833": {
+   "verdict": "UNHEALABLE",
+   "why": "transcript terminal: known_unrecoverable"
+  },
+  "607853": {
+   "verdict": "UNHEALABLE",
+   "why": "transcript terminal: known_unrecoverable"
+  },
+  "608013": {
+   "verdict": "UNHEALABLE",
+   "why": "transcript terminal: known_unrecoverable"
+  },
+  "608155": {
+   "verdict": "UNHEALABLE",
+   "why": "transcript terminal: known_unrecoverable"
+  },
+  "608156": {
+   "verdict": "UNHEALABLE",
+   "why": "transcript terminal: known_unrecoverable"
+  },
+  "608157": {
+   "verdict": "UNHEALABLE",
+   "why": "transcript terminal: known_unrecoverable"
+  },
+  "608322": {
+   "verdict": "UNHEALABLE",
+   "why": "transcript terminal: known_unrecoverable"
+  },
+  "608701": {
+   "verdict": "UNHEALABLE",
+   "why": "transcript terminal: known_unrecoverable"
+  },
+  "608702": {
+   "verdict": "UNHEALABLE",
+   "why": "transcript terminal: known_unrecoverable"
+  },
+  "608996": {
+   "verdict": "UNHEALABLE",
+   "why": "transcript terminal: known_unrecoverable"
+  },
+  "606343": {
+   "verdict": "UNHEALABLE",
+   "why": "transcript terminal: known_unrecoverable"
+  },
+  "606351": {
+   "verdict": "UNHEALABLE",
+   "why": "transcript terminal: known_unrecoverable"
+  },
+  "606646": {
+   "verdict": "UNHEALABLE",
+   "why": "transcript terminal: known_unrecoverable"
+  },
+  "612254": {
+   "verdict": "UNHEALABLE",
+   "why": "transcript terminal: known_unrecoverable"
+  },
+  "612699": {
+   "verdict": "UNHEALABLE",
+   "why": "transcript terminal: known_unrecoverable"
+  },
+  "613214": {
+   "verdict": "UNHEALABLE",
+   "why": "transcript terminal: known_unrecoverable"
+  },
+  "613215": {
+   "verdict": "UNHEALABLE",
+   "why": "transcript terminal: known_unrecoverable"
+  },
+  "613216": {
+   "verdict": "UNHEALABLE",
+   "why": "transcript terminal: known_unrecoverable"
+  },
+  "607668": {
+   "verdict": "VERIFIED",
+   "quote": "I'm really hoping that their earnings when they come out this Thursday it takes another nose dive because I would love to add more to my Costco position",
+   "ts": 280,
+   "why": "Host wants to buy more COST, bullish intent to add to existing position.",
+   "mentions": 9
+  },
+  "607665": {
+   "verdict": "VERIFIED",
+   "quote": "I would say that Microsoft is probably the safest growth stock bet there is today in the market it's already garnered me a 30.9% % return and I don't think this thing is anywhere near done in terms of growth",
+   "ts": 171,
+   "why": "Host directly calls MSFT safest growth bet and says it's not near done.",
+   "mentions": 9
+  },
+  "607666": {
+   "verdict": "VERIFIED",
+   "quote": "my Buy price for Google right now is up to about $195 a share so I might slowly add to Google over the next few weeks",
+   "ts": 630,
+   "why": "Host states personal buy price of $195 and plans to add to Google position.",
+   "mentions": 11
+  },
+  "607667": {
+   "verdict": "VERIFIED",
+   "quote": "msci is one of my favorites I see a lot of potential growth out of msci they have a massive economic mod and they're currently sitting under my buy Target of about $500 so I'm probably going to allocate some of my current cash to them as well",
+   "ts": 701,
+   "why": "Host states MSCI is under $500 buy target and plans to allocate cash to it.",
+   "mentions": 6
+  },
+  "607669": {
+   "verdict": "VERIFIED",
+   "quote": "McDonald's is one of the only stocks in my current portfolio that I'm actually looking to sell I'm not as enamored with their growth prospects as I was when I bought",
+   "ts": 715,
+   "why": "Host explicitly states intent to sell MCD, not enamored with growth prospects.",
+   "mentions": 0
+  },
+  "607671": {
+   "verdict": "VERIFIED",
+   "quote": "I actually want Amazon to become a pretty big part of my portfolio I'm still in the midst of all my research for them I actually think that at $180 right now they're still a pretty good value and I think they have phenomenal growth prospects",
+   "ts": 942,
+   "why": "Host commits to bullish AMZN view: $180 fair value, wants large portfolio position.",
+   "mentions": 3
+  },
+  "607670": {
+   "verdict": "VERIFIED",
+   "quote": "it's actually one of the few I'm actively adding every single pay period I'm slowly building that position there",
+   "ts": 824,
+   "why": "Host states actively adding ADBE every pay period, clearly bullish forward commitment.",
+   "mentions": 5
+  },
+  "607672": {
+   "verdict": "VERIFIED",
+   "quote": "Tesla is the Bastion of volatility you have to have a very strong stomach to hold on to Tesla I very much believe in full self-driving however it is a very large bet if it pays off it will probably be my b",
+   "ts": 751,
+   "why": "Host expresses personal bullish conviction in FSD thesis as forward call.",
+   "mentions": 5
+  },
+  "607673": {
+   "verdict": "VERIFIED",
+   "quote": "Apple's something that I want to hold on to in my IRA for the long-term dividend growth prospects",
+   "ts": 669,
+   "why": "Host expresses forward intent to hold AAPL long-term for dividend growth.",
+   "mentions": 4
+  },
+  "607764": {
+   "verdict": "VERIFIED",
+   "quote": "Microsoft will be a very obvious Target next month it's you know it's kind of almost flat but the fact that it is just barely negative um less than 1% negative but it's negative that's one of my all-time favorite stocks that I very strongly believe in longterm so I'm going to be for sure picking up more of it it's a must buy for me",
+   "ts": 480,
+   "why": "Host commits to buying MSFT next month, calling it a must buy with long-term conviction.",
+   "mentions": 3
+  },
+  "607766": {
+   "verdict": "VERIFIED",
+   "quote": "I do think that we could add a little more though to these dividend payers like Bristol Meyers exr and Cisco so in November I'll be looking to add more of those",
+   "ts": 370,
+   "why": "Host explicitly plans to add more EXR in November as dividend payer.",
+   "mentions": 1
+  },
+  "607765": {
+   "verdict": "VERIFIED",
+   "quote": "I do think that we could add a little more though to these dividend payers like Bristol Meyers exr and Cisco so in November I'll be looking to add more of those",
+   "ts": 370,
+   "why": "Host explicitly plans to add Bristol Myers (BMY) in November as dividend payer.",
+   "mentions": 0
+  },
+  "607767": {
+   "verdict": "VERIFIED",
+   "quote": "I do think that we could add a little more though to these dividend payers like Bristol Meyers exr and Cisco so in November I'll be looking to add more of those",
+   "ts": 370,
+   "why": "Host explicitly plans to buy more Cisco in November as dividend payer.",
+   "mentions": 0
+  },
+  "607768": {
+   "verdict": "VERIFIED",
+   "quote": "I would also like a little more of c3.ai because of how small of a holding it is still for us",
+   "ts": 472,
+   "why": "Host commits to buying more C3.ai due to small position size.",
+   "mentions": 3
+  },
+  "607769": {
+   "verdict": "VERIFIED",
+   "quote": "I would say Verizon and fizer for the large dividends since I'm only up a small amount on those so the dividend yields are still going to be very attractive at these levels I would love to pick up more of them",
+   "ts": 459,
+   "why": "Host explicitly plans to buy more Verizon due to attractive dividend yields.",
+   "mentions": 5
+  },
+  "607771": {
+   "verdict": "VERIFIED",
+   "quote": "for being a higher risk kind of speculative stock I actually kind of like red wire",
+   "ts": 1004,
+   "why": "Host personally expresses liking for RDW as speculative stock with growth opportunity.",
+   "mentions": 1
+  },
+  "607770": {
+   "verdict": "VERIFIED",
+   "quote": "I wouldn't mind adding more of uh in the coming month here especially I would say Verizon and fizer for the large dividends since I'm only up a small amount on those so the dividend yields are still going to be very attractive at these levels I would love to pick up more of them",
+   "ts": 454,
+   "why": "Host explicitly states intent to buy more Pfizer due to attractive dividend yields.",
+   "mentions": 0
+  },
+  "607816": {
+   "verdict": "VERIFIED",
+   "quote": "I invest much much heavier into safer American tech stocks like Microsoft Google Amazon Nvidia meta and more and yeah I'm going to be buying on these dips too",
+   "ts": 986,
+   "why": "Host names Google as major holding and commits to buying dips.",
+   "mentions": 3
+  },
+  "607817": {
+   "verdict": "VERIFIED",
+   "quote": "I invest much much heavier into safer American tech stocks like Microsoft Google Amazon Nvidia meta and more and yeah I'm going to be buying on these dips too",
+   "ts": 986,
+   "why": "Host commits to buying dips in Microsoft as a major holding.",
+   "mentions": 3
+  },
+  "607818": {
+   "verdict": "VERIFIED",
+   "quote": "I invest much much heavier into safer American tech stocks like Microsoft Google Amazon Nvidia meta and more and yeah I'm going to be buying on these dips too",
+   "ts": 986,
+   "why": "Host explicitly names Amazon as a major holding and commits to buying dips.",
+   "mentions": 3
+  },
+  "607819": {
+   "verdict": "REFUTED",
+   "why": "Meta mentioned as context only; no forward bullish call made by host.",
+   "mentions": 5
+  },
+  "607820": {
+   "verdict": "REFUTED",
+   "why": "Host discloses small BABA position but makes no forward neutral call on the stock.",
+   "mentions": 1
+  },
+  "607821": {
+   "verdict": "REFUTED",
+   "why": "Host mentions owning Baidu but makes no neutral forward call; bullish on US tech dips.",
+   "mentions": 0
+  },
+  "607822": {
+   "verdict": "REFUTED",
+   "why": "Host mentions Tencent as small position but makes no forward neutral call on it.",
+   "mentions": 0
+  },
+  "607722": {
+   "verdict": "VERIFIED",
+   "quote": "I definitely plan to buy some more of that stock while they're currently down I think I got to take advantage of that stock crash there because I do feel that it's a decent play on the buildout of AI infrastructure long term which I think will continue to be really important for the future",
+   "ts": 551,
+   "why": "Host commits to buying more SMCI, calling it a decent long-term AI infrastructure play.",
+   "mentions": 0
+  },
+  "607725": {
+   "verdict": "REFUTED",
+   "why": "Microsoft mentioned only as past performance (7% gain), no forward bullish call made.",
+   "mentions": 3
+  },
+  "607726": {
+   "verdict": "REFUTED",
+   "why": "Host only mentions watching Disney stock; no forward bullish call made.",
+   "mentions": 2
+  },
+  "607727": {
+   "verdict": "REFUTED",
+   "why": "Nvidia mention is past performance recap ($5 spent), not a forward bullish call.",
+   "mentions": 2
+  },
+  "607729": {
+   "verdict": "REFUTED",
+   "why": "JPM not mentioned; only $5 Chase purchase listed, no forward bullish call.",
+   "mentions": 0
+  },
+  "607730": {
+   "verdict": "REFUTED",
+   "why": "TSN mentioned only as a $5 purchase with no forward bullish call made.",
+   "mentions": 0
+  },
+  "607733": {
+   "verdict": "REFUTED",
+   "why": "MDT not named; metronic mention is past-performance recap, not a forward bullish call.",
+   "mentions": 0
+  },
+  "607886": {
+   "verdict": "REFUTED",
+   "why": "SNPS never mentioned; no bullish call on Synopsys anywhere in transcript.",
+   "mentions": 0
+  },
+  "607731": {
+   "verdict": "REFUTED",
+   "why": "Host mentions buying fizer but no forward bullish call made explicitly",
+   "mentions": 0
+  },
+  "607887": {
+   "verdict": "REFUTED",
+   "why": "No forward bullish call on NVDA by host; mentions are contextual/third-party.",
+   "mentions": 16
+  },
+  "607888": {
+   "verdict": "REFUTED",
+   "why": "ADI mentioned only as a supplier to Twist, not as a bullish forward call.",
+   "mentions": 0
+  },
+  "607889": {
+   "verdict": "REFUTED",
+   "why": "VTEX not mentioned; 'vertex' refers to Vertex Pharmaceuticals, a healthcare company.",
+   "mentions": 0
+  },
+  "607891": {
+   "verdict": "REFUTED",
+   "why": "PSTG not mentioned anywhere in the transcript; no bullish call made.",
+   "mentions": 0
+  },
+  "607892": {
+   "verdict": "REFUTED",
+   "why": "Host describes AMAT's business model but makes no forward bullish call.",
+   "mentions": 5
+  },
+  "607896": {
+   "verdict": "VERIFIED",
+   "quote": "the reason why we've kind of given up on Micron after owning it for quite quite a number of years is the more we've kind of thought about the industry overall Micron in context of the whole semiconductor supply chain it's just not in one of those critical bottlenecks in the industry where they can consistently acrw most of the profit",
+   "ts": 2655,
+   "why": "Host explicitly states they gave up on Micron due to structural profit disadvantages, a bearish forward stance.",
+   "mentions": 10
+  },
+  "608125": {
+   "verdict": "VERIFIED",
+   "quote": "at a $245 share price I think they're trading very high right now and my Buy price for them would be $190 they would have to come down nearly 23% in price before I even consider buying more",
+   "ts": 323,
+   "why": "Host sets $190 buy price, says AAPL must drop 23% \u2014 bearish forward call.",
+   "mentions": 6
+  },
+  "608128": {
+   "verdict": "REFUTED",
+   "why": "Host is bullish on GOOGL, citing it as great value with buy price $200.",
+   "mentions": 5
+  },
+  "608126": {
+   "verdict": "REFUTED",
+   "why": "$415 is the host's BUY price for MSFT, not a bearish target; call is bullish.",
+   "mentions": 5
+  },
+  "608129": {
+   "verdict": "VERIFIED",
+   "quote": "my Buy price with Visa is at $295 and the biggest reason here is they just don't grow their free cash flow fast enough to justify their current share price so they would have to come down about 15% before I'd be willing to buy more",
+   "ts": 489,
+   "why": "Host sets $295 buy price, requiring 15% drop \u2014 bearish on current V valuation.",
+   "mentions": 3
+  },
+  "608127": {
+   "verdict": "REFUTED",
+   "why": "Host is bullish: AMZN at $216.58 is below his $230 buy price; he'd still add.",
+   "mentions": 5
+  },
+  "608130": {
+   "verdict": "VERIFIED",
+   "quote": "I started adding to into it when it came down to under $600 and I will continue to add more so long as it is under $600",
+   "ts": 508,
+   "why": "Host commits to buying Intuit (into it) at prices under $600, clearly bullish.",
+   "mentions": 0
+  },
+  "608132": {
+   "verdict": "VERIFIED",
+   "quote": "at a price of $543 I do think they're trading at a bit of a premium right now I'm willing to buy into KAC at $670 they would have to fall by almost 12% before I consider adding them to my portfolio",
+   "ts": 718,
+   "why": "Host says KLAC trading at premium, won't buy until it falls 12% to $670.",
+   "mentions": 0
+  },
+  "608133": {
+   "verdict": "REFUTED",
+   "why": "SNPS not mentioned in transcript; Cadence Design Systems discussed instead.",
+   "mentions": 0
+  },
+  "608134": {
+   "verdict": "REFUTED",
+   "why": "Host sets $540 buy price, bullish\u2014would add more if price drops to that level.",
+   "mentions": 1
+  },
+  "608135": {
+   "verdict": "VERIFIED",
+   "quote": "my Buy price is at 1,475 so they have a ways to come down almost 15% before I would add them to my portfolio",
+   "ts": 878,
+   "why": "Host sets buy price below current $1,698, implying bearish wait stance on FICO.",
+   "mentions": 2
+  },
+  "608131": {
+   "verdict": "REFUTED",
+   "why": "Host calls $190 a buy price; stock at $171.3 is below it \u2014 bullish, not bearish.",
+   "mentions": 5
+  },
+  "607723": {
+   "verdict": "INSUFFICIENT",
+   "why": "judge failed: Extra data: line 3 column 1 (char 149)",
+   "mentions": 7,
+   "substring_fail": true
+  },
+  "607111": {
+   "verdict": "VERIFIED",
+   "quote": "Google is about half the peeg and I actually like them even more as a company",
+   "ts": 310,
+   "why": "Host explicitly prefers GOOGL over AAPL, citing cheaper valuation and stronger personal preference.",
+   "mentions": 3
+  },
+  "607112": {
+   "verdict": "VERIFIED",
+   "quote": "I consider Google Microsoft and Amazon and even meta to be great Alternatives as a tech giant to build a portfolio around and every single one of those trade significantly cheaper than Apple on a PEG ratio basis",
+   "ts": 295,
+   "why": "Host calls Amazon a great alternative tech giant, trading cheaper than Apple, implying bullish stance.",
+   "mentions": 2
+  },
+  "607109": {
+   "verdict": "VERIFIED",
+   "quote": "do I consider Apple stock to be a long-term buy well I still say yes mostly yes just because of their massive size and the really sticky business",
+   "ts": 389,
+   "why": "Host personally affirms Apple is a long-term buy despite valuation concerns.",
+   "mentions": 27
+  },
+  "607110": {
+   "verdict": "VERIFIED",
+   "quote": "like Microsoft Google Amazon or even meta who are all also just gigantic Tech behemoths with very large very dominant businesses they're all very profitable and they're all making huge Investments for growth especially in areas of artificial intelligence I talk about it all the time on the channel these companies are making huge moves in Ai and I just want to see apple make similar moves too but until then these stocks are trading cheaper so I think that they are the better Buys in my opinion",
+   "ts": 547,
+   "why": "Host explicitly calls MSFT a better buy than AAPL at current valuation with AI growth thesis.",
+   "mentions": 2
+  },
+  "607144": {
+   "verdict": "VERIFIED",
+   "quote": "next era is looking like a pretty nice bargain here at these prices",
+   "ts": 201,
+   "why": "Host directly calls NEE a bargain buy, bullish forward call.",
+   "mentions": 0
+  },
+  "607146": {
+   "verdict": "VERIFIED",
+   "quote": "I think American water has really what it takes to make for a pretty Dependable long-term dividend stock to own",
+   "ts": 526,
+   "why": "Host explicitly calls AWK a dependable long-term dividend stock to own.",
+   "mentions": 3
+  },
+  "607113": {
+   "verdict": "VERIFIED",
+   "quote": "I consider Google Microsoft and Amazon and even meta to be great Alternatives as a tech giant to build a portfolio around and every single one of those trade significantly cheaper than Apple on a PEG ratio basis",
+   "ts": 295,
+   "why": "Host calls META a great alternative tech giant, cheaper than Apple, implying bullish stance.",
+   "mentions": 5
+  },
+  "607145": {
+   "verdict": "VERIFIED",
+   "quote": "I think Verizon is a pretty good long-term pickup here as well",
+   "ts": 357,
+   "why": "Host directly calls VZ a good long-term pickup, a committed bullish forward call.",
+   "mentions": 6
+  },
+  "607734": {
+   "verdict": "VERIFIED",
+   "quote": "my favorite just happens to be Chevron the second largest producer in America",
+   "ts": 180,
+   "why": "Host explicitly names Chevron as personal favorite with bullish forward reasoning.",
+   "mentions": 5
+  },
+  "607148": {
+   "verdict": "VERIFIED",
+   "quote": "I've been buying it anyway and that is Tyson Foods ticker symbol TSN which has now seen their stock price get decimated from the top losing more than 40% of its value to now trading for one of the lowest prices that we've seen in the past decade but that's actually one of the biggest reasons why I'm currently buying the stock myself",
+   "ts": 704,
+   "why": "Host personally buying TSN, bullish on recovery from 40% decline.",
+   "mentions": 1
+  },
+  "607147": {
+   "verdict": "VERIFIED",
+   "quote": "their EPS is actually expected to see a big recovery both next year and especially in 2025 where it gains a dividend payout ratio of just 62% that's pretty reasonable",
+   "ts": 617,
+   "why": "Host makes forward bullish EPS recovery and dividend sustainability case for PFE.",
+   "mentions": 1
+  },
+  "607735": {
+   "verdict": "VERIFIED",
+   "quote": "I just think the combination of tariffs tax incentives and deregulation could actually help Tesla perform much better in the coming years",
+   "ts": 492,
+   "why": "Host directly predicts Tesla will perform much better due to tariffs, incentives, deregulation.",
+   "mentions": 11
+  },
+  "607738": {
+   "verdict": "VERIFIED",
+   "quote": "well Adison Google stock is a Buy in practically any scenario at this point but even more so in a trump presidency because of how engaged I think everyone will be online which directly should benefit them",
+   "ts": 1012,
+   "why": "Host explicitly calls Google stock a Buy, forward-looking, bullish.",
+   "mentions": 6
+  },
+  "607737": {
+   "verdict": "VERIFIED",
+   "quote": "I'm actually going to give you you guys a much cheaper option that I've never covered before on the channel but the more I research it the more interested I become so I think today is a good of a time as any to introduce it and that is First Solar ticker symbol FS LR which I uh which is uh primarily a solar panel developer maker and seller now this is another stock here that is very similar to the Tesla situation I would say in that normally I wouldn't choose a play on renable energy for a trump stock however because of the Trump tariffs well First Solar actually sens a benefit greatly from them",
+   "ts": 717,
+   "why": "Host personally recommends FSLR as bullish pick citing Trump tariff benefits.",
+   "mentions": 0
+  },
+  "607777": {
+   "verdict": "VERIFIED",
+   "quote": "for stock number one My overall favorite of the list might surprise you but I'm actually not going to go with Tesla at number one instead I'm going with Google ticker symbol g o l",
+   "ts": 98,
+   "why": "Host explicitly ranks Google as #1 pick for robotaxi exposure, bullish forward call.",
+   "mentions": 9
+  },
+  "607736": {
+   "verdict": "VERIFIED",
+   "quote": "there's actually a different stock that I think has much more future potential and that is paler Technologies ticker symbol PLT R because while they may not be a straightforward weapons maker they are far and ahead one of the best at using artificial intelligence and overall data management and Analysis to support the military and the government at large which I actually think may be the most important aspect of defense for the future",
+   "ts": 560,
+   "why": "Host explicitly picks PLTR as bullish defense/AI play benefiting from Trump presidency.",
+   "mentions": 0
+  },
+  "607779": {
+   "verdict": "VERIFIED",
+   "quote": "you might want to consider a Chinese alternative like by ticker symbol BIDU",
+   "ts": 509,
+   "why": "Host directly recommends BIDU as a cheaper robo taxi option with bullish framing.",
+   "mentions": 1
+  },
+  "607780": {
+   "verdict": "VERIFIED",
+   "quote": "I would actually own this stock regardless of the robot taxi business excuse me regardless of the robot taxi business and uh that is the mighty Amazon ticker symbol amzn which is already one of my personal favorite and largest Investments",
+   "ts": 631,
+   "why": "Host explicitly claims Amazon as personal favorite investment with strong bullish conviction.",
+   "mentions": 4
+  },
+  "607781": {
+   "verdict": "VERIFIED",
+   "quote": "they should be able to bounce back fairly quickly and then scale much faster than maybe other Legacy auto out there and yet I would argue that the stock kind of Trades like as if it doesn't even have those AV advantages trading for only around a five earnings multiple and is even more than 60% cheaper than the sector by most metrics",
+   "ts": 833,
+   "why": "Host directly argues GM is undervalued with AV upside, a forward bullish call.",
+   "mentions": 3
+  },
+  "608946": {
+   "verdict": "VERIFIED",
+   "quote": "stock number one on our list is going to be locky Martin stock ticker LMT and this company is a solid combination of starting dividend yield sitting close to about 2.6% combined with dividend growth",
+   "ts": 67,
+   "why": "Host picks LMT as top dividend stock with bullish forward outlook and growth thesis.",
+   "mentions": 3
+  },
+  "607782": {
+   "verdict": "VERIFIED",
+   "quote": "I also think that there a pretty good play maybe like an indirect play on Robo taxis as well it's one to consider for sure",
+   "ts": 894,
+   "why": "Host personally calls NVDA a good indirect robotaxi play worth considering.",
+   "mentions": 2
+  },
+  "608952": {
+   "verdict": "VERIFIED",
+   "quote": "I felt like this stock was undervalued for quite some time and it seems the market is finally understanding what the true intrinsic value of this company is",
+   "ts": 1017,
+   "why": "Host explicitly calls MO undervalued and bullish, validated by 30% gain.",
+   "mentions": 5
+  },
+  "608953": {
+   "verdict": "VERIFIED",
+   "quote": "assuming a free cash flow growth rate of 12.5% we come to an intrinsic value of $321 per share which is actually a little bit above that current trading price meaning the company might be slightly undervalued",
+   "ts": 1248,
+   "why": "Host presents DCF valuation of $321, calls V slightly undervalued \u2014 bullish forward call.",
+   "mentions": 4
+  },
+  "608954": {
+   "verdict": "REFUTED",
+   "why": "NVDA not mentioned anywhere in transcript; no bullish call made.",
+   "mentions": 0
+  },
+  "608955": {
+   "verdict": "VERIFIED",
+   "quote": "from a long-term perspective I like what I see in this company and the Insiders at Louis",
+   "ts": 1510,
+   "why": "Host expresses personal bullish conviction on LVMHF long-term with insider buying support.",
+   "mentions": 1
+  },
+  "608987": {
+   "verdict": "VERIFIED",
+   "quote": "I think it's a high likelihood we continue to see high levels of dividend growth from this company moving forward",
+   "ts": 167,
+   "why": "Host makes explicit forward bullish call on AXP dividend growth.",
+   "mentions": 0
+  },
+  "608949": {
+   "verdict": "VERIFIED",
+   "quote": "so this is a very shareholder friendly company",
+   "ts": 622,
+   "why": "Host owns DPZ personally, lists it as top pick, endorses shareholder yield thesis.",
+   "mentions": 1
+  },
+  "608989": {
+   "verdict": "VERIFIED",
+   "quote": "I think it's a high likelihood we continue to see high levels of dividend growth from this company moving forward",
+   "ts": 167,
+   "why": "Host explicitly forecasts continued high dividend growth for MSCI with clear conviction.",
+   "mentions": 3
+  },
+  "608990": {
+   "verdict": "VERIFIED",
+   "quote": "this most recent dividend hike quite a bit lower than what we're typically used to seeing and free casual has been growing at a really high rate so it's interesting to see that they didn't grow the dividend as much as they typically do it'll be interesting to see if that's the case moving forward",
+   "ts": 376,
+   "why": "Host notes SPGI's below-trend dividend growth with cautious uncertainty about future trajectory.",
+   "mentions": 1
+  },
+  "608991": {
+   "verdict": "VERIFIED",
+   "quote": "I do want to warn you there can be a lot of volatility with the underlying fundamentals with these companies something you have to be wary of",
+   "ts": 457,
+   "why": "Host warns of volatility in CVX fundamentals due to oil price and margin fluctuation\u2014neutral stance.",
+   "mentions": 3
+  },
+  "607159": {
+   "verdict": "REFUTED",
+   "why": "Host describes AAPL as a company hurt by China slowdown, not a forward bearish call.",
+   "mentions": 1
+  },
+  "607160": {
+   "verdict": "REFUTED",
+   "why": "SBUX mentioned as example of China-exposed stock, no bearish forward call made.",
+   "mentions": 1
+  },
+  "607161": {
+   "verdict": "REFUTED",
+   "why": "MCD mentioned only as example of China-exposed stock, no bearish call made.",
+   "mentions": 0
+  },
+  "608986": {
+   "verdict": "VERIFIED",
+   "quote": "it looks like the main priority is continuing to grow that dividend payment over time",
+   "ts": 103,
+   "why": "Host makes forward-looking bullish call on F's dividend growth trajectory after noting free cash flow expansion.",
+   "mentions": 0
+  },
+  "607163": {
+   "verdict": "REFUTED",
+   "why": "NKE mentioned only as example of China-exposed stocks, no bearish call made.",
+   "mentions": 1
+  },
+  "607164": {
+   "verdict": "REFUTED",
+   "why": "Boeing mentioned only as example of China-exposed stock, no bearish call made.",
+   "mentions": 1
+  },
+  "608988": {
+   "verdict": "VERIFIED",
+   "quote": "so a little bit of a red flag there but overall the company has been able to sustain their dividend payments with a payout ratio of about 65%",
+   "ts": 239,
+   "why": "Host balances FCF red flag against healthy payout ratio, implying neutral dividend sustainability.",
+   "mentions": 2
+  },
+  "609182": {
+   "verdict": "VERIFIED",
+   "quote": "and if I'm betting on crude oil those would be the two stocks I would be buying now",
+   "ts": 717,
+   "why": "Host commits to buying CVX combined with OXY as crude oil bets.",
+   "mentions": 3
+  },
+  "607165": {
+   "verdict": "REFUTED",
+   "why": "Tesla mentioned only as example of companies hurt by China slowdown, no forward bearish call made.",
+   "mentions": 1
+  },
+  "609183": {
+   "verdict": "VERIFIED",
+   "quote": "I like those two stocks very much",
+   "ts": 677,
+   "why": "Host personally endorses MPC and PSX as forward bullish picks for oil refiner exposure.",
+   "mentions": 1
+  },
+  "609184": {
+   "verdict": "VERIFIED",
+   "quote": "And you have Philips 66 PSX it's down 18% I like those two stocks very much",
+   "ts": 673,
+   "why": "Host explicitly says 'I like those two stocks very much' about PSX in forward context.",
+   "mentions": 2
+  },
+  "609185": {
+   "verdict": "VERIFIED",
+   "quote": "you have Monster down 133% Celsius down 43% on New Year now again monster is down because of some problems on demand s Al they're buying back stocks that returning value to shareholders very amazing stuff that monster is doing and you have Celsius Holdings which has a problem with Pepsi Pepsi over stocks and all these things I just don't see how 2025 is not a better year for those stocks than 2024",
+   "ts": 738,
+   "why": "Host explicitly states Monster (MNST) will have a better 2025, implying bullish forward call.",
+   "mentions": 0
+  },
+  "609186": {
+   "verdict": "VERIFIED",
+   "quote": "you have Celsius Holdings which has a problem with Pepsi Pepsi over stocks and all these things I just don't see how 2025 is not a better year for those stocks than 2024",
+   "ts": 755,
+   "why": "Host directly states bullish forward view on Celsius Holdings for 2025.",
+   "mentions": 0
+  },
+  "609187": {
+   "verdict": "VERIFIED",
+   "quote": "him and her house is my stock and my cost basis is 687 and I averaged up at 11 and I averaged up again at 1 because I still have conviction in it",
+   "ts": 806,
+   "why": "Host personally owns HIMS, averaged up multiple times, states ongoing conviction bullish call.",
+   "mentions": 0
+  },
+  "609418": {
+   "verdict": "REFUTED",
+   "why": "Host uses VZ as a high-yield example, not a bearish forward call.",
+   "mentions": 11
+  },
+  "609422": {
+   "verdict": "REFUTED",
+   "why": "KO mentioned only as pyramid example, no forward neutral call made.",
+   "mentions": 0
+  },
+  "609427": {
+   "verdict": "REFUTED",
+   "why": "MSFT used only as past-performance example; no forward bullish call made.",
+   "mentions": 7
+  },
+  "609428": {
+   "verdict": "REFUTED",
+   "why": "AAPL used only as buyback illustration; no forward bullish call made.",
+   "mentions": 4
+  },
+  "609429": {
+   "verdict": "REFUTED",
+   "why": "Host analyzes MO fundamentals descriptively but makes no forward bullish call.",
+   "mentions": 3
+  },
+  "609430": {
+   "verdict": "REFUTED",
+   "why": "Host uses META as a case study for dividend initiation; no forward bullish price call made.",
+   "mentions": 10
+  },
+  "609431": {
+   "verdict": "REFUTED",
+   "why": "Host discusses ADC's dividend metrics as an example, makes no forward bullish call.",
+   "mentions": 1
+  },
+  "607285": {
+   "verdict": "REFUTED",
+   "why": "Host says stock is boring and valuation too high; no forward bullish call made.",
+   "mentions": 1
+  },
+  "607287": {
+   "verdict": "VERIFIED",
+   "quote": "it is still a very strong stock regardless and I even own some of it myself",
+   "ts": 499,
+   "why": "Host personally affirms AAPL is very strong and owns it, a committed bullish stance.",
+   "mentions": 11
+  },
+  "607288": {
+   "verdict": "REFUTED",
+   "why": "Host expresses mild positive view on PARA brands; no committed forward bearish call made.",
+   "mentions": 0
+  },
+  "607624": {
+   "verdict": "REFUTED",
+   "why": "No forward bullish call; only past performance recap and dividend metrics review.",
+   "mentions": 1
+  },
+  "607623": {
+   "verdict": "VERIFIED",
+   "quote": "the fourth high quality dividend stock is klaa ticker K they're a semiconductor equipment manufacturing firm",
+   "ts": 605,
+   "why": "Host presents KLAC as a high quality dividend stock with excellent metrics and strong growth.",
+   "mentions": 0
+  },
+  "607621": {
+   "verdict": "VERIFIED",
+   "quote": "next up is elevance Health ticker elv their dividend has increased at a faster rate than Costco's even you can see that here their yield has remained relatively stable as well they haven't decreased as much as what Costco has and they've also shown very good year-over-year dividend growth",
+   "ts": 512,
+   "why": "Host presents ELV as quality dividend growth stock with positive metrics going forward.",
+   "mentions": 1
+  },
+  "609206": {
+   "verdict": "VERIFIED",
+   "quote": "My buy price for them is at $295.",
+   "ts": 504,
+   "why": "Host explicitly states personal buy price target of $295 for Visa.",
+   "mentions": 7
+  },
+  "607625": {
+   "verdict": "VERIFIED",
+   "quote": "one stock that's primarily on my watch list right now and I've been looking into recently is William and Sonoma William Sonoma has accelerated their dividend 133% compounded the last 10 years and just last year they increased their dividend by 20%",
+   "ts": 781,
+   "why": "Host explicitly names WSM as current watch list stock with bullish dividend metrics.",
+   "mentions": 0
+  },
+  "609207": {
+   "verdict": "VERIFIED",
+   "quote": "I have a buy price of $410. So if it comes down below that again I think Microsoft is a strong buy.",
+   "ts": 583,
+   "why": "Host explicitly states $410 buy price and calls MSFT a strong buy.",
+   "mentions": 10
+  },
+  "609210": {
+   "verdict": "VERIFIED",
+   "quote": "I have a buy price of $540.",
+   "ts": 806,
+   "why": "Host explicitly states personal buy price of $540 for MSCI, a committed bullish call.",
+   "mentions": 6
+  },
+  "609209": {
+   "verdict": "VERIFIED",
+   "quote": "Airbnb is $132.91. They have a buy price of $145 right now for them, which they're undervalued by about 9% currently.",
+   "ts": 701,
+   "why": "Host directly states ABNB buy price of $145, confirming bullish call.",
+   "mentions": 11
+  },
+  "609208": {
+   "verdict": "VERIFIED",
+   "quote": "Applied Materials is perhaps the business most affected by tariffs on this list today. Current price at $161.18. Their buy price at $185. I still think they're wildly undervalued right now",
+   "ts": 642,
+   "why": "Host sets $185 buy price and calls AMAT wildly undervalued \u2014 clear bullish forward call.",
+   "mentions": 5
+  },
+  "609406": {
+   "verdict": "VERIFIED",
+   "quote": "we come to an intrinsic value of $23.25 current price is about $172 so with a 10% margin of safety we get an acceptable Buy price of $191.25",
+   "ts": 246,
+   "why": "Host calculates intrinsic value and acceptable buy price for GOOGL, indicating bullish forward call.",
+   "mentions": 14
+  },
+  "609407": {
+   "verdict": "VERIFIED",
+   "quote": "it's clear that valuation is starting to become attractive again",
+   "ts": 476,
+   "why": "Host personally holds MSFT, performs DCF/multiples/DDM, and calls valuation attractive.",
+   "mentions": 12
+  },
+  "607289": {
+   "verdict": "VERIFIED",
+   "quote": "hp's financials have been falling for years with even this year still expected to decline before they finally see a small recovery the year after",
+   "ts": 764,
+   "why": "Host personally explains forward declining financials and PC market saturation as bearish rationale",
+   "mentions": 1
+  },
+  "609410": {
+   "verdict": "VERIFIED",
+   "quote": "assuming a dividend growth rate of just 7% which again if we look over the past decade that's been easily attainable for the company we can see the company's worth about $583 51 which is around 23% higher than",
+   "ts": 960,
+   "why": "Host applies DDM to UNH, values it 23% above current price, implying bullish call.",
+   "mentions": 3
+  },
+  "610596": {
+   "verdict": "VERIFIED",
+   "quote": "as long as markets keep growing as there is more money in the system more Investments Black Rob will keep on growing growing their fee shares growing their dividends faster than the S&P 500",
+   "ts": 208,
+   "why": "Host directly predicts BLK will grow dividends faster than S&P 500 long-term.",
+   "mentions": 0
+  },
+  "609409": {
+   "verdict": "VERIFIED",
+   "quote": "so it looks like at about 11.1% we get the exact current price for this company so the market is currently pricing in 11.1% annual free cash flow growth the question we have to ask oursel is do we think it'll be higher because if so the company's undervalued",
+   "ts": 767,
+   "why": "Host's reverse DCF implies bullish view: if actual FCF growth exceeds 11.1%, stock is undervalued.",
+   "mentions": 4
+  },
+  "610597": {
+   "verdict": "VERIFIED",
+   "quote": "it's cheaper it's a good business there is always this recession risk that Investments slow down and therefore Cisco also gets hammered that's a given with these companies",
+   "ts": 297,
+   "why": "Host calls CSCO cheaper, good business, implying bullish forward view despite recession caveat.",
+   "mentions": 0
+  },
+  "610598": {
+   "verdict": "INSUFFICIENT",
+   "why": "Host describes VZ as interest-rate-sensitive dividend play, no committed bullish forward call.",
+   "mentions": 5
+  },
+  "610599": {
+   "verdict": "REFUTED",
+   "why": "Host expresses uncertainty about UPS, attributes $150 target to analysts, not own call.",
+   "mentions": 5
+  },
+  "610785": {
+   "verdict": "VERIFIED",
+   "quote": "I'll put Nike a little bit lower here below the bu threshold because it's simply a little bit too risky",
+   "ts": 278,
+   "why": "Host explicitly places Nike below buy threshold due to risk concerns.",
+   "mentions": 5
+  },
+  "610600": {
+   "verdict": "VERIFIED",
+   "quote": "they are positioning the company to grow and this is their scenario they are investing and if things go as planned if the market recovers then there will be six billion more in Revenue",
+   "ts": 624,
+   "why": "Host describes TXN's investment cycle and growth scenario with bullish forward-looking framing.",
+   "mentions": 0
+  },
+  "609408": {
+   "verdict": "INSUFFICIENT",
+   "why": "Transcript cuts off before DDM price and final recommendation; no explicit neutral call visible",
+   "mentions": 2
+  },
+  "610786": {
+   "verdict": "VERIFIED",
+   "quote": "craft Hinds we just discussed it recently in a video and here you can see that the yield is already much higher check the video all the links to the videos mentioned will be in the description below also in the intrinsic value you can click there and it leads you directly to the research but 5.5% is already way higher than 2.5% and therefore you hear see how if just 3% growth 5% good yield over time and you can see that it can lead to a 10% required return",
+   "ts": 288,
+   "why": "Host explicitly calls KHC (Kraft Heinz) a buy with 5.5% yield and 10% return potential.",
+   "mentions": 0
+  },
+  "610787": {
+   "verdict": "VERIFIED",
+   "quote": "I have increased the risk here and lowered the reward because of the baby drill scenario",
+   "ts": 525,
+   "why": "Host explicitly raises risk and lowers reward for Exon due to oil price outlook, bearish call confirmed.",
+   "mentions": 0
+  },
+  "610790": {
+   "verdict": "REFUTED",
+   "why": "PSX/Phillips 66 never mentioned; Exxon discussed as risky, not PSX.",
+   "mentions": 0
+  },
+  "610789": {
+   "verdict": "VERIFIED",
+   "quote": "another business that we discussed is Archer Daniel Midlands so again another dividend 4% growth food inflation the market is happy with the 4% dividend for a margin of safety needs to go to 20 and then maybe they will still grow at four then you need it a little bit lower than the current stock price of 50",
+   "ts": 784,
+   "why": "Host discusses ADM with 4% dividend and margin of safety framing as a buy candidate.",
+   "mentions": 0
+  },
+  "608202": {
+   "verdict": "REFUTED",
+   "why": "Host names GOOGL as favorite but chooses Amazon as his one-stock pick, not a forward bullish call on GOOGL.",
+   "mentions": 4
+  },
+  "608204": {
+   "verdict": "VERIFIED",
+   "quote": "my favorite would be Chevron because of how much they've invested into Renewables for future growth while still generating you know a lot of profits with a big dividend and a reasonable valuation",
+   "ts": 1231,
+   "why": "Host personally endorses Chevron as favorite oil/gas dividend stock with bullish reasoning.",
+   "mentions": 1
+  },
+  "608203": {
+   "verdict": "VERIFIED",
+   "quote": "at the moment I'm just kind of holding on to the shares that I already have I don't really plan on either buying or selling until we get some more clarity on this whole situation",
+   "ts": 630,
+   "why": "Host explicitly holds TSLA, neither buying nor selling\u2014neutral forward stance.",
+   "mentions": 6
+  },
+  "608201": {
+   "verdict": "VERIFIED",
+   "quote": "I think I would actually want something that is extremely difficult to replicate cuz it's the only stock I can own I really want to make sure there's a lot of safety with it and while I do think that Google has that for sure I just think that Amazon would be a little stronger in that area",
+   "ts": 214,
+   "why": "Host personally picks Amazon as sole long-term holding due to competitive moat strength.",
+   "mentions": 4
+  },
+  "606928": {
+   "verdict": "VERIFIED",
+   "quote": "United Health Group into it K and Microsoft would be a great foundation for any dividend growth portfolio",
+   "ts": 453,
+   "why": "Host directly recommends UNH as portfolio foundation, a committed bullish forward call.",
+   "mentions": 5
+  },
+  "606929": {
+   "verdict": "VERIFIED",
+   "quote": "United Health Group into it K and Microsoft would be a great foundation for any dividend growth portfolio",
+   "ts": 453,
+   "why": "Host explicitly names Inuit as portfolio foundation, a forward bullish endorsement.",
+   "mentions": 0
+  },
+  "606931": {
+   "verdict": "VERIFIED",
+   "quote": "United Health Group into it K and Microsoft would be a great foundation for any dividend growth portfolio",
+   "ts": 453,
+   "why": "Host directly recommends MSFT as portfolio foundation, bullish forward endorsement.",
+   "mentions": 7
+  },
+  "606930": {
+   "verdict": "VERIFIED",
+   "quote": "United Health Group into it K and Microsoft would be a great foundation for any dividend growth portfolio",
+   "ts": 453,
+   "why": "Host explicitly recommends KLA (K) as portfolio foundation, bullish forward call.",
+   "mentions": 0
+  },
+  "607096": {
+   "verdict": "VERIFIED",
+   "quote": "I think when the economy recovers though I think USB stock will perform a lot better",
+   "ts": 718,
+   "why": "Host makes direct forward bullish call on USB stock recovery.",
+   "mentions": 3
+  },
+  "607099": {
+   "verdict": "VERIFIED",
+   "quote": "I'm still buying small amounts of variet rizon stock myself I think longer term it's just a little hard for me to Envision them not being a leader",
+   "ts": 1015,
+   "why": "Host personally buying VZ, bullish on long-term leadership prospects.",
+   "mentions": 1
+  },
+  "607098": {
+   "verdict": "VERIFIED",
+   "quote": "I do think that it's a solid growth stock that is currently cheap right now",
+   "ts": 854,
+   "why": "Host personally states TSM is cheap and a solid growth stock, a direct bullish forward call.",
+   "mentions": 7
+  },
+  "607097": {
+   "verdict": "VERIFIED",
+   "quote": "my guess is that it will probably perform well as a stock long term",
+   "ts": 603,
+   "why": "Host directly states LMT will probably perform well long term.",
+   "mentions": 0
+  },
+  "607282": {
+   "verdict": "VERIFIED",
+   "quote": "they get the number one ranking from me and it's a pretty easy Choice",
+   "ts": 540,
+   "why": "Host ranks Amazon #1, calls it a long-term world leader, clearly bullish.",
+   "mentions": 20
+  },
+  "607283": {
+   "verdict": "VERIFIED",
+   "quote": "you know Nvidia is a rip behind them I'm going to put them right there at number two",
+   "ts": 685,
+   "why": "Host ranks NVDA #2, bullish long-term, growing into valuation.",
+   "mentions": 11
+  },
+  "607284": {
+   "verdict": "VERIFIED",
+   "quote": "I just have no doubt that they will continue to dominate longterm in some of the most important markets out there",
+   "ts": 845,
+   "why": "Host expresses forward bullish conviction on Microsoft's long-term dominance.",
+   "mentions": 6
+  },
+  "607281": {
+   "verdict": "VERIFIED",
+   "quote": "so I'm not really sure why black rock loves this one so much I mean the stock isn't even a great value either not only trading near a record high but also hundreds of percents more expensive than the sector median on a PE ratio basis so even though I like the business I just think that as long as I have Alternatives like Amazon to invest in Costco will continue to be of pretty much little to no interest for me",
+   "ts": 225,
+   "why": "Host explicitly dismisses COST as overvalued with no interest in owning it.",
+   "mentions": 5
+  },
+  "607249": {
+   "verdict": "VERIFIED",
+   "quote": "even Nvidia who is very highly valued at the moment but I still think has a bright future in artificial intelligence",
+   "ts": 308,
+   "why": "Host personally expresses forward bullish view on NVDA despite high valuation.",
+   "mentions": 3
+  },
+  "607248": {
+   "verdict": "VERIFIED",
+   "quote": "it's just a company and a stock that I really trust long term",
+   "ts": 404,
+   "why": "Host expresses forward conviction in GOOGL as long-term hold, clearly bullish.",
+   "mentions": 7
+  },
+  "607250": {
+   "verdict": "VERIFIED",
+   "quote": "adding by do could be a great kind of one twoo punch on the future of the Chinese market and its recovery long term especially in Chinese Tech and AI so I might look to add BYU as a new stock to the portfolio in the future as well",
+   "ts": 530,
+   "why": "Host personally expresses bullish forward intent to add BYD (transcribed as BYU) citing Chinese market recovery and AI.",
+   "mentions": 0
+  },
+  "607261": {
+   "verdict": "VERIFIED",
+   "quote": "it's a great company guys and I would love to own the stock myself too",
+   "ts": 730,
+   "why": "Host expresses bullish sentiment on CRM, calls it great and wants to own it.",
+   "mentions": 18
+  },
+  "607260": {
+   "verdict": "VERIFIED",
+   "quote": "I still think it's a very solid and reliable long-term investment",
+   "ts": 544,
+   "why": "Host personally owns Visa, ranks it #2, calls it solid long-term investment.",
+   "mentions": 15
+  },
+  "607466": {
+   "verdict": "VERIFIED",
+   "quote": "the coffee chain said it expects fouryear Global Revenue growth to be in the low single digit range down from the prior forecast of 7% to 10%",
+   "ts": 391,
+   "why": "Host reports forward guidance downgrade, then contextualizes it bearishly with declining margins and falling comps.",
+   "mentions": 20
+  },
+  "607467": {
+   "verdict": "REFUTED",
+   "why": "Host recaps past dividend cut and price drop but makes no forward bearish call.",
+   "mentions": 2
+  },
+  "607262": {
+   "verdict": "VERIFIED",
+   "quote": "because I own visa and apple I just kind of feel like I would have to rank them higher than Salesforce even though I like all of them for different reasons",
+   "ts": 938,
+   "why": "Host explicitly ranks Apple higher, owns it, treating it as a preferred long-term holding.",
+   "mentions": 14
+  },
+  "607468": {
+   "verdict": "REFUTED",
+   "why": "Host frames MMM as a hidden dividend cut, no explicit forward neutral stance.",
+   "mentions": 2
+  },
+  "607796": {
+   "verdict": "VERIFIED",
+   "quote": "I've also been a heavy buyer of this one these past couple years",
+   "ts": 202,
+   "why": "Host explicitly states personal buying conviction on MDT (Medtronic).",
+   "mentions": 1
+  },
+  "607597": {
+   "verdict": "VERIFIED",
+   "quote": "I would have to buy movies around 261 dollars per share if it gets to 261 dollars per share or something close to that I would be extremely interested in ordering and opening a small position around 25 times earnings",
+   "ts": 798,
+   "why": "Host sets $261 price target for Moody's and expresses intent to buy.",
+   "mentions": 0
+  },
+  "607595": {
+   "verdict": "VERIFIED",
+   "quote": "if Visa gets to 200 per share or below I would be extremely extremely interested in owning Visa",
+   "ts": 367,
+   "why": "Host explicitly states bullish interest in V at $200 or below with strong conviction.",
+   "mentions": 27
+  },
+  "607596": {
+   "verdict": "VERIFIED",
+   "quote": "I would love it around 19 to 18 times earnings which would be around 72 to 73 dollars per share I would be extremely extremely interested",
+   "ts": 604,
+   "why": "Host explicitly targets $72-73 for Otis with strong personal conviction.",
+   "mentions": 12
+  },
+  "607797": {
+   "verdict": "VERIFIED",
+   "quote": "I'll continue to be a buyer myself into the New Year",
+   "ts": 462,
+   "why": "Host explicitly states ongoing bullish buying commitment on EXR going forward.",
+   "mentions": 4
+  },
+  "607798": {
+   "verdict": "VERIFIED",
+   "quote": "I also think that it's just too attractive at these levels to not be buying more in the coming year",
+   "ts": 590,
+   "why": "Host explicitly states intent to buy more VZ, a forward bullish commitment.",
+   "mentions": 5
+  },
+  "608018": {
+   "verdict": "VERIFIED",
+   "quote": "something like Microsoft could be flat for for 1 to two years",
+   "ts": 237,
+   "why": "Host directly states MSFT could be flat 1-2 years, bearish forward call.",
+   "mentions": 15
+  },
+  "608020": {
+   "verdict": "VERIFIED",
+   "quote": "Google is still the most undervalued Mega cap in my opinion",
+   "ts": 313,
+   "why": "Host directly calls Google most undervalued mega-cap, implying bullish view.",
+   "mentions": 0
+  },
+  "608019": {
+   "verdict": "VERIFIED",
+   "quote": "I think the most likely scenario is we just reverse and and we retest this trend line something like 4300 and then maybe we rebound from 4300",
+   "ts": 445,
+   "why": "Host predicts S&P 500 pullback to 4300 from ~4600, a bearish near-term call.",
+   "mentions": 43
+  },
+  "608418": {
+   "verdict": "VERIFIED",
+   "quote": "companies in the Fab Five asml Applied Materials lamb research Tokyo electron and K Corp are all better suited for this recovery and more upside currently",
+   "ts": 292,
+   "why": "Host states AMAT better suited for recovery and more upside \u2014 forward bullish call.",
+   "mentions": 1
+  },
+  "608419": {
+   "verdict": "VERIFIED",
+   "quote": "companies in the Fab Five asml Applied Materials lamb research Tokyo electron and K Corp are all better suited for this recovery and more upside currently",
+   "ts": 292,
+   "why": "Host names Lam Research as better-suited for recovery, a forward bullish call.",
+   "mentions": 0
+  },
+  "608417": {
+   "verdict": "VERIFIED",
+   "quote": "companies in the Fab Five asml Applied Materials lamb research Tokyo electron and K Corp are all better suited for this recovery and more upside currently",
+   "ts": 292,
+   "why": "Host states ASML and Fab Five are better suited for recovery and more upside.",
+   "mentions": 1
+  },
+  "608669": {
+   "verdict": "VERIFIED",
+   "quote": "what's most likely coming next is again 15 years 10 15 years of no returns especially starting from a high valuation",
+   "ts": 109,
+   "why": "Host explicitly predicts 10-15 years of flat returns for Honeywell starting from high valuation.",
+   "mentions": 0
+  },
+  "608672": {
+   "verdict": "VERIFIED",
+   "quote": "but the p ratio is simply too high for me",
+   "ts": 380,
+   "why": "Host calls SBUX P/E of 44 too high, implying overvaluation and bearish stance.",
+   "mentions": 3
+  },
+  "608673": {
+   "verdict": "VERIFIED",
+   "quote": "now at this dividend yield the macro Outlook long-term Outlook and everything it will take you 50 years to get your price back in dividends Warren Buffett got it back in seven I rest my case for railroad related questions",
+   "ts": 398,
+   "why": "Host explicitly calls railroads overvalued via 50-year dividend payback vs Buffett's 7 years.",
+   "mentions": 0
+  },
+  "609009": {
+   "verdict": "VERIFIED",
+   "quote": "all these factors make vichi an attractive option in my opinion",
+   "ts": 1637,
+   "why": "Host personally owns VICI, calls it attractive with high yield and dividend growth.",
+   "mentions": 1
+  },
+  "609005": {
+   "verdict": "VERIFIED",
+   "quote": "if we assume just a 4% dividend growth rate which like we just saw they have been able to achieve over the past 5 and 10 years we come to an intrinsic value of $732 which is over 40% higher than the current share price",
+   "ts": 1169,
+   "why": "Host calculates 40%+ upside intrinsic value for EIX, conditioned on lawsuit outcome.",
+   "mentions": 3
+  },
+  "609001": {
+   "verdict": "REFUTED",
+   "why": "Host concludes PAYX trades 'pretty close to fair value,' no forward bullish call made.",
+   "mentions": 0
+  },
+  "610703": {
+   "verdict": "VERIFIED",
+   "quote": "I think it will lead to low mid to long-term returns and therefore it is low reward high risk",
+   "ts": 174,
+   "why": "Host directly calls NVDA low reward high risk with low mid-to-long-term returns.",
+   "mentions": 5
+  },
+  "610705": {
+   "verdict": "VERIFIED",
+   "quote": "Archer danian Midland recent addition to my Diversified portfolio so I own this I also just for disclosure own nutrient rubies I have just written a 30 page report on Archer danion Midlands",
+   "ts": 922,
+   "why": "Host discloses ownership and recent purchase of ADM, indicating bullish conviction.",
+   "mentions": 0
+  },
+  "610704": {
+   "verdict": "VERIFIED",
+   "quote": "I have pushed Google to let's say a market level risk medium Market level risk and a little bit higher reward on on the cheapness and on the growth",
+   "ts": 706,
+   "why": "Host repositions Google to medium risk, higher reward\u2014a forward bullish call.",
+   "mentions": 9
+  },
+  "605997": {
+   "verdict": "VERIFIED",
+   "quote": "our valuation is telling us this is a stock that we should currently be buying",
+   "ts": 244,
+   "why": "Host's own valuation model concludes TGT is a buy at $164.",
+   "mentions": 18
+  },
+  "605998": {
+   "verdict": "VERIFIED",
+   "quote": "our acceptable buy price for this company is 194 dollars and our stock valuation spreadsheet is telling us this this is a stock we should be buying",
+   "ts": 461,
+   "why": "Host sets $194 buy price for LOW and calls it a stock to buy.",
+   "mentions": 7
+  },
+  "605999": {
+   "verdict": "VERIFIED",
+   "quote": "if you are considering buying into apple i would go ahead and buy it",
+   "ts": 739,
+   "why": "Host directly recommends buying Apple stock, a forward bullish call.",
+   "mentions": 10
+  },
+  "606340": {
+   "verdict": "VERIFIED",
+   "quote": "we did start purchasing air test system stock again here just a couple months ago",
+   "ts": 313,
+   "why": "Host confirms recent renewed purchase of AEHR, implying bullish stance.",
+   "mentions": 0
+  },
+  "606741": {
+   "verdict": "VERIFIED",
+   "quote": "I like what they're doing I'll keep a very close eye on it but I'm not buying it at the moment",
+   "ts": 391,
+   "why": "Host explicitly says not buying AI (C3.ai) currently, confirming neutral stance.",
+   "mentions": 13
+  },
+  "606342": {
+   "verdict": "REFUTED",
+   "why": "Host expresses interest in watching ACMR but makes no neutral forward call; profitability discussion is inconclusive.",
+   "mentions": 0
+  },
+  "606341": {
+   "verdict": "VERIFIED",
+   "quote": "there are too many questions left unanswered for us to feel comfortable investing in this company",
+   "ts": 867,
+   "why": "Hosts explicitly state discomfort investing in INDI due to unresolved risks.",
+   "mentions": 0
+  },
+  "606742": {
+   "verdict": "REFUTED",
+   "why": "Host explicitly says not buying LMND now; no committed bullish forward call made.",
+   "mentions": 1
+  },
+  "606743": {
+   "verdict": "VERIFIED",
+   "quote": "I'm just gonna keep a very close eye on it see if it dips anymore here alright guys that's going to leave us now with the third and final AI Spec stock to watch and this one is going to be Splunk ticker symbol splk",
+   "ts": 761,
+   "why": "Host watches SPLK without committing to buy/sell \u2014 neutral forward stance confirmed.",
+   "mentions": 1
+  },
+  "607088": {
+   "verdict": "VERIFIED",
+   "quote": "with the stock down almost 90% from the top I think it's looking pretty attractive here as a high risk but also High reward kind of speculative stock",
+   "ts": 719,
+   "why": "Host explicitly calls NEO attractive and owns it, a committed bullish forward call.",
+   "mentions": 2
+  },
+  "607089": {
+   "verdict": "VERIFIED",
+   "quote": "my favorite pickup of all of these is actually on the next page with the fintech Sofi who fell 177% this past month",
+   "ts": 817,
+   "why": "Host calls SOFI his favorite pickup and expresses long-term bullish sentiment.",
+   "mentions": 3
+  },
+  "607087": {
+   "verdict": "VERIFIED",
+   "quote": "this could very well be a buying opportunity here I think I'll wait a little longer myself but if it continues to fall like this I'll probably start buying a small amount uh myself soon I I think this stock does have a lot of long-term potential",
+   "ts": 664,
+   "why": "Host personally plans to buy SHOP, calling it a buying opportunity with long-term potential.",
+   "mentions": 3
+  },
+  "607317": {
+   "verdict": "VERIFIED",
+   "quote": "probably Amazon for sure I'm going to be doing some buying and if things get worse I'm going to buy even more",
+   "ts": 753,
+   "why": "Host explicitly states buying Amazon, committing to bullish forward action.",
+   "mentions": 3
+  },
+  "610060": {
+   "verdict": "REFUTED",
+   "why": "Host questions AI sustainability and market fundamentals; no bullish MSFT call made.",
+   "mentions": 2
+  },
+  "607316": {
+   "verdict": "VERIFIED",
+   "quote": "I'm already going to be putting in some buy orders for Google um probably Amazon for sure I'm going to be doing some buying and if things get worse I'm going to buy even more",
+   "ts": 747,
+   "why": "Host states he is personally placing buy orders for Google, a forward bullish commitment.",
+   "mentions": 3
+  },
+  "607318": {
+   "verdict": "REFUTED",
+   "why": "Host says he will be a buyer on dips, indicating bullish intent despite market crash.",
+   "mentions": 35
+  },
+  "610061": {
+   "verdict": "REFUTED",
+   "why": "Host expresses skepticism about Google's sustainability and disruption risk, not bullish call.",
+   "mentions": 3
+  },
+  "610062": {
+   "verdict": "VERIFIED",
+   "quote": "you see that Intel is still sliding so the fundamentals aren't there",
+   "ts": 469,
+   "why": "Host states Intel is sliding with weak fundamentals, a bearish forward signal.",
+   "mentions": 1
+  },
+  "615714": {
+   "verdict": "REFUTED",
+   "why": "Hosts discuss Tesla's manufacturing innovation; no forward bullish investment call made.",
+   "mentions": 20
+  },
+  "615715": {
+   "verdict": "REFUTED",
+   "why": "UBER never mentioned; topics are 3D printing, Unity, and EV charging.",
+   "mentions": 0
+  },
+  "615713": {
+   "verdict": "REFUTED",
+   "why": "Apple mentions are about 3D printing manufacturing; no host forward bullish call on AAPL stock.",
+   "mentions": 9
+  },
+  "615741": {
+   "verdict": "REFUTED",
+   "why": "SNAP mentioned only as topic of question, host gives no bullish forward call.",
+   "mentions": 1
+  },
+  "615740": {
+   "verdict": "VERIFIED",
+   "quote": "I really do think it is probably one of the most slept on consumer products in the past decade plus and that is the meta rayb band glasses",
+   "ts": 124,
+   "why": "Host makes forward-looking bullish claim about Meta's Ray-Ban glasses product.",
+   "mentions": 3
+  },
+  "607140": {
+   "verdict": "VERIFIED",
+   "quote": "after seeing it fall by this much I I just felt like it was finally time for me to start dipping my toes into the stock and opening up a very small position here to see where this goes",
+   "ts": 749,
+   "why": "Host personally started buying CRSP, opening a new position, a direct bullish commitment.",
+   "mentions": 1
+  },
+  "607139": {
+   "verdict": "VERIFIED",
+   "quote": "that is the biotech and pharmaceutical giant Bristol Meers squib ticker symbol bmy who has now seen their stock price plummet by over 40% which not only leaves it trading right at a 52- we low but it's also at one of the cheapest prices that we've seen in over a decade which is also leaving them with a dirt cheap valuation that is over 60% cheaper than the sector despite this being one of the biggest leaders in the space",
+   "ts": 413,
+   "why": "Host explicitly calls BMY beaten down, cheap, and a buy as a dividend stock.",
+   "mentions": 2
+  },
+  "615742": {
+   "verdict": "REFUTED",
+   "why": "Host discusses SpaceX/Starlink, not SPCE; no bullish call on Virgin Galactic.",
+   "mentions": 0
+  },
+  "607143": {
+   "verdict": "INSUFFICIENT",
+   "why": "Host speculates Google *may* pay dividends but makes no committed bullish call on GOOGL stock.",
+   "mentions": 11
+  },
+  "607142": {
+   "verdict": "VERIFIED",
+   "quote": "even here guys I actually still think that it looks pretty darn attractive",
+   "ts": 482,
+   "why": "Host explicitly calls META attractive as investment at current valuation, forward-looking.",
+   "mentions": 20
+  },
+  "607154": {
+   "verdict": "INSUFFICIENT",
+   "why": "Host buys BTC daily but no explicit $35-45k price target or bullish forward call found here.",
+   "mentions": 66
+  },
+  "607155": {
+   "verdict": "REFUTED",
+   "why": "Host recaps JPMorgan's bullish view; makes no personal forward bullish call on COIN.",
+   "mentions": 2
+  },
+  "607180": {
+   "verdict": "VERIFIED",
+   "quote": "three companies that we are personally adding to our portfolio lamb research excelis Technologies which focuses on I implantation and then air test systems",
+   "ts": 962,
+   "why": "Host explicitly states personally adding Excelis Technologies to portfolio in second half 2024.",
+   "mentions": 0
+  },
+  "607251": {
+   "verdict": "VERIFIED",
+   "quote": "starting with our lowest risk option first this month I'm going with a new favorite of mine that I just started buying for the first time ever in verisign ticker symbol vrsn",
+   "ts": 63,
+   "why": "Host explicitly says they just started buying VRSN as their lowest-risk pick.",
+   "mentions": 1
+  },
+  "607181": {
+   "verdict": "VERIFIED",
+   "quote": "in addition to K we've also added a small cap company onto Innovation to our portfolio",
+   "ts": 989,
+   "why": "Host explicitly states personally adding ONTO to portfolio, confirming bullish position.",
+   "mentions": 3
+  },
+  "607252": {
+   "verdict": "VERIFIED",
+   "quote": "I just think that the stock itself is a deep value at these levels and that is the pharmaceutical giant fizer ticker symbol PFE",
+   "ts": 285,
+   "why": "Host personally calls PFE a deep value buy at current levels.",
+   "mentions": 1
+  },
+  "607298": {
+   "verdict": "VERIFIED",
+   "quote": "ranking it on the list I got to go with Google at number one given that they have a reasonable valuation but with also the size and strength of any of these other companies on the list too",
+   "ts": 869,
+   "why": "Host explicitly ranks Google #1 as favorite with bullish forward conviction.",
+   "mentions": 7
+  },
+  "607279": {
+   "verdict": "VERIFIED",
+   "quote": "Tesla is one of my largest stocks in my portfolio who I think has a ton of future potential",
+   "ts": 14,
+   "why": "Host explicitly states Tesla is a large holding with future potential, signaling bullish conviction.",
+   "mentions": 14
+  },
+  "607296": {
+   "verdict": "VERIFIED",
+   "quote": "I would probably rank apple somewhere close to last place not because I don't like them but rather I just think that the others have better values",
+   "ts": 359,
+   "why": "Host directly expresses bearish valuation view on AAPL relative to peers.",
+   "mentions": 20
+  },
+  "607278": {
+   "verdict": "VERIFIED",
+   "quote": "I also like GM stock for different reasons too as more of a value kind of Legacy player that I personally feel is doing a pretty good job of adapting to a changing Market",
+   "ts": 444,
+   "why": "Host explicitly expresses personal bullish view on GM stock as a value investment.",
+   "mentions": 16
+  },
+  "607310": {
+   "verdict": "REFUTED",
+   "why": "Transcript window shows no bullish GM call; only recap of GM pulling back EV investments.",
+   "mentions": 16
+  },
+  "607309": {
+   "verdict": "VERIFIED",
+   "quote": "really if you're investing in Tesla you're investing for all these other things that",
+   "ts": 715,
+   "why": "Host personally frames Tesla as a long-term investment in energy, robotics, autonomous vehicles.",
+   "mentions": 30
+  },
+  "607562": {
+   "verdict": "REFUTED",
+   "why": "Transcript describes a past bullish thesis on LUMN, not a forward bearish call.",
+   "mentions": 1
+  },
+  "607598": {
+   "verdict": "VERIFIED",
+   "quote": "I'm seeing double digits returns potential with coke maybe 12 to 133% could be even closer to 15%",
+   "ts": 535,
+   "why": "Host explicitly projects 12-15% double-digit returns on KO as forward bullish call",
+   "mentions": 0
+  },
+  "607559": {
+   "verdict": "REFUTED",
+   "why": "Host recaps a completed SAND trade (bought, sold for 15-18%); no forward bullish call made.",
+   "mentions": 2
+  },
+  "607599": {
+   "verdict": "VERIFIED",
+   "quote": "I see a lot of upside potential with MAA being positioned in a pretty well Diversified area in a high quality area in the Sun Belt so I really like MAA",
+   "ts": 981,
+   "why": "Host directly states bullish view on MAA with upside potential and personal endorsement.",
+   "mentions": 6
+  },
+  "607691": {
+   "verdict": "REFUTED",
+   "why": "Host only reports Buffett/Dalio selling SNOW; no host forward bearish call made.",
+   "mentions": 1
+  },
+  "607690": {
+   "verdict": "VERIFIED",
+   "quote": "it just makes so much more sense that he would think that the valuation is too high at these levels and it's therefore time to lock in profits even if he really likes the business just in case the stock happens to fall in the near future",
+   "ts": 375,
+   "why": "Host personally expects Apple stock to fall due to high valuation.",
+   "mentions": 27
+  },
+  "607824": {
+   "verdict": "VERIFIED",
+   "quote": "I just think that it presents me with an amazing price on an amazing company that is not only important for data usage but also for AI too",
+   "ts": 564,
+   "why": "Host personally buying AMT, calls it amazing company at great price, forward bullish.",
+   "mentions": 4
+  },
+  "607823": {
+   "verdict": "VERIFIED",
+   "quote": "I expect Nvidia to remain a leader in all of that so I'm buying the stock",
+   "ts": 274,
+   "why": "Host explicitly states personal purchase intent and forward expectation for NVDA.",
+   "mentions": 16
+  },
+  "608048": {
+   "verdict": "VERIFIED",
+   "quote": "we could most likely have a down year or a flat year in 2024",
+   "ts": 115,
+   "why": "Host predicts flat/down year for mega-cap stocks (SPY-equivalent) in 2024.",
+   "mentions": 53
+  },
+  "608046": {
+   "verdict": "REFUTED",
+   "why": "Host sold CSV and no longer holds it; no forward bullish call made.",
+   "mentions": 2
+  },
+  "608066": {
+   "verdict": "REFUTED",
+   "why": "PEP mentioned only as past January pick; current video focuses on AVB and MAA.",
+   "mentions": 0
+  },
+  "608068": {
+   "verdict": "VERIFIED",
+   "quote": "I think 2025 and Beyond is going to look amazing for these companies",
+   "ts": 712,
+   "why": "Host owns MAA, calls 2024 the bottom, projects strong growth ahead.",
+   "mentions": 0
+  },
+  "608118": {
+   "verdict": "VERIFIED",
+   "quote": "so those are three stocks that I believe are current dividend growth Darlings that will perform very well over the next few years provide both great returns and great dividend growth",
+   "ts": 885,
+   "why": "Host explicitly calls INTU one of three stocks that will perform very well.",
+   "mentions": 0
+  },
+  "608079": {
+   "verdict": "VERIFIED",
+   "quote": "I still believe wbd can return you know fantastic kind of upside potential over the next few years",
+   "ts": 493,
+   "why": "Host directly predicts WBD upside via debt paydown and FCF generation.",
+   "mentions": 8
+  },
+  "608116": {
+   "verdict": "VERIFIED",
+   "quote": "I believe they offer The Best of Both Worlds",
+   "ts": 249,
+   "why": "Host includes ELV in curated list of stocks he believes offer best long-term value.",
+   "mentions": 1
+  },
+  "608078": {
+   "verdict": "VERIFIED",
+   "quote": "for me personally looking at MGM at 10 times free cash flow and was a good balance sheet that have I don't think this is too expensive for this company you should trade at 15 times average market cap to free cash flow",
+   "ts": 322,
+   "why": "Host explicitly calls MGM fairly/undervalued at 10x FCF with bullish forward outlook.",
+   "mentions": 26
+  },
+  "608228": {
+   "verdict": "VERIFIED",
+   "quote": "My buy my buy price though uh will be once that yield crosses 3%. That's really where I'll feel the most confident long term.",
+   "ts": 426,
+   "why": "Host states personal buy trigger for APD at 3% yield, a forward bullish commitment.",
+   "mentions": 4
+  },
+  "608227": {
+   "verdict": "VERIFIED",
+   "quote": "making this one of the easiest stocks to buy on any dip, let alone whatever happens here in 2025.",
+   "ts": 307,
+   "why": "Host explicitly bullish on NEE, calls it easiest to buy on dips.",
+   "mentions": 0
+  },
+  "608372": {
+   "verdict": "REFUTED",
+   "why": "Host says booking won't sustain same stock price growth in 2025; no forward bullish call.",
+   "mentions": 0
+  },
+  "608370": {
+   "verdict": "REFUTED",
+   "why": "Host explicitly says 'hold mode' and won't make CRM a top pick for 2025 \u2014 neutral, not bullish.",
+   "mentions": 10
+  },
+  "608420": {
+   "verdict": "REFUTED",
+   "why": "Host describes ARM as market leader but makes no forward bullish investment call.",
+   "mentions": 3
+  },
+  "608568": {
+   "verdict": "REFUTED",
+   "why": "Host is bullish on Bitcoin adoption, not GME stock specifically; GME used as example only.",
+   "mentions": 0
+  },
+  "608571": {
+   "verdict": "REFUTED",
+   "why": "Tesla mentioned only as past Bitcoin buyer, no forward bullish call on TSLA made.",
+   "mentions": 4
+  },
+  "608425": {
+   "verdict": "REFUTED",
+   "why": "Host describes Marvell descriptively as vertically integrated IP player; no forward buy recommendation made.",
+   "mentions": 0
+  },
+  "608742": {
+   "verdict": "VERIFIED",
+   "quote": "for bmy which I think is the last stock I would buy is the riskiest one but it has the highest reward",
+   "ts": 807,
+   "why": "Host makes forward bullish case on BMY citing high reward despite risk.",
+   "mentions": 2
+  },
+  "608741": {
+   "verdict": "VERIFIED",
+   "quote": "to me PayPal is a no-brainer at this price it's a hated company with bad sentiment I still like it over here",
+   "ts": 757,
+   "why": "Host directly calls PayPal a no-brainer buy with expected 13-14% annual return.",
+   "mentions": 12
+  },
+  "608709": {
+   "verdict": "VERIFIED",
+   "quote": "especially mpw mpw made a massive massive rally in November December whenever we had this whole thing about interest rates it went from $7 to $10",
+   "ts": 439,
+   "why": "Host explicitly calls MPW a high-debt stock that benefits from rate cuts, describing its rally.",
+   "mentions": 3
+  },
+  "608708": {
+   "verdict": "VERIFIED",
+   "quote": "companies like Warner Brothers Discovery this is the 10year bond versus Warner Brothers Warner Brothers is in white and 10year bond is in Orange",
+   "ts": 331,
+   "why": "Host explicitly presents WBD as benefiting from rate cuts due to high fixed debt correlation.",
+   "mentions": 3
+  },
+  "608885": {
+   "verdict": "REFUTED",
+   "why": "Host discusses NVDA's role in Oracle's growth but makes no forward bullish call on NVDA itself.",
+   "mentions": 8
+  },
+  "608913": {
+   "verdict": "VERIFIED",
+   "quote": "Obviously, that's fantastic news for Nvidia. That means Nvidia's probably got a $15 billion Blackwell customer in Coreweave alone the second half of this year.",
+   "ts": 426,
+   "why": "Host directly calls Coreweave's $15B H2 capex fantastic news for Nvidia, bullish forward call.",
+   "mentions": 5
+  },
+  "608886": {
+   "verdict": "VERIFIED",
+   "quote": "they also expect fiscally 2027 growth rate to be around 20% again because of the cloud infrastructure demand that they have",
+   "ts": 627,
+   "why": "Host explicitly affirms Oracle's bullish FY2026 $66B target and 15% growth outlook as management's confirmed view.",
+   "mentions": 28
+  },
+  "608914": {
+   "verdict": "REFUTED",
+   "why": "Host mentions NBIS position with gains but signals selling, not a forward bullish call.",
+   "mentions": 0
+  },
+  "609118": {
+   "verdict": "VERIFIED",
+   "quote": "Pepsi McDonald's I talked about shenir energy LG stock it's also starting to move and everything outside the Big 10 that doesn't have an expensive multiple I think will do amazingly amazingly well",
+   "ts": 406,
+   "why": "Host explicitly owns Pepsi, frames it as part of 6-7 month bullish rotation thesis.",
+   "mentions": 0
+  },
+  "609117": {
+   "verdict": "VERIFIED",
+   "quote": "I own McDonald's at 244 I'm up like 6% or 6 and a half% on McDonald's but all the stocks are starting to move",
+   "ts": 356,
+   "why": "Host owns MCD, frames rotation thesis as bullish, expects continued outperformance over 6-7 months.",
+   "mentions": 0
+  },
+  "609142": {
+   "verdict": "REFUTED",
+   "why": "Host sold MCD at a profit; bullish on big tech now, no neutral forward call on MCD.",
+   "mentions": 0
+  },
+  "609141": {
+   "verdict": "REFUTED",
+   "why": "Host explicitly favors Amazon and Meta; MSFT only appears in past-performance stats (EPS group, cash balance).",
+   "mentions": 4
+  },
+  "609441": {
+   "verdict": "REFUTED",
+   "why": "MRK not analyzed; only Google, Microsoft, and Pepsi are covered by the host.",
+   "mentions": 0
+  },
+  "609439": {
+   "verdict": "VERIFIED",
+   "quote": "assuming a free cash flow growth rate of about 15% for Microsoft, what we can see is we'd come to an intrinsic guy of about $345.31 per share",
+   "ts": 674,
+   "why": "Host runs own DCF model on MSFT, implying bullish forward valuation assessment.",
+   "mentions": 18
+  },
+  "610067": {
+   "verdict": "VERIFIED",
+   "quote": "I have calculated 10 billion for the whole company and now the cash flows are 1.5 billion that's 11.5% those cash flows should grow to 1.4 and that's a 14 15% free cash flow yield",
+   "ts": 543,
+   "why": "Host personally calculates and endorses bullish cash flow yield thesis on SIRI/Liberty Media.",
+   "mentions": 0
+  },
+  "610068": {
+   "verdict": "VERIFIED",
+   "quote": "I will not invest in a consumer business where yes the cash flows look stable but maybe in five years those will not be as stable there will be ups and downs and that's the risk and reward I prefer more certain cash flows for the long term",
+   "ts": 844,
+   "why": "Host explicitly states he won't invest in Apple due to unstable future cash flows and poor risk/reward.",
+   "mentions": 8
+  },
+  "609975": {
+   "verdict": "VERIFIED",
+   "quote": "you can see why super investors think there's potential with this company",
+   "ts": 812,
+   "why": "Host presents COF's low PE and earnings jump favorably, endorsing the bullish case.",
+   "mentions": 0
+  },
+  "609976": {
+   "verdict": "REFUTED",
+   "why": "Host notes past stagnant earnings/revenue concerns but makes no forward bearish call; presents mixed picture with positives noted.",
+   "mentions": 9
+  },
+  "610231": {
+   "verdict": "VERIFIED",
+   "quote": "on a Market Cape of eight 03 billion if they make on average 1 billion 800 million per year over the cycle that's already a 10% return just from what is there now",
+   "ts": 264,
+   "why": "Host bought MOS, projects 10% cycle return, bullish forward call.",
+   "mentions": 0
+  },
+  "610232": {
+   "verdict": "VERIFIED",
+   "quote": "that means that the stock will likely double when that happens across the cycle",
+   "ts": 401,
+   "why": "Host directly forecasts NTR stock doubling at mid-cycle, a bullish forward call.",
+   "mentions": 0
+  },
+  "610595": {
+   "verdict": "VERIFIED",
+   "quote": "I would argue that Buffett has closed Apple if not significantly decreased it again I would be surprised if Buffett still holds Apple next year",
+   "ts": 145,
+   "why": "Host directly predicts Buffett will close/reduce Apple position, implying bearish stance.",
+   "mentions": 6
+  },
+  "610781": {
+   "verdict": "VERIFIED",
+   "quote": "I made this video on Apple how my view the intrinsic value is 105 compared to the 200 stock price",
+   "ts": 0,
+   "why": "Host explicitly states intrinsic value $105 vs $200 price, a bearish valuation call.",
+   "mentions": 1
+  },
+  "610594": {
+   "verdict": "VERIFIED",
+   "quote": "you are now buying the second most expensive Market in history only once was it more expensive in the dot bubble we know how that ended",
+   "ts": 69,
+   "why": "Host directly states market is second-most expensive ever, implying bearish forward outlook on broad US equities.",
+   "mentions": 7
+  },
+  "610783": {
+   "verdict": "REFUTED",
+   "why": "BTC mention is descriptive of supply/demand behavior, not a forward bullish call by host.",
+   "mentions": 1
+  },
+  "605663": {
+   "verdict": "VERIFIED",
+   "quote": "Bitcoin is s tier baby let's go",
+   "ts": 1021,
+   "why": "Host explicitly ranks BTC as S tier, highest category, with strong bullish conviction.",
+   "mentions": 13
+  },
+  "605664": {
+   "verdict": "VERIFIED",
+   "quote": "I'm putting stocks in the a tier because it is 100% passive",
+   "ts": 967,
+   "why": "Host explicitly places stocks (index funds/ETFs, SPY-equivalent) in A tier, bullish forward stance.",
+   "mentions": 17
+  },
+  "605667": {
+   "verdict": "VERIFIED",
+   "quote": "Bitcoin is going to be six figures by summer of 2025 basically August September October right around there",
+   "ts": 523,
+   "why": "Host directly states his own multi-year prediction of BTC reaching six figures by summer 2025.",
+   "mentions": 47
+  },
+  "605670": {
+   "verdict": "VERIFIED",
+   "quote": "we're not going to see a market top until later this year if not in 2026",
+   "ts": 353,
+   "why": "Host personally bought VTI/dips and stated no market top expected until 2026.",
+   "mentions": 9
+  },
+  "605671": {
+   "verdict": "VERIFIED",
+   "quote": "that means more liquidity that means more money that means higher Bitcoin higher gold higher S&P 500",
+   "ts": 395,
+   "why": "Host explicitly states M2 rise leads to higher Bitcoin, a forward bullish call.",
+   "mentions": 1
+  },
+  "605666": {
+   "verdict": "VERIFIED",
+   "quote": "micro strategy price should be 445",
+   "ts": 540,
+   "why": "Host directly states MSTR target price of $445 if Bitcoin reaches $110k.",
+   "mentions": 0
+  },
+  "605903": {
+   "verdict": "REFUTED",
+   "why": "Host mentions CDNS as a peer company and says they took a starter position, but no forward bullish call is made.",
+   "mentions": 1
+  },
+  "605902": {
+   "verdict": "VERIFIED",
+   "quote": "I did recently make a small purchase a starter position in this stock",
+   "ts": 28,
+   "why": "Host personally bought SNPS shares, signaling bullish conviction.",
+   "mentions": 1
+  },
+  "605931": {
+   "verdict": "VERIFIED",
+   "quote": "chip manufacturing equipment stocks are far and away my biggest bet on coming chip manufacturing boom and these are by far the two biggest players in this space and my favorite stocks biggest portion of my portfolio dedicated to chip manufacturing",
+   "ts": 28,
+   "why": "Host calls AMAT one of his favorite stocks with largest portfolio allocation, forward bullish.",
+   "mentions": 33
+  },
+  "605930": {
+   "verdict": "VERIFIED",
+   "quote": "chip manufacturing equipment stocks are far and away my biggest bet on coming chip manufacturing boom and these are by far the two biggest players in this space and my favorite stocks biggest portion of my portfolio dedicated to chip manufacturing",
+   "ts": 28,
+   "why": "Host calls ASML one of his top two favorite stocks with largest portfolio allocation.",
+   "mentions": 32
+  },
+  "606366": {
+   "verdict": "VERIFIED",
+   "quote": "microchip this is another company that we have been started buying in the recent quarters",
+   "ts": 617,
+   "why": "Hosts confirm actively buying MCHP and explain why they remain bullish on it.",
+   "mentions": 0
+  },
+  "606215": {
+   "verdict": "VERIFIED",
+   "quote": "e-commerce is back it looks like it's finally making a comeback after a bit of a slump in 2022 specifically with Amazon",
+   "ts": 107,
+   "why": "Host makes direct bullish forward call on Amazon's e-commerce recovery.",
+   "mentions": 6
+  },
+  "606365": {
+   "verdict": "VERIFIED",
+   "quote": "we finally started nibbling on on semi again about the middle of last year and this is one we're still interested in nibbling on",
+   "ts": 455,
+   "why": "Host states active buying and continued interest in ON Semiconductor.",
+   "mentions": 53
+  },
+  "606218": {
+   "verdict": "VERIFIED",
+   "quote": "given the price right now if those profit margins do make a dramatic increase as the revenue growth slows we think the the stock price is a reasonable value",
+   "ts": 1081,
+   "why": "Host directly calls ONON a reasonable value buy at current price.",
+   "mentions": 0
+  },
+  "606459": {
+   "verdict": "VERIFIED",
+   "quote": "with this increased risk I would continue to stay away",
+   "ts": 681,
+   "why": "Host explicitly states he would stay away from GSK given increased risk.",
+   "mentions": 4
+  },
+  "606457": {
+   "verdict": "VERIFIED",
+   "quote": "rivan is not a sustainable business and there is a lot of execution risk",
+   "ts": 296,
+   "why": "Host directly calls RIVN unsustainable with execution risk, recommending avoidance.",
+   "mentions": 0
+  },
+  "606554": {
+   "verdict": "VERIFIED",
+   "quote": "we do not own acmr we're not interested in chasing the stock price if that means we lose out on gains whatever that's fine that's just not our style",
+   "ts": 827,
+   "why": "Host explicitly sits on sidelines, neither bullish nor bearish, classic neutral stance.",
+   "mentions": 16
+  },
+  "606553": {
+   "verdict": "REFUTED",
+   "why": "No neutral forward call found; transcript only covers company background and history.",
+   "mentions": 1
+  },
+  "606586": {
+   "verdict": "VERIFIED",
+   "quote": "I do think this will be a long-term dividend growth stock",
+   "ts": 629,
+   "why": "Host makes forward bullish call on CRM as long-term dividend growth stock.",
+   "mentions": 4
+  },
+  "606588": {
+   "verdict": "VERIFIED",
+   "quote": "personally I think alphabet's set up for continued long-term growth",
+   "ts": 1077,
+   "why": "Host directly states bullish forward outlook on Alphabet/GOOGL in first person.",
+   "mentions": 8
+  },
+  "606795": {
+   "verdict": "VERIFIED",
+   "quote": "I'm still buying the stock in very small amounts myself because from the top it has now lost close to half its entire value",
+   "ts": 375,
+   "why": "Host personally buying VZ and calls it a stock that could soar when rates drop.",
+   "mentions": 16
+  },
+  "606794": {
+   "verdict": "VERIFIED",
+   "quote": "I think Amazon stock is pretty much always a pickup but I feel I feel that even more strongly right now",
+   "ts": 247,
+   "why": "Host directly states personal bullish conviction on AMZN, not third-party speech.",
+   "mentions": 16
+  },
+  "606813": {
+   "verdict": "VERIFIED",
+   "quote": "I'll probably be buying some of the stock myself soon too because I do really like it",
+   "ts": 300,
+   "why": "Host expresses personal intent to buy PANW, a forward bullish commitment.",
+   "mentions": 6
+  },
+  "606814": {
+   "verdict": "VERIFIED",
+   "quote": "I love this pickup here especially since it's leading up to broadcom's planned acquisition of VMware which I think will probably Propel the stock even higher once it closes",
+   "ts": 512,
+   "why": "Host personally bullish on AVGO, expects stock to rise post-VMware acquisition.",
+   "mentions": 10
+  },
+  "606882": {
+   "verdict": "VERIFIED",
+   "quote": "recession is actually bullish for these companies recession is bullish for Dollar General and Target",
+   "ts": 560,
+   "why": "Host explicitly states recession is bullish for Target, a forward positive call.",
+   "mentions": 4
+  },
+  "606883": {
+   "verdict": "VERIFIED",
+   "quote": "there's a lot of pessimism who's ABV and it's creating opportunity as even something with Pfizer also but mostly every announce their Humira drug",
+   "ts": 655,
+   "why": "Host sees pessimism as opportunity for Pfizer, implying bullish forward view.",
+   "mentions": 3
+  },
+  "606891": {
+   "verdict": "VERIFIED",
+   "quote": "I do believe that you know MAA is close to fair value or on the values for a long term shareholder",
+   "ts": 1031,
+   "why": "Host directly expresses bullish long-term view on MAA with personal conviction.",
+   "mentions": 10
+  },
+  "606890": {
+   "verdict": "VERIFIED",
+   "quote": "I still believe this company is undervalued and it's an amazing business model",
+   "ts": 173,
+   "why": "Host makes direct forward bullish call on Ulta Beauty, expressing continued belief in undervaluation.",
+   "mentions": 28
+  },
+  "607791": {
+   "verdict": "REFUTED",
+   "why": "Host expresses positive/bullish view on WMT, not neutral.",
+   "mentions": 1
+  },
+  "607795": {
+   "verdict": "REFUTED",
+   "why": "Host ranks AAPL #4 but expresses preference for other stocks, not a neutral call.",
+   "mentions": 14
+  },
+  "607859": {
+   "verdict": "REFUTED",
+   "why": "Host describes market problems and volatility; no committed bullish forward call on SPY.",
+   "mentions": 32
+  },
+  "607865": {
+   "verdict": "REFUTED",
+   "why": "Host discusses Ethereum ETF approval; no forward bullish call on BTC made.",
+   "mentions": 20
+  },
+  "607860": {
+   "verdict": "REFUTED",
+   "why": "BTC mentioned as oversold past event, no forward bullish call made by host.",
+   "mentions": 4
+  },
+  "607864": {
+   "verdict": "VERIFIED",
+   "quote": "ethereum has been on a rampage this year it's up 60% year-to date with 20% of that coming in just the last few days and that's because of the spot of theorum ETF which just got approved along with some really interesting things that are also happening behind the scenes so let me show you how we got here what's going on and what can happen to ethereum's price",
+   "ts": 126,
+   "why": "Host frames ETH price surge and ETF approval positively, projecting forward upside.",
+   "mentions": 20
+  },
+  "607932": {
+   "verdict": "REFUTED",
+   "why": "QCOM mentioned only as supply chain example; no forward neutral call made by host.",
+   "mentions": 3
+  },
+  "608337": {
+   "verdict": "VERIFIED",
+   "quote": "for a long-term holders and buyers I think it's really good news",
+   "ts": 643,
+   "why": "Host directly expresses bullish forward view on Bitcoin after rate cut analysis.",
+   "mentions": 22
+  },
+  "608336": {
+   "verdict": "VERIFIED",
+   "quote": "in the 12 months after a rate cut the s&p500 the stock market has posted positive returns in 86% of cases since 1929",
+   "ts": 170,
+   "why": "Host presents bullish historical data on S&P 500 post-rate-cut as basis for bullish stance.",
+   "mentions": 42
+  },
+  "607933": {
+   "verdict": "REFUTED",
+   "why": "Host flags supply chain risks for MPWR but makes no explicit neutral forward call.",
+   "mentions": 0
+  },
+  "608872": {
+   "verdict": "VERIFIED",
+   "quote": "if the Fed does cut rates, that could weaken the dollar and it could send risk assets like Bitcoin much higher",
+   "ts": 834,
+   "why": "Host personally states Fed rate cuts could send Bitcoin much higher.",
+   "mentions": 3
+  },
+  "608873": {
+   "verdict": "REFUTED",
+   "why": "Host explicitly says he's dollar-cost averaging, not selling, not bearish on broad market.",
+   "mentions": 7
+  },
+  "609070": {
+   "verdict": "REFUTED",
+   "why": "Host reports past price drops and tariff impacts on Apple; no forward bearish call made.",
+   "mentions": 5
+  },
+  "609071": {
+   "verdict": "REFUTED",
+   "why": "Host explains tariff impacts factually; no forward bearish call on SPY made by host.",
+   "mentions": 12
+  },
+  "609881": {
+   "verdict": "REFUTED",
+   "why": "Host analyzes past market reaction to tariffs; no forward bearish call on SPY made.",
+   "mentions": 77
+  },
+  "609880": {
+   "verdict": "REFUTED",
+   "why": "MELI never mentioned; transcript covers tariff/market crisis analysis only.",
+   "mentions": 0
+  },
+  "609146": {
+   "verdict": "VERIFIED",
+   "quote": "27 times isn't really too expensive expensive for stocks that were increasing earnings 60 and 50% Amazon is still increasing earnings 50% Google is still increasing earnings like 40% and they're expected to increase than 15 to 20% in the future",
+   "ts": 356,
+   "why": "Host argues mag-7 valuations fair, expects continued growth \u2014 bullish forward call on QQQ components.",
+   "mentions": 5
+  },
+  "609143": {
+   "verdict": "VERIFIED",
+   "quote": "to me that just looks like it and I'm going to talk about all that stuff and tell you what I did on Monday which I bought a lot of stocks",
+   "ts": 131,
+   "why": "Host personally bought stocks at Monday's low, calling it a market bottom bullish on equities.",
+   "mentions": 51
+  },
+  "610083": {
+   "verdict": "VERIFIED",
+   "quote": "I don't think the risk justifies the potential reward",
+   "ts": 664,
+   "why": "Host personally declines NVDA investment citing downside risk and cycle concerns.",
+   "mentions": 15
+  },
+  "610084": {
+   "verdict": "VERIFIED",
+   "quote": "the competition catches up prices go down free cash flows become negative profits barely positive and the company starts losing money it doesn't work",
+   "ts": 300,
+   "why": "Host describes Tesla's decline as a cautionary parallel, implying continued bearish trajectory.",
+   "mentions": 9
+  },
+  "610589": {
+   "verdict": "REFUTED",
+   "why": "BEP not mentioned; Brookfield referenced briefly but no bearish call made.",
+   "mentions": 0
+  },
+  "610588": {
+   "verdict": "VERIFIED",
+   "quote": "we have food here that those are cheap on the cycle can get a little bit cheaper but on the cash flows we are close to 10% returns from Archer Daniel and nutrient",
+   "ts": 239,
+   "why": "Host names Archer Daniels (ADM) as a buy with ~10% cash flow returns.",
+   "mentions": 0
+  },
+  "612453": {
+   "verdict": "REFUTED",
+   "why": "Host describes sector selling off as current event, not a committed forward bearish call on SOXX.",
+   "mentions": 1
+  },
+  "612454": {
+   "verdict": "REFUTED",
+   "why": "Host never mentions SH or any inverse ETF; no bearish instrument call made.",
+   "mentions": 0
+  },
+  "612898": {
+   "verdict": "VERIFIED",
+   "quote": "the current one of those highlights we have right now is actually cassie woods arc in fact if you compare her etf to the dot-com bubble type of stocks you could pretty much seize the same correlation how they went up and how they crashed all the way down",
+   "ts": 79,
+   "why": "Host directly compares ARKK to dot-com crash stocks, implying continued bearish decline.",
+   "mentions": 5
+  },
+  "612900": {
+   "verdict": "VERIFIED",
+   "quote": "despite this big drawdown i still personally saying that we are far from a bottom only s p 500",
+   "ts": 25,
+   "why": "Host personally states SPY is far from bottom, implying continued bearish outlook.",
+   "mentions": 16
+  },
+  "615089": {
+   "verdict": "REFUTED",
+   "why": "Host is bullish on AMD; no bearish SPY forward call made.",
+   "mentions": 73
+  },
+  "615088": {
+   "verdict": "REFUTED",
+   "why": "Host discusses AMD stock only; no forward bullish call on SPY made.",
+   "mentions": 73
+  },
+  "615120": {
+   "verdict": "REFUTED",
+   "why": "No forward bullish call on QQQ; only past NASDAQ performance recap.",
+   "mentions": 22
+  },
+  "615119": {
+   "verdict": "INSUFFICIENT",
+   "why": "No explicit SPY/broad market bullish forward call found; context discusses recovery but not a direct SPY call.",
+   "mentions": 55
+  },
+  "615709": {
+   "verdict": "REFUTED",
+   "why": "Host frames drop as buying opportunity; no committed bearish forward call on SPY.",
+   "mentions": 23
+  },
+  "615708": {
+   "verdict": "VERIFIED",
+   "quote": "Apple may also not be that affected because Apple has a very strong brand, especially in the US, they've got pricing power. So even if their input material costs go up, they can raise prices to pass on the cost to the consumer and maintain their profit margins.",
+   "ts": 943,
+   "why": "Host personally owns AAPL, says tariff impact minimal due to pricing power and services\u2014neutral hold stance.",
+   "mentions": 5
+  },
+  "615726": {
+   "verdict": "REFUTED",
+   "why": "PLTR never mentioned; transcript covers Block, AI regulation, and Starlink only.",
+   "mentions": 0
+  },
+  "615725": {
+   "verdict": "REFUTED",
+   "why": "Host discusses Block/Square operations but makes no forward bullish call on SQ stock.",
+   "mentions": 0
+  },
+  "615750": {
+   "verdict": "REFUTED",
+   "why": "Transcript discusses Bitcoin only; X (the company) never mentioned as investment.",
+   "mentions": 0
+  },
+  "615751": {
+   "verdict": "REFUTED",
+   "why": "Host discusses Vision Pro sales and developer issues; no neutral forward call on AAPL.",
+   "mentions": 3
+  },
+  "616421": {
+   "verdict": "VERIFIED",
+   "quote": "if the economy is actually shakier than people think and the FED might take their time cutting slowly and slower because they're afraid so that might pose a problem",
+   "ts": 216,
+   "why": "Host personally warns slow Fed cuts with weak economy poses market problem (bearish SPY).",
+   "mentions": 8
+  },
+  "616420": {
+   "verdict": "VERIFIED",
+   "quote": "if we have a short cutting cycle which means that they're going to be proactive and they'll cut a few 50 basis points and they're not going to take their time too slowly and and we're going to have a strong economy um and we're you know there's a good chance that we go on a rally going forward",
+   "ts": 200,
+   "why": "Host directly calls for market rally if Fed cuts proactively and economy stays strong.",
+   "mentions": 8
+  },
+  "616453": {
+   "verdict": "VERIFIED",
+   "quote": "October November December is where you should expect the rally not now",
+   "ts": 605,
+   "why": "Host makes forward bullish call on market (SPY) for Oct-Dec timeframe.",
+   "mentions": 15
+  },
+  "616657": {
+   "verdict": "REFUTED",
+   "why": "Host expects further 5-10% drop before bottom; no bullish SPY call made.",
+   "mentions": 3
+  },
+  "616452": {
+   "verdict": "VERIFIED",
+   "quote": "August and probably September are going to be sideways months you're not going to be seeing a lot of Market rallies in the summer and in September",
+   "ts": 586,
+   "why": "Host directly predicts sideways/neutral SPY movement for August-September.",
+   "mentions": 15
+  },
+  "616656": {
+   "verdict": "REFUTED",
+   "why": "Host calls for further 5-10% drop, not neutral; bearish forward call on market.",
+   "mentions": 3
+  },
+  "616331": {
+   "verdict": "REFUTED",
+   "why": "Host argues AI stocks are NOT a bubble; no neutral SPY call made.",
+   "mentions": 22
+  },
+  "616332": {
+   "verdict": "VERIFIED",
+   "quote": "the concentration isn't a bubble. It's the result of exceptional execution.",
+   "ts": 267,
+   "why": "Host argues S&P/SPY concentration is justified by real earnings, implying continued bullish outlook.",
+   "mentions": 22
+  },
+  "616444": {
+   "verdict": "VERIFIED",
+   "quote": "I think we're looking down the barrel of a massive bull run for the next few years.",
+   "ts": 85,
+   "why": "Host makes forward bullish call on Nasdaq/tech stocks including QQQ constituents.",
+   "mentions": 9
+  },
+  "616439": {
+   "verdict": "VERIFIED",
+   "quote": "I think we're looking down the barrel of a massive bull run for the next few years.",
+   "ts": 85,
+   "why": "Host directly predicts multi-year bull run for S&P 500/SPY market.",
+   "mentions": 25
+  },
+  "617013": {
+   "verdict": "REFUTED",
+   "why": "No SPY/broad market neutral call; host discusses Walmart and GE Vernova specifically.",
+   "mentions": 38
+  },
+  "617012": {
+   "verdict": "REFUTED",
+   "why": "Host discusses Walmart and GE Vernova; no forward bullish call on SPY made.",
+   "mentions": 38
+  },
+  "617023": {
+   "verdict": "VERIFIED",
+   "quote": "Expect stocks to trade up and down with a lot of volatility, but maybe not go anywhere with any real direction.",
+   "ts": 173,
+   "why": "Host directly forecasts broad market (SPY) moving sideways\u2014neutral call.",
+   "mentions": 48
+  },
+  "617024": {
+   "verdict": "REFUTED",
+   "why": "Host presents cautious/mixed 2026 outlook; expects volatility and sideways trading, not a bullish SPY call.",
+   "mentions": 48
+  },
+  "607133": {
+   "verdict": "VERIFIED",
+   "quote": "that's because this is the food and poultry giant Tyson Food scker symbol TSN which just like metronic this is a beaten down leader that nobody seems to think can overcome some of these short-term hurdles",
+   "ts": 277,
+   "why": "Host explicitly names TSN as a buy, framing short-term pain as opportunity like Medtronic.",
+   "mentions": 1
+  },
+  "607120": {
+   "verdict": "VERIFIED",
+   "quote": "well in today's video I'm not only going to answer that but I'm also going to cover some more recent news uh surrounding Sofi stock including by the way the fact that some insiders have been selling a ton of the stock however there's also one Insider in my opinion the biggest Insider the CEO who's been buying a ton of Sofi stocks",
+   "ts": 17,
+   "why": "Host signals personal buying intent on dip and frames CEO buying as bullish signal throughout.",
+   "mentions": 22
+  },
+  "607196": {
+   "verdict": "VERIFIED",
+   "quote": "air has a lot of upside if that cycle continues to move in that direction",
+   "ts": 1007,
+   "why": "Host explicitly states bullish upside for AEHR as power/auto chip cycle resumes.",
+   "mentions": 0
+  },
+  "607192": {
+   "verdict": "VERIFIED",
+   "quote": "we have a small position in Cloud flare in our portfolio and we've held that since 2019 shortly after the IPO and we've nibbled a couple of times over the years but in order to justify the very very high valuation for a company like Cloud flare we will need to see some improvement in their profit margins especially since their revenue has started to decelerate below the 30% Mark something that we'll keep an eye on we're not adding anything to our position at this point just holding what we currently have",
+   "ts": 1039,
+   "why": "Host holds NET, not adding, monitoring margin improvement \u2014 neutral hold stance.",
+   "mentions": 0
+  },
+  "607199": {
+   "verdict": "VERIFIED",
+   "quote": "Intel is not going to just simply catch up to Taiwan semi by just upping its spending on capital expenditure",
+   "ts": 442,
+   "why": "Host explicitly states Intel cannot catch TSMC, a committed bearish forward call.",
+   "mentions": 8
+  },
+  "607215": {
+   "verdict": "VERIFIED",
+   "quote": "we're still on course for probably a pretty good 2025 and maybe an even better 2026 after that",
+   "ts": 634,
+   "why": "Host explicitly forecasts positive LRCX performance in 2025-2026.",
+   "mentions": 0
+  },
+  "607208": {
+   "verdict": "VERIFIED",
+   "quote": "we do take our cues from what the companies say and what the data shows as you mentioned Nick and what the data says is that Nvidia has made a ton of money in the last year on these data center accelerated compute chips and they still plan on making a lot of money hitting their stride with Revenue generation",
+   "ts": 873,
+   "why": "Hosts affirm Nvidia's ongoing revenue growth and forward momentum as bullish conviction.",
+   "mentions": 24
+  },
+  "607277": {
+   "verdict": "VERIFIED",
+   "quote": "one stock that I do already own though and that I've been extremely happy with over the past year well that is stock number four and that is is paler technology",
+   "ts": 620,
+   "why": "Host confirms ownership and happiness with PLTR, implying continued bullish stance.",
+   "mentions": 1
+  },
+  "607291": {
+   "verdict": "VERIFIED",
+   "quote": "well one stock that I do not own yet but that I am very likely going to be uh starting to buy here in the coming weeks for both my personal portfolio and the community one CU I like it that much well that stock is number two it's going to be Cisco ticker symbol CSCO",
+   "ts": 363,
+   "why": "Host commits to buying CSCO personally and for community portfolio in coming weeks.",
+   "mentions": 1
+  },
+  "607301": {
+   "verdict": "VERIFIED",
+   "quote": "I just felt that the business uh and their future potential was worth the high price tag",
+   "ts": 416,
+   "why": "Host, a Tesla shareholder, affirms bullish conviction in TSLA's future potential.",
+   "mentions": 31
+  },
+  "607300": {
+   "verdict": "INSUFFICIENT",
+   "why": "Host mentions owning NVDA but makes no explicit forward bullish call in this window.",
+   "mentions": 31
+  },
+  "607433": {
+   "verdict": "INSUFFICIENT",
+   "why": "Window shows bearish concerns and capex context, no explicit neutral call made yet.",
+   "mentions": 1
+  },
+  "607327": {
+   "verdict": "VERIFIED",
+   "quote": "and then with Intel you're just you're really just betting on a big recovery here for what used to be the most dominant player in the space and I don't think they need to be number one by the way I just think that they need to do a better job competing with new products in especially artificial intelligence which they are launching multiple for in CPUs gpus and even AI accelerators which are a new type of AI chip and then on top of that they need to cement themselves as really the I would say like the one of the big three to actually build chips in America helping the West diversify away from the East away from Asia which will include huge incentives subsidies and even help uh with them attracting other businesses to build chips for them too and even other developers too so all three of these stocks in my opinion look like a Buy on these dips",
+   "ts": 864,
+   "why": "Host explicitly says all three stocks including Intel look like a Buy on dips.",
+   "mentions": 7
+  },
+  "607445": {
+   "verdict": "VERIFIED",
+   "quote": "in my opinion vich properties now complete transparency like always V Properties is a company I hold in my personal portfolio",
+   "ts": 536,
+   "why": "Host explicitly calls VICI best opportunity, holds it, supports bullish valuation at $403 intrinsic value.",
+   "mentions": 0
+  },
+  "607452": {
+   "verdict": "VERIFIED",
+   "quote": "I'm going to talk about another Real Estate Investment Trust that I believe has the potential to be the next realy income Corporation",
+   "ts": 42,
+   "why": "Host explicitly states personal belief ADC can be the next Realty Income, a bullish forward call.",
+   "mentions": 6
+  },
+  "607459": {
+   "verdict": "VERIFIED",
+   "quote": "free cash flow per share has been declining by a large amount since 2018 and again that's a large reason this company had to cut their dividend payments dividend payments are paid out of free cash flow so if a company's free cash flow is declining really those dividend payments probably aren't sustainable",
+   "ts": 1213,
+   "why": "Host personally critiques WBA's declining FCF, dividend cut, and negative EPS as red flags.",
+   "mentions": 2
+  },
+  "607567": {
+   "verdict": "VERIFIED",
+   "quote": "I really really like this first retailer",
+   "ts": 572,
+   "why": "Host expresses strong bullish sentiment on ULTA with multiple expansion thesis before 2025.",
+   "mentions": 24
+  },
+  "607551": {
+   "verdict": "VERIFIED",
+   "quote": "my fair value hasn't changed it's actually around 76.28 transport share and if I buy it around there I will get around 100 on the upside",
+   "ts": 473,
+   "why": "Host states personal fair value target and upside for DIS, a forward bullish call.",
+   "mentions": 35
+  },
+  "607605": {
+   "verdict": "VERIFIED",
+   "quote": "I think Crocs is extremely undervalued here",
+   "ts": 470,
+   "why": "Host directly calls CROX extremely undervalued at 6.5x earnings with growing EPS guidance.",
+   "mentions": 0
+  },
+  "607608": {
+   "verdict": "VERIFIED",
+   "quote": "I'm getting around $53 per share you know $53 per share is you know where the stock was trading at pretty much I mean in something like 2019 now I'm not sure if it's going there because the stock is oversold but looking at valuations alone this is my fair value on solar Edge after they reported earnings and after the shocks that happened $53 I mean if it gets close to that maybe 60 or 61 I think it would be extremely interesting but for me personally I would not touch Soul redge something above $53",
+   "ts": 480,
+   "why": "Host sets $53 fair value and refuses to buy SEDG above that price.",
+   "mentions": 0
+  },
+  "607638": {
+   "verdict": "VERIFIED",
+   "quote": "I do believe the market is having a pretty big knee-jerk reaction around open Ai and adobe's supposedly weak earnings forecast",
+   "ts": 370,
+   "why": "Host directly dismisses bearish market reaction, implying bullish stance on ADBE.",
+   "mentions": 57
+  },
+  "607640": {
+   "verdict": "REFUTED",
+   "why": "Host finds stock overvalued at current price, no committed buy call made.",
+   "mentions": 0
+  },
+  "607661": {
+   "verdict": "VERIFIED",
+   "quote": "United Health followed by Apple are my number four and five largest positions",
+   "ts": 439,
+   "why": "Host confirms Apple is his fifth largest position, affirming bullish conviction as core holding.",
+   "mentions": 4
+  },
+  "607683": {
+   "verdict": "VERIFIED",
+   "quote": "I'm very happy to see that is back on track for 2024",
+   "ts": 478,
+   "why": "Host personally affirms UNH is back on track, having added $33k to position bullishly.",
+   "mentions": 21
+  },
+  "607677": {
+   "verdict": "VERIFIED",
+   "quote": "I believe each of these businesses are poised to outperform in the back half of 2024",
+   "ts": 154,
+   "why": "Host explicitly states bullish forward call on INTU (Intuit) among the three discussed.",
+   "mentions": 0
+  },
+  "607697": {
+   "verdict": "VERIFIED",
+   "quote": "I'm actually going to go with the pharmaceutical giant fizer ticker symbol PFE which is another one that just doesn't make any sense why it's trading so cheap probably even more so than United",
+   "ts": 369,
+   "why": "Host personally picks PFE as a buy, calls it undervalued",
+   "mentions": 1
+  },
+  "607749": {
+   "verdict": "REFUTED",
+   "why": "Host ranks AT&T last, prefers Verizon; no committed bullish call on T.",
+   "mentions": 0
+  },
+  "607758": {
+   "verdict": "VERIFIED",
+   "quote": "it's just so highly valued at this point that I don't see a lot more gains to really be had from it long term",
+   "ts": 405,
+   "why": "Host personally doubts AAPL's long-term upside due to extreme valuation.",
+   "mentions": 6
+  },
+  "607835": {
+   "verdict": "INSUFFICIENT",
+   "why": "Host describes WD but makes no explicit forward bullish call in this window.",
+   "mentions": 1
+  },
+  "607804": {
+   "verdict": "VERIFIED",
+   "quote": "it just feels like a very up in theair type of business with also massive competition to where it's just too difficult to predict prct where they'll end up long term so I'm ranking them at the bottom here at number four",
+   "ts": 831,
+   "why": "Host ranks SIRI last, citing competition, subscriber losses, and unpredictable future.",
+   "mentions": 0
+  },
+  "607843": {
+   "verdict": "INSUFFICIENT",
+   "why": "Host explains rally context but makes no committed forward bullish call on SPY specifically.",
+   "mentions": 22
+  },
+  "607850": {
+   "verdict": "VERIFIED",
+   "quote": "the stock market should technically go up in 2024 which is also an election year",
+   "ts": 544,
+   "why": "Host directly predicts market up in 2024, bullish on SPY/S&P 500.",
+   "mentions": 66
+  },
+  "607870": {
+   "verdict": "REFUTED",
+   "why": "Hosts explain crash context but make no forward bearish call; they say boom is not over.",
+   "mentions": 24
+  },
+  "607906": {
+   "verdict": "VERIFIED",
+   "quote": "synopsis and Cadence Design Systems are most definitely still innovating at a very fast Place synopsis you can see in this slide has a broad IP portfolio and software that is chalk full of AI in order to design all kinds of things on the semiconductor",
+   "ts": 1198,
+   "why": "Host directly states Synopsys is innovating rapidly and will maintain position, implying bullish forward outlook.",
+   "mentions": 0
+  },
+  "608001": {
+   "verdict": "VERIFIED",
+   "quote": "agree Realty I love their tenant profile",
+   "ts": 102,
+   "why": "Host expresses direct bullish conviction on ADC with multiple positive statements about management and balance sheet.",
+   "mentions": 3
+  },
+  "607983": {
+   "verdict": "REFUTED",
+   "why": "Host notes weak growth and low dividend increase but makes no committed forward bearish call.",
+   "mentions": 3
+  },
+  "608024": {
+   "verdict": "VERIFIED",
+   "quote": "I think personally the Ulta beauty is pretty much fairly valued at this level I mean I don't see anything more than 10 to 12% return maximum 12% return with a multiple expansion every single year",
+   "ts": 438,
+   "why": "Host explicitly says ULTA is fairly valued with limited upside, confirming neutral stance.",
+   "mentions": 26
+  },
+  "608023": {
+   "verdict": "VERIFIED",
+   "quote": "Mid America in my opinion is the most undervalued dividend stock or rate in the market still sitting at $125 pretty much close to preo levels",
+   "ts": 520,
+   "why": "Host makes direct bullish call on Mid America (MAA) as most undervalued dividend stock",
+   "mentions": 0
+  },
+  "608037": {
+   "verdict": "VERIFIED",
+   "quote": "so I'm very very bullish on gold going into 2024 I'm exposed to Gold I have many things on gold",
+   "ts": 448,
+   "why": "Host explicitly states strong bullish conviction on gold for 2024 timeframe.",
+   "mentions": 20
+  },
+  "608060": {
+   "verdict": "VERIFIED",
+   "quote": "eBay could go up 20 30% within weeks if not within months",
+   "ts": 635,
+   "why": "Host makes forward bullish call on EBAY with explicit upside potential stated.",
+   "mentions": 37
+  },
+  "608095": {
+   "verdict": "VERIFIED",
+   "quote": "Google's at $163 24 right now and I'm going to keep buying Google up until about 180 190",
+   "ts": 685,
+   "why": "Host states actively buying GOOGL up to $180-190 target range.",
+   "mentions": 14
+  },
+  "608063": {
+   "verdict": "VERIFIED",
+   "quote": "I'm seeing a lowrisk high return kind of potential for these two stocks and this is why I'm getting very interested for them it's more of an asymmetrical bet",
+   "ts": 128,
+   "why": "Host explicitly calls PFE (fizer) a low-risk high-return asymmetrical bet alongside BMY.",
+   "mentions": 0
+  },
+  "608096": {
+   "verdict": "INSUFFICIENT",
+   "why": "Transcript cuts off mid-sentence before valuation conclusion is reached.",
+   "mentions": 24
+  },
+  "608120": {
+   "verdict": "VERIFIED",
+   "quote": "they're projecting revenues of 450 to 455 billion that's over a 10% increase in revenue for a business the size of United Health that's very impressive and they're expecting their Gap earnings per share to be at $28.15 to $28.65",
+   "ts": 594,
+   "why": "Host affirms UNH's 2025 revenue 10%+ growth and EPS guidance as strong bullish outlook.",
+   "mentions": 37
+  },
+  "608174": {
+   "verdict": "VERIFIED",
+   "quote": "The downward spiral continues for Starbucks as they released their Q2 2025 earnings. This is a business in decline",
+   "ts": 138,
+   "why": "Host directly characterizes SBUX as declining business with ongoing downward spiral.",
+   "mentions": 42
+  },
+  "608180": {
+   "verdict": "VERIFIED",
+   "quote": "growth is expected to remain at 20% plus through 2028",
+   "ts": 465,
+   "why": "Host directly projects Nvidia revenue growth rate continuing through 2028, a forward bullish call.",
+   "mentions": 25
+  },
+  "608192": {
+   "verdict": "VERIFIED",
+   "quote": "stock number two I actually did decide to start buying today for the first time ever",
+   "ts": 308,
+   "why": "Host explicitly says he started buying SWK (Stanley Black & Decker) today, a bullish commitment.",
+   "mentions": 1
+  },
+  "608184": {
+   "verdict": "VERIFIED",
+   "quote": "I just think it's at too big of a discount here, uh you know, from a stock perspective alone, for uh for me to ignore.",
+   "ts": 647,
+   "why": "Host personally buying PFE, calls it deep discount, bullish conviction stated.",
+   "mentions": 3
+  },
+  "608223": {
+   "verdict": "VERIFIED",
+   "quote": "I do really like Shopify and I agree with Grock here that if it dips more, it will only get even more attractive",
+   "ts": 956,
+   "why": "Host personally endorses Shopify as increasingly attractive on further dips.",
+   "mentions": 13
+  },
+  "608346": {
+   "verdict": "REFUTED",
+   "why": "Host describes company performance and competition but makes no forward neutral call.",
+   "mentions": 1
+  },
+  "608304": {
+   "verdict": "INSUFFICIENT",
+   "why": "Host expresses concern but makes no explicit forward bearish price/direction call on TSLA.",
+   "mentions": 40
+  },
+  "608348": {
+   "verdict": "VERIFIED",
+   "quote": "all indications are that power and sensor chip inventories are coming back down to more normal level which sets the stage for a more gradual recovery in 2025",
+   "ts": 1160,
+   "why": "Host predicts sector recovery in 2025, directly tied to Allegro's prospects.",
+   "mentions": 0
+  },
+  "608478": {
+   "verdict": "REFUTED",
+   "why": "Host discusses GOOGL only as context/comparison, makes no forward bullish call on it.",
+   "mentions": 27
+  },
+  "608397": {
+   "verdict": "VERIFIED",
+   "quote": "we're calling now a U-shaped recovery incoming perhaps summer 2025 u-shaped recovery we borrowed that term from Lis semiconductors new CEO but this is the expectation now for onsi",
+   "ts": 156,
+   "why": "Hosts directly forecast ON recovery by summer 2025, indicating bullish outlook.",
+   "mentions": 58
+  },
+  "608588": {
+   "verdict": "VERIFIED",
+   "quote": "I think I'll sell another half of the Holdings",
+   "ts": 1769,
+   "why": "Host personally sells half NVDA holdings due to 56% overvaluation \u2014 bearish action confirmed.",
+   "mentions": 7
+  },
+  "608515": {
+   "verdict": "VERIFIED",
+   "quote": "this was a stock that was just so heavily beaten down to where the valuation and the dividend were at crazy levels. It was just such an obvious buy to me, and thankfully now it's looking like it's finally climbing.",
+   "ts": 914,
+   "why": "Host calls PFE an 'obvious buy' due to valuation and dividend, forward bullish stance.",
+   "mentions": 6
+  },
+  "608593": {
+   "verdict": "VERIFIED",
+   "quote": "our final point is it's finally time to start buying AMD stock again",
+   "ts": 554,
+   "why": "Host explicitly calls AMD a buy with DCF fair value of $110/share.",
+   "mentions": 38
+  },
+  "608596": {
+   "verdict": "VERIFIED",
+   "quote": "foret back in allout growth mode and while this does tend to be a cyclical business profit growth can be a bit lumpy",
+   "ts": 865,
+   "why": "Host explicitly states Fortinet is back in all-out growth mode heading into 2025.",
+   "mentions": 0
+  },
+  "608597": {
+   "verdict": "VERIFIED",
+   "quote": "the downturn is definitely getting worse before we expect a recovery maybe the beginning of a recovery later in 2025",
+   "ts": 22,
+   "why": "Host forecasts worsening downturn for ACLS sector before eventual recovery.",
+   "mentions": 1
+  },
+  "608599": {
+   "verdict": "REFUTED",
+   "why": "Host says 'we're not worried about Nvidia' but makes no forward bullish call on NVDA stock.",
+   "mentions": 27
+  },
+  "608613": {
+   "verdict": "VERIFIED",
+   "quote": "this low dividend growth rate is nothing new the 10-year dividend kager is sitting at about 2.39% in the 5year sitting at 2.27% now again going back to free cash flow the dividend growth is slow because the free cash flow growth has been very slow it hasn't grown at a very healthy rate the past 5 years free cash flow kg of just 2.85% and we can also see it's a little bit choppy it's not very consistent when I'm buying a stock I want to see very predictable free cash flow growth so the payout ratio is very high it's sitting at 94.9%",
+   "ts": 305,
+   "why": "Host directly cites slow growth, choppy FCF, and high payout as structural concerns for VZ.",
+   "mentions": 4
+  },
+  "608627": {
+   "verdict": "VERIFIED",
+   "quote": "I think if we see a huge selloff it could definitely create an opportunity for McDonald's",
+   "ts": 489,
+   "why": "Host calls a potential MCD selloff a buying opportunity, expressing forward bullish view.",
+   "mentions": 2
+  },
+  "608626": {
+   "verdict": "VERIFIED",
+   "quote": "based off adjusted funds from operation as of right now the dividend payout actually looks pretty healthy",
+   "ts": 422,
+   "why": "Host confirms healthy AFFO payout ratio, implicitly bullish on sustainability of EPR's dividend.",
+   "mentions": 16
+  },
+  "608639": {
+   "verdict": "REFUTED",
+   "why": "KO not mentioned; transcript covers PEP, ADM, PFE, ASML only",
+   "mentions": 0
+  },
+  "608631": {
+   "verdict": "VERIFIED",
+   "quote": "so that's not something that concerns me whatsoever",
+   "ts": 210,
+   "why": "Host dismisses FCF decline as long-term investment, implying sustained bullish conviction on MSFT.",
+   "mentions": 27
+  },
+  "608653": {
+   "verdict": "VERIFIED",
+   "quote": "if I do a 5% annual growth rate over the next decade, then it's a winning stock",
+   "ts": 1397,
+   "why": "Host explicitly states 5% growth makes RR a winning stock; target 455p mentioned.",
+   "mentions": 0
+  },
+  "608668": {
+   "verdict": "VERIFIED",
+   "quote": "Intel will likely go up 50 or 100 percent at some point in time when the semicycle reverts 2024 2025",
+   "ts": 622,
+   "why": "Host directly predicts Intel bullish rise 50-100% when semiconductor cycle reverts.",
+   "mentions": 1
+  },
+  "608696": {
+   "verdict": "VERIFIED",
+   "quote": "I am starting to worry a little bit about the S&P 500",
+   "ts": 2,
+   "why": "Host signals bearish shift on S&P 500, citing speculation and inflation surprises as downturn catalysts.",
+   "mentions": 34
+  },
+  "608744": {
+   "verdict": "VERIFIED",
+   "quote": "Choice Hotels to be is an undervalued stock that's still offer some quality 7% On The Low End high end is 20% good risk reward setup so I really like it here and I'm considering owning the stock myself",
+   "ts": 634,
+   "why": "Host explicitly calls CHH undervalued, states 7-20% return potential, and considers buying.",
+   "mentions": 0
+  },
+  "608750": {
+   "verdict": "VERIFIED",
+   "quote": "I think paycom is a Buy in general I mean I don't see the stock being overvalued and I really like it over here",
+   "ts": 431,
+   "why": "Host explicitly calls PAYC a buy, citing value and positive sentiment opportunity.",
+   "mentions": 0
+  },
+  "608899": {
+   "verdict": "VERIFIED",
+   "quote": "At over 10, this looks like a screaming deal. But really, this could be the market saying onsemi is crazy cheap right now. Perhaps the best buy since the pandemic, March, A",
+   "ts": 599,
+   "why": "Host calls ON a screaming deal and potentially the best buy since pandemic lows.",
+   "mentions": 39
+  },
+  "608900": {
+   "verdict": "VERIFIED",
+   "quote": "we're very much still buyers of the stock",
+   "ts": 33,
+   "why": "Host explicitly states active buying position on MPWR, confirming bullish conviction.",
+   "mentions": 1
+  },
+  "608901": {
+   "verdict": "VERIFIED",
+   "quote": "ASML has a good runway of growth, a good little cycle about to ramp up for these companies.",
+   "ts": 515,
+   "why": "Host directly states ASML has growth runway and cycle ramping up, forward bullish call.",
+   "mentions": 16
+  },
+  "608905": {
+   "verdict": "VERIFIED",
+   "quote": "We're kind of of the opinion lamb is probably undervalued again at this particular juncture",
+   "ts": 616,
+   "why": "Host directly states Lam Research is probably undervalued, a forward bullish call.",
+   "mentions": 0
+  },
+  "608933": {
+   "verdict": "VERIFIED",
+   "quote": "now is a really solid time to consider J&J especially if you're looking for very predictable and stable cash flows",
+   "ts": 848,
+   "why": "Host directly recommends buying JNJ as a bullish defensive dividend play.",
+   "mentions": 0
+  },
+  "608965": {
+   "verdict": "VERIFIED",
+   "quote": "this one's actually probably trading pretty close to fair value and I think the selloff is Justified",
+   "ts": 1199,
+   "why": "Host calls SJM near fair value, implying neutral stance on forward direction.",
+   "mentions": 4
+  },
+  "609110": {
+   "verdict": "VERIFIED",
+   "quote": "I own Pepsi I own shenir energy LG this is another one is going to benefit",
+   "ts": 636,
+   "why": "Host explicitly owns Pepsi and calls it a beneficiary of rotation as rates fall.",
+   "mentions": 0
+  },
+  "609168": {
+   "verdict": "VERIFIED",
+   "quote": "I still believe the stock is solid as it turn around not as a long investment but as they turn around the stimate changes things get better",
+   "ts": 443,
+   "why": "Host explicitly states personal bullish view on ULTA as a turnaround opportunity.",
+   "mentions": 9
+  },
+  "609172": {
+   "verdict": "REFUTED",
+   "why": "Host discusses DG only as Realty Income tenant context, no forward neutral call on DG itself.",
+   "mentions": 0
+  },
+  "609229": {
+   "verdict": "REFUTED",
+   "why": "INTC not mentioned; Intuit (INTU) discussed, not Intel.",
+   "mentions": 0
+  },
+  "609236": {
+   "verdict": "VERIFIED",
+   "quote": "I would be comfortable buying Netflix once it comes down below 1,000, but anytime before that, it's just a little bit too rich.",
+   "ts": 1404,
+   "why": "Host expresses bullish intent to buy NFLX below $1000, confirming bullish call with valuation caveat.",
+   "mentions": 29
+  },
+  "609238": {
+   "verdict": "REFUTED",
+   "why": "Host sold for portfolio consolidation, not bearish thesis; no forward bearish call made.",
+   "mentions": 5
+  },
+  "609288": {
+   "verdict": "VERIFIED",
+   "quote": "the credit bureaus face clear downside risk given they collectively generate more than 200 million annually from reselling FICO scores at margins over 40%",
+   "ts": 310,
+   "why": "Host directly states Equifax (a credit bureau) faces clear downside risk from FICO's new program.",
+   "mentions": 0
+  },
+  "609368": {
+   "verdict": "REFUTED",
+   "why": "Transcript only recaps past valuations; no forward bearish call made by host.",
+   "mentions": 9
+  },
+  "609367": {
+   "verdict": "REFUTED",
+   "why": "Host explains earnings report mechanics and market reaction; no bearish price target stated.",
+   "mentions": 17
+  },
+  "609411": {
+   "verdict": "INSUFFICIENT",
+   "why": "Window ends mid-analysis before host states a buy/valuation conclusion.",
+   "mentions": 6
+  },
+  "609417": {
+   "verdict": "VERIFIED",
+   "quote": "this is a reate that's growing a little bit faster than their peers",
+   "ts": 255,
+   "why": "Host directly asserts ADC's superior growth, implying continued bullish outlook.",
+   "mentions": 11
+  },
+  "609433": {
+   "verdict": "REFUTED",
+   "why": "AHH not mentioned; transcript covers LVMH, Armada Hoffler (AHH ticker match but called by full name with different context), and Home Depot.",
+   "mentions": 0
+  },
+  "609436": {
+   "verdict": "REFUTED",
+   "why": "Host explicitly says OXY doesn't fit his investable universe; bullish call is analyst's, not host's.",
+   "mentions": 8
+  },
+  "609450": {
+   "verdict": "VERIFIED",
+   "quote": "we come to a DCF price per share of $68.61, which is about 16% higher than that share price",
+   "ts": 430,
+   "why": "Host's own DCF model shows UNH ~16% undervalued, explicitly bullish forward call.",
+   "mentions": 16
+  },
+  "610070": {
+   "verdict": "REFUTED",
+   "why": "Host expresses uncertainty and attributes gold rise to speculation, making no committed bullish call.",
+   "mentions": 4
+  },
+  "610071": {
+   "verdict": "VERIFIED",
+   "quote": "on the stocks to buy do I consider this a relative buy dividend plus growth yes as I said 4% dividend 5% BuyBacks plus 4% growth that's a 9% company consumer defensive whatever this likely then fits a good dividend portfolio",
+   "ts": 290,
+   "why": "Host explicitly calls UL a relative buy with positive forward return thesis.",
+   "mentions": 0
+  },
+  "610089": {
+   "verdict": "VERIFIED",
+   "quote": "NOW is this maximum pessimism that's the key question to check and if it is then it is a buy",
+   "ts": 67,
+   "why": "Host frames ALB's 70% crash as potential buy if maximum pessimism confirmed.",
+   "mentions": 1
+  },
+  "610081": {
+   "verdict": "VERIFIED",
+   "quote": "people are not thinking about price the p ratio is a 27 way above the average historical nobody cares because s you're stupid you're an idiot AI will make so much money for everyone that it's going to be crazy",
+   "ts": 119,
+   "why": "Host calls S&P 500 an AI bubble with extreme valuations, implying bearish forward view.",
+   "mentions": 14
+  },
+  "610108": {
+   "verdict": "VERIFIED",
+   "quote": "I believe the stock is priced in for pretty much the worst case scenario of the search engine and for all those businesses",
+   "ts": 415,
+   "why": "Host personally declares GOOGL undervalued with $182 sum-of-parts floor price.",
+   "mentions": 70
+  },
+  "610233": {
+   "verdict": "VERIFIED",
+   "quote": "Apple is extremely risky for a very low reward",
+   "ts": 344,
+   "why": "Host directly states Apple offers very low reward for high risk, a bearish valuation call.",
+   "mentions": 18
+  },
+  "610230": {
+   "verdict": "VERIFIED",
+   "quote": "58 average earnings let's say five six six with some growth that's 10 11 12% returns for the longterm dividend BuyBacks it looks good",
+   "ts": 354,
+   "why": "Host calls ADM good buy with 10-12% long-term returns, dividend growth, buybacks.",
+   "mentions": 1
+  },
+  "610236": {
+   "verdict": "VERIFIED",
+   "quote": "the money has likely already been made and those selling to Microsoft doing BuyBacks are likely the smartest ones",
+   "ts": 11,
+   "why": "Host states returns are limited and sellers are smartest, implying bearish forward outlook.",
+   "mentions": 4
+  },
+  "610239": {
+   "verdict": "VERIFIED",
+   "quote": "B finger another good business you can see here this Industrials not going anywhere and you can play these Cycles this is again global company okay Europe dividend is there nothing wrong with the company they are number one in the world with the cranes so this is a business some private company will take it over if there is trouble so really good business they have their mark margins but this is it dividend yeld 5% a few years ago everyone was happy 3% because of the good quality business and you can learn about this business see how it fits your portfolio it should be a good addition and then you can maybe do a 2x on the upside when the cycle reverts and this is most likely to revert Somewhere in Time",
+   "ts": 903,
+   "why": "Host calls Bfinger good business, number one in cranes, recommends 2x upside on cycle reversion.",
+   "mentions": 0
+  },
+  "610350": {
+   "verdict": "VERIFIED",
+   "quote": "if things return to normality put a p ratio of 18 apple is back where it was just a few years ago as it is stagnating no Growth Company and that is 50% down could happen",
+   "ts": 248,
+   "why": "Host directly predicts 50% decline if P/E normalizes, a clear bearish forward call.",
+   "mentions": 19
+  },
+  "610361": {
+   "verdict": "REFUTED",
+   "why": "Host explicitly puts STNE on 'too hard pile', not a committed bullish call.",
+   "mentions": 0
+  },
+  "610591": {
+   "verdict": "REFUTED",
+   "why": "Host increases risk rating, warns of AI disruption, no forward bullish commitment on GOOGL.",
+   "mentions": 29
+  },
+  "610585": {
+   "verdict": "VERIFIED",
+   "quote": "if there is a recession Ford goes down",
+   "ts": 284,
+   "why": "Host directly states Ford stock declines in a recession scenario.",
+   "mentions": 0
+  },
+  "610593": {
+   "verdict": "VERIFIED",
+   "quote": "if this reverts to the mean this is just this is 50% down",
+   "ts": 153,
+   "why": "Host calls S&P 500 overvalued (4X price vs 2X earnings, P/E 31), projects 50% downside on mean reversion.",
+   "mentions": 18
+  },
+  "610780": {
+   "verdict": "VERIFIED",
+   "quote": "the stock is now fairly valued for a return of around 9%",
+   "ts": 449,
+   "why": "Host's own DCF concludes KHC is fairly valued at current price.",
+   "mentions": 0
+  },
+  "610603": {
+   "verdict": "VERIFIED",
+   "quote": "Amazon is let's say giving the growth and everything cheap compared to other things we have cheaper than the market great business",
+   "ts": 225,
+   "why": "Host directly states Amazon is cheaper than market, implying bullish forward stance.",
+   "mentions": 14
+  },
+  "610784": {
+   "verdict": "VERIFIED",
+   "quote": "maybe we are just looking for a two-year return to normality for margins higher competition with these businesses which then would lead to maybe five earnings per share p ratio 15 and and that's 75 stock price so that is still a potential for 50% down here",
+   "ts": 256,
+   "why": "Host models normalized scenario yielding $75, explicitly calling 50% downside risk.",
+   "mentions": 0
+  },
+  "610711": {
+   "verdict": "VERIFIED",
+   "quote": "yes it is a bargain looks like a in investment that will deliver returns",
+   "ts": 50,
+   "why": "Host directly calls EVO a bargain and forward-predicts returns.",
+   "mentions": 0
+  },
+  "610794": {
+   "verdict": "REFUTED",
+   "why": "Transcript discusses CNH Industrial; DE mentioned only as comparison, no bearish call on DE.",
+   "mentions": 1
+  },
+  "610791": {
+   "verdict": "VERIFIED",
+   "quote": "all else equal, Google will likely deliver a good return going forward.",
+   "ts": 423,
+   "why": "Host directly predicts good return for Google stock going forward.",
+   "mentions": 15
+  },
+  "610803": {
+   "verdict": "VERIFIED",
+   "quote": "asml stock is a strong buy from the European stock market",
+   "ts": 0,
+   "why": "Host directly calls ASML a strong buy with bullish price targets.",
+   "mentions": 3
+  },
+  "605661": {
+   "verdict": "VERIFIED",
+   "quote": "gun to my head $150,000 Bitcoin totally reasonable",
+   "ts": 472,
+   "why": "Host Joe makes direct forward bullish price call on BTC.",
+   "mentions": 68
+  },
+  "610804": {
+   "verdict": "VERIFIED",
+   "quote": "we have my research platform ADM birkshire and treasures so if you start investing 100,000 let's say a th000 a month how to build that portfolio",
+   "ts": 198,
+   "why": "Host includes ADM in his own low-risk, long-term portfolio recommendation alongside Berkshire.",
+   "mentions": 1
+  },
+  "605912": {
+   "verdict": "VERIFIED",
+   "quote": "2025 Revenue expected to be between 30 and 40 billion euros uh with gross margin increasing to 54 and 60 56 percent",
+   "ts": 218,
+   "why": "Host personally holds ASML long and endorses long-term growth trajectory.",
+   "mentions": 16
+  },
+  "605914": {
+   "verdict": "REFUTED",
+   "why": "No forward bullish call by host; discussion is analytical/descriptive, not a buy recommendation.",
+   "mentions": 37
+  },
+  "605986": {
+   "verdict": "VERIFIED",
+   "quote": "this is not a company that we should be buying now",
+   "ts": 315,
+   "why": "Host concludes PEP trades above intrinsic value and is not a buy.",
+   "mentions": 0
+  },
+  "605934": {
+   "verdict": "VERIFIED",
+   "quote": "you could think of the 60 plus return over five months which is very attractive as just a cherry on top",
+   "ts": 1267,
+   "why": "Host endorses SIMO as attractive investment with 60%+ upside, bullish forward call.",
+   "mentions": 0
+  },
+  "606093": {
+   "verdict": "VERIFIED",
+   "quote": "China will likely return to being a a Powerhouse economy these Chinese businesses are uniquely positioned to capture an incredibly large amount of business",
+   "ts": 536,
+   "why": "Host endorses bullish thesis on BABA as part of China recovery bet.",
+   "mentions": 4
+  },
+  "606183": {
+   "verdict": "VERIFIED",
+   "quote": "this one has moved towards the top of our current buy list",
+   "ts": 623,
+   "why": "Host explicitly says LRCX moved to top of buy list, signaling bullish intent.",
+   "mentions": 0
+  },
+  "606103": {
+   "verdict": "REFUTED",
+   "why": "Host reports Pabrai's buys of Warrior Met Coal; no host forward bullish call on HCC.",
+   "mentions": 0
+  },
+  "606223": {
+   "verdict": "REFUTED",
+   "why": "Hosts analyze risks to QCOM from Huawei; no forward bullish call made.",
+   "mentions": 33
+  },
+  "606226": {
+   "verdict": "REFUTED",
+   "why": "Transcript window covers only Salesforce and semiconductor market; no host call on NOW/ServiceNow visible.",
+   "mentions": 41
+  },
+  "606237": {
+   "verdict": "VERIFIED",
+   "quote": "we think a fair value on air test systems currently at this particular stage is still less than 40 bucks a share",
+   "ts": 729,
+   "why": "Host states fair value below current price (~$48), implying neutral/hold stance.",
+   "mentions": 0
+  },
+  "606364": {
+   "verdict": "VERIFIED",
+   "quote": "why we think Qualcomm is again going to be a good stock to own for 2024 why we have it as one of our big Tech stock core Holdings in our chip stock portfolio",
+   "ts": 150,
+   "why": "Host directly states forward bullish thesis on QCOM for 2024.",
+   "mentions": 83
+  },
+  "606469": {
+   "verdict": "VERIFIED",
+   "quote": "I think Nvidia will continue just to rake in massive profits over the next year to two to maybe 3 years",
+   "ts": 1194,
+   "why": "Host directly states forward bullish outlook on NVDA profits.",
+   "mentions": 22
+  },
+  "606452": {
+   "verdict": "VERIFIED",
+   "quote": "the earnings per share is growing and in a year two I assume they will be at all-time highs on these metrics it's 24% undervalued based on the consensus price Target and it is currently trading below the lowest price Target on Wall Street",
+   "ts": 507,
+   "why": "Host makes direct bullish forward call on T. Rowe Price (t price/tro price) stock.",
+   "mentions": 0
+  },
+  "606545": {
+   "verdict": "VERIFIED",
+   "quote": "ugly first half of 2024 but still a favorite stock for the long term Casey yeah absolutely gross profit margin still at 70%",
+   "ts": 305,
+   "why": "Host explicitly calls LSCC a long-term favorite despite near-term weakness.",
+   "mentions": 0
+  },
+  "606534": {
+   "verdict": "REFUTED",
+   "why": "Host discusses CMG's past performance as historical example; no forward bullish call made.",
+   "mentions": 0
+  },
+  "606569": {
+   "verdict": "VERIFIED",
+   "quote": "we do think it is early days still for Netflix so that's why we pulled the trigger on that one",
+   "ts": 1272,
+   "why": "Host confirms buying Netflix, calling it early days with forward bullish conviction.",
+   "mentions": 11
+  },
+  "606580": {
+   "verdict": "VERIFIED",
+   "quote": "we still see ample opportunity for air and we really like this company",
+   "ts": 1046,
+   "why": "Host directly expresses bullish forward sentiment on AEHR as their own position.",
+   "mentions": 0
+  },
+  "606582": {
+   "verdict": "VERIFIED",
+   "quote": "this is why we continue to hold our long-term position in a RIS not adding at",
+   "ts": 1490,
+   "why": "Host states holding position but not adding\u2014neutral forward stance on ANET.",
+   "mentions": 0
+  },
+  "606607": {
+   "verdict": "VERIFIED",
+   "quote": "this stock will likely keep going up over the next few years given all the positive tail winds behind it",
+   "ts": 511,
+   "why": "Host directly predicts AVGO will keep rising over next few years.",
+   "mentions": 13
+  },
+  "606642": {
+   "verdict": "VERIFIED",
+   "quote": "over the coming years tsmc will be impacted financially by this what that means is their growing profit margin will likely come down",
+   "ts": 392,
+   "why": "Host directly predicts TSM profit margin decline due to tariffs.",
+   "mentions": 18
+  },
+  "606692": {
+   "verdict": "VERIFIED",
+   "quote": "we come to an intrinsic value of 34.30 with a ten percent margin of safety are acceptable by price is sitting at around thirty dollars and eighty seven cents",
+   "ts": 360,
+   "why": "Host's own valuation model yields $34.30 intrinsic value, above current $29.27 price, bullish.",
+   "mentions": 6
+  },
+  "606698": {
+   "verdict": "VERIFIED",
+   "quote": "analysts currently have a Target price of around 115 dollars per share",
+   "ts": 256,
+   "why": "Host projects bullish valuation targets and growth for SBUX using own models",
+   "mentions": 15
+  },
+  "606697": {
+   "verdict": "VERIFIED",
+   "quote": "it is teetering on a dividend cut but I think management is taking steps to try to sustain this dividend",
+   "ts": 319,
+   "why": "Host's own neutral assessment: possible cut but management acting to sustain it",
+   "mentions": 4
+  },
+  "606705": {
+   "verdict": "VERIFIED",
+   "quote": "I think it owns some really high quality real estate has a nice starting dividend yield I think we'll see some pretty decent share price appreciation but I also like the fact that we should see some dividend growth from this company",
+   "ts": 744,
+   "why": "Host makes forward bullish call on VICI: price appreciation and dividend growth expected.",
+   "mentions": 0
+  },
+  "606713": {
+   "verdict": "VERIFIED",
+   "quote": "that gives us an intrinsic value at 236.30 per share now the current trading price of this company is sitting at 225.89 so there's not much of a difference",
+   "ts": 441,
+   "why": "Host calculates intrinsic value above current price, implying bullish forward call on LOW.",
+   "mentions": 7
+  },
+  "606719": {
+   "verdict": "VERIFIED",
+   "quote": "for the first time in a while I just added an entirely new company to my portfolio and that company was Waste Management stock ticker WM",
+   "ts": 0,
+   "why": "Host personally bought WM, expressing long-term bullish conviction.",
+   "mentions": 2
+  },
+  "606749": {
+   "verdict": "VERIFIED",
+   "quote": "longer term I'm still very optimistic about U.S banking so that's why I'm buying the stock it's just too cheap right now",
+   "ts": 572,
+   "why": "Host states personal bullish conviction and active buying of USB stock.",
+   "mentions": 6
+  },
+  "606829": {
+   "verdict": "VERIFIED",
+   "quote": "if I was forced to buy just one of these I think I would actually prefer Jack In The Box",
+   "ts": 36,
+   "why": "Host explicitly states personal preference for JACK over McDonald's as forward-looking choice.",
+   "mentions": 12
+  },
+  "606819": {
+   "verdict": "VERIFIED",
+   "quote": "I continue to think that one of the absolute best dividend stocks out there at today's prices is the medical device giant Medtronic ticker symbol MDT",
+   "ts": 405,
+   "why": "Host directly calls MDT one of the absolute best dividend stocks at current prices.",
+   "mentions": 1
+  },
+  "606885": {
+   "verdict": "VERIFIED",
+   "quote": "I would say bti is still a Buy in my opinion I don't think the company is a value trap",
+   "ts": 495,
+   "why": "Host explicitly calls BTI a Buy and rejects value trap concern.",
+   "mentions": 28
+  },
+  "606887": {
+   "verdict": "VERIFIED",
+   "quote": "in my personal opinion the dividend cut for 3M is pretty much imminent and it's sad that this is where it's gonna have to play out but I'm just not seeing any way out",
+   "ts": 388,
+   "why": "Host explicitly states dividend cut is imminent and sees no way out for 3M.",
+   "mentions": 0
+  },
+  "606915": {
+   "verdict": "VERIFIED",
+   "quote": "I certainly plan to pick up some shares and dollar cost average my position into the Applied Materials up until it reach",
+   "ts": 591,
+   "why": "Host directly states personal buying intent for AMAT, a clear bullish forward call.",
+   "mentions": 16
+  },
+  "606944": {
+   "verdict": "INSUFFICIENT",
+   "why": "Transcript shows past performance recap only; no forward bearish price target visible in window.",
+   "mentions": 1
+  },
+  "606927": {
+   "verdict": "VERIFIED",
+   "quote": "I'm far under projecting what they did historically for free cash flow growth as well as Revenue growth and operating income growth",
+   "ts": 489,
+   "why": "Host presents conservative valuation implying upside; maintains bullish thesis on LOW despite weak earnings.",
+   "mentions": 2
+  },
+  "606972": {
+   "verdict": "VERIFIED",
+   "quote": "Applied Materials is already going to have a place at the table for whatever the next big thing is",
+   "ts": 1240,
+   "why": "Host directly states forward bullish view on AMAT's role in future computing.",
+   "mentions": 8
+  },
+  "607033": {
+   "verdict": "VERIFIED",
+   "quote": "I'm planning to hold this as a core position of mine well into the future",
+   "ts": 774,
+   "why": "Host states personal long-term bullish commitment to GOOGL as core holding.",
+   "mentions": 44
+  },
+  "606983": {
+   "verdict": "VERIFIED",
+   "quote": "we are going to reallocate that cash to those two companies are Apple and monday.com",
+   "ts": 1073,
+   "why": "Host announces buying Apple with reallocated cash \u2014 forward committed bullish action.",
+   "mentions": 4
+  },
+  "607059": {
+   "verdict": "INSUFFICIENT",
+   "why": "Transcript shows dividend metrics analysis only; no explicit forward bullish price target stated yet.",
+   "mentions": 1
+  },
+  "607067": {
+   "verdict": "REFUTED",
+   "why": "Host shows bullish lean: up 34%, strong dividends, intrinsic value $279 vs $236 price.",
+   "mentions": 2
+  },
+  "607073": {
+   "verdict": "INSUFFICIENT",
+   "why": "The key bearish quote is absent; transcript ends before any forward sell call appears.",
+   "mentions": 10
+  },
+  "607158": {
+   "verdict": "VERIFIED",
+   "quote": "as a hedge to the US dollar and potential inflation in the future I'm also dollar cost averaging into Bitcoin a hundred dollars per day",
+   "ts": 591,
+   "why": "Host personally buys Bitcoin daily as inflation hedge, a committed bullish action.",
+   "mentions": 1
+  },
+  "607157": {
+   "verdict": "REFUTED",
+   "why": "Host recaps SPY's 20% YTD gain as past performance, makes no forward bullish call.",
+   "mentions": 20
+  },
+  "607257": {
+   "verdict": "VERIFIED",
+   "quote": "I strongly believe that we're going to see a lot of volatility in the market uh going forward with perhaps a correction or maybe even a crash at some point too",
+   "ts": 947,
+   "why": "Host personally predicts market correction or crash, which is bearish on broad market/SPY.",
+   "mentions": 8
+  },
+  "607258": {
+   "verdict": "VERIFIED",
+   "quote": "the stock market is extremely high right now and I think a correction is desperately needed",
+   "ts": 400,
+   "why": "Host calls market overvalued, expects correction, clearly bearish on broad equities/SPY.",
+   "mentions": 7
+  },
+  "607532": {
+   "verdict": "REFUTED",
+   "why": "Host mentions trimming Rolls-Royce for tax purposes, not a neutral forward call.",
+   "mentions": 0
+  },
+  "607446": {
+   "verdict": "VERIFIED",
+   "quote": "I think long-term realy in looks like a much more attractive option it appears that the company is currently slightly undervalued you get a nice starting dividend yield and the potential for a lot of dividend growth and monthly dividend payments",
+   "ts": 567,
+   "why": "Host directly states long-term bullish view: undervalued, good yield, dividend growth potential.",
+   "mentions": 0
+  },
+  "607615": {
+   "verdict": "REFUTED",
+   "why": "MCO not named; 'Moody' mention is a passing watchlist item, not a committed bullish call.",
+   "mentions": 0
+  },
+  "607645": {
+   "verdict": "REFUTED",
+   "why": "Host repeatedly calls themselves bullish, is actively buying V; earnings dip comment is short-term caveat, not a bearish call.",
+   "mentions": 29
+  },
+  "607752": {
+   "verdict": "REFUTED",
+   "why": "Host is bearish on economy/banks, makes no neutral forward call on SPY.",
+   "mentions": 16
+  },
+  "607839": {
+   "verdict": "REFUTED",
+   "why": "Host explains the concept theoretically; no direct bullish forward call on SPY.",
+   "mentions": 29
+  },
+  "607939": {
+   "verdict": "REFUTED",
+   "why": "Transcript discusses secular trend investing strategy only; no specific SPY bullish call made.",
+   "mentions": 0
+  },
+  "607942": {
+   "verdict": "REFUTED",
+   "why": "Host warns of dividend cut risks; no forward bullish call made on MMM.",
+   "mentions": 1
+  },
+  "608153": {
+   "verdict": "VERIFIED",
+   "quote": "I believe there's a lot more upside to apply materials in the future growth due to their current position within the semiconductor equipment industry",
+   "ts": 690,
+   "why": "Host explicitly states bullish forward view on AMAT's upside potential.",
+   "mentions": 8
+  },
+  "608210": {
+   "verdict": "VERIFIED",
+   "quote": "2025 is really setting up to be one of the best buying opportunities that we've seen",
+   "ts": 9,
+   "why": "Host personally commits to buying stocks during the dip, bullish on broad market recovery.",
+   "mentions": 28
+  },
+  "608225": {
+   "verdict": "REFUTED",
+   "why": "Host explicitly says markets are a buying opportunity and remains optimistic long-term.",
+   "mentions": 5
+  },
+  "608330": {
+   "verdict": "VERIFIED",
+   "quote": "as an insurance policy I also like to buy some Bitcoin",
+   "ts": 858,
+   "why": "Host personally buys Bitcoin as insurance, expressing forward bullish intent.",
+   "mentions": 7
+  },
+  "608333": {
+   "verdict": "VERIFIED",
+   "quote": "I'm putting in about $100 a day into Bitcoin sometimes more sometimes less but that's about my pace",
+   "ts": 1041,
+   "why": "Host actively dollar-cost averages into BTC, signaling ongoing bullish commitment.",
+   "mentions": 3
+  },
+  "608338": {
+   "verdict": "VERIFIED",
+   "quote": "first stimulus packages AK money printers typically mean asset values go up means we're probably going to see stock prices in the US go up as well",
+   "ts": 364,
+   "why": "Host directly predicts US stock prices will rise due to China stimulus.",
+   "mentions": 15
+  },
+  "608566": {
+   "verdict": "VERIFIED",
+   "quote": "Bitcoin just graduated with honors. It should no longer be dismissed as a Ponzi scheme or get-richqu scam. It is now recognized as a strategic asset sitting alongside oil, gold, and yes, even that 1.4 billion pounds of cheese in Missou's caves.",
+   "ts": 457,
+   "why": "Host endorses Bitcoin as legitimate strategic asset, implying bullish forward outlook.",
+   "mentions": 47
+  },
+  "608573": {
+   "verdict": "VERIFIED",
+   "quote": "I'll keep dollar cost averaging into Bitcoin. And on weeks like the one we just had, I'll buy a little bit of extra, which is what I just did, at a discount.",
+   "ts": 820,
+   "why": "Host commits to ongoing BTC purchases and bought more recently, a forward bullish stance.",
+   "mentions": 3
+  },
+  "608567": {
+   "verdict": "VERIFIED",
+   "quote": "but here's where things take an even crazier turn because as unbelievable as $444,000 sounds there's actual real evidence to suggest this number could be possible for this cycle",
+   "ts": 534,
+   "why": "Host endorses BTC reaching $444k this cycle as plausible, bullish forward call.",
+   "mentions": 25
+  },
+  "608585": {
+   "verdict": "REFUTED",
+   "why": "Host explains Japan macro mechanics; no direct forward bearish call on SPY made.",
+   "mentions": 16
+  },
+  "608618": {
+   "verdict": "INSUFFICIENT",
+   "why": "Host analyzes NKE problems and CEO change but makes no committed forward bullish call.",
+   "mentions": 26
+  },
+  "608632": {
+   "verdict": "INSUFFICIENT",
+   "why": "Transcript cuts off before conclusion; host presents positive data but no explicit forward buy call found.",
+   "mentions": 9
+  },
+  "608642": {
+   "verdict": "REFUTED",
+   "why": "Host recaps past performance of Mitsubishi UFJ shares; no forward bullish call made.",
+   "mentions": 0
+  },
+  "608651": {
+   "verdict": "VERIFIED",
+   "quote": "Starbucks is one that we like there the stocks at an alltime um 52- we low right now I like the company love it but they've got a lot of locations in China and China's a big expansion uh plan for them if if they can't if they can't do that then then their earnings are going to suffer going forward",
+   "ts": 2611,
+   "why": "Host says SBUX earnings will suffer if China expansion fails; bearish forward call.",
+   "mentions": 4
+  },
+  "608654": {
+   "verdict": "VERIFIED",
+   "quote": "the PE ratio for the S&P 500 is 275 right now an absolute huge number and that's about two standard deviations away from the mean so the the valuation metrics that are that that that we can start seeing are at alltime highs or or of or at the outer bounds of what is considered fair value",
+   "ts": 715,
+   "why": "Host flags S&P 500 at extreme overvaluation, implying bearish forward outlook.",
+   "mentions": 52
+  },
+  "608692": {
+   "verdict": "REFUTED",
+   "why": "Host sold AMZN after a profitable bullish trade, not a forward bearish call.",
+   "mentions": 5
+  },
+  "608716": {
+   "verdict": "VERIFIED",
+   "quote": "if we have no rate cuts in 2024 the stock market has to have a pullback like a small pullback to price in that we're going to have rate Cuts so a small pullback not anything crazy not a 20% market crash just a very small pullback",
+   "ts": 207,
+   "why": "Host directly predicts a pullback on the broad market (S&P) as a forward call.",
+   "mentions": 39
+  },
+  "608878": {
+   "verdict": "REFUTED",
+   "why": "LRCX mentioned by name only once as Fab Five member; no forward bullish call made.",
+   "mentions": 0
+  },
+  "608920": {
+   "verdict": "REFUTED",
+   "why": "Host describes neutral/positive outlook; no bearish forward call on SNPS found.",
+   "mentions": 0
+  },
+  "609159": {
+   "verdict": "VERIFIED",
+   "quote": "maybe Starbucks and Nike and new stocks are going much much much higher from here",
+   "ts": 361,
+   "why": "Host's own contrarian forward thesis: SBUX goes much higher as recession already priced in.",
+   "mentions": 6
+  },
+  "609246": {
+   "verdict": "REFUTED",
+   "why": "Host calls China issues a short-term headwind; maintains bullish long-term AMAT thesis explicitly.",
+   "mentions": 24
+  },
+  "609405": {
+   "verdict": "REFUTED",
+   "why": "Host discusses crash preparation and dividend strategy, no forward bullish call on SPY.",
+   "mentions": 35
+  },
+  "609432": {
+   "verdict": "INSUFFICIENT",
+   "why": "Transcript cuts off mid-analysis before host delivers any directional conclusion on NKE.",
+   "mentions": 21
+  },
+  "609447": {
+   "verdict": "REFUTED",
+   "why": "Host discusses Vici Properties (VICI), not VTR; no VTR mention found.",
+   "mentions": 0
+  },
+  "609971": {
+   "verdict": "VERIFIED",
+   "quote": "staying away from stocks just because they're at all-time highs can be one of the biggest mistakes you can make",
+   "ts": 90,
+   "why": "Host directly argues investing in market at all-time highs (SPY) is correct, bullish call.",
+   "mentions": 23
+  },
+  "610051": {
+   "verdict": "VERIFIED",
+   "quote": "this is 80% down during the 1930s this is 50% down in the 1970s and stocks going nowhere for more than a decade this can happen",
+   "ts": 615,
+   "why": "Host warns stocks could drop 50-80% and go nowhere for decades, bearish on broad market.",
+   "mentions": 4
+  },
+  "610092": {
+   "verdict": "VERIFIED",
+   "quote": "compare this 5.3% with the 1.29 1.3 sap 500 dividend yield and in case that this becomes too low for the market and they require 5% yield the stock market crashes 75%",
+   "ts": 101,
+   "why": "Host warns S&P 500 could crash 75% if yield requirements rise, implying bearish forward call.",
+   "mentions": 11
+  },
+  "610100": {
+   "verdict": "VERIFIED",
+   "quote": "I very recently revised my fair value to $58 per share.",
+   "ts": 44,
+   "why": "Host explicitly states personal bearish fair value of $58, matching stored prediction.",
+   "mentions": 57
+  },
+  "610225": {
+   "verdict": "REFUTED",
+   "why": "Host reports Buffett sold AAPL; no host-originated bearish forward call on AAPL.",
+   "mentions": 1
+  },
+  "610227": {
+   "verdict": "VERIFIED",
+   "quote": "I would consider Intel a cell of course anything can happen Intel can be a plus 100% in the next 12 months if something happens in China if things improve that is always a risk but from a clear mind not anchoring the situation to the price you paid wait for a partial recovery to recoup some of that money that's anchoring that's pure behavioral Finance I would not consider Intel a thing to play now with unfortunately",
+   "ts": 719,
+   "why": "Host explicitly calls Intel a sell from value investing perspective, not third-party speech.",
+   "mentions": 24
+  },
+  "610229": {
+   "verdict": "REFUTED",
+   "why": "Host is bearish on SPY, calling valuations crazy and risk/reward poor.",
+   "mentions": 21
+  },
+  "610228": {
+   "verdict": "VERIFIED",
+   "quote": "when it comes to the S&P 500 this is a great asset it is the best businesses in the world no question about it but at the current moment in time people know that the FED is printing and therefore they all seeking protection however you are paying if you look at the dividend yield the most expensive price for owning those great businesses in history the only similar time was the 2000.com bubble",
+   "ts": 316,
+   "why": "Host calls S&P 500 at its most expensive valuation ever, comparable to dot-com bubble, implying bearish outlook.",
+   "mentions": 4
+  },
+  "610241": {
+   "verdict": "VERIFIED",
+   "quote": "the average p ratio for the S&P 500 historical perspective should be 15 and that means a 50% crash for stocks",
+   "ts": 311,
+   "why": "Host directly predicts 50% crash in S&P 500 if valuations revert to historical mean.",
+   "mentions": 10
+  },
+  "610235": {
+   "verdict": "REFUTED",
+   "why": "Host warns about AI bubble generally; no specific bearish call on QQQ ticker.",
+   "mentions": 0
+  },
+  "610354": {
+   "verdict": "VERIFIED",
+   "quote": "the S&P 500 is down 50% to 3,000 points just from normalization of the financial environment",
+   "ts": 340,
+   "why": "Host directly states S&P 500 drops 50%, a clear bearish forward call.",
+   "mentions": 22
+  },
+  "610356": {
+   "verdict": "VERIFIED",
+   "quote": "I think the market signals are pretty clear even Powell was a little bit more considerate about rate Cuts etc etc and if he cannot cut rates that's a game Cher for the whole stock market because if the 10year treasury just goes to a normal level of 5 6% at nominal GDP then the expected return from stock goes to 7% compared to the historical normality and the current situation that's 50% down just from a normalization of the market",
+   "ts": 95,
+   "why": "Host directly predicts 50% market drop from rate normalization, bearish on broad US stocks.",
+   "mentions": 12
+  },
+  "610590": {
+   "verdict": "REFUTED",
+   "why": "Host describes inelastic market dynamics and risks; no committed forward bullish call on SPY.",
+   "mentions": 24
+  },
+  "610530": {
+   "verdict": "REFUTED",
+   "why": "Host celebrates portfolio gains and inflation news but makes no forward bullish call on SPY specifically.",
+   "mentions": 16
+  },
+  "610604": {
+   "verdict": "VERIFIED",
+   "quote": "if I revert to the earnings yield or even to the mean then we are in for a big crash even bigger I would not be surprised if the market corrects to 3,000 points which is 50% down",
+   "ts": 438,
+   "why": "Host explicitly forecasts 50% S&P 500 decline, a direct bearish call on broad US equities.",
+   "mentions": 13
+  },
+  "610702": {
+   "verdict": "REFUTED",
+   "why": "SLI never mentioned; host discusses sector and other companies only.",
+   "mentions": 0
+  },
+  "610606": {
+   "verdict": "VERIFIED",
+   "quote": "we are now at 38 and there were times when the Schiller p ratio was below 10 for long periods of time and even during the 2009 crash so the market will always get too exuberant when things are good and too panicky when things are bad",
+   "ts": 212,
+   "why": "Host warns of extreme overvaluation at Shiller PE 38, implying severe forward downside for US equities.",
+   "mentions": 4
+  },
+  "610706": {
+   "verdict": "REFUTED",
+   "why": "Host never makes a personal bearish call on SPY; only discusses Buffett's actions.",
+   "mentions": 10
+  },
+  "610707": {
+   "verdict": "VERIFIED",
+   "quote": "I'm not investing in US high priced stocks there are some cheap stocks but okay let's compare the bare versus bull thesis we have been optimism 60% up since the last two years that leads to extremely high valuations top 10 things change over time reflexivity works on the upside but also on the downside which makes things very risky and most likely returns will be negative for the next decade or two",
+   "ts": 590,
+   "why": "Host explicitly calls it a bubble, refuses US stocks, predicts negative returns for next decade.",
+   "mentions": 40
+  },
+  "610708": {
+   "verdict": "REFUTED",
+   "why": "Host calls BTC speculative, not a forward bullish call; expresses skepticism.",
+   "mentions": 4
+  },
+  "610712": {
+   "verdict": "VERIFIED",
+   "quote": "if Fields go to 5% s SP 500 will go to 5,000 not 7,000",
+   "ts": 486,
+   "why": "Host predicts SPY lower than prior bullish target if rates rise to 5%.",
+   "mentions": 7
+  },
+  "610779": {
+   "verdict": "VERIFIED",
+   "quote": "the sap is to standard deviations overvalued from a historical perspective",
+   "ts": 186,
+   "why": "Host personally states S&P 500 is overvalued, implying bearish outlook on broad market.",
+   "mentions": 21
+  },
+  "611019": {
+   "verdict": "REFUTED",
+   "why": "Host discusses weak/growth stocks generally; IVW ETF never named or directly called bearish.",
+   "mentions": 36
+  },
+  "611034": {
+   "verdict": "VERIFIED",
+   "quote": "i think inflation will go down over the course of 2022 and i think it will be lower by the end of 2022 than it is today",
+   "ts": 394,
+   "why": "Host directly predicts inflation falling, implying bullish SPY outlook.",
+   "mentions": 11
+  },
+  "611075": {
+   "verdict": "REFUTED",
+   "why": "Transcript covers AVGO and a bank stock; no SCHD mention found.",
+   "mentions": 13
+  },
+  "611151": {
+   "verdict": "REFUTED",
+   "why": "Host only explains Howard Marks' thesis; no direct bearish SPY call made.",
+   "mentions": 1
+  },
+  "612380": {
+   "verdict": "VERIFIED",
+   "quote": "the S&P 500 is going to return 10 15 20% per year and it's going to give you outsized returns if you just give it time and you be patient",
+   "ts": 314,
+   "why": "Host directly predicts long-term S&P 500 gains, bullish forward call.",
+   "mentions": 58
+  },
+  "612472": {
+   "verdict": "INSUFFICIENT",
+   "why": "judge failed: Extra data: line 3 column 1 (char 120)",
+   "mentions": 59,
+   "substring_fail": true
+  },
+  "612463": {
+   "verdict": "REFUTED",
+   "why": "Host leans cautious-bullish (buy panic dips); no committed neutral/hold call on SPY.",
+   "mentions": 49
+  },
+  "612540": {
+   "verdict": "REFUTED",
+   "why": "No direct bullish SPY call; host discusses global diversification preference over S&P 500.",
+   "mentions": 23
+  },
+  "612532": {
+   "verdict": "VERIFIED",
+   "quote": "If you were willing to buy the S&P when prices were 20% higher, then surely you'd be willing to buy the S&P at these cheaper prices.",
+   "ts": 588,
+   "why": "Host directly encourages buying S&P (SPY proxy) at current lower prices, bullish forward call.",
+   "mentions": 22
+  },
+  "612868": {
+   "verdict": "VERIFIED",
+   "quote": "all the indicators are flashing red it doesn't mean that we're going to have a massive market crash or a massive recession but the odds of the likelihood of this happening are rising and rising by the day therefore i would not personally be following into the bear market rallies",
+   "ts": 244,
+   "why": "Host warns against bear market rallies, signals rising crash odds\u2014committed bearish SPY call.",
+   "mentions": 8
+  },
+  "612778": {
+   "verdict": "VERIFIED",
+   "quote": "the nasdaq is full of highly valued growth-oriented stocks and that's exactly what's going to suffer the most during a period of rising interest rates where company earnings will go down which raises their already lofty valuations and growth is going to slow down as well which will make them even less attractive kind of a perfect storm for those type of stocks to really struggle",
+   "ts": 412,
+   "why": "Host directly states growth stocks face perfect storm of rising rates and slowing growth.",
+   "mentions": 2
+  },
+  "612882": {
+   "verdict": "REFUTED",
+   "why": "Video recaps past 2022 crash calls; no forward bearish call on SPY made here.",
+   "mentions": 28
+  },
+  "613151": {
+   "verdict": "REFUTED",
+   "why": "All bearish SPY calls are attributed to Michael Burry's tweets; host only narrates.",
+   "mentions": 6
+  },
+  "613221": {
+   "verdict": "REFUTED",
+   "why": "Host explains bond mechanics and risks but makes no committed forward bearish call on TLT.",
+   "mentions": 39
+  },
+  "613191": {
+   "verdict": "REFUTED",
+   "why": "Host only relays Charlie Munger's views; makes no forward bearish call on SPY himself.",
+   "mentions": 23
+  },
+  "613774": {
+   "verdict": "REFUTED",
+   "why": "Host asks questions; no forward bullish call on SPY made by Joseph Carlson.",
+   "mentions": 14
+  },
+  "613780": {
+   "verdict": "REFUTED",
+   "why": "Host analyzes rising risk appetite and stretched valuations; no forward bullish call on SPY.",
+   "mentions": 23
+  },
+  "614101": {
+   "verdict": "REFUTED",
+   "why": "No forward bullish call on SPY; discussion covers individual stocks only.",
+   "mentions": 98
+  },
+  "614162": {
+   "verdict": "REFUTED",
+   "why": "Host discusses Berkshire Hathaway, not SPY/broad market; no forward bullish call on SPY.",
+   "mentions": 10
+  },
+  "614262": {
+   "verdict": "REFUTED",
+   "why": "Host only recaps Munger's comments; no host forward bearish call on SPY.",
+   "mentions": 1
+  },
+  "614447": {
+   "verdict": "REFUTED",
+   "why": "No forward bullish call on SPY; host discusses personal portfolio and real estate holdings.",
+   "mentions": 23
+  },
+  "614977": {
+   "verdict": "VERIFIED",
+   "quote": "what is most common when you hit all-time highs in the market? You hit more all-time highs in the market.",
+   "ts": 193,
+   "why": "Host argues market hitting all-time highs leads to more highs, bullish on broad market/SPY.",
+   "mentions": 48
+  },
+  "615011": {
+   "verdict": "REFUTED",
+   "why": "No forward bullish call on SPY; host discusses small caps, MJ stocks, ELF, Celsius, Planet.",
+   "mentions": 86
+  },
+  "615017": {
+   "verdict": "REFUTED",
+   "why": "Host discusses Dutch Bros, Trade Desk, Snowflake, Adobe \u2014 no forward bullish call on SPY.",
+   "mentions": 77
+  },
+  "615060": {
+   "verdict": "VERIFIED",
+   "quote": "we're now at a stage where we're getting into an everything bull market.",
+   "ts": 509,
+   "why": "Host directly states market entering everything bull market, bullish on broad equities including SPY.",
+   "mentions": 144
+  },
+  "615590": {
+   "verdict": "REFUTED",
+   "why": "No explicit TLT bullish call; host discusses sectors/ETFs, not TLT bonds.",
+   "mentions": 9
+  },
+  "615586": {
+   "verdict": "REFUTED",
+   "why": "Host is actively buying equities during the dip, not making a bearish forward call on SPY.",
+   "mentions": 39
+  },
+  "615592": {
+   "verdict": "REFUTED",
+   "why": "Host is bullish on NVDA long-term, not neutral; holds shares, expects major upside.",
+   "mentions": 30
+  },
+  "615591": {
+   "verdict": "REFUTED",
+   "why": "Host uses AAPL only as tax-avoidance example; no forward directional call made.",
+   "mentions": 10
+  },
+  "615593": {
+   "verdict": "REFUTED",
+   "why": "Transcript discusses tax avoidance generally; no mention of AMZN or bullish call.",
+   "mentions": 0
+  },
+  "615594": {
+   "verdict": "REFUTED",
+   "why": "Host recaps a past warning 6 months ago, not a new forward bearish call.",
+   "mentions": 3
+  },
+  "615595": {
+   "verdict": "VERIFIED",
+   "quote": "I still personally think that it's attractive by the way I just added some more shares uh a few days ago on Amazon",
+   "ts": 516,
+   "why": "Host explicitly calls Amazon attractive and confirms recent personal purchase.",
+   "mentions": 5
+  },
+  "615596": {
+   "verdict": "VERIFIED",
+   "quote": "we can expect that in the next 12 months the stock market could uh potentially go up another 15%",
+   "ts": 576,
+   "why": "Host makes forward bullish call on stock market (S&P 500/SPY) after Fed cuts.",
+   "mentions": 82
+  },
+  "615598": {
+   "verdict": "REFUTED",
+   "why": "Host discusses TBT mechanics implicitly but never names TBT or makes a direct bullish call.",
+   "mentions": 0
+  },
+  "615599": {
+   "verdict": "REFUTED",
+   "why": "PFE mentioned only as generic big Pharma example; no forward bullish call made.",
+   "mentions": 0
+  },
+  "615601": {
+   "verdict": "VERIFIED",
+   "quote": "I remain bullish that I think that this boot Market is still having room to run",
+   "ts": 550,
+   "why": "Host explicitly states bullish stance on broad market (S&P/SPY) with room to run.",
+   "mentions": 23
+  },
+  "615600": {
+   "verdict": "REFUTED",
+   "why": "AAPL never mentioned; host discusses Amazon, Meta, Alphabet, Microsoft, Nvidia only.",
+   "mentions": 0
+  },
+  "615603": {
+   "verdict": "REFUTED",
+   "why": "Host clearly favors Nvidia over AMD; no neutral call on AMD made.",
+   "mentions": 52
+  },
+  "615604": {
+   "verdict": "VERIFIED",
+   "quote": "I believe that in 2025 will be the year where you know AI agents will go to the next level and that's where paler would be the you know kind of like the operating system defecto platform for AI agents in the future",
+   "ts": 1034,
+   "why": "Host explicitly names Palantir as future AI agent OS platform, a forward bullish call.",
+   "mentions": 0
+  },
+  "615606": {
+   "verdict": "REFUTED",
+   "why": "Host discusses NVDA only as past example; no forward neutral call made.",
+   "mentions": 15
+  },
+  "615607": {
+   "verdict": "REFUTED",
+   "why": "Amazon mentioned only as example delivery service; no bullish forward call on AMZN stock.",
+   "mentions": 2
+  }
+ }
+}
