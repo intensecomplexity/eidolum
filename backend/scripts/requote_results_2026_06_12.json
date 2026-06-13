@@ -1,0 +1,2782 @@
+{
+ "generated": "2026-06-12",
+ "ship": "quote-representativeness re-quote (evidence-only)",
+ "cohort": "precision = (b) opposite-direction 261 + truly-orphan (a) 106 = 367 visible scored youtube_haiku_v1 ticker_call rows",
+ "fetch": {
+  "ok": 208,
+  "transient": 19,
+  "terminal": 0
+ },
+ "run2_unjudged_ids": [
+  614049,
+  609122,
+  611101,
+  609456,
+  606243,
+  609874,
+  607005,
+  606368,
+  608891,
+  607008,
+  608888,
+  606900,
+  625621,
+  626021,
+  626848,
+  606871,
+  609457,
+  612655,
+  609957,
+  607017,
+  612538,
+  608890,
+  627565
+ ],
+ "verdicts": {
+  "606315": {
+   "verdict": "INSUFFICIENT",
+   "flag": "a_orphan",
+   "why": "transcript terminal: unrecoverable"
+  },
+  "611200": {
+   "verdict": "INSUFFICIENT",
+   "flag": "a_orphan",
+   "why": "transcript terminal: unrecoverable"
+  },
+  "609321": {
+   "verdict": "INSUFFICIENT",
+   "flag": "b",
+   "why": "transcript terminal: unrecoverable"
+  },
+  "608290": {
+   "verdict": "INSUFFICIENT",
+   "flag": "b",
+   "why": "transcript terminal: unrecoverable"
+  },
+  "607423": {
+   "verdict": "INSUFFICIENT",
+   "flag": "b",
+   "why": "transcript terminal: unrecoverable"
+  },
+  "607790": {
+   "verdict": "INSUFFICIENT",
+   "flag": "b",
+   "why": "transcript terminal: unrecoverable"
+  },
+  "614627": {
+   "verdict": "INSUFFICIENT",
+   "flag": "b",
+   "why": "transcript terminal: unrecoverable"
+  },
+  "606978": {
+   "verdict": "INSUFFICIENT",
+   "flag": "b",
+   "why": "transcript terminal: unrecoverable"
+  },
+  "606895": {
+   "verdict": "INSUFFICIENT",
+   "flag": "b",
+   "why": "transcript terminal: unrecoverable"
+  },
+  "608707": {
+   "verdict": "INSUFFICIENT",
+   "flag": "b",
+   "why": "transcript terminal: unrecoverable"
+  },
+  "610165": {
+   "verdict": "INSUFFICIENT",
+   "flag": "b",
+   "why": "transcript terminal: unrecoverable"
+  },
+  "605708": {
+   "verdict": "INSUFFICIENT",
+   "flag": "b",
+   "why": "transcript terminal: unrecoverable"
+  },
+  "610943": {
+   "verdict": "INSUFFICIENT",
+   "flag": "b",
+   "why": "transcript terminal: unrecoverable"
+  },
+  "611045": {
+   "verdict": "INSUFFICIENT",
+   "flag": "b",
+   "why": "transcript terminal: unrecoverable"
+  },
+  "606246": {
+   "verdict": "INSUFFICIENT",
+   "flag": "a_orphan",
+   "why": "transcript terminal: unrecoverable"
+  },
+  "607788": {
+   "verdict": "INSUFFICIENT",
+   "flag": "b",
+   "why": "transcript terminal: unrecoverable"
+  },
+  "608997": {
+   "verdict": "INSUFFICIENT",
+   "flag": "b",
+   "why": "transcript terminal: unrecoverable"
+  },
+  "606360": {
+   "verdict": "INSUFFICIENT",
+   "flag": "b",
+   "why": "transcript terminal: unrecoverable"
+  },
+  "608444": {
+   "verdict": "INSUFFICIENT",
+   "flag": "b",
+   "why": "transcript terminal: unrecoverable"
+  },
+  "608159": {
+   "verdict": "INSUFFICIENT",
+   "flag": "b",
+   "why": "transcript terminal: unrecoverable"
+  },
+  "609445": {
+   "verdict": "INSUFFICIENT",
+   "flag": "b",
+   "why": "transcript terminal: unrecoverable"
+  },
+  "609322": {
+   "verdict": "INSUFFICIENT",
+   "flag": "b",
+   "why": "transcript terminal: unrecoverable"
+  },
+  "614831": {
+   "verdict": "INSUFFICIENT",
+   "flag": "a_orphan",
+   "why": "transcript terminal: unrecoverable"
+  },
+  "611082": {
+   "verdict": "INSUFFICIENT",
+   "flag": "b",
+   "why": "transcript terminal: unrecoverable"
+  },
+  "608734": {
+   "verdict": "INSUFFICIENT",
+   "flag": "b",
+   "why": "transcript terminal: unrecoverable"
+  },
+  "612298": {
+   "verdict": "INSUFFICIENT",
+   "flag": "a_orphan",
+   "why": "transcript terminal: unrecoverable"
+  },
+  "607133": {
+   "verdict": "REQUOTE",
+   "quote": "this is the food and poultry giant Tyson Food scker symbol TSN which just like metronic this is a beaten down leader that nobody seems to think can overcome some of these short-term hurdles",
+   "ts": 277,
+   "names_ticker": true,
+   "flag": "b",
+   "why": "Host frames TSN as beaten-down leader worth buying, mirroring bullish MDT thesis."
+  },
+  "608671": {
+   "verdict": "REQUOTE",
+   "quote": "ConocoPhillips oil is cyclical just look at this and then look at where do you want to buy a cyclical at the bottom of the cycle or you prefer buying at the top of the cycle where you will get better returns I think that explains everything you need to know with oil stocks now and the losses here tell me that kanako has either shorter term oil fields or higher costs but therefore the high volatility in the stock price and also the volatility in net income",
+   "ts": 273,
+   "names_ticker": false,
+   "flag": "b",
+   "why": "Host implies COP is at cycle top with high costs, signaling poor forward returns."
+  },
+  "616474": {
+   "verdict": "REQUOTE",
+   "quote": "Palunteer the company will continue to grow and grow profits, but PLTR the stock will most likely fall.",
+   "ts": 1166,
+   "names_ticker": true,
+   "flag": "b",
+   "why": "Host explicitly predicts PLTR stock will fall despite company growth."
+  },
+  "607281": {
+   "verdict": "REQUOTE",
+   "quote": "as long as I have Alternatives like Amazon to invest in Costco will continue to be of pretty much little to no interest for me",
+   "ts": 244,
+   "names_ticker": true,
+   "flag": "b",
+   "why": "Names Costco explicitly and states clear bearish dismissal; current quote is truncated."
+  },
+  "616226": {
+   "verdict": "REQUOTE",
+   "quote": "keep in mind guys nothing has gone wrong fundamentally with shopify the business is still roaring on all cylinders",
+   "ts": 188,
+   "names_ticker": true,
+   "flag": "b",
+   "why": "Host explicitly states Shopify fundamentals intact and praises insanely low valuation."
+  },
+  "608675": {
+   "verdict": "REQUOTE",
+   "quote": "atnt dividend isn't holding the stock up okay there was the Warner Bros spin Etc but the key factor here is that so if you have 123 billion on that with interest rates going higher they now still have low interest rates so the cash flow is there but this cash flow can get 50 down as interest rates go up which then means another dividend cut which then means more risk so again not interested into it",
+   "ts": 436,
+   "names_ticker": false,
+   "flag": "b",
+   "why": "Host warns AT&T cash flow could drop 50%, causing dividend cuts; explicitly not interested."
+  },
+  "606413": {
+   "verdict": "REQUOTE",
+   "quote": "a stock like Microsoft you only had about a couple months during 2020 to buy it before it raced back up to all-time highs",
+   "ts": 559,
+   "names_ticker": true,
+   "flag": "b",
+   "why": "Host implies MSFT recovers quickly, signaling bullish conviction on quality"
+  },
+  "616227": {
+   "verdict": "REQUOTE",
+   "quote": "has a trailing p e ratio of 14 right now like come on for meta really",
+   "ts": 207,
+   "names_ticker": true,
+   "flag": "b",
+   "why": "Host expresses disbelief at cheap valuation (P/E 14), implicit bullish call; names company."
+  },
+  "608463": {
+   "verdict": "REQUOTE",
+   "quote": "I'm still very bullish and very optimistic about this company and I thought this was a fantastic earnings report",
+   "ts": 785,
+   "names_ticker": false,
+   "flag": "b",
+   "why": "Host explicitly states bullish conviction on Netflix after earnings review"
+  },
+  "612643": {
+   "verdict": "DIRECTION_MISMATCH",
+   "quote": "are we going to go to new higher highs? And I think the answer is yes.",
+   "ts": 634,
+   "mismatch_kind": "opposite",
+   "flag": "b",
+   "labeled_direction": "bearish",
+   "ticker": "SOL",
+   "why": "Host recommends swing trade buy at 105 and expects new higher highs on SOL."
+  },
+  "606944": {
+   "verdict": "REQUOTE",
+   "quote": "to me Texas Instruments is a weight right now that price will definitely come down and if you're comfortable buying into it once it gets below that 146 145 pick up some shares",
+   "ts": 435,
+   "names_ticker": false,
+   "flag": "b",
+   "why": "Host explicitly calls TXN a weight with price declining, bearish committed call."
+  },
+  "610147": {
+   "verdict": "REQUOTE",
+   "quote": "I'm buying put options on the NASDAQ on QQQ. So if we do have some kind of a pullback this way, I'm up 32%, I maybe if we keep going up then I lose some percentage of gain and then you know I lose on them. But if I if we don't if we go back down then I that's why I'm hedging my portfolio.",
+   "ts": 604,
+   "names_ticker": true,
+   "flag": "b",
+   "why": "Host explicitly buys QQQ put options expecting pullback, confirming bearish hedge."
+  },
+  "606412": {
+   "verdict": "DIRECTION_MISMATCH",
+   "quote": "focus on quality perhaps a company like Visa could fall to $200 or $230 I know I'll be buying a lot then",
+   "ts": 517,
+   "mismatch_kind": "opposite",
+   "flag": "b",
+   "labeled_direction": "bearish",
+   "ticker": "V",
+   "why": "Host frames price drop as buying opportunity; intent is bullish accumulation, not bearish call"
+  },
+  "605666": {
+   "verdict": "REQUOTE",
+   "quote": "micro strategy price should be 445",
+   "ts": 540,
+   "names_ticker": false,
+   "flag": "a_orphan",
+   "why": "Host projects MSTR at $445 if Bitcoin reaches $110k, a clear bullish call."
+  },
+  "605912": {
+   "verdict": "REQUOTE",
+   "quote": "great company still on progress for massive growth so don't give up on this one",
+   "ts": 490,
+   "names_ticker": false,
+   "flag": "a_orphan",
+   "why": "Host explicitly calls ASML a great company with massive growth, staying long."
+  },
+  "606692": {
+   "verdict": "REQUOTE",
+   "quote": "we come to an intrinsic value of 34.30 with a ten percent margin of safety are acceptable by price is sitting at around thirty dollars and eighty seven cents",
+   "ts": 360,
+   "names_ticker": false,
+   "flag": "a_orphan",
+   "why": "Host calculates intrinsic value above current price and personally owns/added shares."
+  },
+  "608129": {
+   "verdict": "REQUOTE",
+   "quote": "my Buy price with Visa is at $295 and the biggest reason here is they just don't grow their free cash flow fast enough to justify their current share price so they would have to come down about 15% before I'd be willing to buy more",
+   "ts": 489,
+   "names_ticker": true,
+   "flag": "b",
+   "why": "Host names Visa, states current price too high, needs 15% drop to buy"
+  },
+  "607598": {
+   "verdict": "REQUOTE",
+   "quote": "I'm seeing double digits returns potential with coke maybe 12 to 133% could be even closer to 15%",
+   "ts": 535,
+   "names_ticker": false,
+   "flag": "a_orphan",
+   "why": "Host explicitly states double-digit return potential on Coke, a clear bullish forward call."
+  },
+  "607797": {
+   "verdict": "REQUOTE",
+   "quote": "I'll continue to be a buyer myself into the New Year",
+   "ts": 462,
+   "names_ticker": false,
+   "flag": "a_orphan",
+   "why": "Host commits to buying EXR into New Year after naming ticker explicitly nearby."
+  },
+  "607804": {
+   "verdict": "REQUOTE",
+   "quote": "it just feels like a very up in theair type of business with also massive competition to where it's just too difficult to predict prct where they'll end up long term so I'm ranking them at the bottom here at number four",
+   "ts": 831,
+   "names_ticker": false,
+   "flag": "b",
+   "why": "Host ranks Sirius at bottom, citing competition and unpredictability \u2014 committed bearish call."
+  },
+  "608215": {
+   "verdict": "REQUOTE",
+   "quote": "give me some of the best companies out there with large dominant businesses preferably market leaders like Metronic, Verizon, Vichy Properties, Extra Space Storage.",
+   "ts": 841,
+   "names_ticker": false,
+   "flag": "a_orphan",
+   "why": "Host explicitly names Medtronic (Metronic) as a dividend stock to buy during downturn."
+  },
+  "608180": {
+   "verdict": "REQUOTE",
+   "quote": "growth is expected to remain at 20% plus through 2028",
+   "ts": 465,
+   "names_ticker": false,
+   "flag": "a_orphan",
+   "why": "Host projects sustained Nvidia revenue growth above 20% through 2028, explicit bullish call."
+  },
+  "608135": {
+   "verdict": "REQUOTE",
+   "quote": "FICO has a three-year annualized return of 51.8% % and now with a share price of $1,698 111 they're trading at quite the premium they have a PE right now of 77.9 my Buy price is at 1,475 so they have a ways to come down almost 15% before I would add them to my portfolio",
+   "ts": 863,
+   "names_ticker": true,
+   "flag": "b",
+   "why": "Host names FICO, calls it premium-priced, sets buy target 15% below current price"
+  },
+  "608672": {
+   "verdict": "REQUOTE",
+   "quote": "Starbucks great business did great for investors over the last 30 years but over the last five years it has been a little bit more volatile as the market doesn't know exactly what the direction will be but with the p ratio of 44 you are expecting that this great growth that has happened over the last year will just continue forever but if I look at the numbers is it really that easy that Starbucks will just 2x in the next seven years which would be something to expect for a p ratio 44 because if they 2x then even if the stock price goes nowhere then the p e ratio in seven years is 15 and if yes they grow they double double ten percent a year for seven years and then they start slowing down then this might be a correct P Eurasia in seven years and you haven't made any money because of the valuation contraction so again that makes it risky nothing wrong with the business nothing wrong with you paying six dollars for a frappuccino that kills you faster but the p ratio is simply too high for me",
+   "ts": 309,
+   "names_ticker": true,
+   "flag": "a_orphan",
+   "why": "Host names Starbucks explicitly, calls P/E 44 too high, implies overvaluation risk."
+  },
+  "608613": {
+   "verdict": "REQUOTE",
+   "quote": "if a company's return on invested capital is not greater than their weighted average cost of capital they're actually destroying shareholder value so that's a big concern for Verizon",
+   "ts": 377,
+   "names_ticker": true,
+   "flag": "b",
+   "why": "Host explicitly names Verizon and calls ROIC a structural bearish concern."
+  },
+  "608626": {
+   "verdict": "REQUOTE",
+   "quote": "if we look at the Investor's presentation for epr we can actually see the affo payout sitting at about 71% which I think is very solid for Reit especially a rate that has a yield sitting close to around 7%",
+   "ts": 410,
+   "names_ticker": true,
+   "flag": "a_orphan",
+   "why": "Names EPR, gives specific AFFO figure, calls it very solid \u2014 stronger than current quote"
+  },
+  "608933": {
+   "verdict": "REQUOTE",
+   "quote": "now is a really solid time to consider J&J especially if you're looking for very predictable and stable cash flows",
+   "ts": 848,
+   "names_ticker": false,
+   "flag": "a_orphan",
+   "why": "Host directly recommends buying J&J at current valuation as defensive dividend play"
+  },
+  "609210": {
+   "verdict": "REQUOTE",
+   "quote": "I have a buy price of $540.",
+   "ts": 806,
+   "names_ticker": false,
+   "flag": "a_orphan",
+   "why": "Host sets $540 buy price for MSCI, confirming bullish conviction."
+  },
+  "610787": {
+   "verdict": "REQUOTE",
+   "quote": "I have increased the risk here and lowered the reward because of the baby drill scenario",
+   "ts": 525,
+   "names_ticker": false,
+   "flag": "a_orphan",
+   "why": "Host explicitly increases risk and lowers reward for Exxon, confirming bearish stance"
+  },
+  "609406": {
+   "verdict": "REQUOTE",
+   "quote": "we come to an intrinsic value of $23.25 current price is about $172 so with a 10% margin of safety we get an acceptable Buy price of $191.25",
+   "ts": 246,
+   "names_ticker": false,
+   "flag": "a_orphan",
+   "why": "Host calculates intrinsic value above current price and sets a buy price for Google."
+  },
+  "608673": {
+   "verdict": "REQUOTE",
+   "quote": "everybody loves railroads after this great performance Warren Buffett bought here by 2015 he got back his price in dividends now at this dividend yield the macro Outlook long-term Outlook and everything it will take you 50 years to get your price back in dividends Warren Buffett got it back in seven I rest my case for railroad related questions",
+   "ts": 387,
+   "names_ticker": false,
+   "flag": "b",
+   "why": "Starts at 'railroads' naming the sector; current quote begins mid-sentence losing context."
+  },
+  "608597": {
+   "verdict": "REQUOTE",
+   "quote": "we also have our small bets basket for power and sensor chips now we've kind of stilted towards air test systems and excelis over the last couple of years but those are very tiny positions and we been pretty clear that we have put buying any more of those on hold",
+   "ts": 105,
+   "names_ticker": false,
+   "flag": "a_orphan",
+   "why": "Names excelis/ACLS directly; explicit buying halt is stronger bearish signal than sector quote"
+  },
+  "610068": {
+   "verdict": "REQUOTE",
+   "quote": "I will not invest in a consumer business where yes the cash flows look stable but maybe in five years those will not be as stable there will be ups and downs and that's the risk and reward I prefer more certain cash flows for the long term",
+   "ts": 844,
+   "names_ticker": false,
+   "flag": "b",
+   "why": "Host explicitly states he won't invest in Apple due to unstable future cash flows and low yield."
+  },
+  "610100": {
+   "verdict": "REQUOTE",
+   "quote": "I very recently revised my fair value to $58 per share.",
+   "ts": 44,
+   "names_ticker": false,
+   "flag": "a_orphan",
+   "why": "Host states bearish fair value of $58, below then-current price, confirming bearish stance."
+  },
+  "610594": {
+   "verdict": "REQUOTE",
+   "quote": "you are now buying the second most expensive Market in history only once was it more expensive in the dot bubble we know how that ended",
+   "ts": 69,
+   "names_ticker": false,
+   "flag": "b",
+   "why": "Host directly states market is second-most expensive ever, implying bearish outlook on SPY"
+  },
+  "608125": {
+   "verdict": "REQUOTE",
+   "quote": "at a $245 share price I think they're trading very high right now and my Buy price for them would be $190 they would have to come down nearly 23% in price before I even consider buying more",
+   "ts": 323,
+   "names_ticker": false,
+   "flag": "b",
+   "why": "Host explicitly states Apple trades too high, needs 23% drop before buying."
+  },
+  "609117": {
+   "verdict": "REQUOTE",
+   "quote": "I own McDonald's at 244 I'm up like 6% or 6 and a half% on McDonald's but all the stocks are starting to move",
+   "ts": 356,
+   "names_ticker": false,
+   "flag": "a_orphan",
+   "why": "Host owns MCD, profits rising, thesis confirmed; current quote is already the best sentence."
+  },
+  "609102": {
+   "verdict": "REQUOTE",
+   "quote": "I really like McDonald's over here",
+   "ts": 472,
+   "names_ticker": false,
+   "flag": "a_orphan",
+   "why": "Host expresses clear bullish conviction on MCD at 20x earnings fair value"
+  },
+  "610703": {
+   "verdict": "REQUOTE",
+   "quote": "I think it will lead to low mid to long-term returns and therefore it is low reward high risk",
+   "ts": 174,
+   "names_ticker": false,
+   "flag": "b",
+   "why": "Host explicitly calls NVDA low reward high risk, a clear bearish forward call."
+  },
+  "608183": {
+   "verdict": "REQUOTE",
+   "quote": "Well, you can be sure that I am buying this one, too. It's one of my really favorite stocks at the moment.",
+   "ts": 470,
+   "names_ticker": false,
+   "flag": "b",
+   "why": "Host explicitly states buying SMG and calls it a favorite stock, confirming bullish call."
+  },
+  "610784": {
+   "verdict": "REQUOTE",
+   "quote": "maybe we are just looking for a two-year return to normality for margins higher competition with these businesses which then would lead to maybe five earnings per share p ratio 15 and and that's 75 stock price so that is still a potential for 50% down here",
+   "ts": 256,
+   "names_ticker": false,
+   "flag": "b",
+   "why": "Host explicitly models 50% downside to $75 via normalized margins and lower EPS"
+  },
+  "608480": {
+   "verdict": "REQUOTE",
+   "quote": "And again, Amazon along with Microsoft, those two are in the best positions to deliver those AI services out to customers. And that's why I love those two stocks. They're two of my absolute biggest holdings in my portfolio.",
+   "ts": 642,
+   "names_ticker": true,
+   "flag": "b",
+   "why": "Host explicitly names Microsoft, calls it a top holding, expresses strong bullish conviction."
+  },
+  "605986": {
+   "verdict": "REQUOTE",
+   "quote": "this is not a company that we should be buying now",
+   "ts": 315,
+   "names_ticker": false,
+   "flag": "b",
+   "why": "Host concludes PEP trades above intrinsic value and is not worth buying."
+  },
+  "610585": {
+   "verdict": "REQUOTE",
+   "quote": "if there is a recession like dra Miller and everyone is saying end 20125 exactly because no one is expecting it then Ford's numbers that now look good the 5 billion cash flows look terrible and they lose 5 billion from electric cars 5 billion from everyone else's car and that's 10 billion and that's a huge hit",
+   "ts": 250,
+   "names_ticker": false,
+   "flag": "a_orphan",
+   "why": "Host names Ford, forecasts terrible cash flows and $10B hit in recession scenario"
+  },
+  "610083": {
+   "verdict": "REQUOTE",
+   "quote": "I don't think the risk justifies the potential reward",
+   "ts": 664,
+   "names_ticker": false,
+   "flag": "a_orphan",
+   "why": "Host explicitly states NVDA risk/reward unfavorable, a clear bearish stance"
+  },
+  "608132": {
+   "verdict": "REQUOTE",
+   "quote": "at a price of $543 I do think they're trading at a bit of a premium right now I'm willing to buy into KAC at $670 they would have to fall by almost 12% before I consider adding them to my portfolio",
+   "ts": 718,
+   "names_ticker": false,
+   "flag": "b",
+   "why": "Host explicitly says KAC trades at a premium and must fall ~12% before buying."
+  },
+  "610079": {
+   "verdict": "REQUOTE",
+   "quote": "thinking about Nvidia compared to the nifty50 of the 1960s 70s and 1929 the weight of the large lest companies is extremely high yet history is not on their side",
+   "ts": 497,
+   "names_ticker": true,
+   "flag": "b",
+   "why": "Names Nvidia explicitly, bearish via historical overvaluation comparison; stronger than current quote"
+  },
+  "607457": {
+   "verdict": "REQUOTE",
+   "quote": "there's way too many potential red flags with this company right now the lawsuits are definitely in danger and I definitely don't want to buy a company that can't sustain growing dividend payments and might not be able to sustain their dividend payments at all so this is definitely not a company on my radar",
+   "ts": 943,
+   "names_ticker": false,
+   "flag": "b",
+   "why": "Host explicitly rejects MMM due to lawsuit risks and unsustainable dividends."
+  },
+  "606565": {
+   "verdict": "REQUOTE",
+   "quote": "we've also added to Arcadium lithium alt M Air Products and chemicals APD shift four ticker symbol for f r and on running on on",
+   "ts": 861,
+   "names_ticker": false,
+   "flag": "a_orphan",
+   "why": "Host states 'added to...on running on on' \u2014 buying more is a bullish action"
+  },
+  "607021": {
+   "verdict": "REQUOTE",
+   "quote": "I do think there are much better stocks to buy in today's market than Broadcom right now.",
+   "ts": 140,
+   "names_ticker": true,
+   "flag": "b",
+   "why": "Host explicitly favors other stocks over Broadcom, a bearish relative call."
+  },
+  "606457": {
+   "verdict": "REQUOTE",
+   "quote": "rivan is not a sustainable business and there is a lot of execution risk",
+   "ts": 296,
+   "names_ticker": false,
+   "flag": "a_orphan",
+   "why": "Host explicitly calls RIVN unsustainable with execution risk, clear bearish stance."
+  },
+  "610789": {
+   "verdict": "DIRECTION_MISMATCH",
+   "quote": "you need it a little bit lower than the current stock price of 50",
+   "ts": 806,
+   "mismatch_kind": "no_call",
+   "flag": "b",
+   "labeled_direction": "bullish",
+   "ticker": "ADM",
+   "why": "Host says price must fall before buying; no committed bullish call at current levels."
+  },
+  "605933": {
+   "verdict": "REQUOTE",
+   "quote": "that puts a fair value on global foundries in the low 50 dollar per share range currently as of this recording the stock trading for 68 dollars per share so suffice to say I'm being patient here",
+   "ts": 807,
+   "names_ticker": false,
+   "flag": "b",
+   "why": "Names company, shows stock overvalued at $68 vs low-$50s fair value, confirms bearish stance"
+  },
+  "608235": {
+   "verdict": "REQUOTE",
+   "quote": "that's really where I think most investors are probably interested in Tesla at the moment is in the robotaxi business cuz that that could really generate a lot of revenue for them, and a lot of analysts think that's a market that could be worth trillions long term.",
+   "ts": 624,
+   "names_ticker": true,
+   "flag": "b",
+   "why": "Host names Tesla, projects robotaxi as major revenue driver; forward bullish."
+  },
+  "609419": {
+   "verdict": "DIRECTION_MISMATCH",
+   "quote": "let's compare this to a dividend grow stock maybe for example we want to look at Domino's Pizza",
+   "ts": 257,
+   "mismatch_kind": "no_call",
+   "flag": "b",
+   "labeled_direction": "bullish",
+   "ticker": "DPZ",
+   "why": "Host uses DPZ only as illustrative teaching example; no explicit buy call or committed bullish stance made"
+  },
+  "609000": {
+   "verdict": "DIRECTION_MISMATCH",
+   "quote": "over the long term that's obviously not sustainable a company cannot continue to grow their dividends over the long term if free cash flow is not growing",
+   "ts": 189,
+   "mismatch_kind": "no_call",
+   "flag": "b",
+   "labeled_direction": "bullish",
+   "ticker": "AMGN",
+   "why": "Host raises FCF sustainability concern; no committed forward bullish call made"
+  },
+  "606698": {
+   "verdict": "REQUOTE",
+   "quote": "so yes even though this company has seen a lot of growth in the past that growth rate is still projected to be very high which is something we will need to take into account when performing our valuation",
+   "ts": 172,
+   "names_ticker": false,
+   "flag": "a_orphan",
+   "why": "Host affirms Starbucks' growth rate remains projected high, own forward-looking bullish statement"
+  },
+  "608239": {
+   "verdict": "REQUOTE",
+   "quote": "And so in their forecast, Pepsico explicitly cut full year profit guidance and cited tariffs as the reason for for those higher input costs.",
+   "ts": 961,
+   "names_ticker": false,
+   "flag": "b",
+   "why": "Host reports guidance cut naming Pepsico; current stored quote has 'fullear' typo"
+  },
+  "608669": {
+   "verdict": "REQUOTE",
+   "quote": "nothing wrong with the business but at a p ratio of 24 I'm simply not attracted to such an industrial because if you look at things you can see here this was 15 years of flat returns then you have this jump like you had in the 1990s and what's most likely coming next is again 15 years 10 15 years of no returns especially starting from a high valuation",
+   "ts": 90,
+   "names_ticker": false,
+   "flag": "a_orphan",
+   "why": "Host names Honeywell, cites high P/E, predicts 10-15 years of flat returns."
+  },
+  "607751": {
+   "verdict": "REQUOTE",
+   "quote": "Bank of America even witnessed a double digit decline in their net income saying that it stems from higher Provisions for loan losses and Rising expenses that's a clear sign that the economy is actually not as great as they're making it out to be at least they don't think so",
+   "ts": 426,
+   "names_ticker": true,
+   "flag": "b",
+   "why": "Host cites BAC's double-digit net income decline and loan loss provisions as bearish economic signal"
+  },
+  "607311": {
+   "verdict": "REQUOTE",
+   "quote": "Ford on the other hand just kind of seems stuck in the past to me and it's not very exciting at all as they actually posted their worst performing day this week since the Great Recession guys the stock fell by over 18% on earnings day as they not only missed analyst estimates but despite having Revenue growth of 6% their adjusted ebit actually declined their adjusted ebbit profits it declined by close to 30% year-over-year this was in large part due to higher warant y costs that have been plaguing the company for years",
+   "ts": 924,
+   "names_ticker": true,
+   "flag": "b",
+   "why": "Host names Ford, cites 18% drop, missed estimates, 30% EBIT decline \u2014 clear bearish call"
+  },
+  "608379": {
+   "verdict": "REQUOTE",
+   "quote": "we think the Fab Five and lamb research in particular our pick for playing the memory Market recovery are going to be just fine",
+   "ts": 461,
+   "names_ticker": false,
+   "flag": "a_orphan",
+   "why": "Host explicitly picks Lam Research as bullish play on memory market recovery"
+  },
+  "608678": {
+   "verdict": "REQUOTE",
+   "quote": "Medtronic stagnating business but still average Market PE ratio average above average Market dividend so again okay but nothing special there",
+   "ts": 525,
+   "names_ticker": false,
+   "flag": "a_orphan",
+   "why": "Host explicitly rates MDT as okay but unremarkable\u2014neutral assessment confirmed"
+  },
+  "608680": {
+   "verdict": "REQUOTE",
+   "quote": "prologis this is the first read on the list that's the most expensive they have been growing by issuing that issuing Equity buying properties so buying properties at Peak prices and lowest interest rates everything looks great now a little bit less but still the risk is too much here because of the business model yes Logistics are cool now everybody wants them but as everyone wants them so are they paying higher prices for low dividend yields and this tells you everything you need to do no",
+   "ts": 613,
+   "names_ticker": false,
+   "flag": "b",
+   "why": "Host names Prologis, calls it most expensive, cites peak prices and low dividend yields as risks."
+  },
+  "610779": {
+   "verdict": "REQUOTE",
+   "quote": "the S&P 500p ratio is here has been that high do bubble 1960s nifty50 bubble and 9029 and later in the lows of the depression",
+   "ts": 223,
+   "names_ticker": true,
+   "flag": "a_orphan",
+   "why": "Host explicitly names S&P 500 and places current P/E at historic bubble peaks, clearer than current quote's 'sap' misrecognition"
+  },
+  "609109": {
+   "verdict": "REQUOTE",
+   "quote": "I love McDonald's over here and I believe this is a stock that's going to be a massive beneficiary of Z rotation",
+   "ts": 509,
+   "names_ticker": false,
+   "flag": "b",
+   "why": "Host explicitly names McDonald's and makes committed bullish forward call"
+  },
+  "609440": {
+   "verdict": "REQUOTE",
+   "quote": "This is not sustainable over the long term.",
+   "ts": 861,
+   "names_ticker": false,
+   "flag": "b",
+   "why": "Host explicitly calls PEP's 100% FCF payout ratio unsustainable, a committed bearish structural concern."
+  },
+  "606562": {
+   "verdict": "REQUOTE",
+   "quote": "we've also added to Arcadium lithium alt M Air Products and chemicals APD shift four ticker symbol for f r and on running on on",
+   "ts": 861,
+   "names_ticker": false,
+   "flag": "a_orphan",
+   "why": "Host lists ALTM as a position they added to in 2024, implying bullish conviction."
+  },
+  "608588": {
+   "verdict": "REQUOTE",
+   "quote": "I think I'll sell another half of the Holdings and um hold on to the remaining half for precisely the same reason that I did in in the during the summer of 2023",
+   "ts": 1769,
+   "names_ticker": false,
+   "flag": "a_orphan",
+   "why": "Host explicitly selling more NVDA due to 56% overvaluation; bearish action confirmed"
+  },
+  "608712": {
+   "verdict": "REQUOTE",
+   "quote": "same thing for Bristol Myers that also has like a 5 and a half% dividend so any company with a 5% plus dividend I believe will do amazingly amazingly well in an environment when we have lower interest rates",
+   "ts": 639,
+   "names_ticker": false,
+   "flag": "b",
+   "why": "Host explicitly names Bristol Myers and predicts strong performance in lower-rate environment"
+  },
+  "606442": {
+   "verdict": "REQUOTE",
+   "quote": "Intel is just getting killed so maybe a year or two from Now intel will start to turn around but it doesn't seem like it's happening this quarter",
+   "ts": 1161,
+   "names_ticker": true,
+   "flag": "b",
+   "why": "Host says turnaround not happening this quarter; bearish near-term call on INTC"
+  },
+  "609269": {
+   "verdict": "REQUOTE",
+   "quote": "I have a buy price of $645 and that is based on a 20% margin of safety. So Meta would have to come down almost 16% for a viable entry point into the business.",
+   "ts": 102,
+   "names_ticker": true,
+   "flag": "b",
+   "why": "Host explicitly states META must fall 16%, confirming bearish stance; better quote than stored."
+  },
+  "608020": {
+   "verdict": "REQUOTE",
+   "quote": "Google is still the most undervalued Mega cap in my opinion",
+   "ts": 313,
+   "names_ticker": false,
+   "flag": "a_orphan",
+   "why": "Host explicitly calls Google most undervalued mega-cap, a clear bullish relative call."
+  },
+  "609111": {
+   "verdict": "REQUOTE",
+   "quote": "most of my money is now going into stocks like Pepsi like dividend stocks REITs LNG many different stocks they going to benefit amazingly well from lower interest rates and from the rotation",
+   "ts": 705,
+   "names_ticker": true,
+   "flag": "b",
+   "why": "Host explicitly names LNG as a stock he is buying, expecting benefit from rate cuts."
+  },
+  "608944": {
+   "verdict": "DIRECTION_MISMATCH",
+   "quote": "as for me this is company I would stay away from",
+   "ts": 1169,
+   "mismatch_kind": "opposite",
+   "flag": "b",
+   "labeled_direction": "bullish",
+   "ticker": "SLB",
+   "why": "Host explicitly says to stay away from SLB, not bullish."
+  },
+  "607815": {
+   "verdict": "REQUOTE",
+   "quote": "but even Nvidia AMD paler broadcom again these are proven leaders that are actually trusted in the space with strong track records",
+   "ts": 553,
+   "names_ticker": true,
+   "flag": "b",
+   "why": "Names AMD explicitly as proven leader; stronger bullish signal than current quote"
+  },
+  "609272": {
+   "verdict": "DIRECTION_MISMATCH",
+   "quote": "So, you're going to have to take those opportunities when FICO does dip seriously and buy when that happens cuz it's not going to last for long with this business.",
+   "ts": 595,
+   "mismatch_kind": "opposite",
+   "flag": "b",
+   "labeled_direction": "bearish",
+   "ticker": "FICO",
+   "why": "Host already owns FICO shares, has a buy price, and recommends buying dips \u2014 clearly bullish."
+  },
+  "609119": {
+   "verdict": "REQUOTE",
+   "quote": "I'm talking about stocks like Chipotle this bubble is starting to pop Chipotle I believe Costco is next",
+   "ts": 275,
+   "names_ticker": true,
+   "flag": "b",
+   "why": "Host names Costco explicitly as next bubble to pop after Chipotle."
+  },
+  "609007": {
+   "verdict": "REQUOTE",
+   "quote": "and if we look at projected earnings growth for Snap-on what we can see is earnings growth aren't necessarily very high moving forward we're talking about mid single digits but it is pretty easy to see why the stock would make this list",
+   "ts": 1374,
+   "names_ticker": false,
+   "flag": "b",
+   "why": "Host explicitly names Snap-on and affirms its place on the bullish dividend list."
+  },
+  "609273": {
+   "verdict": "REQUOTE",
+   "quote": "My buy price is at $535. So, they would have to come down about 6% to justify buying more MSCI.",
+   "ts": 652,
+   "names_ticker": true,
+   "flag": "b",
+   "why": "Host explicitly states MSCI must fall 6% to $535 buy price, confirming bearish stance."
+  },
+  "607605": {
+   "verdict": "REQUOTE",
+   "quote": "I think Crocs is extremely undervalued here",
+   "ts": 470,
+   "names_ticker": false,
+   "flag": "a_orphan",
+   "why": "Host makes explicit bullish call on Crocs at 6.5x earnings with growing fundamentals"
+  },
+  "608679": {
+   "verdict": "REQUOTE",
+   "quote": "with uh Qualcomm they have no Book value because they did a lot of BuyBacks this is the downward Trend in the cycle you can then calculate net average income over the last years and if you do it you end up at 5 billion which then gives you a p ratio of 25 which doesn't make it the bargain",
+   "ts": 573,
+   "names_ticker": true,
+   "flag": "b",
+   "why": "Host names Qualcomm, cites no book value and adjusted P/E 25 as unattractive \u2014 clear bearish conclusion."
+  },
+  "606566": {
+   "verdict": "REQUOTE",
+   "quote": "we decided to repurchase that stock going into 2024 in November and December we started a new DCA plan into air test systems",
+   "ts": 1085,
+   "names_ticker": false,
+   "flag": "b",
+   "why": "Host states repurchase and new DCA plan into Aehr Test Systems; cleaner quote names company fully"
+  },
+  "607292": {
+   "verdict": "REQUOTE",
+   "quote": "and if interest rates start coming down or the economy recovers I think this will be a high flyer once again",
+   "ts": 655,
+   "names_ticker": false,
+   "flag": "b",
+   "why": "Explicit forward bullish call; Sofi named repeatedly in immediately preceding sentences"
+  },
+  "606439": {
+   "verdict": "REQUOTE",
+   "quote": "if you're looking for Reliable and growing high yield dividend stocks then the ultra group in my opinion is one of the best you can pick",
+   "ts": 875,
+   "names_ticker": false,
+   "flag": "a_orphan",
+   "why": "Host explicitly recommends Altria Group as one of the best high-yield dividend stocks"
+  },
+  "608687": {
+   "verdict": "REQUOTE",
+   "quote": "then we have Intel that we said it was okay risk and reward situation and we bought just the first stage it is going up we will see how it develops maybe we'll even buy more at a higher price if the same is Industries will turn around",
+   "ts": 41,
+   "names_ticker": true,
+   "flag": "a_orphan",
+   "why": "Names Intel, confirms purchase, and signals willingness to buy more bullishly"
+  },
+  "609270": {
+   "verdict": "REQUOTE",
+   "quote": "They would have to come down a staggering 25.4% for a good entry into this business and it seems like we're a long way from that because this is a highly profitable business and a vital business to the semiconductor supply chain system. Cadence Design Systems or CDNs has a staggering PE ratio right now of 97.8. Their forward PE sits at 90.8 both of which are far higher than their 5 and 10ear average.",
+   "ts": 190,
+   "names_ticker": true,
+   "flag": "b",
+   "why": "Host says CDNS must drop 25.4% to reach buy price; PE far above average \u2014 clear bearish valuation call."
+  },
+  "608048": {
+   "verdict": "REQUOTE",
+   "quote": "we could most likely have a down year or a flat year in 2024",
+   "ts": 115,
+   "names_ticker": false,
+   "flag": "a_orphan",
+   "why": "Host explicitly states flat (neutral) or down outcome for 2024 mega-cap stocks"
+  },
+  "612642": {
+   "verdict": "REQUOTE",
+   "quote": "If we go to XRP, this is the one that's been getting hit the worst. I've been telling you this for a while now. Uh the 13 EMA just crossed. There it is. This is an example. Look at these kind of small candles. Small candle, small candle. Now you're getting this really long downward candle because the 13 is hitting the 50 and crossing. So with that happening, you get that massive sell-off.",
+   "ts": 396,
+   "names_ticker": true,
+   "flag": "b",
+   "why": "Names XRP explicitly and signals bearish sell-off from 13/50 EMA cross"
+  },
+  "607758": {
+   "verdict": "REQUOTE",
+   "quote": "even in the case of like apple which is still berkshire's largest investment well it's just so highly valued at this point that I don't see a lot more gains to really be had from it long term",
+   "ts": 400,
+   "names_ticker": true,
+   "flag": "b",
+   "why": "Same bearish sentiment but names Apple explicitly, stronger supporting quote"
+  },
+  "608464": {
+   "verdict": "REQUOTE",
+   "quote": "I don't think the QQQ is a sell and I still believe investors will do better over the next 10 years waiting big tech companies a greater portion of their portfolio than selling out of them",
+   "ts": 732,
+   "names_ticker": true,
+   "flag": "b",
+   "why": "Host explicitly names QQQ and makes 10-year bullish forward call"
+  },
+  "615010": {
+   "verdict": "DIRECTION_MISMATCH",
+   "quote": null,
+   "ts": null,
+   "mismatch_kind": "no_call",
+   "flag": "b",
+   "labeled_direction": "bearish",
+   "ticker": "SPY",
+   "why": "Window contains no SPY/market directional call by host; only stock-specific discussion."
+  },
+  "608426": {
+   "verdict": "DIRECTION_MISMATCH",
+   "quote": "this could be a key Advantage for peer storage in the storage server Market",
+   "ts": 533,
+   "mismatch_kind": "no_call",
+   "flag": "b",
+   "labeled_direction": "bullish",
+   "ticker": "PURE",
+   "why": "Host notes a potential advantage but makes no committed bullish investment call on PURE."
+  },
+  "607253": {
+   "verdict": "REQUOTE",
+   "quote": "but longer term I do think there's a lot of still potential there and so considering how much the stock has crashed already it might not be the worst time to start you know very slowly building up a position in this one at least a very cautious one for the longer term of course I own Tesla stock myself it is one of my largest positions and I have no plans of selling it anytime soon",
+   "ts": 880,
+   "names_ticker": true,
+   "flag": "b",
+   "why": "Host explicitly builds position, holds Tesla as largest holding, bullish long-term."
+  },
+  "607560": {
+   "verdict": "REQUOTE",
+   "quote": "the stock around 20 24 dollars was trading at five times free cash flow five times free cash flow for this company and this is a company that's normally in a very resilient industry because I mean unfortunately people pass away every single year maybe they d",
+   "ts": 596,
+   "names_ticker": false,
+   "flag": "b",
+   "why": "Host bought CSV at deep value 5x FCF, doubled position, confirms bullish thesis"
+  },
+  "605934": {
+   "verdict": "REQUOTE",
+   "quote": "I think um kind of kind of an asymmetric uh bet here if if the deal goes through I guess you could call it 60 cherry on top",
+   "ts": 1319,
+   "names_ticker": false,
+   "flag": "a_orphan",
+   "why": "Host frames SIMO as asymmetric bet; deal upside is bonus on already-solid business"
+  },
+  "607982": {
+   "verdict": "REQUOTE",
+   "quote": "the free cash flow is growing at a very healthy rate easily covering those dividend increases and here's what I really like to see out of dividend growth stocks when the free cash low payout ratio is decreasing over time so yes they're still increasing those dividend payments but the free cash low payout ratio is actually decreasing because free cash flow is growing at a rate even faster than the dividend payments this is something I really like",
+   "ts": 261,
+   "names_ticker": false,
+   "flag": "b",
+   "why": "Host explicitly says 'this is something I really like' about RSG's FCF growth and dividend trajectory"
+  },
+  "613188": {
+   "verdict": "DIRECTION_MISMATCH",
+   "quote": "charlie's answer to this question is very very simple he says yes there is a dot-com style bubble going on right now but nobody knows w",
+   "ts": 549,
+   "mismatch_kind": "no_call",
+   "flag": "b",
+   "labeled_direction": "bearish",
+   "ticker": "SPY",
+   "why": "Host only narrates and attributes bearish call to Munger; makes no committed own call on SPY."
+  },
+  "616464": {
+   "verdict": "REQUOTE",
+   "quote": "The stock that we're talking about is B Y ND Beyond Meat up 127% on Monday and it looks like the short squeeze is just getting started.",
+   "ts": 41,
+   "names_ticker": false,
+   "flag": "b",
+   "why": "Host explicitly names BYND and declares short squeeze bullish momentum just beginning."
+  },
+  "616326": {
+   "verdict": "REQUOTE",
+   "quote": "Based upon technical analysis alone, I expect Rumble would hit at least $11, a mid price target of $13. And on the high end, I could see Rumble going as high as $15 over the next three months.",
+   "ts": 980,
+   "names_ticker": false,
+   "flag": "ba_orphan",
+   "why": "Host gives explicit bullish price targets of $11-$15 for RUM over three months."
+  },
+  "616407": {
+   "verdict": "REQUOTE",
+   "quote": "2024 is heading into new highs it will finish very very strong even though the next couple of weeks the next eight weeks are going to seem very very tough",
+   "ts": 238,
+   "names_ticker": false,
+   "flag": "b",
+   "why": "Host explicitly states S&P/stocks finish strong in 2024, bullish call on broad market"
+  },
+  "611167": {
+   "verdict": "REQUOTE",
+   "quote": "you've got uh process that trades at something like a 39 discount to just the 10 cent holding",
+   "ts": 860,
+   "names_ticker": false,
+   "flag": "b",
+   "why": "Host describes Prosus trading at 39% discount to Tencent stake, implying undervaluation/bullish"
+  },
+  "616365": {
+   "verdict": "DIRECTION_MISMATCH",
+   "quote": "So naturally, while the rest of the stock market is absolutely booming, farmer companies are seeing their stocks go red.",
+   "ts": 417,
+   "mismatch_kind": "no_call",
+   "flag": "b",
+   "labeled_direction": "bearish",
+   "ticker": "JNJ",
+   "why": "Host calls pharma broadly bearish; JNJ never named in window."
+  },
+  "606630": {
+   "verdict": "REQUOTE",
+   "quote": "so in terms of your purchase price this may be a solid entry point for ADM stock and especially with dividend yield this current dividend yield is one of its highest ever",
+   "ts": 659,
+   "names_ticker": true,
+   "flag": "b",
+   "why": "Host calls ADM a solid entry point at historically high dividend yield, clearly bullish."
+  },
+  "606664": {
+   "verdict": "REQUOTE",
+   "quote": "so I would not be buying the dip on Apple stock right now this is definitely in my opinion in the category of wait and see for more information because they really could see a lot of disruption from this",
+   "ts": 340,
+   "names_ticker": true,
+   "flag": "b",
+   "why": "Host explicitly says not buying the dip on Apple, labeling it wait and see."
+  },
+  "614131": {
+   "verdict": "DIRECTION_MISMATCH",
+   "quote": "Should in bond investors swap out Treasury bills that are short-term for 20 to 30year Treasury bonds?",
+   "ts": 100,
+   "mismatch_kind": "no_call",
+   "flag": "b",
+   "labeled_direction": "bearish",
+   "ticker": "TLT",
+   "why": "Host only asks questions; bearish TLT quote is from guest Amy Arnot, not the host."
+  },
+  "608717": {
+   "verdict": "REQUOTE",
+   "quote": "if I'm a very conservative investor I would not be willing to pay more than 80 to $85 per share on nface",
+   "ts": 639,
+   "names_ticker": false,
+   "flag": "b",
+   "why": "Host sets $80-85 fair value ceiling vs $122 current price, implying stock is overvalued"
+  },
+  "606853": {
+   "verdict": "REQUOTE",
+   "quote": "I believe that you know Verizon is dealing and inflection point and I think it's a pretty you know good opportunity at such prices",
+   "ts": 406,
+   "names_ticker": true,
+   "flag": "b",
+   "why": "Host explicitly calls VZ a good opportunity and names inflection point bullishly"
+  },
+  "614027": {
+   "verdict": "REQUOTE",
+   "quote": "I'm wondering if we're going to be doing a complete round trip on Starbucks and retest those levels down at closer to $55 per share",
+   "ts": 23,
+   "names_ticker": true,
+   "flag": "b",
+   "why": "Host explicitly targets $55 retest, a bearish forward call on Starbucks"
+  },
+  "628983": {
+   "verdict": "REQUOTE",
+   "quote": "it's very clear within the within a very short period of time there's a blow-off top coming because if you look back historically, um like the SOX index for it to be 54% above the 200-day moving average, you know, the previous record going back to 2002 is like 46, 47, maybe 48%",
+   "ts": 582,
+   "names_ticker": true,
+   "flag": "a_orphan",
+   "why": "Speaker explicitly forecasts imminent blow-off top in SOX/semiconductors based on extreme overextension."
+  },
+  "616584": {
+   "verdict": "REQUOTE",
+   "quote": "adm is such a business that if the price goes lower lower and lower you can be pretty sure that you can add more to it that's the key here and when you find such good businesses essential businesses you got to it",
+   "ts": 772,
+   "names_ticker": true,
+   "flag": "b",
+   "why": "Host explicitly recommends adding ADM on dips, naming it a good essential business."
+  },
+  "614701": {
+   "verdict": "DIRECTION_MISMATCH",
+   "quote": "this is spy which tracks the S&P 500 so you can see from November 27th to current day it's down 1.8%",
+   "ts": 300,
+   "mismatch_kind": "no_call",
+   "flag": "b",
+   "labeled_direction": "bullish",
+   "ticker": "SPY",
+   "why": "Host describes SPY declining; no forward bullish call made anywhere in window"
+  },
+  "610957": {
+   "verdict": "DIRECTION_MISMATCH",
+   "quote": "exxon mobil's free cash flow over the years is very volatile this is a reason that this company trades at typically a lower multiple than other companies some years it's very good some years it's very bad",
+   "ts": 949,
+   "mismatch_kind": "no_call",
+   "flag": "b",
+   "labeled_direction": "bullish",
+   "ticker": "XOM",
+   "why": "Host only analyzes XOM financials in Biden context; no forward buy recommendation made"
+  },
+  "617188": {
+   "verdict": "REQUOTE",
+   "quote": "That alone puts it on our list with annualized growth of 45% and adjusted valuation under.2 time sales and this company is using AI to transform the loan industry.",
+   "ts": 143,
+   "names_ticker": false,
+   "flag": "b",
+   "why": "Host explicitly keeps UPST on buy list despite crash, citing growth and valuation."
+  },
+  "617189": {
+   "verdict": "REQUOTE",
+   "quote": "Ticker EPAM is another one that has sold off lately, but is still expected to post strong sales growth and is trading for under 1.8 times on a price to sales basis.",
+   "ts": 215,
+   "names_ticker": true,
+   "flag": "b",
+   "why": "Host recommends EPAM as undervalued with strong growth, explicitly bullish framing."
+  },
+  "614555": {
+   "verdict": "REQUOTE",
+   "quote": "Bitcoin. I think this was Michael Saylor buying right here. And so this is going to be another example where Michael Saylor's going to end up reporting next week, \"Oh, uh I bought Bitcoin at an average price of 90,000.\" And then people are going to be like, \"Bro, what?\" It's at 86.",
+   "ts": 4383,
+   "names_ticker": true,
+   "flag": "b",
+   "why": "Host implies Bitcoin fell below Saylor's 90K buy, signaling weakness and bearish near-term view."
+  },
+  "614556": {
+   "verdict": "REQUOTE",
+   "quote": "But But this What is it? BMNR or whatever? The Like I I can't help but think this is just like financial engineering. I don't want to go as far as calling it like fraud, but if you think about it, the this company provides no value.",
+   "ts": 4455,
+   "names_ticker": true,
+   "flag": "b",
+   "why": "Host names BMNR, calls it financial engineering with no value; clear bearish conviction."
+  },
+  "606874": {
+   "verdict": "REQUOTE",
+   "quote": "I believe the NASDAQ rally got way overstretched and maybe it's pretty soon to coming you know to an end as it's starting to underperform the Dao and the S P 500",
+   "ts": 48,
+   "names_ticker": true,
+   "flag": "b",
+   "why": "Host directly calls NASDAQ rally overstretched and predicts imminent end; names NASDAQ."
+  },
+  "608138": {
+   "verdict": "REQUOTE",
+   "quote": "apple is still trading very high the price at the original video was at $245 now down to 219 so you can see it still has quite a ways to go about 133% before it hits my Buy price of $190",
+   "ts": 172,
+   "names_ticker": true,
+   "flag": "b",
+   "why": "Host explicitly states AAPL has far to fall before reaching his $190 buy price"
+  },
+  "609264": {
+   "verdict": "REQUOTE",
+   "quote": "my buy price for Apple is at $180. So, they would have to come down nearly 25% to be reasonable enough in my view to buy Apple.",
+   "ts": 154,
+   "names_ticker": true,
+   "flag": "b",
+   "why": "Host explicitly names Apple, sets $180 buy price, requires 25% drop \u2014 clear bearish call."
+  },
+  "613766": {
+   "verdict": "REQUOTE",
+   "quote": "not really in fact 18 t is selling their stake in directv to other companies so that they can get billions of dollars in cash and use that to strengthen their balance sheet and pay off debt more aggressively this is a really good move by att they're selling off non-core assets to be able to strengthen their balance sheet to be able to reduce their debt load and then while they're doing that they have a growth story they're projecting that hbo max will hit 120 to 150 million subscribers by 2025",
+   "ts": 294,
+   "names_ticker": false,
+   "flag": "b",
+   "why": "Host names AT&T, calls DirecTV sale good move, cites HBO Max growth as bullish catalyst."
+  },
+  "606621": {
+   "verdict": "REQUOTE",
+   "quote": "and right now I wouldn't say it's the best time to buy Exxon or Chevron stock and that's because I'm predicting that the price of oil is going to go down in the coming years while demand may be higher Supply is expected to increase significantly especially with Trump's energy policies so that will hurt the margins of oil producers like Exxon and Chevron",
+   "ts": 1535,
+   "names_ticker": true,
+   "flag": "b",
+   "why": "Host explicitly predicts oil price decline hurting Exxon margins, a committed bearish call."
+  },
+  "609263": {
+   "verdict": "REQUOTE",
+   "quote": "I do have a buy price of $135, but that means they would have to come down nearly 20% to make Nvidia a reasonable buy in my view.",
+   "ts": 96,
+   "names_ticker": true,
+   "flag": "b",
+   "why": "Host explicitly says Nvidia must fall ~20% before it's a reasonable buy \u2014 bearish valuation call."
+  },
+  "607918": {
+   "verdict": "REQUOTE",
+   "quote": "broadcom very much has a piece of that bill and it's not just the networking chips though by now hopefully you know from our videos here that it's broadcom's IP that is actually helping Google make its own custom chips",
+   "ts": 544,
+   "names_ticker": true,
+   "flag": "b",
+   "why": "Host explicitly states broadcom benefits from Google capex and custom chip IP deals"
+  },
+  "607917": {
+   "verdict": "REQUOTE",
+   "quote": "so this bodess very well for nvidia's networking sales in 2025 and of course Google and Google Cloud by extension will be among the first to get their hands on the Blackwell systems which are reportedly completely sold out for 2025",
+   "ts": 488,
+   "names_ticker": true,
+   "flag": "b",
+   "why": "Host directly predicts strong NVDA networking sales in 2025 driven by Google capex and Blackwell demand."
+  },
+  "614592": {
+   "verdict": "DIRECTION_MISMATCH",
+   "quote": "I said I'm bearish the rotation out of hard asset chips. And if you notice since this morning, Broadcom has tanked off a cliff even more.",
+   "ts": 65,
+   "mismatch_kind": "opposite",
+   "flag": "b",
+   "labeled_direction": "bullish",
+   "ticker": "AVGO",
+   "why": "Host explicitly states bearish on Broadcom; no bullish call found in window."
+  },
+  "606622": {
+   "verdict": "REQUOTE",
+   "quote": "and right now I wouldn't say it's the best time to buy Exxon or Chevron stock and that's because I'm predicting that the price of oil is going to go down in the coming years while demand may be higher Supply is expected to increase significantly especially with Trump's energy policies",
+   "ts": 1535,
+   "names_ticker": true,
+   "flag": "b",
+   "why": "Host explicitly predicts oil price decline hurting Chevron margins, a clear bearish call."
+  },
+  "626410": {
+   "verdict": "REQUOTE",
+   "quote": "So, these are the trades that are going to been working out and I'm still bullish on them.",
+   "ts": 214,
+   "names_ticker": false,
+   "flag": "b",
+   "why": "Host explicitly calls these trades bullish; Netflix named moments earlier in same list."
+  },
+  "606866": {
+   "verdict": "REQUOTE",
+   "quote": "now it's starting to get very very expensive I think I made it somewhere around 250 or 255 now it's 318. I think no stock it is getting expensive the multiple is getting high",
+   "ts": 178,
+   "names_ticker": false,
+   "flag": "b",
+   "why": "Host explicitly calls MSFT very expensive with rising multiple, a clear bearish valuation call."
+  },
+  "614642": {
+   "verdict": "REQUOTE",
+   "quote": "I've got more meta recovery. This is not surprising either. I think the sell-off there was quite overdone.",
+   "ts": 261,
+   "names_ticker": true,
+   "flag": "b",
+   "why": "Host calls META sell-off overdone, implying recovery justified; bullish stance confirmed."
+  },
+  "606865": {
+   "verdict": "REQUOTE",
+   "quote": "and I think the same thing is gonna happen to Nvidia investors I mean if you actually bought it video you did amazingly well I mean congratulations to you but I would not be buying and holding Forever on something like Nvidia if you try to Value it on any metric no matter the AI story or whatever and you cannot come up with any kind of scenario where I think you know it's actually fairly valued at 312 dollars per share",
+   "ts": 101,
+   "names_ticker": true,
+   "flag": "b",
+   "why": "Host explicitly says he would not buy and hold Nvidia and it is overvalued"
+  },
+  "625651": {
+   "verdict": "REQUOTE",
+   "quote": "I think the mega cap tech earnings, especially like the Microsofts and Googles, will be very strong",
+   "ts": 77,
+   "names_ticker": false,
+   "flag": "a_orphan",
+   "why": "Host explicitly predicts Google earnings will be very strong \u2014 clear bullish call."
+  },
+  "625650": {
+   "verdict": "DIRECTION_MISMATCH",
+   "quote": "I would call this a hold. I would not rush to sell it, but I also don't think this is the best buy of the week. It looks like a high-quality hold, not a high-conviction pre-earnings buy.",
+   "ts": 327,
+   "mismatch_kind": "no_call",
+   "flag": "a_orphan",
+   "labeled_direction": "bullish",
+   "ticker": "JPM",
+   "why": "Host explicitly calls JPM a hold, not a bullish buy."
+  },
+  "625824": {
+   "verdict": "REQUOTE",
+   "quote": "Amazon, on the other hand, failing the neckline and still elevated away from these lows.",
+   "ts": 2769,
+   "names_ticker": true,
+   "flag": "b",
+   "why": "Names Amazon, 'failing the neckline' is a direct committed bearish call."
+  },
+  "608144": {
+   "verdict": "REQUOTE",
+   "quote": "Texas Instruments this is another stock that I believe is actually quite High given its future cash flow potential it's trading at over $185 right now my Buy price is$ 135",
+   "ts": 308,
+   "names_ticker": false,
+   "flag": "b",
+   "why": "Host names TXN, calls it overvalued at $185, buy price $135 confirms bearish stance"
+  },
+  "626648": {
+   "verdict": "REQUOTE",
+   "quote": "we're still bearish on the smaller time frames, daily and below",
+   "ts": 514,
+   "names_ticker": false,
+   "flag": "a_orphan",
+   "why": "Host explicitly states bearish stance on SPY daily and below timeframes"
+  },
+  "614640": {
+   "verdict": "REQUOTE",
+   "quote": "It's all predicated on uh underlying risk pricing for Ethereum. You know, I I mean, risk assets should be bullish between now and uh I I actually think we might be able to get through this Fed meeting because I think they'll punt their hawkishness to uh January.",
+   "ts": 1393,
+   "names_ticker": true,
+   "flag": "b",
+   "why": "Host explicitly calls risk assets bullish near-term in direct Ethereum context."
+  },
+  "626649": {
+   "verdict": "DIRECTION_MISMATCH",
+   "quote": "Robin Hood's a little bit worse. We'll take a look at that in a second.",
+   "ts": 3999,
+   "mismatch_kind": "no_call",
+   "flag": "a_orphan",
+   "labeled_direction": "bearish",
+   "ticker": "HOOD",
+   "why": "Host only notes HOOD is down more than PLTR; defers analysis to later."
+  },
+  "626825": {
+   "verdict": "REQUOTE",
+   "quote": "I like SanDisk a little bit better. SNDK is the ticker on that. Look at the consolidation up here. Look at the backtoback hammers and it's already starting a little bit of a gap up. So, I'd opt for SanDisk. Just look at the strength.",
+   "ts": 2385,
+   "names_ticker": true,
+   "flag": "a_orphan",
+   "why": "Host explicitly prefers SNDK over MU, citing consolidation, hammers, and gap up."
+  },
+  "613770": {
+   "verdict": "REQUOTE",
+   "quote": "i plan on keeping texas roadhouse in fact once they reinstate the dividend which i think they'll do in the future when the the company's outlook becomes more sure i plan on increasing my stake in this company so even though this was very tragic news to hear it doesn't change my outlook on texas roadhouse",
+   "ts": 1104,
+   "names_ticker": false,
+   "flag": "b",
+   "why": "Host explicitly plans to hold and increase stake, unchanged bullish outlook despite tragic news."
+  },
+  "625829": {
+   "verdict": "REQUOTE",
+   "quote": "Micron, one of the leading memory stocks, is trading down on a pretty strong earnings number, which is never a good sign.",
+   "ts": 14,
+   "names_ticker": true,
+   "flag": "ba_orphan",
+   "why": "Names Micron, notes bearish price reaction to earnings as a bad sign"
+  },
+  "626409": {
+   "verdict": "REQUOTE",
+   "quote": "Palenter, American Airlines, Walmart, I would sell puts, Nvidia, Netflix. Let me actually write the Walmart trade.",
+   "ts": 177,
+   "names_ticker": false,
+   "flag": "ba_orphan",
+   "why": "Host lists WMT for sell-puts and explicitly singles out Walmart trade to record."
+  },
+  "614700": {
+   "verdict": "REQUOTE",
+   "quote": "the issue that I have with high-yield bonds is they don't do any of that so they strayed in line with the stock market if the stock market Falls 50 or 60 percent your high-yield bonds might fall 50 or 60 percent they might fall just as much because when the stock market is falling it's usually because of a recession when there's recession these risky bonds offer a higher yield are given to companies that typically go out of business when they go out of business they don't pay back the bond holder so I just don't see a role with high-yield bonds on my portfolio they're just too risky they don't offer the protection of higher rated bonds that I have",
+   "ts": 1637,
+   "names_ticker": false,
+   "flag": "b",
+   "why": "Host explicitly rejects HYG as too risky, correlated with stocks, no portfolio role."
+  },
+  "626820": {
+   "verdict": "REQUOTE",
+   "quote": "Still a lower high on the IWM. There's nothing really changing about this daily chart here.",
+   "ts": 863,
+   "names_ticker": true,
+   "flag": "ba_orphan",
+   "why": "Names IWM directly; lower high confirms downtrend; stored quote omits ticker."
+  },
+  "610958": {
+   "verdict": "REQUOTE",
+   "quote": "i want to explain in this video why i think the market here is wrong and why this should be looked at positively for investors",
+   "ts": 69,
+   "names_ticker": true,
+   "flag": "b",
+   "why": "Host explicitly calls S&P 500 sell-off unwarranted and urges positive outlook for investors."
+  },
+  "614584": {
+   "verdict": "DIRECTION_MISMATCH",
+   "quote": "I don't know man Tesla's in no man's land so I did not support a bullish move on Tesla today",
+   "ts": 1022,
+   "mismatch_kind": "no_call",
+   "flag": "b",
+   "labeled_direction": "bearish",
+   "ticker": "TSLA",
+   "why": "Host expresses uncertainty and non-bullishness, not a committed bearish directional call"
+  },
+  "612681": {
+   "verdict": "REQUOTE",
+   "quote": "Hold this support, which I think's going to happen, and we'll we'll be able to push up to that 50 EMA.",
+   "ts": 582,
+   "names_ticker": false,
+   "flag": "b",
+   "why": "Host expects XRP to hold support and rally to 50 EMA, clear bullish call."
+  },
+  "626946": {
+   "verdict": "REQUOTE",
+   "quote": "Bearish inside inverted hammer bearish three bar play at the daily 20 underneath 151",
+   "ts": 4200,
+   "names_ticker": false,
+   "flag": "a_orphan",
+   "why": "Host explicitly calls DDOG bearish with technical setup and target below 151"
+  },
+  "607552": {
+   "verdict": "REQUOTE",
+   "quote": "I think at T is actually not bad at such prices if you're more of an income oriented investor or if you if you're a deep value guys that's looking for a you know multiple expansion or a change inside a bit I think atnt is not bad at all if they continue on whatever they're doing with that repayments and focusing more on free cash flow and selling some assets like you know they've been doing so I like atnt here",
+   "ts": 490,
+   "names_ticker": false,
+   "flag": "b",
+   "why": "Host explicitly says 'I like atnt here' and recommends it for value/income investors."
+  },
+  "608828": {
+   "verdict": "REQUOTE",
+   "quote": "I am heavily considering adding them to my own portfolio as a brand new position in the coming weeks, especially if it keeps falling like it has.",
+   "ts": 78,
+   "names_ticker": false,
+   "flag": "b",
+   "why": "Host states clear forward intent to buy NOW, confirming bullish call."
+  },
+  "611044": {
+   "verdict": "DIRECTION_MISMATCH",
+   "quote": "i'm not trying to single out chicken genius but i think it's a good example of how quickly things can change",
+   "ts": 844,
+   "mismatch_kind": "no_call",
+   "flag": "b",
+   "labeled_direction": "bearish",
+   "ticker": "TSLA",
+   "why": "Host narrates chicken genius's Tesla put, makes no forward bearish call himself"
+  },
+  "614596": {
+   "verdict": "DIRECTION_MISMATCH",
+   "quote": "So, everything is not fine.",
+   "ts": 5318,
+   "mismatch_kind": "no_call",
+   "flag": "b",
+   "labeled_direction": "bullish",
+   "ticker": "QQQ",
+   "why": "Window is macro-bearish; no committed forward bullish call on QQQ/tech stocks present."
+  },
+  "614171": {
+   "verdict": "DIRECTION_MISMATCH",
+   "quote": "PDD does have that potential because the valuation is not expensive at this current price and their fundamentals are incredible in terms of what they're reporting",
+   "ts": 346,
+   "mismatch_kind": "no_call",
+   "flag": "b",
+   "labeled_direction": "bearish",
+   "ticker": "PDD",
+   "why": "Host sees attractive valuation; bearish quotes relay management guidance, not host's own call"
+  },
+  "612449": {
+   "verdict": "REQUOTE",
+   "quote": "Palanteer was selling at six and 12 and 15 and 20 for a whole year. Guess what? It's almost at 100 today. Should be 100 by the time I make this video. So it worked out pretty well for us.",
+   "ts": 494,
+   "names_ticker": false,
+   "flag": "b",
+   "why": "Stored quote contains sentences absent from transcript; this is the verbatim window text."
+  },
+  "609365": {
+   "verdict": "REQUOTE",
+   "quote": "But when Bitcoin's price goes below that 50week moving average level, that marked the end of the bull cycle and the beginning of the long cool off period. That's what people call the bare market. Now, I know this sounds kind of like astrology, but this is backed by data going back more than a decade. And this week, we broke below that price point. That's not good, right?",
+   "ts": 913,
+   "names_ticker": true,
+   "flag": "b",
+   "why": "Host explicitly states Bitcoin broke below 50-week MA, signaling end of bull cycle."
+  },
+  "612457": {
+   "verdict": "REQUOTE",
+   "quote": "if you actually zoom out over the past 6 months, Palanteer is up 104%. That shows you that panic selling in turbulent times is never a good idea.",
+   "ts": 70,
+   "names_ticker": false,
+   "flag": "b",
+   "why": "Verbatim, names company, clearest bullish framing; displayed quote omits Tesla/Nvidia and is non-contiguous."
+  },
+  "612668": {
+   "verdict": "REQUOTE",
+   "quote": "That line right there is 126. If we fail at 126, I do believe you're going to test down there at 105. And I don't think it's I don't think it's going to take long, either.",
+   "ts": 542,
+   "names_ticker": false,
+   "flag": "b",
+   "why": "Stored quote omits stutter; verbatim transcript differs; Solana named immediately above."
+  },
+  "614373": {
+   "verdict": "REQUOTE",
+   "quote": "i might actually exit the position that's how overvalued costco probably is",
+   "ts": 1606,
+   "names_ticker": true,
+   "flag": "b",
+   "why": "Names Costco directly; host explicitly considers exiting due to overvaluation"
+  },
+  "614270": {
+   "verdict": "REQUOTE",
+   "quote": "i still think there's there's some some solid tailwinds over the next couple of years at least from micron micron isn't a coffee can position for me it's not something i'm going to stash away for 10 20 years but i like i like the short to mid-term prospects for micron",
+   "ts": 2584,
+   "names_ticker": true,
+   "flag": "b",
+   "why": "Host explicitly states bullish short-to-mid-term view on Micron despite China risk"
+  },
+  "610832": {
+   "verdict": "REQUOTE",
+   "quote": "Disney's one of the companies that as I look back on it I have no regrets in selling out of this company it may go up in the future but I think it's very unpredictable they have so much cash flows to make up for so many things have to go right with their execution they're building out Disney plus and them continuing to use their same brands of Star Wars and Marvel which are becoming a little bit exhausted",
+   "ts": 1708,
+   "names_ticker": true,
+   "flag": "b",
+   "why": "Host names Disney, sold it, calls it unpredictable with heavy execution burden; bearish confirmed."
+  },
+  "612723": {
+   "verdict": "REQUOTE",
+   "quote": "AMD on the other hand they reported earnings that really disappointed investors this week as they missed on both the top and bottom line despite seeing Revenue soar by almost 30 percent year over year AMD is a special case though because they usually trade for a rich valuation which means that they need to put up even higher growth in order to justify it",
+   "ts": 376,
+   "names_ticker": true,
+   "flag": "b",
+   "why": "Displayed quote inserts a period mid-sentence; this is the byte-exact verbatim substring."
+  },
+  "614406": {
+   "verdict": "REQUOTE",
+   "quote": "i think that jpmorgan will have capital appreciation and i think it will have dividend increases over the next five or six years",
+   "ts": 748,
+   "names_ticker": true,
+   "flag": "b",
+   "why": "Host explicitly forecasts JPM capital appreciation and dividend increases, naming the company."
+  },
+  "610434": {
+   "verdict": "REQUOTE",
+   "quote": "the economic growth of Costco has been outstanding if I look at the past 5 years this company has grown its free cash flow per share at nearly 19% per year a kager of 18.89% that is fast that is incredibly incredibly fast that beats out the majority of big Tech",
+   "ts": 425,
+   "names_ticker": true,
+   "flag": "b",
+   "why": "Host pivots from valuation concern to strong FCF growth conviction, holding position."
+  },
+  "608347": {
+   "verdict": "REQUOTE",
+   "quote": "the stock is back at all-time highs because it didn't take very long but it looks like this platformization strategy is working",
+   "ts": 307,
+   "names_ticker": false,
+   "flag": "b",
+   "why": "Host confirms platformization working, stock at all-time highs \u2014 committed bullish call on PANW"
+  },
+  "610663": {
+   "verdict": "DIRECTION_MISMATCH",
+   "quote": "I believe this is a dip that should be bought because 56% of Americans are exposed to stocks.",
+   "ts": 414,
+   "mismatch_kind": "opposite",
+   "flag": "b",
+   "labeled_direction": "bearish",
+   "ticker": "SPY",
+   "why": "Host explicitly calls SPY pullback a buy opportunity, not a bearish position."
+  },
+  "605806": {
+   "verdict": "DIRECTION_MISMATCH",
+   "quote": "so here's what he says about Costco he's asked what can hurt the economic mode of Costco right",
+   "ts": 611,
+   "mismatch_kind": "no_call",
+   "flag": "b",
+   "labeled_direction": "bullish",
+   "ticker": "COST",
+   "why": "Bullish quote is Munger's; host only relays it, makes no own call"
+  },
+  "616769": {
+   "verdict": "REQUOTE",
+   "quote": "Now, look, both of these trades that I'm going to make are bullish trades. I'm personally bullish because SoFi has an amazing network effect.",
+   "ts": 127,
+   "names_ticker": true,
+   "flag": "b",
+   "why": "Host explicitly states both trades are bullish and names SoFi directly."
+  },
+  "608896": {
+   "verdict": "REQUOTE",
+   "quote": "Google one of the deepest pocketed if not the deepest pocketed organization on the planet with well over $120 billion in net cash and Investments on balance",
+   "ts": 420,
+   "names_ticker": true,
+   "flag": "a_orphan",
+   "why": "Host highlights Google's massive cash position, implying financial strength bullish on GOOGL"
+  },
+  "616690": {
+   "verdict": "REQUOTE",
+   "quote": "as the AI sector expands poet directly tackles heat and bandwidth limitations challenges every AI company is striving to overcome positioning their technology as a crucial solution",
+   "ts": 448,
+   "names_ticker": true,
+   "flag": "b",
+   "why": "Host frames POET as crucial forward solution as AI sector expands \u2014 stronger bullish call than current quote"
+  },
+  "612637": {
+   "verdict": "REQUOTE",
+   "quote": "just say this gets down to my $100 target here for Salana. Remember, we were all the way up. If we go all the way back here, how high were we? Uh, two, almost 300. We're almost, if we get down to the 100, roughly a little over 100",
+   "ts": 607,
+   "names_ticker": false,
+   "flag": "b",
+   "why": "Host explicitly states $100 target for Solana, down from ~300, confirming bearish call."
+  },
+  "610063": {
+   "verdict": "REQUOTE",
+   "quote": "If the market, for some reason, tanks another 10%, there you are at 50, very, very possibly.",
+   "ts": 658,
+   "names_ticker": false,
+   "flag": "a_orphan",
+   "why": "Host explicitly predicts SBUX could fall to $50 if market declines further."
+  },
+  "607435": {
+   "verdict": "REQUOTE",
+   "quote": "that gives them a dividend discount model price per share of around $114 per share now their payout ratio is close to around 50% so that growth rate should be sustainable moving forward",
+   "ts": 315,
+   "names_ticker": false,
+   "flag": "b",
+   "why": "DDM target of $114 with sustainable 4% growth is the clearest bullish forward call on TR"
+  },
+  "606383": {
+   "verdict": "REQUOTE",
+   "quote": "we're making air and lamb research the only two Fab equipment stocks that we're buying at this moment",
+   "ts": 987,
+   "names_ticker": false,
+   "flag": "a_orphan",
+   "why": "Host explicitly names Aehr as one of only two Fab equipment stocks being bought."
+  },
+  "610658": {
+   "verdict": "REQUOTE",
+   "quote": "other defensive stocks like Verizon, which could potentially go up if the market goes down",
+   "ts": 570,
+   "names_ticker": true,
+   "flag": "a_orphan",
+   "why": "Host sells puts on Verizon as defensive stock expected to rise; bullish positioning confirmed."
+  },
+  "609125": {
+   "verdict": "REQUOTE",
+   "quote": "I'm starting to get bullish from here I'm getting excited I'm finding deals I'm liking a lot of things",
+   "ts": 144,
+   "names_ticker": false,
+   "flag": "a_orphan",
+   "why": "Host explicitly states bullish stance from current position on broad market equities"
+  },
+  "607245": {
+   "verdict": "REQUOTE",
+   "quote": "their price of sales ratio which still sits north of 30 and you know as much as I'd love to ignore that and just buy the stock anyway for all of that future potential that they have I just can't bring myself to do it at a time when the broader Market is trading near an all-time high I just think there's safer and cheaper stocks out there and yes even in the more kind of speculative areas of the market so I'll be sitting this one out to at least for now",
+   "ts": 663,
+   "names_ticker": false,
+   "flag": "b",
+   "why": "Host explicitly declines SOUN due to P/S 30+ and unprofitability; current quote cuts off before bearish pivot"
+  },
+  "614874": {
+   "verdict": "REQUOTE",
+   "quote": "Walmart up 114% in 5 years.",
+   "ts": 1088,
+   "names_ticker": false,
+   "flag": "a_orphan",
+   "why": "Host highlights Walmart's strong 5-year gain vs Target's decline, implying bullish view."
+  },
+  "611069": {
+   "verdict": "REQUOTE",
+   "quote": "our acceptable Buy price for this company is about 16.58 per share meaning it's not quite in that buy range",
+   "ts": 335,
+   "names_ticker": false,
+   "flag": "a_orphan",
+   "why": "Host states current price exceeds buy threshold, implying fair-value/neutral hold stance."
+  },
+  "616620": {
+   "verdict": "REQUOTE",
+   "quote": "I would not be buying into Amazon this particular month because I expect those tariffs to really increase all the product costs and that's going to hurt their retail sales at least over the summer.",
+   "ts": 696,
+   "names_ticker": true,
+   "flag": "b",
+   "why": "Host explicitly says not buying Amazon due to tariff headwinds hurting retail sales."
+  },
+  "606599": {
+   "verdict": "REQUOTE",
+   "quote": "paler stock has just gotten too risky to buy right now so even though it's a high quality business and will likely grow in the real world the stock in my opinion is just a loser at these valuations",
+   "ts": 672,
+   "names_ticker": false,
+   "flag": "b",
+   "why": "Host explicitly calls PLTR a loser at current valuations, clear bearish call."
+  },
+  "609710": {
+   "verdict": "REQUOTE",
+   "quote": "Pure Storage expects a 7% sequential increase in revenue and a 17% year-over-year growth rate for Q4 fiscal 2026, which ends in January of 2026.",
+   "ts": 183,
+   "names_ticker": false,
+   "flag": "a_orphan",
+   "why": "Host reports management's forward guidance naming company with specific bullish growth metrics."
+  },
+  "617204": {
+   "verdict": "REQUOTE",
+   "quote": "could have a nasty surprise coming for investors when it reports its earnings November 20th",
+   "ts": 508,
+   "names_ticker": false,
+   "flag": "b",
+   "why": "Host warns of nasty surprise at earnings, explicitly bearish on WMT outlook"
+  },
+  "616902": {
+   "verdict": "REQUOTE",
+   "quote": "Netflix just recently lost the bid to acquire Warner Brothers its studio, its back catalog of of movies and media. The Paramount overbid them for $111 billion. that bidding for Netflix is actually a huge win for investors because not only did they avoid paying way too much for that Warner Brothers content in an era where AI could be making remaking a lot of that content for very much cheaply, very much cheaper here in the very near very near term. But, also Netflix got a 2.8 billion billion-dollar breakup fee from this",
+   "ts": 315,
+   "names_ticker": true,
+   "flag": "b",
+   "why": "Host explicitly frames Netflix's avoided acquisition and $2.8B fee as bullish wins for investors."
+  },
+  "616859": {
+   "verdict": "REQUOTE",
+   "quote": "Iran is likely to stretch it as long as possible. That means we do want some downside protection for these growth names against those near-term losses.",
+   "ts": 439,
+   "names_ticker": false,
+   "flag": "b",
+   "why": "Host explicitly forecasts continued market weakness requiring downside protection due to Iran conflict."
+  },
+  "606199": {
+   "verdict": "REQUOTE",
+   "quote": "Skyworks Solutions highly reliant on Apple unlike any other chip company out there. It's a big risk and some of these other outside markets have really not grown as quickly as we would have liked to see. So, stay tuned, but I think we may be moving on to Skyworks sooner rather than later for what we think could be better opportunities for the long term.",
+   "ts": 1726,
+   "names_ticker": false,
+   "flag": "b",
+   "why": "Host signals imminent exit from SWKS for better long-term opportunities, clearly bearish."
+  },
+  "617212": {
+   "verdict": "REQUOTE",
+   "quote": "cyber security is the one area companies cannot afford to cut.",
+   "ts": 245,
+   "names_ticker": false,
+   "flag": "b",
+   "why": "Host names CRWD as favorite, buys dip, cites irreplaceable cybersecurity spending."
+  },
+  "606596": {
+   "verdict": "REQUOTE",
+   "quote": "TFI International has the lowest valuation while still paying a fast growing and sustainable dividend",
+   "ts": 458,
+   "names_ticker": false,
+   "flag": "a_orphan",
+   "why": "Host explicitly favors TFII as lowest valuation with growing dividend"
+  },
+  "607092": {
+   "verdict": "REQUOTE",
+   "quote": "I just think it makes Disney a solid long-term pickup at a historically low price for a world leader",
+   "ts": 303,
+   "names_ticker": true,
+   "flag": "b",
+   "why": "Host explicitly calls Disney a solid long-term pickup at historically low price."
+  },
+  "608884": {
+   "verdict": "REQUOTE",
+   "quote": "the proposition Nvidia is making is the upgrade to Blackwell dramatically increases the throughput and the user experience the number of of tokens that can be generated for the users by a dramatic amount which ultimately leads to more Revenue potential for those data centers",
+   "ts": 568,
+   "names_ticker": true,
+   "flag": "a_orphan",
+   "why": "Names Nvidia explicitly; forward bullish claim on revenue potential from Blackwell upgrade"
+  },
+  "610426": {
+   "verdict": "REQUOTE",
+   "quote": "I still believe Adobe is presenting a good buying opportunity here and don't quote me on this, but I would not be surprised if Adobe has actually bottomed and maybe it's headed much higher from here.",
+   "ts": 260,
+   "names_ticker": true,
+   "flag": "b",
+   "why": "Host explicitly calls Adobe a buying opportunity and expects upside."
+  },
+  "606372": {
+   "verdict": "REQUOTE",
+   "quote": "for TI specifically we don't know if they're going to fall in line with the rest of the industry because they missed the entire Peak growth cycle of the last year and a half for auto and Industrial chips so I'd be a bit leery of this one for now and Casey and I are content to watch from the sidelines",
+   "ts": 815,
+   "names_ticker": false,
+   "flag": "b",
+   "why": "Names TI explicitly, expresses leery stance, concrete sidelines action \u2014 stronger bearish signal than stored quote"
+  },
+  "626942": {
+   "verdict": "REQUOTE",
+   "quote": "the valuation already looks stretched, I would say no, I wouldn't be buying Intel stock ahead of the earnings release",
+   "ts": 440,
+   "names_ticker": true,
+   "flag": "b",
+   "why": "Host explicitly says no to buying Intel, citing stretched valuation pre-earnings."
+  },
+  "608906": {
+   "verdict": "REQUOTE",
+   "quote": "The guidance implies less than 12 billion in revenue, which is both a sequential and year-over-year decrease.",
+   "ts": 188,
+   "names_ticker": false,
+   "flag": "a_orphan",
+   "why": "Host states Q2 guidance shows sequential and YoY revenue decline, explicitly bearish on Intel."
+  },
+  "617167": {
+   "verdict": "REQUOTE",
+   "quote": "AMD can still be a good value play.",
+   "ts": 239,
+   "names_ticker": true,
+   "flag": "b",
+   "why": "Host names AMD directly with a forward-looking bullish value assertion."
+  },
+  "611251": {
+   "verdict": "REQUOTE",
+   "quote": "we are sandwiched. The upside today is very low because you're going to reject before 607.\" And sure enough, we did. So, there's no reason to play calls on the Qs today.",
+   "ts": 803,
+   "names_ticker": false,
+   "flag": "ba_orphan",
+   "why": "Current quote inserts 'on the cues today' not in transcript; verbatim match with 'Qs' available."
+  },
+  "608021": {
+   "verdict": "REQUOTE",
+   "quote": "the dividend has a like high likelihood of being cut",
+   "ts": 314,
+   "names_ticker": false,
+   "flag": "b",
+   "why": "Host explicitly predicts MMM dividend cut, a clear bearish call."
+  },
+  "628461": {
+   "verdict": "REQUOTE",
+   "quote": "I do expect a decent pullback to happen in the rocket labs of the world um as some of the air will come out of the out of the uh idea as SpaceX comes to market on the 12th right",
+   "ts": 1807,
+   "names_ticker": false,
+   "flag": "a_orphan",
+   "why": "Host explicitly predicts pullback in Rocket Lab as SpaceX IPO approaches."
+  },
+  "628661": {
+   "verdict": "REQUOTE",
+   "quote": "I do like Rocket Lab down there at those prices.",
+   "ts": 2825,
+   "names_ticker": false,
+   "flag": "a_orphan",
+   "why": "Host explicitly states bullish preference for RKLB at specific price level."
+  },
+  "613158": {
+   "verdict": "DIRECTION_MISMATCH",
+   "quote": "considering the fortune Bergkshire made on your BYD suggestion, why doesn't Buffer buy Alibaba?",
+   "ts": 576,
+   "mismatch_kind": "no_call",
+   "flag": "a_orphan",
+   "labeled_direction": "bullish",
+   "ticker": "BYD",
+   "why": "Host only relays others' BYD views; makes no own directional call on BYD."
+  },
+  "626841": {
+   "verdict": "REQUOTE",
+   "quote": "I figured we'll go down to around 160 something down here",
+   "ts": 437,
+   "names_ticker": false,
+   "flag": "a_orphan",
+   "why": "Host explicitly targets $160 downside for Nvidia after bearish technical analysis"
+  },
+  "612154": {
+   "verdict": "REQUOTE",
+   "quote": "Stocks like Coinbase and Micro Strategy would lose 30 to 45% off theirs. That's a massive loss.",
+   "ts": 776,
+   "names_ticker": false,
+   "flag": "b",
+   "why": "Host predicts Coinbase stock loses 30-45% if crypto bill fails \u2014 clear bearish call."
+  },
+  "614292": {
+   "verdict": "DIRECTION_MISMATCH",
+   "quote": "Yeah, they were they were really low there for a while. I think they were like 600 bucks for a while and we're like, man, this is a a great company. It's selling cheap.",
+   "ts": 4272,
+   "mismatch_kind": "no_call",
+   "flag": "b",
+   "labeled_direction": "bullish",
+   "ticker": "ASML",
+   "why": "Host recounts a past call retrospectively; no committed forward bullish call made here."
+  },
+  "625811": {
+   "verdict": "REQUOTE",
+   "quote": "Look at how this how Microsoft has been below this declining 5-day moving average. There is no reason to buy a stock under those conditions.",
+   "ts": 956,
+   "names_ticker": true,
+   "flag": "b",
+   "why": "Host explicitly states no reason to buy MSFT, confirming bearish stance."
+  },
+  "612876": {
+   "verdict": "REQUOTE",
+   "quote": "according to my model shopify is not a buy right now",
+   "ts": 455,
+   "names_ticker": true,
+   "flag": "b",
+   "why": "Host explicitly states Shopify is not a buy based on his valuation model"
+  },
+  "612895": {
+   "verdict": "REQUOTE",
+   "quote": "it's a really good buy of 53 dollars a share or it could even go to 20 or 25 dollars a share",
+   "ts": 23,
+   "names_ticker": false,
+   "flag": "b",
+   "why": "Host explicitly states COIN could fall to $20-25, a bearish downside target."
+  },
+  "629269": {
+   "verdict": "DIRECTION_MISMATCH",
+   "quote": "NVDA. Same thing. Ooh, continuously selling.",
+   "ts": 504,
+   "mismatch_kind": "no_call",
+   "flag": "a_orphan",
+   "labeled_direction": "bullish",
+   "ticker": "NVDA",
+   "why": "Host corrects to NVDA and notes it is continuously selling; no bullish price target given"
+  },
+  "626287": {
+   "verdict": "REQUOTE",
+   "quote": "there's just been too much selling suggesting uh it's finally time to go shopping at Roblox",
+   "ts": 61,
+   "names_ticker": false,
+   "flag": "b",
+   "why": "Host signals buying opportunity at Roblox after overselling, implying bullish stance."
+  },
+  "608982": {
+   "verdict": "REQUOTE",
+   "quote": "for me personally a slight Miss on something like that just isn't enough for me to think it warrants a selloff we have to keep in mind we're talking about one of the highest quality businesses in the entire world that despite its success over the decades it's still in the growth stage",
+   "ts": 576,
+   "names_ticker": false,
+   "flag": "b",
+   "why": "Host explicitly rejects selloff and defends Microsoft as high-quality growth business."
+  },
+  "610981": {
+   "verdict": "REQUOTE",
+   "quote": "i think verizon is a value trap i think it's mostly a dud i think it's gonna be basically dead or next to dead money for a very long time going forward",
+   "ts": 1132,
+   "names_ticker": true,
+   "flag": "b",
+   "why": "Host explicitly calls Verizon a value trap and dead money long-term."
+  },
+  "611185": {
+   "verdict": "INSUFFICIENT",
+   "flag": "b",
+   "why": "judge/substring failed: "
+  },
+  "612229": {
+   "verdict": "REQUOTE",
+   "quote": "The 450 series seems like they have demand that they they have so much demand for 450 series that like it's going to be hard to even fathom how much demand they have for that, okay?",
+   "ts": 1449,
+   "names_ticker": false,
+   "flag": "a_orphan",
+   "why": "Host's own forward bullish claim on AMD MI450 demand; AMD named immediately prior"
+  },
+  "613854": {
+   "verdict": "REQUOTE",
+   "quote": "got weakness in apple as they report their earnings on August 1st it's going to be difficult for Apple to provide any type of upside surprises I think you continue to see weakness in apple that pullbacks certainly south of 200 those should be bought",
+   "ts": 1144,
+   "names_ticker": true,
+   "flag": "b",
+   "why": "Host explicitly forecasts continued weakness in Apple below $200, a clear bearish call."
+  },
+  "614053": {
+   "verdict": "REQUOTE",
+   "quote": "Intel is actually the opposite they missed on their revenue projections this quarter they're going to miss in the second quarter as well and that is just a disaster for the stock",
+   "ts": 237,
+   "names_ticker": true,
+   "flag": "b",
+   "why": "Host calls Intel missing projections 'a disaster for the stock', clear bearish call"
+  },
+  "609537": {
+   "verdict": "REQUOTE",
+   "quote": "look at this going okay we've had this big run up and go look a parabolic run-up i mean guys this is not sustainable",
+   "ts": 506,
+   "names_ticker": false,
+   "flag": "b",
+   "why": "Host calls OCGN chart parabolic and explicitly states it is not sustainable."
+  },
+  "613880": {
+   "verdict": "REQUOTE",
+   "quote": "you could blast up above to new highs on a stock like this that's certainly one of the bull case Arguments for meta",
+   "ts": 1052,
+   "names_ticker": true,
+   "flag": "b",
+   "why": "Host explicitly names bull case and new highs for meta, stronger than current quote"
+  },
+  "609783": {
+   "verdict": "DIRECTION_MISMATCH",
+   "quote": "be very careful with this one be very careful paul",
+   "ts": 323,
+   "mismatch_kind": "no_call",
+   "flag": "b",
+   "labeled_direction": "bullish",
+   "ticker": "INVA",
+   "why": "Host warns caution twice; no committed bullish call despite volume scenario description"
+  },
+  "613831": {
+   "verdict": "REQUOTE",
+   "quote": "I think we've got a fullblown market correction on our hands after Amazon reported earnings after the Bell today we are seeing shares of Amazon decline by about 5%",
+   "ts": 15,
+   "names_ticker": true,
+   "flag": "b",
+   "why": "Host states market correction driven by Amazon earnings miss with 5% after-hours decline"
+  },
+  "611013": {
+   "verdict": "DIRECTION_MISMATCH",
+   "quote": "when i see high quality companies fall dramatically in price in a short amount of time because of what i consider to be mostly temporary and overblown news i think that that's an opportunity that i like to take advantage of",
+   "ts": 1475,
+   "mismatch_kind": "no_call",
+   "flag": "b",
+   "labeled_direction": "bullish",
+   "ticker": "CMG",
+   "why": "CMG never mentioned; window covers only Starbucks and Dominos calls"
+  },
+  "612616": {
+   "verdict": "REQUOTE",
+   "quote": "That moves us over to Salana. The other one I'm I'm looking to add into my portfolio. Very similar to XRP. Huge downward we had right here. We crossed the 13. Expect to finish below here within the next three candles. One, two, boom. third one got us there after we finished below. We do expect to go a little lower.",
+   "ts": 548,
+   "names_ticker": false,
+   "flag": "a_orphan",
+   "why": "Names Solana and contains explicit bearish call; better than pronoun-only current quote."
+  },
+  "613051": {
+   "verdict": "REQUOTE",
+   "quote": "management is incompetent and uh good luck with shareholders. Oh, by the way, you're already down 75%, right? Perhaps the stock might go higher on a takeover or something like that. What can I say? You can see the quality of the management with their actions, with what they say, with what they do it",
+   "ts": 788,
+   "names_ticker": false,
+   "flag": "b",
+   "why": "Host explicitly calls management incompetent and signals no bullish case for WHR."
+  },
+  "610972": {
+   "verdict": "DIRECTION_MISMATCH",
+   "quote": "i still continue to dollar cost average in basically every week and every month and i'll continue to throughout this year",
+   "ts": 1554,
+   "mismatch_kind": "no_call",
+   "flag": "b",
+   "labeled_direction": "bearish",
+   "ticker": "TSLA",
+   "why": "TSLA never mentioned; host expresses bullish DCA intent, not bearish call"
+  },
+  "607966": {
+   "verdict": "REQUOTE",
+   "quote": "if we jump over to the dividend breakdown sheet we'll come up here plug in un H and you'll quickly see everything looks really really good yes starting div yield but the dividend growth is massive 10-year dividend kager of 19.58%",
+   "ts": 829,
+   "names_ticker": false,
+   "flag": "b",
+   "why": "Names ticker, explicit 'everything looks really really good' plus massive dividend growth conviction"
+  },
+  "614057": {
+   "verdict": "REQUOTE",
+   "quote": "shame on me for ever doubting uh Google I tell you what here's your net income 2324 billion",
+   "ts": 548,
+   "names_ticker": true,
+   "flag": "b",
+   "why": "Host reverses prior criticism, expressing strong bullish conviction on Google after earnings beat"
+  },
+  "608070": {
+   "verdict": "REQUOTE",
+   "quote": "maybe it could do another lvmh and go up over 17 or 18% within two to three weeks",
+   "ts": 166,
+   "names_ticker": false,
+   "flag": "b",
+   "why": "Host expects NSRGY to bounce like LVMH, projecting 17-18% upside in weeks."
+  },
+  "607454": {
+   "verdict": "REQUOTE",
+   "quote": "so despite the fact I'm up over 163% on this position I have no interest in selling my shares even if I saw a slight decline in the coming months or even years I still wouldn't sell this position",
+   "ts": 196,
+   "names_ticker": false,
+   "flag": "b",
+   "why": "Host explicitly commits to holding AVGO long-term despite gains, confirming bullish stance."
+  },
+  "608805": {
+   "verdict": "REQUOTE",
+   "quote": "I'm ranking them very high at number two, because this really is an ultra-premium company at surprisingly still a pretty reasonable valuation for what you get back in return.",
+   "ts": 305,
+   "names_ticker": false,
+   "flag": "b",
+   "why": "Host ranks MSFT #2, calls it ultra-premium at reasonable valuation \u2014 clear bullish commitment."
+  },
+  "606821": {
+   "verdict": "REQUOTE",
+   "quote": "my favorite though is easily Neo who I decided to pick up after seeing it Crash from over $66 a share down to just $10 today and I'm not saying that I expected to return back up to those really high levels but even if it doubles or maybe triples from here I'd be super ecstatic",
+   "ts": 914,
+   "names_ticker": true,
+   "flag": "b",
+   "why": "Host bought NEO and expects it to double or triple; clearly bullish."
+  },
+  "607447": {
+   "verdict": "REQUOTE",
+   "quote": "I personally have no plans to sell this company I absolutely love the free cash flow growth that I've seen from them and the dividend growth as a result of that",
+   "ts": 583,
+   "names_ticker": false,
+   "flag": "b",
+   "why": "Host confirms long-term bullish hold on DPZ citing FCF and dividend growth"
+  },
+  "606889": {
+   "verdict": "REQUOTE",
+   "quote": "I would not buy Nike anywhere above 90 per share",
+   "ts": 466,
+   "names_ticker": true,
+   "flag": "b",
+   "why": "Host explicitly states he would not buy Nike above $90, a clear bearish call."
+  },
+  "607090": {
+   "verdict": "REQUOTE",
+   "quote": "I absolutely love Microsoft stock unfortunately it rarely ever dips but I think that's always going to be the case with this one the valuation will probably always be very rich but you really get what you pay for with Microsoft and I personally feel that they they deserve the premium price tag and the number one ranking it's definitely the type of stock that you want to go ham on during any kind of Market correction or crash",
+   "ts": 882,
+   "names_ticker": true,
+   "flag": "b",
+   "why": "Host explicitly loves MSFT, endorses premium valuation, recommends buying on dips."
+  },
+  "608732": {
+   "verdict": "REQUOTE",
+   "quote": "fundamentals are good at all now for the valuation of the stock it's now only trading at a 12% free cash flow yield",
+   "ts": 327,
+   "names_ticker": false,
+   "flag": "b",
+   "why": "Host is consistently bearish on CVS fundamentals, guidance cuts, and worsening outlook."
+  },
+  "606579": {
+   "verdict": "INSUFFICIENT",
+   "flag": "b",
+   "why": "Stored quote absent from window; window cuts off mid-sentence before any explicit directional call."
+  },
+  "614401": {
+   "verdict": "REQUOTE",
+   "quote": "i've purchased more comcast i've purchased more target with comcast there's a lot of things i like about this company",
+   "ts": 847,
+   "names_ticker": false,
+   "flag": "b",
+   "why": "Host explicitly states buying more Comcast and lists bullish reasons for it."
+  },
+  "606424": {
+   "verdict": "DIRECTION_MISMATCH",
+   "quote": "finally explain why it may be time to buy the dip on Visa stock if it continues to fall from this price",
+   "ts": 72,
+   "mismatch_kind": "opposite",
+   "flag": "b",
+   "labeled_direction": "bearish",
+   "ticker": "V",
+   "why": "Host signals buying opportunity; no bearish forward call made anywhere in window"
+  },
+  "614435": {
+   "verdict": "REQUOTE",
+   "quote": "i think this bank will come out very strong so i'm going to be putting more money into jpmorgan this is more of a risky bet but i think this company will come out strong and eventually be trading back at 130 140 a share where it was previous to this year",
+   "ts": 299,
+   "names_ticker": true,
+   "flag": "b",
+   "why": "Host commits to buying more JPM, targets $130-140, names company explicitly"
+  },
+  "606658": {
+   "verdict": "REQUOTE",
+   "quote": "I think Google's valuation makes a lot of sense, even if you are only looking at Google search and YouTube.",
+   "ts": 526,
+   "names_ticker": true,
+   "flag": "a_orphan",
+   "why": "Host expresses clear bullish conviction on Alphabet valuation and growth prospects"
+  },
+  "606242": {
+   "verdict": "REQUOTE",
+   "quote": "I think we're going to make a small nibble on this and then maybe see what happens from there very small nible",
+   "ts": 1715,
+   "names_ticker": false,
+   "flag": "a_orphan",
+   "why": "Host explicitly states intent to buy sphere entertainment shares, clearer than current quote"
+  },
+  "606338": {
+   "verdict": "REQUOTE",
+   "quote": "Marvel we really really do not think is a Best Buy yet keep tabs on it but you know sit on your hands we think patients will continue to pay off on this one",
+   "ts": 1155,
+   "names_ticker": false,
+   "flag": "b",
+   "why": "Host explicitly says MRVL not a Best Buy yet, advises sitting on hands."
+  },
+  "606386": {
+   "verdict": "REQUOTE",
+   "quote": "we think armh holding is going to be a solid growth business for a while and rebounding profitability off of depressed financials last year in 2022 and 2023",
+   "ts": 0,
+   "names_ticker": false,
+   "flag": "a_orphan",
+   "why": "Host makes forward bullish call naming ARMH with growth and profitability rebound prediction"
+  },
+  "606957": {
+   "verdict": "REQUOTE",
+   "quote": "we really like the position that excelis is in right now they have well over half a billion dollars in cash sitting on their balance sheet and no debt that puts them in pretty good shape to it sounds like they're probably in advanced talks to make some sort of acquisition to strengthen their business in the midst of this downturn it's a fantastic place to be in",
+   "ts": 1006,
+   "names_ticker": false,
+   "flag": "b",
+   "why": "Full sentence ends with 'fantastic place to be in' \u2014 stronger bullish close cut from stored quote"
+  },
+  "607150": {
+   "verdict": "REQUOTE",
+   "quote": "so if you add all of these details up together what I think that we're really left with here is a giant leader in a market that I think is only going to grow larger over time but that the stock is being dragged down because of macroeconomic issues here in the short term but longer term I think this is a dividend Beast here that uh should probably be owned in most people's portfolios",
+   "ts": 521,
+   "names_ticker": false,
+   "flag": "b",
+   "why": "Host calls APD a dividend Beast that should be owned in most portfolios."
+  },
+  "608883": {
+   "verdict": "REQUOTE",
+   "quote": "I think this stock is going to probably come under some pressure I think it would be worth being patient",
+   "ts": 162,
+   "names_ticker": false,
+   "flag": "b",
+   "why": "Host explicitly predicts stock pressure and advises patience, confirming bearish stance."
+  },
+  "607125": {
+   "verdict": "REQUOTE",
+   "quote": "I still feel that the overall Eevee Market in the future will be large enough to support multiple players and I do feel that GM could um be one of the successful ones in that space",
+   "ts": 863,
+   "names_ticker": true,
+   "flag": "b",
+   "why": "Host explicitly names GM and expresses forward bullish belief in its EV future."
+  },
+  "606663": {
+   "verdict": "DIRECTION_MISMATCH",
+   "quote": "Microsoft's Core Business will not be directly impacted",
+   "ts": 480,
+   "mismatch_kind": "opposite",
+   "flag": "b",
+   "labeled_direction": "bearish",
+   "ticker": "MSFT",
+   "why": "Host calls MSFT unaffected by tariffs; displayed quote shows a buy order \u2014 both bullish."
+  },
+  "607449": {
+   "verdict": "INSUFFICIENT",
+   "flag": "b",
+   "why": "Window cuts off before conclusion; stored quote absent; no explicit buy call found"
+  },
+  "608641": {
+   "verdict": "DIRECTION_MISMATCH",
+   "quote": "that's typically considered a pretty good valuation also keep in mind return on invested capital for this company has actually been pretty solid especially for a retail stock over the past decade",
+   "ts": 461,
+   "mismatch_kind": "no_call",
+   "flag": "b",
+   "labeled_direction": "bullish",
+   "ticker": "TGT",
+   "why": "Window presents valuation metrics positively but contains no committed forward bullish call on TGT"
+  },
+  "606918": {
+   "verdict": "REQUOTE",
+   "quote": "I would not buy in for a while and I would definitely um wait until that price Falls a little bit more before even thinking about opening a position",
+   "ts": 546,
+   "names_ticker": false,
+   "flag": "b",
+   "why": "Host explicitly says wait, don't buy, price will fall further \u2014 committed bearish call."
+  },
+  "614712": {
+   "verdict": "REQUOTE",
+   "quote": "Apple TV plus is a brand-new service they're going into the content creation business they're competing with all the other big companies and this is something that could lead to a brand new path of growth for the company unlike their iPhones and their devices that they already sell so this is huge news",
+   "ts": 589,
+   "names_ticker": true,
+   "flag": "b",
+   "why": "Host explicitly names Apple TV+ as new growth path, making a committed bullish call."
+  },
+  "606377": {
+   "verdict": "REQUOTE",
+   "quote": "we do still have confidence in Alam Marl we still do have confidence in Arcadium lithium our outlock hasn't really changed",
+   "ts": 538,
+   "names_ticker": false,
+   "flag": "a_orphan",
+   "why": "Host expresses unchanged, non-committal confidence in ALB \u2014 neutral stance confirmed."
+  },
+  "608073": {
+   "verdict": "REQUOTE",
+   "quote": "if I do get assigned my adjusted cost basis is $3.50 per share which is dirt cheap for me for sandstorm I did a video on it before and I understand this company very very well and I saying if I do get a signed I hope I do $33.50 is I mean it's just the best deal in the world in my opinion so I'm happy to make 12% on some cash that I had on the side selling put options on Sandstorm Gold",
+   "ts": 336,
+   "names_ticker": false,
+   "flag": "b",
+   "why": "Host explicitly calls $3.50 sandstorm cost basis 'best deal in the world', confirms bullish put-selling strategy."
+  },
+  "608398": {
+   "verdict": "REQUOTE",
+   "quote": "we talked about the rally was probably deserved after snowflakes 23 fiscal 2025 update but posited that we thought this rally was going to fade and sure enough it has a bit it's back where it was in the first quarter of calendar year 2024",
+   "ts": 130,
+   "names_ticker": false,
+   "flag": "b",
+   "why": "Host names Snowflake, states rally predicted to fade, confirms it has \u2014 clear bearish call"
+  },
+  "625459": {
+   "verdict": "REQUOTE",
+   "quote": "I don't think Palantir stock is a buying opportunity ahead of earnings.",
+   "ts": 381,
+   "names_ticker": true,
+   "flag": "b",
+   "why": "Host explicitly says Palantir is not a buying opportunity, confirming bearish call."
+  },
+  "625737": {
+   "verdict": "REQUOTE",
+   "quote": "I would like to be short on a lower high sub 296, re-targeting the gap close, and then even looking for follow-through through the thin structure retracement.",
+   "ts": 4035,
+   "names_ticker": false,
+   "flag": "a_orphan",
+   "why": "Host explicitly states desire to go short on GOOGL on lower high below 296"
+  },
+  "625850": {
+   "verdict": "REQUOTE",
+   "quote": "Overhead supply still exists. Bearish, bearish, bearish. Nothing, you know, no no update to the thesis here. Still looking for downside.",
+   "ts": 4648,
+   "names_ticker": false,
+   "flag": "a_orphan",
+   "why": "Host explicitly calls JPM bearish with repeated emphasis and downside target."
+  },
+  "625894": {
+   "verdict": "REQUOTE",
+   "quote": "A 20% decline at SanDisk. It is, in my opinion, very undesirable to own it at these levels.",
+   "ts": 1433,
+   "names_ticker": false,
+   "flag": "a_orphan",
+   "why": "Host names SanDisk and explicitly calls it very undesirable to own at current levels"
+  },
+  "626303": {
+   "verdict": "REQUOTE",
+   "quote": "odds favor more to the downside. Uh, but we'll have to see, of course, what happens",
+   "ts": 689,
+   "names_ticker": false,
+   "flag": "a_orphan",
+   "why": "Host explicitly states odds favor downside for IBIT near unfilled gap and declining MAs"
+  },
+  "626276": {
+   "verdict": "REQUOTE",
+   "quote": "We're now losing the 9097 support line, which suggests 77 is in the future.",
+   "ts": 431,
+   "names_ticker": false,
+   "flag": "a_orphan",
+   "why": "Host forecasts NFLX price dropping to 77, a bearish forward call."
+  },
+  "626007": {
+   "verdict": "REQUOTE",
+   "quote": "That's basically cuz uh American Airlines is going up. I have a 14 sell put. It's at $16. So, I feel comfortable repositioning this from 14 sell put to a 15 sell put.",
+   "ts": 726,
+   "names_ticker": false,
+   "flag": "b",
+   "why": "Host explicitly states American Airlines is going up and repositions to higher strike put."
+  },
+  "626397": {
+   "verdict": "REQUOTE",
+   "quote": "Jazz in biotech pulling back towards this low area. Subtle undercut of that last week. So, let me go ahead and draw that in for you. And now it's trying to build out this space and uh push through um these uh highs right here. So, watching for a breakout here and basically U-turn and start of a strong trend.",
+   "ts": 555,
+   "names_ticker": true,
+   "flag": "a_orphan",
+   "why": "Host names Jazz, describes breakout setup and start of strong uptrend \u2014 bullish call."
+  },
+  "626602": {
+   "verdict": "REQUOTE",
+   "quote": "symbotic is probably going to demomentum and get back down to 53 to 64 is my opinion",
+   "ts": 3443,
+   "names_ticker": false,
+   "flag": "a_orphan",
+   "why": "Host predicts SYM price decline to 53-64, a clear bearish directional call"
+  },
+  "626422": {
+   "verdict": "REQUOTE",
+   "quote": "WDC, really great-looking chart out of this two-day doji back-to-back. Nice break and follow-through. Brand new all-time high close. Looking for the next higher low.",
+   "ts": 2037,
+   "names_ticker": true,
+   "flag": "a_orphan",
+   "why": "Host explicitly bullish on WDC: all-time high close, looking for higher lows."
+  },
+  "626128": {
+   "verdict": "REQUOTE",
+   "quote": "595, I think, is our next stop. Yeah, 595 is our next stop.",
+   "ts": 5264,
+   "names_ticker": false,
+   "flag": "a_orphan",
+   "why": "Host calls QQQ dropping to 595 as next stop, bearish price target."
+  },
+  "626120": {
+   "verdict": "REQUOTE",
+   "quote": "Eli Liy, take a look at this thing. Nice balance range here. Bull flag earnings in the rearview mirror. Gap and go on earnings.",
+   "ts": 3055,
+   "names_ticker": false,
+   "flag": "a_orphan",
+   "why": "Names company, states bullish setup: bull flag, gap and go \u2014 better than pronoun-only quote."
+  },
+  "626240": {
+   "verdict": "REQUOTE",
+   "quote": "So, just like the IGV, big breakdown here, lower high and looking for continuation. Look at the inverted hammer on Friday, right off of that 229 area. If we can get a break of Friday's low, I would expect at least the equal lows in here at 220.",
+   "ts": 3689,
+   "names_ticker": false,
+   "flag": "a_orphan",
+   "why": "Host explicitly calls CRM bearish with lower high and downside target at 220."
+  },
+  "626884": {
+   "verdict": "REQUOTE",
+   "quote": "Freaking Tesla going down.",
+   "ts": 4,
+   "names_ticker": true,
+   "flag": "ba_orphan",
+   "why": "Host confirms Tesla falling; mentions mid-3s target and loss of 414 support bearishly"
+  },
+  "608486": {
+   "verdict": "REQUOTE",
+   "quote": "I got to say, Veracite at that valuation looks pretty attractive to me here on the dip.",
+   "ts": 765,
+   "names_ticker": false,
+   "flag": "b",
+   "why": "Host calls Veracite valuation attractive on the dip, a clear bullish commitment."
+  },
+  "612608": {
+   "verdict": "REQUOTE",
+   "quote": "More times than not that'll lead over the next few candles to a break lower than this close right here at 87,000.",
+   "ts": 340,
+   "names_ticker": false,
+   "flag": "a_orphan",
+   "why": "Host predicts BTC breaks below 87k close, clear bearish technical call."
+  },
+  "608665": {
+   "verdict": "REQUOTE",
+   "quote": "the incredible net income and profitability is likely over it can go into a very ugly business and therefore I would not buy it I would leave it to the investment bankers",
+   "ts": 532,
+   "names_ticker": false,
+   "flag": "b",
+   "why": "Host explicitly says 'I would not buy it' after bearish analysis of Disney."
+  },
+  "626911": {
+   "verdict": "REQUOTE",
+   "quote": "I'm expecting this to continue its trend after some pullback after some short-term consolidation very strong action",
+   "ts": 508,
+   "names_ticker": false,
+   "flag": "b",
+   "why": "Host explicitly expects NVDA trend continuation after consolidation, clear bullish call."
+  },
+  "627086": {
+   "verdict": "REQUOTE",
+   "quote": "And Broadcom is expected to continue that 20% pace of revenue growth, but expectations are so high and investors just want more everinccreasing growth forecasts. With shares trading at 25 times on a price to sales basis, a huge premium to the valuation it's traded at in the past, this one is set up for a disappointment and a drop, even if it will still be a good long-term investment.",
+   "ts": 606,
+   "names_ticker": true,
+   "flag": "b",
+   "why": "Names Broadcom explicitly then delivers the same bearish drop call; better than pronoun-only current quote."
+  },
+  "610048": {
+   "verdict": "REQUOTE",
+   "quote": "you're not buying stability at a p ratio of 26 and then on their innovativeness and the air brand I'm sorry to say that but my Mike is now 61 years old and maybe he will kill me for saying this maybe he can't dunk anymore which is a big risk no the risk is not Mike dunking or not but it is risky to check a company at a p ratio of 27 expecting that things will turn around and start growing",
+   "ts": 347,
+   "names_ticker": false,
+   "flag": "b",
+   "why": "Host explicitly rejects Nike as a buy at P/E 26-27 with no growth, clear bearish stance."
+  },
+  "605977": {
+   "verdict": "REQUOTE",
+   "quote": "i do love coca-cola stock but at this price i don't know if it's the best option for dividend investors",
+   "ts": 399,
+   "names_ticker": false,
+   "flag": "b",
+   "why": "Names company, clearly states current price is not recommended for investors"
+  },
+  "609241": {
+   "verdict": "REQUOTE",
+   "quote": "And in fact, I do plan on selling Apple over the next couple months here to further consolidate my portfolio.",
+   "ts": 644,
+   "names_ticker": true,
+   "flag": "b",
+   "why": "Host explicitly states selling Apple; stronger bearish signal than displayed DCF quote."
+  },
+  "627177": {
+   "verdict": "REQUOTE",
+   "quote": "watching for a break through these highs, this short-term range on volume, following through on Friday's strong bar and pushing off that level and then continuing the trend",
+   "ts": 96,
+   "names_ticker": false,
+   "flag": "b",
+   "why": "Host watches for breakout continuation on MGNI, a clear bullish forward call."
+  },
+  "610057": {
+   "verdict": "REQUOTE",
+   "quote": "Strong by clear Weare energy so another utility another spread corporate debt refinancing and then we have to see when and how will that be refinanced everything looks great the yield is great everything looks great but this is then again utility us everybody's now investing in the US but Warren Buffett warned in his letter to shareholders about the change in the utility environment in the US which is then another risk and a risk that long-term investors should think about before betting on reversals here",
+   "ts": 1599,
+   "names_ticker": false,
+   "flag": "b",
+   "why": "Host flags refinancing risk and Buffett utility warning as bearish concerns on Clear Wave Energy"
+  },
+  "605669": {
+   "verdict": "REQUOTE",
+   "quote": "I buy Bitcoin literally every day and I smash buy it on the disc I had limit orders down to $10,000 uh when Bitcoin was trading at 16k okay it's close to $100,000 right now so um it's just one of those things that you have to study if you don't get it you think I'm an idiot if you get it it's the smartest thing on this list",
+   "ts": 685,
+   "names_ticker": true,
+   "flag": "b",
+   "why": "Names Bitcoin explicitly; stronger bullish endorsement than stored quote"
+  },
+  "605979": {
+   "verdict": "REQUOTE",
+   "quote": "this is still at this current value an opportunity to see some price appreciation with a massive 9.25 percent dividend yield",
+   "ts": 542,
+   "names_ticker": false,
+   "flag": "b",
+   "why": "Host calls OHI a buying opportunity with price appreciation and high yield"
+  },
+  "609113": {
+   "verdict": "REQUOTE",
+   "quote": "I believe lbmh is somewhat overvalued at 22 times earnings it's not the best bargain ever",
+   "ts": 215,
+   "names_ticker": false,
+   "flag": "b",
+   "why": "Host explicitly calls LVMH somewhat overvalued at current price, bearish stance confirmed"
+  },
+  "607719": {
+   "verdict": "REQUOTE",
+   "quote": "either way though longer term uh I think that it'll be a winner from its current valuation and it's a decent play on the Travel markets overall too",
+   "ts": 542,
+   "names_ticker": false,
+   "flag": "b",
+   "why": "Host makes committed bullish long-term call on Expedia explicitly naming current valuation"
+  },
+  "607680": {
+   "verdict": "REQUOTE",
+   "quote": "assuming about a 6% free cash flow growth over the next 10 years or so I have a margin of safety Buy price at $482 1 cent or 4 PE of 18.1",
+   "ts": 259,
+   "names_ticker": false,
+   "flag": "a_orphan",
+   "why": "Host sets explicit margin-of-safety buy price for Ulta, confirming bullish conviction."
+  },
+  "612648": {
+   "verdict": "REQUOTE",
+   "quote": "I'm looking for crypto to get down to the 80 or Bitcoin to get down to the 80 to 85 zone.",
+   "ts": 521,
+   "names_ticker": true,
+   "flag": "b",
+   "why": "Host explicitly targets BTC at 80-85 zone, a committed bearish forward call."
+  },
+  "613109": {
+   "verdict": "REQUOTE",
+   "quote": "so the fair value for me it's a p ratio of 15 on grade times the 70 down nothing against Ferrari but this is the investing reality extremely risky",
+   "ts": 271,
+   "names_ticker": false,
+   "flag": "b",
+   "why": "Host assigns fair value 70% below market, explicitly calling Ferrari extremely risky."
+  },
+  "627268": {
+   "verdict": "REQUOTE",
+   "quote": "do I think you should be buying AMD stock ahead of earnings? I would say no. I would say the valuation is already incorporating a lot of this positive news.",
+   "ts": 480,
+   "names_ticker": true,
+   "flag": "a_orphan",
+   "why": "Names AMD explicitly; clearer bearish call than pronoun-only downside quote"
+  },
+  "606196": {
+   "verdict": "REQUOTE",
+   "quote": "so we are continuing to add to our position here with dynatrace",
+   "ts": 1143,
+   "names_ticker": false,
+   "flag": "a_orphan",
+   "why": "Host confirms active buying of Dynatrace position, clear bullish commitment."
+  },
+  "610352": {
+   "verdict": "REQUOTE",
+   "quote": "BCE it is too risky for the yield especially with the slow unlikely future growth there has been a lot of debt piling that will increase the cost and therefore I would not consider it here as a long-term buy",
+   "ts": 730,
+   "names_ticker": true,
+   "flag": "b",
+   "why": "Names BCE directly, explicit rejection as long-term buy due to debt/risk."
+  },
+  "606844": {
+   "verdict": "REQUOTE",
+   "quote": "in the mining sector I only have one company Rio Tinto the share price is almost unchanged over the year but in the last 6 months the shares have risen nearly 18% one to watch perhaps in 2024",
+   "ts": 205,
+   "names_ticker": true,
+   "flag": "a_orphan",
+   "why": "Better quote names Rio Tinto explicitly; host signals bullish watch for 2024."
+  },
+  "609925": {
+   "verdict": "REQUOTE",
+   "quote": "Yeah, we own both Figma and ServiceNow. Started buying Figma after the catastrophic performance here as of late.",
+   "ts": 1302,
+   "names_ticker": false,
+   "flag": "a_orphan",
+   "why": "Host discloses owning and actively buying Figma after price decline \u2014 committed bullish position."
+  },
+  "608461": {
+   "verdict": "REQUOTE",
+   "quote": "I don't know how long this will take for crowd strike to recover fully but I do think it will take a bit longer than investors are expecting",
+   "ts": 1855,
+   "names_ticker": false,
+   "flag": "b",
+   "why": "Host explicitly says recovery slower than investors expect, naming company directly"
+  },
+  "611245": {
+   "verdict": "REQUOTE",
+   "quote": "Affirm stock has, well, not only intraday been falling on this news, but over the you know, since about January, so year-to-date we've dropped about 50% in value on Affirm.",
+   "ts": 12550,
+   "names_ticker": false,
+   "flag": "b",
+   "why": "Host explicitly names Affirm, cites 50% YTD drop, signals bearish outlook."
+  },
+  "607915": {
+   "verdict": "REQUOTE",
+   "quote": "we're still very pleased with the progress and still happy to own lamb and possibly nibble some more on lamb as the year go progresses",
+   "ts": 34,
+   "names_ticker": false,
+   "flag": "a_orphan",
+   "why": "Host affirms ownership and willingness to add; current quote is already the best sentence."
+  },
+  "608919": {
+   "verdict": "REQUOTE",
+   "quote": "you don't want to miss the beginning of those cycles because the first wave of growth tends to be quite dramatic. So the EDA leaders, Synopsis, Cadence, Seaman's EDA, perhaps even Ksite still waiting for the return of growth for the industry excluding AI and accelerated computing. If you remove Nvidia and TSMC, everybody else still waiting for a more dramatic upturn.",
+   "ts": 686,
+   "names_ticker": false,
+   "flag": "a_orphan",
+   "why": "Including preceding sentence links dramatic growth cycle thesis directly to Cadence by name."
+  },
+  "614276": {
+   "verdict": "DIRECTION_MISMATCH",
+   "quote": "joint corp j-y-n-t uh oh he's sold a lot of that recently so this might be off on the timing for a joint corp",
+   "ts": 3150,
+   "mismatch_kind": "no_call",
+   "flag": "b",
+   "labeled_direction": "bullish",
+   "ticker": "JYNT",
+   "why": "Host notes recent selling and timing uncertainty; no bullish forward call made."
+  },
+  "614268": {
+   "verdict": "REQUOTE",
+   "quote": "i wasn't able to wrap my head around you know what the durable competitive advantage is for curiosity stream or if they have a compelling enough offering to be able to attract a growing ecosystem of customers i wasn't able to wrap my head around that so yeah that was a pass for me",
+   "ts": 3059,
+   "names_ticker": false,
+   "flag": "b",
+   "why": "Host explicitly passes on Curiosity Stream citing inability to identify durable competitive advantage."
+  },
+  "614500": {
+   "verdict": "REQUOTE",
+   "quote": "I think Duolingo has kind of been tanking a little bit because yes, you can learn a language in a fantastic manner with Duolingo, but why do you need to learn a language if you could just put on AI glasses or use your phone or use AirPods like what Apple is doing now?",
+   "ts": 792,
+   "names_ticker": false,
+   "flag": "a_orphan",
+   "why": "Host states Duolingo is tanking due to AI translation alternatives, clear bearish call."
+  },
+  "607203": {
+   "verdict": "REQUOTE",
+   "quote": "2025 could certainly be a big year for Verdi",
+   "ts": 660,
+   "names_ticker": false,
+   "flag": "b",
+   "why": "Host names Vertiv and makes explicit forward bullish call for 2025"
+  },
+  "614560": {
+   "verdict": "REQUOTE",
+   "quote": "the way to protect our wealth is by having exposure to good companies. Whether that's great companies in the stock market over the long term",
+   "ts": 849,
+   "names_ticker": true,
+   "flag": "a_orphan",
+   "why": "Host explicitly recommends long-term broad stock market exposure as wealth protection"
+  },
+  "614990": {
+   "verdict": "REQUOTE",
+   "quote": "as you see with Duolingo here like you know 2 days already 27% but it can go it can easily go the other way as well.",
+   "ts": 1556,
+   "names_ticker": false,
+   "flag": "b",
+   "why": "Host bought puts on Duolingo expecting massive downside, clearly bearish."
+  },
+  "614868": {
+   "verdict": "REQUOTE",
+   "quote": "people gave Tom Lee like $10 billion or $13 billion to go buy Ethereum. And he's burned 30% of their money roughly. Ethereum's down 7% year-to-date. Tom Lee was shopping at the top. Tom Lee was the top. He was the exit liquidity. Tom Lee was the exit liquidity.",
+   "ts": 3211,
+   "names_ticker": true,
+   "flag": "b",
+   "why": "Stored quote has wrong caps and 'here today' vs transcript's 'year-to-date'; this exact substring names ETH and conveys bearish framing."
+  },
+  "625474": {
+   "verdict": "REQUOTE",
+   "quote": "I am expecting first quarter earnings when gold was at new records above $5,500 an ounce to be a record quarter for Agnico.",
+   "ts": 275,
+   "names_ticker": false,
+   "flag": "a_orphan",
+   "why": "Host explicitly expects record quarter for Agnico, a committed bullish call."
+  },
+  "609200": {
+   "verdict": "DIRECTION_MISMATCH",
+   "quote": "Personally, I do not see the competitive advantage that Nike has anymore.",
+   "ts": 636,
+   "mismatch_kind": "opposite",
+   "flag": "b",
+   "labeled_direction": "bullish",
+   "ticker": "NKE",
+   "why": "Host explicitly says Nike has no competitive advantage; bullish view belongs to Aman."
+  },
+  "605748": {
+   "verdict": "REQUOTE",
+   "quote": "Now, the fifth company in our list, Canadian Railway. This is the most recent addition to our own Quantigens portfolio, where we have 30 dividend growth investing stocks. And we would only ever sell this firm if the dividend stops growing.",
+   "ts": 561,
+   "names_ticker": false,
+   "flag": "b",
+   "why": "Host confirms active bullish hold on CNR; only exit if dividend stops growing."
+  },
+  "607612": {
+   "verdict": "REQUOTE",
+   "quote": "this is my favorite one out of those three stocks I think it has a lot of potential the company again it's not growing without a multiple expansion I see eight or a 9% return every single year",
+   "ts": 759,
+   "names_ticker": false,
+   "flag": "b",
+   "why": "Host names HPQ as favorite pick with explicit 8-9% annual return thesis"
+  },
+  "616454": {
+   "verdict": "REQUOTE",
+   "quote": "Tesla bounced off of this blue resistance level on Friday. However, it did not fall below the 21-day EMA and that means the stock remains bullish and also it means the stock is at a dip which might be a good buying opportunity.",
+   "ts": 337,
+   "names_ticker": true,
+   "flag": "b",
+   "why": "Host names Tesla, says stock remains bullish, calls dip a buying opportunity."
+  },
+  "613851": {
+   "verdict": "DIRECTION_MISMATCH",
+   "quote": "just 2% growth in the shorter term not going to cut it and that's one of the reasons why Shares are being punished in the after hours",
+   "ts": 129,
+   "mismatch_kind": "no_call",
+   "flag": "b",
+   "labeled_direction": "bearish",
+   "ticker": "TSLA",
+   "why": "Window shows bearish earnings analysis but no committed forward price call or $200 target."
+  },
+  "612869": {
+   "verdict": "REQUOTE",
+   "quote": "geo is only trading at three times free cash flow now why that's happened because course effect was earlier than geo they transitioned from a read to c corp they cut the dividend and they were paying down the debt aggressively so they are way ahead of geo",
+   "ts": 571,
+   "names_ticker": true,
+   "flag": "b",
+   "why": "Host compares GEO unfavorably to CivicCore implying GEO will follow same bullish path"
+  },
+  "614225": {
+   "verdict": "REQUOTE",
+   "quote": "anyway SCD is a no-brainer for me that is one that I will keep adding I already have been adding",
+   "ts": 752,
+   "names_ticker": false,
+   "flag": "b",
+   "why": "Host explicitly calls SCHD a no-brainer and commits to continued buying."
+  },
+  "614323": {
+   "verdict": "REQUOTE",
+   "quote": "Uh in my opinion, this would be terrible. Uh, you know, I I was anti uh I uh have been and still am anti- Tesla buying shares in XAI. I think Elon is is out of money at XAI.",
+   "ts": 5865,
+   "names_ticker": true,
+   "flag": "b",
+   "why": "Host calls Tesla acquiring XAI 'terrible' and explicitly opposes Tesla buying XAI shares."
+  },
+  "614335": {
+   "verdict": "DIRECTION_MISMATCH",
+   "quote": "Gemini thinks we are experiencing what's called a rolling top.",
+   "ts": 189,
+   "mismatch_kind": "no_call",
+   "flag": "a_orphan",
+   "labeled_direction": "neutral",
+   "ticker": "SPY",
+   "why": "Host only relays AI bearish analysis; makes no personal neutral SPY call here."
+  },
+  "613138": {
+   "verdict": "REQUOTE",
+   "quote": "this is a pretty insane prediction because it means Barry is thinking we're probably going to get down to an S P 500 value of roughly 2 800 but it's also pretty scary because I kind of agree with his reasoning",
+   "ts": 178,
+   "names_ticker": false,
+   "flag": "a_orphan",
+   "why": "Host endorses bearish S&P 500 target of 2800, naming index directly"
+  },
+  "608049": {
+   "verdict": "REQUOTE",
+   "quote": "so I would personally expect the S&P to return between 10 to 12% in 2024 if we do not have a recession and if we do not have any major banking crisis or a black one event which no one in the world can pretty much predict so I would say low double digits 10 to 12% to me this seems very very fair maybe around 8% even but I'm not seeing a m massive crash in 2024 if we have no recession and if we have no major black one event",
+   "ts": 331,
+   "names_ticker": true,
+   "flag": "b",
+   "why": "Host explicitly predicts 10-12% S&P return in 2024, clearly bullish."
+  },
+  "607863": {
+   "verdict": "DIRECTION_MISMATCH",
+   "quote": "if you were buying gold for the long term you would look at its you know 100-year track record of 2% and you would never buy it so you're speculating",
+   "ts": 899,
+   "mismatch_kind": "no_call",
+   "flag": "b",
+   "labeled_direction": "bearish",
+   "ticker": "GLD",
+   "why": "Bearish gold quote is Dave Ramsey (guest), not host Andrei Jikh"
+  },
+  "614463": {
+   "verdict": "DIRECTION_MISMATCH",
+   "quote": "over the last week, not only have we seen SOXL, which we called for a rally on up over 50%, but we've also seen memory skyrocket",
+   "ts": 218,
+   "mismatch_kind": "no_call",
+   "flag": "a_orphan",
+   "labeled_direction": "bullish",
+   "ticker": "SOXX",
+   "why": "Host reports past SOXL rally; no forward bullish call on SOXX made"
+  },
+  "606847": {
+   "verdict": "REQUOTE",
+   "quote": "I intend to buy back all the astroica shares before the end of the year",
+   "ts": 788,
+   "names_ticker": false,
+   "flag": "a_orphan",
+   "why": "Host explicitly commits to repurchasing all AZN shares sold, a clear bullish forward call."
+  },
+  "605926": {
+   "verdict": "REQUOTE",
+   "quote": "one of the companies I've kind of landed on here as a potential addition to my portfolio for solar and renewable in general is ON Semiconductor much more reasonable valuation if we think the solar industry and Renewables are going to be a hot investment theme for the next five to ten years",
+   "ts": 1501,
+   "names_ticker": false,
+   "flag": "a_orphan",
+   "why": "Full sentence names company and includes explicit bullish valuation thesis"
+  },
+  "608691": {
+   "verdict": "DIRECTION_MISMATCH",
+   "quote": "the key question for investing is Will margins improve at some point very likely but not yet if you look at their predictions indications of margins around zero only the prepared foods that are usually higher margins that's a different business those are unchanged but that will not be enough to have positive cash flows",
+   "ts": 159,
+   "mismatch_kind": "no_call",
+   "flag": "b",
+   "labeled_direction": "bullish",
+   "ticker": "TSN",
+   "why": "Host advises waiting, cites zero margins and delayed cash flows; no buy call made"
+  },
+  "608314": {
+   "verdict": "REQUOTE",
+   "quote": "I've actually been locking in some profits on Tesla's stock just because like this whole situation, whether whether I agree or disagree with any of it socially, politically, putting all of that aside, the whole situation has just become a bit too volatile and political in my opinion, which is something that I never really like to see in a stock that I own because it can potentially alienate part of your customer b customer base, which in the case of Tesla is also happening happens to be occurring during a very challenging time for them where they not only as a stock hold a very rich valuation forward P ratio is like almost a,000% higher than the sector but they're also facing you know a delivery growth slowdown that has even turned negative in some cases and although um I am still holding much of my position long-term for their future potential and all the technologies that they have and on the impressive work they do. It's still something that I just felt like I need to be locking in some profits here because um it's very hard to predict how some of this stuff is going to play out.",
+   "ts": 697,
+   "names_ticker": true,
+   "flag": "b",
+   "why": "Host actively trims Tesla citing rich valuation, delivery slowdown, and political volatility."
+  },
+  "612883": {
+   "verdict": "REQUOTE",
+   "quote": "my personal target on the s p 500 is pretty much around 3 000 to 3 200. we could go as low as 2500 i would not be surprised at all but i believe you know under 3 500 is pretty much most likely going to happen",
+   "ts": 327,
+   "names_ticker": false,
+   "flag": "a_orphan",
+   "why": "Host makes committed bearish S&P 500 call with specific downside targets below current levels."
+  },
+  "614198": {
+   "verdict": "DIRECTION_MISMATCH",
+   "quote": "this is TLT this is a bond ETF and they invest in long-term treasuries and since the start of the year the same time period bonds the price of bonds are down about 30 percent",
+   "ts": 65,
+   "mismatch_kind": "no_call",
+   "flag": "b",
+   "labeled_direction": "bearish",
+   "ticker": "TLT",
+   "why": "TLT only cited for past YTD loss; no forward bearish call made in this window"
+  }
+ }
+}
