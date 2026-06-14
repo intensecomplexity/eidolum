@@ -415,6 +415,16 @@ class Prediction(Base):
     is_holding_disclosure = Column(Boolean, nullable=False, default=False,
                                    server_default="false")
 
+    # 2026-06-14 quote-accountability pass. TRUE = NOT_ACCOUNTABLE: no
+    # claim-bearing sentence for the ticker exists anywhere in the ±90s
+    # transcript window / tweet (commentary / narration / past recap /
+    # bare mention). Not a real scored prediction: hidden via the bundled
+    # hedged_filter_sql helper (kill switch HIDE_NO_CLAIM) AND off the
+    # accuracy board (outcome='unresolved'). LLM-judged per row by
+    # scripts/accountability_pass_2026_06_14.py.
+    is_no_claim = Column(Boolean, nullable=False, default=False,
+                         server_default="false")
+
     # Ship #14 — long-horizon predictions ("Tesla $500 by 2030") are
     # kept as valid training data but skipped by the evaluator until
     # their window resolves. evaluation_deferred=TRUE means the
