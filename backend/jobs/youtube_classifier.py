@@ -4530,6 +4530,33 @@ def insert_youtube_prediction(
         video_id=video_id, channel_name=channel_name, stats=stats,
     ):
         return _reject("missing_source_timestamp")
+    # Ship: forward CONDITIONAL guard (transcript-aware; eval-gated 2026-06-14).
+    # Catches trigger-gated calls the classifier emits as FLAT ticker_calls (the
+    # "if X then Y" class). Cost-gated to conditional-suspects (regex over
+    # quote+context); one Sonnet verify over the ±90s window. event_macro ->
+    # insert outcome='unresolved' (unverifiable from price); price_trigger ->
+    # route to insert_youtube_conditional_prediction (evaluator fires it via
+    # price_bars, PROPER scoring); keep -> normal flat call. Runs BEFORE the
+    # representativeness guard so a route/unresolve short-circuits its second-pass
+    # (no double LLM call). Additive, fail-open, gated by ENABLE_CONDITIONAL_GUARD.
+    _cond_unresolved = False
+    try:
+        from jobs import representativeness_guard as _rgc
+        _cg = _rgc.conditional_decide(pred, ticker, direction, _ts_fields, transcript_data, db, stats=stats)
+        if _cg.get("action") == "route_price":
+            tr = _cg["trigger"]
+            pred["_trigger_type"] = tr["trigger_type"]
+            pred["_trigger_ticker"] = tr["trigger_ticker"]
+            pred["_trigger_price"] = tr["trigger_price"]
+            pred["_trigger_condition"] = tr["trigger_condition"]
+            return insert_youtube_conditional_prediction(
+                pred, channel_name=channel_name, channel_id=channel_id, video_id=video_id,
+                video_title=video_title, publish_date=publish_date, db=db,
+                transcript_snippet=transcript_snippet, stats=stats, transcript_data=transcript_data)
+        if _cg.get("action") == "unresolved":
+            _cond_unresolved = True
+    except Exception:
+        _cond_unresolved = False
     # Ship: representativeness guard (transcript-aware (a)/(c)/(d)/(e); eval-gated
     # 2026-06-14). Additive, fail-open, flag-not-delete; gated by
     # ENABLE_REPRESENTATIVENESS_GUARD. ticker_call only. Never hard-rejects (eval
@@ -4542,7 +4569,10 @@ def insert_youtube_prediction(
     _rg_reported = _rg_weak = False
     try:
         from jobs import representativeness_guard as _rg
-        _gd = _rg.decide(pred, ticker, direction, _ts_fields, transcript_data, db, stats=stats)
+        # Skip the rep second-pass if the conditional guard already routed this row
+        # to unresolved (it's hidden; no value in a second LLM call).
+        _gd = ({"action": "keep"} if _cond_unresolved
+               else _rg.decide(pred, ticker, direction, _ts_fields, transcript_data, db, stats=stats))
         if _gd.get("action") == "reject":
             return _reject(_gd.get("reason") or "representativeness_guard")
         _gdir = _gd.get("direction")
@@ -4612,6 +4642,13 @@ def insert_youtube_prediction(
         _pred.is_reported_speech = True
     if _rg_weak:
         _pred.is_weak_basket_call = True
+    # Conditional guard (event/macro): insert off the scored set, tagged. The
+    # call is contingent on an unverifiable event/macro trigger — flag-not-delete.
+    if _cond_unresolved:
+        _pred.outcome = "unresolved"
+        _pred.evaluation_summary = (
+            "[conditional_guard=event_macro] inserted unresolved "
+            "(unverifiable event/macro trigger; excluded from accuracy)")
     if _classifier_validation_gate(_pred, db, stats):
         return _reject("classifier_validation_gate")
     db.add(_pred)

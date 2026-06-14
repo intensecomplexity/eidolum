@@ -273,6 +273,122 @@ def verify_suspect(ticker, direction, window, quote, terms_str="", model=None):
         return {"verdict": "KEEP", "grounded_direction": direction, "grounded_quote": None, "error": str(e)[:80]}
 
 
+# ── Forward conditional guard ───────────────────────────────────────────────
+# Catches trigger-gated calls the classifier emits as FLAT ticker_calls (the
+# "if X then Y" class the da47210+aae459c cleanup re-marked). Cost-gated to
+# conditional-suspects (the SAME high-recall regex the audit used). One claude -p
+# verify over the ±90s window classifies the gating trigger:
+#   event_macro  -> insert outcome='unresolved' (unverifiable from price; tagged)
+#   price_trigger-> route to insert_youtube_conditional_prediction so the
+#                   evaluator fires it via price_bars and scores it PROPERLY
+#   keep         -> rhetorical/embedded "if"; normal flat ticker_call, no change
+# Default ON behind ENABLE_CONDITIONAL_GUARD; fail-open.
+_COND_RX = re.compile(
+    r"(\bif\b|as long as|\bassuming\b|in the (first|second|third|fourth|fifth|bull|bear|base|worst|best)"
+    r"[ -]?(case )?scenario|should .{0,40}\bthen\b|when .{0,40}\bthen\b|provided that|in the event)", re.I)
+_PRICE_TRIGGER_TYPES = {"price_break", "price_hold"}
+
+
+def conditional_enabled() -> bool:
+    return (os.environ.get("ENABLE_CONDITIONAL_GUARD", "true") or "true").strip().lower() in ("1", "true", "yes")
+
+
+def is_conditional_suspect(quote, context):
+    return bool(_COND_RX.search(quote or "") or _COND_RX.search(context or ""))
+
+
+_COND_PROMPT = """You audit a stored stock prediction whose quote contains "if/when/assuming". Almost all such phrasing in finance commentary is rhetorical, explanatory, or a valuation hypothetical — NOT a gated call. Your DEFAULT is "keep". Only override when the directional call is EXPLICITLY conditioned on a trigger such that, if the trigger never occurs, the call simply does not apply.
+
+Ticker: {ticker} ({terms}). Direction: {direction}.
+Quote: "{quote}"
+
+TRANSCRIPT WINDOW (±90s; raw ASR):
+---
+{window}
+---
+
+THE TEST: would the speaker's directional call on {ticker} still stand if the "if" condition never happened?
+- If YES (the call stands on its own) -> keep. This includes: explanatory "if" ("it's cheap; if they execute, even better"), valuation hypotheticals ("if they hit $100M FCF that's upside"), reasons/mechanisms ("I like it because if rates fall it benefits"), and emphasis ("if you ask me"). When unsure, keep.
+- If NO (the WHOLE call is contingent — "IF trigger THEN this call", and absent the trigger there is no call):
+  - event_macro: the trigger is an EVENT / MACRO / GEOPOLITICAL condition NOT checkable from price (Fed decision, CPI/jobs print, recession declared, regulatory approval, a vote, an earnings beat/miss, a war/peace outcome). It may never fire.
+  - price_trigger: the trigger is a PRICE / LEVEL of a ticker ("IF SPY breaks 450 THEN...", "as long as it HOLDS 200"). Provide trigger_type="price_break" (fires when price crosses a level) or "price_hold" (holds while price stays above/below a level), trigger_ticker (symbol gating it — may be an index), trigger_price (numeric level). Only price_trigger when there is a clear ticker AND a clear numeric level.
+
+Strong bias to keep: a real flat call wrongly marked contingent is the worst outcome. Choose event_macro/price_trigger ONLY when the contingency is unambiguous.
+
+Reply ONLY JSON: {{"kind":"event_macro|price_trigger|keep","trigger_type":"price_break|price_hold|null","trigger_ticker":"<sym or null>","trigger_price":<number or null>,"trigger_condition":"<short phrase or null>","why":"<=15 words"}}"""
+
+
+def conditional_verify(ticker, direction, window, quote, terms_str="", model=None):
+    model = (model or VERIFY_MODEL).strip().lower()
+    prompt = _COND_PROMPT.format(ticker=ticker, terms=terms_str or ticker, direction=direction,
+                                 quote=(quote or "")[:300], window=(window or "")[:8000])
+    try:
+        p = subprocess.run(["claude", "-p", "--model", model, prompt],
+                           capture_output=True, text=True, timeout=240,
+                           env=_subprocess_env(), stdin=subprocess.DEVNULL)
+        out = json.loads(re.search(r"\{.*\}", p.stdout, re.S).group(0))
+        kind = (out.get("kind") or "").strip().lower()
+        if kind not in ("event_macro", "price_trigger", "keep"):
+            return {"kind": "keep", "error": "bad_kind"}
+        return {"kind": kind, "trigger_type": out.get("trigger_type"),
+                "trigger_ticker": out.get("trigger_ticker"), "trigger_price": out.get("trigger_price"),
+                "trigger_condition": out.get("trigger_condition"), "why": out.get("why", "")}
+    except Exception as e:
+        return {"kind": "keep", "error": str(e)[:80]}
+
+
+def conditional_decide(pred, ticker, direction, ts_fields, transcript_data, db, *, stats=None):
+    """Return {'action': 'keep'|'unresolved'|'route_price', 'trigger': {...}, 'why':...}.
+    Fail-open keep. Cost-gated: only conditional-suspects run the LLM verify.
+    """
+    out = {"action": "keep", "trigger": None, "why": None}
+    try:
+        if not conditional_enabled() or transcript_data is None:
+            return out
+        seconds = (ts_fields or {}).get("source_timestamp_seconds")
+        if not seconds:
+            return out
+        quote = (ts_fields.get("source_verbatim_quote")
+                 or pred.get("_verbatim_quote") or pred.get("verbatim_quote") or "")
+        context = pred.get("context") or pred.get("_context") or ""
+        if not is_conditional_suspect(quote, context):
+            return out
+        if stats is not None:
+            stats["condguard_suspect"] = int(stats.get("condguard_suspect", 0)) + 1
+        amap = alias_map(db)
+        cnames = company_names(db)
+        terms = ticker_terms(ticker, amap, cnames)
+        win = window_text(transcript_data, seconds)
+        v = conditional_verify(ticker, direction, win, quote, terms_str=", ".join(sorted(terms)[:6]))
+        kind = v.get("kind", "keep")
+        if kind == "event_macro":
+            if stats is not None:
+                stats["condguard_event_macro"] = int(stats.get("condguard_event_macro", 0)) + 1
+            return {"action": "unresolved", "trigger": v, "why": v.get("why")}
+        if kind == "price_trigger":
+            tt = (v.get("trigger_type") or "").strip().lower()
+            ttk = (v.get("trigger_ticker") or "").strip().upper().lstrip("$")
+            tp = v.get("trigger_price")
+            try:
+                tp = float(tp) if tp is not None else None
+            except Exception:
+                tp = None
+            # Route ONLY with a clean, price-scoreable trigger; else degrade to
+            # unresolved (never emit a broken conditional row).
+            if tt in _PRICE_TRIGGER_TYPES and ttk and tp and tp > 0:
+                if stats is not None:
+                    stats["condguard_route_price"] = int(stats.get("condguard_route_price", 0)) + 1
+                return {"action": "route_price", "trigger": {
+                    "trigger_type": tt, "trigger_ticker": ttk, "trigger_price": tp,
+                    "trigger_condition": v.get("trigger_condition") or f"{ttk} {tt} {tp}"}, "why": v.get("why")}
+            if stats is not None:
+                stats["condguard_price_degraded_unresolved"] = int(stats.get("condguard_price_degraded_unresolved", 0)) + 1
+            return {"action": "unresolved", "trigger": v, "why": "price_trigger_unparseable"}
+        return out
+    except Exception:
+        return out
+
+
 def decide(pred, ticker, direction, ts_fields, transcript_data, db,
            *, run_second_pass=True, stats=None):
     """Return a decision dict:
