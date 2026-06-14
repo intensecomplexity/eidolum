@@ -1,0 +1,52 @@
+{
+ "generated": "2026-06-14",
+ "run": 3,
+ "ship": "requote run 3 (5 transient-retry rows)",
+ "fetch": {
+  "ok": 3,
+  "transient": 0,
+  "terminal": 0
+ },
+ "verdicts": {
+  "611101": {
+   "verdict": "REQUOTE",
+   "quote": "based upon that you can see our acceptable Buy price for this company is about 29.44 per share meaning now may be a good time to consider adding shares to this company",
+   "ts": 360,
+   "names_ticker": false,
+   "flag": "run3_transient_retry",
+   "why": "Host explicitly recommends buying INTC shares at current levels near 52-week low"
+  },
+  "608888": {
+   "verdict": "REQUOTE",
+   "quote": "And then Intuitive Surgical, one of our top picks in robotics.",
+   "ts": 976,
+   "names_ticker": false,
+   "flag": "run3_transient_retry",
+   "why": "Host explicitly names ISRG as a top pick, signaling bullish stance."
+  },
+  "625621": {
+   "verdict": "REQUOTE",
+   "quote": "Let's jump on over to MU. Beautiful setup, probably my top watch for tomorrow. Bullish three-bar play with the inside hammer on today's session.",
+   "ts": 2508,
+   "names_ticker": true,
+   "flag": "run3_transient_retry",
+   "why": "Host explicitly calls MU bullish three-bar play, top watch for tomorrow."
+  },
+  "608891": {
+   "verdict": "REQUOTE",
+   "quote": "In our basket, we have on semiconductor, microchip, and monolithic power systems.",
+   "ts": 949,
+   "names_ticker": false,
+   "flag": "run3_transient_retry",
+   "why": "Host explicitly names MPWR in active investment basket, confirming bullish position."
+  },
+  "608890": {
+   "verdict": "REQUOTE",
+   "quote": "In our basket, we have on semiconductor, microchip, and monolithic power systems.",
+   "ts": 949,
+   "names_ticker": false,
+   "flag": "run3_transient_retry",
+   "why": "Host explicitly includes microchip in their investment basket, a committed bullish position."
+  }
+ }
+}

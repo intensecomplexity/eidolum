@@ -1,0 +1,70 @@
+{
+ "generated": "2026-06-14",
+ "ship": "adjudicate run-2 direction_mismatch (4 rows)",
+ "rows": [
+  {
+   "id": 606900,
+   "bucket": "reported_speech",
+   "pre": {
+    "direction": "bullish",
+    "outcome": "hit",
+    "actual_return": 151.52,
+    "evaluation_date": "2025-06-14 17:09:14",
+    "is_reported_speech": false
+   },
+   "post": {
+    "direction": "bullish",
+    "outcome": "hit",
+    "is_reported_speech": true
+   }
+  },
+  {
+   "id": 606579,
+   "bucket": "no_call",
+   "pre": {
+    "direction": "bearish",
+    "outcome": "hit",
+    "actual_return": 9.76,
+    "evaluation_date": "2024-07-09 00:00:00",
+    "is_reported_speech": false
+   },
+   "post": {
+    "direction": "bearish",
+    "outcome": "unresolved",
+    "is_reported_speech": false
+   }
+  },
+  {
+   "id": 607449,
+   "bucket": "no_call",
+   "pre": {
+    "direction": "bullish",
+    "outcome": "hit",
+    "actual_return": 5.75,
+    "evaluation_date": "2025-03-25 14:01:56",
+    "is_reported_speech": false
+   },
+   "post": {
+    "direction": "bullish",
+    "outcome": "unresolved",
+    "is_reported_speech": false
+   }
+  },
+  {
+   "id": 612538,
+   "bucket": "no_call",
+   "pre": {
+    "direction": "bullish",
+    "outcome": "hit",
+    "actual_return": 57.34,
+    "evaluation_date": "2025-12-31 19:01:56",
+    "is_reported_speech": false
+   },
+   "post": {
+    "direction": "bullish",
+    "outcome": "unresolved",
+    "is_reported_speech": false
+   }
+  }
+ ]
+}
