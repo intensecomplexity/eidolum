@@ -1,0 +1,213 @@
+{
+ "generated": "2026-06-14",
+ "run": 2,
+ "ship": "quote-representativeness re-quote run 2 (26-row tail)",
+ "fetch": {
+  "ok": 16,
+  "transient": 3,
+  "terminal": 0
+ },
+ "verdicts": {
+  "609957": {
+   "verdict": "REQUOTE",
+   "quote": "we can see even with Vich's outperformance in the last year, the REIT is still relatively attractive at current prices.",
+   "ts": 916,
+   "names_ticker": false,
+   "flag": "unjudged",
+   "why": "Host confirms VICI is still attractive and undervalued with rate cut catalyst."
+  },
+  "607017": {
+   "verdict": "REQUOTE",
+   "quote": "this is really high on my target list long term, especially if there's any kind of oil crash.",
+   "ts": 1493,
+   "names_ticker": false,
+   "flag": "unjudged",
+   "why": "Host expresses strong long-term bullish intent on TPL with buying interest on dips."
+  },
+  "611185": {
+   "verdict": "REQUOTE",
+   "quote": "which is not great for risk assets, you know, bad for Bitcoin, bad for uh you know, growth and tech stocks, software stocks, whatever.",
+   "ts": 724,
+   "names_ticker": true,
+   "flag": "ambiguous",
+   "why": "Host explicitly states uncertainty is bad for Bitcoin; stored quote has minor word-level deviations."
+  },
+  "609457": {
+   "verdict": "REQUOTE",
+   "quote": "Finally, if we jump over to our dividend discount model, assuming 6% dividend growth, we'd come to an intrinsic value of about $104 per share, which is about 8 or 9% higher than the current share price. So, right now, yes, there is some uncertainty with the tariffs and the potential recession, but it does look like there is some nice upside.",
+   "ts": 912,
+   "names_ticker": false,
+   "flag": "unjudged",
+   "why": "Host gives $104 DDM target and explicitly concludes 'nice upside' \u2014 stronger combined bullish call."
+  },
+  "609456": {
+   "verdict": "REQUOTE",
+   "quote": "Through 2030, our total return would be 62% and our compounded annual return would be about 8.36%.",
+   "ts": 658,
+   "names_ticker": false,
+   "flag": "unjudged",
+   "why": "62% total return projection is the clearest bullish call; DDM quote implies overvaluation"
+  },
+  "606579": {
+   "verdict": "DIRECTION_MISMATCH",
+   "quote": "not a new problem we've known intel was an industry underperformer for years",
+   "ts": 407,
+   "mismatch_kind": "no_call",
+   "flag": "ambiguous",
+   "labeled_direction": "bearish",
+   "ticker": "INTC",
+   "why": "Window is analytical/descriptive; no explicit forward bearish buy/sell commitment from host."
+  },
+  "607449": {
+   "verdict": "DIRECTION_MISMATCH",
+   "quote": "we can see all four valuations that we use",
+   "ts": 469,
+   "mismatch_kind": "no_call",
+   "flag": "ambiguous",
+   "labeled_direction": "bullish",
+   "ticker": "SBUX",
+   "why": "Window cuts off before conclusion; no explicit buy/bullish commitment found in window."
+  },
+  "626021": {
+   "verdict": "REQUOTE",
+   "quote": "we've had three beats in a row now so I am expecting another here",
+   "ts": 412,
+   "names_ticker": false,
+   "flag": "unjudged",
+   "why": "Host expects another earnings beat on ACA, a clear bullish forward call."
+  },
+  "609122": {
+   "verdict": "REQUOTE",
+   "quote": "I like Visa over here I think it's fairly valued maybe closer to undervalued I like it very much",
+   "ts": 776,
+   "names_ticker": true,
+   "flag": "unjudged",
+   "why": "Host explicitly calls Visa fairly valued to undervalued and expresses clear bullish conviction."
+  },
+  "609874": {
+   "verdict": "REQUOTE",
+   "quote": "I don't like social media companies as Investments that much anyway but I especially don't like Reddit I think it's right there with other companies like Pinterest and Snapchat companies that will likely disappoint investors for a long period of time",
+   "ts": 1462,
+   "names_ticker": false,
+   "flag": "unjudged",
+   "why": "Host explicitly names Reddit and predicts long-term investor disappointment, a clear bearish call."
+  },
+  "627565": {
+   "verdict": "REQUOTE",
+   "quote": "I'm pretty bullish in American Airlines so I'm going to go for a higher Delta",
+   "ts": 687,
+   "names_ticker": false,
+   "flag": "unjudged",
+   "why": "Host explicitly states bullish view on American Airlines before placing trade"
+  },
+  "606243": {
+   "verdict": "REQUOTE",
+   "quote": "at less than 20 times forward price to earnings and free cash flow we think maybe the market isn't fully understanding applied material potential going forward we'll see what happens in 2024 of course but we're willing to buy some more after the pullback in the last two months",
+   "ts": 407,
+   "names_ticker": false,
+   "flag": "unjudged",
+   "why": "Host names company, cites undervaluation, commits to buying more shares."
+  },
+  "626848": {
+   "verdict": "REQUOTE",
+   "quote": "Disney, if we need shorts, looks pretty compelling underneath that 105.",
+   "ts": 4390,
+   "names_ticker": true,
+   "flag": "unjudged",
+   "why": "Host explicitly calls DIS compelling for shorts, confirming bearish direction."
+  },
+  "612538": {
+   "verdict": "DIRECTION_MISMATCH",
+   "quote": "you compare that with Nvidia or any of the other Magnificent Seven stocks and the valuations there are much lower so 26 times for inv viia",
+   "ts": 2662,
+   "mismatch_kind": "no_call",
+   "flag": "unjudged",
+   "labeled_direction": "bullish",
+   "ticker": "NVDA",
+   "why": "Host only cites NVDA's relative valuation vs Tesla; no directional bullish call made."
+  },
+  "606900": {
+   "verdict": "DIRECTION_MISMATCH",
+   "quote": "even still that doesn't mean that Bitcoin or crypto is the answer to getting rich it's really fallacy to use the historical growth rates of stuff like crypto and Bitcoin",
+   "ts": 113,
+   "mismatch_kind": "opposite",
+   "flag": "unjudged",
+   "labeled_direction": "bullish",
+   "ticker": "BTC",
+   "why": "Host explicitly rejects BTC-as-wealth premise; displayed quote is from a reviewed TikToker, not the host."
+  },
+  "606871": {
+   "verdict": "REQUOTE",
+   "quote": "so I believe it's not a buy I think AutoZone is a much better alternative you know than Advanced Auto Parts",
+   "ts": 510,
+   "names_ticker": false,
+   "flag": "unjudged",
+   "why": "Host explicitly says AAP is not a buy, preferring AutoZone instead."
+  },
+  "606368": {
+   "verdict": "REQUOTE",
+   "quote": "so no we don't think this rally in arm stock can continue",
+   "ts": 201,
+   "names_ticker": true,
+   "flag": "unjudged",
+   "why": "Host explicitly says ARM rally cannot continue, a committed bearish forward call."
+  },
+  "612655": {
+   "verdict": "REQUOTE",
+   "quote": "Monthly candle, 51 on the RSI, bullish. Above the 50 EMA still, bullish. Hit down there close and now pushing back up, bullish. In other words, you got a low, new higher low. Do not be surprised to see January be a big month.",
+   "ts": 486,
+   "names_ticker": false,
+   "flag": "unjudged",
+   "why": "Host explicitly calls ETH bullish on monthly candles with multiple technical confirmations."
+  },
+  "614049": {
+   "verdict": "REQUOTE",
+   "quote": "shares of Google went up 10% and it was for good reason they were absolutely spectacular results you've got a forward PE in the low 20s on this one and it it was spectacular they cut their marketing spend they grew their revenues they grew their profits YouTube's firing on all cylinder Google cloud looks like it's fired on all cylinders",
+   "ts": 963,
+   "names_ticker": true,
+   "flag": "unjudged",
+   "why": "Host explicitly praises Google's strong results and fundamentals with clear bullish enthusiasm."
+  },
+  "607005": {
+   "verdict": "REQUOTE",
+   "quote": "PepsiCo has sold off nearly 27% from its all-time high and it is currently trading at one of the highest dividend yields in the entire history of the company. Purely in terms of dividend yield, this may be one of the best entry points for PepsiCo stock.",
+   "ts": 301,
+   "names_ticker": false,
+   "flag": "unjudged",
+   "why": "Host explicitly calls PEP a best dividend yield entry point; clearly bullish."
+  },
+  "607008": {
+   "verdict": "REQUOTE",
+   "quote": "The NE dividend is growing at an 11.4% 10-year compound annual growth rate. They actually just increased their payment by 10%. And that's not bad with a starting dividend yield of 3.4%. And with the stock selling off lately, that 3.4% dividend yield is one of the highest over the past 5 years. So again, not a bad entry point.",
+   "ts": 682,
+   "names_ticker": false,
+   "flag": "unjudged",
+   "why": "Names ticker NE, shows dividend growth, and ends with explicit entry-point call."
+  },
+  "611101": {
+   "verdict": "INSUFFICIENT",
+   "why": "transcript fetch transient this run (transient)",
+   "flag": "unjudged"
+  },
+  "608891": {
+   "verdict": "INSUFFICIENT",
+   "why": "transcript fetch transient this run (transient)",
+   "flag": "unjudged"
+  },
+  "608888": {
+   "verdict": "INSUFFICIENT",
+   "why": "transcript fetch transient this run (transient)",
+   "flag": "unjudged"
+  },
+  "625621": {
+   "verdict": "INSUFFICIENT",
+   "why": "transcript fetch transient this run (transient)",
+   "flag": "unjudged"
+  },
+  "608890": {
+   "verdict": "INSUFFICIENT",
+   "why": "transcript fetch transient this run (transient)",
+   "flag": "unjudged"
+  }
+ }
+}

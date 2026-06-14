@@ -1,0 +1,63 @@
+{
+ "generated": "2026-06-14",
+ "purpose": "HUMAN ADJUDICATION ONLY (run 2). No automated mutation. Same as run-1 review.",
+ "count": 4,
+ "rows": [
+  {
+   "id": 606579,
+   "ticker": "INTC",
+   "labeled_direction": "bearish",
+   "current_outcome": "hit",
+   "actual_return": 9.76,
+   "mismatch_kind": "no_call",
+   "judge_why": "Window is analytical/descriptive; no explicit forward bearish buy/sell commitment from host.",
+   "conflicting_transcript_sentence": "not a new problem we've known intel was an industry underperformer for years",
+   "currently_displayed_quote": "as for us we're not buying the financial targets for Intel tsmc is already there at an operating profit margin of over 40% right now as we've mentioned in the past we're still looking for a hard split between Intel products which is the fabulous designer and Intel Foundry a third party manufacturer like tsmc or amd's old manufacturing business Global foundaries before we're even remotely interested in investing in Intel",
+   "source_url": "https://www.youtube.com/watch?v=FYmdQuQp8S8",
+   "timestamp_seconds": 1199,
+   "forecaster": "Chip Stock Investor"
+  },
+  {
+   "id": 607449,
+   "ticker": "SBUX",
+   "labeled_direction": "bullish",
+   "current_outcome": "hit",
+   "actual_return": 5.75,
+   "mismatch_kind": "no_call",
+   "judge_why": "Window cuts off before conclusion; no explicit buy/bullish commitment found in window.",
+   "conflicting_transcript_sentence": "we can see all four valuations that we use",
+   "currently_displayed_quote": "Starbucks has an incredibly loyal consumer base so yes what's going on in the Middle East is definitely affecting this company but we have to keep in mind here in the US there are a lot of loyal customers to this brand it appears they're going through some short-term headwinds but I think longterm this could be a good dividend grower",
+   "source_url": "https://www.youtube.com/watch?v=2LXhL1miL14",
+   "timestamp_seconds": 490,
+   "forecaster": "Dividendology"
+  },
+  {
+   "id": 612538,
+   "ticker": "NVDA",
+   "labeled_direction": "bullish",
+   "current_outcome": "hit",
+   "actual_return": 57.34,
+   "mismatch_kind": "no_call",
+   "judge_why": "Host only cites NVDA's relative valuation vs Tesla; no directional bullish call made.",
+   "conflicting_transcript_sentence": "you compare that with Nvidia or any of the other Magnificent Seven stocks and the valuations there are much lower so 26 times for inv viia",
+   "currently_displayed_quote": "if we look at Nvidia or any of the other Magnificent Seven stocks and the valuations there are much lower so 26 times for inv viia uh if we look at Apple that's the next highest I think after after Tesla Apple yeah they're the forward price WIS multiples 29",
+   "source_url": "https://www.youtube.com/watch?v=PZbaRNnlxEg",
+   "timestamp_seconds": 2665,
+   "forecaster": "PensionCraft"
+  },
+  {
+   "id": 606900,
+   "ticker": "BTC",
+   "labeled_direction": "bullish",
+   "current_outcome": "hit",
+   "actual_return": 151.52,
+   "mismatch_kind": "opposite",
+   "judge_why": "Host explicitly rejects BTC-as-wealth premise; displayed quote is from a reviewed TikToker, not the host.",
+   "conflicting_transcript_sentence": "even still that doesn't mean that Bitcoin or crypto is the answer to getting rich it's really fallacy to use the historical growth rates of stuff like crypto and Bitcoin",
+   "currently_displayed_quote": "crypto is the middle class's answer to be able to compete on a playing field that they don't have any other chance of ever competing the middle class is never going to get rich from stocks they're never it's absolutely impossible but I can really confidently say that if somebody buys Bitcoin today within the next 18 months you're going to be able to sell that for three times as much money",
+   "source_url": "https://www.youtube.com/watch?v=K0iN4ArK5Y4",
+   "timestamp_seconds": 76,
+   "forecaster": "The Plain Bagel"
+  }
+ ]
+}
