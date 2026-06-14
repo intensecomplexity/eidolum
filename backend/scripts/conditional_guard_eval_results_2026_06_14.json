@@ -1,0 +1,2514 @@
+[
+ {
+  "id": 616445,
+  "gold": "a",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 614590,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 614409,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 614638,
+  "gold": "a",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 615118,
+  "gold": "a",
+  "act": "unresolved",
+  "pred": "a",
+  "trigger": {
+   "kind": "event_macro",
+   "trigger_type": null,
+   "trigger_ticker": null,
+   "trigger_price": null,
+   "trigger_condition": "funds gain confidence in US economy and more tariff deals announced",
+   "why": "Bearish GLD call contingent on economic confidence and tariff deals materializing"
+  }
+ },
+ {
+  "id": 612721,
+  "gold": "a",
+  "act": "unresolved",
+  "pred": "a",
+  "trigger": {
+   "kind": "event_macro",
+   "trigger_type": null,
+   "trigger_ticker": null,
+   "trigger_price": null,
+   "trigger_condition": "CPI report for October comes back high",
+   "why": "Bearish call on market explicitly conditioned on high CPI print"
+  }
+ },
+ {
+  "id": 614448,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 616422,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 614133,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 612651,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 615119,
+  "gold": "a",
+  "act": "unresolved",
+  "pred": "a",
+  "trigger": {
+   "kind": "event_macro",
+   "trigger_type": null,
+   "trigger_ticker": null,
+   "trigger_price": null,
+   "trigger_condition": "funds get more confident about US economy/policy, more tariff deals announced",
+   "why": "Rotation from gold to stocks contingent on policy clarity and deal announcements"
+  }
+ },
+ {
+  "id": 611043,
+  "gold": "a",
+  "act": "unresolved",
+  "pred": "a",
+  "trigger": {
+   "kind": "event_macro",
+   "trigger_type": null,
+   "trigger_ticker": null,
+   "trigger_price": null,
+   "trigger_condition": "recession occurs due to policy error",
+   "why": "Call on SH explicitly conditioned on recession happening; no recession = no call"
+  }
+ },
+ {
+  "id": 616767,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 612380,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 612532,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 616420,
+  "gold": "a",
+  "act": "unresolved",
+  "pred": "a",
+  "trigger": {
+   "kind": "event_macro",
+   "trigger_type": null,
+   "trigger_ticker": null,
+   "trigger_price": null,
+   "trigger_condition": "short/proactive cutting cycle with 50bp cuts AND strong economy",
+   "why": "Speaker explicitly pairs bull case with counter-scenario if economy shakier or cuts slower"
+  }
+ },
+ {
+  "id": 616811,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 612537,
+  "gold": "c",
+  "act": "unresolved",
+  "pred": "a",
+  "trigger": {
+   "kind": "event_macro",
+   "trigger_type": null,
+   "trigger_ticker": null,
+   "trigger_price": null,
+   "trigger_condition": "dollar strengthens",
+   "why": "Export problem explicitly conditioned on dollar strengthening; absent that, no UUP call"
+  }
+ },
+ {
+  "id": 616768,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 612898,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 610529,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 612615,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 609221,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 612150,
+  "gold": "a",
+  "act": "unresolved",
+  "pred": "a",
+  "trigger": {
+   "kind": "event_macro",
+   "trigger_type": null,
+   "trigger_ticker": null,
+   "trigger_price": null,
+   "trigger_condition": "Clarity Act voted down / fails to pass",
+   "why": "Entire bearish call is conditional on legislation failing; no trigger = no call"
+  }
+ },
+ {
+  "id": 614046,
+  "gold": "a",
+  "act": "unresolved",
+  "pred": "a",
+  "trigger": {
+   "kind": "event_macro",
+   "trigger_type": null,
+   "trigger_ticker": null,
+   "trigger_price": null,
+   "trigger_condition": "Amazon posts record cash flow, revenue, and e-commerce profit at earnings",
+   "why": "Bullish call explicitly conditioned on strong earnings results occurring"
+  }
+ },
+ {
+  "id": 614054,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 608670,
+  "gold": "c",
+  "act": "unresolved",
+  "pred": "a",
+  "trigger": {
+   "kind": "event_macro",
+   "trigger_type": null,
+   "trigger_ticker": null,
+   "trigger_price": null,
+   "trigger_condition": "analyst growth estimates fail to materialize",
+   "why": "Bear case only activates if expected revenue growth doesn't happen"
+  }
+ },
+ {
+  "id": 607966,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 608615,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 607597,
+  "gold": "b",
+  "act": "route_price",
+  "pred": "b",
+  "trigger": {
+   "trigger_type": "price_break",
+   "trigger_ticker": "MCO",
+   "trigger_price": 261.0,
+   "trigger_condition": "MCO reaches ~$261 (25x earnings mean multiple)"
+  }
+ },
+ {
+  "id": 606619,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 606818,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 614222,
+  "gold": "b",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 613884,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 609426,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 608751,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 609265,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 607453,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 608213,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 606184,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 606821,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 608369,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 608947,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 609163,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 608212,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 609101,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 609160,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 606662,
+  "gold": "b",
+  "act": "unresolved",
+  "pred": "a",
+  "trigger": {
+   "kind": "price_trigger",
+   "trigger_type": "price_break",
+   "trigger_ticker": "GOOGL",
+   "trigger_price": null,
+   "trigger_condition": "if GOOGL sells off this much or more tomorrow",
+   "why": "Buy order explicitly contingent on GOOGL price selling off further"
+  }
+ },
+ {
+  "id": 608219,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 614699,
+  "gold": "a",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 608679,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 608422,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 608359,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 608749,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 608752,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 610055,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 608932,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 608076,
+  "gold": "b",
+  "act": "route_price",
+  "pred": "b",
+  "trigger": {
+   "trigger_type": "price_break",
+   "trigger_ticker": "UNH",
+   "trigger_price": 270.0,
+   "trigger_condition": "UNH drops to $270"
+  }
+ },
+ {
+  "id": 606468,
+  "gold": "a",
+  "act": "unresolved",
+  "pred": "a",
+  "trigger": {
+   "kind": "event_macro",
+   "trigger_type": null,
+   "trigger_ticker": null,
+   "trigger_price": null,
+   "trigger_condition": "TGT beats Q3 guidance",
+   "why": "Bullish call explicitly conditioned on beating guidance; no beat = no call"
+  }
+ },
+ {
+  "id": 609162,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 608060,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 605669,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 627184,
+  "gold": "b",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 627180,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 614266,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 614290,
+  "gold": "a",
+  "act": "unresolved",
+  "pred": "a",
+  "trigger": {
+   "kind": "event_macro",
+   "trigger_type": null,
+   "trigger_ticker": null,
+   "trigger_price": null,
+   "trigger_condition": "Supreme Court lifts tariffs",
+   "why": "Call to $300 explicitly only applies if Supreme Court lifts tariffs"
+  }
+ },
+ {
+  "id": 608154,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 607454,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 609434,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 607720,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 608040,
+  "gold": "a",
+  "act": "unresolved",
+  "pred": "a",
+  "trigger": {
+   "kind": "event_macro",
+   "trigger_type": null,
+   "trigger_ticker": null,
+   "trigger_price": null,
+   "trigger_condition": "if interest rates fall to ~3\u20133.5% in 2024",
+   "why": "KO bullish call explicitly conditioned on lower interest rates materializing"
+  }
+ },
+ {
+  "id": 608669,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 608361,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 607312,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 608352,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 608653,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 608682,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 606424,
+  "gold": "b",
+  "act": "route_price",
+  "pred": "b",
+  "trigger": {
+   "trigger_type": "price_break",
+   "trigger_ticker": "V",
+   "trigger_price": 260.0,
+   "trigger_condition": "V drops to $260 or below"
+  }
+ },
+ {
+  "id": 609421,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 608358,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 608211,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 608677,
+  "gold": "a",
+  "act": "unresolved",
+  "pred": "a",
+  "trigger": {
+   "kind": "event_macro",
+   "trigger_type": null,
+   "trigger_ticker": null,
+   "trigger_price": null,
+   "trigger_condition": "recession occurs",
+   "why": "Entire bearish trifecta (revenue/profit/valuation drop) contingent on recession"
+  }
+ },
+ {
+  "id": 608038,
+  "gold": "a",
+  "act": "unresolved",
+  "pred": "a",
+  "trigger": {
+   "kind": "event_macro",
+   "trigger_type": null,
+   "trigger_ticker": null,
+   "trigger_price": null,
+   "trigger_condition": "if lower interest rates occur in 2024",
+   "why": "Entire dividend stock bullish call explicitly conditioned on lower rates materializing"
+  }
+ },
+ {
+  "id": 608039,
+  "gold": "a",
+  "act": "unresolved",
+  "pred": "a",
+  "trigger": {
+   "kind": "event_macro",
+   "trigger_type": null,
+   "trigger_ticker": null,
+   "trigger_price": null,
+   "trigger_condition": "if interest rates fall to 3-3.5% in 2024",
+   "why": "Whole bullish case on VZ explicitly conditioned on lower interest rates materializing"
+  }
+ },
+ {
+  "id": 608041,
+  "gold": "a",
+  "act": "unresolved",
+  "pred": "a",
+  "trigger": {
+   "kind": "event_macro",
+   "trigger_type": null,
+   "trigger_ticker": null,
+   "trigger_price": null,
+   "trigger_condition": "if lower interest rates materialize in 2024",
+   "why": "Bullish call on JNJ explicitly conditioned on lower rates occurring"
+  }
+ },
+ {
+  "id": 607309,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 607326,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 607324,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 607325,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 607452,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 607004,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 606865,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 606182,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 626240,
+  "gold": "b",
+  "act": "route_price",
+  "pred": "b",
+  "trigger": {
+   "trigger_type": "price_break",
+   "trigger_ticker": "CRM",
+   "trigger_price": 229.0,
+   "trigger_condition": "break of Friday's low (~229 area)"
+  }
+ },
+ {
+  "id": 608674,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 609006,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 612654,
+  "gold": "b",
+  "act": "route_price",
+  "pred": "b",
+  "trigger": {
+   "trigger_type": "price_break",
+   "trigger_ticker": "BTC",
+   "trigger_price": 90700.0,
+   "trigger_condition": "BTC finishes December at or above 90700"
+  }
+ },
+ {
+  "id": 610149,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 608362,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 609180,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 607017,
+  "gold": "a",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 607967,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 607606,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 610809,
+  "gold": "c",
+  "act": "unresolved",
+  "pred": "a",
+  "trigger": {
+   "kind": "event_macro",
+   "trigger_type": null,
+   "trigger_ticker": null,
+   "trigger_price": null,
+   "trigger_condition": "UK merger approval required to close deal",
+   "why": "Call contingent on deal closing; UK approval outstanding, deal may not complete"
+  }
+ },
+ {
+  "id": 608075,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 612447,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 609424,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 607307,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 607894,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 608636,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 614223,
+  "gold": "b",
+  "act": "route_price",
+  "pred": "b",
+  "trigger": {
+   "trigger_type": "price_break",
+   "trigger_ticker": "O",
+   "trigger_price": 55.0,
+   "trigger_condition": "O drops to 55 or lower"
+  }
+ },
+ {
+  "id": 614268,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 606629,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 607611,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 627086,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 605668,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 606185,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 606554,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 607196,
+  "gold": "a",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 607595,
+  "gold": "b",
+  "act": "route_price",
+  "pred": "b",
+  "trigger": {
+   "trigger_type": "price_break",
+   "trigger_ticker": "V",
+   "trigger_price": 200.0,
+   "trigger_condition": "V falls to or below $200/share"
+  }
+ },
+ {
+  "id": 607680,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 607681,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 606598,
+  "gold": "b",
+  "act": "unresolved",
+  "pred": "a",
+  "trigger": {
+   "kind": "price_trigger",
+   "trigger_type": "price_break",
+   "trigger_ticker": "BTC",
+   "trigger_price": null,
+   "trigger_condition": "Bitcoin goes down at all in 2025",
+   "why": "Bearish call on MSTR explicitly conditioned on Bitcoin declining"
+  }
+ },
+ {
+  "id": 609457,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 608509,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 610148,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 610150,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 608812,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 609002,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 608689,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 608612,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 608617,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 608421,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 608357,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 607275,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 607299,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 609242,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 605748,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 616446,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 607861,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 608931,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 608049,
+  "gold": "a",
+  "act": "unresolved",
+  "pred": "a",
+  "trigger": {
+   "kind": "event_macro",
+   "trigger_type": null,
+   "trigger_ticker": null,
+   "trigger_price": null,
+   "trigger_condition": "no recession and no major banking crisis or black swan event",
+   "why": "Entire 10-12% return call explicitly conditioned on no recession/crisis occurring"
+  }
+ },
+ {
+  "id": 609008,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 614265,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 613855,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 614500,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 615587,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 615708,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 609115,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 609003,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 609667,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 609158,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 608951,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 607317,
+  "gold": "b",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 614873,
+  "gold": "b",
+  "act": "route_price",
+  "pred": "b",
+  "trigger": {
+   "trigger_type": "price_break",
+   "trigger_ticker": "QQQ",
+   "trigger_price": 607.0,
+   "trigger_condition": "QQQ loses 607"
+  }
+ },
+ {
+  "id": 608220,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 609114,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 616232,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 609121,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 607087,
+  "gold": "b",
+  "act": "unresolved",
+  "pred": "a",
+  "trigger": {
+   "kind": "price_trigger",
+   "trigger_type": "price_break",
+   "trigger_ticker": "SHOP",
+   "trigger_price": null,
+   "trigger_condition": "continues to fall",
+   "why": "Buying contingent on continued price decline; no fall = no buy"
+  }
+ },
+ {
+  "id": 616363,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 608637,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 607551,
+  "gold": "b",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 616471,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 608948,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 609228,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 614591,
+  "gold": "b",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 607281,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 616436,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 616225,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 606748,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 606186,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 614321,
+  "gold": "b",
+  "act": "route_price",
+  "pred": "b",
+  "trigger": {
+   "trigger_type": "price_break",
+   "trigger_ticker": "QQQ",
+   "trigger_price": 577.0,
+   "trigger_condition": "wedge breaks down"
+  }
+ },
+ {
+  "id": 616582,
+  "gold": "b",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 616585,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 616584,
+  "gold": "b",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 614050,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 606198,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 614052,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 606944,
+  "gold": "b",
+  "act": "route_price",
+  "pred": "b",
+  "trigger": {
+   "trigger_type": "price_break",
+   "trigger_ticker": "TXN",
+   "trigger_price": 146.0,
+   "trigger_condition": "TXN price breaks below 146-145"
+  }
+ },
+ {
+  "id": 607781,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 614273,
+  "gold": "b",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 607963,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 612445,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 612446,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 614274,
+  "gold": "a",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 606467,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 609140,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 608304,
+  "gold": "a",
+  "act": "unresolved",
+  "pred": "a",
+  "trigger": {
+   "kind": "event_macro",
+   "trigger_type": null,
+   "trigger_ticker": null,
+   "trigger_price": null,
+   "trigger_condition": "political situation between Musk and Trump worsens; Tesla brand continues to weaken",
+   "why": "Selling contingent on political mess worsening and brand further deteriorating"
+  }
+ },
+ {
+  "id": 608718,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 608223,
+  "gold": "b",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 608953,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 609182,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 609207,
+  "gold": "b",
+  "act": "route_price",
+  "pred": "b",
+  "trigger": {
+   "trigger_type": "price_break",
+   "trigger_ticker": "MSFT",
+   "trigger_price": 410.0,
+   "trigger_condition": "MSFT falls below $410"
+  }
+ },
+ {
+  "id": 610227,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 610239,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 612152,
+  "gold": "a",
+  "act": "unresolved",
+  "pred": "a",
+  "trigger": {
+   "kind": "event_macro",
+   "trigger_type": null,
+   "trigger_ticker": null,
+   "trigger_price": null,
+   "trigger_condition": "Clarity Act fails",
+   "why": "Entire XRP drop to ~$1 explicitly conditioned on Clarity Act failing"
+  }
+ },
+ {
+  "id": 610600,
+  "gold": "a",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 626848,
+  "gold": "b",
+  "act": "route_price",
+  "pred": "b",
+  "trigger": {
+   "trigger_type": "price_break",
+   "trigger_ticker": "DIS",
+   "trigger_price": 105.0,
+   "trigger_condition": "DIS breaks below 105"
+  }
+ },
+ {
+  "id": 606628,
+  "gold": "b",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 610586,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 605999,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 607316,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 607459,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 607690,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 613860,
+  "gold": "b",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 612448,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 608613,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 610804,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 612457,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 608627,
+  "gold": "a",
+  "act": "unresolved",
+  "pred": "a",
+  "trigger": {
+   "kind": "event_macro",
+   "trigger_type": null,
+   "trigger_ticker": null,
+   "trigger_price": null,
+   "trigger_condition": "large selloff in MCD stock",
+   "why": "Call only applies if a major selloff occurs; no selloff, no opportunity"
+  }
+ },
+ {
+  "id": 610089,
+  "gold": "a",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 610228,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 610786,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 610350,
+  "gold": "a",
+  "act": "unresolved",
+  "pred": "a",
+  "trigger": {
+   "kind": "event_macro",
+   "trigger_type": null,
+   "trigger_ticker": null,
+   "trigger_price": null,
+   "trigger_condition": "interest rates return to normality",
+   "why": "Bearish case explicitly conditioned on rates normalizing; absent that, stock deemed cheap"
+  }
+ },
+ {
+  "id": 607608,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 607672,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 610982,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 608897,
+  "gold": "a",
+  "act": "unresolved",
+  "pred": "a",
+  "trigger": {
+   "kind": "event_macro",
+   "trigger_type": null,
+   "trigger_ticker": null,
+   "trigger_price": null,
+   "trigger_condition": "Google stops making TAC payment to Apple",
+   "why": "Entire bearish impact contingent on Google ceasing TAC payments"
+  }
+ },
+ {
+  "id": 608618,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 610598,
+  "gold": "a",
+  "act": "unresolved",
+  "pred": "a",
+  "trigger": {
+   "kind": "event_macro",
+   "trigger_type": null,
+   "trigger_ticker": null,
+   "trigger_price": null,
+   "trigger_condition": "interest rates go down",
+   "why": "Call is explicitly bi-directional and contingent on rate direction"
+  }
+ },
+ {
+  "id": 609411,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 605933,
+  "gold": "b",
+  "act": "route_price",
+  "pred": "b",
+  "trigger": {
+   "trigger_type": "price_break",
+   "trigger_ticker": "GFS",
+   "trigger_price": 60.0,
+   "trigger_condition": "shares fall under $60"
+  }
+ },
+ {
+  "id": 605926,
+  "gold": "a",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 605934,
+  "gold": "a",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 605977,
+  "gold": "b",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 606439,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 606658,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 607021,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 607150,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 607292,
+  "gold": "a",
+  "act": "unresolved",
+  "pred": "a",
+  "trigger": {
+   "kind": "event_macro",
+   "trigger_type": null,
+   "trigger_ticker": null,
+   "trigger_price": null,
+   "trigger_condition": "interest rates declining or economic recovery",
+   "why": "High-flyer call explicitly conditioned on rates falling or economy recovering"
+  }
+ },
+ {
+  "id": 607552,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 608981,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 608073,
+  "gold": "b",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 612444,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 612668,
+  "gold": "b",
+  "act": "route_price",
+  "pred": "b",
+  "trigger": {
+   "trigger_type": "price_break",
+   "trigger_ticker": "SOL",
+   "trigger_price": 126.0,
+   "trigger_condition": "SOL fails/breaks below 126"
+  }
+ },
+ {
+  "id": 611166,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 608626,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 608675,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 608687,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 608672,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 608717,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 608828,
+  "gold": "b",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 608919,
+  "gold": "a",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 608933,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 609007,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 610585,
+  "gold": "a",
+  "act": "unresolved",
+  "pred": "a",
+  "trigger": {
+   "kind": "event_macro",
+   "trigger_type": null,
+   "trigger_ticker": null,
+   "trigger_price": null,
+   "trigger_condition": "recession occurring end of 2025",
+   "why": "Bearish call explicitly conditioned on recession materializing; no recession = maybe +50%"
+  }
+ },
+ {
+  "id": 610147,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 610658,
+  "gold": "a",
+  "act": "unresolved",
+  "pred": "a",
+  "trigger": {
+   "kind": "event_macro",
+   "trigger_type": null,
+   "trigger_ticker": null,
+   "trigger_price": null,
+   "trigger_condition": "market goes down",
+   "why": "VZ call exists only if market declines; absent that trigger, no standalone call"
+  }
+ },
+ {
+  "id": 610958,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 612869,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 614700,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 628983,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 612642,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 614027,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 606663,
+  "gold": "b",
+  "act": "route_price",
+  "pred": "b",
+  "trigger": {
+   "trigger_type": "price_break",
+   "trigger_ticker": "MSFT",
+   "trigger_price": 369.0,
+   "trigger_condition": "MSFT sells off to high 360s"
+  }
+ },
+ {
+  "id": 612643,
+  "gold": "b",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 607008,
+  "gold": "b",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 611074,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 614556,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 614408,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 610063,
+  "gold": "a",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 609126,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 611014,
+  "gold": "a",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 616689,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 614714,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 610657,
+  "gold": "b",
+  "act": "route_price",
+  "pred": "b",
+  "trigger": {
+   "trigger_type": "price_break",
+   "trigger_ticker": "SOFI",
+   "trigger_price": 19.0,
+   "trigger_condition": "SOFI reaches $19"
+  }
+ },
+ {
+  "id": 610434,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 609139,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 608462,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 610663,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 608896,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 612637,
+  "gold": "b",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 612667,
+  "gold": "b",
+  "act": "route_price",
+  "pred": "b",
+  "trigger": {
+   "trigger_type": "price_break",
+   "trigger_ticker": "BTC",
+   "trigger_price": 99000.0,
+   "trigger_condition": "13 EMA crosses below 50 EMA on weekly candles"
+  }
+ },
+ {
+  "id": 608901,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 611168,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 616859,
+  "gold": "a",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 617191,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 606743,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 612897,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 616685,
+  "gold": "a",
+  "act": "unresolved",
+  "pred": "a",
+  "trigger": {
+   "kind": "event_macro",
+   "trigger_type": null,
+   "trigger_ticker": null,
+   "trigger_price": null,
+   "trigger_condition": "PLTR misses or barely beats next quarterly earnings",
+   "why": "Pullback call explicitly contingent on missing/not beating earnings"
+  }
+ },
+ {
+  "id": 616907,
+  "gold": "a",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 606218,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 608354,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 607007,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 609425,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 610426,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 606846,
+  "gold": "a",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 610593,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 610231,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 610069,
+  "gold": "a",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 608813,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 617211,
+  "gold": "a",
+  "act": "unresolved",
+  "pred": "a",
+  "trigger": {
+   "kind": "event_macro",
+   "trigger_type": null,
+   "trigger_ticker": null,
+   "trigger_price": null,
+   "trigger_condition": "management confirms 32% sales growth forecast",
+   "why": "Stock keeps running only IF management confirms the growth forecast next earnings"
+  }
+ },
+ {
+  "id": 617220,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 606829,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 605670,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 606372,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 609410,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 609409,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 609439,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 608360,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 610359,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 610712,
+  "gold": "a",
+  "act": "route_price",
+  "pred": "b",
+  "trigger": {
+   "trigger_type": "price_break",
+   "trigger_ticker": "TNX",
+   "trigger_price": 5.0,
+   "trigger_condition": "if 10-year yields reach 5%"
+  }
+ },
+ {
+  "id": 610596,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 610831,
+  "gold": "b",
+  "act": "unresolved",
+  "pred": "a",
+  "trigger": {
+   "kind": "price_trigger",
+   "trigger_type": "price_hold",
+   "trigger_ticker": "INTU",
+   "trigger_price": null,
+   "trigger_condition": "as long as INTU stays flatish",
+   "why": "Adding to position only while price remains flat, not rising"
+  }
+ },
+ {
+  "id": 608651,
+  "gold": "a",
+  "act": "unresolved",
+  "pred": "a",
+  "trigger": {
+   "kind": "event_macro",
+   "trigger_type": null,
+   "trigger_ticker": null,
+   "trigger_price": null,
+   "trigger_condition": "China expansion fails",
+   "why": "Earnings suffer only IF China expansion blocked; absent that, no bearish call"
+  }
+ },
+ {
+  "id": 612228,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 612535,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 613189,
+  "gold": "c",
+  "act": "unresolved",
+  "pred": "a",
+  "trigger": {
+   "kind": "event_macro",
+   "trigger_type": null,
+   "trigger_ticker": null,
+   "trigger_price": null,
+   "trigger_condition": "significant market collapse occurs",
+   "why": "Call is contingent on a significant collapse happening"
+  }
+ },
+ {
+  "id": 610356,
+  "gold": "a",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ },
+ {
+  "id": 610595,
+  "gold": "c",
+  "act": "keep",
+  "pred": "c",
+  "trigger": null
+ }
+]
