@@ -53,6 +53,13 @@ HIDE_WEAK_BASKET_CALLS = (
     in ("on", "true", "1", "yes")
 )
 
+# 2026-06-14 holdings taxonomy — hide passive holding disclosures (is_holding_disclosure)
+# from every user surface. Default on; independent kill switch.
+HIDE_HOLDING_DISCLOSURES = (
+    os.environ.get("HIDE_HOLDING_DISCLOSURES", "on").lower()
+    in ("on", "true", "1", "yes")
+)
+
 
 def weak_basket_filter_sql(table_alias: str = "p") -> str:
     """Return an ``AND``-prefixed SQL fragment that excludes rows flagged
@@ -157,6 +164,10 @@ def hedged_filter_sql(table_alias: str = "p") -> str:
     if HIDE_WEAK_BASKET_CALLS:
         parts.append(
             f" AND COALESCE({table_alias}.is_weak_basket_call, FALSE) = FALSE"
+        )
+    if HIDE_HOLDING_DISCLOSURES:
+        parts.append(
+            f" AND COALESCE({table_alias}.is_holding_disclosure, FALSE) = FALSE"
         )
     return "".join(parts)
 

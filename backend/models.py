@@ -405,6 +405,16 @@ class Prediction(Base):
     is_weak_basket_call = Column(Boolean, nullable=False, default=False,
                                  server_default="false")
 
+    # 2026-06-14 holdings taxonomy. TRUE = a PASSIVE holding disclosure
+    # ("happy to keep holding", "my biggest position", "I own it long
+    # term") rather than an active buy/sell recommendation. NOT a scored
+    # call: taken off the accuracy board (outcome='unresolved') AND hidden
+    # from every user surface via the bundled hedged_filter_sql helper
+    # (kill switch HIDE_HOLDING_DISCLOSURES). Kept for audit + a future
+    # holdings surface. LLM-judged per row by scripts/reclass_holdings_2026_06_14.py.
+    is_holding_disclosure = Column(Boolean, nullable=False, default=False,
+                                   server_default="false")
+
     # Ship #14 — long-horizon predictions ("Tesla $500 by 2030") are
     # kept as valid training data but skipped by the evaluator until
     # their window resolves. evaluation_deferred=TRUE means the

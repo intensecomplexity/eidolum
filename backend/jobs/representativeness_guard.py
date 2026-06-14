@@ -288,6 +288,85 @@ _COND_RX = re.compile(
     r"[ -]?(case )?scenario|should .{0,40}\bthen\b|when .{0,40}\bthen\b|provided that|in the event)", re.I)
 _PRICE_TRIGGER_TYPES = {"price_break", "price_hold"}
 
+# ── Forward HOLDINGS guard ──────────────────────────────────────────────────
+# Passive holding disclosures ("happy to keep holding", "my biggest position",
+# "I own it long term") are NOT scored calls. Cost-gated to hold-suspects (regex);
+# one verify splits HOLDING vs CALL (active buy/sell rec) vs OTHER. HOLDING ->
+# the caller sets is_holding_disclosure=TRUE + outcome='unresolved' (hidden via
+# bundle, off the scoreboard). Default ON behind ENABLE_HOLDING_GUARD; fail-open.
+_HOLD_RX = re.compile(
+    r"(happy to (keep |continue |continue to )?hold|continue(s|d)? to hold|continuing to hold|"
+    r"still hold|keep hold|hold(ing)? (on|onto|my|the|this)|not (going to |gonna )?sell|"
+    r"never (going to |gonna )?sell|won'?t sell|wouldn'?t sell|no (reason|plans) to sell|"
+    r"my (top |largest |biggest |core |favorite )?(holding|position)|remain(s|ing)? long|"
+    r"i'?m (still )?(long|holding|invested)|i (still )?(own|hold)\b|i'?ve (held|owned|been holding)|"
+    r"been holding|in my portfolio|part of my portfolio|i own (shares|some)|buy and hold|"
+    r"long.?term hold|core (position|holding))", re.I)
+
+
+def holding_enabled() -> bool:
+    return (os.environ.get("ENABLE_HOLDING_GUARD", "true") or "true").strip().lower() in ("1", "true", "yes")
+
+
+def is_holding_suspect(quote, context):
+    return bool(_HOLD_RX.search(quote or "") or _HOLD_RX.search(context or ""))
+
+
+_HOLD_PROMPT = """You classify ONE stored stock prediction by whether it is a PASSIVE holding disclosure or an ACTIVE recommendation.
+
+Ticker {ticker}, stored direction {direction}.
+verbatim_quote: "{quote}"
+context: "{ctx}"
+{win}
+
+- HOLDING: passive disposition, NO fresh directional recommendation — "I'm happy to keep holding", "I own it / my biggest position", "still holding my shares", "long-term hold", "not selling". Disclosing an existing position is NOT a call to action.
+- CALL: an ACTIVE recommendation or fresh action — "buy here", "I'm adding / I increased my position", "strong buy", a price target to reach, "I sold / trimming", "buy the dip".
+- OTHER: pure commentary / narration / a question.
+
+Conservative: if there is ANY active buy/sell rec or fresh add/trim action, choose CALL — do NOT hide a real recommendation. Only HOLDING when it is purely a passive position disclosure.
+
+Reply ONLY JSON: {{"label":"HOLDING|CALL|OTHER","why":"<=15 words"}}"""
+
+
+def holding_verify(ticker, direction, quote, ctx, window_txt="", model=None):
+    model = (model or VERIFY_MODEL).strip().lower()
+    prompt = _HOLD_PROMPT.format(ticker=ticker, direction=direction, quote=(quote or "")[:500],
+                                 ctx=(ctx or "")[:300],
+                                 win=(f"transcript window: {window_txt}" if window_txt else ""))
+    try:
+        p = subprocess.run(["claude", "-p", "--model", model, prompt], capture_output=True, text=True,
+                           timeout=240, env=_subprocess_env(), stdin=subprocess.DEVNULL)
+        out = json.loads(re.search(r"\{.*\}", p.stdout, re.S).group(0))
+        lab = (out.get("label") or "").upper().strip()
+        return lab if lab in ("HOLDING", "CALL", "OTHER") else "CALL"
+    except Exception:
+        return "CALL"  # fail-safe: keep as a call, never hide on error
+
+
+def holding_decide(pred, ticker, direction, ts_fields, transcript_data, db, *, stats=None):
+    """Return {'action': 'hold'|'keep'}. fail-open keep. Cost-gated to hold-suspects."""
+    try:
+        if not holding_enabled():
+            return {"action": "keep"}
+        quote = (ts_fields or {}).get("source_verbatim_quote") or pred.get("_verbatim_quote") or pred.get("verbatim_quote") or ""
+        ctx = pred.get("context") or pred.get("_context") or ""
+        if not is_holding_suspect(quote, ctx):
+            return {"action": "keep"}
+        if stats is not None:
+            stats["holdguard_suspect"] = int(stats.get("holdguard_suspect", 0)) + 1
+        win = ""
+        seconds = (ts_fields or {}).get("source_timestamp_seconds")
+        if transcript_data is not None and seconds:
+            win = window_text(transcript_data, seconds)
+        lab = holding_verify(ticker, direction, quote, ctx, win)
+        if lab == "HOLDING":
+            if stats is not None:
+                stats["holdguard_hidden"] = int(stats.get("holdguard_hidden", 0)) + 1
+            return {"action": "hold"}
+        return {"action": "keep"}
+    except Exception:
+        return {"action": "keep"}
+
 
 def conditional_enabled() -> bool:
     return (os.environ.get("ENABLE_CONDITIONAL_GUARD", "true") or "true").strip().lower() in ("1", "true", "yes")

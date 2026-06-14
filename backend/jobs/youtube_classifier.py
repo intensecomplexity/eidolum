@@ -4530,6 +4530,19 @@ def insert_youtube_prediction(
         video_id=video_id, channel_name=channel_name, stats=stats,
     ):
         return _reject("missing_source_timestamp")
+    # Ship: forward HOLDINGS guard (eval-gated 2026-06-14). A passive holding
+    # disclosure ("happy to keep holding", "my biggest position") is NOT a scored
+    # call — insert it hidden (is_holding_disclosure) + off the scoreboard
+    # (outcome='unresolved'), never as a bullish call. Cost-gated to hold-suspects
+    # (regex), one verify; runs first and short-circuits the other guards.
+    # Default-on behind ENABLE_HOLDING_GUARD; fail-open (keep on error).
+    _is_holding = False
+    try:
+        from jobs import representativeness_guard as _rgh
+        if _rgh.holding_decide(pred, ticker, direction, _ts_fields, transcript_data, db, stats=stats).get("action") == "hold":
+            _is_holding = True
+    except Exception:
+        _is_holding = False
     # Ship: forward CONDITIONAL guard (transcript-aware; eval-gated 2026-06-14).
     # Catches trigger-gated calls the classifier emits as FLAT ticker_calls (the
     # "if X then Y" class). Cost-gated to conditional-suspects (regex over
@@ -4542,7 +4555,8 @@ def insert_youtube_prediction(
     _cond_unresolved = False
     try:
         from jobs import representativeness_guard as _rgc
-        _cg = _rgc.conditional_decide(pred, ticker, direction, _ts_fields, transcript_data, db, stats=stats)
+        _cg = ({"action": "keep"} if _is_holding
+               else _rgc.conditional_decide(pred, ticker, direction, _ts_fields, transcript_data, db, stats=stats))
         if _cg.get("action") == "route_price":
             tr = _cg["trigger"]
             pred["_trigger_type"] = tr["trigger_type"]
@@ -4569,9 +4583,9 @@ def insert_youtube_prediction(
     _rg_reported = _rg_weak = False
     try:
         from jobs import representativeness_guard as _rg
-        # Skip the rep second-pass if the conditional guard already routed this row
-        # to unresolved (it's hidden; no value in a second LLM call).
-        _gd = ({"action": "keep"} if _cond_unresolved
+        # Skip the rep second-pass if this row is already a holding or conditional-
+        # unresolved (it's hidden/off-board; no value in a second LLM call).
+        _gd = ({"action": "keep"} if (_cond_unresolved or _is_holding)
                else _rg.decide(pred, ticker, direction, _ts_fields, transcript_data, db, stats=stats))
         if _gd.get("action") == "reject":
             return _reject(_gd.get("reason") or "representativeness_guard")
@@ -4649,6 +4663,14 @@ def insert_youtube_prediction(
         _pred.evaluation_summary = (
             "[conditional_guard=event_macro] inserted unresolved "
             "(unverifiable event/macro trigger; excluded from accuracy)")
+    # Holdings guard: passive holding disclosure — hidden (bundle) + off the
+    # scoreboard. Not a scored call; flag-not-delete.
+    if _is_holding:
+        _pred.is_holding_disclosure = True
+        _pred.outcome = "unresolved"
+        _pred.evaluation_summary = (
+            "[holding_guard] passive holding disclosure — hidden + off scoreboard "
+            "(not a scored call)")
     if _classifier_validation_gate(_pred, db, stats):
         return _reject("classifier_validation_gate")
     db.add(_pred)
