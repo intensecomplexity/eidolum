@@ -1,0 +1,833 @@
+{
+ "generated": "2026-06-14",
+ "ship": "conditional flat-scoring remediation (macro/event-first slice)",
+ "candidates_total": 1081,
+ "judged": 117,
+ "split": {
+  "a_event_macro": 51,
+  "b_price_trigger": 4,
+  "c_keep": 62
+ },
+ "ticker_call_tail_for_followup": 964,
+ "verdicts": {
+  "616498": {
+   "verdict": "a",
+   "trigger": "if retail sales actually come in negative 0.3%",
+   "ticker": "SH",
+   "pre_outcome": "miss",
+   "category": "macro_call"
+  },
+  "616313": {
+   "verdict": "a",
+   "trigger": "if economic data starts coming out good and we do in fact get that September rate, the December rate cut",
+   "ticker": "SPY",
+   "pre_outcome": "hit",
+   "category": "macro_call"
+  },
+  "616369": {
+   "verdict": "a",
+   "trigger": "if this situation continues deteriorating",
+   "ticker": "TLT",
+   "pre_outcome": "miss",
+   "category": "macro_call"
+  },
+  "616445": {
+   "verdict": "a",
+   "trigger": "if the Fed cuts rates in September",
+   "ticker": "TLT",
+   "pre_outcome": "hit",
+   "category": "macro_call"
+  },
+  "614590": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "SPY",
+   "pre_outcome": "near",
+   "category": "regime_call"
+  },
+  "616424": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "NVDA",
+   "pre_outcome": "hit",
+   "category": "pair_call"
+  },
+  "616572": {
+   "verdict": "a",
+   "trigger": "if the trend continues",
+   "ticker": "META",
+   "pre_outcome": "hit",
+   "category": "metric_forecast_call"
+  },
+  "616435": {
+   "verdict": "a",
+   "trigger": "if the rate Cuts come in the recessionary environment",
+   "ticker": "SH",
+   "pre_outcome": "hit",
+   "category": "macro_call"
+  },
+  "612851": {
+   "verdict": "a",
+   "trigger": "if something really breaks in 2023 with all the tightening",
+   "ticker": "SH",
+   "pre_outcome": "miss",
+   "category": "macro_call"
+  },
+  "613124": {
+   "verdict": "a",
+   "trigger": "in the event of a big sell off",
+   "ticker": "EEM",
+   "pre_outcome": "hit",
+   "category": "macro_call"
+  },
+  "612425": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "SPY",
+   "pre_outcome": "miss",
+   "category": "regime_call"
+  },
+  "612902": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "SH",
+   "pre_outcome": "hit",
+   "category": "macro_call"
+  },
+  "614634": {
+   "verdict": "a",
+   "trigger": "if we don't fall off a cliff there",
+   "ticker": "TLT",
+   "pre_outcome": "miss",
+   "category": "macro_call"
+  },
+  "616590": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "GRAB",
+   "pre_outcome": "miss",
+   "category": "pair_call"
+  },
+  "614409": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "MSFT",
+   "pre_outcome": "hit",
+   "category": "pair_call"
+  },
+  "613212": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "TLT",
+   "pre_outcome": "miss",
+   "category": "macro_call"
+  },
+  "611322": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "TIP",
+   "pre_outcome": "miss",
+   "category": "macro_call"
+  },
+  "611198": {
+   "verdict": "a",
+   "trigger": "if the Houthies strike shipping lanes",
+   "ticker": "USO",
+   "pre_outcome": "hit",
+   "category": "macro_call"
+  },
+  "610946": {
+   "verdict": "a",
+   "trigger": "if we do cut back on spending",
+   "ticker": "SH",
+   "pre_outcome": "hit",
+   "category": "macro_call"
+  },
+  "611754": {
+   "verdict": "a",
+   "trigger": "if inflation's in a good place and jobs aren't really strengthening",
+   "ticker": "TLT",
+   "pre_outcome": "miss",
+   "category": "macro_call"
+  },
+  "613244": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "NFLX",
+   "pre_outcome": "hit",
+   "category": "metric_forecast_call"
+  },
+  "612543": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "SPY",
+   "pre_outcome": "near",
+   "category": "regime_call"
+  },
+  "611321": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "SPY",
+   "pre_outcome": "miss",
+   "category": "macro_call"
+  },
+  "613202": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "GLD",
+   "pre_outcome": "hit",
+   "category": "macro_call"
+  },
+  "613222": {
+   "verdict": "a",
+   "trigger": "if rates keep increasing",
+   "ticker": "TBT",
+   "pre_outcome": "hit",
+   "category": "macro_call"
+  },
+  "614638": {
+   "verdict": "a",
+   "trigger": "if we get a rate cut on December 10th / Jan 28th",
+   "ticker": "TLT",
+   "pre_outcome": "hit",
+   "category": "macro_call"
+  },
+  "611640": {
+   "verdict": "a",
+   "trigger": "If they are forced to sell these United States dollars",
+   "ticker": "UUP",
+   "pre_outcome": "hit",
+   "category": "macro_call"
+  },
+  "614606": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "TIP",
+   "pre_outcome": "hit",
+   "category": "macro_call"
+  },
+  "614605": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "SH",
+   "pre_outcome": "miss",
+   "category": "macro_call"
+  },
+  "615118": {
+   "verdict": "a",
+   "trigger": "if these Wall Streeters and these funds get more confident about where the United States economy is going, more of these tariff deals are announced",
+   "ticker": "GLD",
+   "pre_outcome": "hit",
+   "category": "macro_call"
+  },
+  "612276": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "QQQ",
+   "pre_outcome": "miss",
+   "category": "regime_call"
+  },
+  "613131": {
+   "verdict": "a",
+   "trigger": "if manufacturing output does drop, earnings fall, and widespread layoffs occur",
+   "ticker": "SH",
+   "pre_outcome": "miss",
+   "category": "macro_call"
+  },
+  "612721": {
+   "verdict": "a",
+   "trigger": "if that report comes back high",
+   "ticker": "TIP",
+   "pre_outcome": "miss",
+   "category": "macro_call"
+  },
+  "613114": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "TIP",
+   "pre_outcome": "miss",
+   "category": "macro_call"
+  },
+  "612861": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "SPY",
+   "pre_outcome": "miss",
+   "category": "regime_call"
+  },
+  "613001": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "TIP",
+   "pre_outcome": "hit",
+   "category": "macro_call"
+  },
+  "612074": {
+   "verdict": "a",
+   "trigger": "if they do that, and they can add it to the defense bill",
+   "ticker": "IBIT",
+   "pre_outcome": "hit",
+   "category": "macro_call"
+  },
+  "612508": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "SPY",
+   "pre_outcome": "miss",
+   "category": "macro_call"
+  },
+  "614189": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "SPY",
+   "pre_outcome": "hit",
+   "category": "macro_call"
+  },
+  "613073": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "SPY",
+   "pre_outcome": "miss",
+   "category": "regime_call"
+  },
+  "616570": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "SH",
+   "pre_outcome": "miss",
+   "category": "macro_call"
+  },
+  "612129": {
+   "verdict": "b",
+   "trigger": "breaks back down below 124",
+   "ticker": "SOL",
+   "pre_outcome": "hit",
+   "category": "conditional_call"
+  },
+  "616385": {
+   "verdict": "a",
+   "trigger": "if the downturn becomes a full-on stock market crash",
+   "ticker": "SH",
+   "pre_outcome": "miss",
+   "category": "macro_call"
+  },
+  "616463": {
+   "verdict": "a",
+   "trigger": "If we're no longer able to sell software related goods to China",
+   "ticker": "SH",
+   "pre_outcome": "miss",
+   "category": "macro_call"
+  },
+  "616434": {
+   "verdict": "a",
+   "trigger": "if the market believes we're going back towards neutral",
+   "ticker": "TLT",
+   "pre_outcome": "miss",
+   "category": "macro_call"
+  },
+  "612708": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "SH",
+   "pre_outcome": "miss",
+   "category": "macro_call"
+  },
+  "614448": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "TIP",
+   "pre_outcome": "miss",
+   "category": "macro_call"
+  },
+  "614779": {
+   "verdict": "a",
+   "trigger": "Supreme Court killing the tariffs",
+   "ticker": "UUP",
+   "pre_outcome": "hit",
+   "category": "macro_call"
+  },
+  "614838": {
+   "verdict": "a",
+   "trigger": "if this economy continues to decay... we'll get our rate cut",
+   "ticker": "TLT",
+   "pre_outcome": "miss",
+   "category": "macro_call"
+  },
+  "614859": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "TLT",
+   "pre_outcome": "miss",
+   "category": "macro_call"
+  },
+  "616314": {
+   "verdict": "a",
+   "trigger": "if some of the economic data starts coming out good and we do in fact get that September rate, the December rate cut",
+   "ticker": "QQQ",
+   "pre_outcome": "hit",
+   "category": "macro_call"
+  },
+  "616422": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "GLD",
+   "pre_outcome": "hit",
+   "category": "macro_call"
+  },
+  "616511": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "VXX",
+   "pre_outcome": "miss",
+   "category": "macro_call"
+  },
+  "612519": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "UUP",
+   "pre_outcome": "hit",
+   "category": "macro_call"
+  },
+  "614133": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "ORCL",
+   "pre_outcome": "miss",
+   "category": "pair_call"
+  },
+  "612521": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "GLD",
+   "pre_outcome": "hit",
+   "category": "macro_call"
+  },
+  "612842": {
+   "verdict": "a",
+   "trigger": "if we can hit 230 EPS",
+   "ticker": "SPY",
+   "pre_outcome": "hit",
+   "category": "macro_call"
+  },
+  "612651": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "IBIT",
+   "pre_outcome": "miss",
+   "category": "macro_call"
+  },
+  "612692": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "XLE",
+   "pre_outcome": "miss",
+   "category": "sector_call"
+  },
+  "615119": {
+   "verdict": "a",
+   "trigger": "if more tariff deals are announced and funds get more confident about US economy/policy",
+   "ticker": "SPY",
+   "pre_outcome": "hit",
+   "category": "regime_call"
+  },
+  "611043": {
+   "verdict": "a",
+   "trigger": "if that happens we go into recession",
+   "ticker": "SH",
+   "pre_outcome": "miss",
+   "category": "macro_call"
+  },
+  "612541": {
+   "verdict": "a",
+   "trigger": "if tariffs on off continue if this crazy policy volatility carries on in the United States",
+   "ticker": "UUP",
+   "pre_outcome": "hit",
+   "category": "macro_call"
+  },
+  "616767": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "SPY",
+   "pre_outcome": "hit",
+   "category": "regime_call"
+  },
+  "612814": {
+   "verdict": "a",
+   "trigger": "if recession hits",
+   "ticker": "SH",
+   "pre_outcome": "hit",
+   "category": "macro_call"
+  },
+  "612380": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "SPY",
+   "pre_outcome": "hit",
+   "category": "regime_call"
+  },
+  "612843": {
+   "verdict": "a",
+   "trigger": "if the FED does pivot before anything bad happens",
+   "ticker": "UUP",
+   "pre_outcome": "miss",
+   "category": "macro_call"
+  },
+  "612532": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "SPY",
+   "pre_outcome": "hit",
+   "category": "regime_call"
+  },
+  "616420": {
+   "verdict": "a",
+   "trigger": "short cutting cycle...proactive...cut a few 50 basis points...strong economy",
+   "ticker": "SPY",
+   "pre_outcome": "hit",
+   "category": "regime_call"
+  },
+  "612548": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "IBIT",
+   "pre_outcome": "miss",
+   "category": "macro_call"
+  },
+  "612924": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "SPY",
+   "pre_outcome": "hit",
+   "category": "macro_call"
+  },
+  "616643": {
+   "verdict": "a",
+   "trigger": "these tariffs volley back and forth and escalate",
+   "ticker": "SH",
+   "pre_outcome": "miss",
+   "category": "macro_call"
+  },
+  "616644": {
+   "verdict": "a",
+   "trigger": "If we continue on this path",
+   "ticker": "TIP",
+   "pre_outcome": "miss",
+   "category": "macro_call"
+  },
+  "610167": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "QQQ",
+   "pre_outcome": "hit",
+   "category": "macro_call"
+  },
+  "616811": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "SPY",
+   "pre_outcome": "hit",
+   "category": "regime_call"
+  },
+  "611263": {
+   "verdict": "b",
+   "trigger": "Brent crude goes up $2 from $98.75",
+   "ticker": "QQQ",
+   "pre_outcome": "hit",
+   "category": "conditional_call"
+  },
+  "612537": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "UUP",
+   "pre_outcome": "miss",
+   "category": "macro_call"
+  },
+  "614483": {
+   "verdict": "a",
+   "trigger": "if we can actually get back to labor growth",
+   "ticker": "SH",
+   "pre_outcome": "hit",
+   "category": "macro_call"
+  },
+  "613213": {
+   "verdict": "a",
+   "trigger": "if the federal reserve is going to hike that fast",
+   "ticker": "SH",
+   "pre_outcome": "miss",
+   "category": "macro_call"
+  },
+  "611269": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "USO",
+   "pre_outcome": "hit",
+   "category": "macro_call"
+  },
+  "616768": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "QQQ",
+   "pre_outcome": "miss",
+   "category": "sector_call"
+  },
+  "610961": {
+   "verdict": "a",
+   "trigger": "if gas continues to go up / if we get 5.50 or six dollars",
+   "ticker": "SH",
+   "pre_outcome": "miss",
+   "category": "macro_call"
+  },
+  "611557": {
+   "verdict": "b",
+   "trigger": "If oil prices stay near current levels at $100 per barrel",
+   "ticker": "TIP",
+   "pre_outcome": "miss",
+   "category": "macro_call"
+  },
+  "612903": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "TBT",
+   "pre_outcome": "hit",
+   "category": "macro_call"
+  },
+  "616947": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "SPY",
+   "pre_outcome": "hit",
+   "category": "macro_call"
+  },
+  "612432": {
+   "verdict": "a",
+   "trigger": "if bad times might be coming / if recession hits",
+   "ticker": "SH",
+   "pre_outcome": "miss",
+   "category": "macro_call"
+  },
+  "616600": {
+   "verdict": "a",
+   "trigger": "if inflation ramps up",
+   "ticker": "TBT",
+   "pre_outcome": "hit",
+   "category": "macro_call"
+  },
+  "611211": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "USO",
+   "pre_outcome": "hit",
+   "category": "macro_call"
+  },
+  "612898": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "ARKK",
+   "pre_outcome": "hit",
+   "category": "sector_call"
+  },
+  "612138": {
+   "verdict": "a",
+   "trigger": "if Clarity Act passes",
+   "ticker": "IBIT",
+   "pre_outcome": "miss",
+   "category": "macro_call"
+  },
+  "611958": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "GLD",
+   "pre_outcome": "hit",
+   "category": "macro_call"
+  },
+  "612503": {
+   "verdict": "a",
+   "trigger": "if it's going to show up more in consumer prices later on in the year",
+   "ticker": "TIP",
+   "pre_outcome": "hit",
+   "category": "macro_call"
+  },
+  "614669": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "SH",
+   "pre_outcome": "hit",
+   "category": "macro_call"
+  },
+  "613227": {
+   "verdict": "a",
+   "trigger": "if inflation stays persistent",
+   "ticker": "DBC",
+   "pre_outcome": "hit",
+   "category": "sector_call"
+  },
+  "610529": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "TLT",
+   "pre_outcome": "miss",
+   "category": "macro_call"
+  },
+  "613225": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "USO",
+   "pre_outcome": "hit",
+   "category": "macro_call"
+  },
+  "611262": {
+   "verdict": "a",
+   "trigger": "If the war ends",
+   "ticker": "TIP",
+   "pre_outcome": "miss",
+   "category": "macro_call"
+  },
+  "612740": {
+   "verdict": "a",
+   "trigger": "assuming that Chinese stocks don't get delisted and assuming that their own government doesn't destroy these companies themselves",
+   "ticker": "FXI",
+   "pre_outcome": "miss",
+   "category": "sector_call"
+  },
+  "611643": {
+   "verdict": "a",
+   "trigger": "If Japan continues raising their interest rates",
+   "ticker": "EMB",
+   "pre_outcome": "miss",
+   "category": "macro_call"
+  },
+  "611586": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "GLD",
+   "pre_outcome": "miss",
+   "category": "macro_call"
+  },
+  "611957": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "IWM",
+   "pre_outcome": "miss",
+   "category": "sector_call"
+  },
+  "613172": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "SPY",
+   "pre_outcome": "hit",
+   "category": "macro_call"
+  },
+  "612550": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "ITA",
+   "pre_outcome": "hit",
+   "category": "sector_call"
+  },
+  "613154": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "TBT",
+   "pre_outcome": "hit",
+   "category": "macro_call"
+  },
+  "614380": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "DIS",
+   "pre_outcome": "hit",
+   "category": "metric_forecast_call"
+  },
+  "614565": {
+   "verdict": "b",
+   "trigger": "if we stay on this trajectory",
+   "ticker": "SPY",
+   "pre_outcome": "near",
+   "category": "regime_call"
+  },
+  "613211": {
+   "verdict": "a",
+   "trigger": "once all the stimulus and all this BS ends",
+   "ticker": "VNQ",
+   "pre_outcome": "hit",
+   "category": "macro_call"
+  },
+  "611599": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "TIP",
+   "pre_outcome": "miss",
+   "category": "macro_call"
+  },
+  "613198": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "SH",
+   "pre_outcome": "hit",
+   "category": "macro_call"
+  },
+  "611641": {
+   "verdict": "a",
+   "trigger": "If the Bank of Japan and the Japanese government now start to raise interest rates and they cool down their stimulus",
+   "ticker": "TBT",
+   "pre_outcome": "miss",
+   "category": "macro_call"
+  },
+  "612505": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "UDN",
+   "pre_outcome": "hit",
+   "category": "macro_call"
+  },
+  "611639": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "FXY",
+   "pre_outcome": "miss",
+   "category": "macro_call"
+  },
+  "614921": {
+   "verdict": "a",
+   "trigger": "if we do end up having a problem or crisis in the economy",
+   "ticker": "SH",
+   "pre_outcome": "miss",
+   "category": "macro_call"
+  },
+  "614566": {
+   "verdict": "a",
+   "trigger": "if we get data like this again in January",
+   "ticker": "TLT",
+   "pre_outcome": "miss",
+   "category": "macro_call"
+  },
+  "611271": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "TBT",
+   "pre_outcome": "hit",
+   "category": "macro_call"
+  },
+  "616645": {
+   "verdict": "a",
+   "trigger": "if all the countries find a solution within 8 to 10 weeks",
+   "ticker": "SPY",
+   "pre_outcome": "hit",
+   "category": "ticker_call"
+  },
+  "614577": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "SOXX",
+   "pre_outcome": "miss",
+   "category": "sector_call"
+  },
+  "612019": {
+   "verdict": "a",
+   "trigger": "If the data is weak",
+   "ticker": "TLT",
+   "pre_outcome": "miss",
+   "category": "macro_call"
+  }
+ }
+}
