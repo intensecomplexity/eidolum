@@ -1,0 +1,5797 @@
+{
+ "generated": "2026-06-14",
+ "run": 2,
+ "ship": "conditional flat-scoring FULL TAIL",
+ "judged": 964,
+ "split": {
+  "a": 109,
+  "b": 156,
+  "c": 699
+ },
+ "verdicts": {
+  "622218": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "RCI",
+   "pre_outcome": "hit"
+  },
+  "606961": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "META",
+   "pre_outcome": "hit"
+  },
+  "622214": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "TGT",
+   "pre_outcome": "hit"
+  },
+  "622217": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "AXON",
+   "pre_outcome": "hit"
+  },
+  "622453": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "PLTR",
+   "pre_outcome": "hit"
+  },
+  "612604": {
+   "verdict": "b",
+   "trigger": "if we break this resistance and confirm above it",
+   "ticker": "ETH",
+   "pre_outcome": "hit"
+  },
+  "605848": {
+   "verdict": "b",
+   "trigger": "if we get a manager's amendment, we get a markup vote",
+   "ticker": "XRP",
+   "pre_outcome": "near"
+  },
+  "610487": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "INTC",
+   "pre_outcome": "miss"
+  },
+  "608634": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "ABBV",
+   "pre_outcome": "miss"
+  },
+  "605807": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "TCEHY",
+   "pre_outcome": "hit"
+  },
+  "613732": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "AAPL",
+   "pre_outcome": "near"
+  },
+  "609508": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "MO",
+   "pre_outcome": "miss"
+  },
+  "609498": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "REGN",
+   "pre_outcome": "hit"
+  },
+  "611899": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "ELV",
+   "pre_outcome": "near"
+  },
+  "624593": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "SNAP",
+   "pre_outcome": "hit"
+  },
+  "612615": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "XRP",
+   "pre_outcome": "hit"
+  },
+  "609221": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "GOOGL",
+   "pre_outcome": "hit"
+  },
+  "622259": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "ARE",
+   "pre_outcome": "miss"
+  },
+  "622353": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "NFLX",
+   "pre_outcome": "hit"
+  },
+  "609414": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "COST",
+   "pre_outcome": "miss"
+  },
+  "609319": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "AAPL",
+   "pre_outcome": "hit"
+  },
+  "612150": {
+   "verdict": "a",
+   "trigger": "if this is voted down",
+   "ticker": "BTC",
+   "pre_outcome": "near"
+  },
+  "613972": {
+   "verdict": "b",
+   "trigger": "if we did break to the all-time highs",
+   "ticker": "AAPL",
+   "pre_outcome": "hit"
+  },
+  "613792": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "DIS",
+   "pre_outcome": "miss"
+  },
+  "613117": {
+   "verdict": "b",
+   "trigger": "when the stock price is at 50",
+   "ticker": "GOOGL",
+   "pre_outcome": "miss"
+  },
+  "614026": {
+   "verdict": "b",
+   "trigger": "as long as you maintain kind of a share price above 20",
+   "ticker": "PLTR",
+   "pre_outcome": "near"
+  },
+  "614032": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "NVDA",
+   "pre_outcome": "hit"
+  },
+  "612085": {
+   "verdict": "a",
+   "trigger": "if the Democrats come out tomorrow after the closed door meeting",
+   "ticker": "BTC",
+   "pre_outcome": "miss"
+  },
+  "619068": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "SH",
+   "pre_outcome": "miss"
+  },
+  "614043": {
+   "verdict": "b",
+   "trigger": "stop loss right underneath that maybe right about 630",
+   "ticker": "SOFI",
+   "pre_outcome": "near"
+  },
+  "614046": {
+   "verdict": "a",
+   "trigger": "if Amazon has similar operating results where they produced record cash flow for operation record revenue and profit",
+   "ticker": "AMZN",
+   "pre_outcome": "hit"
+  },
+  "614111": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "LAC",
+   "pre_outcome": "hit"
+  },
+  "614040": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "AMD",
+   "pre_outcome": "near"
+  },
+  "614054": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "AMD",
+   "pre_outcome": "miss"
+  },
+  "614106": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "COST",
+   "pre_outcome": "hit"
+  },
+  "623114": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "AXP",
+   "pre_outcome": "hit"
+  },
+  "614176": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "SPY",
+   "pre_outcome": "hit"
+  },
+  "623185": {
+   "verdict": "a",
+   "trigger": "if you don't have a markup by the 14th or the 15th",
+   "ticker": "XRP",
+   "pre_outcome": "hit"
+  },
+  "608670": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "UPS",
+   "pre_outcome": "miss"
+  },
+  "613791": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "AAPL",
+   "pre_outcome": "hit"
+  },
+  "624613": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "GOOGL",
+   "pre_outcome": "hit"
+  },
+  "607966": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "UNH",
+   "pre_outcome": "miss"
+  },
+  "624011": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "PAYC",
+   "pre_outcome": "hit"
+  },
+  "624013": {
+   "verdict": "b",
+   "trigger": "if we hold the two-day volume weighted average price tomorrow maybe dip a little bit lower and then we break above the daily vwap tomorrow",
+   "ticker": "SPY",
+   "pre_outcome": "miss"
+  },
+  "623765": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "SPY",
+   "pre_outcome": "miss"
+  },
+  "623954": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "STNE",
+   "pre_outcome": "miss"
+  },
+  "624603": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "TBT",
+   "pre_outcome": "hit"
+  },
+  "623834": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "SMCI",
+   "pre_outcome": "hit"
+  },
+  "608615": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "JPM",
+   "pre_outcome": "hit"
+  },
+  "606916": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "MSCI",
+   "pre_outcome": "hit"
+  },
+  "624818": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "DEO",
+   "pre_outcome": "miss"
+  },
+  "606535": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "NVDA",
+   "pre_outcome": "miss"
+  },
+  "623256": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "BBAI",
+   "pre_outcome": "hit"
+  },
+  "607597": {
+   "verdict": "b",
+   "trigger": "if it gets to 261 dollars per share",
+   "ticker": "MCO",
+   "pre_outcome": "hit"
+  },
+  "606973": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "NVDA",
+   "pre_outcome": "hit"
+  },
+  "606619": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "MA",
+   "pre_outcome": "hit"
+  },
+  "606913": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "V",
+   "pre_outcome": "hit"
+  },
+  "606818": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "DIS",
+   "pre_outcome": "hit"
+  },
+  "609435": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "GOOGL",
+   "pre_outcome": "hit"
+  },
+  "622744": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "NFLX",
+   "pre_outcome": "miss"
+  },
+  "610064": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "INTC",
+   "pre_outcome": "hit"
+  },
+  "614039": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "AAPL",
+   "pre_outcome": "miss"
+  },
+  "610465": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "AAPL",
+   "pre_outcome": "hit"
+  },
+  "612055": {
+   "verdict": "a",
+   "trigger": "if there is not true peace and it's just a small war going on non-stop proxy wars",
+   "ticker": "RTX",
+   "pre_outcome": "miss"
+  },
+  "622746": {
+   "verdict": "b",
+   "trigger": "if you were able to buy Snowflake stock in the 150s, 160s, 170s",
+   "ticker": "SNOW",
+   "pre_outcome": "miss"
+  },
+  "622743": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "UNH",
+   "pre_outcome": "hit"
+  },
+  "624015": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "SPY",
+   "pre_outcome": "hit"
+  },
+  "622748": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "TSLA",
+   "pre_outcome": "hit"
+  },
+  "623876": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "RIVN",
+   "pre_outcome": "hit"
+  },
+  "623211": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "AMZN",
+   "pre_outcome": "miss"
+  },
+  "623884": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "UNH",
+   "pre_outcome": "miss"
+  },
+  "623896": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "GLD",
+   "pre_outcome": "hit"
+  },
+  "623897": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "SPY",
+   "pre_outcome": "hit"
+  },
+  "614222": {
+   "verdict": "b",
+   "trigger": "if this stock stays at current levels or trends down from here",
+   "ticker": "PFE",
+   "pre_outcome": "miss"
+  },
+  "613965": {
+   "verdict": "b",
+   "trigger": "if you get a break above that",
+   "ticker": "NFLX",
+   "pre_outcome": "miss"
+  },
+  "613971": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "META",
+   "pre_outcome": "miss"
+  },
+  "607873": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "PSTG",
+   "pre_outcome": "hit"
+  },
+  "609464": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "ASML",
+   "pre_outcome": "hit"
+  },
+  "608574": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "BTC",
+   "pre_outcome": "miss"
+  },
+  "607954": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "LVMHF",
+   "pre_outcome": "miss"
+  },
+  "613884": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "NVDA",
+   "pre_outcome": "miss"
+  },
+  "607486": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "META",
+   "pre_outcome": "near"
+  },
+  "608745": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "ADBE",
+   "pre_outcome": "miss"
+  },
+  "606200": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "DOCN",
+   "pre_outcome": "miss"
+  },
+  "609426": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "IBM",
+   "pre_outcome": "miss"
+  },
+  "606417": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "V",
+   "pre_outcome": "hit"
+  },
+  "607945": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "WM",
+   "pre_outcome": "miss"
+  },
+  "608751": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "PSTG",
+   "pre_outcome": "hit"
+  },
+  "606647": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "GOOGL",
+   "pre_outcome": "hit"
+  },
+  "606213": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "ALGM",
+   "pre_outcome": "hit"
+  },
+  "608016": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "BJ",
+   "pre_outcome": "hit"
+  },
+  "609265": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "AMZN",
+   "pre_outcome": "miss"
+  },
+  "607453": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "IBM",
+   "pre_outcome": "hit"
+  },
+  "608213": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "META",
+   "pre_outcome": "hit"
+  },
+  "606184": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "INTC",
+   "pre_outcome": "miss"
+  },
+  "608364": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "AMAT",
+   "pre_outcome": "hit"
+  },
+  "605843": {
+   "verdict": "a",
+   "trigger": "if we pass that act",
+   "ticker": "XRP",
+   "pre_outcome": "miss"
+  },
+  "606821": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "NEO",
+   "pre_outcome": "hit"
+  },
+  "607882": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "META",
+   "pre_outcome": "hit"
+  },
+  "607041": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "NVDA",
+   "pre_outcome": "hit"
+  },
+  "608369": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "AMZN",
+   "pre_outcome": "hit"
+  },
+  "606671": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "AVGO",
+   "pre_outcome": "hit"
+  },
+  "605858": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "XRP",
+   "pre_outcome": "miss"
+  },
+  "607100": {
+   "verdict": "a",
+   "trigger": "if recession hits",
+   "ticker": "TSLA",
+   "pre_outcome": "hit"
+  },
+  "605816": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "XRP",
+   "pre_outcome": "miss"
+  },
+  "607444": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "BAC",
+   "pre_outcome": "miss"
+  },
+  "608947": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "ADC",
+   "pre_outcome": "hit"
+  },
+  "608399": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "U",
+   "pre_outcome": "hit"
+  },
+  "607126": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "NVDA",
+   "pre_outcome": "hit"
+  },
+  "608009": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "O",
+   "pre_outcome": "hit"
+  },
+  "608010": {
+   "verdict": "a",
+   "trigger": "if interest rates are coming down",
+   "ticker": "AIR",
+   "pre_outcome": "hit"
+  },
+  "607952": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "BMY",
+   "pre_outcome": "near"
+  },
+  "607950": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "MCD",
+   "pre_outcome": "hit"
+  },
+  "608036": {
+   "verdict": "b",
+   "trigger": "if it gets to 315 or below",
+   "ticker": "MSFT",
+   "pre_outcome": "hit"
+  },
+  "606381": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "QCOM",
+   "pre_outcome": "hit"
+  },
+  "610109": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "UNH",
+   "pre_outcome": "miss"
+  },
+  "609163": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "MGM",
+   "pre_outcome": "miss"
+  },
+  "608725": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "NVDA",
+   "pre_outcome": "hit"
+  },
+  "608212": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "AMZN",
+   "pre_outcome": "hit"
+  },
+  "609101": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "V",
+   "pre_outcome": "hit"
+  },
+  "609160": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "NKE",
+   "pre_outcome": "miss"
+  },
+  "606941": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "COST",
+   "pre_outcome": "hit"
+  },
+  "607941": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "MSFT",
+   "pre_outcome": "miss"
+  },
+  "607418": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "WM",
+   "pre_outcome": "hit"
+  },
+  "608158": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "TGT",
+   "pre_outcome": "hit"
+  },
+  "608105": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "AAPL",
+   "pre_outcome": "hit"
+  },
+  "609166": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "CME",
+   "pre_outcome": "hit"
+  },
+  "606583": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "QCOM",
+   "pre_outcome": "hit"
+  },
+  "606870": {
+   "verdict": "b",
+   "trigger": "if it ever goes there [to $400]",
+   "ticker": "UNH",
+   "pre_outcome": "hit"
+  },
+  "606325": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "AAPL",
+   "pre_outcome": "hit"
+  },
+  "606324": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "QCOM",
+   "pre_outcome": "hit"
+  },
+  "605810": {
+   "verdict": "a",
+   "trigger": "if it does and we got to go to skinny bill and project crypto",
+   "ticker": "XRP",
+   "pre_outcome": "miss"
+  },
+  "609189": {
+   "verdict": "b",
+   "trigger": "if it keeps going lower",
+   "ticker": "V",
+   "pre_outcome": "hit"
+  },
+  "608098": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "GOOGL",
+   "pre_outcome": "hit"
+  },
+  "608065": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "DIS",
+   "pre_outcome": "hit"
+  },
+  "607197": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "ASML",
+   "pre_outcome": "hit"
+  },
+  "608002": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "SOFI",
+   "pre_outcome": "miss"
+  },
+  "608591": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "META",
+   "pre_outcome": "miss"
+  },
+  "607576": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "NKE",
+   "pre_outcome": "hit"
+  },
+  "606662": {
+   "verdict": "b",
+   "trigger": "if it sells off this much or even more",
+   "ticker": "GOOGL",
+   "pre_outcome": "hit"
+  },
+  "608219": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "PFE",
+   "pre_outcome": "hit"
+  },
+  "609990": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "JPM",
+   "pre_outcome": "hit"
+  },
+  "606740": {
+   "verdict": "b",
+   "trigger": "as long as it trades this cheap",
+   "ticker": "USB",
+   "pre_outcome": "hit"
+  },
+  "614699": {
+   "verdict": "a",
+   "trigger": "if they haven't made a lot of progress getting this plane back in the air",
+   "ticker": "BA",
+   "pre_outcome": "hit"
+  },
+  "608679": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "QCOM",
+   "pre_outcome": "miss"
+  },
+  "606760": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "AMZN",
+   "pre_outcome": "hit"
+  },
+  "607417": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "EPD",
+   "pre_outcome": "miss"
+  },
+  "608562": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "XRP",
+   "pre_outcome": "miss"
+  },
+  "608422": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "QCOM",
+   "pre_outcome": "miss"
+  },
+  "608394": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "CRM",
+   "pre_outcome": "miss"
+  },
+  "608359": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "AMAT",
+   "pre_outcome": "hit"
+  },
+  "607786": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "APLD",
+   "pre_outcome": "hit"
+  },
+  "608749": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "MCD",
+   "pre_outcome": "hit"
+  },
+  "608752": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "DEO",
+   "pre_outcome": "hit"
+  },
+  "607944": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "VICI",
+   "pre_outcome": "miss"
+  },
+  "610055": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "SHLS",
+   "pre_outcome": "hit"
+  },
+  "606786": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "GOOGL",
+   "pre_outcome": "miss"
+  },
+  "606790": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "META",
+   "pre_outcome": "miss"
+  },
+  "606788": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "VZ",
+   "pre_outcome": "miss"
+  },
+  "607921": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "LSCC",
+   "pre_outcome": "hit"
+  },
+  "608932": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "MDLZ",
+   "pre_outcome": "miss"
+  },
+  "608076": {
+   "verdict": "b",
+   "trigger": "if it gets to $270 I will most likely open a position",
+   "ticker": "UNH",
+   "pre_outcome": "hit"
+  },
+  "607951": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "PEP",
+   "pre_outcome": "near"
+  },
+  "606861": {
+   "verdict": "a",
+   "trigger": "if they make a decision in later June to actually resume those student loan payments",
+   "ticker": "SOFI",
+   "pre_outcome": "hit"
+  },
+  "614724": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "MSFT",
+   "pre_outcome": "hit"
+  },
+  "624978": {
+   "verdict": "b",
+   "trigger": "if it bounces",
+   "ticker": "ADSK",
+   "pre_outcome": "miss"
+  },
+  "624924": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "SPY",
+   "pre_outcome": "hit"
+  },
+  "614728": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "ADBE",
+   "pre_outcome": "hit"
+  },
+  "614730": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "ELF",
+   "pre_outcome": "miss"
+  },
+  "614729": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "CELH",
+   "pre_outcome": "miss"
+  },
+  "614854": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "AAPL",
+   "pre_outcome": "miss"
+  },
+  "615969": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "PLTR",
+   "pre_outcome": "miss"
+  },
+  "614905": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "TSLA",
+   "pre_outcome": "miss"
+  },
+  "614930": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "APLD",
+   "pre_outcome": "miss"
+  },
+  "615074": {
+   "verdict": "b",
+   "trigger": "if Mag7s continue to roll",
+   "ticker": "AAPL",
+   "pre_outcome": "hit"
+  },
+  "625654": {
+   "verdict": "b",
+   "trigger": "A rejection of the 50 SMA if we crack the two-day lows",
+   "ticker": "META",
+   "pre_outcome": "hit"
+  },
+  "625714": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "IGV",
+   "pre_outcome": "miss"
+  },
+  "626075": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "IONQ",
+   "pre_outcome": "miss"
+  },
+  "614850": {
+   "verdict": "b",
+   "trigger": "AMD doesn't go green at the open",
+   "ticker": "AMD",
+   "pre_outcome": "miss"
+  },
+  "615071": {
+   "verdict": "b",
+   "trigger": "if Mag7s continue to roll",
+   "ticker": "META",
+   "pre_outcome": "miss"
+  },
+  "626548": {
+   "verdict": "b",
+   "trigger": "put in a resting bar on Thursday and then break out on Friday",
+   "ticker": "CRWD",
+   "pre_outcome": "hit"
+  },
+  "615072": {
+   "verdict": "b",
+   "trigger": "if Mag7s continue to roll",
+   "ticker": "AMZN",
+   "pre_outcome": "miss"
+  },
+  "625462": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "MU",
+   "pre_outcome": "miss"
+  },
+  "615820": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "SPY",
+   "pre_outcome": "hit"
+  },
+  "625461": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "NVDA",
+   "pre_outcome": "miss"
+  },
+  "616009": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "META",
+   "pre_outcome": "hit"
+  },
+  "616014": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "TIP",
+   "pre_outcome": "hit"
+  },
+  "616022": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "GEN",
+   "pre_outcome": "hit"
+  },
+  "626769": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "MU",
+   "pre_outcome": "hit"
+  },
+  "616035": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "BABA",
+   "pre_outcome": "hit"
+  },
+  "616040": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "SHOP",
+   "pre_outcome": "hit"
+  },
+  "615666": {
+   "verdict": "b",
+   "trigger": "if it breaks below this level",
+   "ticker": "SPY",
+   "pre_outcome": "hit"
+  },
+  "616052": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "JNJ",
+   "pre_outcome": "miss"
+  },
+  "615661": {
+   "verdict": "b",
+   "trigger": "gets back above the daily VWAP",
+   "ticker": "XLK",
+   "pre_outcome": "hit"
+  },
+  "616064": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "SPY",
+   "pre_outcome": "miss"
+  },
+  "616046": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "GOOGL",
+   "pre_outcome": "hit"
+  },
+  "616050": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "SPY",
+   "pre_outcome": "hit"
+  },
+  "616129": {
+   "verdict": "a",
+   "trigger": "If we have a good earnings",
+   "ticker": "RBRK",
+   "pre_outcome": "miss"
+  },
+  "608103": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "LOW",
+   "pre_outcome": "hit"
+  },
+  "612720": {
+   "verdict": "a",
+   "trigger": "if it gets approved",
+   "ticker": "ATVI",
+   "pre_outcome": "hit"
+  },
+  "606468": {
+   "verdict": "a",
+   "trigger": "if they beat that guidance",
+   "ticker": "TGT",
+   "pre_outcome": "miss"
+  },
+  "609162": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "CZR",
+   "pre_outcome": "miss"
+  },
+  "607846": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "BTC",
+   "pre_outcome": "hit"
+  },
+  "608060": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "EBAY",
+   "pre_outcome": "hit"
+  },
+  "607760": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "VZ",
+   "pre_outcome": "miss"
+  },
+  "605827": {
+   "verdict": "b",
+   "trigger": "if we start to go under the five",
+   "ticker": "BAC",
+   "pre_outcome": "near"
+  },
+  "605982": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "DPZ",
+   "pre_outcome": "hit"
+  },
+  "606399": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "MCD",
+   "pre_outcome": "hit"
+  },
+  "610224": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "NKE",
+   "pre_outcome": "miss"
+  },
+  "605838": {
+   "verdict": "b",
+   "trigger": "dip into the 120s",
+   "ticker": "BTC",
+   "pre_outcome": "hit"
+  },
+  "606690": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "JPM",
+   "pre_outcome": "hit"
+  },
+  "606780": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "PDD",
+   "pre_outcome": "hit"
+  },
+  "606402": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "HSY",
+   "pre_outcome": "miss"
+  },
+  "605686": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "LPLA",
+   "pre_outcome": "miss"
+  },
+  "606906": {
+   "verdict": "b",
+   "trigger": "keeping it under that 320 330",
+   "ticker": "MSFT",
+   "pre_outcome": "hit"
+  },
+  "610561": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "AAL",
+   "pre_outcome": "miss"
+  },
+  "607419": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "PFE",
+   "pre_outcome": "near"
+  },
+  "610563": {
+   "verdict": "b",
+   "trigger": "if you make a new all-time high",
+   "ticker": "KR",
+   "pre_outcome": "miss"
+  },
+  "606244": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "CRM",
+   "pre_outcome": "hit"
+  },
+  "609511": {
+   "verdict": "b",
+   "trigger": "if you get a real true green engulfing candlestick",
+   "ticker": "HALO",
+   "pre_outcome": "hit"
+  },
+  "608973": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "MDLZ",
+   "pre_outcome": "hit"
+  },
+  "605669": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "BTC",
+   "pre_outcome": "miss"
+  },
+  "627184": {
+   "verdict": "b",
+   "trigger": "if it goes",
+   "ticker": "OKLO",
+   "pre_outcome": "miss"
+  },
+  "627180": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "LEU",
+   "pre_outcome": "hit"
+  },
+  "608594": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "ISRG",
+   "pre_outcome": "miss"
+  },
+  "610582": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "CNH",
+   "pre_outcome": "miss"
+  },
+  "623120": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "AMZN",
+   "pre_outcome": "hit"
+  },
+  "623116": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "AXP",
+   "pre_outcome": "hit"
+  },
+  "608258": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "MSFT",
+   "pre_outcome": "miss"
+  },
+  "623763": {
+   "verdict": "b",
+   "trigger": "if that fails",
+   "ticker": "SPY",
+   "pre_outcome": "hit"
+  },
+  "608056": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "MO",
+   "pre_outcome": "hit"
+  },
+  "623838": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "TGT",
+   "pre_outcome": "hit"
+  },
+  "624723": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "BTC",
+   "pre_outcome": "hit"
+  },
+  "614266": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "VZ",
+   "pre_outcome": "near"
+  },
+  "624732": {
+   "verdict": "a",
+   "trigger": "if you believe that the official 4.2% rate is true",
+   "ticker": "SH",
+   "pre_outcome": "miss"
+  },
+  "614290": {
+   "verdict": "a",
+   "trigger": "if the Supreme Court lifts tariffs",
+   "ticker": "RH",
+   "pre_outcome": "miss"
+  },
+  "624754": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "FMC",
+   "pre_outcome": "miss"
+  },
+  "624847": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "LMT",
+   "pre_outcome": "hit"
+  },
+  "624849": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "LOW",
+   "pre_outcome": "hit"
+  },
+  "624848": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "KR",
+   "pre_outcome": "miss"
+  },
+  "624779": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "TSLA",
+   "pre_outcome": "miss"
+  },
+  "624821": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "PFE",
+   "pre_outcome": "hit"
+  },
+  "608713": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "TMUS",
+   "pre_outcome": "hit"
+  },
+  "605922": {
+   "verdict": "b",
+   "trigger": "this earnings",
+   "ticker": "NVDA",
+   "pre_outcome": "hit"
+  },
+  "624809": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "XRP",
+   "pre_outcome": "hit"
+  },
+  "614084": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "DHR",
+   "pre_outcome": "hit"
+  },
+  "608154": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "CMG",
+   "pre_outcome": "hit"
+  },
+  "606942": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "WBA",
+   "pre_outcome": "hit"
+  },
+  "606448": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "MO",
+   "pre_outcome": "hit"
+  },
+  "607454": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "AVGO",
+   "pre_outcome": "hit"
+  },
+  "608085": {
+   "verdict": "a",
+   "trigger": "once you have the rotation out of The Magnificent Seven out of the AI stocks / if we have a massive recession",
+   "ticker": "O",
+   "pre_outcome": "hit"
+  },
+  "608936": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "VICI",
+   "pre_outcome": "miss"
+  },
+  "608957": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "JNJ",
+   "pre_outcome": "hit"
+  },
+  "609534": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "AVGO",
+   "pre_outcome": "miss"
+  },
+  "609434": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "HD",
+   "pre_outcome": "miss"
+  },
+  "607720": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "SMCI",
+   "pre_outcome": "hit"
+  },
+  "608927": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "LVMHF",
+   "pre_outcome": "hit"
+  },
+  "608633": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "O",
+   "pre_outcome": "miss"
+  },
+  "609466": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "MAIN",
+   "pre_outcome": "hit"
+  },
+  "608040": {
+   "verdict": "a",
+   "trigger": "if we do have lower interest rates in 2024 maybe 3% 3 and a half%",
+   "ticker": "KO",
+   "pre_outcome": "hit"
+  },
+  "608669": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "HON",
+   "pre_outcome": "hit"
+  },
+  "608361": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "LITE",
+   "pre_outcome": "hit"
+  },
+  "606212": {
+   "verdict": "b",
+   "trigger": "if that stock price continues to dip closer to 50 bucks a share or maybe even dips under 50 bucks a share",
+   "ticker": "MRVL",
+   "pre_outcome": "near"
+  },
+  "609460": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "NVO",
+   "pre_outcome": "miss"
+  },
+  "608035": {
+   "verdict": "b",
+   "trigger": "if Starbucks gets around $85",
+   "ticker": "SBUX",
+   "pre_outcome": "miss"
+  },
+  "607312": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "GOOGL",
+   "pre_outcome": "hit"
+  },
+  "609167": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "VZ",
+   "pre_outcome": "hit"
+  },
+  "608352": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "NVDA",
+   "pre_outcome": "hit"
+  },
+  "608653": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "RR",
+   "pre_outcome": "hit"
+  },
+  "608682": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "IBM",
+   "pre_outcome": "miss"
+  },
+  "606573": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "ORCL",
+   "pre_outcome": "hit"
+  },
+  "606424": {
+   "verdict": "b",
+   "trigger": "if Visa gets down in the $260 range again and Below",
+   "ticker": "V",
+   "pre_outcome": "hit"
+  },
+  "609421": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "V",
+   "pre_outcome": "miss"
+  },
+  "608087": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "EBAY",
+   "pre_outcome": "hit"
+  },
+  "606727": {
+   "verdict": "b",
+   "trigger": "if we confirm above that resistance",
+   "ticker": "ETH",
+   "pre_outcome": "near"
+  },
+  "608358": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "ASML",
+   "pre_outcome": "hit"
+  },
+  "608335": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "NVDA",
+   "pre_outcome": "miss"
+  },
+  "608211": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "GOOGL",
+   "pre_outcome": "hit"
+  },
+  "614410": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "MSFT",
+   "pre_outcome": "hit"
+  },
+  "605850": {
+   "verdict": "a",
+   "trigger": "if they're not getting it done by the end of March, this is what's going to happen",
+   "ticker": "XRP",
+   "pre_outcome": "miss"
+  },
+  "608966": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "O",
+   "pre_outcome": "miss"
+  },
+  "607131": {
+   "verdict": "b",
+   "trigger": "as long as it continues to trade at one of the lowest prices in the past decade",
+   "ticker": "BIDU",
+   "pre_outcome": "miss"
+  },
+  "608677": {
+   "verdict": "a",
+   "trigger": "if there is a recession",
+   "ticker": "MCO",
+   "pre_outcome": "miss"
+  },
+  "605829": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "DPZ",
+   "pre_outcome": "miss"
+  },
+  "607512": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "FCEL",
+   "pre_outcome": "miss"
+  },
+  "605737": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "STZ",
+   "pre_outcome": "near"
+  },
+  "609400": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "OXY",
+   "pre_outcome": "hit"
+  },
+  "607651": {
+   "verdict": "b",
+   "trigger": "if msci right now comes down to the $475 range",
+   "ticker": "MSCI",
+   "pre_outcome": "hit"
+  },
+  "608038": {
+   "verdict": "a",
+   "trigger": "if we do have lower interest rates in 2024 maybe 3% 3 and a half%",
+   "ticker": "PEP",
+   "pre_outcome": "miss"
+  },
+  "607788": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "MDT",
+   "pre_outcome": "hit"
+  },
+  "607429": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "O",
+   "pre_outcome": "miss"
+  },
+  "608039": {
+   "verdict": "a",
+   "trigger": "if we do have lower interest rates in 2024 maybe 3% 3 and a half% kind of interest rates",
+   "ticker": "VZ",
+   "pre_outcome": "hit"
+  },
+  "608083": {
+   "verdict": "a",
+   "trigger": "rotation out of the Magnificent Seven / AI stocks",
+   "ticker": "PFE",
+   "pre_outcome": "miss"
+  },
+  "608041": {
+   "verdict": "a",
+   "trigger": "if we do have lower interest rates in 2024 maybe 3% 3 and a half%",
+   "ticker": "JNJ",
+   "pre_outcome": "miss"
+  },
+  "609465": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "O",
+   "pre_outcome": "near"
+  },
+  "607462": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "JNJ",
+   "pre_outcome": "hit"
+  },
+  "607448": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "KO",
+   "pre_outcome": "hit"
+  },
+  "607585": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "SAND",
+   "pre_outcome": "hit"
+  },
+  "608736": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "GOOGL",
+   "pre_outcome": "miss"
+  },
+  "607309": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "TSLA",
+   "pre_outcome": "hit"
+  },
+  "608450": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "GOOGL",
+   "pre_outcome": "hit"
+  },
+  "607326": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "AMD",
+   "pre_outcome": "hit"
+  },
+  "607324": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "DIS",
+   "pre_outcome": "hit"
+  },
+  "607325": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "NVDA",
+   "pre_outcome": "hit"
+  },
+  "608252": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "AAPL",
+   "pre_outcome": "hit"
+  },
+  "609413": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "IBM",
+   "pre_outcome": "miss"
+  },
+  "606708": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "O",
+   "pre_outcome": "miss"
+  },
+  "605665": {
+   "verdict": "a",
+   "trigger": "if they were to put $200,000 Bitcoin a year by order in this market",
+   "ticker": "BTC",
+   "pre_outcome": "hit"
+  },
+  "607452": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "ADC",
+   "pre_outcome": "hit"
+  },
+  "607004": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "GOOGL",
+   "pre_outcome": "hit"
+  },
+  "606962": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "PATH",
+   "pre_outcome": "miss"
+  },
+  "606865": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "NVDA",
+   "pre_outcome": "miss"
+  },
+  "606680": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "CAT",
+   "pre_outcome": "hit"
+  },
+  "606182": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "KLAC",
+   "pre_outcome": "hit"
+  },
+  "607267": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "VZ",
+   "pre_outcome": "hit"
+  },
+  "607224": {
+   "verdict": "a",
+   "trigger": "if this is true",
+   "ticker": "SNPS",
+   "pre_outcome": "hit"
+  },
+  "614726": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "CRM",
+   "pre_outcome": "miss"
+  },
+  "624931": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "SPY",
+   "pre_outcome": "miss"
+  },
+  "614691": {
+   "verdict": "a",
+   "trigger": "if a virus breaks out in one of these centers",
+   "ticker": "WELL",
+   "pre_outcome": "miss"
+  },
+  "625490": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "GOOGL",
+   "pre_outcome": "miss"
+  },
+  "614954": {
+   "verdict": "a",
+   "trigger": "If those tariffs are overruled",
+   "ticker": "WHR",
+   "pre_outcome": "hit"
+  },
+  "615653": {
+   "verdict": "b",
+   "trigger": "break below here",
+   "ticker": "SPY",
+   "pre_outcome": "hit"
+  },
+  "615654": {
+   "verdict": "b",
+   "trigger": "break below here",
+   "ticker": "QQQ",
+   "pre_outcome": "hit"
+  },
+  "626240": {
+   "verdict": "b",
+   "trigger": "If we can get a break of Friday's low",
+   "ticker": "CRM",
+   "pre_outcome": "hit"
+  },
+  "605817": {
+   "verdict": "a",
+   "trigger": "if they can't, if they come up with no announcement",
+   "ticker": "XRP",
+   "pre_outcome": "miss"
+  },
+  "613859": {
+   "verdict": "b",
+   "trigger": "as long as you don't have like a big gap up in Microsoft",
+   "ticker": "MSFT",
+   "pre_outcome": "miss"
+  },
+  "607136": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "CRSP",
+   "pre_outcome": "miss"
+  },
+  "608674": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "LOW",
+   "pre_outcome": "miss"
+  },
+  "609006": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "CI",
+   "pre_outcome": "miss"
+  },
+  "612704": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "CVNA",
+   "pre_outcome": "miss"
+  },
+  "608935": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "NKE",
+   "pre_outcome": "miss"
+  },
+  "612654": {
+   "verdict": "b",
+   "trigger": "if we can finish December at 90,190,700 or higher",
+   "ticker": "BTC",
+   "pre_outcome": "miss"
+  },
+  "612922": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "BMY",
+   "pre_outcome": "hit"
+  },
+  "608349": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "PSTG",
+   "pre_outcome": "hit"
+  },
+  "608690": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "PYPL",
+   "pre_outcome": "miss"
+  },
+  "608561": {
+   "verdict": "a",
+   "trigger": "if other companies start to use his strategy",
+   "ticker": "BTC",
+   "pre_outcome": "miss"
+  },
+  "610149": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "PEP",
+   "pre_outcome": "hit"
+  },
+  "608362": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "SIMO",
+   "pre_outcome": "hit"
+  },
+  "611884": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "MOH",
+   "pre_outcome": "miss"
+  },
+  "609180": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "LULU",
+   "pre_outcome": "miss"
+  },
+  "611055": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "NOMD",
+   "pre_outcome": "miss"
+  },
+  "610605": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "OXY",
+   "pre_outcome": "miss"
+  },
+  "612114": {
+   "verdict": "b",
+   "trigger": "If we give that up [180 to 185]",
+   "ticker": "XRP",
+   "pre_outcome": "hit"
+  },
+  "608956": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "PEP",
+   "pre_outcome": "miss"
+  },
+  "606877": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "TGT",
+   "pre_outcome": "miss"
+  },
+  "608929": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "AAPL",
+   "pre_outcome": "miss"
+  },
+  "606991": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "ONTO",
+   "pre_outcome": "miss"
+  },
+  "607017": {
+   "verdict": "a",
+   "trigger": "if there's any kind of oil crash",
+   "ticker": "TPL",
+   "pre_outcome": "miss"
+  },
+  "452498": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "ONDS",
+   "pre_outcome": "hit"
+  },
+  "452499": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "RKLB",
+   "pre_outcome": "hit"
+  },
+  "452501": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "SIDU",
+   "pre_outcome": "hit"
+  },
+  "607040": {
+   "verdict": "a",
+   "trigger": "if we do get rate cuts over the coming year",
+   "ticker": "UNH",
+   "pre_outcome": "hit"
+  },
+  "607167": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "QCOM",
+   "pre_outcome": "miss"
+  },
+  "612278": {
+   "verdict": "a",
+   "trigger": "if the stock market goes down big",
+   "ticker": "PLTR",
+   "pre_outcome": "hit"
+  },
+  "607967": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "LVMHF",
+   "pre_outcome": "miss"
+  },
+  "612054": {
+   "verdict": "a",
+   "trigger": "if they have the failed negotiations over a few weeks and couple months",
+   "ticker": "CVX",
+   "pre_outcome": "miss"
+  },
+  "608700": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "AZO",
+   "pre_outcome": "hit"
+  },
+  "606650": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "MO",
+   "pre_outcome": "hit"
+  },
+  "607978": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "MSFT",
+   "pre_outcome": "hit"
+  },
+  "610087": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "PYPL",
+   "pre_outcome": "miss"
+  },
+  "608925": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "OXY",
+   "pre_outcome": "miss"
+  },
+  "607808": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "EXR",
+   "pre_outcome": "miss"
+  },
+  "607936": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "NVDA",
+   "pre_outcome": "hit"
+  },
+  "607211": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "AMZN",
+   "pre_outcome": "hit"
+  },
+  "607234": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "AMZN",
+   "pre_outcome": "hit"
+  },
+  "607606": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "PYPL",
+   "pre_outcome": "hit"
+  },
+  "608959": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "TPL",
+   "pre_outcome": "miss"
+  },
+  "611088": {
+   "verdict": "b",
+   "trigger": "if it does step back down to that acceptable buy price of around 105.68 per share",
+   "ticker": "JPM",
+   "pre_outcome": "hit"
+  },
+  "610809": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "ATVI",
+   "pre_outcome": "hit"
+  },
+  "608075": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "BMY",
+   "pre_outcome": "miss"
+  },
+  "612610": {
+   "verdict": "b",
+   "trigger": "if we drop to 182 or lower",
+   "ticker": "XRP",
+   "pre_outcome": "miss"
+  },
+  "613119": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "INTC",
+   "pre_outcome": "miss"
+  },
+  "612447": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "MSFT",
+   "pre_outcome": "hit"
+  },
+  "613007": {
+   "verdict": "b",
+   "trigger": "if it falls down there [to $200]",
+   "ticker": "GOOGL",
+   "pre_outcome": "hit"
+  },
+  "611140": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "RACE",
+   "pre_outcome": "hit"
+  },
+  "609536": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "EBAY",
+   "pre_outcome": "hit"
+  },
+  "610158": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "RIVN",
+   "pre_outcome": "hit"
+  },
+  "609484": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "SNOW",
+   "pre_outcome": "miss"
+  },
+  "609424": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "LOW",
+   "pre_outcome": "hit"
+  },
+  "609136": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "PEP",
+   "pre_outcome": "miss"
+  },
+  "608995": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "KEY",
+   "pre_outcome": "hit"
+  },
+  "607898": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "QCOM",
+   "pre_outcome": "miss"
+  },
+  "607776": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "CRSP",
+   "pre_outcome": "hit"
+  },
+  "607451": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "VZ",
+   "pre_outcome": "miss"
+  },
+  "607307": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "VZ",
+   "pre_outcome": "hit"
+  },
+  "608628": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "KO",
+   "pre_outcome": "near"
+  },
+  "610492": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "DIS",
+   "pre_outcome": "miss"
+  },
+  "607894": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "TWST",
+   "pre_outcome": "hit"
+  },
+  "609474": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "PFE",
+   "pre_outcome": "hit"
+  },
+  "608636": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "PEP",
+   "pre_outcome": "near"
+  },
+  "614223": {
+   "verdict": "b",
+   "trigger": "if it gets down to 55 or lower",
+   "ticker": "O",
+   "pre_outcome": "hit"
+  },
+  "614268": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "CURI",
+   "pre_outcome": "hit"
+  },
+  "607461": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "UNH",
+   "pre_outcome": "hit"
+  },
+  "606629": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "PEP",
+   "pre_outcome": "miss"
+  },
+  "607611": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "AAP",
+   "pre_outcome": "near"
+  },
+  "608908": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "BKNG",
+   "pre_outcome": "hit"
+  },
+  "609148": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "ULTA",
+   "pre_outcome": "hit"
+  },
+  "612830": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "NIO",
+   "pre_outcome": "miss"
+  },
+  "608560": {
+   "verdict": "b",
+   "trigger": "if Bitcoin continues to go up",
+   "ticker": "MSTR",
+   "pre_outcome": "miss"
+  },
+  "607586": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "MMM",
+   "pre_outcome": "miss"
+  },
+  "607218": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "SIMO",
+   "pre_outcome": "hit"
+  },
+  "627086": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "AVGO",
+   "pre_outcome": "miss"
+  },
+  "605668": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "MSTR",
+   "pre_outcome": "miss"
+  },
+  "606449": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "TPR",
+   "pre_outcome": "hit"
+  },
+  "606178": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "NXPI",
+   "pre_outcome": "miss"
+  },
+  "606240": {
+   "verdict": "a",
+   "trigger": "if the market has this huge rebound",
+   "ticker": "QRVO",
+   "pre_outcome": "miss"
+  },
+  "606185": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "STM",
+   "pre_outcome": "miss"
+  },
+  "606554": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "ACMR",
+   "pre_outcome": "miss"
+  },
+  "606668": {
+   "verdict": "a",
+   "trigger": "if you think a long-term recession is unlikely",
+   "ticker": "AXP",
+   "pre_outcome": "hit"
+  },
+  "607196": {
+   "verdict": "a",
+   "trigger": "if that cycle continues to move in that direction",
+   "ticker": "AEHR",
+   "pre_outcome": "miss"
+  },
+  "607595": {
+   "verdict": "b",
+   "trigger": "if Visa gets to 200 per share or below",
+   "ticker": "V",
+   "pre_outcome": "hit"
+  },
+  "607680": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "ULTA",
+   "pre_outcome": "near"
+  },
+  "607681": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "UNH",
+   "pre_outcome": "miss"
+  },
+  "608912": {
+   "verdict": "a",
+   "trigger": "if the growth thesis for vertically integrated commercially focused space economy stocks continues to play out",
+   "ticker": "RKLB",
+   "pre_outcome": "hit"
+  },
+  "607866": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "GME",
+   "pre_outcome": "hit"
+  },
+  "612529": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "QQQ",
+   "pre_outcome": "hit"
+  },
+  "609230": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "AMAT",
+   "pre_outcome": "hit"
+  },
+  "609445": {
+   "verdict": "a",
+   "trigger": "If Vietnam cuts their tariffs down to zero",
+   "ticker": "NKE",
+   "pre_outcome": "hit"
+  },
+  "612988": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "NVDA",
+   "pre_outcome": "miss"
+  },
+  "606598": {
+   "verdict": "b",
+   "trigger": "if Bitcoin goes down at all in 2025",
+   "ticker": "MSTR",
+   "pre_outcome": "hit"
+  },
+  "614366": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "WYNN",
+   "pre_outcome": "miss"
+  },
+  "609457": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "CNR",
+   "pre_outcome": "near"
+  },
+  "608509": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "FRT",
+   "pre_outcome": "hit"
+  },
+  "610148": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "PG",
+   "pre_outcome": "miss"
+  },
+  "610150": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "WCN",
+   "pre_outcome": "miss"
+  },
+  "607064": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "V",
+   "pre_outcome": "hit"
+  },
+  "610058": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "NSRGY",
+   "pre_outcome": "hit"
+  },
+  "609104": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "MCD",
+   "pre_outcome": "hit"
+  },
+  "606188": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "MPWR",
+   "pre_outcome": "hit"
+  },
+  "608812": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "AVGO",
+   "pre_outcome": "hit"
+  },
+  "608428": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "APH",
+   "pre_outcome": "hit"
+  },
+  "608755": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "PEP",
+   "pre_outcome": "miss"
+  },
+  "609002": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "QCOM",
+   "pre_outcome": "hit"
+  },
+  "607715": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "COP",
+   "pre_outcome": "hit"
+  },
+  "609012": {
+   "verdict": "b",
+   "trigger": "if this thing breaks out tomorrow",
+   "ticker": "BBY",
+   "pre_outcome": "miss"
+  },
+  "609050": {
+   "verdict": "b",
+   "trigger": "if you can get some engulfing candle sticks today",
+   "ticker": "PINS",
+   "pre_outcome": "hit"
+  },
+  "609810": {
+   "verdict": "b",
+   "trigger": "if it can break through this level",
+   "ticker": "BABA",
+   "pre_outcome": "hit"
+  },
+  "609463": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "JNJ",
+   "pre_outcome": "hit"
+  },
+  "606181": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "SIMO",
+   "pre_outcome": "miss"
+  },
+  "608998": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "LVMHF",
+   "pre_outcome": "miss"
+  },
+  "608689": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "AMZN",
+   "pre_outcome": "hit"
+  },
+  "608612": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "MSFT",
+   "pre_outcome": "hit"
+  },
+  "609401": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "TXRH",
+   "pre_outcome": "hit"
+  },
+  "608617": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "TMUS",
+   "pre_outcome": "hit"
+  },
+  "608421": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "SNPS",
+   "pre_outcome": "miss"
+  },
+  "608357": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "LRCX",
+   "pre_outcome": "hit"
+  },
+  "606914": {
+   "verdict": "b",
+   "trigger": "the price may come down a little bit more",
+   "ticker": "TXN",
+   "pre_outcome": "miss"
+  },
+  "607275": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "PNW",
+   "pre_outcome": "hit"
+  },
+  "608977": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "COST",
+   "pre_outcome": "hit"
+  },
+  "607299": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "INTC",
+   "pre_outcome": "miss"
+  },
+  "607701": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "DIS",
+   "pre_outcome": "hit"
+  },
+  "609242": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "AMZN",
+   "pre_outcome": "hit"
+  },
+  "605748": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "CNR",
+   "pre_outcome": "miss"
+  },
+  "323134": {
+   "verdict": "b",
+   "trigger": "rejection here of the 1DHMA ribbon",
+   "ticker": "ONDS",
+   "pre_outcome": "hit"
+  },
+  "616446": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "IWM",
+   "pre_outcome": "hit"
+  },
+  "612848": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "CSV",
+   "pre_outcome": "hit"
+  },
+  "613776": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "SPY",
+   "pre_outcome": "hit"
+  },
+  "612524": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "TLT",
+   "pre_outcome": "hit"
+  },
+  "612852": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "SPY",
+   "pre_outcome": "miss"
+  },
+  "612056": {
+   "verdict": "a",
+   "trigger": "if there is not true peace and it's just a small war going on non-stop proxy wars",
+   "ticker": "LMT",
+   "pre_outcome": "miss"
+  },
+  "619163": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "TLT",
+   "pre_outcome": "miss"
+  },
+  "623255": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "NFLX",
+   "pre_outcome": "hit"
+  },
+  "607861": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "SPY",
+   "pre_outcome": "hit"
+  },
+  "611472": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "TSLA",
+   "pre_outcome": "hit"
+  },
+  "607488": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "IRBT",
+   "pre_outcome": "miss"
+  },
+  "607303": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "NTLA",
+   "pre_outcome": "miss"
+  },
+  "624747": {
+   "verdict": "a",
+   "trigger": "if economic pressure mounts, central banks may revisit the idea of cutting rates",
+   "ticker": "SH",
+   "pre_outcome": "miss"
+  },
+  "607848": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "TSLA",
+   "pre_outcome": "miss"
+  },
+  "608931": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "CNI",
+   "pre_outcome": "miss"
+  },
+  "608049": {
+   "verdict": "a",
+   "trigger": "if we do not have a recession and if we do not have any major banking crisis or a black one event",
+   "ticker": "SPY",
+   "pre_outcome": "hit"
+  },
+  "606405": {
+   "verdict": "b",
+   "trigger": "if it dips to a low price",
+   "ticker": "TSLA",
+   "pre_outcome": "hit"
+  },
+  "609008": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "PM",
+   "pre_outcome": "hit"
+  },
+  "606751": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "SPY",
+   "pre_outcome": "hit"
+  },
+  "608409": {
+   "verdict": "a",
+   "trigger": "if S&P 500 notches 15% earnings growth",
+   "ticker": "SPY",
+   "pre_outcome": "hit"
+  },
+  "606252": {
+   "verdict": "a",
+   "trigger": "if we do it",
+   "ticker": "TSLA",
+   "pre_outcome": "miss"
+  },
+  "614265": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "TCEHY",
+   "pre_outcome": "miss"
+  },
+  "614017": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "NVDA",
+   "pre_outcome": "hit"
+  },
+  "614279": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "HD",
+   "pre_outcome": "miss"
+  },
+  "613855": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "AMZN",
+   "pre_outcome": "hit"
+  },
+  "613858": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "GOOGL",
+   "pre_outcome": "miss"
+  },
+  "614500": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "DUOL",
+   "pre_outcome": "hit"
+  },
+  "614725": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "SNOW",
+   "pre_outcome": "hit"
+  },
+  "614411": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "AAPL",
+   "pre_outcome": "hit"
+  },
+  "614375": {
+   "verdict": "a",
+   "trigger": "if the economy starts to recover",
+   "ticker": "JPM",
+   "pre_outcome": "hit"
+  },
+  "615645": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "SOL",
+   "pre_outcome": "miss"
+  },
+  "615662": {
+   "verdict": "b",
+   "trigger": "as it gets back above the daily VWAP",
+   "ticker": "IHE",
+   "pre_outcome": "miss"
+  },
+  "615657": {
+   "verdict": "b",
+   "trigger": "break below here",
+   "ticker": "NVDA",
+   "pre_outcome": "hit"
+  },
+  "615651": {
+   "verdict": "b",
+   "trigger": "If it breaks below this low",
+   "ticker": "SOL",
+   "pre_outcome": "miss"
+  },
+  "615587": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "META",
+   "pre_outcome": "hit"
+  },
+  "615708": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "AAPL",
+   "pre_outcome": "hit"
+  },
+  "615926": {
+   "verdict": "a",
+   "trigger": "if we are in a correction or a bare market",
+   "ticker": "TBT",
+   "pre_outcome": "hit"
+  },
+  "615968": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "INTU",
+   "pre_outcome": "miss"
+  },
+  "615971": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "TCEHY",
+   "pre_outcome": "miss"
+  },
+  "616029": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "SPY",
+   "pre_outcome": "miss"
+  },
+  "615650": {
+   "verdict": "b",
+   "trigger": "If it breaks below this low",
+   "ticker": "ETH",
+   "pre_outcome": "miss"
+  },
+  "605813": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "XRP",
+   "pre_outcome": "miss"
+  },
+  "605890": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "META",
+   "pre_outcome": "miss"
+  },
+  "605897": {
+   "verdict": "a",
+   "trigger": "if the acquisition were to close by the first half of 2023",
+   "ticker": "SIMO",
+   "pre_outcome": "near"
+  },
+  "605913": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "INTC",
+   "pre_outcome": "miss"
+  },
+  "612023": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "SPY",
+   "pre_outcome": "hit"
+  },
+  "611413": {
+   "verdict": "b",
+   "trigger": "if and when the Q's go down 7 plus% from all-time highs",
+   "ticker": "QQQ",
+   "pre_outcome": "hit"
+  },
+  "619135": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "GLD",
+   "pre_outcome": "hit"
+  },
+  "619137": {
+   "verdict": "a",
+   "trigger": "if the Fed decided to open that back up the discount window",
+   "ticker": "TLT",
+   "pre_outcome": "miss"
+  },
+  "612134": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "GLD",
+   "pre_outcome": "miss"
+  },
+  "623676": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "SH",
+   "pre_outcome": "hit"
+  },
+  "623036": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "GLD",
+   "pre_outcome": "hit"
+  },
+  "612857": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "SQ",
+   "pre_outcome": "miss"
+  },
+  "606104": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "TSLA",
+   "pre_outcome": "miss"
+  },
+  "609115": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "SPY",
+   "pre_outcome": "miss"
+  },
+  "609003": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "LMT",
+   "pre_outcome": "hit"
+  },
+  "607900": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "UI",
+   "pre_outcome": "hit"
+  },
+  "609667": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "TSLA",
+   "pre_outcome": "miss"
+  },
+  "607655": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "FTNT",
+   "pre_outcome": "hit"
+  },
+  "609158": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "SPY",
+   "pre_outcome": "hit"
+  },
+  "608951": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "HSY",
+   "pre_outcome": "hit"
+  },
+  "608719": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "UNH",
+   "pre_outcome": "miss"
+  },
+  "607317": {
+   "verdict": "b",
+   "trigger": "if things get worse",
+   "ticker": "AMZN",
+   "pre_outcome": "hit"
+  },
+  "616211": {
+   "verdict": "b",
+   "trigger": "as long as it's below twelve hundred dollars per share",
+   "ticker": "TSLA",
+   "pre_outcome": "miss"
+  },
+  "614723": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "ORCL",
+   "pre_outcome": "hit"
+  },
+  "614873": {
+   "verdict": "b",
+   "trigger": "If we lose 607",
+   "ticker": "QQQ",
+   "pre_outcome": "miss"
+  },
+  "615099": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "AMD",
+   "pre_outcome": "near"
+  },
+  "615062": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "AMD",
+   "pre_outcome": "hit"
+  },
+  "610398": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "AMZN",
+   "pre_outcome": "hit"
+  },
+  "611102": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "VZ",
+   "pre_outcome": "hit"
+  },
+  "617111": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "CVX",
+   "pre_outcome": "hit"
+  },
+  "605898": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "MXL",
+   "pre_outcome": "miss"
+  },
+  "627661": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "NVDA",
+   "pre_outcome": "miss"
+  },
+  "608220": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "SPY",
+   "pre_outcome": "hit"
+  },
+  "607702": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "QXO",
+   "pre_outcome": "hit"
+  },
+  "615655": {
+   "verdict": "b",
+   "trigger": "break below here",
+   "ticker": "XLK",
+   "pre_outcome": "hit"
+  },
+  "615999": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "GLD",
+   "pre_outcome": "hit"
+  },
+  "616023": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "TSLA",
+   "pre_outcome": "hit"
+  },
+  "609114": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "KVUE",
+   "pre_outcome": "hit"
+  },
+  "605993": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "SJM",
+   "pre_outcome": "miss"
+  },
+  "612905": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "HPQ",
+   "pre_outcome": "miss"
+  },
+  "610557": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "LMT",
+   "pre_outcome": "hit"
+  },
+  "626506": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "IBIT",
+   "pre_outcome": "miss"
+  },
+  "612167": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "QQQ",
+   "pre_outcome": "miss"
+  },
+  "616278": {
+   "verdict": "a",
+   "trigger": "If February 24th earnings show positive cash flow for 2025",
+   "ticker": "AMC",
+   "pre_outcome": "miss"
+  },
+  "607617": {
+   "verdict": "a",
+   "trigger": "once the Deb situation goes away",
+   "ticker": "CSV",
+   "pre_outcome": "hit"
+  },
+  "616232": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "ZM",
+   "pre_outcome": "miss"
+  },
+  "616411": {
+   "verdict": "a",
+   "trigger": "if the broader market correction occurs",
+   "ticker": "IWM",
+   "pre_outcome": "miss"
+  },
+  "609121": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "AMZN",
+   "pre_outcome": "hit"
+  },
+  "607087": {
+   "verdict": "b",
+   "trigger": "if it continues to fall like this",
+   "ticker": "SHOP",
+   "pre_outcome": "hit"
+  },
+  "616363": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "PLTR",
+   "pre_outcome": "hit"
+  },
+  "608637": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "ADM",
+   "pre_outcome": "hit"
+  },
+  "607953": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "DE",
+   "pre_outcome": "miss"
+  },
+  "616489": {
+   "verdict": "b",
+   "trigger": "if these stocks drop much further",
+   "ticker": "META",
+   "pre_outcome": "hit"
+  },
+  "607551": {
+   "verdict": "b",
+   "trigger": "if I buy it around there",
+   "ticker": "DIS",
+   "pre_outcome": "hit"
+  },
+  "616471": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "UNH",
+   "pre_outcome": "hit"
+  },
+  "606394": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "SHW",
+   "pre_outcome": "hit"
+  },
+  "608948": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "CNI",
+   "pre_outcome": "miss"
+  },
+  "612762": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "TSLA",
+   "pre_outcome": "hit"
+  },
+  "607427": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "SPY",
+   "pre_outcome": "hit"
+  },
+  "614152": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "CEIX",
+   "pre_outcome": "miss"
+  },
+  "608969": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "LMT",
+   "pre_outcome": "miss"
+  },
+  "609228": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "SPY",
+   "pre_outcome": "miss"
+  },
+  "614309": {
+   "verdict": "a",
+   "trigger": "if we can clear these labor reports where participation stays low and unemployment goes down and we get good jobs",
+   "ticker": "SPY",
+   "pre_outcome": "miss"
+  },
+  "614591": {
+   "verdict": "b",
+   "trigger": "watch 617 if we end up going down at open",
+   "ticker": "QQQ",
+   "pre_outcome": "miss"
+  },
+  "614412": {
+   "verdict": "a",
+   "trigger": "if gm does end up dumping nikola",
+   "ticker": "NKLA",
+   "pre_outcome": "hit"
+  },
+  "614367": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "NKLA",
+   "pre_outcome": "miss"
+  },
+  "614924": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "QQQ",
+   "pre_outcome": "miss"
+  },
+  "615648": {
+   "verdict": "b",
+   "trigger": "rallies up through that 5day moving average, catches a bid along it after a little pullback",
+   "ticker": "IWM",
+   "pre_outcome": "hit"
+  },
+  "615649": {
+   "verdict": "b",
+   "trigger": "breaks below this low",
+   "ticker": "SOXX",
+   "pre_outcome": "hit"
+  },
+  "607281": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "COST",
+   "pre_outcome": "miss"
+  },
+  "616312": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "NVDA",
+   "pre_outcome": "hit"
+  },
+  "616252": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "TCOM",
+   "pre_outcome": "hit"
+  },
+  "616242": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "GOOGL",
+   "pre_outcome": "miss"
+  },
+  "616111": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "CNX",
+   "pre_outcome": "miss"
+  },
+  "616436": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "NVDA",
+   "pre_outcome": "miss"
+  },
+  "616225": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "MSFT",
+   "pre_outcome": "miss"
+  },
+  "606748": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "WBA",
+   "pre_outcome": "miss"
+  },
+  "607999": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "CVS",
+   "pre_outcome": "miss"
+  },
+  "616508": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "IWM",
+   "pre_outcome": "miss"
+  },
+  "606186": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "ENPH",
+   "pre_outcome": "miss"
+  },
+  "616484": {
+   "verdict": "a",
+   "trigger": "if we do see a lot of credit defaults and we see a lot of margin calls",
+   "ticker": "NVDA",
+   "pre_outcome": "miss"
+  },
+  "616494": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "SMCI",
+   "pre_outcome": "hit"
+  },
+  "616704": {
+   "verdict": "a",
+   "trigger": "demonstrate that capability / next-generation battery lowers cost and improves margins",
+   "ticker": "ENPH",
+   "pre_outcome": "hit"
+  },
+  "616565": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "META",
+   "pre_outcome": "hit"
+  },
+  "614321": {
+   "verdict": "b",
+   "trigger": "if this wedge breaks down",
+   "ticker": "QQQ",
+   "pre_outcome": "miss"
+  },
+  "616582": {
+   "verdict": "b",
+   "trigger": "let me know when we are at 55",
+   "ticker": "SBUX",
+   "pre_outcome": "hit"
+  },
+  "616585": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "HPQ",
+   "pre_outcome": "hit"
+  },
+  "616584": {
+   "verdict": "b",
+   "trigger": "if the price goes lower lower and lower",
+   "ticker": "ADM",
+   "pre_outcome": "hit"
+  },
+  "610082": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "ULTA",
+   "pre_outcome": "hit"
+  },
+  "606221": {
+   "verdict": "a",
+   "trigger": "if sanctions are ramped up",
+   "ticker": "ASML",
+   "pre_outcome": "miss"
+  },
+  "614194": {
+   "verdict": "b",
+   "trigger": "as long as the stock stays down near these levels",
+   "ticker": "MSFT",
+   "pre_outcome": "hit"
+  },
+  "607947": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "SBUX",
+   "pre_outcome": "hit"
+  },
+  "614041": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "AMZN",
+   "pre_outcome": "hit"
+  },
+  "323181": {
+   "verdict": "b",
+   "trigger": "Need to hold that breakout level and get back above the SMA 200",
+   "ticker": "BTC",
+   "pre_outcome": "hit"
+  },
+  "616568": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "WBD",
+   "pre_outcome": "miss"
+  },
+  "452510": {
+   "verdict": "b",
+   "trigger": "IF $TSLA LOSES $356",
+   "ticker": "TSLA",
+   "pre_outcome": "miss"
+  },
+  "614280": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "BABA",
+   "pre_outcome": "miss"
+  },
+  "608274": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "BIDU",
+   "pre_outcome": "hit"
+  },
+  "614050": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "MSFT",
+   "pre_outcome": "hit"
+  },
+  "606331": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "AMD",
+   "pre_outcome": "hit"
+  },
+  "452511": {
+   "verdict": "b",
+   "trigger": "IF $TSLA LOSES $356",
+   "ticker": "TSLA",
+   "pre_outcome": "miss"
+  },
+  "606977": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "PANW",
+   "pre_outcome": "hit"
+  },
+  "612211": {
+   "verdict": "b",
+   "trigger": "go down about that $40 level or maybe even break 40 and go into the 30s",
+   "ticker": "CAVA",
+   "pre_outcome": "hit"
+  },
+  "609403": {
+   "verdict": "a",
+   "trigger": "if we saw a huge selloff in the market a broad selloff maybe even a bare Market",
+   "ticker": "MSFT",
+   "pre_outcome": "hit"
+  },
+  "607949": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "MSCI",
+   "pre_outcome": "hit"
+  },
+  "609138": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "PYPL",
+   "pre_outcome": "hit"
+  },
+  "614028": {
+   "verdict": "b",
+   "trigger": "if you do you got areas up at 480",
+   "ticker": "META",
+   "pre_outcome": "hit"
+  },
+  "614034": {
+   "verdict": "b",
+   "trigger": "buying Microsoft at 406",
+   "ticker": "MSFT",
+   "pre_outcome": "hit"
+  },
+  "611964": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "APVO",
+   "pre_outcome": "miss"
+  },
+  "607168": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "PSTG",
+   "pre_outcome": "hit"
+  },
+  "608978": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "AAPL",
+   "pre_outcome": "hit"
+  },
+  "607881": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "GOOGL",
+   "pre_outcome": "hit"
+  },
+  "612577": {
+   "verdict": "b",
+   "trigger": "a finish above 94,000",
+   "ticker": "BTC",
+   "pre_outcome": "hit"
+  },
+  "612684": {
+   "verdict": "b",
+   "trigger": "flip the 50",
+   "ticker": "BTC",
+   "pre_outcome": "miss"
+  },
+  "613743": {
+   "verdict": "a",
+   "trigger": "if disney plus is a success",
+   "ticker": "DIS",
+   "pre_outcome": "miss"
+  },
+  "614064": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "NFLX",
+   "pre_outcome": "hit"
+  },
+  "613744": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "AAPL",
+   "pre_outcome": "hit"
+  },
+  "606575": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "AVGO",
+   "pre_outcome": "hit"
+  },
+  "614030": {
+   "verdict": "b",
+   "trigger": "if Amazon is able to push through 180",
+   "ticker": "AMZN",
+   "pre_outcome": "miss"
+  },
+  "323182": {
+   "verdict": "b",
+   "trigger": "Need to hold that breakout level and get back above the SMA 200",
+   "ticker": "BTC",
+   "pre_outcome": "hit"
+  },
+  "606202": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "META",
+   "pre_outcome": "hit"
+  },
+  "452502": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "SATL",
+   "pre_outcome": "hit"
+  },
+  "452519": {
+   "verdict": "b",
+   "trigger": "if that top breaks",
+   "ticker": "NAKA",
+   "pre_outcome": "hit"
+  },
+  "452509": {
+   "verdict": "b",
+   "trigger": "IF $TSLA LOSES $356",
+   "ticker": "TSLA",
+   "pre_outcome": "miss"
+  },
+  "606198": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "QCOM",
+   "pre_outcome": "hit"
+  },
+  "630442": {
+   "verdict": "b",
+   "trigger": "if we reclaim that area on revisit",
+   "ticker": "BTC",
+   "pre_outcome": "hit"
+  },
+  "427048": {
+   "verdict": "b",
+   "trigger": "if that breaks 0.235 and build over it",
+   "ticker": "AIXI",
+   "pre_outcome": "miss"
+  },
+  "613844": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "NVDA",
+   "pre_outcome": "miss"
+  },
+  "630847": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "CELH",
+   "pre_outcome": "miss"
+  },
+  "605674": {
+   "verdict": "a",
+   "trigger": "a relief rally in these magnificent stocks",
+   "ticker": "SPY",
+   "pre_outcome": "hit"
+  },
+  "612812": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "AMZN",
+   "pre_outcome": "miss"
+  },
+  "614052": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "SPY",
+   "pre_outcome": "miss"
+  },
+  "606363": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "SQ",
+   "pre_outcome": "miss"
+  },
+  "612086": {
+   "verdict": "a",
+   "trigger": "If they don't mess with their rewards",
+   "ticker": "ETH",
+   "pre_outcome": "miss"
+  },
+  "606362": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "PYPL",
+   "pre_outcome": "miss"
+  },
+  "607237": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "CVX",
+   "pre_outcome": "miss"
+  },
+  "613970": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "SPY",
+   "pre_outcome": "hit"
+  },
+  "606944": {
+   "verdict": "b",
+   "trigger": "once it gets below that 146 145",
+   "ticker": "TXN",
+   "pre_outcome": "near"
+  },
+  "607781": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "GM",
+   "pre_outcome": "hit"
+  },
+  "614273": {
+   "verdict": "b",
+   "trigger": "dependent on price",
+   "ticker": "BABA",
+   "pre_outcome": "miss"
+  },
+  "607963": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "MO",
+   "pre_outcome": "hit"
+  },
+  "607516": {
+   "verdict": "b",
+   "trigger": "if i did buy it today",
+   "ticker": "LMT",
+   "pre_outcome": "miss"
+  },
+  "615073": {
+   "verdict": "b",
+   "trigger": "if Mag7s continue to roll",
+   "ticker": "GOOGL",
+   "pre_outcome": "hit"
+  },
+  "612374": {
+   "verdict": "a",
+   "trigger": "beat top, beat bottom, and give guidance better than expected",
+   "ticker": "PLTR",
+   "pre_outcome": "miss"
+  },
+  "610160": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "GOOGL",
+   "pre_outcome": "hit"
+  },
+  "615048": {
+   "verdict": "a",
+   "trigger": "if they can keep this going and they don't have a bad guidance",
+   "ticker": "SOFI",
+   "pre_outcome": "miss"
+  },
+  "616487": {
+   "verdict": "b",
+   "trigger": "if these stocks drop much further",
+   "ticker": "GOOGL",
+   "pre_outcome": "hit"
+  },
+  "612445": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "META",
+   "pre_outcome": "hit"
+  },
+  "614824": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "GOOGL",
+   "pre_outcome": "hit"
+  },
+  "612476": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "WMT",
+   "pre_outcome": "hit"
+  },
+  "605834": {
+   "verdict": "a",
+   "trigger": "if they announce a vote",
+   "ticker": "XRP",
+   "pre_outcome": "miss"
+  },
+  "616488": {
+   "verdict": "b",
+   "trigger": "if these stocks drop much further",
+   "ticker": "AAPL",
+   "pre_outcome": "miss"
+  },
+  "614784": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "PLTR",
+   "pre_outcome": "hit"
+  },
+  "609103": {
+   "verdict": "b",
+   "trigger": "if I want to get a double on Starbucks or 15% I would have to buy the stock at $71",
+   "ticker": "SBUX",
+   "pre_outcome": "hit"
+  },
+  "614998": {
+   "verdict": "b",
+   "trigger": "Russell's up 3%",
+   "ticker": "SOFI",
+   "pre_outcome": "hit"
+  },
+  "612446": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "AMZN",
+   "pre_outcome": "hit"
+  },
+  "614019": {
+   "verdict": "b",
+   "trigger": "stop loss at 386",
+   "ticker": "MSFT",
+   "pre_outcome": "miss"
+  },
+  "614006": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "NFLX",
+   "pre_outcome": "hit"
+  },
+  "612569": {
+   "verdict": "b",
+   "trigger": "finish a weekly candle out at 92.5 to 93, and especially above 93",
+   "ticker": "BTC",
+   "pre_outcome": "miss"
+  },
+  "607593": {
+   "verdict": "b",
+   "trigger": "if ADC gets to a six percent yield which would be around 51 or a little bit below 51 dollars per share",
+   "ticker": "ADC",
+   "pre_outcome": "hit"
+  },
+  "614274": {
+   "verdict": "a",
+   "trigger": "if i had the short one",
+   "ticker": "META",
+   "pre_outcome": "hit"
+  },
+  "606467": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "LOW",
+   "pre_outcome": "hit"
+  },
+  "613864": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "AMZN",
+   "pre_outcome": "near"
+  },
+  "608112": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "ADBE",
+   "pre_outcome": "miss"
+  },
+  "609140": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "GOOGL",
+   "pre_outcome": "hit"
+  },
+  "631312": {
+   "verdict": "a",
+   "trigger": "if $HIMS news is confirmed",
+   "ticker": "HIMS",
+   "pre_outcome": "hit"
+  },
+  "608304": {
+   "verdict": "a",
+   "trigger": "if all the political mess just keeps getting worse, especially between Elon Musk and Trump, and if the Tesla brand just continues to weaken",
+   "ticker": "TSLA",
+   "pre_outcome": "miss"
+  },
+  "608718": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "SPY",
+   "pre_outcome": "miss"
+  },
+  "612136": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "BTC",
+   "pre_outcome": "miss"
+  },
+  "608223": {
+   "verdict": "b",
+   "trigger": "if it dips more",
+   "ticker": "SHOP",
+   "pre_outcome": "hit"
+  },
+  "612873": {
+   "verdict": "b",
+   "trigger": "if you could buy geo under six dollars so around five dollars 555",
+   "ticker": "GEO",
+   "pre_outcome": "hit"
+  },
+  "612763": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "AMZN",
+   "pre_outcome": "hit"
+  },
+  "608953": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "V",
+   "pre_outcome": "hit"
+  },
+  "612474": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "PG",
+   "pre_outcome": "miss"
+  },
+  "612831": {
+   "verdict": "a",
+   "trigger": "if the economy and the stock market start to recover",
+   "ticker": "HOOD",
+   "pre_outcome": "hit"
+  },
+  "609182": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "CVX",
+   "pre_outcome": "hit"
+  },
+  "609207": {
+   "verdict": "b",
+   "trigger": "if it comes down below that again",
+   "ticker": "MSFT",
+   "pre_outcome": "hit"
+  },
+  "610227": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "INTC",
+   "pre_outcome": "miss"
+  },
+  "610239": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "BFIN",
+   "pre_outcome": "miss"
+  },
+  "612152": {
+   "verdict": "a",
+   "trigger": "If we fail on the Clarity Act",
+   "ticker": "XRP",
+   "pre_outcome": "near"
+  },
+  "610600": {
+   "verdict": "a",
+   "trigger": "if the market recovers",
+   "ticker": "TXN",
+   "pre_outcome": "miss"
+  },
+  "605989": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "MSFT",
+   "pre_outcome": "near"
+  },
+  "605673": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "TSLA",
+   "pre_outcome": "hit"
+  },
+  "626848": {
+   "verdict": "b",
+   "trigger": "underneath that 105",
+   "ticker": "DIS",
+   "pre_outcome": "near"
+  },
+  "606384": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "APD",
+   "pre_outcome": "hit"
+  },
+  "606454": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "V",
+   "pre_outcome": "hit"
+  },
+  "606628": {
+   "verdict": "b",
+   "trigger": "if the stock starts to fall back down to those levels",
+   "ticker": "GOOGL",
+   "pre_outcome": "hit"
+  },
+  "606682": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "SBUX",
+   "pre_outcome": "miss"
+  },
+  "606683": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "JNJ",
+   "pre_outcome": "miss"
+  },
+  "606857": {
+   "verdict": "b",
+   "trigger": "buy msci around 375 or lower",
+   "ticker": "MSCI",
+   "pre_outcome": "miss"
+  },
+  "606771": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "PYPL",
+   "pre_outcome": "miss"
+  },
+  "607940": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "NKE",
+   "pre_outcome": "miss"
+  },
+  "607958": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "MCD",
+   "pre_outcome": "miss"
+  },
+  "614003": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "NVDA",
+   "pre_outcome": "miss"
+  },
+  "613977": {
+   "verdict": "b",
+   "trigger": "if you're able to approach this $200 area",
+   "ticker": "TSLA",
+   "pre_outcome": "miss"
+  },
+  "610586": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "GOOGL",
+   "pre_outcome": "miss"
+  },
+  "614172": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "AAPL",
+   "pre_outcome": "miss"
+  },
+  "612061": {
+   "verdict": "a",
+   "trigger": "if they pass this",
+   "ticker": "XRP",
+   "pre_outcome": "miss"
+  },
+  "605999": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "AAPL",
+   "pre_outcome": "miss"
+  },
+  "613199": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "SPY",
+   "pre_outcome": "hit"
+  },
+  "607316": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "GOOGL",
+   "pre_outcome": "miss"
+  },
+  "607459": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "WBA",
+   "pre_outcome": "hit"
+  },
+  "613966": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "NVDA",
+   "pre_outcome": "near"
+  },
+  "607690": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "AAPL",
+   "pre_outcome": "miss"
+  },
+  "613860": {
+   "verdict": "b",
+   "trigger": "If you break down from here",
+   "ticker": "SPY",
+   "pre_outcome": "hit"
+  },
+  "612448": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "AAPL",
+   "pre_outcome": "hit"
+  },
+  "612277": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "TSLA",
+   "pre_outcome": "hit"
+  },
+  "606827": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "ARM",
+   "pre_outcome": "miss"
+  },
+  "607587": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "RTX",
+   "pre_outcome": "hit"
+  },
+  "608064": {
+   "verdict": "a",
+   "trigger": "once we get a new CEO in place",
+   "ticker": "PYPL",
+   "pre_outcome": "hit"
+  },
+  "608613": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "VZ",
+   "pre_outcome": "hit"
+  },
+  "610804": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "ADM",
+   "pre_outcome": "hit"
+  },
+  "612457": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "PLTR",
+   "pre_outcome": "hit"
+  },
+  "608627": {
+   "verdict": "a",
+   "trigger": "if we see a huge selloff",
+   "ticker": "MCD",
+   "pre_outcome": "hit"
+  },
+  "612743": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "PFE",
+   "pre_outcome": "miss"
+  },
+  "610089": {
+   "verdict": "a",
+   "trigger": "if it is maximum pessimism",
+   "ticker": "ALB",
+   "pre_outcome": "miss"
+  },
+  "610228": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "SPY",
+   "pre_outcome": "miss"
+  },
+  "610786": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "KHC",
+   "pre_outcome": "miss"
+  },
+  "610350": {
+   "verdict": "a",
+   "trigger": "if things return to normality",
+   "ticker": "AAPL",
+   "pre_outcome": "miss"
+  },
+  "612758": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "TSLA",
+   "pre_outcome": "hit"
+  },
+  "607608": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "SEDG",
+   "pre_outcome": "near"
+  },
+  "607672": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "TSLA",
+   "pre_outcome": "hit"
+  },
+  "610982": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "ALLY",
+   "pre_outcome": "miss"
+  },
+  "612663": {
+   "verdict": "b",
+   "trigger": "If we push back in",
+   "ticker": "BTC",
+   "pre_outcome": "hit"
+  },
+  "608731": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "ULTA",
+   "pre_outcome": "hit"
+  },
+  "613794": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "NFLX",
+   "pre_outcome": "hit"
+  },
+  "608897": {
+   "verdict": "a",
+   "trigger": "if they lose that Google tax payment each year",
+   "ticker": "AAPL",
+   "pre_outcome": "miss"
+  },
+  "608618": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "NKE",
+   "pre_outcome": "miss"
+  },
+  "610598": {
+   "verdict": "a",
+   "trigger": "if interest rates go down",
+   "ticker": "VZ",
+   "pre_outcome": "miss"
+  },
+  "609411": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "MO",
+   "pre_outcome": "hit"
+  },
+  "605933": {
+   "verdict": "b",
+   "trigger": "if shares fell under 60 bucks",
+   "ticker": "GFS",
+   "pre_outcome": "hit"
+  },
+  "605926": {
+   "verdict": "a",
+   "trigger": "if the solar industry and Renewables are going to be a hot investment theme",
+   "ticker": "ONON",
+   "pre_outcome": "hit"
+  },
+  "605934": {
+   "verdict": "a",
+   "trigger": "if the deal goes through",
+   "ticker": "SIMO",
+   "pre_outcome": "miss"
+  },
+  "605977": {
+   "verdict": "b",
+   "trigger": "if it does dip back down into this acceptable buy price of about 46 dollars",
+   "ticker": "KO",
+   "pre_outcome": "miss"
+  },
+  "606439": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "MO",
+   "pre_outcome": "hit"
+  },
+  "606658": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "GOOGL",
+   "pre_outcome": "hit"
+  },
+  "607021": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "AVGO",
+   "pre_outcome": "miss"
+  },
+  "607150": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "APD",
+   "pre_outcome": "hit"
+  },
+  "607292": {
+   "verdict": "a",
+   "trigger": "if interest rates start coming down or the economy recovers",
+   "ticker": "SOFI",
+   "pre_outcome": "hit"
+  },
+  "607552": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "T",
+   "pre_outcome": "hit"
+  },
+  "607166": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "NVDA",
+   "pre_outcome": "miss"
+  },
+  "607813": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "AI",
+   "pre_outcome": "miss"
+  },
+  "608981": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "SBUX",
+   "pre_outcome": "miss"
+  },
+  "607174": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "TSM",
+   "pre_outcome": "hit"
+  },
+  "608073": {
+   "verdict": "b",
+   "trigger": "if I do get assigned",
+   "ticker": "SAND",
+   "pre_outcome": "hit"
+  },
+  "612444": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "GOOGL",
+   "pre_outcome": "hit"
+  },
+  "608970": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "XOM",
+   "pre_outcome": "hit"
+  },
+  "612433": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "PLTR",
+   "pre_outcome": "hit"
+  },
+  "614704": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "BAC",
+   "pre_outcome": "miss"
+  },
+  "611287": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "SPY",
+   "pre_outcome": "hit"
+  },
+  "612668": {
+   "verdict": "b",
+   "trigger": "If we fail at 126",
+   "ticker": "SOL",
+   "pre_outcome": "near"
+  },
+  "609193": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "PSX",
+   "pre_outcome": "miss"
+  },
+  "611166": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "META",
+   "pre_outcome": "miss"
+  },
+  "612119": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "BTC",
+   "pre_outcome": "miss"
+  },
+  "615656": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "AMD",
+   "pre_outcome": "miss"
+  },
+  "608626": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "EPR",
+   "pre_outcome": "hit"
+  },
+  "608675": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "T",
+   "pre_outcome": "miss"
+  },
+  "608687": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "INTC",
+   "pre_outcome": "miss"
+  },
+  "608672": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "SBUX",
+   "pre_outcome": "hit"
+  },
+  "608717": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "ENPH",
+   "pre_outcome": "hit"
+  },
+  "608828": {
+   "verdict": "b",
+   "trigger": "if it keeps falling like it has",
+   "ticker": "NOW",
+   "pre_outcome": "miss"
+  },
+  "608919": {
+   "verdict": "a",
+   "trigger": "return of growth for the industry excluding AI and accelerated computing",
+   "ticker": "CDNS",
+   "pre_outcome": "hit"
+  },
+  "614082": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "MSFT",
+   "pre_outcome": "hit"
+  },
+  "608933": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "JNJ",
+   "pre_outcome": "hit"
+  },
+  "609007": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "SNA",
+   "pre_outcome": "hit"
+  },
+  "610585": {
+   "verdict": "a",
+   "trigger": "if there is a recession",
+   "ticker": "F",
+   "pre_outcome": "hit"
+  },
+  "610147": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "QQQ",
+   "pre_outcome": "miss"
+  },
+  "610658": {
+   "verdict": "a",
+   "trigger": "if the market goes down",
+   "ticker": "VZ",
+   "pre_outcome": "hit"
+  },
+  "610958": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "SPY",
+   "pre_outcome": "hit"
+  },
+  "612869": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "GEO",
+   "pre_outcome": "hit"
+  },
+  "614700": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "HYG",
+   "pre_outcome": "hit"
+  },
+  "628983": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "SOXX",
+   "pre_outcome": "hit"
+  },
+  "612642": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "XRP",
+   "pre_outcome": "hit"
+  },
+  "614027": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "SBUX",
+   "pre_outcome": "miss"
+  },
+  "606663": {
+   "verdict": "b",
+   "trigger": "if it sells off this much or even more",
+   "ticker": "MSFT",
+   "pre_outcome": "hit"
+  },
+  "612643": {
+   "verdict": "b",
+   "trigger": "if you want to take a shot on a swing trade on that",
+   "ticker": "SOL",
+   "pre_outcome": "miss"
+  },
+  "607008": {
+   "verdict": "b",
+   "trigger": "if it sells off more after earnings",
+   "ticker": "NEE",
+   "pre_outcome": "hit"
+  },
+  "609096": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "SOFI",
+   "pre_outcome": "hit"
+  },
+  "608764": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "CRM",
+   "pre_outcome": "hit"
+  },
+  "611074": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "MSFT",
+   "pre_outcome": "hit"
+  },
+  "614556": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "BMNR",
+   "pre_outcome": "hit"
+  },
+  "612809": {
+   "verdict": "b",
+   "trigger": "if it was to dip even lower",
+   "ticker": "MSFT",
+   "pre_outcome": "hit"
+  },
+  "614018": {
+   "verdict": "b",
+   "trigger": "retest top of the channel at 150",
+   "ticker": "GOOGL",
+   "pre_outcome": "hit"
+  },
+  "614408": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "MSFT",
+   "pre_outcome": "hit"
+  },
+  "606635": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "SN",
+   "pre_outcome": "miss"
+  },
+  "614768": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "DIS",
+   "pre_outcome": "miss"
+  },
+  "615647": {
+   "verdict": "b",
+   "trigger": "rallies up through that 5day moving average, catches a bid along it after a little pullback",
+   "ticker": "SPY",
+   "pre_outcome": "hit"
+  },
+  "615681": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "AMD",
+   "pre_outcome": "miss"
+  },
+  "614516": {
+   "verdict": "b",
+   "trigger": "if we went green in the first 5 minutes",
+   "ticker": "QQQ",
+   "pre_outcome": "hit"
+  },
+  "616650": {
+   "verdict": "b",
+   "trigger": "if that happens",
+   "ticker": "PLTR",
+   "pre_outcome": "hit"
+  },
+  "606589": {
+   "verdict": "a",
+   "trigger": "if they hit the upper end of that guidance",
+   "ticker": "NDSN",
+   "pre_outcome": "miss"
+  },
+  "610063": {
+   "verdict": "a",
+   "trigger": "if the market tanks another 10%",
+   "ticker": "SBUX",
+   "pre_outcome": "miss"
+  },
+  "606591": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "AVGO",
+   "pre_outcome": "hit"
+  },
+  "607422": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "WBA",
+   "pre_outcome": "hit"
+  },
+  "609126": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "NVDA",
+   "pre_outcome": "hit"
+  },
+  "616802": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "TSLA",
+   "pre_outcome": "hit"
+  },
+  "605859": {
+   "verdict": "a",
+   "trigger": "as long as they follow through",
+   "ticker": "SPY",
+   "pre_outcome": "miss"
+  },
+  "611014": {
+   "verdict": "a",
+   "trigger": "era of cheap money is ending / rising interest rates",
+   "ticker": "AAPL",
+   "pre_outcome": "hit"
+  },
+  "605907": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "TSM",
+   "pre_outcome": "hit"
+  },
+  "612527": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "QQQ",
+   "pre_outcome": "miss"
+  },
+  "614996": {
+   "verdict": "a",
+   "trigger": "if reclassification comes",
+   "ticker": "PLNT",
+   "pre_outcome": "miss"
+  },
+  "615037": {
+   "verdict": "b",
+   "trigger": "VIX go 30 plus, then push 40 plus into the 50 range / NASDAQ go down well over 20% from recent highs",
+   "ticker": "SPY",
+   "pre_outcome": "hit"
+  },
+  "616689": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "CRWD",
+   "pre_outcome": "miss"
+  },
+  "607423": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "VZ",
+   "pre_outcome": "hit"
+  },
+  "608992": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "O",
+   "pre_outcome": "near"
+  },
+  "614714": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "NLY",
+   "pre_outcome": "miss"
+  },
+  "610916": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "DIS",
+   "pre_outcome": "miss"
+  },
+  "612526": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "VT",
+   "pre_outcome": "hit"
+  },
+  "610657": {
+   "verdict": "b",
+   "trigger": "if it gets to $19",
+   "ticker": "SOFI",
+   "pre_outcome": "hit"
+  },
+  "610434": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "COST",
+   "pre_outcome": "hit"
+  },
+  "609139": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "META",
+   "pre_outcome": "hit"
+  },
+  "608607": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "AAPL",
+   "pre_outcome": "hit"
+  },
+  "608462": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "NFLX",
+   "pre_outcome": "hit"
+  },
+  "615066": {
+   "verdict": "a",
+   "trigger": "if cake comes in next quarter and shows another acceleration of growth rates and then has a really strong guidance and the Russell keeps rolling",
+   "ticker": "CAKE",
+   "pre_outcome": "miss"
+  },
+  "611270": {
+   "verdict": "a",
+   "trigger": "if we end up with a short-term solution",
+   "ticker": "SPY",
+   "pre_outcome": "hit"
+  },
+  "610277": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "MO",
+   "pre_outcome": "hit"
+  },
+  "610663": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "SPY",
+   "pre_outcome": "miss"
+  },
+  "616015": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "JD",
+   "pre_outcome": "hit"
+  },
+  "608896": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "GOOGL",
+   "pre_outcome": "hit"
+  },
+  "606995": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "LSCC",
+   "pre_outcome": "miss"
+  },
+  "612637": {
+   "verdict": "b",
+   "trigger": "if we get down to the 100",
+   "ticker": "SOL",
+   "pre_outcome": "hit"
+  },
+  "607428": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "SBUX",
+   "pre_outcome": "miss"
+  },
+  "606895": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "AVB",
+   "pre_outcome": "miss"
+  },
+  "609169": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "DG",
+   "pre_outcome": "near"
+  },
+  "612667": {
+   "verdict": "b",
+   "trigger": "if this crosses next week",
+   "ticker": "BTC",
+   "pre_outcome": "miss"
+  },
+  "608901": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "ASML",
+   "pre_outcome": "hit"
+  },
+  "612914": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "FL",
+   "pre_outcome": "near"
+  },
+  "607564": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "MPW",
+   "pre_outcome": "hit"
+  },
+  "615660": {
+   "verdict": "b",
+   "trigger": "gets back above the daily VWAP",
+   "ticker": "IWM",
+   "pre_outcome": "near"
+  },
+  "611168": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "RYM",
+   "pre_outcome": "miss"
+  },
+  "616601": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "GME",
+   "pre_outcome": "miss"
+  },
+  "615659": {
+   "verdict": "b",
+   "trigger": "if the buyers can gain control and get back above the VWAP",
+   "ticker": "SPY",
+   "pre_outcome": "hit"
+  },
+  "616663": {
+   "verdict": "b",
+   "trigger": "if it can't have consistent support to maintain this price",
+   "ticker": "TSLA",
+   "pre_outcome": "hit"
+  },
+  "616770": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "SHOP",
+   "pre_outcome": "miss"
+  },
+  "616859": {
+   "verdict": "a",
+   "trigger": "Iran is likely to stretch it as long as possible",
+   "ticker": "SPY",
+   "pre_outcome": "miss"
+  },
+  "617191": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "HPE",
+   "pre_outcome": "miss"
+  },
+  "606743": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "SPLK",
+   "pre_outcome": "miss"
+  },
+  "609772": {
+   "verdict": "b",
+   "trigger": "break out up here and get over its all-time previous all-time high which was just under 204",
+   "ticker": "MMM",
+   "pre_outcome": "miss"
+  },
+  "606456": {
+   "verdict": "a",
+   "trigger": "if there's ever an oil and gas crash again",
+   "ticker": "TPL",
+   "pre_outcome": "hit"
+  },
+  "612528": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "META",
+   "pre_outcome": "hit"
+  },
+  "607054": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "GOOGL",
+   "pre_outcome": "hit"
+  },
+  "619094": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "SPY",
+   "pre_outcome": "hit"
+  },
+  "610863": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "TXRH",
+   "pre_outcome": "hit"
+  },
+  "608754": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "PARA",
+   "pre_outcome": "hit"
+  },
+  "612566": {
+   "verdict": "b",
+   "trigger": "If we take out this little zone here",
+   "ticker": "XRP",
+   "pre_outcome": "miss"
+  },
+  "612897": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "SPY",
+   "pre_outcome": "hit"
+  },
+  "616005": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "TIP",
+   "pre_outcome": "hit"
+  },
+  "612123": {
+   "verdict": "b",
+   "trigger": "if it fails and they can't get it done",
+   "ticker": "BTC",
+   "pre_outcome": "hit"
+  },
+  "608707": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "LULU",
+   "pre_outcome": "hit"
+  },
+  "614113": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "B",
+   "pre_outcome": "miss"
+  },
+  "611920": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "SF",
+   "pre_outcome": "hit"
+  },
+  "616685": {
+   "verdict": "a",
+   "trigger": "if they miss their next quarterly earnings or only Come Close without a beat",
+   "ticker": "PLTR",
+   "pre_outcome": "miss"
+  },
+  "616946": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "WMT",
+   "pre_outcome": "hit"
+  },
+  "616672": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "GOOGL",
+   "pre_outcome": "hit"
+  },
+  "616907": {
+   "verdict": "a",
+   "trigger": "If Iran goes the other way",
+   "ticker": "USO",
+   "pre_outcome": "miss"
+  },
+  "612051": {
+   "verdict": "a",
+   "trigger": "if they announce a Clarity Act vote",
+   "ticker": "BTC",
+   "pre_outcome": "hit"
+  },
+  "617110": {
+   "verdict": "a",
+   "trigger": "if you're worried about those further losses",
+   "ticker": "EXE",
+   "pre_outcome": "miss"
+  },
+  "608050": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "PYPL",
+   "pre_outcome": "hit"
+  },
+  "606849": {
+   "verdict": "b",
+   "trigger": "if it suffers any more big falls",
+   "ticker": "BP",
+   "pre_outcome": "miss"
+  },
+  "606623": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "NVDA",
+   "pre_outcome": "miss"
+  },
+  "612124": {
+   "verdict": "b",
+   "trigger": "if it fails and they can't get it done",
+   "ticker": "ETH",
+   "pre_outcome": "hit"
+  },
+  "608051": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "DIS",
+   "pre_outcome": "near"
+  },
+  "606218": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "ONON",
+   "pre_outcome": "hit"
+  },
+  "608354": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "QCOM",
+   "pre_outcome": "hit"
+  },
+  "607007": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "TXN",
+   "pre_outcome": "hit"
+  },
+  "612844": {
+   "verdict": "a",
+   "trigger": "if the dollar weakens",
+   "ticker": "AAPL",
+   "pre_outcome": "hit"
+  },
+  "616739": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "NVDA",
+   "pre_outcome": "hit"
+  },
+  "609425": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "JNJ",
+   "pre_outcome": "hit"
+  },
+  "609195": {
+   "verdict": "a",
+   "trigger": "with lower interest rates",
+   "ticker": "SOFI",
+   "pre_outcome": "hit"
+  },
+  "610426": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "ADBE",
+   "pre_outcome": "miss"
+  },
+  "611324": {
+   "verdict": "b",
+   "trigger": "if Nvidia tanks",
+   "ticker": "QQQ",
+   "pre_outcome": "miss"
+  },
+  "606765": {
+   "verdict": "a",
+   "trigger": "if the dividend does not get cut",
+   "ticker": "VZ",
+   "pre_outcome": "hit"
+  },
+  "606846": {
+   "verdict": "a",
+   "trigger": "if payments are restored",
+   "ticker": "RR",
+   "pre_outcome": "hit"
+  },
+  "619085": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "SPY",
+   "pre_outcome": "miss"
+  },
+  "619084": {
+   "verdict": "b",
+   "trigger": "green marabosu that breaks the base on volume and tests and holds the high of that candle",
+   "ticker": "TSLA",
+   "pre_outcome": "hit"
+  },
+  "619136": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "SPY",
+   "pre_outcome": "hit"
+  },
+  "619139": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "SH",
+   "pre_outcome": "hit"
+  },
+  "611724": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "SPY",
+   "pre_outcome": "hit"
+  },
+  "619072": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "TLT",
+   "pre_outcome": "miss"
+  },
+  "628653": {
+   "verdict": "b",
+   "trigger": "if Snapchat gets to the high",
+   "ticker": "SNAP",
+   "pre_outcome": "hit"
+  },
+  "612273": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "BTC",
+   "pre_outcome": "hit"
+  },
+  "611227": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "SPY",
+   "pre_outcome": "miss"
+  },
+  "610593": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "SPY",
+   "pre_outcome": "miss"
+  },
+  "610231": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "MOS",
+   "pre_outcome": "hit"
+  },
+  "613118": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "AAPL",
+   "pre_outcome": "miss"
+  },
+  "610483": {
+   "verdict": "b",
+   "trigger": "if the stock continues to trade down",
+   "ticker": "TXRH",
+   "pre_outcome": "hit"
+  },
+  "610397": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "META",
+   "pre_outcome": "hit"
+  },
+  "616958": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "COIN",
+   "pre_outcome": "miss"
+  },
+  "608880": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "PSTG",
+   "pre_outcome": "miss"
+  },
+  "616709": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "PLTR",
+   "pre_outcome": "hit"
+  },
+  "610069": {
+   "verdict": "a",
+   "trigger": "if that stays stable",
+   "ticker": "SPY",
+   "pre_outcome": "miss"
+  },
+  "609777": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "PTON",
+   "pre_outcome": "miss"
+  },
+  "611199": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "QQQ",
+   "pre_outcome": "miss"
+  },
+  "608813": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "GOOGL",
+   "pre_outcome": "hit"
+  },
+  "617211": {
+   "verdict": "a",
+   "trigger": "if management confirms next year's forecast for 32% sales growth",
+   "ticker": "AVGO",
+   "pre_outcome": "hit"
+  },
+  "617220": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "SPY",
+   "pre_outcome": "hit"
+  },
+  "606829": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "JACK",
+   "pre_outcome": "hit"
+  },
+  "605670": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "SPY",
+   "pre_outcome": "hit"
+  },
+  "609397": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "VICI",
+   "pre_outcome": "hit"
+  },
+  "606372": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "TXN",
+   "pre_outcome": "miss"
+  },
+  "609410": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "UNH",
+   "pre_outcome": "miss"
+  },
+  "609409": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "ASML",
+   "pre_outcome": "hit"
+  },
+  "624773": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "BTC",
+   "pre_outcome": "miss"
+  },
+  "627683": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "AMZN",
+   "pre_outcome": "hit"
+  },
+  "624770": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "HCA",
+   "pre_outcome": "miss"
+  },
+  "619093": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "AAPL",
+   "pre_outcome": "hit"
+  },
+  "619074": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "SPY",
+   "pre_outcome": "hit"
+  },
+  "619082": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "TLT",
+   "pre_outcome": "miss"
+  },
+  "612662": {
+   "verdict": "b",
+   "trigger": "if we lose 195",
+   "ticker": "XRP",
+   "pre_outcome": "miss"
+  },
+  "619169": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "SH",
+   "pre_outcome": "miss"
+  },
+  "609439": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "MSFT",
+   "pre_outcome": "hit"
+  },
+  "608360": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "KLAC",
+   "pre_outcome": "hit"
+  },
+  "628782": {
+   "verdict": "b",
+   "trigger": "as long as it's underneath it on Tuesday",
+   "ticker": "RGTI",
+   "pre_outcome": "miss"
+  },
+  "606867": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "IIPR",
+   "pre_outcome": "near"
+  },
+  "628805": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "EL",
+   "pre_outcome": "miss"
+  },
+  "628785": {
+   "verdict": "b",
+   "trigger": "If we get some rally in Alibaba",
+   "ticker": "BABA",
+   "pre_outcome": "miss"
+  },
+  "628795": {
+   "verdict": "b",
+   "trigger": "failed pre-market high or VWOP short",
+   "ticker": "SMR",
+   "pre_outcome": "miss"
+  },
+  "610359": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "SPY",
+   "pre_outcome": "miss"
+  },
+  "610712": {
+   "verdict": "a",
+   "trigger": "if Fields go to 5%",
+   "ticker": "SPY",
+   "pre_outcome": "miss"
+  },
+  "610328": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "WMT",
+   "pre_outcome": "hit"
+  },
+  "610596": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "BLK",
+   "pre_outcome": "hit"
+  },
+  "629536": {
+   "verdict": "b",
+   "trigger": "if we see momentum follow through in the upward direction",
+   "ticker": "SPY",
+   "pre_outcome": "hit"
+  },
+  "610831": {
+   "verdict": "b",
+   "trigger": "as long as this company mostly stays flatish",
+   "ticker": "INTU",
+   "pre_outcome": "hit"
+  },
+  "607172": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "MCHP",
+   "pre_outcome": "miss"
+  },
+  "607171": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "ON",
+   "pre_outcome": "miss"
+  },
+  "607825": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "AMD",
+   "pre_outcome": "miss"
+  },
+  "608651": {
+   "verdict": "a",
+   "trigger": "if they can't do that then their earnings are going to suffer",
+   "ticker": "SBUX",
+   "pre_outcome": "hit"
+  },
+  "610899": {
+   "verdict": "a",
+   "trigger": "if bill ackman is correct and inflation is down considerably in a year",
+   "ticker": "CHD",
+   "pre_outcome": "hit"
+  },
+  "610924": {
+   "verdict": "a",
+   "trigger": "if the Chinese consumer ever gets back on track",
+   "ticker": "SBUX",
+   "pre_outcome": "hit"
+  },
+  "612058": {
+   "verdict": "a",
+   "trigger": "if the negotiations fail",
+   "ticker": "CRWD",
+   "pre_outcome": "hit"
+  },
+  "612081": {
+   "verdict": "b",
+   "trigger": "if we can't and we start to confirm lower",
+   "ticker": "BTC",
+   "pre_outcome": "hit"
+  },
+  "612376": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "PLTR",
+   "pre_outcome": "miss"
+  },
+  "623835": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "ADBE",
+   "pre_outcome": "miss"
+  },
+  "611642": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "SPY",
+   "pre_outcome": "miss"
+  },
+  "608994": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "ADC",
+   "pre_outcome": "hit"
+  },
+  "619150": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "AAPL",
+   "pre_outcome": "miss"
+  },
+  "619159": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "SPY",
+   "pre_outcome": "hit"
+  },
+  "619121": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "SPY",
+   "pre_outcome": "hit"
+  },
+  "619170": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "TIP",
+   "pre_outcome": "hit"
+  },
+  "611885": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "UNH",
+   "pre_outcome": "hit"
+  },
+  "612228": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "SOFI",
+   "pre_outcome": "miss"
+  },
+  "427059": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "BTC",
+   "pre_outcome": "miss"
+  },
+  "619138": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "TLT",
+   "pre_outcome": "miss"
+  },
+  "619166": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "SH",
+   "pre_outcome": "hit"
+  },
+  "619167": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "SPY",
+   "pre_outcome": "hit"
+  },
+  "607495": {
+   "verdict": "b",
+   "trigger": "if we can get below some of these moving averages",
+   "ticker": "PETS",
+   "pre_outcome": "hit"
+  },
+  "628558": {
+   "verdict": "b",
+   "trigger": "if we get a form of a pullback",
+   "ticker": "HOOD",
+   "pre_outcome": "miss"
+  },
+  "612280": {
+   "verdict": "a",
+   "trigger": "If this market gets hit pretty decent over this next two to three months",
+   "ticker": "RH",
+   "pre_outcome": "near"
+  },
+  "612573": {
+   "verdict": "b",
+   "trigger": "If Solana crosses right here",
+   "ticker": "SOL",
+   "pre_outcome": "miss"
+  },
+  "612624": {
+   "verdict": "b",
+   "trigger": "if we do this this week under a support level",
+   "ticker": "SOL",
+   "pre_outcome": "hit"
+  },
+  "612535": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "BYD",
+   "pre_outcome": "hit"
+  },
+  "612555": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "RYM",
+   "pre_outcome": "hit"
+  },
+  "613120": {
+   "verdict": "b",
+   "trigger": "if it goes 30 down you buy again",
+   "ticker": "AMZN",
+   "pre_outcome": "hit"
+  },
+  "612671": {
+   "verdict": "b",
+   "trigger": "if we have a nasty red candle",
+   "ticker": "XRP",
+   "pre_outcome": "near"
+  },
+  "612737": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "BABA",
+   "pre_outcome": "hit"
+  },
+  "613189": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "TSLA",
+   "pre_outcome": "miss"
+  },
+  "607519": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "NVDA",
+   "pre_outcome": "miss"
+  },
+  "610356": {
+   "verdict": "a",
+   "trigger": "if he cannot cut rates",
+   "ticker": "SPY",
+   "pre_outcome": "miss"
+  },
+  "610481": {
+   "verdict": "b",
+   "trigger": "if this stock continues to trade down or trade flat",
+   "ticker": "CP",
+   "pre_outcome": "hit"
+  },
+  "610595": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "AAPL",
+   "pre_outcome": "hit"
+  },
+  "609248": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "FICO",
+   "pre_outcome": "hit"
+  },
+  "619175": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "SPY",
+   "pre_outcome": "miss"
+  },
+  "609192": {
+   "verdict": "b",
+   "trigger": "if oil would go to like 50 55",
+   "ticker": "OXY",
+   "pre_outcome": "miss"
+  },
+  "619176": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "SPY",
+   "pre_outcome": "miss"
+  },
+  "608704": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "ANF",
+   "pre_outcome": "hit"
+  },
+  "608705": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "SAND",
+   "pre_outcome": "near"
+  },
+  "608247": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "FRT",
+   "pre_outcome": "hit"
+  },
+  "619134": {
+   "verdict": "a",
+   "trigger": "if the Fed lowers the Fed funds rate",
+   "ticker": "TLT",
+   "pre_outcome": "hit"
+  },
+  "619146": {
+   "verdict": "c",
+   "trigger": null,
+   "ticker": "CMG",
+   "pre_outcome": "hit"
+  }
+ }
+}
