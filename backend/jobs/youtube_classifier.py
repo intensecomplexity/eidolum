@@ -4530,6 +4530,30 @@ def insert_youtube_prediction(
         video_id=video_id, channel_name=channel_name, stats=stats,
     ):
         return _reject("missing_source_timestamp")
+    # Ship: representativeness guard (transcript-aware (a)/(c)/(d)/(e); eval-gated
+    # 2026-06-14). Additive, fail-open, flag-not-delete; gated by
+    # ENABLE_REPRESENTATIVENESS_GUARD. ticker_call only. Never hard-rejects (eval
+    # showed a deterministic orphan-reject drops 23.5% of valid calls); it corrects
+    # a flipped direction (c) and sets reversible hide flags for reported-speech (d)
+    # and verified no-call narration (e). Grounds the stored quote to transcript
+    # text on a fuzzy timestamp match (a). Cost-gated: a Sonnet verify fires only on
+    # suspects (opposite-direction cue / reported-speech near-miss / no commitment
+    # word) — ~21% of rows. See backend/jobs/representativeness_guard.py.
+    _rg_reported = _rg_weak = False
+    try:
+        from jobs import representativeness_guard as _rg
+        _gd = _rg.decide(pred, ticker, direction, _ts_fields, transcript_data, db, stats=stats)
+        if _gd.get("action") == "reject":
+            return _reject(_gd.get("reason") or "representativeness_guard")
+        _gdir = _gd.get("direction")
+        if _gdir in ("bullish", "bearish") and _gdir != direction:
+            direction = _gdir
+        if _gd.get("verbatim"):
+            _ts_fields["source_verbatim_quote"] = _gd["verbatim"][:2000]
+        _rg_reported = bool(_gd.get("reported_speech"))
+        _rg_weak = bool(_gd.get("weak_flag"))
+    except Exception:
+        _rg_reported = _rg_weak = False
     # Ship #9 rescoped: metadata enrichment — category-inferred
     # window + conviction level. Overrides window_days / eval_date
     # when Haiku emits inferred_timeframe_days; no-ops silently when
@@ -4581,6 +4605,13 @@ def insert_youtube_prediction(
             **_ts_fields,
             **_meta_fields,
         )
+    # Representativeness-guard hide flags (reversible; hidden via the
+    # hedged_filter visibility bundle). reported-speech (d) and verified
+    # no-call narration (e) — flag-not-delete, never a hard drop.
+    if _rg_reported:
+        _pred.is_reported_speech = True
+    if _rg_weak:
+        _pred.is_weak_basket_call = True
     if _classifier_validation_gate(_pred, db, stats):
         return _reject("classifier_validation_gate")
     db.add(_pred)
