@@ -1,0 +1,669 @@
+{
+ "generated": "2026-06-12",
+ "ship": "adjudicate direction_mismatch (3 buckets, Nimrod-adjudicated)",
+ "rows": [
+  {
+   "id": 606424,
+   "bucket": "A_flip",
+   "pre": {
+    "direction": "bearish",
+    "outcome": "miss",
+    "actual_return": -17.21,
+    "evaluation_date": "2024-12-31 00:00:00",
+    "is_reported_speech": false
+   },
+   "post": {
+    "direction": "bullish",
+    "outcome": "hit",
+    "actual_return": 17.21,
+    "is_reported_speech": false
+   }
+  },
+  {
+   "id": 606663,
+   "bucket": "A_flip",
+   "pre": {
+    "direction": "bearish",
+    "outcome": "miss",
+    "actual_return": -31.62,
+    "evaluation_date": "2025-07-02 00:00:00",
+    "is_reported_speech": false
+   },
+   "post": {
+    "direction": "bullish",
+    "outcome": "hit",
+    "actual_return": 31.62,
+    "is_reported_speech": false
+   }
+  },
+  {
+   "id": 609200,
+   "bucket": "A_flip",
+   "pre": {
+    "direction": "bullish",
+    "outcome": "miss",
+    "actual_return": -28.47,
+    "evaluation_date": "2026-05-26 21:52:22",
+    "is_reported_speech": false
+   },
+   "post": {
+    "direction": "bearish",
+    "outcome": "hit",
+    "actual_return": 28.47,
+    "is_reported_speech": false
+   }
+  },
+  {
+   "id": 612643,
+   "bucket": "A_flip",
+   "pre": {
+    "direction": "bearish",
+    "outcome": "hit",
+    "actual_return": 3.16,
+    "evaluation_date": "2025-12-26 13:30:56",
+    "is_reported_speech": false
+   },
+   "post": {
+    "direction": "bullish",
+    "outcome": "miss",
+    "actual_return": -3.17,
+    "is_reported_speech": false
+   }
+  },
+  {
+   "id": 610663,
+   "bucket": "A_flip",
+   "pre": {
+    "direction": "bearish",
+    "outcome": "hit",
+    "actual_return": 1.3,
+    "evaluation_date": "2026-03-01 14:26:12",
+    "is_reported_speech": false
+   },
+   "post": {
+    "direction": "bullish",
+    "outcome": "miss",
+    "actual_return": -1.3,
+    "is_reported_speech": false
+   }
+  },
+  {
+   "id": 608944,
+   "bucket": "A_flip",
+   "pre": {
+    "direction": "bullish",
+    "outcome": "hit",
+    "actual_return": 1.96,
+    "evaluation_date": "2025-12-30 15:01:03",
+    "is_reported_speech": false
+   },
+   "post": {
+    "direction": "bearish",
+    "outcome": "miss",
+    "actual_return": -1.96,
+    "is_reported_speech": false
+   }
+  },
+  {
+   "id": 606412,
+   "bucket": "Ap_conditional_unresolved",
+   "pre": {
+    "direction": "bearish",
+    "outcome": "miss",
+    "actual_return": -13.81,
+    "evaluation_date": "2024-11-03 00:00:00",
+    "is_reported_speech": false
+   },
+   "post": {
+    "direction": "bearish",
+    "outcome": "unresolved",
+    "actual_return": -13.81,
+    "is_reported_speech": false
+   }
+  },
+  {
+   "id": 609272,
+   "bucket": "Ap_conditional_unresolved",
+   "pre": {
+    "direction": "bearish",
+    "outcome": "miss",
+    "actual_return": -10.47,
+    "evaluation_date": "2025-12-31 11:31:43",
+    "is_reported_speech": false
+   },
+   "post": {
+    "direction": "bearish",
+    "outcome": "unresolved",
+    "actual_return": -10.47,
+    "is_reported_speech": false
+   }
+  },
+  {
+   "id": 605806,
+   "bucket": "B_reported_speech",
+   "pre": {
+    "direction": "bullish",
+    "outcome": "miss",
+    "actual_return": -1.81,
+    "evaluation_date": "2023-05-17 04:43:00",
+    "is_reported_speech": false
+   },
+   "post": {
+    "direction": "bullish",
+    "outcome": "miss",
+    "actual_return": -1.81,
+    "is_reported_speech": true
+   }
+  },
+  {
+   "id": 613158,
+   "bucket": "B_reported_speech",
+   "pre": {
+    "direction": "bullish",
+    "outcome": "miss",
+    "actual_return": -2.52,
+    "evaluation_date": "2023-02-23 12:45:01",
+    "is_reported_speech": false
+   },
+   "post": {
+    "direction": "bullish",
+    "outcome": "miss",
+    "actual_return": -2.52,
+    "is_reported_speech": true
+   }
+  },
+  {
+   "id": 607863,
+   "bucket": "B_reported_speech",
+   "pre": {
+    "direction": "bearish",
+    "outcome": "miss",
+    "actual_return": -40.3,
+    "evaluation_date": "2025-05-10 22:48:28",
+    "is_reported_speech": false
+   },
+   "post": {
+    "direction": "bearish",
+    "outcome": "miss",
+    "actual_return": -40.3,
+    "is_reported_speech": true
+   }
+  },
+  {
+   "id": 613188,
+   "bucket": "B_reported_speech",
+   "pre": {
+    "direction": "bearish",
+    "outcome": "miss",
+    "actual_return": -24.87,
+    "evaluation_date": "2022-01-01 20:00:00",
+    "is_reported_speech": false
+   },
+   "post": {
+    "direction": "bearish",
+    "outcome": "miss",
+    "actual_return": -24.87,
+    "is_reported_speech": true
+   }
+  },
+  {
+   "id": 614131,
+   "bucket": "B_reported_speech",
+   "pre": {
+    "direction": "bearish",
+    "outcome": "miss",
+    "actual_return": -2.84,
+    "evaluation_date": "2025-10-19 09:00:06",
+    "is_reported_speech": false
+   },
+   "post": {
+    "direction": "bearish",
+    "outcome": "miss",
+    "actual_return": -2.84,
+    "is_reported_speech": true
+   }
+  },
+  {
+   "id": 614335,
+   "bucket": "B_reported_speech",
+   "pre": {
+    "direction": "neutral",
+    "outcome": "hit",
+    "actual_return": 1.47,
+    "evaluation_date": "2026-01-31 18:30:05",
+    "is_reported_speech": false
+   },
+   "post": {
+    "direction": "neutral",
+    "outcome": "hit",
+    "actual_return": 1.47,
+    "is_reported_speech": true
+   }
+  },
+  {
+   "id": 611044,
+   "bucket": "C_no_call_unresolved",
+   "pre": {
+    "direction": "bearish",
+    "outcome": "hit",
+    "actual_return": 54.21,
+    "evaluation_date": "2023-01-13 19:46:03",
+    "is_reported_speech": false
+   },
+   "post": {
+    "direction": "bearish",
+    "outcome": "unresolved",
+    "actual_return": 54.21,
+    "is_reported_speech": false
+   }
+  },
+  {
+   "id": 613851,
+   "bucket": "C_no_call_unresolved",
+   "pre": {
+    "direction": "bearish",
+    "outcome": "hit",
+    "actual_return": 18.56,
+    "evaluation_date": "2024-08-06 23:52:46",
+    "is_reported_speech": false
+   },
+   "post": {
+    "direction": "bearish",
+    "outcome": "unresolved",
+    "actual_return": 18.56,
+    "is_reported_speech": false
+   }
+  },
+  {
+   "id": 614701,
+   "bucket": "C_no_call_unresolved",
+   "pre": {
+    "direction": "bullish",
+    "outcome": "hit",
+    "actual_return": 17.73,
+    "evaluation_date": "2020-12-03 18:31:51",
+    "is_reported_speech": false
+   },
+   "post": {
+    "direction": "bullish",
+    "outcome": "unresolved",
+    "actual_return": 17.73,
+    "is_reported_speech": false
+   }
+  },
+  {
+   "id": 611013,
+   "bucket": "C_no_call_unresolved",
+   "pre": {
+    "direction": "bullish",
+    "outcome": "hit",
+    "actual_return": 10.67,
+    "evaluation_date": "2023-04-12 21:21:59",
+    "is_reported_speech": false
+   },
+   "post": {
+    "direction": "bullish",
+    "outcome": "unresolved",
+    "actual_return": 10.67,
+    "is_reported_speech": false
+   }
+  },
+  {
+   "id": 610972,
+   "bucket": "C_no_call_unresolved",
+   "pre": {
+    "direction": "bearish",
+    "outcome": "miss",
+    "actual_return": -31.77,
+    "evaluation_date": "2022-08-23 21:11:10",
+    "is_reported_speech": false
+   },
+   "post": {
+    "direction": "bearish",
+    "outcome": "unresolved",
+    "actual_return": -31.77,
+    "is_reported_speech": false
+   }
+  },
+  {
+   "id": 610789,
+   "bucket": "C_no_call_unresolved",
+   "pre": {
+    "direction": "bullish",
+    "outcome": "hit",
+    "actual_return": 5.76,
+    "evaluation_date": "2025-07-31 13:01:15",
+    "is_reported_speech": false
+   },
+   "post": {
+    "direction": "bullish",
+    "outcome": "unresolved",
+    "actual_return": 5.76,
+    "is_reported_speech": false
+   }
+  },
+  {
+   "id": 609419,
+   "bucket": "C_no_call_unresolved",
+   "pre": {
+    "direction": "bullish",
+    "outcome": "miss",
+    "actual_return": -16.74,
+    "evaluation_date": "2026-03-18 16:23:40",
+    "is_reported_speech": false
+   },
+   "post": {
+    "direction": "bullish",
+    "outcome": "unresolved",
+    "actual_return": -16.74,
+    "is_reported_speech": false
+   }
+  },
+  {
+   "id": 609000,
+   "bucket": "C_no_call_unresolved",
+   "pre": {
+    "direction": "bullish",
+    "outcome": "hit",
+    "actual_return": 12.89,
+    "evaluation_date": "2025-12-30 15:00:45",
+    "is_reported_speech": false
+   },
+   "post": {
+    "direction": "bullish",
+    "outcome": "unresolved",
+    "actual_return": 12.89,
+    "is_reported_speech": false
+   }
+  },
+  {
+   "id": 615010,
+   "bucket": "C_no_call_unresolved",
+   "pre": {
+    "direction": "bearish",
+    "outcome": "miss",
+    "actual_return": -5.76,
+    "evaluation_date": "2025-11-27 00:46:15",
+    "is_reported_speech": false
+   },
+   "post": {
+    "direction": "bearish",
+    "outcome": "unresolved",
+    "actual_return": -5.76,
+    "is_reported_speech": false
+   }
+  },
+  {
+   "id": 608426,
+   "bucket": "C_no_call_unresolved",
+   "pre": {
+    "direction": "bullish",
+    "outcome": "miss",
+    "actual_return": -40.0,
+    "evaluation_date": "2025-12-31 17:00:24",
+    "is_reported_speech": false
+   },
+   "post": {
+    "direction": "bullish",
+    "outcome": "unresolved",
+    "actual_return": -40.0,
+    "is_reported_speech": false
+   }
+  },
+  {
+   "id": 616365,
+   "bucket": "C_no_call_unresolved",
+   "pre": {
+    "direction": "bearish",
+    "outcome": "hit",
+    "actual_return": 3.7,
+    "evaluation_date": "2025-05-13 14:53:41",
+    "is_reported_speech": false
+   },
+   "post": {
+    "direction": "bearish",
+    "outcome": "unresolved",
+    "actual_return": 3.7,
+    "is_reported_speech": false
+   }
+  },
+  {
+   "id": 610957,
+   "bucket": "C_no_call_unresolved",
+   "pre": {
+    "direction": "bullish",
+    "outcome": "hit",
+    "actual_return": 10.34,
+    "evaluation_date": "2022-12-16 19:15:33",
+    "is_reported_speech": false
+   },
+   "post": {
+    "direction": "bullish",
+    "outcome": "unresolved",
+    "actual_return": 10.34,
+    "is_reported_speech": false
+   }
+  },
+  {
+   "id": 614596,
+   "bucket": "C_no_call_unresolved",
+   "pre": {
+    "direction": "bullish",
+    "outcome": "hit",
+    "actual_return": 15.62,
+    "evaluation_date": "2026-06-12 17:21:19",
+    "is_reported_speech": false
+   },
+   "post": {
+    "direction": "bullish",
+    "outcome": "unresolved",
+    "actual_return": 15.62,
+    "is_reported_speech": false
+   }
+  },
+  {
+   "id": 614171,
+   "bucket": "C_no_call_unresolved",
+   "pre": {
+    "direction": "bearish",
+    "outcome": "miss",
+    "actual_return": -23.91,
+    "evaluation_date": "2025-08-26 00:00:00",
+    "is_reported_speech": false
+   },
+   "post": {
+    "direction": "bearish",
+    "outcome": "unresolved",
+    "actual_return": -23.91,
+    "is_reported_speech": false
+   }
+  },
+  {
+   "id": 609783,
+   "bucket": "C_no_call_unresolved",
+   "pre": {
+    "direction": "bullish",
+    "outcome": "miss",
+    "actual_return": -5.13,
+    "evaluation_date": "2026-05-13 03:57:11.742158",
+    "is_reported_speech": false
+   },
+   "post": {
+    "direction": "bullish",
+    "outcome": "unresolved",
+    "actual_return": -5.13,
+    "is_reported_speech": false
+   }
+  },
+  {
+   "id": 608641,
+   "bucket": "C_no_call_unresolved",
+   "pre": {
+    "direction": "bullish",
+    "outcome": "miss",
+    "actual_return": -13.85,
+    "evaluation_date": "2025-03-06 15:01:06",
+    "is_reported_speech": false
+   },
+   "post": {
+    "direction": "bullish",
+    "outcome": "unresolved",
+    "actual_return": -13.85,
+    "is_reported_speech": false
+   }
+  },
+  {
+   "id": 614276,
+   "bucket": "C_no_call_unresolved",
+   "pre": {
+    "direction": "bullish",
+    "outcome": "miss",
+    "actual_return": -34.06,
+    "evaluation_date": "2022-01-15 15:56:38",
+    "is_reported_speech": false
+   },
+   "post": {
+    "direction": "bullish",
+    "outcome": "unresolved",
+    "actual_return": -34.06,
+    "is_reported_speech": false
+   }
+  },
+  {
+   "id": 608691,
+   "bucket": "C_no_call_unresolved",
+   "pre": {
+    "direction": "bullish",
+    "outcome": "hit",
+    "actual_return": 10.44,
+    "evaluation_date": "2024-07-02 12:00:29",
+    "is_reported_speech": false
+   },
+   "post": {
+    "direction": "bullish",
+    "outcome": "unresolved",
+    "actual_return": 10.44,
+    "is_reported_speech": false
+   }
+  },
+  {
+   "id": 614198,
+   "bucket": "C_no_call_unresolved",
+   "pre": {
+    "direction": "bearish",
+    "outcome": "hit",
+    "actual_return": 0.97,
+    "evaluation_date": "2023-01-01 13:15:01",
+    "is_reported_speech": false
+   },
+   "post": {
+    "direction": "bearish",
+    "outcome": "unresolved",
+    "actual_return": 0.97,
+    "is_reported_speech": false
+   }
+  },
+  {
+   "id": 614292,
+   "bucket": "C_no_call_unresolved",
+   "pre": {
+    "direction": "bullish",
+    "outcome": "hit",
+    "actual_return": 37.46,
+    "evaluation_date": "2026-06-07 17:13:18",
+    "is_reported_speech": false
+   },
+   "post": {
+    "direction": "bullish",
+    "outcome": "unresolved",
+    "actual_return": 37.46,
+    "is_reported_speech": false
+   }
+  },
+  {
+   "id": 614463,
+   "bucket": "C_no_call_unresolved",
+   "pre": {
+    "direction": "bullish",
+    "outcome": "hit",
+    "actual_return": 7.44,
+    "evaluation_date": "2026-04-22 22:29:30",
+    "is_reported_speech": false
+   },
+   "post": {
+    "direction": "bullish",
+    "outcome": "unresolved",
+    "actual_return": 7.44,
+    "is_reported_speech": false
+   }
+  },
+  {
+   "id": 629269,
+   "bucket": "C_no_call_unresolved",
+   "pre": {
+    "direction": "bullish",
+    "outcome": "miss",
+    "actual_return": -3.94,
+    "evaluation_date": "2026-06-10 23:43:47.382020",
+    "is_reported_speech": false
+   },
+   "post": {
+    "direction": "bullish",
+    "outcome": "unresolved",
+    "actual_return": -3.94,
+    "is_reported_speech": false
+   }
+  },
+  {
+   "id": 625650,
+   "bucket": "C_no_call_unresolved",
+   "pre": {
+    "direction": "bullish",
+    "outcome": "hit",
+    "actual_return": 1.88,
+    "evaluation_date": "2026-05-25 12:17:46.580312",
+    "is_reported_speech": false
+   },
+   "post": {
+    "direction": "bullish",
+    "outcome": "unresolved",
+    "actual_return": 1.88,
+    "is_reported_speech": false
+   }
+  },
+  {
+   "id": 626649,
+   "bucket": "C_no_call_unresolved",
+   "pre": {
+    "direction": "bearish",
+    "outcome": "miss",
+    "actual_return": -12.96,
+    "evaluation_date": "2026-06-09 20:37:11.323580",
+    "is_reported_speech": false
+   },
+   "post": {
+    "direction": "bearish",
+    "outcome": "unresolved",
+    "actual_return": -12.96,
+    "is_reported_speech": false
+   }
+  },
+  {
+   "id": 614584,
+   "bucket": "C_no_call_unresolved",
+   "pre": {
+    "direction": "bearish",
+    "outcome": "miss",
+    "actual_return": 0.0,
+    "evaluation_date": "2025-12-13 19:05:23",
+    "is_reported_speech": false
+   },
+   "post": {
+    "direction": "bearish",
+    "outcome": "unresolved",
+    "actual_return": 0.0,
+    "is_reported_speech": false
+   }
+  }
+ ]
+}
