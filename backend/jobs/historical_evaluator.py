@@ -435,7 +435,7 @@ def evaluate_batch(max_tickers: int | None = None) -> dict:
             # makes a perfectly fine +20% prediction score MISS. The
             # rejected target falls through to direction-only scoring.
             from services.target_sanity import sanity_check_target
-            target = sanity_check_target(ref, target, p.get("window_days"))
+            target = sanity_check_target(ref, target, p.get("window_days"), direction=p.get("direction"))
 
             # Bug 3: an explicit direction is canonical. The OLD code
             # silently flipped direction whenever target_price > entry
