@@ -158,6 +158,18 @@ _groq_limiter = _GroqRateLimiter(GROQ_MAX_RPM)
 TWEETS_PER_ACCOUNT = 20
 CURRENCY_IGNORE = {"USD", "EUR", "GBP", "JPY", "CAD", "AUD", "NZD", "CHF", "CNY", "HKD", "SGD"}
 
+# 2026-06-15 deterministic wrong-cashtag guard (X-scoped, fail-open). When a
+# tweet carries explicit cashtags but the stored ticker is NOT among them, the
+# call was almost certainly mis-attributed to the wrong symbol (the GOOGL/INTC
+# multi-cashtag class). We flag is_ambiguous_symbol (hidden via
+# hedged_filter_sql) rather than dropping. PRESERVES X loose-by-design:
+# crypto tickers (often written without $) and tweets with NO cashtags at all
+# (bare-symbol "AAPL long" / sector-phrase calls) are EXEMPT — they pass
+# untouched. Kill switch: X_CASHTAG_GUARD=off.
+X_CASHTAG_GUARD = (
+    os.environ.get("X_CASHTAG_GUARD", "on").lower() in ("on", "true", "1", "yes")
+)
+
 # Skip tweets older than this. Apify's tweet-scraper actor occasionally
 # returns tweets from as far back as 2010-2011 for high-signal handles
 # (it returns "recent" tweets but has no strict date filter), which wastes
@@ -1175,6 +1187,54 @@ def _extract_cashtags(text: str) -> list[str]:
     return [t for t in tags if t not in CURRENCY_IGNORE]
 
 
+def _cashtag_mismatch(ticker: str, body: str, db=None) -> bool:
+    """True when ``body`` carries explicit cashtags but ``ticker`` is referenced
+    NEITHER as a cashtag NOR by company name — the deterministic wrong-cashtag
+    signal (the stored ticker was almost certainly mis-attributed). Precision-
+    first: a false flag hides a real call, so we EXEMPT (return False, i.e.
+    pass) on every doubt —
+
+      * crypto tickers (often written without ``$``);
+      * tweets with NO cashtags at all (bare-symbol / sector-phrase calls);
+      * the ticker's full symbol OR its base (part before any ``.``, e.g. BRK in
+        BRK.B) matching a cashtag, case-insensitive (lowercase ``$googl`` counts);
+      * the ticker's COMPANY NAME or a known alias appearing in the body — e.g.
+        a tweet cashtagging ``$GOOGL $META`` while raising "Amazon"'s target is a
+        real AMZN call even though ``$AMZN`` never appears (requires ``db``).
+
+    Only flags when ``db`` is provided AND the name lookup succeeds AND the name
+    is absent; if the lookup is unavailable we exempt rather than risk a false
+    hide (the X insert path always passes ``db``).
+    """
+    if not ticker or not body:
+        return False
+    try:
+        from crypto_prices import is_crypto
+        if is_crypto(ticker):
+            return False
+    except Exception:
+        return False  # fail-open: never flag if crypto check is unavailable
+    cts = {c.upper() for c in re.findall(r'\$([A-Za-z]{1,5})\b', body)} - CURRENCY_IGNORE
+    if not cts:
+        return False  # no cashtags → bare-symbol/sector call, exempt
+    tu = ticker.upper()
+    base = tu.split('.')[0]
+    if tu in cts or base in cts:
+        return False  # present as a cashtag
+    if db is None:
+        return False  # can't verify name absence → exempt (precision-first)
+    try:
+        from jobs.representativeness_guard import (
+            alias_map, company_names, ticker_terms, _names,
+        )
+        terms = ticker_terms(ticker, alias_map(db), company_names(db))
+        if _names(body, terms):
+            return False  # referenced by company name / alias — real call, exempt
+    except Exception:
+        return False  # name lookup unavailable → exempt
+    return True
+
+
 def _prefilter_tweet(text: str, is_rt: bool) -> str | None:
     """Quick pre-filter before sending to AI. Returns rejection reason or None if OK.
 
@@ -1318,6 +1378,20 @@ def _insert_prediction(db, ticker: str, direction: str, target_price, timeframe_
         except Exception:
             pass  # fail-open: the gate must never break an X insert
 
+        # 2026-06-15 deterministic wrong-cashtag guard (X-scoped). Flag — do not
+        # drop — rows whose stored ticker isn't among the tweet's cashtags
+        # (crypto / no-cashtag tweets exempt; see _cashtag_mismatch). Hidden via
+        # hedged_filter_sql's is_ambiguous_symbol bundle. Fail-open.
+        is_ambiguous = False
+        if X_CASHTAG_GUARD:
+            try:
+                if _cashtag_mismatch(ticker, body, db):
+                    is_ambiguous = True
+                    log.info("[x_cashtag_guard] flag is_ambiguous_symbol "
+                             "ticker=%s author=%s body=%r", ticker, author, body[:160])
+            except Exception:
+                is_ambiguous = False
+
         from models import Prediction
         db.add(Prediction(
             forecaster_id=forecaster.id, ticker=ticker, direction=direction,
@@ -1334,6 +1408,7 @@ def _insert_prediction(db, ticker: str, direction: str, target_price, timeframe_
             prediction_type=prediction_type,
             position_action=position_action,
             confidence_tier=confidence_tier,
+            is_ambiguous_symbol=is_ambiguous,
         ))
         return True
     except Exception:
