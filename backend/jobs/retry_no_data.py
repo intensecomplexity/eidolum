@@ -457,7 +457,7 @@ def _score_predictions(preds, prices, now, ticker, verbose=False):
             # Bug 4: drop absurd targets (>cap × entry) so they degrade
             # to direction-only scoring instead of dominating the verdict.
             from services.target_sanity import sanity_check_target
-            target = sanity_check_target(ref, target, p.get("window_days"))
+            target = sanity_check_target(ref, target, p.get("window_days"), direction=p.get("direction"))
             # Bug 3: explicit direction is canonical — see services.direction_classifier.
             from services.direction_classifier import classify as classify_direction
             direction = classify_direction(

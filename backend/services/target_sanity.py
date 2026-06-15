@@ -44,10 +44,25 @@ def _max_move_for_window(timeframe_days: int | None) -> float:
     return 2.0  # > 1 year
 
 
+# Bug 4b (2026-06-15): the magnitude cap above catches UPSIDE blowups ("to the
+# moon, $2000 on a $50 stock") but NOT a target on the WRONG SIDE of entry — a
+# BULLISH call whose target sits far below entry, or a BEARISH call whose target
+# sits far above it. That class is almost always an extraction slip (a dropped
+# digit like AVGO $34 vs ~$385, or an EPS/PE/DCF figure misread as a price —
+# ADBE $62 on a $511 stock). Like the magnitude cap, the fix DROPS the target so
+# the prediction scores DIRECTION-ONLY — it never hides the row, so a real call
+# is never lost (zero-false-hide by construction). The band is deliberately wide
+# (must be >2x off on the wrong side) so a merely-conservative target near entry
+# is untouched; only egregiously-wrong-side targets are dropped.
+_WRONG_SIDE_BULL_MAX_BELOW = 0.5   # bullish: drop if target < 0.5 × entry
+_WRONG_SIDE_BEAR_MIN_ABOVE = 2.0   # bearish: drop if target > 2.0 × entry
+
+
 def sanity_check_target(
     entry_price: float | None,
     target_price: float | None,
     timeframe_days: int | None,
+    direction: str | None = None,
 ) -> float | None:
     """Return the target if it passes the sanity check, else None.
 
@@ -55,11 +70,18 @@ def sanity_check_target(
     NEVER raises — bad inputs (None / non-positive / non-numeric) just
     fall through with a None return so the caller can degrade gracefully.
 
+    When ``direction`` ('bullish'|'bearish') is supplied, an additional
+    WRONG-SIDE check runs (Bug 4b): a bullish target far below entry, or a
+    bearish target far above entry, is dropped to direction-only. Omitting
+    ``direction`` preserves the original magnitude-only behaviour exactly.
+
     Examples:
-      sanity_check_target(50, 60, 90)   → 60.0   (20% in 90d, ok)
-      sanity_check_target(50, 2000, 90) → None  (40x in 90d, rejected)
-      sanity_check_target(50, 75, 365)  → 75.0   (50% in a year, ok)
-      sanity_check_target(None, 60, 90) → None  (no entry, can't check)
+      sanity_check_target(50, 60, 90)              → 60.0  (20% in 90d, ok)
+      sanity_check_target(50, 2000, 90)            → None  (40x in 90d, rejected)
+      sanity_check_target(50, 75, 365)             → 75.0  (50% in a year, ok)
+      sanity_check_target(None, 60, 90)            → None  (no entry, can't check)
+      sanity_check_target(385, 34, 1095, 'bullish')→ None  (bullish target 0.09× entry)
+      sanity_check_target(100, 40, 30, 'bearish')  → 40.0  (bearish target below entry, ok)
     """
     if entry_price is None or target_price is None:
         return None
@@ -73,6 +95,11 @@ def sanity_check_target(
     pct = abs(t / e - 1)
     cap = _max_move_for_window(timeframe_days)
     if pct > cap:
+        return None
+    d = (direction or "").strip().lower()
+    if d == "bullish" and t < e * _WRONG_SIDE_BULL_MAX_BELOW:
+        return None
+    if d == "bearish" and t > e * _WRONG_SIDE_BEAR_MIN_ABOVE:
         return None
     return t
 

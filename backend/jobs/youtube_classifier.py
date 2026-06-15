@@ -4481,7 +4481,7 @@ def insert_youtube_prediction(
                     spot_price = _q.get("_current") if _q else None
                 except Exception:
                     spot_price = None
-            checked = sanity_check_target(spot_price, target_price, window_days)
+            checked = sanity_check_target(spot_price, target_price, window_days, direction=direction)
             if spot_price is not None and checked is None:
                 log.info(
                     "[YT-CLF] Bug-4 sanity reject: %s target=%s spot=%s window=%sd → direction-only",
