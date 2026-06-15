@@ -1,0 +1,758 @@
+{
+"631575": {
+"verdict": "OK",
+"why": "Host endorses Alibaba with positive framing: low valuations, structural tailwind \u2014 bullish call confirmed.",
+"ticker": "BABA",
+"direction": "bullish"
+},
+"631581": {
+"verdict": "OK",
+"why": "Transcript confirms CRWD bullish call with $750 mid-case target matching stored fields.",
+"ticker": "CRWD",
+"direction": "bullish"
+},
+"631576": {
+"verdict": "OK",
+"why": "Host explicitly bullish on TSLA medium/long-term growth from Next Gen vehicle builds.",
+"ticker": "TSLA",
+"direction": "bullish"
+},
+"631573": {
+"verdict": "OK",
+"why": "Host calls ARKK/ARK Innovation stocks bullish comeback; stored fields match.",
+"ticker": "ARKK",
+"direction": "bullish"
+},
+"631584": {
+"verdict": "OK",
+"why": "Host calls AAPL great value at 157, bullish stance matches stored direction.",
+"ticker": "AAPL",
+"direction": "bullish"
+},
+"631577": {
+"verdict": "OK",
+"why": "Transcript confirms bullish MSFT call with re-breakout and trend continuation language matching stored quote.",
+"ticker": "MSFT",
+"direction": "bullish"
+},
+"631570": {
+"verdict": "OK",
+"why": "Host confirms ITW is overvalued, two-star rated, trades above fair value \u2014 bearish call matches.",
+"ticker": "ITW",
+"direction": "bearish"
+},
+"631569": {
+"verdict": "OK",
+"why": "Host bullish on CMCSA broadband recovery long-term; stored quote matches transcript exactly.",
+"ticker": "CMCSA",
+"direction": "bullish"
+},
+"631566": {
+"verdict": "OK",
+"why": "Host is bullish WMT via robotics thesis; quote and direction match transcript exactly.",
+"ticker": "WMT",
+"direction": "bullish"
+},
+"631565": {
+"verdict": "OK",
+"why": "Host confirms buying more AMZN shares, calling it cheap; bullish forward call matches stored prediction.",
+"ticker": "AMZN",
+"direction": "bullish"
+},
+"631564": {
+"verdict": "OK",
+"why": "Host confirms BA fairly priced, recently bought more \u2014 bullish call matches stored fields.",
+"ticker": "BA",
+"direction": "bullish"
+},
+"631572": {
+"verdict": "OK",
+"why": "Host calls AMZN four-star, wide moat, medium uncertainty \u2014 matches stored bullish call.",
+"ticker": "AMZN",
+"direction": "bullish"
+},
+"631563": {
+"verdict": "OK",
+"why": "Host calls biotech undervalued, bought more XBI \u2014 clear bullish forward call.",
+"ticker": "XBI",
+"direction": "bullish"
+},
+"631561": {
+"verdict": "wrong_ticker",
+"why": "Quote is about Huntington Ingalls Industries but context refers to Huntington Bancshares (a bank).",
+"ticker": "HII",
+"direction": "bullish"
+},
+"631557": {
+"verdict": "OK",
+"why": "Stored quote matches transcript: $200 DCF target, 20% upside, bullish on GOOGL.",
+"ticker": "GOOGL",
+"direction": "bullish"
+},
+"631560": {
+"verdict": "OK",
+"why": "Host recommends WBD split as bullish catalyst; stored quote matches transcript exactly.",
+"ticker": "WBD",
+"direction": "bullish"
+},
+"631559": {
+"verdict": "OK",
+"why": "Host is bullish TSLA at $160-$180, stored direction and quote match.",
+"ticker": "TSLA",
+"direction": "bullish"
+},
+"631555": {
+"verdict": "not_a_prediction",
+"why": "META mentioned as example of high-OBV disconnect, no forward directional call made.",
+"ticker": "META",
+"direction": "bearish"
+},
+"631554": {
+"verdict": "OK",
+"why": "Host signals bearish NVDA: buyer vacuum, distribution coming, dip-buying failing.",
+"ticker": "NVDA",
+"direction": "bearish"
+},
+"631550": {
+"verdict": "direction_mismatch",
+"why": "Host calls COIN a 'call credit spread' \u2014 bearish overlay on bullish, not stored bearish direction.",
+"ticker": "COIN",
+"direction": "bearish"
+},
+"631553": {
+"verdict": "OK",
+"why": "Host calls BABA bullish 'a lot higher in a year or two'; stored fields match.",
+"ticker": "BABA",
+"direction": "bullish"
+},
+"631562": {
+"verdict": "OK",
+"why": "Transcript confirms KR bullish call with 7-8% return at current price, matching stored fields.",
+"ticker": "KR",
+"direction": "bullish"
+},
+"631547": {
+"verdict": "OK",
+"why": "Host calls TGT a high conviction play, likes it, uses bullish options strategy.",
+"ticker": "TGT",
+"direction": "bullish"
+},
+"631546": {
+"verdict": "OK",
+"why": "Host confirms short HSY, bearish, high conviction, ~3-month call credit spread.",
+"ticker": "HSY",
+"direction": "bearish"
+},
+"631544": {
+"verdict": "OK",
+"why": "Host calls TSLA very overvalued at double fair value; bearish call matches stored direction.",
+"ticker": "TSLA",
+"direction": "bearish"
+},
+"631542": {
+"verdict": "OK",
+"why": "Host is clearly bullish BTC as new hurdle rate and paradigm shift asset.",
+"ticker": "BTC",
+"direction": "bullish"
+},
+"631548": {
+"verdict": "not_a_prediction",
+"why": "Host recaps a current winning trade on SBUX; no forward buy/sell call made.",
+"ticker": "SBUX",
+"direction": "bullish"
+},
+"631541": {
+"verdict": "OK",
+"why": "Quote matches transcript exactly; ticker NET, $173 target, 17% upside all confirmed.",
+"ticker": "NET",
+"direction": "bullish"
+},
+"631543": {
+"verdict": "OK",
+"why": "Quote, ticker, bullish direction, and 730\u2013740 target all match transcript exactly.",
+"ticker": "ASML",
+"direction": "bullish"
+},
+"631540": {
+"verdict": "OK",
+"why": "Host holds Shopify puts, expects pullback below 80; bearish call confirmed.",
+"ticker": "SHOP",
+"direction": "bearish"
+},
+"631529": {
+"verdict": "OK",
+"why": "Transcript confirms moderate bullish stance on TSLA, 34-day timeframe, matching stored fields.",
+"ticker": "TSLA",
+"direction": "bullish"
+},
+"631535": {
+"verdict": "OK",
+"why": "Quote matches transcript exactly; bullish thesis with $100\u2013$200 target on EL confirmed.",
+"ticker": "EL",
+"direction": "bullish"
+},
+"631527": {
+"verdict": "OK",
+"why": "Host rates CWT above average long-term, bullish on water utility; stored fields match.",
+"ticker": "CWT",
+"direction": "bullish"
+},
+"631526": {
+"verdict": "OK",
+"why": "Host clearly states bearish stance on ABM, never owning it; quote and ticker match.",
+"ticker": "ABM",
+"direction": "bearish"
+},
+"631528": {
+"verdict": "OK",
+"why": "Host clearly picks SWK as favorite buy; bullish call matches stored direction.",
+"ticker": "SWK",
+"direction": "bullish"
+},
+"631525": {
+"verdict": "OK",
+"why": "Host clearly states MO is a dividend trap with no bright future; bearish call confirmed.",
+"ticker": "MO",
+"direction": "bearish"
+},
+"631522": {
+"verdict": "OK",
+"why": "Host clearly bullish IFF: destocking ending, normalized growth, 4-star rated, 27% discount.",
+"ticker": "IFF",
+"direction": "bullish"
+},
+"631523": {
+"verdict": "OK",
+"why": "Host explicitly recommends VTR as undervalued REIT with bullish long-term healthcare thesis.",
+"ticker": "VTR",
+"direction": "bullish"
+},
+"631520": {
+"verdict": "OK",
+"why": "Host confirms CMG at $40 fair value, 57% premium, one-star rating \u2014 bearish call matches.",
+"ticker": "CMG",
+"direction": "bearish"
+},
+"631521": {
+"verdict": "OK",
+"why": "Transcript confirms ILMN bullish, $188 target, 5-star rating, 44% discount post spin-off.",
+"ticker": "ILMN",
+"direction": "bullish"
+},
+"631517": {
+"verdict": "OK",
+"why": "Host calls ASML bubble with poor long-term returns, matching bearish stored call.",
+"ticker": "ASML",
+"direction": "bearish"
+},
+"631518": {
+"verdict": "OK",
+"why": "Host confirms CCL bullish: 4-star, 33% discount, demand momentum continuing 2+ quarters.",
+"ticker": "CCL",
+"direction": "bullish"
+},
+"631514": {
+"verdict": "OK",
+"why": "Quote matches transcript exactly; bullish long-term thesis on SHOP confirmed.",
+"ticker": "SHOP",
+"direction": "bullish"
+},
+"631513": {
+"verdict": "OK",
+"why": "Host clearly bullish on SOFI, holding long-term; stored fields match transcript.",
+"ticker": "SOFI",
+"direction": "bullish"
+},
+"631512": {
+"verdict": "OK",
+"why": "Host clearly says avoid INTC, bearish on Germany fab thesis; quote matches transcript.",
+"ticker": "INTC",
+"direction": "bearish"
+},
+"631509": {
+"verdict": "OK",
+"why": "Host explicitly shorts Visa, calls sub-300 next week; stored fields match.",
+"ticker": "V",
+"direction": "bearish"
+},
+"631508": {
+"verdict": "OK",
+"why": "Host clearly states ORCL is a bounce in a downtrend\u2014bearish call confirmed.",
+"ticker": "ORCL",
+"direction": "bearish"
+},
+"631506": {
+"verdict": "OK",
+"why": "Host clearly calls NFLX a broken downtrend; bearish, no target, matches stored fields.",
+"ticker": "NFLX",
+"direction": "bearish"
+},
+"631505": {
+"verdict": "OK",
+"why": "Host clearly states Nasdaq likely heads down to 587 level; bearish call confirmed.",
+"ticker": "QQQ",
+"direction": "bearish"
+},
+"631492": {
+"verdict": "OK",
+"why": "Host bullish on AFL dividend growth and buybacks; quote matches transcript exactly.",
+"ticker": "AFL",
+"direction": "bullish"
+},
+"631504": {
+"verdict": "OK",
+"why": "Host clearly says gold more likely to push to a new high \u2014 bullish call confirmed.",
+"ticker": "GLD",
+"direction": "bullish"
+},
+"631493": {
+"verdict": "OK",
+"why": "Host argues ASPs falling hits NVDA's 80% data center margins \u2014 bearish thesis matches.",
+"ticker": "NVDA",
+"direction": "bearish"
+},
+"631488": {
+"verdict": "OK",
+"why": "Quote matches transcript exactly; SPY bearish 8-10% correction call confirmed.",
+"ticker": "SPY",
+"direction": "bearish"
+},
+"631485": {
+"verdict": "OK",
+"why": "Host explicitly calls buying NIO 'risky/stupid,' confirming strong bearish stance on NIO.",
+"ticker": "NIO",
+"direction": "bearish"
+},
+"631486": {
+"verdict": "OK",
+"why": "Host explicitly says V is still a buy after quarterly results, matching stored bullish call.",
+"ticker": "V",
+"direction": "bullish"
+},
+"631484": {
+"verdict": "OK",
+"why": "Host clearly says AFRM will get hurt as buy-now-pay-later delinquencies rise \u2014 bearish call confirmed.",
+"ticker": "AFRM",
+"direction": "bearish"
+},
+"631481": {
+"verdict": "OK",
+"why": "Host actively buying VZ, bullish on dividend and valuation; stored fields match.",
+"ticker": "VZ",
+"direction": "bullish"
+},
+"631482": {
+"verdict": "OK",
+"why": "Host clearly states bullish stance on HOOD, buying more at current lows.",
+"ticker": "HOOD",
+"direction": "bullish"
+},
+"631480": {
+"verdict": "OK",
+"why": "Host says $23 target with 40% upside, matching stored fields exactly.",
+"ticker": "SOFI",
+"direction": "bullish"
+},
+"631477": {
+"verdict": "OK",
+"why": "Host calls TSM a buy with 44% upside and strong valuation case vs Nvidia.",
+"ticker": "TSM",
+"direction": "bullish"
+},
+"631479": {
+"verdict": "OK",
+"why": "Host explicitly predicts BTC over 80k by July-October; stored fields match.",
+"ticker": "BTC",
+"direction": "bullish"
+},
+"631489": {
+"verdict": "OK",
+"why": "Quote matches transcript; ETH supply shock narrative clearly implies bullish directional call.",
+"ticker": "ETH",
+"direction": "bullish"
+},
+"631475": {
+"verdict": "OK",
+"why": "Host says META doubled down on AI, analysts rate buy \u2014 bullish call confirmed.",
+"ticker": "META",
+"direction": "bullish"
+},
+"631473": {
+"verdict": "not_a_prediction",
+"why": "Quote is a minor setback comment on Bard; no forward price or buy call made.",
+"ticker": "GOOGL",
+"direction": "bullish"
+},
+"631474": {
+"verdict": "OK",
+"why": "Host clearly calls TSLA top AI stock buy; bullish stance matches stored fields.",
+"ticker": "TSLA",
+"direction": "bullish"
+},
+"631472": {
+"verdict": "OK",
+"why": "Host explicitly calls ASML an obvious buy for AI demand over many years.",
+"ticker": "ASML",
+"direction": "bullish"
+},
+"631469": {
+"verdict": "OK",
+"why": "Quote matches transcript exactly; bullish PE buyout call on AAP is valid and checkable.",
+"ticker": "AAP",
+"direction": "bullish"
+},
+"631449": {
+"verdict": "OK",
+"why": "Host explicitly calls RIOT best value crypto miner buy, matching bullish direction.",
+"ticker": "RIOT",
+"direction": "bullish"
+},
+"631447": {
+"verdict": "OK",
+"why": "Host explicitly says COIN to $1,000 in 18 months; stored fields match accurately.",
+"ticker": "COIN",
+"direction": "bullish"
+},
+"631446": {
+"verdict": "OK",
+"why": "Transcript confirms BTC bullish, 30-40% rise, ~$100K target, four-week timeframe.",
+"ticker": "BTC",
+"direction": "bullish"
+},
+"631442": {
+"verdict": "OK",
+"why": "Host says PYPL won't go up despite good numbers \u2014 bearish stance matches stored call.",
+"ticker": "PYPL",
+"direction": "bearish"
+},
+"631445": {
+"verdict": "OK",
+"why": "Transcript confirms $37 DCF fair value, 25% undervalued, bullish TSM call matches stored fields.",
+"ticker": "TSM",
+"direction": "bullish"
+},
+"631471": {
+"verdict": "OK",
+"why": "Host says Microsoft benefits long-term from AI wave; bullish macro thesis confirmed.",
+"ticker": "MSFT",
+"direction": "bullish"
+},
+"631441": {
+"verdict": "OK",
+"why": "Host calls NASDAQ overextended and rate-cut optimism unrealistic \u2014 clear bearish stance on QQQ.",
+"ticker": "QQQ",
+"direction": "bearish"
+},
+"631440": {
+"verdict": "OK",
+"why": "Host owns RIVN, cites catalysts, calls it cheap and exciting \u2014 clearly bullish.",
+"ticker": "RIVN",
+"direction": "bullish"
+},
+"631437": {
+"verdict": "OK",
+"why": "Host is bullish COIN as crypto infrastructure king; quote matches transcript exactly.",
+"ticker": "COIN",
+"direction": "bullish"
+},
+"631439": {
+"verdict": "OK",
+"why": "Host explicitly names UBER, bullish on public transport and self-driving taxi dominance.",
+"ticker": "UBER",
+"direction": "bullish"
+},
+"631433": {
+"verdict": "OK",
+"why": "Host clearly states BTC has long way to run; quote matches transcript accurately.",
+"ticker": "BTC",
+"direction": "bullish"
+},
+"631428": {
+"verdict": "OK",
+"why": "Host clearly initiates new bullish ADBE position, holding for years; quote matches transcript exactly.",
+"ticker": "ADBE",
+"direction": "bullish"
+},
+"631417": {
+"verdict": "OK",
+"why": "Host clearly prefers HSY's future over PepsiCo/Coca-Cola; bullish directional call confirmed.",
+"ticker": "HSY",
+"direction": "bullish"
+},
+"631413": {
+"verdict": "OK",
+"why": "Host explicitly states $30 target and 227% return for SOUN; stored fields match.",
+"ticker": "SOUN",
+"direction": "bullish"
+},
+"631412": {
+"verdict": "OK",
+"why": "Host says $171 target, 502% return over 3 years for IONQ; stored quote matches.",
+"ticker": "IONQ",
+"direction": "bullish"
+},
+"631411": {
+"verdict": "OK",
+"why": "Quote matches transcript exactly; bullish $45 target for 'this year' confirmed.",
+"ticker": "SMCI",
+"direction": "bullish"
+},
+"631407": {
+"verdict": "OK",
+"why": "Transcript confirms $172 target on ANET, bullish, long-term data center thesis.",
+"ticker": "ANET",
+"direction": "bullish"
+},
+"631388": {
+"verdict": "OK",
+"why": "Host explicitly states bullish stance on SRG over next five to ten years.",
+"ticker": "SRG",
+"direction": "bullish"
+},
+"631403": {
+"verdict": "target_or_number_error",
+"why": "Host said $304 per share for AVGO, not $34 as stored.",
+"ticker": "AVGO",
+"direction": "bullish"
+},
+"631387": {
+"verdict": "OK",
+"why": "Host says MU will triple in 4 years; stored bullish long-term call matches.",
+"ticker": "MU",
+"direction": "bullish"
+},
+"631386": {
+"verdict": "wrong_ticker",
+"why": "Window discusses Google's robotics breakthrough but the forward call is on Tesla, not GOOGL.",
+"ticker": "GOOGL",
+"direction": "bullish"
+},
+"631385": {
+"verdict": "OK",
+"why": "Host says 'stay away' on PTON; bearish, no target, moderate conviction match.",
+"ticker": "PTON",
+"direction": "bearish"
+},
+"631384": {
+"verdict": "OK",
+"why": "Host says SoFi unlikely to pull back, valuation cheap \u2014 clear bullish stance on SOFI.",
+"ticker": "SOFI",
+"direction": "bullish"
+},
+"631379": {
+"verdict": "not_a_prediction",
+"why": "NVDA is a passing preference mention vs Intel/AMD, not a forward buy call.",
+"ticker": "NVDA",
+"direction": "bullish"
+},
+"631381": {
+"verdict": "OK",
+"why": "Host clearly states AMZN is cheap under $200 and he is buying \u2014 bullish call confirmed.",
+"ticker": "AMZN",
+"direction": "bullish"
+},
+"631378": {
+"verdict": "holding_not_call",
+"why": "Host discloses he holds Google shares with no forward buy/sell/price call.",
+"ticker": "GOOG",
+"direction": "bullish"
+},
+"631377": {
+"verdict": "OK",
+"why": "Host says bullish on Lululemon; stored ticker, direction, and quote all match.",
+"ticker": "LULU",
+"direction": "bullish"
+},
+"631376": {
+"verdict": "OK",
+"why": "Quote matches transcript; XRP bullish call targeting 331 retest confirmed.",
+"ticker": "XRP",
+"direction": "bullish"
+},
+"631375": {
+"verdict": "OK",
+"why": "Host calls PG on sale, plans future purchase; bullish forward call on PG confirmed.",
+"ticker": "PG",
+"direction": "bullish"
+},
+"631373": {
+"verdict": "OK",
+"why": "Stored quote matches transcript; bullish double thesis on SAND confirmed with timeframe.",
+"ticker": "SAND",
+"direction": "bullish"
+},
+"631372": {
+"verdict": "OK",
+"why": "Host clearly bullish CXW, expects big move at 2024 election; stored fields match.",
+"ticker": "CXW",
+"direction": "bullish"
+},
+"631374": {
+"verdict": "OK",
+"why": "Host explicitly says buying KO this week; bullish call with no target matches stored fields.",
+"ticker": "KO",
+"direction": "bullish"
+},
+"631370": {
+"verdict": "OK",
+"why": "Host explicitly states bearish lean on JPM: downside pressure, would sell before buying.",
+"ticker": "JPM",
+"direction": "bearish"
+},
+"631367": {
+"verdict": "OK",
+"why": "Host is bullish NBIS, lifting targets, expecting new highs; quote and ticker match.",
+"ticker": "NBIS",
+"direction": "bullish"
+},
+"631368": {
+"verdict": "OK",
+"why": "Quote matches transcript exactly; bullish thesis on AMPX clearly stated with strong conviction.",
+"ticker": "AMPX",
+"direction": "bullish"
+},
+"631365": {
+"verdict": "OK",
+"why": "Host explicitly says 400-600% upside and calls it one of the best times to buy Nvidia.",
+"ticker": "NVDA",
+"direction": "bullish"
+},
+"631356": {
+"verdict": "OK",
+"why": "Host flags AFRM actionable off earnings gap with huge volume \u2014 bullish swing call confirmed.",
+"ticker": "AFRM",
+"direction": "bullish"
+},
+"631366": {
+"verdict": "OK",
+"why": "Transcript confirms bullish AMD call with exact 3-400% upside quote over coming years.",
+"ticker": "AMD",
+"direction": "bullish"
+},
+"631360": {
+"verdict": "OK",
+"why": "Host is bullish TSLA robo-taxi entering market; stored quote and direction match.",
+"ticker": "TSLA",
+"direction": "bullish"
+},
+"631352": {
+"verdict": "OK",
+"why": "Host is bullish SBUX, buying low 80s/high 70s, expects multi-year recovery; matches stored fields.",
+"ticker": "SBUX",
+"direction": "bullish"
+},
+"631351": {
+"verdict": "OK",
+"why": "Host says JNJ will outperform market; bullish call matches stored direction and quote exactly.",
+"ticker": "JNJ",
+"direction": "bullish"
+},
+"631313": {
+"verdict": "OK",
+"why": "Host states 94% underperform chance, bearish on NKE fundamentals; stored fields match.",
+"ticker": "NKE",
+"direction": "bearish"
+},
+"631353": {
+"verdict": "OK",
+"why": "Host clearly expects QQQ to move higher; quote and bullish direction match transcript.",
+"ticker": "QQQ",
+"direction": "bullish"
+},
+"631254": {
+"verdict": "OK",
+"why": "Host makes inflation-driven bullish case for AXP via fee-doubling thesis; quote and direction match.",
+"ticker": "AXP",
+"direction": "bullish"
+},
+"631253": {
+"verdict": "OK",
+"why": "Host ranks AVGO #2, owns it, bullish long-term dividend growth thesis; matches stored call.",
+"ticker": "AVGO",
+"direction": "bullish"
+},
+"631248": {
+"verdict": "OK",
+"why": "Transcript confirms BUD bullish call with $90 target; stored fields match exactly.",
+"ticker": "BUD",
+"direction": "bullish"
+},
+"631249": {
+"verdict": "OK",
+"why": "Host says VWAGY worth $37, bullish long-term; stored fields match exactly.",
+"ticker": "VWAGY",
+"direction": "bullish"
+},
+"631247": {
+"verdict": "OK",
+"why": "Host says $50 target in 2025/next 12-18 months; stored fields match exactly.",
+"ticker": "PLTR",
+"direction": "bullish"
+},
+"631245": {
+"verdict": "OK",
+"why": "Host explicitly models $70 valuation as bearish base case, 40% downside stated.",
+"ticker": "PYPL",
+"direction": "bearish"
+},
+"631251": {
+"verdict": "OK",
+"why": "Host bought more PLTR long-term; bullish stance and quote match transcript.",
+"ticker": "PLTR",
+"direction": "bullish"
+},
+"631243": {
+"verdict": "OK",
+"why": "Host clearly prefers NVO over LLY, expects a bid; bullish call confirmed.",
+"ticker": "NVO",
+"direction": "bullish"
+},
+"631240": {
+"verdict": "OK",
+"why": "Host clearly bullish on NVDA: cheap valuation, PEG 0.5, strong growth thesis.",
+"ticker": "NVDA",
+"direction": "bullish"
+},
+"631250": {
+"verdict": "OK",
+"why": "Transcript confirms Nestl\u00e9 (NSRGY) bullish call with $130 target price verbatim.",
+"ticker": "NSRGY",
+"direction": "bullish"
+},
+"631242": {
+"verdict": "OK",
+"why": "Host clearly calls NVDA overdone and suggests alternatives, matching stored bearish call.",
+"ticker": "NVDA",
+"direction": "bearish"
+},
+"631241": {
+"verdict": "OK",
+"why": "Host explicitly states 'I'm bearish on Tesla' for political/populist reasons; ticker and direction match.",
+"ticker": "TSLA",
+"direction": "bearish"
+},
+"631238": {
+"verdict": "OK",
+"why": "Host clearly bullish on MEDP: expansion upside, likes trend, quote matches stored.",
+"ticker": "MEDP",
+"direction": "bullish"
+},
+"631237": {
+"verdict": "OK",
+"why": "Host confirms SOFI buy rating, $20\u2013$22 target; stored fields match transcript exactly.",
+"ticker": "SOFI",
+"direction": "bullish"
+},
+"631235": {
+"verdict": "OK",
+"why": "Host confirms buying more OHI shares, bullish on recovery; quote matches transcript exactly.",
+"ticker": "OHI",
+"direction": "bullish"
+},
+"631234": {
+"verdict": "OK",
+"why": "Host is clearly bearish on PYPL, won't buy, calls it 'Penalty Box'; quote matches.",
+"ticker": "PYPL",
+"direction": "bearish"
+}
+}

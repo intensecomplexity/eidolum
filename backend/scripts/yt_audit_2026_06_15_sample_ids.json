@@ -1,0 +1,1922 @@
+[
+{
+"id": 631584,
+"ticker": "AAPL",
+"direction": "bullish",
+"outcome": "pending",
+"visible": true,
+"hide_flags": [],
+"verdict": "OK"
+},
+{
+"id": 631583,
+"ticker": "V",
+"direction": "bearish",
+"outcome": "pending",
+"visible": false,
+"hide_flags": [
+"conviction_hedged"
+],
+"verdict": null
+},
+{
+"id": 631582,
+"ticker": "SMCI",
+"direction": "bullish",
+"outcome": "pending",
+"visible": false,
+"hide_flags": [
+"conviction_hedged"
+],
+"verdict": null
+},
+{
+"id": 631581,
+"ticker": "CRWD",
+"direction": "bullish",
+"outcome": "pending",
+"visible": true,
+"hide_flags": [],
+"verdict": "OK"
+},
+{
+"id": 631580,
+"ticker": "NMAX",
+"direction": "bearish",
+"outcome": "pending",
+"visible": false,
+"hide_flags": [
+"conviction_hypothetical"
+],
+"verdict": null
+},
+{
+"id": 631579,
+"ticker": "CRWD",
+"direction": "bullish",
+"outcome": "pending",
+"visible": false,
+"hide_flags": [
+"conviction_hedged"
+],
+"verdict": null
+},
+{
+"id": 631578,
+"ticker": "MU",
+"direction": "bullish",
+"outcome": "pending",
+"visible": false,
+"hide_flags": [
+"conviction_hedged"
+],
+"verdict": null
+},
+{
+"id": 631577,
+"ticker": "MSFT",
+"direction": "bullish",
+"outcome": "pending",
+"visible": true,
+"hide_flags": [],
+"verdict": "OK"
+},
+{
+"id": 631576,
+"ticker": "TSLA",
+"direction": "bullish",
+"outcome": "pending",
+"visible": true,
+"hide_flags": [],
+"verdict": "OK"
+},
+{
+"id": 631575,
+"ticker": "BABA",
+"direction": "bullish",
+"outcome": "pending",
+"visible": true,
+"hide_flags": [],
+"verdict": "OK"
+},
+{
+"id": 631574,
+"ticker": "SMCI",
+"direction": "bearish",
+"outcome": "pending",
+"visible": false,
+"hide_flags": [
+"conviction_hedged"
+],
+"verdict": null
+},
+{
+"id": 631573,
+"ticker": "ARKK",
+"direction": "bullish",
+"outcome": "pending",
+"visible": true,
+"hide_flags": [],
+"verdict": "OK"
+},
+{
+"id": 631572,
+"ticker": "AMZN",
+"direction": "bullish",
+"outcome": "pending",
+"visible": true,
+"hide_flags": [],
+"verdict": "OK"
+},
+{
+"id": 631571,
+"ticker": "FMC",
+"direction": "bullish",
+"outcome": "pending",
+"visible": false,
+"hide_flags": [
+"conviction_hedged"
+],
+"verdict": null
+},
+{
+"id": 631570,
+"ticker": "ITW",
+"direction": "bearish",
+"outcome": "pending",
+"visible": true,
+"hide_flags": [],
+"verdict": "OK"
+},
+{
+"id": 631569,
+"ticker": "CMCSA",
+"direction": "bullish",
+"outcome": "pending",
+"visible": true,
+"hide_flags": [],
+"verdict": "OK"
+},
+{
+"id": 631568,
+"ticker": "WU",
+"direction": "bullish",
+"outcome": "pending",
+"visible": false,
+"hide_flags": [
+"conviction_hedged"
+],
+"verdict": null
+},
+{
+"id": 631567,
+"ticker": "JPM",
+"direction": "bullish",
+"outcome": "pending",
+"visible": false,
+"hide_flags": [
+"conviction_hedged"
+],
+"verdict": null
+},
+{
+"id": 631566,
+"ticker": "WMT",
+"direction": "bullish",
+"outcome": "pending",
+"visible": true,
+"hide_flags": [],
+"verdict": "OK"
+},
+{
+"id": 631565,
+"ticker": "AMZN",
+"direction": "bullish",
+"outcome": "pending",
+"visible": true,
+"hide_flags": [],
+"verdict": "OK"
+},
+{
+"id": 631564,
+"ticker": "BA",
+"direction": "bullish",
+"outcome": "pending",
+"visible": true,
+"hide_flags": [],
+"verdict": "OK"
+},
+{
+"id": 631563,
+"ticker": "XBI",
+"direction": "bullish",
+"outcome": "pending",
+"visible": true,
+"hide_flags": [],
+"verdict": "OK"
+},
+{
+"id": 631562,
+"ticker": "KR",
+"direction": "bullish",
+"outcome": "pending",
+"visible": true,
+"hide_flags": [],
+"verdict": "OK"
+},
+{
+"id": 631561,
+"ticker": "HII",
+"direction": "bullish",
+"outcome": "pending",
+"visible": true,
+"hide_flags": [],
+"verdict": "wrong_ticker"
+},
+{
+"id": 631560,
+"ticker": "WBD",
+"direction": "bullish",
+"outcome": "pending",
+"visible": true,
+"hide_flags": [],
+"verdict": "OK"
+},
+{
+"id": 631559,
+"ticker": "TSLA",
+"direction": "bullish",
+"outcome": "pending",
+"visible": true,
+"hide_flags": [],
+"verdict": "OK"
+},
+{
+"id": 631558,
+"ticker": "QQQ",
+"direction": "bullish",
+"outcome": "miss",
+"visible": false,
+"hide_flags": [
+"conviction_hedged"
+],
+"verdict": null
+},
+{
+"id": 631557,
+"ticker": "GOOGL",
+"direction": "bullish",
+"outcome": "pending",
+"visible": true,
+"hide_flags": [],
+"verdict": "OK"
+},
+{
+"id": 631555,
+"ticker": "META",
+"direction": "bearish",
+"outcome": "pending",
+"visible": true,
+"hide_flags": [],
+"verdict": "not_a_prediction"
+},
+{
+"id": 631554,
+"ticker": "NVDA",
+"direction": "bearish",
+"outcome": "pending",
+"visible": true,
+"hide_flags": [],
+"verdict": "OK"
+},
+{
+"id": 631553,
+"ticker": "BABA",
+"direction": "bullish",
+"outcome": "pending",
+"visible": true,
+"hide_flags": [],
+"verdict": "OK"
+},
+{
+"id": 631552,
+"ticker": "AMZN",
+"direction": "bullish",
+"outcome": "pending",
+"visible": true,
+"hide_flags": [],
+"verdict": null
+},
+{
+"id": 631551,
+"ticker": "META",
+"direction": "bullish",
+"outcome": "pending",
+"visible": true,
+"hide_flags": [],
+"verdict": null
+},
+{
+"id": 631550,
+"ticker": "COIN",
+"direction": "bearish",
+"outcome": "pending",
+"visible": true,
+"hide_flags": [],
+"verdict": "direction_mismatch"
+},
+{
+"id": 631549,
+"ticker": "BABA",
+"direction": "bullish",
+"outcome": "pending",
+"visible": false,
+"hide_flags": [
+"conviction_hedged"
+],
+"verdict": null
+},
+{
+"id": 631548,
+"ticker": "SBUX",
+"direction": "bullish",
+"outcome": "pending",
+"visible": true,
+"hide_flags": [],
+"verdict": "not_a_prediction"
+},
+{
+"id": 631547,
+"ticker": "TGT",
+"direction": "bullish",
+"outcome": "pending",
+"visible": true,
+"hide_flags": [],
+"verdict": "OK"
+},
+{
+"id": 631546,
+"ticker": "HSY",
+"direction": "bearish",
+"outcome": "pending",
+"visible": true,
+"hide_flags": [],
+"verdict": "OK"
+},
+{
+"id": 631544,
+"ticker": "TSLA",
+"direction": "bearish",
+"outcome": "pending",
+"visible": true,
+"hide_flags": [],
+"verdict": "OK"
+},
+{
+"id": 631543,
+"ticker": "ASML",
+"direction": "bullish",
+"outcome": "pending",
+"visible": true,
+"hide_flags": [],
+"verdict": "OK"
+},
+{
+"id": 631542,
+"ticker": "BTC",
+"direction": "bullish",
+"outcome": "pending",
+"visible": true,
+"hide_flags": [],
+"verdict": "OK"
+},
+{
+"id": 631541,
+"ticker": "NET",
+"direction": "bullish",
+"outcome": "pending",
+"visible": true,
+"hide_flags": [],
+"verdict": "OK"
+},
+{
+"id": 631540,
+"ticker": "SHOP",
+"direction": "bearish",
+"outcome": "pending",
+"visible": true,
+"hide_flags": [],
+"verdict": "OK"
+},
+{
+"id": 631539,
+"ticker": "TSLA",
+"direction": "bullish",
+"outcome": "pending",
+"visible": false,
+"hide_flags": [
+"conviction_hedged"
+],
+"verdict": null
+},
+{
+"id": 631538,
+"ticker": "COST",
+"direction": "bearish",
+"outcome": "pending",
+"visible": false,
+"hide_flags": [
+"conviction_hedged"
+],
+"verdict": null
+},
+{
+"id": 631537,
+"ticker": "WMT",
+"direction": "bearish",
+"outcome": "pending",
+"visible": false,
+"hide_flags": [
+"conviction_hedged"
+],
+"verdict": null
+},
+{
+"id": 631536,
+"ticker": "PLTR",
+"direction": "bearish",
+"outcome": "pending",
+"visible": false,
+"hide_flags": [
+"conviction_hedged"
+],
+"verdict": null
+},
+{
+"id": 631535,
+"ticker": "EL",
+"direction": "bullish",
+"outcome": "pending",
+"visible": true,
+"hide_flags": [],
+"verdict": "OK"
+},
+{
+"id": 631533,
+"ticker": "TTCF",
+"direction": "bullish",
+"outcome": "pending",
+"visible": false,
+"hide_flags": [
+"conviction_hedged"
+],
+"verdict": null
+},
+{
+"id": 631532,
+"ticker": "AVGO",
+"direction": "bullish",
+"outcome": "pending",
+"visible": false,
+"hide_flags": [
+"conviction_hedged"
+],
+"verdict": null
+},
+{
+"id": 631530,
+"ticker": "PLTR",
+"direction": "bearish",
+"outcome": "pending",
+"visible": false,
+"hide_flags": [
+"conviction_hypothetical"
+],
+"verdict": null
+},
+{
+"id": 631529,
+"ticker": "TSLA",
+"direction": "bullish",
+"outcome": "pending",
+"visible": true,
+"hide_flags": [],
+"verdict": "OK"
+},
+{
+"id": 631528,
+"ticker": "SWK",
+"direction": "bullish",
+"outcome": "pending",
+"visible": true,
+"hide_flags": [],
+"verdict": "OK"
+},
+{
+"id": 631527,
+"ticker": "CWT",
+"direction": "bullish",
+"outcome": "pending",
+"visible": true,
+"hide_flags": [],
+"verdict": "OK"
+},
+{
+"id": 631526,
+"ticker": "ABM",
+"direction": "bearish",
+"outcome": "pending",
+"visible": true,
+"hide_flags": [],
+"verdict": "OK"
+},
+{
+"id": 631525,
+"ticker": "MO",
+"direction": "bearish",
+"outcome": "pending",
+"visible": true,
+"hide_flags": [],
+"verdict": "OK"
+},
+{
+"id": 631523,
+"ticker": "VTR",
+"direction": "bullish",
+"outcome": "pending",
+"visible": true,
+"hide_flags": [],
+"verdict": "OK"
+},
+{
+"id": 631522,
+"ticker": "IFF",
+"direction": "bullish",
+"outcome": "pending",
+"visible": true,
+"hide_flags": [],
+"verdict": "OK"
+},
+{
+"id": 631521,
+"ticker": "ILMN",
+"direction": "bullish",
+"outcome": "pending",
+"visible": true,
+"hide_flags": [],
+"verdict": "OK"
+},
+{
+"id": 631520,
+"ticker": "CMG",
+"direction": "bearish",
+"outcome": "pending",
+"visible": true,
+"hide_flags": [],
+"verdict": "OK"
+},
+{
+"id": 631519,
+"ticker": "NKE",
+"direction": "bearish",
+"outcome": "pending",
+"visible": false,
+"hide_flags": [
+"conviction_hedged"
+],
+"verdict": null
+},
+{
+"id": 631518,
+"ticker": "CCL",
+"direction": "bullish",
+"outcome": "pending",
+"visible": true,
+"hide_flags": [],
+"verdict": "OK"
+},
+{
+"id": 631517,
+"ticker": "ASML",
+"direction": "bearish",
+"outcome": "pending",
+"visible": true,
+"hide_flags": [],
+"verdict": "OK"
+},
+{
+"id": 631514,
+"ticker": "SHOP",
+"direction": "bullish",
+"outcome": "pending",
+"visible": true,
+"hide_flags": [],
+"verdict": "OK"
+},
+{
+"id": 631513,
+"ticker": "SOFI",
+"direction": "bullish",
+"outcome": "pending",
+"visible": true,
+"hide_flags": [],
+"verdict": "OK"
+},
+{
+"id": 631512,
+"ticker": "INTC",
+"direction": "bearish",
+"outcome": "pending",
+"visible": true,
+"hide_flags": [],
+"verdict": "OK"
+},
+{
+"id": 631511,
+"ticker": "CART",
+"direction": "bearish",
+"outcome": "pending",
+"visible": false,
+"hide_flags": [
+"conviction_hedged"
+],
+"verdict": null
+},
+{
+"id": 631510,
+"ticker": "TLT",
+"direction": "bearish",
+"outcome": "pending",
+"visible": false,
+"hide_flags": [
+"conviction_hedged"
+],
+"verdict": null
+},
+{
+"id": 631509,
+"ticker": "V",
+"direction": "bearish",
+"outcome": "pending",
+"visible": true,
+"hide_flags": [],
+"verdict": "OK"
+},
+{
+"id": 631508,
+"ticker": "ORCL",
+"direction": "bearish",
+"outcome": "pending",
+"visible": true,
+"hide_flags": [],
+"verdict": "OK"
+},
+{
+"id": 631507,
+"ticker": "PLTR",
+"direction": "bearish",
+"outcome": "pending",
+"visible": false,
+"hide_flags": [
+"conviction_hedged"
+],
+"verdict": null
+},
+{
+"id": 631506,
+"ticker": "NFLX",
+"direction": "bearish",
+"outcome": "pending",
+"visible": true,
+"hide_flags": [],
+"verdict": "OK"
+},
+{
+"id": 631505,
+"ticker": "QQQ",
+"direction": "bearish",
+"outcome": "pending",
+"visible": true,
+"hide_flags": [],
+"verdict": "OK"
+},
+{
+"id": 631504,
+"ticker": "GLD",
+"direction": "bullish",
+"outcome": "pending",
+"visible": true,
+"hide_flags": [],
+"verdict": "OK"
+},
+{
+"id": 631503,
+"ticker": "SPY",
+"direction": "bearish",
+"outcome": "pending",
+"visible": false,
+"hide_flags": [
+"conviction_hedged"
+],
+"verdict": null
+},
+{
+"id": 631502,
+"ticker": "DOCU",
+"direction": "bearish",
+"outcome": "pending",
+"visible": true,
+"hide_flags": [],
+"verdict": null
+},
+{
+"id": 631501,
+"ticker": "META",
+"direction": "bullish",
+"outcome": "pending",
+"visible": true,
+"hide_flags": [],
+"verdict": null
+},
+{
+"id": 631500,
+"ticker": "GOOGL",
+"direction": "bullish",
+"outcome": "pending",
+"visible": true,
+"hide_flags": [],
+"verdict": null
+},
+{
+"id": 631499,
+"ticker": "AAPL",
+"direction": "bullish",
+"outcome": "pending",
+"visible": true,
+"hide_flags": [],
+"verdict": null
+},
+{
+"id": 631498,
+"ticker": "MSFT",
+"direction": "bullish",
+"outcome": "pending",
+"visible": true,
+"hide_flags": [],
+"verdict": null
+},
+{
+"id": 631493,
+"ticker": "NVDA",
+"direction": "bearish",
+"outcome": "pending",
+"visible": true,
+"hide_flags": [],
+"verdict": "OK"
+},
+{
+"id": 631492,
+"ticker": "AFL",
+"direction": "bullish",
+"outcome": "pending",
+"visible": true,
+"hide_flags": [],
+"verdict": "OK"
+},
+{
+"id": 631491,
+"ticker": "SHOP",
+"direction": "bullish",
+"outcome": "pending",
+"visible": false,
+"hide_flags": [
+"conviction_hedged"
+],
+"verdict": null
+},
+{
+"id": 631490,
+"ticker": "NVDA",
+"direction": "bullish",
+"outcome": "pending",
+"visible": true,
+"hide_flags": [],
+"verdict": null
+},
+{
+"id": 631489,
+"ticker": "ETH",
+"direction": "bullish",
+"outcome": "pending",
+"visible": true,
+"hide_flags": [],
+"verdict": "OK"
+},
+{
+"id": 631488,
+"ticker": "SPY",
+"direction": "bearish",
+"outcome": "pending",
+"visible": true,
+"hide_flags": [],
+"verdict": "OK"
+},
+{
+"id": 631486,
+"ticker": "V",
+"direction": "bullish",
+"outcome": "pending",
+"visible": true,
+"hide_flags": [],
+"verdict": "OK"
+},
+{
+"id": 631485,
+"ticker": "NIO",
+"direction": "bearish",
+"outcome": "pending",
+"visible": true,
+"hide_flags": [],
+"verdict": "OK"
+},
+{
+"id": 631484,
+"ticker": "AFRM",
+"direction": "bearish",
+"outcome": "pending",
+"visible": true,
+"hide_flags": [],
+"verdict": "OK"
+},
+{
+"id": 631482,
+"ticker": "HOOD",
+"direction": "bullish",
+"outcome": "pending",
+"visible": true,
+"hide_flags": [],
+"verdict": "OK"
+},
+{
+"id": 631481,
+"ticker": "VZ",
+"direction": "bullish",
+"outcome": "pending",
+"visible": true,
+"hide_flags": [],
+"verdict": "OK"
+},
+{
+"id": 631480,
+"ticker": "SOFI",
+"direction": "bullish",
+"outcome": "pending",
+"visible": true,
+"hide_flags": [],
+"verdict": "OK"
+},
+{
+"id": 631479,
+"ticker": "BTC",
+"direction": "bullish",
+"outcome": "pending",
+"visible": true,
+"hide_flags": [],
+"verdict": "OK"
+},
+{
+"id": 631478,
+"ticker": "ETH",
+"direction": "bullish",
+"outcome": "pending",
+"visible": false,
+"hide_flags": [
+"conviction_hedged"
+],
+"verdict": null
+},
+{
+"id": 631477,
+"ticker": "TSM",
+"direction": "bullish",
+"outcome": "pending",
+"visible": true,
+"hide_flags": [],
+"verdict": "OK"
+},
+{
+"id": 631476,
+"ticker": "AMZN",
+"direction": "bullish",
+"outcome": "pending",
+"visible": false,
+"hide_flags": [
+"conviction_hedged"
+],
+"verdict": null
+},
+{
+"id": 631475,
+"ticker": "META",
+"direction": "bullish",
+"outcome": "pending",
+"visible": true,
+"hide_flags": [],
+"verdict": "OK"
+},
+{
+"id": 631474,
+"ticker": "TSLA",
+"direction": "bullish",
+"outcome": "pending",
+"visible": true,
+"hide_flags": [],
+"verdict": "OK"
+},
+{
+"id": 631473,
+"ticker": "GOOGL",
+"direction": "bullish",
+"outcome": "pending",
+"visible": true,
+"hide_flags": [],
+"verdict": "not_a_prediction"
+},
+{
+"id": 631472,
+"ticker": "ASML",
+"direction": "bullish",
+"outcome": "pending",
+"visible": true,
+"hide_flags": [],
+"verdict": "OK"
+},
+{
+"id": 631471,
+"ticker": "MSFT",
+"direction": "bullish",
+"outcome": "pending",
+"visible": true,
+"hide_flags": [],
+"verdict": "OK"
+},
+{
+"id": 631470,
+"ticker": "PLTR",
+"direction": "bearish",
+"outcome": "pending",
+"visible": false,
+"hide_flags": [
+"conviction_hedged"
+],
+"verdict": null
+},
+{
+"id": 631469,
+"ticker": "AAP",
+"direction": "bullish",
+"outcome": "pending",
+"visible": true,
+"hide_flags": [],
+"verdict": "OK"
+},
+{
+"id": 631451,
+"ticker": "ABR",
+"direction": "bearish",
+"outcome": "pending",
+"visible": false,
+"hide_flags": [
+"conviction_hedged"
+],
+"verdict": null
+},
+{
+"id": 631450,
+"ticker": "MARA",
+"direction": "bullish",
+"outcome": "pending",
+"visible": false,
+"hide_flags": [
+"conviction_hedged"
+],
+"verdict": null
+},
+{
+"id": 631449,
+"ticker": "RIOT",
+"direction": "bullish",
+"outcome": "pending",
+"visible": true,
+"hide_flags": [],
+"verdict": "OK"
+},
+{
+"id": 631448,
+"ticker": "CLSK",
+"direction": "bullish",
+"outcome": "pending",
+"visible": false,
+"hide_flags": [
+"conviction_hedged"
+],
+"verdict": null
+},
+{
+"id": 631447,
+"ticker": "COIN",
+"direction": "bullish",
+"outcome": "pending",
+"visible": true,
+"hide_flags": [],
+"verdict": "OK"
+},
+{
+"id": 631446,
+"ticker": "BTC",
+"direction": "bullish",
+"outcome": "pending",
+"visible": true,
+"hide_flags": [],
+"verdict": "OK"
+},
+{
+"id": 631445,
+"ticker": "TSM",
+"direction": "bullish",
+"outcome": "pending",
+"visible": true,
+"hide_flags": [],
+"verdict": "OK"
+},
+{
+"id": 631444,
+"ticker": "AMAT",
+"direction": "bullish",
+"outcome": "pending",
+"visible": false,
+"hide_flags": [
+"conviction_hedged"
+],
+"verdict": null
+},
+{
+"id": 631443,
+"ticker": "WING",
+"direction": "bearish",
+"outcome": "pending",
+"visible": false,
+"hide_flags": [
+"conviction_hedged"
+],
+"verdict": null
+},
+{
+"id": 631442,
+"ticker": "PYPL",
+"direction": "bearish",
+"outcome": "pending",
+"visible": true,
+"hide_flags": [],
+"verdict": "OK"
+},
+{
+"id": 631441,
+"ticker": "QQQ",
+"direction": "bearish",
+"outcome": "pending",
+"visible": true,
+"hide_flags": [],
+"verdict": "OK"
+},
+{
+"id": 631440,
+"ticker": "RIVN",
+"direction": "bullish",
+"outcome": "pending",
+"visible": true,
+"hide_flags": [],
+"verdict": "OK"
+},
+{
+"id": 631439,
+"ticker": "UBER",
+"direction": "bullish",
+"outcome": "pending",
+"visible": true,
+"hide_flags": [],
+"verdict": "OK"
+},
+{
+"id": 631438,
+"ticker": "AMC",
+"direction": "bullish",
+"outcome": "pending",
+"visible": false,
+"hide_flags": [
+"conviction_hedged"
+],
+"verdict": null
+},
+{
+"id": 631437,
+"ticker": "COIN",
+"direction": "bullish",
+"outcome": "pending",
+"visible": true,
+"hide_flags": [],
+"verdict": "OK"
+},
+{
+"id": 631436,
+"ticker": "RACE",
+"direction": "bullish",
+"outcome": "pending",
+"visible": true,
+"hide_flags": [],
+"verdict": null
+},
+{
+"id": 631435,
+"ticker": "TSLA",
+"direction": "bullish",
+"outcome": "pending",
+"visible": true,
+"hide_flags": [],
+"verdict": null
+},
+{
+"id": 631434,
+"ticker": "SOL",
+"direction": "bullish",
+"outcome": "pending",
+"visible": false,
+"hide_flags": [
+"conviction_hedged"
+],
+"verdict": null
+},
+{
+"id": 631433,
+"ticker": "BTC",
+"direction": "bullish",
+"outcome": "pending",
+"visible": true,
+"hide_flags": [],
+"verdict": "OK"
+},
+{
+"id": 631432,
+"ticker": "XYL",
+"direction": "bullish",
+"outcome": "pending",
+"visible": true,
+"hide_flags": [],
+"verdict": null
+},
+{
+"id": 631431,
+"ticker": "ESS",
+"direction": "bullish",
+"outcome": "pending",
+"visible": true,
+"hide_flags": [],
+"verdict": null
+},
+{
+"id": 631430,
+"ticker": "BRO",
+"direction": "bullish",
+"outcome": "pending",
+"visible": true,
+"hide_flags": [],
+"verdict": null
+},
+{
+"id": 631429,
+"ticker": "APD",
+"direction": "bullish",
+"outcome": "pending",
+"visible": true,
+"hide_flags": [],
+"verdict": null
+},
+{
+"id": 631428,
+"ticker": "ADBE",
+"direction": "bullish",
+"outcome": "pending",
+"visible": true,
+"hide_flags": [],
+"verdict": "OK"
+},
+{
+"id": 631417,
+"ticker": "HSY",
+"direction": "bullish",
+"outcome": "pending",
+"visible": true,
+"hide_flags": [],
+"verdict": "OK"
+},
+{
+"id": 631416,
+"ticker": "MO",
+"direction": "bullish",
+"outcome": "pending",
+"visible": false,
+"hide_flags": [
+"conviction_hedged"
+],
+"verdict": null
+},
+{
+"id": 631415,
+"ticker": "NVDA",
+"direction": "bearish",
+"outcome": "pending",
+"visible": false,
+"hide_flags": [
+"conviction_hedged"
+],
+"verdict": null
+},
+{
+"id": 631414,
+"ticker": "NVDA",
+"direction": "bullish",
+"outcome": "pending",
+"visible": false,
+"hide_flags": [
+"conviction_hedged"
+],
+"verdict": null
+},
+{
+"id": 631413,
+"ticker": "SOUN",
+"direction": "bullish",
+"outcome": "pending",
+"visible": true,
+"hide_flags": [],
+"verdict": "OK"
+},
+{
+"id": 631412,
+"ticker": "IONQ",
+"direction": "bullish",
+"outcome": "pending",
+"visible": true,
+"hide_flags": [],
+"verdict": "OK"
+},
+{
+"id": 631411,
+"ticker": "SMCI",
+"direction": "bullish",
+"outcome": "pending",
+"visible": true,
+"hide_flags": [],
+"verdict": "OK"
+},
+{
+"id": 631410,
+"ticker": "TTD",
+"direction": "bullish",
+"outcome": "pending",
+"visible": false,
+"hide_flags": [
+"conviction_hedged"
+],
+"verdict": null
+},
+{
+"id": 631407,
+"ticker": "ANET",
+"direction": "bullish",
+"outcome": "pending",
+"visible": true,
+"hide_flags": [],
+"verdict": "OK"
+},
+{
+"id": 631403,
+"ticker": "AVGO",
+"direction": "bullish",
+"outcome": "pending",
+"visible": true,
+"hide_flags": [],
+"verdict": "target_or_number_error"
+},
+{
+"id": 631397,
+"ticker": "DBC",
+"direction": "bearish",
+"outcome": "pending",
+"visible": false,
+"hide_flags": [
+"conviction_hedged"
+],
+"verdict": null
+},
+{
+"id": 631389,
+"ticker": "BABA",
+"direction": "bullish",
+"outcome": "pending",
+"visible": false,
+"hide_flags": [
+"conviction_hypothetical"
+],
+"verdict": null
+},
+{
+"id": 631388,
+"ticker": "SRG",
+"direction": "bullish",
+"outcome": "pending",
+"visible": true,
+"hide_flags": [],
+"verdict": "OK"
+},
+{
+"id": 631387,
+"ticker": "MU",
+"direction": "bullish",
+"outcome": "pending",
+"visible": true,
+"hide_flags": [],
+"verdict": "OK"
+},
+{
+"id": 631386,
+"ticker": "GOOGL",
+"direction": "bullish",
+"outcome": "pending",
+"visible": true,
+"hide_flags": [],
+"verdict": "wrong_ticker"
+},
+{
+"id": 631385,
+"ticker": "PTON",
+"direction": "bearish",
+"outcome": "pending",
+"visible": true,
+"hide_flags": [],
+"verdict": "OK"
+},
+{
+"id": 631384,
+"ticker": "SOFI",
+"direction": "bullish",
+"outcome": "pending",
+"visible": true,
+"hide_flags": [],
+"verdict": "OK"
+},
+{
+"id": 631383,
+"ticker": "RMBS",
+"direction": "bullish",
+"outcome": "pending",
+"visible": false,
+"hide_flags": [
+"conviction_hedged"
+],
+"verdict": null
+},
+{
+"id": 631382,
+"ticker": "MDGL",
+"direction": "bullish",
+"outcome": "pending",
+"visible": false,
+"hide_flags": [
+"conviction_hedged"
+],
+"verdict": null
+},
+{
+"id": 631381,
+"ticker": "AMZN",
+"direction": "bullish",
+"outcome": "pending",
+"visible": true,
+"hide_flags": [],
+"verdict": "OK"
+},
+{
+"id": 631380,
+"ticker": "PFE",
+"direction": "bullish",
+"outcome": "pending",
+"visible": false,
+"hide_flags": [
+"conviction_hedged"
+],
+"verdict": null
+},
+{
+"id": 631379,
+"ticker": "NVDA",
+"direction": "bullish",
+"outcome": "pending",
+"visible": true,
+"hide_flags": [],
+"verdict": "not_a_prediction"
+},
+{
+"id": 631378,
+"ticker": "GOOG",
+"direction": "bullish",
+"outcome": "pending",
+"visible": true,
+"hide_flags": [],
+"verdict": "holding_not_call"
+},
+{
+"id": 631377,
+"ticker": "LULU",
+"direction": "bullish",
+"outcome": "pending",
+"visible": true,
+"hide_flags": [],
+"verdict": "OK"
+},
+{
+"id": 631376,
+"ticker": "XRP",
+"direction": "bullish",
+"outcome": "pending",
+"visible": true,
+"hide_flags": [],
+"verdict": "OK"
+},
+{
+"id": 631375,
+"ticker": "PG",
+"direction": "bullish",
+"outcome": "pending",
+"visible": true,
+"hide_flags": [],
+"verdict": "OK"
+},
+{
+"id": 631374,
+"ticker": "KO",
+"direction": "bullish",
+"outcome": "pending",
+"visible": true,
+"hide_flags": [],
+"verdict": "OK"
+},
+{
+"id": 631373,
+"ticker": "SAND",
+"direction": "bullish",
+"outcome": "pending",
+"visible": true,
+"hide_flags": [],
+"verdict": "OK"
+},
+{
+"id": 631372,
+"ticker": "CXW",
+"direction": "bullish",
+"outcome": "pending",
+"visible": true,
+"hide_flags": [],
+"verdict": "OK"
+},
+{
+"id": 631371,
+"ticker": "QQQ",
+"direction": "bullish",
+"outcome": "pending",
+"visible": false,
+"hide_flags": [
+"conviction_hedged"
+],
+"verdict": null
+},
+{
+"id": 631370,
+"ticker": "JPM",
+"direction": "bearish",
+"outcome": "pending",
+"visible": true,
+"hide_flags": [],
+"verdict": "OK"
+},
+{
+"id": 631369,
+"ticker": "BBAI",
+"direction": "bullish",
+"outcome": "pending",
+"visible": false,
+"hide_flags": [
+"conviction_hedged"
+],
+"verdict": null
+},
+{
+"id": 631368,
+"ticker": "AMPX",
+"direction": "bullish",
+"outcome": "pending",
+"visible": true,
+"hide_flags": [],
+"verdict": "OK"
+},
+{
+"id": 631367,
+"ticker": "NBIS",
+"direction": "bullish",
+"outcome": "pending",
+"visible": true,
+"hide_flags": [],
+"verdict": "OK"
+},
+{
+"id": 631366,
+"ticker": "AMD",
+"direction": "bullish",
+"outcome": "pending",
+"visible": true,
+"hide_flags": [],
+"verdict": "OK"
+},
+{
+"id": 631365,
+"ticker": "NVDA",
+"direction": "bullish",
+"outcome": "pending",
+"visible": true,
+"hide_flags": [],
+"verdict": "OK"
+},
+{
+"id": 631364,
+"ticker": "VTS",
+"direction": "bearish",
+"outcome": "pending",
+"visible": false,
+"hide_flags": [
+"conviction_hedged"
+],
+"verdict": null
+},
+{
+"id": 631363,
+"ticker": "UNH",
+"direction": "bullish",
+"outcome": "pending",
+"visible": false,
+"hide_flags": [
+"conviction_hedged"
+],
+"verdict": null
+},
+{
+"id": 631362,
+"ticker": "ARE",
+"direction": "bullish",
+"outcome": "pending",
+"visible": false,
+"hide_flags": [
+"conviction_hedged"
+],
+"verdict": null
+},
+{
+"id": 631361,
+"ticker": "GLD",
+"direction": "bullish",
+"outcome": "pending",
+"visible": false,
+"hide_flags": [
+"conviction_hedged"
+],
+"verdict": null
+},
+{
+"id": 631360,
+"ticker": "TSLA",
+"direction": "bullish",
+"outcome": "pending",
+"visible": true,
+"hide_flags": [],
+"verdict": "OK"
+},
+{
+"id": 631359,
+"ticker": "PFE",
+"direction": "bullish",
+"outcome": "pending",
+"visible": false,
+"hide_flags": [
+"conviction_hedged"
+],
+"verdict": null
+},
+{
+"id": 631358,
+"ticker": "INSM",
+"direction": "bullish",
+"outcome": "pending",
+"visible": false,
+"hide_flags": [
+"conviction_hedged"
+],
+"verdict": null
+},
+{
+"id": 631357,
+"ticker": "AVGO",
+"direction": "bullish",
+"outcome": "pending",
+"visible": false,
+"hide_flags": [
+"conviction_hedged"
+],
+"verdict": null
+},
+{
+"id": 631356,
+"ticker": "AFRM",
+"direction": "bullish",
+"outcome": "pending",
+"visible": true,
+"hide_flags": [],
+"verdict": "OK"
+},
+{
+"id": 631355,
+"ticker": "UBER",
+"direction": "bullish",
+"outcome": "pending",
+"visible": false,
+"hide_flags": [
+"conviction_hedged"
+],
+"verdict": null
+},
+{
+"id": 631354,
+"ticker": "CAVA",
+"direction": "bullish",
+"outcome": "pending",
+"visible": false,
+"hide_flags": [
+"conviction_hedged"
+],
+"verdict": null
+},
+{
+"id": 631353,
+"ticker": "QQQ",
+"direction": "bullish",
+"outcome": "pending",
+"visible": true,
+"hide_flags": [],
+"verdict": "OK"
+},
+{
+"id": 631352,
+"ticker": "SBUX",
+"direction": "bullish",
+"outcome": "pending",
+"visible": true,
+"hide_flags": [],
+"verdict": "OK"
+},
+{
+"id": 631351,
+"ticker": "JNJ",
+"direction": "bullish",
+"outcome": "pending",
+"visible": true,
+"hide_flags": [],
+"verdict": "OK"
+},
+{
+"id": 631313,
+"ticker": "NKE",
+"direction": "bearish",
+"outcome": "pending",
+"visible": true,
+"hide_flags": [],
+"verdict": "OK"
+},
+{
+"id": 631254,
+"ticker": "AXP",
+"direction": "bullish",
+"outcome": "pending",
+"visible": true,
+"hide_flags": [],
+"verdict": "OK"
+},
+{
+"id": 631253,
+"ticker": "AVGO",
+"direction": "bullish",
+"outcome": "pending",
+"visible": true,
+"hide_flags": [],
+"verdict": "OK"
+},
+{
+"id": 631252,
+"ticker": "NEE",
+"direction": "bullish",
+"outcome": "pending",
+"visible": false,
+"hide_flags": [
+"conviction_hedged"
+],
+"verdict": null
+},
+{
+"id": 631251,
+"ticker": "PLTR",
+"direction": "bullish",
+"outcome": "pending",
+"visible": true,
+"hide_flags": [],
+"verdict": "OK"
+},
+{
+"id": 631250,
+"ticker": "NSRGY",
+"direction": "bullish",
+"outcome": "pending",
+"visible": true,
+"hide_flags": [],
+"verdict": "OK"
+},
+{
+"id": 631249,
+"ticker": "VWAGY",
+"direction": "bullish",
+"outcome": "pending",
+"visible": true,
+"hide_flags": [],
+"verdict": "OK"
+},
+{
+"id": 631248,
+"ticker": "BUD",
+"direction": "bullish",
+"outcome": "pending",
+"visible": true,
+"hide_flags": [],
+"verdict": "OK"
+},
+{
+"id": 631247,
+"ticker": "PLTR",
+"direction": "bullish",
+"outcome": "pending",
+"visible": true,
+"hide_flags": [],
+"verdict": "OK"
+},
+{
+"id": 631246,
+"ticker": "BTC",
+"direction": "bullish",
+"outcome": "pending",
+"visible": false,
+"hide_flags": [
+"conviction_hedged"
+],
+"verdict": null
+},
+{
+"id": 631245,
+"ticker": "PYPL",
+"direction": "bearish",
+"outcome": "pending",
+"visible": true,
+"hide_flags": [],
+"verdict": "OK"
+},
+{
+"id": 631244,
+"ticker": "GPC",
+"direction": "bullish",
+"outcome": "pending",
+"visible": false,
+"hide_flags": [
+"conviction_hedged"
+],
+"verdict": null
+},
+{
+"id": 631243,
+"ticker": "NVO",
+"direction": "bullish",
+"outcome": "pending",
+"visible": true,
+"hide_flags": [],
+"verdict": "OK"
+},
+{
+"id": 631242,
+"ticker": "NVDA",
+"direction": "bearish",
+"outcome": "pending",
+"visible": true,
+"hide_flags": [],
+"verdict": "OK"
+},
+{
+"id": 631241,
+"ticker": "TSLA",
+"direction": "bearish",
+"outcome": "pending",
+"visible": true,
+"hide_flags": [],
+"verdict": "OK"
+},
+{
+"id": 631240,
+"ticker": "NVDA",
+"direction": "bullish",
+"outcome": "pending",
+"visible": true,
+"hide_flags": [],
+"verdict": "OK"
+},
+{
+"id": 631239,
+"ticker": "CRSP",
+"direction": "bullish",
+"outcome": "pending",
+"visible": false,
+"hide_flags": [
+"conviction_hedged"
+],
+"verdict": null
+},
+{
+"id": 631238,
+"ticker": "MEDP",
+"direction": "bullish",
+"outcome": "pending",
+"visible": true,
+"hide_flags": [],
+"verdict": "OK"
+},
+{
+"id": 631237,
+"ticker": "SOFI",
+"direction": "bullish",
+"outcome": "pending",
+"visible": true,
+"hide_flags": [],
+"verdict": "OK"
+},
+{
+"id": 631236,
+"ticker": "BMY",
+"direction": "bullish",
+"outcome": "pending",
+"visible": false,
+"hide_flags": [
+"conviction_hedged"
+],
+"verdict": null
+},
+{
+"id": 631235,
+"ticker": "OHI",
+"direction": "bullish",
+"outcome": "pending",
+"visible": true,
+"hide_flags": [],
+"verdict": "OK"
+},
+{
+"id": 631234,
+"ticker": "PYPL",
+"direction": "bearish",
+"outcome": "pending",
+"visible": true,
+"hide_flags": [],
+"verdict": "OK"
+},
+{
+"id": 631229,
+"ticker": "OXY",
+"direction": "bullish",
+"outcome": "pending",
+"visible": false,
+"hide_flags": [
+"conviction_hedged"
+],
+"verdict": null
+}
+]
