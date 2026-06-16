@@ -74,10 +74,10 @@
    }
   },
   "wrong_ticker": {
-   "n": 194,
-   "confirm": 111,
+   "n": 195,
+   "confirm": 112,
    "opus_dist": {
-    "wrong_ticker": 111,
+    "wrong_ticker": 112,
     "no_claim": 23,
     "OK": 46,
     "direction_mismatch": 3,
@@ -94,5 +94,5 @@
   "is_reported": 103,
   "target_dir_only": 49
  },
- "review_dirtick_agree": 296
+ "review_dirtick_agree": 297
 }

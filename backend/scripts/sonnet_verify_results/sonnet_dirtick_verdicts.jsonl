@@ -802,7 +802,6 @@
 {"id": 629165, "src": "youtube", "ticker": "CRWV", "haiku": "wrong_ticker", "verifier": "sonnet", "verdict": "OK", "agree": false, "why": "Speaker calls CoreWeave a bag holder, bearish stance matches stored direction."}
 {"id": 629889, "src": "youtube", "ticker": "AZN", "haiku": "wrong_ticker", "verifier": "sonnet", "verdict": "reported_speech", "agree": false, "why": "$94 target is Wall Street consensus; speaker's own target is $96"}
 {"id": 630159, "src": "youtube", "ticker": "NGL", "haiku": "wrong_ticker", "verifier": "sonnet", "verdict": "wrong_ticker", "agree": true, "why": "Source quote refers to National Grid, not NGL ticker."}
-{"id": 627686, "src": "youtube", "ticker": "ROL", "haiku": "wrong_ticker", "verifier": "sonnet", "verdict": "ERROR", "agree": null, "why": "judge_failed"}
 {"id": 629902, "src": "youtube", "ticker": "ES", "haiku": "wrong_ticker", "verifier": "sonnet", "verdict": "wrong_ticker", "agree": true, "why": "ES is Eversource Energy; source discusses a utility with PE/balance sheet issues"}
 {"id": 630594, "src": "x", "ticker": "C", "haiku": "wrong_ticker", "verifier": "sonnet", "verdict": "OK", "agree": false, "why": "LONG call on C/USDT with bullish direction and take-profit targets matches source."}
 {"id": 630917, "src": "youtube", "ticker": "SMR", "haiku": "wrong_ticker", "verifier": "sonnet", "verdict": "wrong_ticker", "agree": true, "why": "Source discusses NuScale and BWX Technologies, not SMR"}
@@ -813,3 +812,4 @@
 {"id": 634832, "src": "x", "ticker": "TSLL", "haiku": "wrong_ticker", "verifier": "sonnet", "verdict": "wrong_ticker", "agree": true, "why": "Source discusses $TSLA, not TSLL (leveraged ETF)"}
 {"id": 632730, "src": "x", "ticker": "SPY", "haiku": "wrong_ticker", "verifier": "sonnet", "verdict": "OK", "agree": false, "why": "LONG ES_F/SPY call with entry, stop, and target stated"}
 {"id": 630918, "src": "youtube", "ticker": "NNE", "haiku": "wrong_ticker", "verifier": "sonnet", "verdict": "OK", "agree": false, "why": "Source clearly bearish on Nano Nuclear: 'wouldn't touch it with a 10-ft pole'"}
+{"id": 627686, "src": "youtube", "ticker": "ROL", "haiku": "wrong_ticker", "verifier": "sonnet", "verdict": "wrong_ticker", "agree": true, "why": "Quote refers to Rollins (RIL/pest control), not ROL ticker as stored"}
