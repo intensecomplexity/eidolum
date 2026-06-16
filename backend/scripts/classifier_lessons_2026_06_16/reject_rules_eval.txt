@@ -1,0 +1,15 @@
+keep_sample=24 catch/rule=16
+
+### unnamed_macro
+  CATCH 0/2 (0%) | FALSE-REJECT 0/12 (0%) | ACCEPTANCE preds base=20 with=20 delta=0 (0%)
+
+### reported_speech
+  CATCH 0/2 (0%) | FALSE-REJECT 0/11 (0%) | ACCEPTANCE preds base=19 with=20 delta=-1 (-6%)
+
+### chart_commentary
+  CATCH 3/7 (42%) | FALSE-REJECT 2/12 (16%) | ACCEPTANCE preds base=21 with=16 delta=5 (23%)
+
+### holding
+  CATCH 2/5 (40%) | FALSE-REJECT 3/13 (23%) | ACCEPTANCE preds base=18 with=18 delta=0 (0%)
+
+REJECT-EVAL DONE

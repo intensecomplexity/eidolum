@@ -42,20 +42,41 @@ field-scoped (never changes which predictions are emitted).
   unambiguous nulls (chart level, valuation-model output, market-cap, third-party
   PT). Re-eval false-reject on `clean_keep` before flipping the arg.
 
-## HELD as proposals (not encoded live — overlap existing guards + acceptance-collapse risk)
-Each has a gold fixture in `gold_fixtures.json` (should-catch = Opus/Sonnet-confirmed,
-must-not-regress = Opus=OK). REJECT-type rules can collapse acceptance, so they need
-the full WITH/WITHOUT + acceptance eval before any merge.
-1. **unnamed-instrument / macro invention** (Opus no_claim, 119) — "don't emit an
-   ETF/index ticker from broad macro/'the market' talk without an explicit call on
-   it." Overlaps the existing "Inferred direction" REJECT; thin must-not-regress (10).
-2. **reported-speech** (Opus reported_speech, 103) — third-party PT/stance relays.
-   Overlaps the post-insert `is_reported_speech` guard; the RE-class nuance (speaker
-   adds own call) makes it false-reject-prone.
-3. **chart-commentary-as-call** (Opus chart_commentary, 22) — pure TA levels, no
-   conviction. Small N.
-4. **holding-as-call** (Opus holding, 44) — passive position disclosure. Overlaps
-   the post-insert `holding_decide` guard.
+## The 4 REJECT-rules — ENCODED (default-off), EVAL'd, ALL HELD (auto-ship 0/4)
+Encoded as additive default-off args (`reject_unnamed/reported/chart/holding`);
+all-off path asserted byte-identical; live call site does NOT pass them → live
+prompt unchanged. Strict eval (real `build_cc_prompt` WITH/WITHOUT vs the live
+config, Sonnet): catch on Opus/Sonnet-confirmed should-catch, false-reject +
+acceptance on a 24-row real-call sample (`reject_keep_sample.json`). Marginal-value
+(no-LLM regex check): the post-insert guards' suspect-regexes already MISS 52-67%
+of these. Full numbers in `reject_rules_eval.txt`.
+
+| rule | CATCH | FALSE-REJECT | ACCEPTANCE Δ | verdict |
+|---|---|---|---|---|
+| unnamed_macro | **0/2** | 0/12 | 0% | HOLD — no marginal catch |
+| reported_speech | **0/2** | 0/11 | -6% (noise) | HOLD — no marginal catch |
+| chart_commentary | 3/7 (42%) | 2/12 (16%) | **−23% COLLAPSE** | HOLD — collapses acceptance |
+| holding | 2/5 (40%) | **3/13 (23%)** | 0% | HOLD — false-rejects real calls |
+
+**Why none shipped (the principle held):**
+- A classify-time REJECT is **irreversible** (the row never exists); the post-insert
+  guards keep the row + hide it (reversible, auditable). So a REJECT must CLEARLY
+  beat the guard.
+- **unnamed_macro / reported_speech:** the CURRENT live prompt baseline barely
+  reproduces these errors (only ~2/16 reproduced) — its existing rules
+  ("Inferred direction", "Pronoun-only", etc.) already suppress them at extraction.
+  The gold-set errors came from the cohort's OLDER classification. So the REJECT
+  adds **~0 catch** → no marginal value.
+- **chart_commentary:** modest catch but **−23% acceptance collapse** (dropped 5/21
+  real preds) + 16% false-reject — exactly the 5518ea1 disaster class. Hard fail.
+- **holding:** **23% false-reject** (dropped 3/13 real calls) — too aggressive.
+
+**Recommended instead (reversible):** the marginal-miss (guards' regexes miss
+52-67%) is best closed by **WIDENING the post-insert guards' suspect regexes** so
+they send more rows to their existing reversible Sonnet verify (flag-not-delete) —
+NOT by adding irreversible classify-time REJECTs. The dormant args remain as
+eval'd-and-rejected proposals (don't re-litigate; re-eval only if the live prompt
+changes materially).
 
 ## X-path proposal (separate, not YouTube)
 **X numeric-target capture** (the 872 missing-target rows, mostly X) — extraction

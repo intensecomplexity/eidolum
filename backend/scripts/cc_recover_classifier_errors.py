@@ -393,9 +393,22 @@ price_target — HYGIENE RULE (adjusts ONLY the price_target field, never which 
 - If the number is the host's own price target, KEEP it. When unsure whether it is the host's target, KEEP it. Do NOT apply any above-/below-current-price reasoning here. This rule changes ONLY price_target — it never changes which predictions you extract, their ticker, direction, conviction_level, or timeframe (a real call whose only number is a level / valuation is still extracted, direction-only)."""
 
 
+# Eval-gated additive REJECT rules (2026-06-16) — the 4 Opus/Sonnet-confirmed
+# patterns that overlap the post-insert flag-not-delete guards. REJECT is
+# IRREVERSIBLE (the row never exists) vs the guards' reversible hide, so each
+# ships ONLY if it clearly beats its guard (catches misses) WITHOUT collapsing
+# acceptance. Each is its own default-False arg; all-off => byte-identical.
+_REJECT_UNNAMED = "\n- Macro / unnamed-instrument: an ETF or index ticker (SPY, QQQ, GLD, XLF, DBC, …) emitted from broad \"the market / commodities / growth stocks / rates\" commentary where that ETF or its index is NOT itself given an explicit forward call — drop it. Only emit an ETF/index when the speaker makes an explicit forward call ON it."
+_REJECT_REPORTED = "\n- Reported speech: the call is attributed to a third party (\"analysts expect\", \"Wall Street's target\", \"<firm> upgraded\", \"he said\") and the speaker adds NO own conviction — drop it. (If the speaker states their OWN stance or target alongside, KEEP it.)"
+_REJECT_CHART = "\n- Chart-commentary only: a pure technical-level description (support / resistance, a moving average, an inside bar, \"watching this level\") with NO committed directional conviction on the ticker — drop it."
+_REJECT_HOLDING = "\n- Passive holding disclosure: \"I own / I'm holding / my biggest position / still holding\" with NO fresh forward buy/sell/price call — drop it."
+
+
 def build_cc_prompt(transcripts: dict, conditional: bool = False,
                     long_horizon_rule: bool = False,
-                    target_hygiene: bool = False) -> str:
+                    target_hygiene: bool = False,
+                    reject_unnamed: bool = False, reject_reported: bool = False,
+                    reject_chart: bool = False, reject_holding: bool = False) -> str:
     """transcripts: {video_id: transcript_text}.
 
     conditional=False (default) is the CURRENT live prompt, byte-for-byte.
@@ -419,6 +432,12 @@ def build_cc_prompt(transcripts: dict, conditional: bool = False,
     _cond_example = _CONDITIONAL_EXAMPLE if conditional else ""
     _horizon_rules = _LONG_HORIZON_BLOCK if long_horizon_rule else ""
     _th_rules = _TARGET_HYGIENE_BLOCK if target_hygiene else ""
+    _reject_extra = "".join([
+        _REJECT_UNNAMED if reject_unnamed else "",
+        _REJECT_REPORTED if reject_reported else "",
+        _REJECT_CHART if reject_chart else "",
+        _REJECT_HOLDING if reject_holding else "",
+    ])
     return f"""You are classifying stock predictions from YouTube finance video transcripts. Return JSON only — no prose, no markdown fences.
 
 For each video, extract every valid stock prediction. A valid prediction has ALL of:
@@ -443,7 +462,7 @@ REJECT (do not emit) predictions that are:
 - Pronoun-only context ("they're going up" without naming the company)
 - Wrong-ticker attribution (ticker named but context is a different company)
 - Contradictory pairs (same video bullish AND bearish on the same ticker — drop both)
-- Hallucinated / made-up tickers
+- Hallucinated / made-up tickers{_reject_extra}
 {_cond_rules}
 For a video with no valid predictions, return an entry with "predictions": [].
 Return an entry for EVERY video listed below, even if empty.
