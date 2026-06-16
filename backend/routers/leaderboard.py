@@ -492,7 +492,9 @@ def _refresh_leaderboard(db: Session) -> list | dict:
                     f.avg_follow_through_3m
                 FROM forecasters f
                 WHERE COALESCE(f.total_predictions, 0) >= :min_preds
-                  AND COALESCE(f.accuracy_score, 0) > 0
+                  -- accuracy_score>0 exclusion dropped 2026-06-16 (Nimrod): show
+                  -- EVERYONE, including 0%-accuracy forecasters. Keeps the
+                  -- >=scored floor (via total_predictions) for data sufficiency.
                 ORDER BY f.accuracy_score DESC, f.total_predictions DESC
                 LIMIT :lim OFFSET :off
             """), {"min_preds": min_preds, "lim": BATCH_SIZE, "off": offset}).fetchall()
@@ -1044,6 +1046,15 @@ def get_leaderboard(
     # "This Week" tab
     if tab == "week":
         return _week_leaderboard(db)
+
+    # SHIP 2026-06-16 (Nimrod): the leaderboard shows EVERYONE — dormant
+    # forecasters are no longer hidden on any view (default / filtered / source
+    # / timeframe). This also fixes the audit under-fill bug: dormant rows were
+    # dropped in Python AFTER the row-scan cap, so high-volume views (wallst,
+    # all, long) under-filled far below 100. The >=scored floor and the top-100
+    # display limit are unchanged. (Overrides the include_dormant query param,
+    # which the UI never sends.)
+    include_dormant = True
 
     # Any filter/sort beyond default -> use SQL-based filtered leaderboard
     has_filter = sector or call_type or direction or timeframe or source or (sort and sort != "accuracy") or (min_predictions and min_predictions > 10)
