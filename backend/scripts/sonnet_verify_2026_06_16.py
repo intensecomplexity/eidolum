@@ -19,6 +19,7 @@ CO = sys.argv[1] if len(sys.argv) > 1 else '/tmp/sonnet_cohort.json'
 VP = sys.argv[2] if len(sys.argv) > 2 else '/tmp/sonnet_verdicts.jsonl'
 WORKERS = int(os.environ.get('FULLCOV_WORKERS', '10'))
 MAXROWS = int(os.environ.get('MAXROWS', '0'))  # 0 = all
+VERIFY_MODEL = os.environ.get('VERIFY_MODEL', 'sonnet')  # 'opus' for the authoritative pass
 rows = json.load(open(CO))
 if MAXROWS:
     rows = rows[:MAXROWS]
@@ -73,17 +74,17 @@ def judge(r):
                       quote=(r.get('quote') or '')[:400], ctx=(r.get('ctx') or '')[:2200])
     for _ in range(2):
         try:
-            cp = subprocess.run(['claude', '-p', '--model', 'sonnet', p], capture_output=True,
-                                text=True, timeout=300, cwd='/tmp', env=env(), stdin=subprocess.DEVNULL)
+            cp = subprocess.run(['claude', '-p', '--model', VERIFY_MODEL, p], capture_output=True,
+                                text=True, timeout=420, cwd='/tmp', env=env(), stdin=subprocess.DEVNULL)
             o = json.loads(re.search(r'\{.*\}', cp.stdout, re.S).group(0))
             v = (o.get('verdict') or '').strip()
             if v in CLASSES:
                 return {'id': r['id'], 'src': r['src'], 'ticker': r['ticker'], 'haiku': r['haiku'],
-                        'sonnet': v, 'agree': (v == r['haiku']), 'why': (o.get('why') or '')[:120]}
+                        'verifier': VERIFY_MODEL, 'verdict': v, 'agree': (v == r['haiku']), 'why': (o.get('why') or '')[:120]}
         except Exception:
             continue
     return {'id': r['id'], 'src': r['src'], 'ticker': r['ticker'], 'haiku': r['haiku'],
-            'sonnet': 'ERROR', 'agree': None, 'why': 'judge_failed'}
+            'verifier': VERIFY_MODEL, 'verdict': 'ERROR', 'agree': None, 'why': 'judge_failed'}
 
 
 _n = [0]
@@ -95,12 +96,12 @@ def work(r):
         open(VP, 'a').write(json.dumps(res) + '\n')
         _n[0] += 1
         n = _n[0]
-    if n % 25 == 0 or res['sonnet'] == 'ERROR':
-        print(f"[{n}/{len(todo)}] {res['id']} haiku={res['haiku']} sonnet={res['sonnet']} agree={res['agree']}", flush=True)
+    if n % 25 == 0 or res['verdict'] == 'ERROR':
+        print(f"[{n}/{len(todo)}] {res['id']} haiku={res['haiku']} {res['verifier']}={res['verdict']} agree={res['agree']}", flush=True)
 
 
 todo = [r for r in rows if str(r['id']) not in done]
-print(f'{len(todo)} to verify (cohort slice {len(rows)}; {len(done)} done) workers={WORKERS} model=sonnet', flush=True)
+print(f'{len(todo)} to verify (cohort slice {len(rows)}; {len(done)} done) workers={WORKERS} model={VERIFY_MODEL}', flush=True)
 with ThreadPoolExecutor(WORKERS) as ex:
     list(ex.map(work, todo))
 print('SONNET VERIFY PASS DONE', flush=True)
