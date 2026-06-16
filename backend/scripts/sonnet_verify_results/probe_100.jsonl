@@ -1,0 +1,100 @@
+{"id": 452495, "src": "x", "ticker": "TAO", "haiku": "direction_mismatch", "sonnet": "direction_mismatch", "agree": true, "why": "Source is strongly bullish on TAO; stored direction says bearish."}
+{"id": 452490, "src": "x", "ticker": "AMC", "haiku": "direction_mismatch", "sonnet": "direction_mismatch", "agree": true, "why": "Source is bullish on AMC; stored direction says bearish."}
+{"id": 452496, "src": "x", "ticker": "AMC", "haiku": "direction_mismatch", "sonnet": "direction_mismatch", "agree": true, "why": "Source is bullish on AMC; stored direction is bearish."}
+{"id": 323157, "src": "x", "ticker": "DPZ", "haiku": "direction_mismatch", "sonnet": "target_error", "agree": false, "why": "$90 PT belongs to CAVA, not DPZ which has no target stated"}
+{"id": 452494, "src": "x", "ticker": "BMNR", "haiku": "direction_mismatch", "sonnet": "direction_mismatch", "agree": true, "why": "Source is bullish: NYSE listing is great news, expects short coverings."}
+{"id": 323100, "src": "x", "ticker": "NIO", "haiku": "direction_mismatch", "sonnet": "OK", "agree": false, "why": "Source explicitly states $8 short term target for NIO, matches stored data."}
+{"id": 323134, "src": "x", "ticker": "ONDS", "haiku": "direction_mismatch", "sonnet": "direction_mismatch", "agree": true, "why": "Source is bearish, targeting $6-7 downside, not bullish."}
+{"id": 323167, "src": "x", "ticker": "NVDA", "haiku": "direction_mismatch", "sonnet": "OK", "agree": false, "why": "Reshort thesis on NVDA explicitly stated as favorite name for bearish play"}
+{"id": 427050, "src": "x", "ticker": "BTC", "haiku": "direction_mismatch", "sonnet": "direction_mismatch", "agree": true, "why": "Source mocks bearish traders, implying bullish stance on BTC."}
+{"id": 452504, "src": "x", "ticker": "SPX", "haiku": "direction_mismatch", "sonnet": "no_claim", "agree": false, "why": "Source explains why market is hard to push down, no bearish call"}
+{"id": 452519, "src": "x", "ticker": "NAKA", "haiku": "direction_mismatch", "sonnet": "conditional", "agree": false, "why": "Bullish flip only if top breaks \u2014 gated on if/when trigger"}
+{"id": 452514, "src": "x", "ticker": "HYPE", "haiku": "direction_mismatch", "sonnet": "direction_mismatch", "agree": true, "why": "Source says HYPE will greatly outperform long-term; stored direction is bearish."}
+{"id": 452505, "src": "x", "ticker": "ODD", "haiku": "direction_mismatch", "sonnet": "direction_mismatch", "agree": true, "why": "Source argues bear thesis fails; stored direction is bearish, but author is bullish"}
+{"id": 452503, "src": "x", "ticker": "ETH", "haiku": "direction_mismatch", "sonnet": "direction_mismatch", "agree": true, "why": "Source says 7% jump (bullish), stored direction is bearish"}
+{"id": 605632, "src": "youtube", "ticker": "CP", "haiku": "direction_mismatch", "sonnet": "OK", "agree": false, "why": "Speaker explicitly plans to sell CP, matching stored bearish direction."}
+{"id": 452572, "src": "x", "ticker": "RKT", "haiku": "direction_mismatch", "sonnet": "direction_mismatch", "agree": true, "why": "Barclays upgrades RKT to Overweight; source is bullish, not bearish."}
+{"id": 605608, "src": "youtube", "ticker": "SPY", "haiku": "direction_mismatch", "sonnet": "no_claim", "agree": false, "why": "Source text contains no forward SPY price prediction, only intro narration."}
+{"id": 427042, "src": "x", "ticker": "BTC", "haiku": "direction_mismatch", "sonnet": "wrong_ticker", "agree": false, "why": "Actual buy call is on MSTR; BTC is only a dismissed alternative."}
+{"id": 605701, "src": "youtube", "ticker": "CRWD", "haiku": "direction_mismatch", "sonnet": "OK", "agree": false, "why": "Quote matches source; $460 target and bullish moat upgrade confirmed."}
+{"id": 605717, "src": "youtube", "ticker": "MU", "haiku": "direction_mismatch", "sonnet": "direction_mismatch", "agree": true, "why": "Source says stock is NOT attractive, three stars, expects downside gap."}
+{"id": 605756, "src": "youtube", "ticker": "SPX", "haiku": "direction_mismatch", "sonnet": "hedged", "agree": false, "why": "Speaker says 'long time bullish but near term worry'\u2014mixed, not neutral"}
+{"id": 605798, "src": "youtube", "ticker": "PLTR", "haiku": "direction_mismatch", "sonnet": "OK", "agree": false, "why": "Source confirms bearish target range 150-175, stored 162.5 midpoint matches."}
+{"id": 605810, "src": "youtube", "ticker": "XRP", "haiku": "direction_mismatch", "sonnet": "direction_mismatch", "agree": true, "why": "Source expects a retest down to lows, bearish not bullish."}
+{"id": 605739, "src": "youtube", "ticker": "MKC", "haiku": "direction_mismatch", "sonnet": "no_claim", "agree": false, "why": "Quote discusses acquisition valuation; no forward directional call on MKC."}
+{"id": 605826, "src": "youtube", "ticker": "AAPL", "haiku": "direction_mismatch", "sonnet": "direction_mismatch", "agree": true, "why": "Source calls AAPL 'very nicely bullish, RSI 63, no problem with it.'"}
+{"id": 605817, "src": "youtube", "ticker": "XRP", "haiku": "direction_mismatch", "sonnet": "conditional", "agree": false, "why": "Drop to 110 only if no announcement \u2014 explicitly gated condition"}
+{"id": 605829, "src": "youtube", "ticker": "DPZ", "haiku": "direction_mismatch", "sonnet": "OK", "agree": false, "why": "Speaker directly calls DPZ a route for a call option, bullish conviction."}
+{"id": 605897, "src": "youtube", "ticker": "SIMO", "haiku": "direction_mismatch", "sonnet": "OK", "agree": false, "why": "Source confirms bullish SIMO call with $107 target and 70% gain thesis."}
+{"id": 605839, "src": "youtube", "ticker": "XRP", "haiku": "direction_mismatch", "sonnet": "no_claim", "agree": false, "why": "Source discusses macro/tariff context, no forward XRP price call made"}
+{"id": 605659, "src": "youtube", "ticker": "NFLX", "haiku": "direction_mismatch", "sonnet": "direction_mismatch", "agree": true, "why": "Speaker calls NFLX a buy; $70 is stated downside risk, not the call."}
+{"id": 605929, "src": "youtube", "ticker": "OLED", "haiku": "direction_mismatch", "sonnet": "conditional", "agree": false, "why": "Speaker will add only if stock drops to ~120; no unconditional bearish call."}
+{"id": 605985, "src": "youtube", "ticker": "VZ", "haiku": "direction_mismatch", "sonnet": "OK", "agree": false, "why": "Stored target 59.80 matches averaged intrinsic value; neutral stance fits no buy signal."}
+{"id": 605987, "src": "youtube", "ticker": "V", "haiku": "direction_mismatch", "sonnet": "direction_mismatch", "agree": true, "why": "Source says intrinsic value below current price, implying bearish/sell, not neutral."}
+{"id": 605813, "src": "youtube", "ticker": "XRP", "haiku": "direction_mismatch", "sonnet": "direction_mismatch", "agree": true, "why": "Primary call is bullish $3.50\u2013$7.50; sub-dollar is explicit worst-case only."}
+{"id": 605991, "src": "youtube", "ticker": "MCD", "haiku": "direction_mismatch", "sonnet": "OK", "agree": false, "why": "Source confirms not buying now; neutral/avoid stance matches stored direction."}
+{"id": 605995, "src": "youtube", "ticker": "NKE", "haiku": "direction_mismatch", "sonnet": "conditional", "agree": false, "why": "Speaker wants lower price before buying; call gated on price drop"}
+{"id": 606068, "src": "youtube", "ticker": "LUV", "haiku": "direction_mismatch", "sonnet": "direction_mismatch", "agree": true, "why": "Speaker bought at $25 expecting it to go DOWN, not up."}
+{"id": 606178, "src": "youtube", "ticker": "NXPI", "haiku": "direction_mismatch", "sonnet": "OK", "agree": false, "why": "Speaker calls NXPI a solid hold with expected 8-12% growth rebound."}
+{"id": 606151, "src": "youtube", "ticker": "PLTR", "haiku": "direction_mismatch", "sonnet": "direction_mismatch", "agree": true, "why": "Source says PLTR is overvalued, implying bearish/sell, not neutral."}
+{"id": 606186, "src": "youtube", "ticker": "ENPH", "haiku": "direction_mismatch", "sonnet": "direction_mismatch", "agree": true, "why": "Source clearly signals bearish near-term outlook, not neutral."}
+{"id": 606222, "src": "youtube", "ticker": "ARM", "haiku": "direction_mismatch", "sonnet": "OK", "agree": false, "why": "Speaker explicitly states not investing in ARM, neutral stance confirmed."}
+{"id": 605822, "src": "youtube", "ticker": "XRP", "haiku": "direction_mismatch", "sonnet": "direction_mismatch", "agree": true, "why": "Source's primary targets are bullish (185-558); bear case is 90-120 only"}
+{"id": 606237, "src": "youtube", "ticker": "AEHR", "haiku": "direction_mismatch", "sonnet": "OK", "agree": false, "why": "Speaker states fair value below $40, stock at $48-49, neutral/avoid stance matches."}
+{"id": 606236, "src": "youtube", "ticker": "QCOM", "haiku": "direction_mismatch", "sonnet": "direction_mismatch", "agree": true, "why": "Source is bearish: struggling, cautious, on hold, awaiting improvement."}
+{"id": 606246, "src": "youtube", "ticker": "AEHR", "haiku": "direction_mismatch", "sonnet": "conditional", "agree": false, "why": "Buying again only if price dips to $35 or below."}
+{"id": 606248, "src": "youtube", "ticker": "ASML", "haiku": "direction_mismatch", "sonnet": "OK", "agree": false, "why": "Source warns of risks, high valuation, advises caution \u2014 bearish stance confirmed."}
+{"id": 606252, "src": "youtube", "ticker": "TSLA", "haiku": "direction_mismatch", "sonnet": "OK", "agree": false, "why": "Speaker signals potential buy of TSLA in November, small position."}
+{"id": 606273, "src": "youtube", "ticker": "PEP", "haiku": "direction_mismatch", "sonnet": "OK", "agree": false, "why": "Source confirms PEP 7% dividend raise; stored quote matches source exactly."}
+{"id": 606275, "src": "youtube", "ticker": "TSLA", "haiku": "direction_mismatch", "sonnet": "direction_mismatch", "agree": true, "why": "Source says Tesla is a 'good buy', stored direction is bearish."}
+{"id": 606276, "src": "youtube", "ticker": "GOOGL", "haiku": "direction_mismatch", "sonnet": "direction_mismatch", "agree": true, "why": "Source says 'probably not' buy now \u2014 bearish, not neutral."}
+{"id": 605990, "src": "youtube", "ticker": "WBA", "haiku": "direction_mismatch", "sonnet": "OK", "agree": false, "why": "'Not currently buying' at 42.91 margin-of-safety price matches stored neutral + target"}
+{"id": 606286, "src": "youtube", "ticker": "IBM", "haiku": "direction_mismatch", "sonnet": "hedged", "agree": false, "why": "Speaker explicitly says not 100% buyer, only doing more investigation"}
+{"id": 606338, "src": "youtube", "ticker": "MRVL", "haiku": "direction_mismatch", "sonnet": "OK", "agree": false, "why": "Source clearly says not a buy yet, sit on hands \u2014 bearish stance confirmed"}
+{"id": 606292, "src": "youtube", "ticker": "ALK", "haiku": "direction_mismatch", "sonnet": "OK", "agree": false, "why": "Speaker says 'I like Alaska airlines is my point' \u2014 clear bullish stance."}
+{"id": 606361, "src": "youtube", "ticker": "DIS", "haiku": "direction_mismatch", "sonnet": "holding", "agree": false, "why": "Speaker discloses passive hold with vague exit intent, no fresh directional call"}
+{"id": 606367, "src": "youtube", "ticker": "AEHR", "haiku": "direction_mismatch", "sonnet": "target_error", "agree": false, "why": "Source mentions midyear 2024 target but stored target is None"}
+{"id": 606376, "src": "youtube", "ticker": "KLAC", "haiku": "direction_mismatch", "sonnet": "OK", "agree": false, "why": "Stored neutral with 20% revenue growth peak-to-peak matches source tone"}
+{"id": 606377, "src": "youtube", "ticker": "ALB", "haiku": "direction_mismatch", "sonnet": "OK", "agree": false, "why": "Speakers express continued confidence in Albemarle, matching stored neutral-positive stance."}
+{"id": 606401, "src": "youtube", "ticker": "AVGO", "haiku": "direction_mismatch", "sonnet": "direction_mismatch", "agree": true, "why": "Source calls AVGO overvalued/risky, not neutral; bullish only short-term with long-term worry."}
+{"id": 606412, "src": "youtube", "ticker": "V", "haiku": "direction_mismatch", "sonnet": "conditional", "agree": false, "why": "Buy call gated on V falling to $200-$230 first"}
+{"id": 606433, "src": "youtube", "ticker": "MCD", "haiku": "direction_mismatch", "sonnet": "conditional", "agree": false, "why": "Buy call gated on stock moving back down to $245 level"}
+{"id": 606416, "src": "youtube", "ticker": "NVDA", "haiku": "direction_mismatch", "sonnet": "direction_mismatch", "agree": true, "why": "Source is bullish: hold gains, only semiconductor to buy, not neutral."}
+{"id": 606445, "src": "youtube", "ticker": "TROW", "haiku": "direction_mismatch", "sonnet": "direction_mismatch", "agree": true, "why": "Source clearly states TROW is undervalued/bullish, not neutral."}
+{"id": 606466, "src": "youtube", "ticker": "WMT", "haiku": "direction_mismatch", "sonnet": "OK", "agree": false, "why": "Speaker expresses personal concern stock price is ahead of business, neutral stance."}
+{"id": 606484, "src": "youtube", "ticker": "IBM", "haiku": "direction_mismatch", "sonnet": "OK", "agree": false, "why": "Intrinsic value 133.67 slightly above trading price; matches stored target and neutral tone."}
+{"id": 606489, "src": "youtube", "ticker": "VZ", "haiku": "direction_mismatch", "sonnet": "OK", "agree": false, "why": "Intrinsic value 40.66 matches stored target; current price below suggests upside."}
+{"id": 606483, "src": "youtube", "ticker": "T", "haiku": "direction_mismatch", "sonnet": "direction_mismatch", "agree": true, "why": "Source gives a buy price target, not a neutral stance on T."}
+{"id": 606493, "src": "youtube", "ticker": "RACE", "haiku": "direction_mismatch", "sonnet": "direction_mismatch", "agree": true, "why": "Source says needs to drop a lot \u2014 that's bearish/wait, not neutral."}
+{"id": 606495, "src": "youtube", "ticker": "MSFT", "haiku": "direction_mismatch", "sonnet": "conditional", "agree": false, "why": "Would buy only if price falls to $100 or less\u2014gated on price drop"}
+{"id": 606497, "src": "youtube", "ticker": "IBM", "haiku": "direction_mismatch", "sonnet": "OK", "agree": false, "why": "Speaker calls IBM possible buy at ~90B market cap, 12-13% return"}
+{"id": 606644, "src": "youtube", "ticker": "TSLA", "haiku": "direction_mismatch", "sonnet": "conditional", "agree": false, "why": "Buy only if price drops to low $200/high $100 range"}
+{"id": 606578, "src": "youtube", "ticker": "ZS", "haiku": "direction_mismatch", "sonnet": "OK", "agree": false, "why": "Source recommends DCA to build position; neutral/cautious stance matches stored direction."}
+{"id": 606681, "src": "youtube", "ticker": "AAPL", "haiku": "direction_mismatch", "sonnet": "OK", "agree": false, "why": "Speaker explicitly prefers lower price before adding shares \u2014 neutral/cautious matches"}
+{"id": 606696, "src": "youtube", "ticker": "ABBV", "haiku": "direction_mismatch", "sonnet": "direction_mismatch", "agree": true, "why": "Source shows a bullish buy price analysis, not neutral stance."}
+{"id": 606714, "src": "youtube", "ticker": "MPW", "haiku": "direction_mismatch", "sonnet": "OK", "agree": false, "why": "Intrinsic value 9.83 matches stored target; above trading price implies slight undervalue, neutral fits."}
+{"id": 606715, "src": "youtube", "ticker": "WBA", "haiku": "direction_mismatch", "sonnet": "direction_mismatch", "agree": true, "why": "Source shows buy range analysis, not neutral stance on WBA."}
+{"id": 606737, "src": "youtube", "ticker": "BAC", "haiku": "direction_mismatch", "sonnet": "direction_mismatch", "agree": true, "why": "Source calls BAC 'a good long-term buy', not neutral."}
+{"id": 606741, "src": "youtube", "ticker": "AI", "haiku": "direction_mismatch", "sonnet": "OK", "agree": false, "why": "Speaker clearly states not buying AI at current valuation, neutral stance confirmed"}
+{"id": 606752, "src": "youtube", "ticker": "SHOP", "haiku": "direction_mismatch", "sonnet": "hedged", "agree": false, "why": "Speaker calls SHOP 'fun spec stock' but personally avoids due to valuation"}
+{"id": 606754, "src": "youtube", "ticker": "BABA", "haiku": "direction_mismatch", "sonnet": "OK", "agree": false, "why": "Speaker loves BABA, calls it undervalued, clear bullish forward stance."}
+{"id": 606762, "src": "youtube", "ticker": "AAPL", "haiku": "direction_mismatch", "sonnet": "direction_mismatch", "agree": true, "why": "Speaker prefers Amazon/Microsoft over AAPL; not a bullish call"}
+{"id": 606758, "src": "youtube", "ticker": "CRM", "haiku": "direction_mismatch", "sonnet": "OK", "agree": false, "why": "Speaker calls CRM a good buy, up from lows, expects recovery"}
+{"id": 606768, "src": "youtube", "ticker": "VZ", "haiku": "direction_mismatch", "sonnet": "OK", "agree": false, "why": "Speaker still buying VZ, sees value, small but active position."}
+{"id": 606801, "src": "youtube", "ticker": "TSLA", "haiku": "direction_mismatch", "sonnet": "holding", "agree": false, "why": "Speaker holds TSLA, no fresh buy/sell call made"}
+{"id": 606827, "src": "youtube", "ticker": "ARM", "haiku": "direction_mismatch", "sonnet": "OK", "agree": false, "why": "Speaker explicitly neutral/sideline stance on ARM with no target stored"}
+{"id": 606846, "src": "youtube", "ticker": "RR", "haiku": "direction_mismatch", "sonnet": "OK", "agree": false, "why": "Speaker holds RR bullish, expects dividend restoration to boost price further"}
+{"id": 606850, "src": "youtube", "ticker": "UNP", "haiku": "direction_mismatch", "sonnet": "OK", "agree": false, "why": "Speaker clearly expects UNP guidance cut and 5-6% price decline."}
+{"id": 606858, "src": "youtube", "ticker": "SPY", "haiku": "direction_mismatch", "sonnet": "direction_mismatch", "agree": true, "why": "Source says SPY chart is 'very very bullish', stored direction is bearish."}
+{"id": 606857, "src": "youtube", "ticker": "MSCI", "haiku": "direction_mismatch", "sonnet": "direction_mismatch", "agree": true, "why": "Speaker frames $375 as a buy/entry target, not bearish."}
+{"id": 606878, "src": "youtube", "ticker": "SPX", "haiku": "direction_mismatch", "sonnet": "direction_mismatch", "agree": true, "why": "Retesting lows implies bearish, not bullish outlook for SPX"}
+{"id": 606995, "src": "youtube", "ticker": "LSCC", "haiku": "direction_mismatch", "sonnet": "OK", "agree": false, "why": "Speaker expresses own high conviction in LSCC business overall"}
+{"id": 607072, "src": "youtube", "ticker": "PEP", "haiku": "direction_mismatch", "sonnet": "OK", "agree": false, "why": "Source confirms $149.4 buy price with 10% margin of safety on PEP"}
+{"id": 607076, "src": "youtube", "ticker": "MA", "haiku": "direction_mismatch", "sonnet": "direction_mismatch", "agree": true, "why": "Source says MA appears expensive/overvalued, not neutral."}
+{"id": 607078, "src": "youtube", "ticker": "MO", "haiku": "direction_mismatch", "sonnet": "wrong_ticker", "agree": false, "why": "Source discusses a ~$58 stock; MO trades near $50, values mismatch"}
+{"id": 607091, "src": "youtube", "ticker": "BUD", "haiku": "direction_mismatch", "sonnet": "OK", "agree": false, "why": "Speaker clearly prefers other stocks over BUD, a bearish stance."}
+{"id": 607247, "src": "youtube", "ticker": "ARM", "haiku": "direction_mismatch", "sonnet": "OK", "agree": false, "why": "Speaker avoids ARM due to high valuation; bearish stance confirmed."}
+{"id": 607281, "src": "youtube", "ticker": "COST", "haiku": "direction_mismatch", "sonnet": "OK", "agree": false, "why": "Speaker prefers Amazon over COST, bearish stance clearly stated"}
+{"id": 607289, "src": "youtube", "ticker": "HPQ", "haiku": "direction_mismatch", "sonnet": "direction_mismatch", "agree": true, "why": "Source ranks HPQ #2, likes dividend/valuation \u2014 bullish stance, not bearish."}
+{"id": 607308, "src": "youtube", "ticker": "T", "haiku": "direction_mismatch", "sonnet": "OK", "agree": false, "why": "Speaker calls AT&T weaker than Verizon, not attracted \u2014 bearish stance confirmed."}
+{"id": 607365, "src": "youtube", "ticker": "ORCL", "haiku": "direction_mismatch", "sonnet": "no_claim", "agree": false, "why": "Quote discusses AI bubble broadly; no directional call on ORCL stock."}
