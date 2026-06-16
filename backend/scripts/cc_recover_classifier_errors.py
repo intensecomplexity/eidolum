@@ -374,8 +374,25 @@ TIMEFRAME — HARD RULE (overrides the inferred defaults above):
 - This rule adjusts ONLY timeframe_days and timeframe_category. It never changes which predictions you extract, their direction, conviction_level, or price_target."""
 
 
+# Eval-gated additive rule (2026-06-16, Opus/Sonnet-confirmed lesson set
+# [[project_opus_reverify_2026_06_16]]): the dominant confirmed target error is a
+# non-price number (chart/MA level, P/E or EPS or DCF per-share, market-cap, entry
+# price, or a third party's PT) extracted as price_target. Additive + field-scoped:
+# it sets price_target=null for those, never changing which predictions are
+# emitted (cannot affect acceptance). False stays byte-identical; ship = flip the
+# arg at the live call site.
+_TARGET_HYGIENE_BLOCK = """
+
+price_target — HYGIENE RULE (adjusts ONLY the price_target field):
+- price_target is ONLY an explicit forward PRICE the speaker says the stock itself will reach ("headed to $250", "my target is $90", "$300 by 2027").
+- Set price_target = null when the number is instead: a chart level (support/resistance or a moving average — "the 200-day at 150", "holds 50"); a valuation multiple or model output (P/E, EPS, a DCF / intrinsic "$236 a share", "10x free cash flow"); a market-cap or index level ("a $13 billion company"); the current or entry price ("buying it at $170"); or a THIRD PARTY's target ("Wall Street sees $370", "the analyst PT is $90").
+- Side check: a bullish call's price_target must be ABOVE the current price and a bearish call's BELOW it; if the stated number is on the wrong side, it is not the target — set null.
+- When in doubt, set price_target = null. This rule changes ONLY price_target — it NEVER changes which predictions you extract, their ticker, direction, conviction_level, or timeframe (a real call with no clean target is still extracted, direction-only)."""
+
+
 def build_cc_prompt(transcripts: dict, conditional: bool = False,
-                    long_horizon_rule: bool = False) -> str:
+                    long_horizon_rule: bool = False,
+                    target_hygiene: bool = False) -> str:
     """transcripts: {video_id: transcript_text}.
 
     conditional=False (default) is the CURRENT live prompt, byte-for-byte.
@@ -398,6 +415,7 @@ def build_cc_prompt(transcripts: dict, conditional: bool = False,
     _cond_rules = _CONDITIONAL_BLOCK if conditional else ""
     _cond_example = _CONDITIONAL_EXAMPLE if conditional else ""
     _horizon_rules = _LONG_HORIZON_BLOCK if long_horizon_rule else ""
+    _th_rules = _TARGET_HYGIENE_BLOCK if target_hygiene else ""
     return f"""You are classifying stock predictions from YouTube finance video transcripts. Return JSON only — no prose, no markdown fences.
 
 For each video, extract every valid stock prediction. A valid prediction has ALL of:
@@ -413,7 +431,7 @@ EVERY prediction object MUST also carry these three fields (predictions missing 
     <=90 -> "fundamental_quarterly" ; <=180 -> "cyclical_medium" ;
     <=730 -> "macro_thesis" ; >730 -> "long_term_fundamental"
 - conviction_level: one of exactly "strong" (emphatic, high-confidence), "moderate" (a normal call), "hedged" ("might", "could", "if X then"), "hypothetical" (a speculative what-if scenario), "unknown" (tone unclear).
-- price_target: a number if the speaker names one, otherwise null.{_horizon_rules}
+- price_target: a number if the speaker names one, otherwise null.{_horizon_rules}{_th_rules}
 
 REJECT (do not emit) predictions that are:
 - Past-tense reporting ("revenue grew 40%", "missed estimates", "benefited from", "was up") — history is not a prediction, even when it explains a mechanism that could continue

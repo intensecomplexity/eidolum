@@ -1,0 +1,876 @@
+{
+ "catch": [
+  {
+   "id": 323156,
+   "ticker": "BROS",
+   "baseline_bad": true,
+   "caught": true,
+   "wo": [
+    "found",
+    75
+   ],
+   "wi": [
+    "found",
+    null
+   ]
+  },
+  {
+   "id": 452238,
+   "ticker": "NVDA",
+   "baseline_bad": true,
+   "caught": false,
+   "wo": [
+    "found",
+    280
+   ],
+   "wi": [
+    "found",
+    280
+   ]
+  },
+  {
+   "id": 606868,
+   "ticker": "PARA",
+   "baseline_bad": false,
+   "caught": false,
+   "wo": [
+    "found",
+    null
+   ],
+   "wi": [
+    "found",
+    null
+   ]
+  },
+  {
+   "id": 607060,
+   "ticker": "MO",
+   "baseline_bad": false,
+   "caught": false,
+   "wo": [
+    "found",
+    null
+   ],
+   "wi": [
+    "found",
+    null
+   ]
+  },
+  {
+   "id": 607649,
+   "ticker": "UNH",
+   "baseline_bad": false,
+   "caught": false,
+   "wo": [
+    "found",
+    null
+   ],
+   "wi": [
+    "found",
+    null
+   ]
+  },
+  {
+   "id": 608645,
+   "ticker": "ADP",
+   "baseline_bad": false,
+   "caught": false,
+   "wo": [
+    "absent",
+    null
+   ],
+   "wi": [
+    "absent",
+    null
+   ]
+  },
+  {
+   "id": 609232,
+   "ticker": "GOOGL",
+   "baseline_bad": true,
+   "caught": true,
+   "wo": [
+    "found",
+    347.33
+   ],
+   "wi": [
+    "found",
+    null
+   ]
+  },
+  {
+   "id": 609406,
+   "ticker": "GOOGL",
+   "baseline_bad": true,
+   "caught": true,
+   "wo": [
+    "found",
+    261.64
+   ],
+   "wi": [
+    "found",
+    null
+   ]
+  },
+  {
+   "id": 609471,
+   "ticker": "NVO",
+   "baseline_bad": false,
+   "caught": false,
+   "wo": [
+    "absent",
+    null
+   ],
+   "wi": [
+    "absent",
+    null
+   ]
+  },
+  {
+   "id": 609455,
+   "ticker": "MSFT",
+   "baseline_bad": true,
+   "caught": true,
+   "wo": [
+    "found",
+    4569
+   ],
+   "wi": [
+    "found",
+    null
+   ]
+  },
+  {
+   "id": 610064,
+   "ticker": "INTC",
+   "baseline_bad": false,
+   "caught": false,
+   "wo": [
+    "found",
+    null
+   ],
+   "wi": [
+    "found",
+    null
+   ]
+  },
+  {
+   "id": 610132,
+   "ticker": "RKLB",
+   "baseline_bad": false,
+   "caught": false,
+   "wo": [
+    "found",
+    null
+   ],
+   "wi": [
+    "found",
+    null
+   ]
+  },
+  {
+   "id": 610044,
+   "ticker": "NEE",
+   "baseline_bad": false,
+   "caught": false,
+   "wo": [
+    "found",
+    null
+   ],
+   "wi": [
+    "found",
+    null
+   ]
+  },
+  {
+   "id": 612919,
+   "ticker": "VIAC",
+   "baseline_bad": false,
+   "caught": false,
+   "wo": [
+    "found",
+    null
+   ],
+   "wi": [
+    "found",
+    null
+   ]
+  },
+  {
+   "id": 614022,
+   "ticker": "SHOP",
+   "baseline_bad": false,
+   "caught": false,
+   "wo": [
+    "found",
+    null
+   ],
+   "wi": [
+    "found",
+    null
+   ]
+  },
+  {
+   "id": 617131,
+   "ticker": "GLD",
+   "baseline_bad": false,
+   "caught": false,
+   "wo": [
+    "absent",
+    null
+   ],
+   "wi": [
+    "absent",
+    null
+   ]
+  },
+  {
+   "id": 625550,
+   "ticker": "LMT",
+   "baseline_bad": true,
+   "caught": true,
+   "wo": [
+    "found",
+    680
+   ],
+   "wi": [
+    "found",
+    null
+   ]
+  },
+  {
+   "id": 626834,
+   "ticker": "META",
+   "baseline_bad": true,
+   "caught": true,
+   "wo": [
+    "found",
+    800
+   ],
+   "wi": [
+    "found",
+    null
+   ]
+  },
+  {
+   "id": 626962,
+   "ticker": "SFM",
+   "baseline_bad": false,
+   "caught": false,
+   "wo": [
+    "absent",
+    null
+   ],
+   "wi": [
+    "found",
+    null
+   ]
+  },
+  {
+   "id": 627158,
+   "ticker": "TGT",
+   "baseline_bad": false,
+   "caught": false,
+   "wo": [
+    "absent",
+    null
+   ],
+   "wi": [
+    "absent",
+    null
+   ]
+  },
+  {
+   "id": 631659,
+   "ticker": "KTOS",
+   "baseline_bad": false,
+   "caught": false,
+   "wo": [
+    "found",
+    null
+   ],
+   "wi": [
+    "found",
+    null
+   ]
+  },
+  {
+   "id": 632889,
+   "ticker": "UUUU",
+   "baseline_bad": false,
+   "caught": false,
+   "wo": [
+    "found",
+    null
+   ],
+   "wi": [
+    "found",
+    null
+   ]
+  },
+  {
+   "id": 633021,
+   "ticker": "TSLA",
+   "baseline_bad": false,
+   "caught": false,
+   "wo": [
+    "absent",
+    null
+   ],
+   "wi": [
+    "absent",
+    null
+   ]
+  },
+  {
+   "id": 633434,
+   "ticker": "UNH",
+   "baseline_bad": false,
+   "caught": false,
+   "wo": [
+    "found",
+    null
+   ],
+   "wi": [
+    "found",
+    425
+   ]
+  },
+  {
+   "id": 633387,
+   "ticker": "SUI",
+   "baseline_bad": false,
+   "caught": false,
+   "wo": [
+    "absent",
+    null
+   ],
+   "wi": [
+    "found",
+    null
+   ]
+  },
+  {
+   "id": 634103,
+   "ticker": "BTC",
+   "baseline_bad": false,
+   "caught": false,
+   "wo": [
+    "absent",
+    null
+   ],
+   "wi": [
+    "found",
+    null
+   ]
+  },
+  {
+   "id": 634200,
+   "ticker": "SYM",
+   "baseline_bad": false,
+   "caught": false,
+   "wo": [
+    "found",
+    null
+   ],
+   "wi": [
+    "found",
+    null
+   ]
+  },
+  {
+   "id": 634609,
+   "ticker": "SOL",
+   "baseline_bad": false,
+   "caught": false,
+   "wo": [
+    "found",
+    null
+   ],
+   "wi": [
+    "found",
+    null
+   ]
+  },
+  {
+   "id": 635217,
+   "ticker": "QQQ",
+   "baseline_bad": false,
+   "caught": false,
+   "wo": [
+    "found",
+    null
+   ],
+   "wi": [
+    "found",
+    null
+   ]
+  },
+  {
+   "id": 608311,
+   "ticker": "HAS",
+   "baseline_bad": false,
+   "caught": false,
+   "wo": [
+    "absent",
+    null
+   ],
+   "wi": [
+    "absent",
+    null
+   ]
+  }
+ ],
+ "keep": [
+  {
+   "id": 452240,
+   "ticker": "UNH",
+   "baseline_target": true,
+   "false_reject": false,
+   "accept_drop": false,
+   "wo": [
+    "found",
+    500
+   ],
+   "wi": [
+    "found",
+    500
+   ]
+  },
+  {
+   "id": 452239,
+   "ticker": "MSFT",
+   "baseline_target": true,
+   "false_reject": false,
+   "accept_drop": false,
+   "wo": [
+    "found",
+    500
+   ],
+   "wi": [
+    "found",
+    500
+   ]
+  },
+  {
+   "id": 605776,
+   "ticker": "HOOD",
+   "baseline_target": false,
+   "false_reject": false,
+   "accept_drop": false,
+   "wo": [
+    "found",
+    null
+   ],
+   "wi": [
+    "found",
+    null
+   ]
+  },
+  {
+   "id": 452498,
+   "ticker": "ONDS",
+   "baseline_target": false,
+   "false_reject": false,
+   "accept_drop": false,
+   "wo": [
+    "found",
+    null
+   ],
+   "wi": [
+    "found",
+    null
+   ]
+  },
+  {
+   "id": 605815,
+   "ticker": "ETH",
+   "baseline_target": true,
+   "false_reject": true,
+   "accept_drop": false,
+   "wo": [
+    "found",
+    2400
+   ],
+   "wi": [
+    "found",
+    null
+   ]
+  },
+  {
+   "id": 605779,
+   "ticker": "U",
+   "baseline_target": false,
+   "false_reject": false,
+   "accept_drop": false,
+   "wo": [
+    "found",
+    null
+   ],
+   "wi": [
+    "found",
+    null
+   ]
+  },
+  {
+   "id": 605819,
+   "ticker": "XRP",
+   "baseline_target": true,
+   "false_reject": true,
+   "accept_drop": false,
+   "wo": [
+    "found",
+    160
+   ],
+   "wi": [
+    "found",
+    null
+   ]
+  },
+  {
+   "id": 605870,
+   "ticker": "MSFT",
+   "baseline_target": false,
+   "false_reject": false,
+   "accept_drop": false,
+   "wo": [
+    "found",
+    null
+   ],
+   "wi": [
+    "found",
+    null
+   ]
+  },
+  {
+   "id": 605933,
+   "ticker": "GFS",
+   "baseline_target": true,
+   "false_reject": true,
+   "accept_drop": false,
+   "wo": [
+    "found",
+    50
+   ],
+   "wi": [
+    "found",
+    null
+   ]
+  },
+  {
+   "id": 605989,
+   "ticker": "MSFT",
+   "baseline_target": true,
+   "false_reject": true,
+   "accept_drop": false,
+   "wo": [
+    "found",
+    344
+   ],
+   "wi": [
+    "found",
+    null
+   ]
+  },
+  {
+   "id": 606054,
+   "ticker": "SPX",
+   "baseline_target": false,
+   "false_reject": false,
+   "accept_drop": false,
+   "wo": [
+    "absent",
+    null
+   ],
+   "wi": [
+    "absent",
+    null
+   ]
+  },
+  {
+   "id": 606706,
+   "ticker": "USB",
+   "baseline_target": false,
+   "false_reject": false,
+   "accept_drop": false,
+   "wo": [
+    "found",
+    null
+   ],
+   "wi": [
+    "found",
+    null
+   ]
+  },
+  {
+   "id": 606658,
+   "ticker": "GOOGL",
+   "baseline_target": false,
+   "false_reject": false,
+   "accept_drop": false,
+   "wo": [
+    "found",
+    null
+   ],
+   "wi": [
+    "found",
+    null
+   ]
+  },
+  {
+   "id": 606201,
+   "ticker": "OLED",
+   "baseline_target": false,
+   "false_reject": false,
+   "accept_drop": false,
+   "wo": [
+    "found",
+    null
+   ],
+   "wi": [
+    "found",
+    null
+   ]
+  },
+  {
+   "id": 607063,
+   "ticker": "SBUX",
+   "baseline_target": false,
+   "false_reject": false,
+   "accept_drop": false,
+   "wo": [
+    "absent",
+    null
+   ],
+   "wi": [
+    "absent",
+    null
+   ]
+  },
+  {
+   "id": 607061,
+   "ticker": "O",
+   "baseline_target": false,
+   "false_reject": false,
+   "accept_drop": false,
+   "wo": [
+    "absent",
+    null
+   ],
+   "wi": [
+    "absent",
+    null
+   ]
+  },
+  {
+   "id": 606904,
+   "ticker": "LOW",
+   "baseline_target": true,
+   "false_reject": true,
+   "accept_drop": false,
+   "wo": [
+    "found",
+    286.26
+   ],
+   "wi": [
+    "found",
+    null
+   ]
+  },
+  {
+   "id": 607458,
+   "ticker": "SBUX",
+   "baseline_target": false,
+   "false_reject": false,
+   "accept_drop": false,
+   "wo": [
+    "found",
+    null
+   ],
+   "wi": [
+    "found",
+    null
+   ]
+  },
+  {
+   "id": 607566,
+   "ticker": "O",
+   "baseline_target": false,
+   "false_reject": false,
+   "accept_drop": true,
+   "wo": [
+    "found",
+    null
+   ],
+   "wi": [
+    "absent",
+    null
+   ]
+  },
+  {
+   "id": 607383,
+   "ticker": "MO",
+   "baseline_target": false,
+   "false_reject": false,
+   "accept_drop": false,
+   "wo": [
+    "absent",
+    null
+   ],
+   "wi": [
+    "absent",
+    null
+   ]
+  },
+  {
+   "id": 607587,
+   "ticker": "RTX",
+   "baseline_target": false,
+   "false_reject": false,
+   "accept_drop": false,
+   "wo": [
+    "found",
+    null
+   ],
+   "wi": [
+    "found",
+    null
+   ]
+  },
+  {
+   "id": 607591,
+   "ticker": "PARA",
+   "baseline_target": false,
+   "false_reject": false,
+   "accept_drop": false,
+   "wo": [
+    "absent",
+    null
+   ],
+   "wi": [
+    "absent",
+    null
+   ]
+  },
+  {
+   "id": 607610,
+   "ticker": "META",
+   "baseline_target": false,
+   "false_reject": false,
+   "accept_drop": false,
+   "wo": [
+    "found",
+    null
+   ],
+   "wi": [
+    "found",
+    null
+   ]
+  },
+  {
+   "id": 607952,
+   "ticker": "BMY",
+   "baseline_target": false,
+   "false_reject": false,
+   "accept_drop": false,
+   "wo": [
+    "absent",
+    null
+   ],
+   "wi": [
+    "absent",
+    null
+   ]
+  },
+  {
+   "id": 608007,
+   "ticker": "AMZN",
+   "baseline_target": false,
+   "false_reject": false,
+   "accept_drop": false,
+   "wo": [
+    "found",
+    null
+   ],
+   "wi": [
+    "found",
+    null
+   ]
+  },
+  {
+   "id": 608073,
+   "ticker": "SAND",
+   "baseline_target": false,
+   "false_reject": false,
+   "accept_drop": false,
+   "wo": [
+    "found",
+    null
+   ],
+   "wi": [
+    "found",
+    null
+   ]
+  },
+  {
+   "id": 608132,
+   "ticker": "KLAC",
+   "baseline_target": false,
+   "false_reject": false,
+   "accept_drop": false,
+   "wo": [
+    "absent",
+    null
+   ],
+   "wi": [
+    "absent",
+    null
+   ]
+  },
+  {
+   "id": 608153,
+   "ticker": "AMAT",
+   "baseline_target": true,
+   "false_reject": true,
+   "accept_drop": false,
+   "wo": [
+    "found",
+    222.18
+   ],
+   "wi": [
+    "found",
+    null
+   ]
+  },
+  {
+   "id": 608152,
+   "ticker": "CAT",
+   "baseline_target": true,
+   "false_reject": true,
+   "accept_drop": false,
+   "wo": [
+    "found",
+    484.91
+   ],
+   "wi": [
+    "found",
+    null
+   ]
+  },
+  {
+   "id": 608739,
+   "ticker": "DIS",
+   "baseline_target": false,
+   "false_reject": false,
+   "accept_drop": false,
+   "wo": [
+    "found",
+    null
+   ],
+   "wi": [
+    "found",
+    null
+   ]
+  }
+ ]
+}
