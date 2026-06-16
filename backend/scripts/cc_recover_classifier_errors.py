@@ -383,11 +383,14 @@ TIMEFRAME — HARD RULE (overrides the inferred defaults above):
 # arg at the live call site.
 _TARGET_HYGIENE_BLOCK = """
 
-price_target — HYGIENE RULE (adjusts ONLY the price_target field):
-- price_target is ONLY an explicit forward PRICE the speaker says the stock itself will reach ("headed to $250", "my target is $90", "$300 by 2027").
-- Set price_target = null when the number is instead: a chart level (support/resistance or a moving average — "the 200-day at 150", "holds 50"); a valuation multiple or model output (P/E, EPS, a DCF / intrinsic "$236 a share", "10x free cash flow"); a market-cap or index level ("a $13 billion company"); the current or entry price ("buying it at $170"); or a THIRD PARTY's target ("Wall Street sees $370", "the analyst PT is $90").
-- Side check: a bullish call's price_target must be ABOVE the current price and a bearish call's BELOW it; if the stated number is on the wrong side, it is not the target — set null.
-- When in doubt, set price_target = null. This rule changes ONLY price_target — it NEVER changes which predictions you extract, their ticker, direction, conviction_level, or timeframe (a real call with no clean target is still extracted, direction-only)."""
+price_target — HYGIENE RULE (adjusts ONLY the price_target field, never which predictions are emitted):
+- The host's OWN explicit forward price for the stock IS the price_target — KEEP it: "heading to $900", "goes to $450", "my target is $200", "$300 by 2027", "buying at 406 with the idea it goes to 450" (target = 450).
+- Set price_target = null ONLY when the number is clearly NOT the host's forward target but instead one of:
+  - a chart / technical LEVEL — a moving average, support / resistance, or a fib level ("the 200-day at 150", "resistance at 50", "holds the 21-day").
+  - a VALUATION-MODEL output — an intrinsic / fair value, a DCF result, a multiple, or a buy-price from a margin-of-safety calc ("worth $236 a share", "fair value in the low 50s", "intrinsic value $344", "10x free cash flow", "buy price 229 with a 20% margin of safety").
+  - a MARKET-CAP or a per-share figure of something else ("a $13 billion company", "$1.3B of free cash flow").
+  - a THIRD PARTY's price target being relayed rather than the host's own call ("Wall Street sees $370", "the analyst PT is $90", "Canaccord's $420 target").
+- If the number is the host's own price target, KEEP it. When unsure whether it is the host's target, KEEP it. Do NOT apply any above-/below-current-price reasoning here. This rule changes ONLY price_target — it never changes which predictions you extract, their ticker, direction, conviction_level, or timeframe (a real call whose only number is a level / valuation is still extracted, direction-only)."""
 
 
 def build_cc_prompt(transcripts: dict, conditional: bool = False,
@@ -899,7 +902,8 @@ def main() -> int:
             # drift in ALL attempts; extraction parity within the measured
             # old-vs-old noise floor. False = instant rollback, byte-identical.
             entries, err = run_cc_classifier(build_cc_prompt(good, conditional=True,
-                                                             long_horizon_rule=True))
+                                                             long_horizon_rule=True,
+                                                             target_hygiene=True))
             if err == "stopped":
                 _log("[recover] stopped during classification — exiting cleanly")
                 break

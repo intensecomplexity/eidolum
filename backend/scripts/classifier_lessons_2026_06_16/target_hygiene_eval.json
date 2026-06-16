@@ -164,7 +164,7 @@
     null
    ],
    "wi": [
-    "found",
+    "absent",
     null
    ]
   },
@@ -174,11 +174,11 @@
    "baseline_bad": false,
    "caught": false,
    "wo": [
-    "found",
+    "absent",
     null
    ],
    "wi": [
-    "found",
+    "absent",
     null
    ]
   },
@@ -188,7 +188,7 @@
    "baseline_bad": false,
    "caught": false,
    "wo": [
-    "found",
+    "absent",
     null
    ],
    "wi": [
@@ -202,7 +202,7 @@
    "baseline_bad": false,
    "caught": false,
    "wo": [
-    "found",
+    "absent",
     null
    ],
    "wi": [
@@ -245,10 +245,10 @@
    "caught": true,
    "wo": [
     "found",
-    800
+    845
    ],
    "wi": [
-    "found",
+    "absent",
     null
    ]
   },
@@ -314,7 +314,7 @@
    "baseline_bad": false,
    "caught": false,
    "wo": [
-    "absent",
+    "found",
     null
    ],
    "wi": [
@@ -325,11 +325,11 @@
   {
    "id": 633434,
    "ticker": "UNH",
-   "baseline_bad": false,
+   "baseline_bad": true,
    "caught": false,
    "wo": [
     "found",
-    null
+    395
    ],
    "wi": [
     "found",
@@ -342,7 +342,7 @@
    "baseline_bad": false,
    "caught": false,
    "wo": [
-    "absent",
+    "found",
     null
    ],
    "wi": [
@@ -356,11 +356,11 @@
    "baseline_bad": false,
    "caught": false,
    "wo": [
-    "absent",
+    "found",
     null
    ],
    "wi": [
-    "found",
+    "absent",
     null
    ]
   },
@@ -486,7 +486,7 @@
    "id": 605815,
    "ticker": "ETH",
    "baseline_target": true,
-   "false_reject": true,
+   "false_reject": false,
    "accept_drop": false,
    "wo": [
     "found",
@@ -494,7 +494,7 @@
    ],
    "wi": [
     "found",
-    null
+    2400
    ]
   },
   {
@@ -520,7 +520,7 @@
    "accept_drop": false,
    "wo": [
     "found",
-    160
+    1.6
    ],
    "wi": [
     "found",
@@ -590,15 +590,15 @@
   {
    "id": 606706,
    "ticker": "USB",
-   "baseline_target": false,
-   "false_reject": false,
-   "accept_drop": false,
+   "baseline_target": true,
+   "false_reject": true,
+   "accept_drop": true,
    "wo": [
     "found",
-    null
+    38.21
    ],
    "wi": [
-    "found",
+    "absent",
     null
    ]
   },
@@ -680,12 +680,12 @@
   {
    "id": 607458,
    "ticker": "SBUX",
-   "baseline_target": false,
-   "false_reject": false,
+   "baseline_target": true,
+   "false_reject": true,
    "accept_drop": false,
    "wo": [
     "found",
-    null
+    99.2
    ],
    "wi": [
     "found",
@@ -800,12 +800,12 @@
   {
    "id": 608073,
    "ticker": "SAND",
-   "baseline_target": false,
-   "false_reject": false,
+   "baseline_target": true,
+   "false_reject": true,
    "accept_drop": false,
    "wo": [
     "found",
-    null
+    3.5
    ],
    "wi": [
     "found",
@@ -850,7 +850,7 @@
    "accept_drop": false,
    "wo": [
     "found",
-    484.91
+    377.34
    ],
    "wi": [
     "found",
@@ -860,12 +860,12 @@
   {
    "id": 608739,
    "ticker": "DIS",
-   "baseline_target": false,
-   "false_reject": false,
+   "baseline_target": true,
+   "false_reject": true,
    "accept_drop": false,
    "wo": [
     "found",
-    null
+    89
    ],
    "wi": [
     "found",

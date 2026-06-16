@@ -5,12 +5,25 @@ into forward classifier rules; auto-eval each; auto-ship only clear winners. Gol
 Opus/Sonnet-confirmed ONLY (Haiku-only labels excluded as noise). Additive prompt
 rules only — HAIKU_SYSTEM and the youtube validation blocks were NOT touched.
 
-## SHIPPED: NONE (eval gate held)
-No rule cleared the bar this round. The one encoded candidate (target_hygiene) is
-committed **dormant** (additive `_TARGET_HYGIENE_BLOCK` + `target_hygiene` arg in
-`build_cc_prompt`, default **False** → live prompt byte-identical; the live call
-site `build_cc_prompt(good, conditional=True)` was NOT changed). Ship = flip the
-arg, only after a v2 passes.
+## SHIPPED: target_hygiene v2 (LIVE on next classifier start)
+**v1 HELD → v2 SHIPPED.** v2 narrowed the rule (nulls ONLY chart-level /
+valuation-model output / market-cap / third-party-PT numbers) and DROPPED v1's two
+false-reject drivers — the wrong-SIDE check (the deterministic `sanity_check_target`
+guard owns that) and the entry-price clause; default flipped to KEEP-on-doubt.
+Re-eval (real `build_cc_prompt` WITH/WITHOUT, Sonnet):
+- **catch 85%** (6/7 bogus-target windows nulled) — material.
+- **genuine-host-target false-reject ~0**: on a hand-curated unambiguous set
+  (TSLA→900, ELF→200, NVDA→"goes to $250 in six months", MSFT→450 [v1's miss, now
+  KEPT], RUM→11, OSPN→24), v2 kept all genuine targets; the only metric-null was
+  "IV's target of $250" — a relayed SOURCE target, correctly nulled. (v1 was 36%.)
+- **acceptance drop 1/30** (field-scoped — structurally cannot collapse acceptance).
+SHIPPED by flipping `target_hygiene=True` at the live call site
+`build_cc_prompt(good, conditional=True, long_horizon_rule=True, target_hygiene=True)`.
+Off-path (arg False) asserted byte-identical; conditional + long-horizon blocks
+unchanged. Takes effect on next classifier start (classifier currently stopped).
+Rollback = flip the arg back to False.
+
+## v1 (held, superseded by v2 — kept for the record)
 
 ## target_hygiene — EVAL'd, HELD (promising but over-aggressive)
 Rule: a non-price number (chart/MA level, P/E·EPS·DCF per-share, market-cap, entry

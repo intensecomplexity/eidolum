@@ -9,130 +9,13 @@
   "wi": 900
  },
  {
-  "id": 609026,
-  "ticker": "MSM",
-  "stored": 66.0,
-  "base": false,
-  "fr": false,
-  "wo": null,
-  "wi": null
- },
- {
-  "id": 614307,
-  "ticker": "TSLA",
-  "stored": 433.0,
+  "id": 616326,
+  "ticker": "RUM",
+  "stored": 11.0,
   "base": true,
   "fr": false,
-  "wo": 433,
-  "wi": 433
- },
- {
-  "id": 605823,
-  "ticker": "XRP",
-  "stored": 300.0,
-  "base": true,
-  "fr": false,
-  "wo": 300,
-  "wi": 300
- },
- {
-  "id": 627430,
-  "ticker": "SOFI",
-  "stored": 15.0,
-  "base": false,
-  "fr": false,
-  "wo": null,
-  "wi": null
- },
- {
-  "id": 614288,
-  "ticker": "QQQ",
-  "stored": 577.0,
-  "base": true,
-  "fr": false,
-  "wo": 577,
-  "wi": 577
- },
- {
-  "id": 616286,
-  "ticker": "HOOD",
-  "stored": 65.0,
-  "base": true,
-  "fr": true,
-  "wo": 65,
-  "wi": null
- },
- {
-  "id": 616275,
-  "ticker": "AMZN",
-  "stored": 161.0,
-  "base": false,
-  "fr": false,
-  "wo": null,
-  "wi": null
- },
- {
-  "id": 612255,
-  "ticker": "WIN",
-  "stored": 225.0,
-  "base": false,
-  "fr": false,
-  "wo": null,
-  "wi": null
- },
- {
-  "id": 616281,
-  "ticker": "HUT",
-  "stored": 50.0,
-  "base": true,
-  "fr": true,
-  "wo": 50,
-  "wi": null
- },
- {
-  "id": 615000,
-  "ticker": "WIN",
-  "stored": 200.0,
-  "base": false,
-  "fr": false,
-  "wo": null,
-  "wi": null
- },
- {
-  "id": 614964,
-  "ticker": "AMD",
-  "stored": 400.0,
-  "base": true,
-  "fr": false,
-  "wo": 400,
-  "wi": 400
- },
- {
-  "id": 612877,
-  "ticker": "DIS",
-  "stored": 75.0,
-  "base": false,
-  "fr": false,
-  "wo": null,
-  "wi": null
- },
- {
-  "id": 614951,
-  "ticker": "HOOD",
-  "stored": 60.0,
-  "base": true,
-  "fr": false,
-  "wo": 60,
-  "wi": 60
- },
- {
-  "id": 615102,
-  "ticker": "NKE",
-  "stored": 100.0,
-  "base": false,
-  "fr": false,
-  "wo": null,
-  "wi": 150
+  "wo": 13,
+  "wi": 13
  },
  {
   "id": 614982,
@@ -144,39 +27,39 @@
   "wi": 200
  },
  {
+  "id": 630167,
+  "ticker": "OSPN",
+  "stored": 24.0,
+  "base": false,
+  "fr": false,
+  "wo": null,
+  "wi": null
+ },
+ {
+  "id": 616720,
+  "ticker": "NVDA",
+  "stored": 250.0,
+  "base": true,
+  "fr": false,
+  "wo": 250,
+  "wi": 250
+ },
+ {
+  "id": 617079,
+  "ticker": "NVDA",
+  "stored": 250.0,
+  "base": true,
+  "fr": true,
+  "wo": 250,
+  "wi": null
+ },
+ {
   "id": 614034,
   "ticker": "MSFT",
-  "stored": 450.0,
+  "stored": 450,
   "base": true,
-  "fr": true,
+  "fr": false,
   "wo": 450,
-  "wi": null
- },
- {
-  "id": 613841,
-  "ticker": "AAPL",
-  "stored": 196.0,
-  "base": true,
-  "fr": true,
-  "wo": 196,
-  "wi": null
- },
- {
-  "id": 614008,
-  "ticker": "GOOGL",
-  "stored": 159.0,
-  "base": false,
-  "fr": false,
-  "wo": null,
-  "wi": null
- },
- {
-  "id": 629941,
-  "ticker": "LULU",
-  "stored": 120.0,
-  "base": false,
-  "fr": false,
-  "wo": null,
-  "wi": null
+  "wi": 450
  }
 ]
