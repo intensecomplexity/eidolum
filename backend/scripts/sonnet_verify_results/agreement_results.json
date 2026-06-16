@@ -1,0 +1,98 @@
+{
+ "opus_apply": {
+  "holding": {
+   "n": 120,
+   "confirm": 42,
+   "opus_dist": {
+    "holding": 42,
+    "OK": 37,
+    "no_claim": 31,
+    "reported_speech": 1,
+    "direction_mismatch": 2,
+    "wrong_ticker": 6,
+    "conditional": 1
+   }
+  },
+  "reported_speech": {
+   "n": 268,
+   "confirm": 101,
+   "opus_dist": {
+    "reported_speech": 101,
+    "OK": 85,
+    "no_claim": 53,
+    "target_error": 21,
+    "wrong_ticker": 4,
+    "direction_mismatch": 1,
+    "hedged": 1,
+    "holding": 2
+   }
+  },
+  "chart_commentary": {
+   "n": 69,
+   "confirm": 18,
+   "opus_dist": {
+    "OK": 28,
+    "no_claim": 18,
+    "chart_commentary": 18,
+    "conditional": 2,
+    "target_error": 1,
+    "hedged": 1,
+    "direction_mismatch": 1
+   }
+  },
+  "target_error": {
+   "n": 217,
+   "confirm": 29,
+   "opus_dist": {
+    "OK": 144,
+    "no_claim": 17,
+    "target_error": 29,
+    "hedged": 4,
+    "conditional": 10,
+    "wrong_ticker": 5,
+    "direction_mismatch": 3,
+    "reported_speech": 1,
+    "chart_commentary": 4
+   }
+  }
+ },
+ "sonnet_dirtick": {
+  "direction_mismatch": {
+   "n": 620,
+   "confirm": 185,
+   "opus_dist": {
+    "direction_mismatch": 185,
+    "target_error": 7,
+    "OK": 208,
+    "no_claim": 93,
+    "conditional": 63,
+    "wrong_ticker": 12,
+    "hedged": 17,
+    "holding": 11,
+    "reported_speech": 13,
+    "chart_commentary": 11
+   }
+  },
+  "wrong_ticker": {
+   "n": 194,
+   "confirm": 111,
+   "opus_dist": {
+    "wrong_ticker": 111,
+    "no_claim": 23,
+    "OK": 46,
+    "direction_mismatch": 3,
+    "conditional": 6,
+    "reported_speech": 2,
+    "holding": 2,
+    "hedged": 1
+   }
+  }
+ },
+ "applied": {
+  "is_no_claim": 141,
+  "is_holding": 44,
+  "is_reported": 103,
+  "target_dir_only": 49
+ },
+ "review_dirtick_agree": 296
+}
