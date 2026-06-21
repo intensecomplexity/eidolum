@@ -77,6 +77,32 @@ HIDE_NO_GRADEABLE_CLAIM = (
 )
 
 
+# 2026-06-22 alt-source isolation — corporate-insider (source_type='insider')
+# and congressional (source_type='congress') trades are modeled as scored
+# directional predictions, but they are a SEPARATE product axis behind the
+# ENABLE_INSIDER_CONGRESS_SOURCES flag. They must NEVER mix into the
+# cross-sectional analyst/social surfaces (default leaderboard, asset
+# consensus, activity feed, sector/theme boards, firms, smart money, …).
+# hedged_filter_sql() excludes them by DEFAULT so every aggregate call site
+# picks up the hiding with no per-site edit. The two opt-in surfaces — the
+# dedicated leaderboard source filter and the per-forecaster profile
+# drill-down — call the helper with include_alt_sources=True. This is NOT a
+# hedged kill-switch class; the exclusion is unconditional (independent of
+# HIDE_* env vars) because these rows are off the analyst board by product
+# decision, not by data-quality flag.
+ALT_SOURCE_TYPES = ("insider", "congress")
+
+
+def alt_source_exclusion_sql(table_alias: str = "p") -> str:
+    """Return an ``AND``-prefixed SQL fragment that excludes alt-source
+    (insider/congress) prediction rows. Always active — there is no kill
+    switch; visibility is governed by the ENABLE_INSIDER_CONGRESS_SOURCES
+    flag at the dedicated leaderboard filter, not here."""
+    return (
+        f" AND COALESCE({table_alias}.source_type, '') NOT IN ('insider', 'congress')"
+    )
+
+
 def weak_basket_filter_sql(table_alias: str = "p") -> str:
     """Return an ``AND``-prefixed SQL fragment that excludes rows flagged
     is_weak_basket_call (basket mention with inferred direction — see
@@ -142,13 +168,19 @@ def reported_speech_filter_sql(table_alias: str = "p") -> str:
     )
 
 
-def hedged_filter_sql(table_alias: str = "p") -> str:
+def hedged_filter_sql(table_alias: str = "p", include_alt_sources: bool = False) -> str:
     """Return an ``AND``-prefixed SQL fragment that filters out hedged /
     hypothetical predictions AND reported-speech predictions when their
     respective env-var kill switches are enabled.
 
-    Returns an empty string when both are disabled, so callers can
-    interpolate unconditionally.
+    By default it ALSO excludes alt-source (insider/congress) rows so every
+    cross-sectional aggregate surface hides them automatically (see
+    ``ALT_SOURCE_TYPES`` above). Pass ``include_alt_sources=True`` on the two
+    opt-in surfaces (the dedicated leaderboard source filter and the
+    per-forecaster profile drill-down) to KEEP those rows.
+
+    Returns an empty string only when every hiding class is disabled AND
+    ``include_alt_sources=True``, so callers can interpolate unconditionally.
 
     NULL ``conviction_level`` is preserved on the hedged check — 98%+
     of historical predictions pre-date metadata enrichment and carry
@@ -193,6 +225,8 @@ def hedged_filter_sql(table_alias: str = "p") -> str:
         parts.append(
             f" AND COALESCE({table_alias}.is_no_gradeable_claim, FALSE) = FALSE"
         )
+    if not include_alt_sources:
+        parts.append(alt_source_exclusion_sql(table_alias))
     return "".join(parts)
 
 

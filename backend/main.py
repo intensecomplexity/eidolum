@@ -4357,10 +4357,15 @@ def get_features(db: _Session = _Depends(_get_db)):
         # Captures label data the fine-tuning backfill depends on.
         # Default false.
         "prediction_metadata_enrichment": False,
+        # Boolean: reveals the dedicated "Insiders" and "Congress" leaderboard
+        # source filters (corporate Form-4 open-market trades + congressional
+        # PTR trades scored as directional calls). Default false — the rows
+        # stay isolated from every other surface regardless of this flag.
+        "insider_congress_sources": False,
     }
     try:
         rows = db.execute(_ft(
-            "SELECT key, value FROM config WHERE key IN ('tournaments_enabled','daily_challenge_enabled','duels_enabled','compete_enabled','compare_analysts_enabled','EVALUATE_X_PREDICTIONS','ENABLE_YOUTUBE_SECTOR_CALLS','ENABLE_RANKED_LIST_EXTRACTION','ENABLE_TARGET_REVISIONS','ENABLE_OPTIONS_POSITION_EXTRACTION','ENABLE_EARNINGS_CALL_EXTRACTION','ENABLE_MACRO_CALL_EXTRACTION','ENABLE_PAIR_CALL_EXTRACTION','ENABLE_BINARY_EVENT_EXTRACTION','ENABLE_METRIC_FORECAST_EXTRACTION','ENABLE_CONDITIONAL_CALL_EXTRACTION','ENABLE_DISCLOSURE_EXTRACTION','ENABLE_SOURCE_TIMESTAMPS','ENABLE_REGIME_CALL_EXTRACTION','ENABLE_PREDICTION_METADATA_ENRICHMENT')"
+            "SELECT key, value FROM config WHERE key IN ('tournaments_enabled','daily_challenge_enabled','duels_enabled','compete_enabled','compare_analysts_enabled','EVALUATE_X_PREDICTIONS','ENABLE_YOUTUBE_SECTOR_CALLS','ENABLE_RANKED_LIST_EXTRACTION','ENABLE_TARGET_REVISIONS','ENABLE_OPTIONS_POSITION_EXTRACTION','ENABLE_EARNINGS_CALL_EXTRACTION','ENABLE_MACRO_CALL_EXTRACTION','ENABLE_PAIR_CALL_EXTRACTION','ENABLE_BINARY_EVENT_EXTRACTION','ENABLE_METRIC_FORECAST_EXTRACTION','ENABLE_CONDITIONAL_CALL_EXTRACTION','ENABLE_DISCLOSURE_EXTRACTION','ENABLE_SOURCE_TIMESTAMPS','ENABLE_REGIME_CALL_EXTRACTION','ENABLE_PREDICTION_METADATA_ENRICHMENT','ENABLE_INSIDER_CONGRESS_SOURCES')"
         )).fetchall()
         for r in rows:
             if r[0] == "EVALUATE_X_PREDICTIONS":
@@ -4397,6 +4402,8 @@ def get_features(db: _Session = _Depends(_get_db)):
                 flags["regime_call_extraction"] = str(r[1]).strip().lower() == "true"
             elif r[0] == "ENABLE_PREDICTION_METADATA_ENRICHMENT":
                 flags["prediction_metadata_enrichment"] = str(r[1]).strip().lower() == "true"
+            elif r[0] == "ENABLE_INSIDER_CONGRESS_SOURCES":
+                flags["insider_congress_sources"] = str(r[1]).strip().lower() == "true"
             else:
                 flags[r[0].replace("_enabled", "")] = r[1] == "true"
     except Exception:
