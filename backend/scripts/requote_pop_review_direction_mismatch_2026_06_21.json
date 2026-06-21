@@ -1,0 +1,82 @@
+{
+  "generated": "2026-06-21",
+  "note": "Population requote pass \u2014 rows whose transcript window contradicts the stored label (DIRECTION_MISMATCH) or shows no committed call (NO_CALL). NO mutation applied. A direction flip / re-score is a SCORING change and is human-only. Adjudicate, then run an id-pinned scoring fix if warranted.",
+  "direction_mismatch": [
+    {
+      "id": 614857,
+      "ticker": "TGT",
+      "labeled_direction": "bearish",
+      "grounded_direction": "bullish",
+      "displayed_quote": "Targets got a nice deadcat bounce here, 3%. Dude, their dividend yield is fantastic. You've got Target up 5% as they're offering a 5% dividend. People are buying the consumer dip.",
+      "window_quote": "You've got Target up 5% as they're offering a 5% dividend. People are buying the consumer dip.",
+      "why": "Host describes TGT rising 5% with buying activity; no bearish call made.",
+      "outcome": "miss",
+      "actual_return": "0.0",
+      "vid": "bHh5d7Hlsd8",
+      "flag": "b_opposite",
+      "generating_model": "haiku"
+    }
+  ],
+  "no_call": [
+    {
+      "id": 605748,
+      "ticker": "CNR",
+      "labeled_direction": "bullish",
+      "displayed_quote": "Now, the fifth company in our list, Canadian Railway. This is the most recent addition to our own Quantigens portfolio, where we have 30 dividend growth investing stocks. And we would only ever sell this firm if the dividend stops growing.",
+      "why": "Host describes portfolio holding and yield stats; no forward buy/sell commitment made.",
+      "outcome": "miss",
+      "actual_return": "-4.43",
+      "vid": "ahr3xFgBZBE",
+      "flag": "b_opposite",
+      "generating_model": "haiku"
+    },
+    {
+      "id": 607272,
+      "ticker": "AI",
+      "labeled_direction": "bullish",
+      "displayed_quote": "I've been a buyer in recent years and I'll probably continue to be one in small amounts going forward",
+      "why": "Displayed quote is about BYD; C3.ai mention is position-size only, not a directional call.",
+      "outcome": "miss",
+      "actual_return": "-11.26",
+      "vid": "RFRTDWNp1ao",
+      "flag": "a_orphan",
+      "generating_model": "haiku"
+    },
+    {
+      "id": 607926,
+      "ticker": "FTNT",
+      "labeled_direction": "bullish",
+      "displayed_quote": "today we're going to be focusing one of our favorite cyber security companies foret",
+      "why": "Host only introduces and describes Fortinet; no forward directional call made.",
+      "outcome": "miss",
+      "actual_return": "-12.86",
+      "vid": "j1hV90zD1s8",
+      "flag": "a_orphan",
+      "generating_model": "haiku"
+    },
+    {
+      "id": 609689,
+      "ticker": "SNPS",
+      "labeled_direction": "bullish",
+      "displayed_quote": "Nvidia has already invested 2 billion in Synopsis' common stock.",
+      "why": "Quote is Nvidia's action, not host making a forward directional call on SNPS",
+      "outcome": "miss",
+      "actual_return": "-5.49",
+      "vid": "gNh9s4uzEuo",
+      "flag": "a_orphan",
+      "generating_model": "haiku"
+    },
+    {
+      "id": 609321,
+      "ticker": "AAPL",
+      "labeled_direction": "bullish",
+      "displayed_quote": "one of my most respected investors which is Steve eisan he's one of the big short investors and I believe he gives very level-headed advice he was asked about Ai and which companies he thinks will benefit the most from artificial intelligence you think that there's a huge I think Apple's actually the hidden AI play not exactly today but will be because you know everybody's focused on the chips and everybody's focused on the cloud but at the end of the day when there will be apps and I have no idea when that's going to be but when there will be apps that the consumer can use they're going to want to use it on their phone and I have a new iPhone and I know for sure that when all those apps come on my phone is going to I'll need a new phone and I'll need a new iPad and I'll need a new laptop and so when the app show up the biggest probably beneficiary is going to be apple because they're going to have a refresh of of every literally everything that they sell",
+      "why": "Quote is Steve Eisan's words, not the host's committed bullish call on AAPL.",
+      "outcome": "hit",
+      "actual_return": "5.49",
+      "vid": "2Hxsq2clpbM",
+      "flag": "b_opposite",
+      "generating_model": "haiku"
+    }
+  ]
+}
