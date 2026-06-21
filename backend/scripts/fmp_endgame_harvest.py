@@ -1184,10 +1184,10 @@ def dataset_registry():
     return [
         ("p1_transcripts", 1, harvest_p1_transcripts),
         ("p2_crypto", 2, harvest_p2_crypto),
+        ("p4_mktcap", 4, harvest_p4_mktcap),      # front-loaded: crypto + mktcap are the highest-value bounded gaps
         ("p2_forex", 2, harvest_p2_forex),
         ("p3_pt_news", 3, harvest_p3_pt_news),
         ("p3_grade_news", 3, harvest_p3_grade_news),
-        ("p4_mktcap", 4, harvest_p4_mktcap),
         ("p7_constituents", 7, harvest_p7_constituents),
         ("p8_calendar", 8, harvest_p8_calendar),
         ("p5_13f", 5, harvest_p5_13f),
