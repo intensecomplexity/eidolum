@@ -1130,8 +1130,19 @@ def refresh_all_forecaster_stats():
     from database import BgSessionLocal as SessionLocal
     from feature_flags import x_filter_sql
     from services.prediction_visibility import YT_VISIBLE_FILTER_SQL
-    from routers._prediction_filters import hedged_filter_sql
-    _hedged_na = hedged_filter_sql("predictions")
+    from routers._prediction_filters import hedged_filter_sql, alt_source_exclusion_sql
+    # hedged_filter_sql already excludes alt-source (insider/congress) rows by
+    # default as of 2026-06-22, but we compose it EXPLICITLY here so this
+    # worker-path stat refresh stays correct even if that default is ever
+    # changed. Insider/Congress forecasters (25k+) must never receive cached
+    # forecaster stats: that would (a) surface them on the default leaderboard
+    # — which reads cached forecasters.total_predictions / accuracy_score — and
+    # (b) balloon this per-forecaster loop. They are scored offline and shown
+    # only via the dedicated leaderboard source filter (live aggregation).
+    _hedged_na = (
+        hedged_filter_sql("predictions", include_alt_sources=True)
+        + alt_source_exclusion_sql("predictions")
+    )
     db = SessionLocal()
     updated = 0
     zeroed = 0

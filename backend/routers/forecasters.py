@@ -24,8 +24,14 @@ from routers._prediction_filters import hedged_filter_sql
 # 2026-05-27 since they were hiding 348K legit Wall St rating rows.
 _YT_VIS_BARE = YT_VISIBLE_FILTER_SQL
 _YT_VIS_P = yt_visible_filter("p")
-_HEDGED_P = hedged_filter_sql("p")
-_HEDGED_NA = hedged_filter_sql("predictions")
+# include_alt_sources=True: EVERY hedged usage in this file is forecaster-
+# scoped (WHERE forecaster_id = :fid), so an insider/congress forecaster's own
+# profile + drill-down must show their own rows. This is a no-op for normal
+# analysts/creators (they carry no insider/congress rows). Cross-sectional
+# leakage is still blocked everywhere else by the default-excluding bundle and
+# by these forecasters never receiving cached stats — see ALT_SOURCE_TYPES.
+_HEDGED_P = hedged_filter_sql("p", include_alt_sources=True)
+_HEDGED_NA = hedged_filter_sql("predictions", include_alt_sources=True)
 
 router = APIRouter()
 

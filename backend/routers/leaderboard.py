@@ -14,6 +14,7 @@ from services.prediction_visibility import (
     yt_visible_filter, YT_VISIBLE_FILTER_SQL,
 )
 from routers._prediction_filters import hedged_filter_sql
+from feature_flags import is_insider_congress_sources_enabled
 
 # yt_visible is the only user-facing visibility filter:
 #   yt_visible — legacy YouTube rows missing source_timestamp_seconds
@@ -26,6 +27,13 @@ _HEDGED_P = hedged_filter_sql("p")
 _HEDGED_P2 = hedged_filter_sql("p2")
 _HEDGED_P3 = hedged_filter_sql("p3")
 _HEDGED_NA = hedged_filter_sql("predictions")
+# Alt-source-INCLUSIVE variants — used ONLY in the dedicated insider/congress
+# source-filter branch of _build_filtered_leaderboard, where those rows are
+# the intended payload. Every other leaderboard query uses the default
+# (alt-source-EXCLUDING) constants above. See ALT_SOURCE_TYPES in
+# routers._prediction_filters.
+_HEDGED_P_ALT = hedged_filter_sql("p", include_alt_sources=True)
+_HEDGED_NA_ALT = hedged_filter_sql("predictions", include_alt_sources=True)
 
 router = APIRouter()
 
@@ -845,12 +853,23 @@ def _build_filtered_leaderboard(db: Session, sector=None, call_type=None, sort="
         "p.outcome IN ('hit','near','miss','correct','incorrect')",
         "NOT (p.source_type = 'youtube' AND p.source_timestamp_seconds IS NULL)",
     ]
+    # Insider/Congress are a dedicated source axis behind
+    # ENABLE_INSIDER_CONGRESS_SOURCES. When one of those filters is selected
+    # we (a) hard-gate on the flag — returning [] when off, a second line of
+    # defense behind the hidden frontend pills — and (b) use the alt-source-
+    # INCLUSIVE hedged variant so the rows aren't filtered straight back out
+    # by the bundle's default exclusion. Every other source uses the default
+    # alt-source-EXCLUDING bundle, so insider/congress never bleed into them.
+    _is_alt_source = source in ("insider", "congress")
+    if _is_alt_source and not is_insider_congress_sources_enabled(db):
+        return []
     # Hide hedged/hypothetical predictions from filtered leaderboard. The
     # helper output starts with " AND " for trailing-append usage; here
     # we strip the leading " AND " since this slot is joined by AND
     # already. When the kill switch is off the helper returns "" and
     # we skip the clause.
-    _hedged_clause = _HEDGED_P[5:] if _HEDGED_P else ""
+    _hedged_base = _HEDGED_P_ALT if _is_alt_source else _HEDGED_P
+    _hedged_clause = _hedged_base[5:] if _hedged_base else ""
     if _hedged_clause:
         where_clauses.append(_hedged_clause)
     params = {}
@@ -867,6 +886,10 @@ def _build_filtered_leaderboard(db: Session, sector=None, call_type=None, sort="
             where_clauses.append("p.verified_by = 'stocktwits_scraper'")
         elif source == "community":
             where_clauses.append("p.verified_by IN ('manual', 'user')")
+        elif source == "insider":
+            where_clauses.append("p.source_type = 'insider'")
+        elif source == "congress":
+            where_clauses.append("p.source_type = 'congress'")
 
     if sector:
         where_clauses.append("p.sector = :sector")
@@ -984,7 +1007,7 @@ def _build_filtered_leaderboard(db: Session, sector=None, call_type=None, sort="
                 SELECT forecaster_id, outcome, direction, COUNT(*) as cnt
                 FROM predictions
                 WHERE forecaster_id = ANY(:fids)
-                  AND NOT (source_type = 'youtube' AND source_timestamp_seconds IS NULL){_HEDGED_NA}
+                  AND NOT (source_type = 'youtube' AND source_timestamp_seconds IS NULL){_HEDGED_NA_ALT if _is_alt_source else _HEDGED_NA}
                 GROUP BY forecaster_id, outcome, direction
             """), {"fids": fids}).fetchall()
             counts_by_fid = {}

@@ -725,6 +725,37 @@ def invalidate_product_themes_flag_cache() -> None:
     _PRODUCT_THEMES_FLAG_CACHE["fetched_at"] = 0.0
 
 
+# ── Insider / Congress trade sources (2026-06-22) ───────────────────────────
+#
+# Corporate-insider (Form 4 open-market P/S) and congressional (PTR) trades
+# are harvested in fmp_insider_trades / fmp_congress_trades, modeled as scored
+# directional ticker_call predictions (source_type insider/congress), and
+# surfaced as their OWN leaderboard source filters. The whole surface is dark
+# until Nimrod verifies — default OFF. Flipping it on only reveals the two
+# dedicated leaderboard filters; the rows stay isolated from every other
+# surface (see routers._prediction_filters.ALT_SOURCE_TYPES).
+_INSIDER_CONGRESS_FLAG_CACHE: dict = {"enabled": False, "fetched_at": 0.0}
+_INSIDER_CONGRESS_FLAG_TTL = 60  # seconds
+
+
+def is_insider_congress_sources_enabled(db) -> bool:
+    """Return True if ENABLE_INSIDER_CONGRESS_SOURCES is 'true' in the config
+    table. Default False (key absent ⇒ off). Cached 60s."""
+    now = time.time()
+    if (now - _INSIDER_CONGRESS_FLAG_CACHE["fetched_at"]) < _INSIDER_CONGRESS_FLAG_TTL:
+        return bool(_INSIDER_CONGRESS_FLAG_CACHE["enabled"])
+    enabled = _read_bool(db, "ENABLE_INSIDER_CONGRESS_SOURCES", default=False)
+    _INSIDER_CONGRESS_FLAG_CACHE["enabled"] = enabled
+    _INSIDER_CONGRESS_FLAG_CACHE["fetched_at"] = now
+    return enabled
+
+
+def invalidate_insider_congress_sources_flag_cache() -> None:
+    """Reset the 60-second cache so a config flip takes effect on the next
+    request instead of waiting out the TTL."""
+    _INSIDER_CONGRESS_FLAG_CACHE["fetched_at"] = 0.0
+
+
 # ── Sector/theme top-forecaster ranking floor ───────────────────────────────
 #
 # Minimum SCORED predictions a forecaster needs WITHIN a sector/theme to
