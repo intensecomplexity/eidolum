@@ -8,6 +8,7 @@ import PageHeader from '../components/PageHeader';
 import MiniPieChart from '../components/MiniPieChart';
 import PlatformBadge from '../components/PlatformBadge';
 import { getSourceBadgeKey } from '../utils/getSourceBadgeKey';
+import { useFeatures } from '../context/FeatureContext';
 import RankBadge from '../components/RankBadge';
 import StreakBadge from '../components/StreakBadge';
 import LeaderboardCard from '../components/LeaderboardCard';
@@ -91,6 +92,11 @@ function getMetricValue(f, metricKey) {
 export default function Leaderboard() {
   const [data, setData] = useState([]);
   const navigate = useNavigate();
+  // Insiders / Congress source pills are revealed only when the
+  // ENABLE_INSIDER_CONGRESS_SOURCES flag is on (default off). The backend
+  // source filter hard-gates on the same flag, so the pills are purely the
+  // discoverable entry point.
+  const features = useFeatures();
   // Ship #13B Bug 14: hydrate filter state from the URL once at mount
   // so a shared link like /leaderboard?sector=Technology&sort=accuracy
   // lands on the right filter state, then write every change back to
@@ -377,6 +383,12 @@ export default function Leaderboard() {
                     // StockTwits intentionally hidden: coverage too sparse to
                     // surface. ?source=stocktwits still works — the backend
                     // filter is untouched, only the pill is hidden.
+                    // Insiders / Congress: revealed only behind the
+                    // ENABLE_INSIDER_CONGRESS_SOURCES flag (default off).
+                    ...(features?.insider_congress_sources ? [
+                      { key: 'insider', label: 'Insiders', color: '#7c3aed' },
+                      { key: 'congress', label: 'Congress', color: '#6366f1' },
+                    ] : []),
                   ].map(s => (
                     <button key={s.key} onClick={() => setSource(s.key)}
                       className={`px-2.5 py-1 rounded text-[11px] font-semibold transition-colors ${
