@@ -14,6 +14,9 @@ const SOURCE_MAP = {
   stocktwits_scraper: 'StockTwits', alphavantage: 'Wall St',
   marketbeat_rss: 'Wall St', yfinance: 'Wall St', newsapi: 'Wall St',
   ai_parsed: 'AI Parsed', user: 'Community', manual: 'Community',
+  // Form-4 open-market insider trades + congressional PTR disclosures —
+  // scored as directional calls, surfaced under their own leaderboard axis.
+  insider_filing: 'Insider', congress_filing: 'Congress',
 };
 
 export function getSourceLabel(verifiedBy) {

@@ -13,6 +13,8 @@ export function getSourceBadgeKey(item, forecaster) {
   if (vb === 'benzinga_api' || vb === 'fmp_ratings' || vb === 'alphavantage' || vb === 'benzinga_rss' || vb === 'marketbeat_rss' || vb === 'yfinance') return 'institutional';
   if (vb === 'youtube_scraper') return 'youtube';
   if (vb === 'user' || vb === 'manual') return 'user';
+  if (vb === 'insider_filing') return 'insider';
+  if (vb === 'congress_filing') return 'congress';
 
   // Check source_type (prediction-level or forecaster primary)
   const st = item.source_type || item.primary_source;
@@ -20,6 +22,8 @@ export function getSourceBadgeKey(item, forecaster) {
   if (st === 'youtube') return 'youtube';
   if (st === 'reddit') return 'reddit';
   if (st === 'article') return 'institutional';
+  if (st === 'insider') return 'insider';
+  if (st === 'congress') return 'congress';
 
   return forecaster?.platform || item.platform || null;
 }
