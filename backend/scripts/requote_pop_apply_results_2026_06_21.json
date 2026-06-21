@@ -1,0 +1,20 @@
+{
+"generated": "2026-06-21",
+"cohort_size": 179,
+"judged": 179,
+"counts": {
+"REQUOTE": 4,
+"KEEP": 169,
+"DIRECTION_MISMATCH": 1,
+"NO_CALL": 5,
+"INSUFFICIENT": 0
+},
+"requote_applied": 4,
+"requote_noop_skipped": 0,
+"normalized_mismatch_to_keep": [
+608144
+],
+"marker_total": 4,
+"invariant_violations": [],
+"unexpected_quote_changes": []
+}
