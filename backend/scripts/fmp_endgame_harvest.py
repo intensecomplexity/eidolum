@@ -590,8 +590,10 @@ def harvest_p1_transcripts(ctx):
         cols, pk, _ = TABLES["fmp_transcript_index"]
         _upsert_if(ctx, "fmp_transcript_index", cols, pk, idx_rows, "update", "p1_transcripts")
 
+    # small batch: transcript payloads are ~50KB each and high-count symbols are
+    # front-loaded, so a large batch balloons memory and delays disk persistence.
     per_symbol(ctx, "p1_transcripts", "p1_transcripts", eq, _fetch_transcripts,
-               on_batch, batch=120, guard_pg=False, firehose=True)
+               on_batch, batch=25, guard_pg=False, firehose=True)
 
 
 # ═══════════════════════════════════════════════════════ P2 crypto / forex EOD
