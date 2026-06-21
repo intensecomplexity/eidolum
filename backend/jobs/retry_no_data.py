@@ -621,6 +621,7 @@ def retry_no_data_batch(db, max_tickers: int | None = None):
                p.evaluation_date, p.prediction_date, p.forecaster_id, p.window_days
         FROM predictions p
         WHERE p.outcome = 'no_data'
+          AND COALESCE(p.evaluation_deferred, FALSE) = FALSE
           AND p.prediction_date IS NOT NULL
           AND p.prediction_date >= NOW() - INTERVAL '2 years'
           AND p.evaluation_date <= NOW()
@@ -637,6 +638,7 @@ def retry_no_data_batch(db, max_tickers: int | None = None):
                p.evaluation_date, p.prediction_date, p.forecaster_id, p.window_days
         FROM predictions p
         WHERE p.outcome = 'no_data'
+          AND COALESCE(p.evaluation_deferred, FALSE) = FALSE
           AND p.prediction_date IS NOT NULL
           AND p.prediction_date < NOW() - INTERVAL '2 years'
           AND p.evaluation_date <= NOW()
@@ -673,6 +675,7 @@ def retry_no_data_batch(db, max_tickers: int | None = None):
     remaining_total = db.execute(sql_text(r"""
         SELECT COUNT(*) FROM predictions
         WHERE outcome = 'no_data'
+          AND COALESCE(evaluation_deferred, FALSE) = FALSE
           AND evaluation_date IS NOT NULL
           AND (
               ticker ~ '^[A-Z]{1,5}$'
@@ -818,6 +821,7 @@ def retry_no_data_batch(db, max_tickers: int | None = None):
                 UPDATE predictions
                 SET last_retry_at = NOW(), retry_count = retry_count + 1
                 WHERE outcome='no_data' AND ticker = ANY(:tickers)
+                  AND COALESCE(evaluation_deferred, FALSE) = FALSE
             """), {"tickers": list(all_tickers)})
             db.commit()
             print(f"[RetryNoData] Marked {len(all_tickers)} tickers as retried (FMP phase)", flush=True)
@@ -845,6 +849,7 @@ def retry_no_data_batch(db, max_tickers: int | None = None):
                 UPDATE predictions
                 SET last_retry_at = NOW(), retry_count = retry_count + 1
                 WHERE outcome='no_data' AND ticker = ANY(:tickers)
+                  AND COALESCE(evaluation_deferred, FALSE) = FALSE
             """), {"tickers": list(polygon_fallback)})
             db.commit()
             print(f"[RetryNoData] Marked {len(polygon_fallback)} tickers as retried (Polygon fallback)", flush=True)
@@ -876,6 +881,7 @@ def retry_no_data_batch(db, max_tickers: int | None = None):
                 UPDATE predictions
                 SET last_retry_at = NOW(), retry_count = retry_count + 1
                 WHERE outcome='no_data' AND ticker = ANY(:tickers)
+                  AND COALESCE(evaluation_deferred, FALSE) = FALSE
             """), {"tickers": list(tiingo_fallback)})
             db.commit()
             print(f"[RetryNoData] Marked {len(tiingo_fallback)} tickers as retried (Tiingo fallback)", flush=True)
@@ -917,6 +923,7 @@ def retry_no_data_batch(db, max_tickers: int | None = None):
                 UPDATE predictions
                 SET last_retry_at = NOW(), retry_count = retry_count + 1
                 WHERE outcome='no_data' AND ticker = ANY(:tickers)
+                  AND COALESCE(evaluation_deferred, FALSE) = FALSE
             """), {"tickers": list(polygon_batch)})
             db.commit()
             print(f"[RetryNoData] Marked {len(polygon_batch)} tickers as retried (Polygon phase)", flush=True)
@@ -968,6 +975,7 @@ def retry_no_data_batch(db, max_tickers: int | None = None):
                 UPDATE predictions
                 SET last_retry_at = NOW(), retry_count = retry_count + 1
                 WHERE outcome='no_data' AND ticker = ANY(:tickers)
+                  AND COALESCE(evaluation_deferred, FALSE) = FALSE
             """), {"tickers": list(tiingo_batch)})
             db.commit()
             print(f"[RetryNoData] Marked {len(tiingo_batch)} tickers as retried (Tiingo phase)", flush=True)
@@ -1000,6 +1008,7 @@ def retry_no_data_batch(db, max_tickers: int | None = None):
                 UPDATE predictions
                 SET last_retry_at = NOW(), retry_count = retry_count + 1
                 WHERE outcome='no_data' AND ticker = ANY(:tickers)
+                  AND COALESCE(evaluation_deferred, FALSE) = FALSE
             """), {"tickers": list(tiingo_failed_tickers)})
             db.commit()
             print(f"[RetryNoData] Marked {len(tiingo_failed_tickers)} tickers as retried (FMP Starter fallback)", flush=True)

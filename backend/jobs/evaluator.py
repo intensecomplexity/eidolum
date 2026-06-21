@@ -601,9 +601,13 @@ def run_evaluator(db: Session):
 
     now = datetime.utcnow()
 
-    # Find predictions past their evaluation window
+    # Find predictions past their evaluation window. evaluation_deferred rows
+    # (conditional/regime calls + offline-scored alt sources like insider/
+    # congress) are owned by a different scorer and must NOT be auto-evaluated
+    # here — matches the guard historical_evaluator.evaluate_batch applies.
     base_q = db.query(Prediction).filter(
         Prediction.outcome == "pending",
+        Prediction.evaluation_deferred.isnot(True),
         Prediction.evaluation_date.isnot(None),
         Prediction.evaluation_date <= now,
     )
@@ -617,6 +621,7 @@ def run_evaluator(db: Session):
         # Also check predictions without evaluation_date but past their window
         pending_q = db.query(Prediction).filter(
             Prediction.outcome == "pending",
+            Prediction.evaluation_deferred.isnot(True),
             Prediction.evaluation_date.is_(None),
         )
         if skip_x:
@@ -761,9 +766,11 @@ def sweep_stuck_predictions(db: Session):
     now = datetime.utcnow()
     cutoff = now - timedelta(days=7)
 
-    # Predictions overdue by more than 7 days
+    # Predictions overdue by more than 7 days. Skip evaluation_deferred rows
+    # (offline-scored alt sources + conditional/regime) — not this sweep's job.
     stuck_q = db.query(Prediction).filter(
         Prediction.outcome == "pending",
+        Prediction.evaluation_deferred.isnot(True),
         Prediction.evaluation_date.isnot(None),
         Prediction.evaluation_date <= cutoff,
     )
@@ -867,6 +874,7 @@ def retry_no_data_predictions(db: Session):
     from sqlalchemy import or_
     no_data_q = db.query(Prediction).filter(
         Prediction.outcome == "no_data",
+        Prediction.evaluation_deferred.isnot(True),
         Prediction.entry_price.isnot(None),
         Prediction.entry_price > 0,
         Prediction.ticker.isnot(None),
