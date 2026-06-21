@@ -4571,6 +4571,24 @@ def insert_youtube_prediction(
             _cond_unresolved = True
     except Exception:
         _cond_unresolved = False
+    # Ship: forward NO-GRADEABLE-CLAIM guard (gold-anchor root cause; eval-gated
+    # 2026-06-21 on the 200-row gold set, false-hide of a real call ~0). A
+    # vague-preference / buy-wishlist / hedged-non-call row with NO number and NO
+    # direction stance is not a scored call -> is_no_gradeable_claim=TRUE +
+    # outcome='unresolved' (hidden via the bundle + off the scoreboard). Cost-gated
+    # to no-number/no-direction quotes (the cheap gate auto-keeps everything numeric
+    # or directional, so real calls are structurally protected); one Sonnet verify
+    # over the ±90s window. Runs after holding/conditional, before representativeness,
+    # and short-circuits the rep second-pass when it fires (no double LLM call).
+    # Default-on behind ENABLE_GRADEABLE_GUARD; fail-open keep. Precision over recall.
+    _is_no_gradeable = False
+    try:
+        from jobs import representativeness_guard as _rgg
+        if not (_is_holding or _cond_unresolved):
+            if _rgg.gradeable_decide(pred, ticker, direction, _ts_fields, transcript_data, db, stats=stats).get("action") == "not_gradeable":
+                _is_no_gradeable = True
+    except Exception:
+        _is_no_gradeable = False
     # Ship: representativeness guard (transcript-aware (a)/(c)/(d)/(e); eval-gated
     # 2026-06-14). Additive, fail-open, flag-not-delete; gated by
     # ENABLE_REPRESENTATIVENESS_GUARD. ticker_call only. Never hard-rejects (eval
@@ -4583,9 +4601,10 @@ def insert_youtube_prediction(
     _rg_reported = _rg_weak = False
     try:
         from jobs import representativeness_guard as _rg
-        # Skip the rep second-pass if this row is already a holding or conditional-
-        # unresolved (it's hidden/off-board; no value in a second LLM call).
-        _gd = ({"action": "keep"} if (_cond_unresolved or _is_holding)
+        # Skip the rep second-pass if this row is already a holding, conditional-
+        # unresolved, or no-gradeable-claim (it's hidden/off-board; no value in a
+        # second LLM call).
+        _gd = ({"action": "keep"} if (_cond_unresolved or _is_holding or _is_no_gradeable)
                else _rg.decide(pred, ticker, direction, _ts_fields, transcript_data, db, stats=stats))
         if _gd.get("action") == "reject":
             return _reject(_gd.get("reason") or "representativeness_guard")
@@ -4671,6 +4690,15 @@ def insert_youtube_prediction(
         _pred.evaluation_summary = (
             "[holding_guard] passive holding disclosure — hidden + off scoreboard "
             "(not a scored call)")
+    # No-gradeable-claim guard: vague preference / wishlist / hedged non-call with
+    # no number and no direction — hidden (bundle) + off the scoreboard. Not a
+    # scored call; flag-not-delete.
+    if _is_no_gradeable:
+        _pred.is_no_gradeable_claim = True
+        _pred.outcome = "unresolved"
+        _pred.evaluation_summary = (
+            "[gradeable_guard] no gradeable claim (no number, no direction) — "
+            "hidden + off scoreboard (not a scored call)")
     if _classifier_validation_gate(_pred, db, stats):
         return _reject("classifier_validation_gate")
     db.add(_pred)

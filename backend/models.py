@@ -425,6 +425,23 @@ class Prediction(Base):
     is_no_claim = Column(Boolean, nullable=False, default=False,
                          server_default="false")
 
+    # 2026-06-21 no-gradeable-claim detector (gold-anchor root cause:
+    # GOLD_FINDINGS true user-facing precision ~47.6%; the dominant "OK"
+    # bucket was only ~46% gold-valid, driven by vague-preference rows no
+    # flag caught). TRUE = NOT_GRADEABLE: the row has NEITHER a number
+    # (price target / % / level) NOR a stock-direction stance on the
+    # ticker — vague preference ("I like it", "great company"), a
+    # buy-wishlist ("on my watchlist"), or a hedged non-call. Distinct
+    # from is_no_claim (provenance of the quote): this is about whether
+    # the call itself is SCOREABLE. KEEP bare directional stances
+    # ("bullish on V"), conditionals, and firm targets. Not a scored
+    # call: hidden via the bundled hedged_filter_sql helper (kill switch
+    # HIDE_NO_GRADEABLE_CLAIM) AND off the accuracy board
+    # (outcome='unresolved'). Set forward by representativeness_guard
+    # .gradeable_decide() and backfilled by scripts/no_gradeable_apply_2026_06_21.py.
+    is_no_gradeable_claim = Column(Boolean, nullable=False, default=False,
+                                   server_default="false")
+
     # Ship #14 — long-horizon predictions ("Tesla $500 by 2030") are
     # kept as valid training data but skipped by the evaluator until
     # their window resolves. evaluation_deferred=TRUE means the
