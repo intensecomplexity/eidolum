@@ -1,0 +1,150 @@
+{"id": 628711, "ticker": "FNV", "source": "youtube", "ai_label": "not_a_prediction", "reason": "ownership/buying disclosure ('I'm gonna own'), no target/forecast"}
+{"id": 613243, "ticker": "NFLX", "source": "youtube", "ai_label": "OK", "reason": "fair value $120 vs price $103, undervalued with number"}
+{"id": 629446, "ticker": "PG", "source": "youtube", "ai_label": "not_a_prediction", "reason": "reported speech \u2014 'Wall Street see 174', relays analyst target"}
+{"id": 633200, "ticker": "LUNR", "source": "x", "ai_label": "OK", "reason": "own wave target zone $49.84-$55.21, bullish Wave 5"}
+{"id": 633300, "ticker": "AEHR", "source": "x", "ai_label": "BORDERLINE", "reason": "'I stay bullish' + institutional-discovery thesis, no price number/target"}
+{"id": 631489, "ticker": "ETH", "source": "youtube", "ai_label": "BORDERLINE", "reason": "supply-shock bullish mechanism, no number/target"}
+{"id": 630910, "ticker": "NVDA", "source": "youtube", "ai_label": "OK", "reason": "explicit buy conviction ('best stocks to buy right now'), target $122"}
+{"id": 634844, "ticker": "CRDO", "source": "x", "ai_label": "not_a_prediction", "reason": "reported speech \u2014 Needham analyst maintains Buy, PT $275"}
+{"id": 611387, "ticker": "SPY", "source": "youtube", "ai_label": "not_a_prediction", "reason": "vague market commentary, drifts to housing, no number"}
+{"id": 609511, "ticker": "HALO", "source": "youtube", "ai_label": "BORDERLINE", "reason": "trade setup but heavily hedged ('I don't know how high this can get')"}
+{"id": 609359, "ticker": "EQIX", "source": "youtube", "ai_label": "not_a_prediction", "reason": "vague praise ('great choice'), hedged ('probably'), no number"}
+{"id": 633513, "ticker": "AI", "source": "x", "ai_label": "OK", "reason": "'20%+ up move at earnings' \u2014 number + direction + timeframe"}
+{"id": 605795, "ticker": "TDOC", "source": "youtube", "ai_label": "OK", "reason": "intrinsic value $8.06 vs price $5.52, number"}
+{"id": 625165, "ticker": "CMA", "source": "youtube", "ai_label": "not_a_prediction", "reason": "passing 'four-star rated' mention, no number/conviction"}
+{"id": 606105, "ticker": "PANW", "source": "youtube", "ai_label": "OK", "reason": "explicit upgrade to 'full-fledged buy', target $186"}
+{"id": 625273, "ticker": "VRT", "source": "youtube", "ai_label": "not_a_prediction", "reason": "descriptive 'pure play', no number/target"}
+{"id": 609969, "ticker": "GOOGL", "source": "youtube", "ai_label": "OK", "reason": "quantified undervaluation (P/E 21.5 vs 24-28, cheapest Mag7) + conviction"}
+{"id": 625159, "ticker": "ET", "source": "youtube", "ai_label": "OK", "reason": "20% discount to fair value (number)"}
+{"id": 612833, "ticker": "AZN", "source": "youtube", "ai_label": "not_a_prediction", "reason": "past brag ('up 79%'), vague 'future bright', no forward number"}
+{"id": 631328, "ticker": "SOFI", "source": "x", "ai_label": "conditional", "reason": "'as long as we hold support, move to upside challenging $20'"}
+{"id": 606073, "ticker": "JPM", "source": "youtube", "ai_label": "not_a_prediction", "reason": "buy-wishlist ('maybe we should buy'), hedged"}
+{"id": 630840, "ticker": "TSLA", "source": "youtube", "ai_label": "BORDERLINE", "reason": "autonomy thesis ('first to crack at scale'), no price number"}
+{"id": 629322, "ticker": "INVA", "source": "youtube", "ai_label": "OK", "reason": "360% earnings-growth projection 'not factored in', this year, target $34.8"}
+{"id": 631348, "ticker": "BEAT", "source": "x", "ai_label": "not_a_prediction", "reason": "holding disclosure ('threw profits in as longterm holding')"}
+{"id": 607885, "ticker": "META", "source": "youtube", "ai_label": "not_a_prediction", "reason": "vague praise ('dominant player in AI for years'), no number"}
+{"id": 630408, "ticker": "BTC", "source": "x", "ai_label": "OK", "reason": "explicit model 'Signal: LONG' with timeframe"}
+{"id": 633109, "ticker": "WLD", "source": "x", "ai_label": "OK", "reason": "trade signal \u2014 entry 0.4705 / target 0.606 / stop 0.4485"}
+{"id": 606749, "ticker": "USB", "source": "youtube", "ai_label": "BORDERLINE", "reason": "'too cheap' undervalued no number + buying"}
+{"id": 630412, "ticker": "ETH", "source": "x", "ai_label": "OK", "reason": "bearish with targets $1,373/$857 (matches stored bearish)"}
+{"id": 631848, "ticker": "EWY", "source": "x", "ai_label": "not_a_prediction", "reason": "whale put-flow relay (reported)"}
+{"id": 610980, "ticker": "HD", "source": "youtube", "ai_label": "BORDERLINE", "reason": "bearish fundamental critique (slow guidance, debt), no price target"}
+{"id": 634232, "ticker": "SOFI", "source": "x", "ai_label": "OK", "reason": "buy conviction ('taking Sofi all day') at sub-$18 level"}
+{"id": 627065, "ticker": "ALAB", "source": "youtube", "ai_label": "BORDERLINE", "reason": "trade management ('move stop to BE, reconfirmation up'), no target"}
+{"id": 625116, "ticker": "JNJ", "source": "youtube", "ai_label": "not_a_prediction", "reason": "buying disclosure ('I'm buying right now'), 'not a screaming value'"}
+{"id": 625537, "ticker": "BE", "source": "youtube", "ai_label": "not_a_prediction", "reason": "vague ('super relevant for AI super cycle'), no number"}
+{"id": 612621, "ticker": "ETH", "source": "youtube", "ai_label": "not_a_prediction", "reason": "vague ('should absolutely dominate'), no number"}
+{"id": 606500, "ticker": "MO", "source": "youtube", "ai_label": "not_a_prediction", "reason": "non-committal/hedged ('not opposed, would watch'); stored neutral"}
+{"id": 616492, "ticker": "INTC", "source": "youtube", "ai_label": "not_a_prediction", "reason": "hedged ('might be a great time', 'could compete'), no number"}
+{"id": 622064, "ticker": "PYPL", "source": "youtube", "ai_label": "not_a_prediction", "reason": "intro narration about 'three undervalued stocks', no specific PYPL call"}
+{"id": 634136, "ticker": "NOW", "source": "x", "ai_label": "OK", "reason": "'IS THE TIME TO BUY, $200 SOON' \u2014 target + direction"}
+{"id": 612522, "ticker": "SPY", "source": "youtube", "ai_label": "not_a_prediction", "reason": "vague 'buying at a discount', hedged 'can't time perfectly', no number"}
+{"id": 625987, "ticker": "V", "source": "youtube", "ai_label": "OK", "reason": "fair value $427 vs price $320 (number)"}
+{"id": 627106, "ticker": "INTC", "source": "youtube", "ai_label": "BORDERLINE", "reason": "bearish turnaround/share-loss verdict, no number"}
+{"id": 632447, "ticker": "HIMS", "source": "x", "ai_label": "not_a_prediction", "reason": "whale options-flow relay (reported)"}
+{"id": 632415, "ticker": "TSLA", "source": "x", "ai_label": "not_a_prediction", "reason": "whale call-flow relay (reported)"}
+{"id": 624018, "ticker": "SPY", "source": "youtube", "ai_label": "not_a_prediction", "reason": "market recap/narration, past tense, no call"}
+{"id": 607128, "ticker": "MSFT", "source": "youtube", "ai_label": "not_a_prediction", "reason": "vague praise ('great addition'), no number"}
+{"id": 625633, "ticker": "TXN", "source": "youtube", "ai_label": "OK", "reason": "explicit reiterated 'buy' rating"}
+{"id": 633602, "ticker": "IREN", "source": "x", "ai_label": "BORDERLINE", "reason": "'bullish reversal incoming', directional but thin, no number"}
+{"id": 627656, "ticker": "AAL", "source": "youtube", "ai_label": "OK", "reason": "entry 15-16, target 24-28, 'next year outperforming'"}
+{"id": 611338, "ticker": "IBIT", "source": "youtube", "ai_label": "not_a_prediction", "reason": "reported (banks recommend 1-4% exposure), no IBIT target"}
+{"id": 633205, "ticker": "HOOD", "source": "x", "ai_label": "OK", "reason": "Wave 3 projection target $209.12, bullish"}
+{"id": 630902, "ticker": "NVDA", "source": "youtube", "ai_label": "OK", "reason": "'Buy on any weakness', Zacks rank 2 \u2014 explicit buy"}
+{"id": 625806, "ticker": "DIS", "source": "youtube", "ai_label": "BORDERLINE", "reason": "quote is hedged-descriptive ('could argue recovery setup'); target only in metadata"}
+{"id": 625649, "ticker": "NOC", "source": "youtube", "ai_label": "OK", "reason": "DCF 'undervalued at $745/share' (number)"}
+{"id": 627677, "ticker": "FTNT", "source": "youtube", "ai_label": "not_a_prediction", "reason": "'buy and hold for a long time' (vague, no number)"}
+{"id": 607399, "ticker": "MSFT", "source": "youtube", "ai_label": "OK", "reason": "2030 target $1,020 via EPS x multiple \u2014 dated forecast with numbers"}
+{"id": 632269, "ticker": "SOL", "source": "x", "ai_label": "OK", "reason": "targets $30-35 then $260+ by 2028 \u2014 dated forecast with numbers"}
+{"id": 626629, "ticker": "HOOD", "source": "youtube", "ai_label": "OK", "reason": "year-end $110-130 midpoint $120 \u2014 numeric dated forecast"}
+{"id": 625966, "ticker": "RELX", "source": "youtube", "ai_label": "OK", "reason": "valuation $48.52, 37% undervalued (number)"}
+{"id": 625086, "ticker": "TRIN", "source": "youtube", "ai_label": "not_a_prediction", "reason": "holding disclosure ('newest holding')"}
+{"id": 611768, "ticker": "PLTR", "source": "youtube", "ai_label": "not_a_prediction", "reason": "vague praise ('great investment'), grouped names, no number"}
+{"id": 625261, "ticker": "BABA", "source": "youtube", "ai_label": "OK", "reason": "intrinsic value $146 vs price $119 (number)"}
+{"id": 631283, "ticker": "SE", "source": "x", "ai_label": "not_a_prediction", "reason": "buy-wishlist ('thinking about buys if they go lower')"}
+{"id": 611460, "ticker": "META", "source": "youtube", "ai_label": "BORDERLINE", "reason": "'attractively priced, most upside next 3 years' \u2014 undervalued no number + holding"}
+{"id": 610982, "ticker": "ALLY", "source": "youtube", "ai_label": "BORDERLINE", "reason": "buy-wishlist ('if I buy a bank, probably Ally') + cheap PE/PB metrics"}
+{"id": 630260, "ticker": "GOOGL", "source": "youtube", "ai_label": "OK", "reason": "2030 returns 99-142%, CAGR 12-16% \u2014 dated forecast with numbers"}
+{"id": 611016, "ticker": "SBUX", "source": "youtube", "ai_label": "not_a_prediction", "reason": "descriptive FCF fundamentals, no forward call/target"}
+{"id": 427061, "ticker": "BTC", "source": "x", "ai_label": "OK", "reason": "explicit 'I'm short' (short verdict; matches bearish)"}
+{"id": 607200, "ticker": "AVGO", "source": "youtube", "ai_label": "not_a_prediction", "reason": "descriptive praise ('leader in custom silicon'), no number"}
+{"id": 609109, "ticker": "MCD", "source": "youtube", "ai_label": "not_a_prediction", "reason": "vague praise ('I love'), thesis no number"}
+{"id": 616129, "ticker": "RBRK", "source": "youtube", "ai_label": "conditional", "reason": "'if good earnings, could head back to mid-70s range'"}
+{"id": 615059, "ticker": "IWM", "source": "youtube", "ai_label": "BORDERLINE", "reason": "'Russell rolls remainder of year' \u2014 directional dated, no number"}
+{"id": 452520, "ticker": "GOLD", "source": "x", "ai_label": "not_a_prediction", "reason": "whale long-position relay (reported)"}
+{"id": 614033, "ticker": "GOOG", "source": "youtube", "ai_label": "BORDERLINE", "reason": "chart commentary ('higher highs, nice spot to buy'), no target"}
+{"id": 629124, "ticker": "AVGO", "source": "youtube", "ai_label": "not_a_prediction", "reason": "buying disclosure ('just bought more'), 'I like'"}
+{"id": 630397, "ticker": "BLUR", "source": "x", "ai_label": "BORDERLINE", "reason": "chart bias bearish + mixed '+7% if reclaims', no clear target"}
+{"id": 605896, "ticker": "SWKS", "source": "youtube", "ai_label": "BORDERLINE", "reason": "'really cheap, compelling value' \u2014 undervalued no number"}
+{"id": 605778, "ticker": "PG", "source": "youtube", "ai_label": "OK", "reason": "DCF $198 vs price $144, undervalued (number)"}
+{"id": 627640, "ticker": "KHC", "source": "youtube", "ai_label": "OK", "reason": "45% discount to fair value (number)"}
+{"id": 607412, "ticker": "META", "source": "youtube", "ai_label": "BORDERLINE", "reason": "mild 'I like' + 'attractive ~21x forward earnings', no price target"}
+{"id": 627671, "ticker": "OKTA", "source": "youtube", "ai_label": "OK", "reason": "'15% undervalued, most undervalued in cyber' (number)"}
+{"id": 627621, "ticker": "TLT", "source": "youtube", "ai_label": "BORDERLINE", "reason": "rates-higher -> TLT-down macro thesis, no number"}
+{"id": 630813, "ticker": "TDOC", "source": "youtube", "ai_label": "BORDERLINE", "reason": "long-term 'best shot at market leader' thesis + 'bet long term', no number"}
+{"id": 627618, "ticker": "JNJ", "source": "youtube", "ai_label": "not_a_prediction", "reason": "vague ('excited to revise strategy, more emphasis'), no call/number"}
+{"id": 612678, "ticker": "BTC", "source": "youtube", "ai_label": "conditional", "reason": "'if you break 86,000 and finish below, we're going into the 70s'"}
+{"id": 612458, "ticker": "XLK", "source": "youtube", "ai_label": "not_a_prediction", "reason": "vague macro hype ('impact will be wild, flips the script'), no number"}
+{"id": 634828, "ticker": "TSLA", "source": "x", "ai_label": "BORDERLINE", "reason": "dated op forecast ('5,000+ robotaxis by EOY') \u2014 not a price target"}
+{"id": 616053, "ticker": "CINT", "source": "youtube", "ai_label": "not_a_prediction", "reason": "descriptive fundamentals (mkt cap/EV/FCF), 'not sexy', no forward call"}
+{"id": 633149, "ticker": "RKLB", "source": "x", "ai_label": "conditional", "reason": "'if close & hold above $123, next target $131, otherwise pullback $110'"}
+{"id": 610969, "ticker": "COST", "source": "youtube", "ai_label": "not_a_prediction", "reason": "holding disclosure ('largest holdings') + praise ('best company in world')"}
+{"id": 634597, "ticker": "ETH", "source": "x", "ai_label": "OK", "reason": "short targets TP1 2258/TP2/TP3 + SL \u2014 trade signal (matches bearish)"}
+{"id": 608451, "ticker": "AAPL", "source": "youtube", "ai_label": "BORDERLINE", "reason": "'difficult to see how this company loses' \u2014 conviction, no number"}
+{"id": 625740, "ticker": "TSLX", "source": "youtube", "ai_label": "not_a_prediction", "reason": "buying disclosure ('picked up more shares'), 'cheaper than usual'"}
+{"id": 626383, "ticker": "GOOGL", "source": "youtube", "ai_label": "BORDERLINE", "reason": "chart 'looking for a lower high' \u2014 bearish technical, no target"}
+{"id": 607806, "ticker": "FSLR", "source": "youtube", "ai_label": "BORDERLINE", "reason": "Trump-tariff bullish thesis, backlog through 2030, no price number"}
+{"id": 608687, "ticker": "INTC", "source": "youtube", "ai_label": "not_a_prediction", "reason": "buying disclosure ('bought first stage, maybe buy more'), hedged"}
+{"id": 633666, "ticker": "XRP", "source": "x", "ai_label": "not_a_prediction", "reason": "promo/spam ('activate strategy, LONG 20x leverage'), no real target"}
+{"id": 623252, "ticker": "DKNG", "source": "youtube", "ai_label": "OK", "reason": "intrinsic value $53 vs price $33, undervalued (number)"}
+{"id": 609227, "ticker": "TXN", "source": "youtube", "ai_label": "BORDERLINE", "reason": "sell-half disclosure + bearish growth view, no number"}
+{"id": 634281, "ticker": "XRP", "source": "x", "ai_label": "conditional", "reason": "'watching $1.34 buy zone; if it holds, targets $1.37/$1.40'"}
+{"id": 616968, "ticker": "PANW", "source": "youtube", "ai_label": "not_a_prediction", "reason": "vague ('I like this one, power to dominate'), no number"}
+{"id": 606627, "ticker": "TPL", "source": "youtube", "ai_label": "not_a_prediction", "reason": "buying disclosure ('opened position, bought 1 share, multi-decade')"}
+{"id": 631967, "ticker": "BTC", "source": "x", "ai_label": "not_a_prediction", "reason": "promo/spam ('LONG 500x leverage'), no target"}
+{"id": 616767, "ticker": "SPY", "source": "youtube", "ai_label": "not_a_prediction", "reason": "descriptive ('sustained rally, $4T cash'), no forward target"}
+{"id": 632050, "ticker": "BTC", "source": "x", "ai_label": "not_a_prediction", "reason": "vague 'bullish on BTC' + SpaceX-holdings fact, no number/target"}
+{"id": 627231, "ticker": "FTNT", "source": "youtube", "ai_label": "BORDERLINE", "reason": "'on average $112, 58% upside, may be one to consider' \u2014 reported-avg + hedged"}
+{"id": 616590, "ticker": "GRAB", "source": "youtube", "ai_label": "not_a_prediction", "reason": "hypothetical preference ('if I was interested, I'd prefer Grab')"}
+{"id": 616266, "ticker": "NOC", "source": "youtube", "ai_label": "BORDERLINE", "reason": "'a little overpriced but contracts could push higher' \u2014 mixed/hedged"}
+{"id": 630737, "ticker": "HOOD", "source": "youtube", "ai_label": "OK", "reason": "explicit $100 target with conviction ('we're going to be over 100')"}
+{"id": 613085, "ticker": "AMZN", "source": "youtube", "ai_label": "BORDERLINE", "reason": "hedged ('would not be surprised') $3T mkt-cap, vague timeframe"}
+{"id": 631196, "ticker": "VG", "source": "x", "ai_label": "OK", "reason": "trade levels \u2014 hold $12, take out $19, hit $21 target"}
+{"id": 627443, "ticker": "HUM", "source": "youtube", "ai_label": "not_a_prediction", "reason": "vague praise ('favorite rebound stock, strong upside'), no number"}
+{"id": 606116, "ticker": "AVGO", "source": "youtube", "ai_label": "OK", "reason": "intrinsic value $383 vs price $313 (number)"}
+{"id": 630113, "ticker": "CIFR", "source": "x", "ai_label": "OK", "reason": "breakout $25.52, wave 3 target $46.01 \u2014 trade levels"}
+{"id": 629830, "ticker": "GTLB", "source": "youtube", "ai_label": "BORDERLINE", "reason": "'very attractive at 8x P/S' \u2014 valuation multiple, no price target"}
+{"id": 626089, "ticker": "AAPL", "source": "youtube", "ai_label": "OK", "reason": "'30x earnings is ridiculous' \u2014 overvalued verdict with multiple (bearish)"}
+{"id": 606630, "ticker": "ADM", "source": "youtube", "ai_label": "BORDERLINE", "reason": "hedged ('may be a solid entry point') + dividend, no target"}
+{"id": 633799, "ticker": "USOIL", "source": "x", "ai_label": "OK", "reason": "'strong continuation toward $140/barrel in upcoming days' \u2014 target+timeframe"}
+{"id": 607743, "ticker": "AAPL", "source": "youtube", "ai_label": "not_a_prediction", "reason": "vague ('pretty good choice for Harris presidency'), no number"}
+{"id": 608448, "ticker": "CRM", "source": "youtube", "ai_label": "not_a_prediction", "reason": "buying disclosure ('still buying, in the red, still bullish'), no number"}
+{"id": 628846, "ticker": "RTX", "source": "youtube", "ai_label": "BORDERLINE", "reason": "'going to do very well over next couple months' \u2014 vague + timeframe, no number"}
+{"id": 635111, "ticker": "TE", "source": "x", "ai_label": "not_a_prediction", "reason": "reported PT ('Roth still at $10 PT') + position disclosure"}
+{"id": 633071, "ticker": "META", "source": "x", "ai_label": "OK", "reason": "'attractive buying opportunity', forward PE 20.5, 25% rev growth"}
+{"id": 626492, "ticker": "USB", "source": "youtube", "ai_label": "BORDERLINE", "reason": "ambiguous ('market perform long run but market beater next 5 years')"}
+{"id": 631237, "ticker": "SOFI", "source": "youtube", "ai_label": "OK", "reason": "explicit price target $20-22, reiterated buy"}
+{"id": 633772, "ticker": "BEAT", "source": "x", "ai_label": "OK", "reason": "SHORT signal \u2014 SL 0.40461, TP 0.37153/0.35880/0.35117 (matches bearish)"}
+{"id": 623219, "ticker": "META", "source": "youtube", "ai_label": "OK", "reason": "explicit 'ranked top stock to buy', strong conviction"}
+{"id": 625666, "ticker": "TMUS", "source": "youtube", "ai_label": "BORDERLINE", "reason": "'looking especially attractive' \u2014 undervalued no number"}
+{"id": 606136, "ticker": "AMD", "source": "youtube", "ai_label": "not_a_prediction", "reason": "fair value $186 ~ price (calls it 'fairly valued'); stored neutral"}
+{"id": 622743, "ticker": "UNH", "source": "youtube", "ai_label": "not_a_prediction", "reason": "past-tense stance ('been bullish since price fell'), no number/forward"}
+{"id": 633399, "ticker": "HYPE", "source": "x", "ai_label": "not_a_prediction", "reason": "vague ('Bullish, first target hit, going to second'), no number stated"}
+{"id": 630310, "ticker": "COIN", "source": "youtube", "ai_label": "not_a_prediction", "reason": "vague belief ('will come back, great company'), no number"}
+{"id": 608804, "ticker": "TSLA", "source": "youtube", "ai_label": "not_a_prediction", "reason": "vague ranking ('bullish long-term but rank middle #5'), no number"}
+{"id": 626184, "ticker": "AMZN", "source": "youtube", "ai_label": "BORDERLINE", "reason": "'Amazon's cheap too' \u2014 undervalued no number"}
+{"id": 634191, "ticker": "XPEV", "source": "x", "ai_label": "BORDERLINE", "reason": "promotional hype ('rises 200%, next TSLA'), rhetorical number"}
+{"id": 629766, "ticker": "SPOT", "source": "youtube", "ai_label": "BORDERLINE", "reason": "'over next 2 years huge change in profitability' \u2014 dated thesis, no price number"}
+{"id": 605656, "ticker": "CSU", "source": "youtube", "ai_label": "not_a_prediction", "reason": "vague ('worth looking at'), no number"}
+{"id": 634507, "ticker": "BTC", "source": "x", "ai_label": "BORDERLINE", "reason": "mixed range plan (shorts + longs), bearish lean, no committed call"}
+{"id": 609844, "ticker": "CSU", "source": "youtube", "ai_label": "not_a_prediction", "reason": "buy-wishlist ('if it drops on tariffs I'd buy') + praise"}
+{"id": 610829, "ticker": "CP", "source": "youtube", "ai_label": "not_a_prediction", "reason": "buying disclosure ('going to be buying, adding') + praise"}
+{"id": 627368, "ticker": "QCOM", "source": "youtube", "ai_label": "OK", "reason": "DCF fair value ~$234, 57% upside (number)"}
+{"id": 629279, "ticker": "MSTR", "source": "youtube", "ai_label": "not_a_prediction", "reason": "vague ('good week next Monday'), no number/target"}
+{"id": 633678, "ticker": "TIA", "source": "x", "ai_label": "OK", "reason": "trade signal \u2014 LONG 18x, enter 0.3000, stop 0.2799"}
+{"id": 634774, "ticker": "OPEN", "source": "x", "ai_label": "BORDERLINE", "reason": "concrete bullish options trade (9.5 call 10/31) but promo ('bank on it'), no target"}
+{"id": 634209, "ticker": "RDDT", "source": "x", "ai_label": "OK", "reason": "'Wave 3 price target is $450' + thesis"}
+{"id": 631879, "ticker": "SPX", "source": "x", "ai_label": "BORDERLINE", "reason": "mixed conditional chart scenarios ('put if fails, call if breakout'), levels"}
+{"id": 632155, "ticker": "BEAT", "source": "x", "ai_label": "OK", "reason": "explicit short position ('I'm short, placed another short above resistance')"}
+{"id": 630576, "ticker": "CPB", "source": "x", "ai_label": "not_a_prediction", "reason": "reported \u2014 analyst target cuts (RBC/Bernstein/BofA/UBS)"}
+{"id": 633570, "ticker": "BTC", "source": "x", "ai_label": "OK", "reason": "'bearish engulfing + sell signal weekly, trending dots at $73,350' (matches bearish)"}
