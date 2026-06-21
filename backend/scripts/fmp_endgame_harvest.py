@@ -40,23 +40,27 @@ Run (from backend/), data as app_worker, FMP_KEY from the worker service:
 """
 import argparse
 import atexit
+import fcntl
 import gzip
 import json
 import os
 import signal
 import sys
+import threading
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
 from urllib.parse import urlparse, urlunparse
 
+import httpx
 import psycopg2
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-# Reuse wave-1 helpers verbatim (httpx transport + backoff, rate limiter, DB I/O)
+# Reuse wave-1 helpers (rate limiter, DB I/O, coercers); transport is local +
+# instrumented so we can meter bandwidth (the binding constraint).
 from fmp_ultimate_harvest import (  # noqa: E402
-    _get_json, Rate, upsert, map_rows, row_hash, db_size_gb, KIND,
-    _f, _i, _s, _d,
+    Rate, upsert, map_rows, row_hash, db_size_gb, KIND,
+    _f, _i, _s, _d, FMP_KEY, BASE,
 )
 
 import pyarrow as pa  # noqa: E402
@@ -85,6 +89,111 @@ def log(msg):
 
 def st(ds):
     return _stats.setdefault(ds, {"fetched": 0, "pg": 0, "arch_rows": 0, "arch_bytes": 0})
+
+
+# ───────────────────────────────────────────────── bandwidth meter (binding constraint)
+BW_FILE = os.path.join(ART, "fmp_endgame_bandwidth.json")
+TRANSCRIPT_MKTCAP_FLOOR = float(os.environ.get("FMP_TRANSCRIPT_MKTCAP_FLOOR", "1e9"))
+# content_bytes = sum(len(response.content)) — decompressed; our hard-guard meter
+# (safe: FMP gzips so this >= the wire bytes FMP actually meters). wire_bytes =
+# num_bytes_downloaded (actual egress) — tracked for calibration vs FMP dashboard.
+_BW = {"content_bytes": 0, "wire_bytes": 0, "datasets": {}}
+_BW_LOCK = threading.Lock()
+_CUR_DS = "init"
+
+
+def set_ds(key):
+    global _CUR_DS
+    _CUR_DS = key
+
+
+def _bw_add(content, wire):
+    with _BW_LOCK:
+        _BW["content_bytes"] += content
+        _BW["wire_bytes"] += wire
+        _BW["datasets"][_CUR_DS] = _BW["datasets"].get(_CUR_DS, 0) + content
+
+
+def _trip_stop(reason):
+    global _STOP
+    if not _STOP:
+        log(reason)
+    _STOP = True
+
+
+def _instance_id():
+    return "bounded" if "bounded" in os.path.basename(CHECKPOINT) else "main"
+
+
+def bw_sync():
+    """Publish this instance's content_bytes to the flock'd shared file; return
+    the global sum across BOTH instances (the real cross-instance meter)."""
+    try:
+        os.makedirs(ART, exist_ok=True)
+        f = open(BW_FILE, "a+")
+    except OSError:
+        return _BW["content_bytes"]
+    try:
+        fcntl.flock(f, fcntl.LOCK_EX)
+        f.seek(0)
+        raw = f.read()
+        d = json.loads(raw) if raw.strip() else {}
+        d[_instance_id()] = _BW["content_bytes"]
+        f.seek(0)
+        f.truncate()
+        f.write(json.dumps(d))
+        f.flush()
+        return sum(v for v in d.values() if isinstance(v, (int, float)))
+    except Exception:
+        return _BW["content_bytes"]
+    finally:
+        try:
+            fcntl.flock(f, fcntl.LOCK_UN)
+        except Exception:
+            pass
+        f.close()
+
+
+def bw_guard(ctx):
+    """Sync the shared meter, persist into checkpoint, set _STOP if over cap."""
+    total = bw_sync()
+    ctx["cp"]["_bandwidth"] = _BW
+    if total / 1e9 >= ctx["args"].bandwidth_cap_gb:
+        _trip_stop(f"BANDWIDTH CAP {ctx['args'].bandwidth_cap_gb}GB hit "
+                   f"(global {total/1e9:.2f}GB; this instance {_BW['content_bytes']/1e9:.2f}GB) "
+                   f"— graceful stop (flush + checkpoint + exit)")
+    return total
+
+
+def _get_json(path, params=None, retries=3):
+    """Instrumented FMP GET. Accumulates len(content) (cap meter) + wire bytes.
+    429/5xx exponential backoff identical to wave-1."""
+    p = dict(params or {})
+    p["apikey"] = FMP_KEY
+    backoff = [20, 45, 90]
+    for a in range(retries):
+        try:
+            r = httpx.get(BASE + path, params=p, timeout=60)
+            try:
+                _bw_add(len(r.content), getattr(r, "num_bytes_downloaded", 0) or 0)
+            except Exception:
+                pass
+            if r.status_code == 429 or 500 <= r.status_code < 600:
+                if a < retries - 1:
+                    time.sleep(backoff[a]); continue
+                return None
+            if r.status_code != 200:
+                return None
+            j = r.json()
+            return j if isinstance(j, list) else None
+        except (httpx.ConnectError, httpx.ReadTimeout, httpx.ConnectTimeout,
+                httpx.RemoteProtocolError):
+            if a < retries - 1:
+                time.sleep(backoff[a]); continue
+            return None
+        except Exception:
+            return None
+    return None
 
 
 # ───────────────────────────────────────────────── connection (app_worker only)
@@ -476,6 +585,43 @@ def build_universe(conn, cp):
     return syms
 
 
+def build_transcript_universe(conn, cp, mode, base_universe):
+    """Transcripts are the bandwidth hog. 'prio' = prediction-universe tickers
+    + S&P500/Nasdaq/Dow constituents + market cap >= $1B (company_profiles),
+    intersected with the non-foreign base universe and kept in base order
+    (so prediction tickers stay front-loaded). 'all' = the full non-foreign set.
+    Cached so a resume's high-water index stays valid."""
+    cache = f"_transcript_universe_{mode}"
+    if cp.get(cache):
+        return cp[cache]
+    nonforeign = [s for s in base_universe if not is_foreign(s)]
+    if mode == "all":
+        out = nonforeign
+    else:
+        prio = set()
+        with conn.cursor() as cur:
+            cur.execute("SELECT DISTINCT ticker FROM predictions "
+                        "WHERE ticker IS NOT NULL AND ticker<>''")
+            prio |= {(r[0] or "").strip().upper() for r in cur.fetchall()}
+            try:
+                cur.execute("SELECT symbol FROM company_profiles WHERE market_cap >= %s",
+                            (TRANSCRIPT_MKTCAP_FLOOR,))
+                prio |= {(r[0] or "").strip().upper() for r in cur.fetchall()}
+            except Exception:
+                conn.rollback()
+        for ep in ("sp500-constituent", "nasdaq-constituent", "dowjones-constituent"):
+            for r in (_get_json(ep) or []):
+                prio.add((r.get("symbol") or "").strip().upper())
+        out = [s for s in nonforeign if s in prio]
+        log(f"transcript universe 'prio': {len(out):,} of {len(nonforeign):,} non-foreign "
+            f"(predictions ∪ constituents ∪ mktcap>=${TRANSCRIPT_MKTCAP_FLOOR/1e9:.0f}B)")
+    if mode == "all":
+        log(f"transcript universe 'all': {len(out):,} symbols")
+    cp[cache] = out
+    save_cp(cp)
+    return out
+
+
 # ═══════════════════════════════════════════════════════ generic per-symbol driver
 def per_symbol(ctx, ds, cp_key, symbols, fetch_fn, on_batch, batch=200,
                guard_pg=True, firehose=False):
@@ -519,6 +665,7 @@ def per_symbol(ctx, ds, cp_key, symbols, fetch_fn, on_batch, batch=200,
                 pass
         hw += len(chunk)
         cp[cp_key] = {"hw": hw}
+        cp["_bandwidth"] = _BW
         save_cp(cp)
         # periodic flush: land parquet on disk promptly so a hard-kill can't lose
         # a large in-RAM buffer and so --reload-pg-from-archive can see the data
@@ -526,9 +673,13 @@ def per_symbol(ctx, ds, cp_key, symbols, fetch_fn, on_batch, batch=200,
         if ((b // batch) + 1) % 10 == 0:
             for w in ctx["pq"].values():
                 w.flush()
+        total = bw_guard(ctx)
         rate = hw / max(1e-6, time.time() - t0)
         log(f"{ds}: {hw:,}/{len(symbols):,} symbols  fetched={st(ds)['fetched']:,} "
-            f"pg={st(ds)['pg']:,} arch={st(ds)['arch_rows']:,}  ({rate*60:.0f}/min)")
+            f"pg={st(ds)['pg']:,} gb={_BW['content_bytes']/1e9:.2f} "
+            f"global={total/1e9:.2f}/{ctx['args'].bandwidth_cap_gb}  ({rate*60:.0f}/min)")
+        if _STOP:
+            break
 
 
 def _guarded_fetch(ctx, fetch_fn, symbol):
@@ -580,7 +731,8 @@ def harvest_p1_transcripts(ctx):
     if not ctx["archive"].firehose_ok:
         log("p1 transcripts: firehose paused (low disk) — skipping")
         return
-    eq = [s for s in ctx["universe"] if not is_foreign(s)]
+    eq = build_transcript_universe(ctx["conn"], ctx["cp"],
+                                   ctx["args"].transcript_universe, ctx["universe"])
 
     def on_batch(collected):
         idx_rows = []
@@ -801,6 +953,7 @@ def harvest_p8_calendar(ctx):
         done.add(key)
         cp["p8_calendar"] = {"done": sorted(done)}
         save_cp(cp)
+        bw_guard(ctx)
     log(f"p8 calendar: fetched={st('p8_calendar')['fetched']:,}")
 
 
@@ -837,6 +990,7 @@ def harvest_p5_13f(ctx):
             if page % 25 == 0:
                 p5["enum_page"] = page
                 save_cp(cp)
+                bw_guard(ctx)
                 log(f"p5 13F enum: page {page}, {len(ulist):,} unique filings")
         units = ulist
         p5["units"] = units
@@ -862,7 +1016,9 @@ def harvest_p5_13f(ctx):
             p5["hw"] = i + 1
             save_cp(cp)
             ctx["pq"]["inst_holdings"].flush()
+            total = bw_guard(ctx)
             log(f"p5 13F: {i+1:,}/{len(units):,} filings  rows={st('p5_13f')['fetched']:,} "
+                f"gb={_BW['content_bytes']/1e9:.2f} global={total/1e9:.2f}/{ctx['args'].bandwidth_cap_gb} "
                 f"arch={ctx['archive'].used_gb():.1f}GB")
     p5["hw"] = min(len(units), p5.get("hw", 0)) if _STOP else len(units)
     save_cp(cp)
@@ -897,7 +1053,9 @@ def _harvest_feed(ctx, ds, cp_key, endpoint, archive_ds):
         if page % 50 == 0:
             save_cp(cp)
             ctx["pq"][archive_ds].flush()
-            log(f"{ds}: page {page:,}  rows={st(ds)['fetched']:,}  arch={ctx['archive'].used_gb():.1f}GB")
+            total = bw_guard(ctx)
+            log(f"{ds}: page {page:,}  rows={st(ds)['fetched']:,}  "
+                f"gb={_BW['content_bytes']/1e9:.2f} global={total/1e9:.2f}  arch={ctx['archive'].used_gb():.1f}GB")
     save_cp(cp)
 
 
@@ -1240,6 +1398,12 @@ def print_summary(conn, archive):
                 conn.rollback()
             except Exception:
                 pass
+    log("  ── bandwidth (this instance, content-bytes = cap meter) ──")
+    for ds, b in sorted(_BW["datasets"].items(), key=lambda x: -x[1]):
+        log(f"    {ds:18s} {b/1e9:.3f}GB")
+    ratio = _BW["wire_bytes"] / max(1, _BW["content_bytes"])
+    log(f"  bandwidth TOTAL content={_BW['content_bytes']/1e9:.2f}GB  "
+        f"wire={_BW['wire_bytes']/1e9:.2f}GB  (wire/content={ratio:.2f}; FMP gzips → wire≈FMP egress)")
     log(f"TOTAL archive={archive.used_gb():.2f}GB   DB={safe_db_gb(conn):.2f}GB")
 
 
@@ -1252,6 +1416,12 @@ def main():
     ap.add_argument("--rate-limit", type=int, default=1200)
     ap.add_argument("--workers", type=int, default=8)
     ap.add_argument("--max-pages", type=int, default=0, help="cap firehose feed pages")
+    ap.add_argument("--bandwidth-cap-gb", type=float, default=115.0,
+                    help="graceful stop when global content-bytes (both instances) cross this")
+    ap.add_argument("--datasets", default="",
+                    help="explicit ordered dataset keys (overrides --only/registry order)")
+    ap.add_argument("--transcript-universe", default="prio", choices=["prio", "all"],
+                    help="'prio'=predictions+constituents+mktcap>=$1B; 'all'=full non-foreign")
     ap.add_argument("--probe-only", action="store_true")
     ap.add_argument("--print-ddl", action="store_true")
     ap.add_argument("--reload-pg-from-archive", action="store_true",
@@ -1289,6 +1459,9 @@ def main():
         cur.execute("SELECT current_user")
         log(f"connected as {cur.fetchone()[0]}  DB={safe_db_gb(conn):.2f}GB  guard={DB_GUARD_GB}GB")
     cp = load_cp()
+    if cp.get("_bandwidth"):
+        _BW.update(cp["_bandwidth"])
+        log(f"resumed bandwidth meter: content={_BW['content_bytes']/1e9:.2f}GB")
     archive = Archive(ARCHIVE_ROOT, MAX_ARCHIVE_GB)
     universe = build_universe(conn, cp)
     if args.limit:
@@ -1305,19 +1478,33 @@ def main():
            "workers": args.workers, "pq": {}}
 
     reg = dataset_registry()
-    only = parse_groups(args.only) if args.only else None
-    skip = parse_groups(args.skip) if args.skip else set()
-    frm = min(parse_groups(args.from_priority)) if args.from_priority else 0
+    reg_by_key = {k: (k, g, fn) for k, g, fn in reg}
+    if args.datasets:
+        keys = [x.strip() for x in args.datasets.split(",") if x.strip()]
+        unknown = [k for k in keys if k not in reg_by_key]
+        if unknown:
+            log(f"WARN unknown dataset keys ignored: {unknown}")
+        run_order = [reg_by_key[k] for k in keys if k in reg_by_key]
+    else:
+        only = parse_groups(args.only) if args.only else None
+        skip = parse_groups(args.skip) if args.skip else set()
+        frm = min(parse_groups(args.from_priority)) if args.from_priority else 0
+        run_order = [(k, g, fn) for (k, g, fn) in reg
+                     if (only is None or g in only) and g not in skip and g >= frm]
 
-    log(f"universe={len(universe):,}  rate={args.rate_limit}/min workers={args.workers}")
-    for key, grp, fn in reg:
+    log(f"universe={len(universe):,}  rate={args.rate_limit}/min workers={args.workers}  "
+        f"bw_cap={args.bandwidth_cap_gb}GB  transcript-universe={args.transcript_universe}")
+    log(f"run order ({_instance_id()}): {[k for k, _, _ in run_order]}")
+    for key, grp, fn in run_order:
         if _STOP:
             break
-        if only is not None and grp not in only:
-            continue
-        if grp in skip or grp < frm:
-            continue
-        log(f"═══ {key} (P{grp}) ═══")
+        set_ds(key)
+        total = bw_sync()
+        if total / 1e9 >= args.bandwidth_cap_gb:
+            _trip_stop(f"bandwidth cap {args.bandwidth_cap_gb}GB already reached "
+                       f"(global {total/1e9:.2f}GB) — not starting {key}")
+            break
+        log(f"═══ {key} (P{grp})  global_bw={total/1e9:.2f}/{args.bandwidth_cap_gb}GB ═══")
         try:
             fn(ctx)
         except Exception as e:
