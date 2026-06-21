@@ -67,6 +67,15 @@ HIDE_NO_CLAIM = (
     in ("on", "true", "1", "yes")
 )
 
+# 2026-06-21 no-gradeable-claim — hide NOT_GRADEABLE rows
+# (is_no_gradeable_claim: vague preference / buy-wishlist / hedged non-call
+# with no number AND no stock-direction stance). The gold-anchor root cause
+# of the ~47.6% true precision finding. Default on; independent kill switch.
+HIDE_NO_GRADEABLE_CLAIM = (
+    os.environ.get("HIDE_NO_GRADEABLE_CLAIM", "on").lower()
+    in ("on", "true", "1", "yes")
+)
+
 
 def weak_basket_filter_sql(table_alias: str = "p") -> str:
     """Return an ``AND``-prefixed SQL fragment that excludes rows flagged
@@ -179,6 +188,10 @@ def hedged_filter_sql(table_alias: str = "p") -> str:
     if HIDE_NO_CLAIM:
         parts.append(
             f" AND COALESCE({table_alias}.is_no_claim, FALSE) = FALSE"
+        )
+    if HIDE_NO_GRADEABLE_CLAIM:
+        parts.append(
+            f" AND COALESCE({table_alias}.is_no_gradeable_claim, FALSE) = FALSE"
         )
     return "".join(parts)
 

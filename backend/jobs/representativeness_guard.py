@@ -468,6 +468,155 @@ def conditional_decide(pred, ticker, direction, ts_fields, transcript_data, db, 
         return out
 
 
+# ── Forward NO-GRADEABLE-CLAIM guard ────────────────────────────────────────
+# The gold-anchor root cause (GOLD_FINDINGS 2026-06-21: true user-facing
+# precision ~47.6%, not the silver 76.5%; the dominant "OK" bucket was only
+# ~46% gold-valid, driven by vague-preference rows NO existing flag caught).
+# ~16% of visible OK quotes are vague preference ("I like it", "great company")
+# with NO number and NO stock-direction stance. Nimrod's locked rule:
+#   NOT_GRADEABLE = NO number AND NO stock-direction word.
+#   KEEP  bare directional stances ("bullish on V"), conditionals, firm targets.
+#   Hedged non-call  -> reject (even if a number is mentioned only in passing).
+#   Buy-wishlist ("on my watchlist", "I'd love to own it someday") -> reject.
+# Cost-gated to suspects: a row is judged only when its quote carries NEITHER a
+# digit NOR a direction word — the cheap gate AUTO-KEEPS everything numeric or
+# directional, which auto-keeps ~all real calls (on the 2026-06-21 gold 200 only
+# 2 of 79 valid rows are even suspects), so the cardinal sin (false-hide of a
+# real call) is structurally bounded to a tiny set the conservative verify then
+# protects. One claude -p Sonnet verify over the ±90s window confirms.
+# NOT_GRADEABLE -> is_no_gradeable_claim=TRUE + outcome='unresolved' (hidden via
+# the hedged_filter bundle + off the scoreboard). Default ON behind
+# ENABLE_GRADEABLE_GUARD; fail-open KEEP (never hide on error). Precision > recall.
+_GRADE_NUM_RX = re.compile(r"\d")
+_GRADE_DIR = {
+    "buy", "buys", "buyer", "buyers", "buying", "bought",
+    "sell", "sells", "seller", "sellers", "selling", "sold",
+    "long", "short", "bull", "bullish", "bear", "bearish",
+    "upside", "downside", "higher", "lower",
+    "undervalued", "overvalued", "oversold", "overbought",
+    "accumulate", "rally", "rallies", "breakout", "breakdown",
+    "moon", "crash", "dump", "tank", "collapse", "avoid",
+    "puts", "calls", "downtrend", "uptrend", "outperform",
+    "underperform", "overweight", "underweight", "dip",
+    "soar", "soars", "plunge", "surge", "rocket",
+    "double", "triple", "multibagger", "runup",
+    "target", "support", "resistance", "cheap", "expensive", "worth",
+    "decline", "declines", "rise", "rises", "grow", "grows", "growth",
+    "gain", "gains", "drop", "drops", "fall", "falls",
+}
+_GRADE_DIR_RX = re.compile(
+    r"(?<![a-z])(" + "|".join(re.escape(w) for w in sorted(_GRADE_DIR, key=len, reverse=True)) + r")(?![a-z])",
+    re.I)
+_GRADE_PHRASE_RX = re.compile(
+    r"price target|fair value|all.?time high|to the moon|sell.?off|take profit", re.I)
+
+
+def gradeable_enabled() -> bool:
+    return (os.environ.get("ENABLE_GRADEABLE_GUARD", "true") or "true").strip().lower() in ("1", "true", "yes")
+
+
+def is_gradeable_suspect(quote):
+    """NOT_GRADEABLE *candidate* iff the quote carries NEITHER a number NOR a
+    direction word/phrase. Everything numeric or directional is auto-kept (no
+    LLM call) — that auto-keeps ~all real calls, so false-hide is structurally
+    bounded to this narrow set. High recall for the gate; the verify does the
+    precision work."""
+    q = quote or ""
+    if _GRADE_NUM_RX.search(q):
+        return False
+    if _GRADE_DIR_RX.search(q) or _GRADE_PHRASE_RX.search(q):
+        return False
+    return True
+
+
+_GRADEABLE_PROMPT = """You decide whether ONE stored stock prediction is a GRADEABLE forward call.
+
+Ticker: {ticker} ({terms}). Stored direction: {direction}. Stored target: {target}.
+Stored quote: "{quote}"
+
+SOURCE CONTEXT (±90s transcript window / tweet around the quote; raw ASR):
+---
+{window}
+---
+
+A call is GRADEABLE if the speaker makes a checkable forward call on {ticker} with EITHER:
+  - a NUMBER: a price target, % move, or price level ("$300", "20% upside", "worth $41"), OR
+  - a DIRECTION stance: bullish/bearish, buy/sell, long/short, up/down, "I'd avoid", "headed higher".
+A BARE directional stance counts even with no number ("bullish on {ticker}", "it's a buy", "I'm long").
+A CONDITIONAL call counts ("if it breaks 450 I'd buy"). A forward EXPECTATION of a move counts and IS a
+direction ("I expect it to decline", "I'm expecting a rate cut", "cash flows will fall") -> GRADEABLE.
+
+Return NOT_GRADEABLE ONLY when there is NEITHER a number NOR a direction on {ticker} — i.e.:
+  - vague preference: "I like it", "great company", "solid name", "one to watch", "interesting here".
+  - buy-wishlist: "on my watchlist", "I'd love to own it someday", "wish I'd bought it" — aspiration, not a call.
+  - hedged non-call: an explicitly hedged musing with no committed view ("maybe, who knows, could go either
+    way") — NOT_GRADEABLE even if a number is mentioned only in passing.
+
+DECISIVE BIAS — precision over recall: false-hiding a REAL call is the worst outcome. If there is ANY
+plausible number OR direction tied to {ticker} in the quote OR the context, choose GRADEABLE. Choose
+NOT_GRADEABLE ONLY when it is clearly vague preference / wishlist / hedged-no-call. Ignore ASR garble.
+
+Reply ONLY JSON: {{"verdict":"GRADEABLE|NOT_GRADEABLE","reason":"vague_preference|wishlist|hedged|has_number|has_direction|conditional","why":"<=15 words"}}"""
+
+
+def gradeable_verify(ticker, direction, window, quote, target=None, terms_str="", model=None):
+    """ONE claude -p verify. Fail-open: returns GRADEABLE on any error (never
+    hide a row because the verify failed). cwd=/tmp so no repo CLAUDE.md leaks in."""
+    model = (model or VERIFY_MODEL).strip().lower()
+    prompt = _GRADEABLE_PROMPT.format(
+        ticker=ticker, terms=terms_str or ticker, direction=direction,
+        target=("none" if target in (None, "", "None") else target),
+        quote=(quote or "")[:300], window=(window or "")[:8000])
+    try:
+        p = subprocess.run(["claude", "-p", "--model", model, prompt],
+                           capture_output=True, text=True, timeout=240,
+                           env=_subprocess_env(), cwd="/tmp", stdin=subprocess.DEVNULL)
+        out = json.loads(re.search(r"\{.*\}", p.stdout, re.S).group(0))
+        vd = (out.get("verdict") or "").upper().strip()
+        if vd not in ("GRADEABLE", "NOT_GRADEABLE"):
+            return {"verdict": "GRADEABLE", "reason": "bad_verdict", "why": ""}
+        return {"verdict": vd, "reason": (out.get("reason") or ""), "why": (out.get("why") or "")}
+    except Exception as e:
+        return {"verdict": "GRADEABLE", "reason": "error", "why": str(e)[:80]}
+
+
+def gradeable_decide(pred, ticker, direction, ts_fields, transcript_data, db, *, stats=None):
+    """Return {'action': 'keep'|'not_gradeable', 'reason':..., 'why':...}.
+    Fail-open keep. Cost-gated: only no-number/no-direction quotes run the verify."""
+    out = {"action": "keep", "reason": None, "why": None}
+    try:
+        if not gradeable_enabled():
+            return out
+        quote = (ts_fields or {}).get("source_verbatim_quote") if ts_fields else None
+        quote = quote or pred.get("_verbatim_quote") or pred.get("verbatim_quote") or ""
+        if not is_gradeable_suspect(quote):
+            return out
+        if stats is not None:
+            stats["gradeguard_suspect"] = int(stats.get("gradeguard_suspect", 0)) + 1
+        # window: real ±90s when we have a timestamp + transcript; else fall back
+        # to context/quote (X tweets carry no transcript -> the tweet is context).
+        win = ""
+        seconds = (ts_fields or {}).get("source_timestamp_seconds") if ts_fields else None
+        if transcript_data is not None and seconds:
+            win = window_text(transcript_data, seconds)
+        if not win:
+            win = (pred.get("context") or pred.get("_context") or quote or "")
+        amap = alias_map(db)
+        cnames = company_names(db)
+        terms = ticker_terms(ticker, amap, cnames)
+        v = gradeable_verify(ticker, direction, win, quote,
+                             target=(pred.get("target_price") if pred.get("target_price") is not None
+                                     else pred.get("_target_price")),
+                             terms_str=", ".join(sorted(terms)[:6]))
+        if v["verdict"] == "NOT_GRADEABLE":
+            if stats is not None:
+                stats["gradeguard_not_gradeable"] = int(stats.get("gradeguard_not_gradeable", 0)) + 1
+            return {"action": "not_gradeable", "reason": v.get("reason"), "why": v.get("why")}
+        return out
+    except Exception:
+        return out
+
+
 def decide(pred, ticker, direction, ts_fields, transcript_data, db,
            *, run_second_pass=True, stats=None):
     """Return a decision dict:
