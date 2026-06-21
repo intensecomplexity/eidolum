@@ -520,6 +520,12 @@ def per_symbol(ctx, ds, cp_key, symbols, fetch_fn, on_batch, batch=200,
         hw += len(chunk)
         cp[cp_key] = {"hw": hw}
         save_cp(cp)
+        # periodic flush: land parquet on disk promptly so a hard-kill can't lose
+        # a large in-RAM buffer and so --reload-pg-from-archive can see the data
+        # (per-letter partitions otherwise sit un-flushed until they hit 100k).
+        if ((b // batch) + 1) % 10 == 0:
+            for w in ctx["pq"].values():
+                w.flush()
         rate = hw / max(1e-6, time.time() - t0)
         log(f"{ds}: {hw:,}/{len(symbols):,} symbols  fetched={st(ds)['fetched']:,} "
             f"pg={st(ds)['pg']:,} arch={st(ds)['arch_rows']:,}  ({rate*60:.0f}/min)")
