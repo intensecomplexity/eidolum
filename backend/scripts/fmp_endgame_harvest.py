@@ -1172,15 +1172,19 @@ def _reload_transcript_index(conn, present):
     return total
 
 
-def run_reload(conn):
+def run_reload(conn, only=None):
     present = {t for t in TABLES if table_exists(conn, t)}
     if table_exists(conn, "fmp_forex"):
         present.add("fmp_forex")
-    log(f"reload-pg-from-archive: {len(present)} target tables present, archive={ARCHIVE_ROOT}")
+    log(f"reload-pg-from-archive: {len(present)} target tables present, archive={ARCHIVE_ROOT}"
+        + (f", only={sorted(only)}" if only else ""))
     grand = 0
     for ds_dir, table, columns, pk, conflict, hf in RELOAD:
+        if only and not (ds_dir in only or ds_dir.split("/")[0] in only or table in only):
+            continue
         grand += _reload_one(conn, present, ds_dir, table, columns, pk, conflict, hf)
-    grand += _reload_transcript_index(conn, present)
+    if not only or any(k in only for k in ("transcripts", "fmp_transcript_index")):
+        grand += _reload_transcript_index(conn, present)
     log(f"reload DONE: {grand:,} total rows upserted")
 
 
@@ -1252,6 +1256,8 @@ def main():
     ap.add_argument("--print-ddl", action="store_true")
     ap.add_argument("--reload-pg-from-archive", action="store_true",
                     help="upsert PG from the parquet/jsonl archive (no FMP calls)")
+    ap.add_argument("--reload-only", default="",
+                    help="restrict reload to these archive-dirs/tables (comma list)")
     ap.add_argument("--checkpoint", default="", help="override checkpoint path (isolate runs)")
     args = ap.parse_args()
     if args.checkpoint:
@@ -1265,11 +1271,12 @@ def main():
         run_probe()
         return
     if args.reload_pg_from_archive:
+        only = {x.strip() for x in args.reload_only.split(",") if x.strip()} or None
         conn = app_connect()
         with conn.cursor() as cur:
             cur.execute("SELECT current_user")
             log(f"connected as {cur.fetchone()[0]} (reload mode)")
-        run_reload(conn)
+        run_reload(conn, only=only)
         conn.close()
         return
 
