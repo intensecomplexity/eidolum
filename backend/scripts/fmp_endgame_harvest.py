@@ -165,6 +165,17 @@ def bw_guard(ctx):
     return total
 
 
+# ONE shared pooled, keep-alive client (thread-safe). The module-level httpx.get
+# builds a fresh Client — loading the CA bundle + a new TLS handshake — on EVERY
+# call, which at 48 workers churning fast (empty micro-caps) burns ~10 cores on
+# SSL setup and collapses throughput. Reusing connections fixes both.
+_HTTP = httpx.Client(
+    timeout=httpx.Timeout(60.0),
+    limits=httpx.Limits(max_connections=128, max_keepalive_connections=128,
+                        keepalive_expiry=60.0),
+)
+
+
 def _get_json(path, params=None, retries=3):
     """Instrumented FMP GET. Accumulates len(content) (cap meter) + wire bytes.
     429/5xx exponential backoff identical to wave-1."""
@@ -173,7 +184,7 @@ def _get_json(path, params=None, retries=3):
     backoff = [20, 45, 90]
     for a in range(retries):
         try:
-            r = httpx.get(BASE + path, params=p, timeout=60)
+            r = _HTTP.get(BASE + path, params=p)
             try:
                 _bw_add(len(r.content), getattr(r, "num_bytes_downloaded", 0) or 0)
             except Exception:
