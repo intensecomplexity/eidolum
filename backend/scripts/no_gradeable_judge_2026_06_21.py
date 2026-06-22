@@ -149,8 +149,15 @@ def work(pid):
         with LOCK:
             _susp[0] += 1
         win = window_for(r)
-        v = rg.gradeable_verify(r["ticker"], r["direction"], win, r["quote"],
-                                target=r.get("target"), terms_str=r["ticker"])
+        # up to 2 attempts: on a contended shared box claude -p can return no JSON
+        # (starved/timed-out) -> reason 'error'; one retry recovers most. Anything
+        # still failing is written ERROR and re-judged on resume.
+        v = None
+        for _attempt in range(2):
+            v = rg.gradeable_verify(r["ticker"], r["direction"], win, r["quote"],
+                                    target=r.get("target"), terms_str=r["ticker"])
+            if v.get("reason") not in ("error", "bad_verdict"):
+                break
         vd = v["verdict"] if v["verdict"] in ("GRADEABLE", "NOT_GRADEABLE") else "ERROR"
         # verify-level failures (subprocess/parse) fail-open to GRADEABLE inside
         # gradeable_verify (correct for the live guard: never hide on error). In the
