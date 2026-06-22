@@ -661,6 +661,7 @@ def per_symbol(ctx, ds, cp_key, symbols, fetch_fn, on_batch, batch=200,
     done_idx = set()
     collected = []
     processed = 0
+    last_flush = 0
     flushes = 0
 
     def _advance():
@@ -680,7 +681,11 @@ def per_symbol(ctx, ds, cp_key, symbols, fetch_fn, on_batch, batch=200,
                 collected.append((sym, raw))
             done_idx.add(idx)
             processed += 1
-            if len(collected) >= batch or processed == len(todo):
+            # flush on PROCESSED count (not collected) so empty-heavy datasets
+            # (e.g. the micro-cap transcript tail) still checkpoint, log, and
+            # hit the bandwidth guard on a regular cadence.
+            if processed - last_flush >= batch or processed == len(todo):
+                last_flush = processed
                 try:
                     on_batch(collected)
                 except Exception as e:
