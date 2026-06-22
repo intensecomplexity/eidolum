@@ -1163,6 +1163,8 @@ def harvest_p9_etf(ctx):
         if _STOP or not ctx["archive"].has_room():
             break
         sym = etfs[i]
+        if is_foreign(sym):   # foreign ETFs (.DE/.KS/.L/…) return null-asset holdings; skip
+            continue
         ctx["rate"].wait()
         hold = _get_json("etf/holdings", {"symbol": sym}) or []
         for r in hold:
@@ -1170,8 +1172,9 @@ def harvest_p9_etf(ctx):
         if hold:
             st("p9_etf")["fetched"] += len(hold)
             ctx["pq"]["etf_holdings"].add(sym[:1].upper(), hold)
+            hrows = [r for r in map_rows(hold, ETF_HOLD) if r.get("etf") and r.get("asset")]
             _upsert_if(ctx, "fmp_etf_holdings", ETF_HOLD, ["etf", "asset"],
-                       map_rows(hold, ETF_HOLD), "update", "p9_etf")
+                       hrows, "update", "p9_etf")
         wrows = []
         for kind, ep, lab in (("sector", "etf/sector-weightings", "sector"),
                               ("country", "etf/country-weightings", "country")):
@@ -1181,8 +1184,10 @@ def harvest_p9_etf(ctx):
                               "weightPercentage": r.get("weightPercentage")})
         if wrows:
             ctx["pq"]["etf_weightings"].add(sym[:1].upper(), wrows)
+            wmap = [r for r in map_rows(wrows, ETF_WEIGHT)
+                    if r.get("etf") and r.get("kind") and r.get("label")]
             _upsert_if(ctx, "fmp_etf_weightings", ETF_WEIGHT, ["etf", "kind", "label"],
-                       map_rows(wrows, ETF_WEIGHT), "update", "p9_etf")
+                       wmap, "update", "p9_etf")
         if (i + 1) % 50 == 0:
             cp["p9_etf"] = {"hw": i + 1}
             save_cp(cp)
