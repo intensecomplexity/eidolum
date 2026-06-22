@@ -1,0 +1,200 @@
+{"id": 323094, "ticker": "BTC", "src": "x", "verdict": "GRADEABLE", "reason": "auto_kept_has_signal", "why": "", "llm": false}
+{"id": 605645, "ticker": "NFLX", "src": "youtube", "verdict": "GRADEABLE", "reason": "auto_kept_has_signal", "why": "", "llm": false}
+{"id": 605678, "ticker": "CMCSA", "src": "youtube", "verdict": "GRADEABLE", "reason": "auto_kept_has_signal", "why": "", "llm": false}
+{"id": 605827, "ticker": "BAC", "src": "youtube", "verdict": "GRADEABLE", "reason": "auto_kept_has_signal", "why": "", "llm": false}
+{"id": 605883, "ticker": "NFLX", "src": "youtube", "verdict": "GRADEABLE", "reason": "auto_kept_has_signal", "why": "", "llm": false}
+{"id": 605954, "ticker": "XOM", "src": "youtube", "verdict": "GRADEABLE", "reason": "auto_kept_has_signal", "why": "", "llm": false}
+{"id": 606361, "ticker": "DIS", "src": "youtube", "verdict": "GRADEABLE", "reason": "auto_kept_has_signal", "why": "", "llm": false}
+{"id": 607334, "ticker": "MSFT", "src": "youtube", "verdict": "GRADEABLE", "reason": "auto_kept_has_signal", "why": "", "llm": false}
+{"id": 607402, "ticker": "META", "src": "youtube", "verdict": "GRADEABLE", "reason": "auto_kept_has_signal", "why": "", "llm": false}
+{"id": 606520, "ticker": "UL", "src": "youtube", "verdict": "GRADEABLE", "reason": "auto_kept_has_signal", "why": "", "llm": false}
+{"id": 606706, "ticker": "USB", "src": "youtube", "verdict": "GRADEABLE", "reason": "auto_kept_has_signal", "why": "", "llm": false}
+{"id": 606864, "ticker": "SIG", "src": "youtube", "verdict": "GRADEABLE", "reason": "auto_kept_has_signal", "why": "", "llm": false}
+{"id": 607205, "ticker": "ON", "src": "youtube", "verdict": "GRADEABLE", "reason": "auto_kept_has_signal", "why": "", "llm": false}
+{"id": 606694, "ticker": "TXN", "src": "youtube", "verdict": "GRADEABLE", "reason": "auto_kept_has_signal", "why": "", "llm": false}
+{"id": 607686, "ticker": "PG", "src": "youtube", "verdict": "GRADEABLE", "reason": "auto_kept_has_signal", "why": "", "llm": false}
+{"id": 608632, "ticker": "MO", "src": "youtube", "verdict": "GRADEABLE", "reason": "auto_kept_has_signal", "why": "", "llm": false}
+{"id": 606510, "ticker": "SQ", "src": "youtube", "verdict": "GRADEABLE", "reason": "auto_kept_has_signal", "why": "", "llm": false}
+{"id": 607754, "ticker": "TSLA", "src": "youtube", "verdict": "GRADEABLE", "reason": "auto_kept_has_signal", "why": "", "llm": false}
+{"id": 608068, "ticker": "MAA", "src": "youtube", "verdict": "GRADEABLE", "reason": "auto_kept_has_signal", "why": "", "llm": false}
+{"id": 609365, "ticker": "BTC", "src": "youtube", "verdict": "GRADEABLE", "reason": "auto_kept_has_signal", "why": "", "llm": false}
+{"id": 608314, "ticker": "TSLA", "src": "youtube", "verdict": "GRADEABLE", "reason": "auto_kept_has_signal", "why": "", "llm": false}
+{"id": 609069, "ticker": "PYPL", "src": "youtube", "verdict": "GRADEABLE", "reason": "auto_kept_has_signal", "why": "", "llm": false}
+{"id": 609156, "ticker": "AMZN", "src": "youtube", "verdict": "GRADEABLE", "reason": "auto_kept_has_signal", "why": "", "llm": false}
+{"id": 610093, "ticker": "WBD", "src": "youtube", "verdict": "GRADEABLE", "reason": "auto_kept_has_signal", "why": "", "llm": false}
+{"id": 609680, "ticker": "APP", "src": "youtube", "verdict": "GRADEABLE", "reason": "auto_kept_has_signal", "why": "", "llm": false}
+{"id": 609809, "ticker": "NOC", "src": "youtube", "verdict": "GRADEABLE", "reason": "auto_kept_has_signal", "why": "", "llm": false}
+{"id": 610550, "ticker": "CAG", "src": "youtube", "verdict": "GRADEABLE", "reason": "auto_kept_has_signal", "why": "", "llm": false}
+{"id": 609258, "ticker": "V", "src": "youtube", "verdict": "GRADEABLE", "reason": "auto_kept_has_signal", "why": "", "llm": false}
+{"id": 607744, "ticker": "TSLA", "src": "youtube", "verdict": "GRADEABLE", "reason": "auto_kept_has_signal", "why": "", "llm": false}
+{"id": 611293, "ticker": "SH", "src": "youtube", "verdict": "GRADEABLE", "reason": "auto_kept_has_signal", "why": "", "llm": false}
+{"id": 611305, "ticker": "AAPL", "src": "youtube", "verdict": "GRADEABLE", "reason": "auto_kept_has_signal", "why": "", "llm": false}
+{"id": 611398, "ticker": "CCL", "src": "youtube", "verdict": "GRADEABLE", "reason": "auto_kept_has_signal", "why": "", "llm": false}
+{"id": 610570, "ticker": "DKS", "src": "youtube", "verdict": "GRADEABLE", "reason": "auto_kept_has_signal", "why": "", "llm": false}
+{"id": 610460, "ticker": "AAPL", "src": "youtube", "verdict": "NOT_GRADEABLE", "reason": "vague_preference", "why": "AAPL used as analogy; no direction or target stated", "llm": true}
+{"id": 609784, "ticker": "BIG", "src": "youtube", "verdict": "NOT_GRADEABLE", "reason": "vague_preference", "why": "Paul defers to Gary's bearish view; no personal directional call made", "llm": true}
+{"id": 611502, "ticker": "INTU", "src": "youtube", "verdict": "NOT_GRADEABLE", "reason": "vague_preference", "why": "Speaker praises INTU's moat and business model with no directional call", "llm": true}
+{"id": 611620, "ticker": "TBT", "src": "youtube", "verdict": "GRADEABLE", "reason": "auto_kept_has_signal", "why": "", "llm": false}
+{"id": 611702, "ticker": "SPY", "src": "youtube", "verdict": "GRADEABLE", "reason": "auto_kept_has_signal", "why": "", "llm": false}
+{"id": 607199, "ticker": "INTC", "src": "youtube", "verdict": "GRADEABLE", "reason": "has_direction", "why": "Speaker says INTC won't catch up to TSMC \u2014 bearish stance", "llm": true}
+{"id": 610459, "ticker": "SPOT", "src": "youtube", "verdict": "GRADEABLE", "reason": "has_direction", "why": "Speaker calls Spotify layoffs positive, expects profits to rise", "llm": true}
+{"id": 611830, "ticker": "MSOS", "src": "youtube", "verdict": "GRADEABLE", "reason": "auto_kept_has_signal", "why": "", "llm": false}
+{"id": 608265, "ticker": "CRM", "src": "youtube", "verdict": "GRADEABLE", "reason": "has_direction", "why": "Speaker ranks CRM as a buy, adding it to portfolio rankings", "llm": true}
+{"id": 611865, "ticker": "UACL", "src": "youtube", "verdict": "GRADEABLE", "reason": "auto_kept_has_signal", "why": "", "llm": false}
+{"id": 612065, "ticker": "COIN", "src": "youtube", "verdict": "GRADEABLE", "reason": "auto_kept_has_signal", "why": "", "llm": false}
+{"id": 610920, "ticker": "MTD", "src": "youtube", "verdict": "NOT_GRADEABLE", "reason": "vague_preference", "why": "Speaker unfamiliar with MTD, notes metrics look good but makes no call", "llm": true}
+{"id": 612297, "ticker": "VIX", "src": "youtube", "verdict": "GRADEABLE", "reason": "auto_kept_has_signal", "why": "", "llm": false}
+{"id": 611466, "ticker": "RVLV", "src": "youtube", "verdict": "GRADEABLE", "reason": "has_direction", "why": "If it runs it will run huge \u2014 bullish forward expectation", "llm": true}
+{"id": 612310, "ticker": "UDN", "src": "youtube", "verdict": "GRADEABLE", "reason": "auto_kept_has_signal", "why": "", "llm": false}
+{"id": 612530, "ticker": "UUP", "src": "youtube", "verdict": "GRADEABLE", "reason": "auto_kept_has_signal", "why": "", "llm": false}
+{"id": 612626, "ticker": "XRP", "src": "youtube", "verdict": "GRADEABLE", "reason": "auto_kept_has_signal", "why": "", "llm": false}
+{"id": 612670, "ticker": "QQQ", "src": "youtube", "verdict": "GRADEABLE", "reason": "auto_kept_has_signal", "why": "", "llm": false}
+{"id": 612719, "ticker": "TSLA", "src": "youtube", "verdict": "GRADEABLE", "reason": "auto_kept_has_signal", "why": "", "llm": false}
+{"id": 611543, "ticker": "UUP", "src": "youtube", "verdict": "GRADEABLE", "reason": "has_direction", "why": "speaker explains higher rates strengthen dollar, bullish UUP implication", "llm": true}
+{"id": 612989, "ticker": "SPY", "src": "youtube", "verdict": "GRADEABLE", "reason": "auto_kept_has_signal", "why": "", "llm": false}
+{"id": 613000, "ticker": "SH", "src": "youtube", "verdict": "GRADEABLE", "reason": "auto_kept_has_signal", "why": "", "llm": false}
+{"id": 613227, "ticker": "DBC", "src": "youtube", "verdict": "GRADEABLE", "reason": "auto_kept_has_signal", "why": "", "llm": false}
+{"id": 613289, "ticker": "SOFI", "src": "youtube", "verdict": "GRADEABLE", "reason": "auto_kept_has_signal", "why": "", "llm": false}
+{"id": 614000, "ticker": "MSFT", "src": "youtube", "verdict": "GRADEABLE", "reason": "auto_kept_has_signal", "why": "", "llm": false}
+{"id": 614029, "ticker": "AAPL", "src": "youtube", "verdict": "GRADEABLE", "reason": "auto_kept_has_signal", "why": "", "llm": false}
+{"id": 614086, "ticker": "TLT", "src": "youtube", "verdict": "GRADEABLE", "reason": "auto_kept_has_signal", "why": "", "llm": false}
+{"id": 614124, "ticker": "FTNT", "src": "youtube", "verdict": "GRADEABLE", "reason": "auto_kept_has_signal", "why": "", "llm": false}
+{"id": 614128, "ticker": "SHW", "src": "youtube", "verdict": "GRADEABLE", "reason": "auto_kept_has_signal", "why": "", "llm": false}
+{"id": 614130, "ticker": "TLT", "src": "youtube", "verdict": "GRADEABLE", "reason": "auto_kept_has_signal", "why": "", "llm": false}
+{"id": 614170, "ticker": "SMCI", "src": "youtube", "verdict": "GRADEABLE", "reason": "auto_kept_has_signal", "why": "", "llm": false}
+{"id": 614276, "ticker": "JYNT", "src": "youtube", "verdict": "GRADEABLE", "reason": "auto_kept_has_signal", "why": "", "llm": false}
+{"id": 614534, "ticker": "SOFI", "src": "youtube", "verdict": "GRADEABLE", "reason": "auto_kept_has_signal", "why": "", "llm": false}
+{"id": 614616, "ticker": "SATS", "src": "youtube", "verdict": "GRADEABLE", "reason": "auto_kept_has_signal", "why": "", "llm": false}
+{"id": 614646, "ticker": "SOFI", "src": "youtube", "verdict": "GRADEABLE", "reason": "auto_kept_has_signal", "why": "", "llm": false}
+{"id": 614711, "ticker": "DB", "src": "youtube", "verdict": "GRADEABLE", "reason": "auto_kept_has_signal", "why": "", "llm": false}
+{"id": 614779, "ticker": "UUP", "src": "youtube", "verdict": "GRADEABLE", "reason": "auto_kept_has_signal", "why": "", "llm": false}
+{"id": 614782, "ticker": "INTC", "src": "youtube", "verdict": "GRADEABLE", "reason": "auto_kept_has_signal", "why": "", "llm": false}
+{"id": 611795, "ticker": "NVDA", "src": "youtube", "verdict": "GRADEABLE", "reason": "has_direction", "why": "Speaker states plan to continue holding NVDA as largest position, bullish stance", "llm": true}
+{"id": 614865, "ticker": "NVDA", "src": "youtube", "verdict": "GRADEABLE", "reason": "auto_kept_has_signal", "why": "", "llm": false}
+{"id": 614882, "ticker": "EVENT", "src": "youtube", "verdict": "GRADEABLE", "reason": "auto_kept_has_signal", "why": "", "llm": false}
+{"id": 614886, "ticker": "SPY", "src": "youtube", "verdict": "GRADEABLE", "reason": "auto_kept_has_signal", "why": "", "llm": false}
+{"id": 611758, "ticker": "SPY", "src": "youtube", "verdict": "GRADEABLE", "reason": "has_direction", "why": "Bearish market bubble warning implies elevated downside risk for SPY", "llm": true}
+{"id": 611580, "ticker": "USO", "src": "youtube", "verdict": "GRADEABLE", "reason": "has_direction", "why": "Speaker states oil prices continue rising due to Middle East conflict", "llm": true}
+{"id": 615666, "ticker": "SPY", "src": "youtube", "verdict": "GRADEABLE", "reason": "auto_kept_has_signal", "why": "", "llm": false}
+{"id": 615683, "ticker": "META", "src": "youtube", "verdict": "GRADEABLE", "reason": "auto_kept_has_signal", "why": "", "llm": false}
+{"id": 615914, "ticker": "MACRO", "src": "youtube", "verdict": "GRADEABLE", "reason": "auto_kept_has_signal", "why": "", "llm": false}
+{"id": 616077, "ticker": "CRWV", "src": "youtube", "verdict": "GRADEABLE", "reason": "auto_kept_has_signal", "why": "", "llm": false}
+{"id": 616105, "ticker": "MGY", "src": "youtube", "verdict": "GRADEABLE", "reason": "auto_kept_has_signal", "why": "", "llm": false}
+{"id": 616267, "ticker": "LHX", "src": "youtube", "verdict": "GRADEABLE", "reason": "auto_kept_has_signal", "why": "", "llm": false}
+{"id": 611834, "ticker": "GLD", "src": "youtube", "verdict": "GRADEABLE", "reason": "has_direction", "why": "Gold called flight to safety asset implying bullish directional stance", "llm": true}
+{"id": 612306, "ticker": "UUP", "src": "youtube", "verdict": "GRADEABLE", "reason": "has_direction", "why": "Trump wants weaker dollar; bearish stance on USD/UUP implied", "llm": true}
+{"id": 616463, "ticker": "SH", "src": "youtube", "verdict": "GRADEABLE", "reason": "auto_kept_has_signal", "why": "", "llm": false}
+{"id": 616582, "ticker": "SBUX", "src": "youtube", "verdict": "GRADEABLE", "reason": "auto_kept_has_signal", "why": "", "llm": false}
+{"id": 612758, "ticker": "TSLA", "src": "youtube", "verdict": "GRADEABLE", "reason": "has_direction", "why": "Speaker says Tesla 'starting to look pretty attractive again' \u2014 bullish stance", "llm": true}
+{"id": 622261, "ticker": "MSFT", "src": "youtube", "verdict": "GRADEABLE", "reason": "auto_kept_has_signal", "why": "", "llm": false}
+{"id": 622953, "ticker": "SH", "src": "youtube", "verdict": "GRADEABLE", "reason": "auto_kept_has_signal", "why": "", "llm": false}
+{"id": 612120, "ticker": "TLT", "src": "youtube", "verdict": "GRADEABLE", "reason": "has_direction", "why": "Expects rate cut by June, bullish implication for TLT bonds", "llm": true}
+{"id": 623883, "ticker": "RDDT", "src": "youtube", "verdict": "GRADEABLE", "reason": "auto_kept_has_signal", "why": "", "llm": false}
+{"id": 624296, "ticker": "SPY", "src": "youtube", "verdict": "GRADEABLE", "reason": "auto_kept_has_signal", "why": "", "llm": false}
+{"id": 624642, "ticker": "TSLA", "src": "youtube", "verdict": "GRADEABLE", "reason": "auto_kept_has_signal", "why": "", "llm": false}
+{"id": 624648, "ticker": "AX", "src": "youtube", "verdict": "GRADEABLE", "reason": "auto_kept_has_signal", "why": "", "llm": false}
+{"id": 614921, "ticker": "SH", "src": "youtube", "verdict": "NOT_GRADEABLE", "reason": "vague_preference", "why": "No direct call on SH ticker; context discusses macro risk scenarios", "llm": true}
+{"id": 624670, "ticker": "BAC", "src": "youtube", "verdict": "GRADEABLE", "reason": "auto_kept_has_signal", "why": "", "llm": false}
+{"id": 624762, "ticker": "DIS", "src": "youtube", "verdict": "GRADEABLE", "reason": "auto_kept_has_signal", "why": "", "llm": false}
+{"id": 624788, "ticker": "NVT", "src": "youtube", "verdict": "GRADEABLE", "reason": "auto_kept_has_signal", "why": "", "llm": false}
+{"id": 624862, "ticker": "BTC", "src": "youtube", "verdict": "GRADEABLE", "reason": "error", "why": "'NoneType' object has no attribute 'group'", "llm": true}
+{"id": 616353, "ticker": "XLY", "src": "youtube", "verdict": "GRADEABLE", "reason": "error", "why": "'NoneType' object has no attribute 'group'", "llm": true}
+{"id": 619166, "ticker": "SH", "src": "youtube", "verdict": "GRADEABLE", "reason": "error", "why": "'NoneType' object has no attribute 'group'", "llm": true}
+{"id": 614850, "ticker": "AMD", "src": "youtube", "verdict": "GRADEABLE", "reason": "error", "why": "'NoneType' object has no attribute 'group'", "llm": true}
+{"id": 624665, "ticker": "NQ", "src": "youtube", "verdict": "GRADEABLE", "reason": "error", "why": "'NoneType' object has no attribute 'group'", "llm": true}
+{"id": 623113, "ticker": "GM", "src": "youtube", "verdict": "GRADEABLE", "reason": "error", "why": "'NoneType' object has no attribute 'group'", "llm": true}
+{"id": 625225, "ticker": "MELI", "src": "youtube", "verdict": "GRADEABLE", "reason": "auto_kept_has_signal", "why": "", "llm": false}
+{"id": 625296, "ticker": "TTD", "src": "youtube", "verdict": "GRADEABLE", "reason": "auto_kept_has_signal", "why": "", "llm": false}
+{"id": 616449, "ticker": "SPY", "src": "youtube", "verdict": "GRADEABLE", "reason": "error", "why": "'NoneType' object has no attribute 'group'", "llm": true}
+{"id": 625629, "ticker": "GOOGL", "src": "youtube", "verdict": "GRADEABLE", "reason": "auto_kept_has_signal", "why": "", "llm": false}
+{"id": 615083, "ticker": "FUBO", "src": "youtube", "verdict": "GRADEABLE", "reason": "error", "why": "'NoneType' object has no attribute 'group'", "llm": true}
+{"id": 625856, "ticker": "BBWI", "src": "youtube", "verdict": "GRADEABLE", "reason": "auto_kept_has_signal", "why": "", "llm": false}
+{"id": 626220, "ticker": "HNST", "src": "youtube", "verdict": "GRADEABLE", "reason": "auto_kept_has_signal", "why": "", "llm": false}
+{"id": 626776, "ticker": "KMB", "src": "youtube", "verdict": "GRADEABLE", "reason": "auto_kept_has_signal", "why": "", "llm": false}
+{"id": 624938, "ticker": "V", "src": "youtube", "verdict": "NOT_GRADEABLE", "reason": "vague_preference", "why": "Quote is about health/obesity discussion, no mention of V stock", "llm": true}
+{"id": 627232, "ticker": "CROX", "src": "youtube", "verdict": "GRADEABLE", "reason": "auto_kept_has_signal", "why": "", "llm": false}
+{"id": 626884, "ticker": "TSLA", "src": "youtube", "verdict": "GRADEABLE", "reason": "has_direction", "why": "Speaker says Tesla going down, clear bearish directional call", "llm": true}
+{"id": 627375, "ticker": "ACHR", "src": "youtube", "verdict": "GRADEABLE", "reason": "auto_kept_has_signal", "why": "", "llm": false}
+{"id": 627490, "ticker": "PROP", "src": "youtube", "verdict": "GRADEABLE", "reason": "auto_kept_has_signal", "why": "", "llm": false}
+{"id": 625674, "ticker": "PSA", "src": "youtube", "verdict": "GRADEABLE", "reason": "has_direction", "why": "PSA named as attractive/undervalued with bullish stance in real estate sector", "llm": true}
+{"id": 628458, "ticker": "INTC", "src": "youtube", "verdict": "GRADEABLE", "reason": "auto_kept_has_signal", "why": "", "llm": false}
+{"id": 628487, "ticker": "CPB", "src": "youtube", "verdict": "GRADEABLE", "reason": "auto_kept_has_signal", "why": "", "llm": false}
+{"id": 624927, "ticker": "DIS", "src": "youtube", "verdict": "NOT_GRADEABLE", "reason": "vague_preference", "why": "Quote discusses free speech/Kimmel return; no DIS price call", "llm": true}
+{"id": 629468, "ticker": "META", "src": "youtube", "verdict": "GRADEABLE", "reason": "auto_kept_has_signal", "why": "", "llm": false}
+{"id": 629469, "ticker": "TSLA", "src": "youtube", "verdict": "GRADEABLE", "reason": "auto_kept_has_signal", "why": "", "llm": false}
+{"id": 629956, "ticker": "AGEN", "src": "x", "verdict": "GRADEABLE", "reason": "auto_kept_has_signal", "why": "", "llm": false}
+{"id": 629959, "ticker": "RR", "src": "x", "verdict": "GRADEABLE", "reason": "auto_kept_has_signal", "why": "", "llm": false}
+{"id": 629968, "ticker": "ASTS", "src": "x", "verdict": "GRADEABLE", "reason": "auto_kept_has_signal", "why": "", "llm": false}
+{"id": 630017, "ticker": "BTC", "src": "x", "verdict": "GRADEABLE", "reason": "auto_kept_has_signal", "why": "", "llm": false}
+{"id": 630302, "ticker": "AAPL", "src": "youtube", "verdict": "GRADEABLE", "reason": "auto_kept_has_signal", "why": "", "llm": false}
+{"id": 630477, "ticker": "FET", "src": "x", "verdict": "GRADEABLE", "reason": "auto_kept_has_signal", "why": "", "llm": false}
+{"id": 630493, "ticker": "HYPE", "src": "x", "verdict": "GRADEABLE", "reason": "auto_kept_has_signal", "why": "", "llm": false}
+{"id": 630544, "ticker": "NVDA", "src": "x", "verdict": "GRADEABLE", "reason": "auto_kept_has_signal", "why": "", "llm": false}
+{"id": 630568, "ticker": "MGNI", "src": "x", "verdict": "GRADEABLE", "reason": "auto_kept_has_signal", "why": "", "llm": false}
+{"id": 630781, "ticker": "COST", "src": "youtube", "verdict": "GRADEABLE", "reason": "auto_kept_has_signal", "why": "", "llm": false}
+{"id": 630917, "ticker": "SMR", "src": "youtube", "verdict": "GRADEABLE", "reason": "auto_kept_has_signal", "why": "", "llm": false}
+{"id": 631051, "ticker": "XOM", "src": "youtube", "verdict": "GRADEABLE", "reason": "auto_kept_has_signal", "why": "", "llm": false}
+{"id": 631149, "ticker": "RXRX", "src": "x", "verdict": "GRADEABLE", "reason": "auto_kept_has_signal", "why": "", "llm": false}
+{"id": 631713, "ticker": "JCT", "src": "x", "verdict": "GRADEABLE", "reason": "auto_kept_has_signal", "why": "", "llm": false}
+{"id": 631746, "ticker": "BONK", "src": "x", "verdict": "GRADEABLE", "reason": "auto_kept_has_signal", "why": "", "llm": false}
+{"id": 631771, "ticker": "INTU", "src": "x", "verdict": "GRADEABLE", "reason": "auto_kept_has_signal", "why": "", "llm": false}
+{"id": 631937, "ticker": "SLDP", "src": "x", "verdict": "GRADEABLE", "reason": "auto_kept_has_signal", "why": "", "llm": false}
+{"id": 631950, "ticker": "C", "src": "x", "verdict": "GRADEABLE", "reason": "auto_kept_has_signal", "why": "", "llm": false}
+{"id": 631994, "ticker": "JCT", "src": "x", "verdict": "GRADEABLE", "reason": "auto_kept_has_signal", "why": "", "llm": false}
+{"id": 632042, "ticker": "BTC", "src": "x", "verdict": "GRADEABLE", "reason": "auto_kept_has_signal", "why": "", "llm": false}
+{"id": 632264, "ticker": "ROBO", "src": "x", "verdict": "GRADEABLE", "reason": "auto_kept_has_signal", "why": "", "llm": false}
+{"id": 632351, "ticker": "NVDA", "src": "x", "verdict": "GRADEABLE", "reason": "auto_kept_has_signal", "why": "", "llm": false}
+{"id": 632523, "ticker": "ARM", "src": "x", "verdict": "GRADEABLE", "reason": "auto_kept_has_signal", "why": "", "llm": false}
+{"id": 632562, "ticker": "LEGN", "src": "x", "verdict": "GRADEABLE", "reason": "auto_kept_has_signal", "why": "", "llm": false}
+{"id": 632687, "ticker": "HIMS", "src": "x", "verdict": "GRADEABLE", "reason": "auto_kept_has_signal", "why": "", "llm": false}
+{"id": 632700, "ticker": "LAB", "src": "x", "verdict": "GRADEABLE", "reason": "auto_kept_has_signal", "why": "", "llm": false}
+{"id": 632761, "ticker": "ORCL", "src": "x", "verdict": "GRADEABLE", "reason": "auto_kept_has_signal", "why": "", "llm": false}
+{"id": 632777, "ticker": "BABA", "src": "x", "verdict": "GRADEABLE", "reason": "auto_kept_has_signal", "why": "", "llm": false}
+{"id": 632816, "ticker": "AAPL", "src": "x", "verdict": "GRADEABLE", "reason": "auto_kept_has_signal", "why": "", "llm": false}
+{"id": 632829, "ticker": "BTBT", "src": "x", "verdict": "GRADEABLE", "reason": "auto_kept_has_signal", "why": "", "llm": false}
+{"id": 632854, "ticker": "SES", "src": "x", "verdict": "GRADEABLE", "reason": "auto_kept_has_signal", "why": "", "llm": false}
+{"id": 632876, "ticker": "SLDP", "src": "x", "verdict": "GRADEABLE", "reason": "auto_kept_has_signal", "why": "", "llm": false}
+{"id": 632901, "ticker": "FIVN", "src": "x", "verdict": "GRADEABLE", "reason": "auto_kept_has_signal", "why": "", "llm": false}
+{"id": 632943, "ticker": "BTC", "src": "x", "verdict": "GRADEABLE", "reason": "auto_kept_has_signal", "why": "", "llm": false}
+{"id": 633050, "ticker": "SOFI", "src": "x", "verdict": "GRADEABLE", "reason": "auto_kept_has_signal", "why": "", "llm": false}
+{"id": 633086, "ticker": "ACHR", "src": "x", "verdict": "GRADEABLE", "reason": "auto_kept_has_signal", "why": "", "llm": false}
+{"id": 633135, "ticker": "TIA", "src": "x", "verdict": "GRADEABLE", "reason": "auto_kept_has_signal", "why": "", "llm": false}
+{"id": 633156, "ticker": "SOFI", "src": "x", "verdict": "GRADEABLE", "reason": "auto_kept_has_signal", "why": "", "llm": false}
+{"id": 633185, "ticker": "CRWV", "src": "x", "verdict": "GRADEABLE", "reason": "auto_kept_has_signal", "why": "", "llm": false}
+{"id": 633244, "ticker": "LUNR", "src": "x", "verdict": "GRADEABLE", "reason": "auto_kept_has_signal", "why": "", "llm": false}
+{"id": 633398, "ticker": "DEGEN", "src": "x", "verdict": "GRADEABLE", "reason": "auto_kept_has_signal", "why": "", "llm": false}
+{"id": 633436, "ticker": "AAPL", "src": "x", "verdict": "GRADEABLE", "reason": "auto_kept_has_signal", "why": "", "llm": false}
+{"id": 633475, "ticker": "NVDA", "src": "x", "verdict": "GRADEABLE", "reason": "auto_kept_has_signal", "why": "", "llm": false}
+{"id": 633520, "ticker": "TSLA", "src": "x", "verdict": "GRADEABLE", "reason": "auto_kept_has_signal", "why": "", "llm": false}
+{"id": 633559, "ticker": "BTC", "src": "x", "verdict": "GRADEABLE", "reason": "auto_kept_has_signal", "why": "", "llm": false}
+{"id": 633687, "ticker": "ETC", "src": "x", "verdict": "GRADEABLE", "reason": "auto_kept_has_signal", "why": "", "llm": false}
+{"id": 633724, "ticker": "SOL", "src": "x", "verdict": "GRADEABLE", "reason": "auto_kept_has_signal", "why": "", "llm": false}
+{"id": 633767, "ticker": "ZAMA", "src": "x", "verdict": "GRADEABLE", "reason": "auto_kept_has_signal", "why": "", "llm": false}
+{"id": 633769, "ticker": "WET", "src": "x", "verdict": "GRADEABLE", "reason": "auto_kept_has_signal", "why": "", "llm": false}
+{"id": 633885, "ticker": "BTC", "src": "x", "verdict": "GRADEABLE", "reason": "auto_kept_has_signal", "why": "", "llm": false}
+{"id": 633889, "ticker": "MU", "src": "x", "verdict": "GRADEABLE", "reason": "auto_kept_has_signal", "why": "", "llm": false}
+{"id": 634108, "ticker": "BTC", "src": "x", "verdict": "GRADEABLE", "reason": "auto_kept_has_signal", "why": "", "llm": false}
+{"id": 634308, "ticker": "SOL", "src": "x", "verdict": "GRADEABLE", "reason": "auto_kept_has_signal", "why": "", "llm": false}
+{"id": 634456, "ticker": "GOAT", "src": "x", "verdict": "GRADEABLE", "reason": "auto_kept_has_signal", "why": "", "llm": false}
+{"id": 634521, "ticker": "BTC", "src": "x", "verdict": "GRADEABLE", "reason": "auto_kept_has_signal", "why": "", "llm": false}
+{"id": 634544, "ticker": "BTC", "src": "x", "verdict": "GRADEABLE", "reason": "auto_kept_has_signal", "why": "", "llm": false}
+{"id": 634613, "ticker": "BTC", "src": "x", "verdict": "GRADEABLE", "reason": "auto_kept_has_signal", "why": "", "llm": false}
+{"id": 634617, "ticker": "BTC", "src": "x", "verdict": "GRADEABLE", "reason": "auto_kept_has_signal", "why": "", "llm": false}
+{"id": 634649, "ticker": "OPEN", "src": "x", "verdict": "GRADEABLE", "reason": "auto_kept_has_signal", "why": "", "llm": false}
+{"id": 634664, "ticker": "OPEN", "src": "x", "verdict": "GRADEABLE", "reason": "auto_kept_has_signal", "why": "", "llm": false}
+{"id": 634668, "ticker": "OPEN", "src": "x", "verdict": "GRADEABLE", "reason": "auto_kept_has_signal", "why": "", "llm": false}
+{"id": 634695, "ticker": "OPEN", "src": "x", "verdict": "GRADEABLE", "reason": "auto_kept_has_signal", "why": "", "llm": false}
+{"id": 634815, "ticker": "OSCR", "src": "x", "verdict": "GRADEABLE", "reason": "auto_kept_has_signal", "why": "", "llm": false}
+{"id": 634843, "ticker": "CRDO", "src": "x", "verdict": "GRADEABLE", "reason": "auto_kept_has_signal", "why": "", "llm": false}
+{"id": 634850, "ticker": "WTI", "src": "x", "verdict": "GRADEABLE", "reason": "auto_kept_has_signal", "why": "", "llm": false}
+{"id": 634857, "ticker": "BTC", "src": "x", "verdict": "GRADEABLE", "reason": "auto_kept_has_signal", "why": "", "llm": false}
+{"id": 635030, "ticker": "AIO", "src": "x", "verdict": "GRADEABLE", "reason": "auto_kept_has_signal", "why": "", "llm": false}
+{"id": 635058, "ticker": "SQD", "src": "x", "verdict": "GRADEABLE", "reason": "auto_kept_has_signal", "why": "", "llm": false}
+{"id": 635184, "ticker": "XOM", "src": "x", "verdict": "GRADEABLE", "reason": "auto_kept_has_signal", "why": "", "llm": false}
+{"id": 624928, "ticker": "SPY", "src": "youtube", "verdict": "NOT_GRADEABLE", "reason": "vague_preference", "why": "Quote is about First Amendment/Kimmel; no SPY direction or number", "llm": true}
+{"id": 625055, "ticker": "ASTS", "src": "youtube", "verdict": "GRADEABLE", "reason": "has_direction", "why": "ASTS ranked at bottom tier, called overvalued with broken promises", "llm": true}
+{"id": 624948, "ticker": "AVGO", "src": "youtube", "verdict": "NOT_GRADEABLE", "reason": "vague_preference", "why": "General advice on when to sell stocks, no AVGO-specific call", "llm": true}
+{"id": 625454, "ticker": "AXON", "src": "youtube", "verdict": "NOT_GRADEABLE", "reason": "vague_preference", "why": "Speaker calls AXON a beneficiary but takes no directional stance", "llm": true}
+{"id": 627286, "ticker": "COIN", "src": "youtube", "verdict": "GRADEABLE", "reason": "has_direction", "why": "Bullish stance: if crypto has big future, Coinbase will do well", "llm": true}
+{"id": 627584, "ticker": "MSFT", "src": "youtube", "verdict": "GRADEABLE", "reason": "has_direction", "why": "Speaker commits to buying more MSFT this month, clear bullish action", "llm": true}
+{"id": 628712, "ticker": "WY", "src": "youtube", "verdict": "GRADEABLE", "reason": "has_direction", "why": "Speaker recommends buying WY as a public timber play with bullish framing", "llm": true}
