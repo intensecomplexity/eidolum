@@ -322,6 +322,7 @@ def _purge_stale_fmp(preds: list, prices: dict, db, now) -> tuple[list, int]:
                     evaluation_summary=:s,
                     evaluated_at=:now
                 WHERE id=:id AND outcome='no_data'
+                  AND COALESCE(evaluation_deferred, FALSE) = FALSE
             """), {
                 "id": p["id"],
                 "s": (
@@ -554,6 +555,7 @@ def retry_no_data_batch(db, max_tickers: int | None = None):
         SET outcome='delisted',
             evaluation_summary='Foreign ticker — not supported by US price data pipeline'
         WHERE outcome='no_data'
+          AND COALESCE(evaluation_deferred, FALSE) = FALSE
           AND ticker LIKE '%.%'
           AND ticker NOT IN ('BRK.A','BRK.B','BF.A','BF.B','GEF.B','HEI.A','LEN.B','MOG.A','MOG.B')
     """))
@@ -567,6 +569,7 @@ def retry_no_data_batch(db, max_tickers: int | None = None):
         SET outcome='delisted',
             evaluation_summary='Digit-prefix foreign ticker — not supported'
         WHERE outcome='no_data'
+          AND COALESCE(evaluation_deferred, FALSE) = FALSE
           AND ticker ~ '^[0-9]'
     """))
     digit_prefix = res_b.rowcount or 0
@@ -585,6 +588,7 @@ def retry_no_data_batch(db, max_tickers: int | None = None):
         SET outcome='delisted',
             evaluation_summary='Ticker unreachable via FMP/Tiingo/Polygon after 5 retry attempts'
         WHERE outcome='no_data' AND retry_count >= 5
+          AND COALESCE(evaluation_deferred, FALSE) = FALSE
           AND ticker NOT IN :crypto
     """), {"crypto": tuple(_CT)})
     retry_zombies = res_c.rowcount or 0
