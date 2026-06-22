@@ -48,7 +48,7 @@ import signal
 import sys
 import threading
 import time
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import ThreadPoolExecutor, FIRST_COMPLETED, wait
 from datetime import datetime
 from urllib.parse import urlparse, urlunparse
 
@@ -647,14 +647,14 @@ def build_transcript_universe(conn, cp, mode, base_universe):
 # ═══════════════════════════════════════════════════════ generic per-symbol driver
 def per_symbol(ctx, ds, cp_key, symbols, fetch_fn, on_batch, batch=200,
                guard_pg=True, firehose=False):
-    """Streaming fan-out: ONE persistent ThreadPoolExecutor, all symbols submitted
-    up front, results consumed via as_completed. A worker that finishes a short
-    symbol immediately pulls the next — no per-batch barrier, so the pool stays
-    saturated at the rate limit. on_batch (archive + PG upsert) runs on the
-    consumer thread every `batch` completions while workers keep fetching (off
-    the hot path). Resumable via the CONTIGUOUS-done prefix in cp[cp_key]['hw'];
-    a kill re-fetches at most the in-flight + out-of-order-completed tail (all
-    upserts/jsonl writes are idempotent)."""
+    """Streaming fan-out with a BOUNDED submission window (~workers*3 in flight).
+    A worker that finishes a short symbol immediately gets the next — pool stays
+    saturated at the rate limit, no per-batch barrier. Submitting tens of
+    thousands of futures up front instead caused a GIL/thread-spawn convoy that
+    starved the workers, so we submit incrementally as completions arrive.
+    on_batch (archive + PG upsert) runs on the consumer thread off the fetch hot
+    path. Resumable via the CONTIGUOUS-done prefix in cp[cp_key]['hw']; a kill
+    re-fetches only the in-flight + out-of-order tail (all writes idempotent)."""
     cp = ctx["cp"]
     hw = cp.get(cp_key, {}).get("hw", 0)
     todo = symbols[hw:]
@@ -665,79 +665,85 @@ def per_symbol(ctx, ds, cp_key, symbols, fetch_fn, on_batch, batch=200,
         log(f"{ds}: firehose paused (low disk) — skipping")
         return
     t0 = time.time()
-    ex = ThreadPoolExecutor(max_workers=ctx["workers"])
-    meta = {ex.submit(_guarded_fetch, ctx, fetch_fn, s): (hw + i, s)
-            for i, s in enumerate(todo)}
     base_hw = hw
+    window = max(8, ctx["workers"] * 3)
+    ex = ThreadPoolExecutor(max_workers=ctx["workers"])
+    src = enumerate(todo)
+    inflight = {}
     done_idx = set()
     collected = []
     processed = 0
     last_flush = 0
     flushes = 0
 
+    def _submit_next():
+        try:
+            i, s = next(src)
+        except StopIteration:
+            return False
+        inflight[ex.submit(_guarded_fetch, ctx, fetch_fn, s)] = (base_hw + i, s)
+        return True
+
     def _advance():
         nonlocal hw
         while hw in done_idx:
             done_idx.discard(hw); hw += 1
 
-    try:
-        for fut in as_completed(meta):
-            idx, sym = meta.pop(fut)        # drop ref so the result can be GC'd
+    def _flush():
+        nonlocal collected, flushes
+        try:
+            on_batch(collected)
+        except Exception as e:
+            log(f"{ds}: on_batch error {type(e).__name__}: {e}")
             try:
-                raw = fut.result()
-            except Exception as e:
-                raw = None
-                log(f"{ds} {sym}: {type(e).__name__}")
-            if raw:
-                collected.append((sym, raw))
-            done_idx.add(idx)
-            processed += 1
-            # flush on PROCESSED count (not collected) so empty-heavy datasets
-            # (e.g. the micro-cap transcript tail) still checkpoint, log, and
-            # hit the bandwidth guard on a regular cadence.
-            if processed - last_flush >= batch or processed == len(todo):
-                last_flush = processed
-                try:
-                    on_batch(collected)
-                except Exception as e:
-                    log(f"{ds}: on_batch error {type(e).__name__}: {e}")
-                    try:
-                        ctx["conn"].rollback()
-                    except Exception:
-                        pass
-                collected = []
-                _advance()
-                cp[cp_key] = {"hw": hw}
-                cp["_bandwidth"] = _BW
-                save_cp(cp)
-                flushes += 1
-                if flushes % 10 == 0:
-                    for w in ctx["pq"].values():
-                        w.flush()
-                total = bw_guard(ctx)
-                rate = processed / max(1e-6, time.time() - t0)
-                log(f"{ds}: hw={hw:,} done={base_hw + processed:,}/{len(symbols):,}  "
-                    f"fetched={st(ds)['fetched']:,} pg={st(ds)['pg']:,} "
-                    f"gb={_BW['content_bytes']/1e9:.2f} global={total/1e9:.2f}/{ctx['args'].bandwidth_cap_gb}"
-                    f"  ({rate*60:.0f} sym/min)")
-                if _STOP:
-                    break
-                if firehose and not ctx["archive"].has_room():
-                    _trip_stop(f"{ds}: archive cap {MAX_ARCHIVE_GB}GB reached"); break
-                if guard_pg and safe_db_gb(ctx["conn"]) >= DB_GUARD_GB:
-                    _trip_stop(f"{ds}: DB guard {DB_GUARD_GB}GB reached"); break
-    finally:
-        if collected:
-            try:
-                on_batch(collected)
+                ctx["conn"].rollback()
             except Exception:
                 pass
+        collected = []
         _advance()
         cp[cp_key] = {"hw": hw}
         cp["_bandwidth"] = _BW
         save_cp(cp)
-        for w in ctx["pq"].values():
-            w.flush()
+        flushes += 1
+        if flushes % 10 == 0:
+            for w in ctx["pq"].values():
+                w.flush()
+        total = bw_guard(ctx)
+        rate = processed / max(1e-6, time.time() - t0)
+        log(f"{ds}: hw={hw:,} done={base_hw + processed:,}/{len(symbols):,}  "
+            f"fetched={st(ds)['fetched']:,} pg={st(ds)['pg']:,} "
+            f"gb={_BW['content_bytes']/1e9:.2f} global={total/1e9:.2f}/{ctx['args'].bandwidth_cap_gb}"
+            f"  ({rate*60:.0f} sym/min)")
+        if firehose and not ctx["archive"].has_room():
+            _trip_stop(f"{ds}: archive cap {MAX_ARCHIVE_GB}GB reached")
+        if guard_pg and safe_db_gb(ctx["conn"]) >= DB_GUARD_GB:
+            _trip_stop(f"{ds}: DB guard {DB_GUARD_GB}GB reached")
+
+    try:
+        for _ in range(window):
+            if not _submit_next():
+                break
+        while inflight and not _STOP:
+            done, _ = wait(list(inflight), return_when=FIRST_COMPLETED)
+            for fut in done:
+                idx, sym = inflight.pop(fut)
+                try:
+                    raw = fut.result()
+                except Exception as e:
+                    raw = None
+                    log(f"{ds} {sym}: {type(e).__name__}")
+                if raw:
+                    collected.append((sym, raw))
+                done_idx.add(idx)
+                processed += 1
+                _submit_next()        # keep the window full
+                if processed - last_flush >= batch:
+                    last_flush = processed
+                    _flush()
+                    if _STOP:
+                        break
+    finally:
+        _flush()
         ex.shutdown(wait=False, cancel_futures=True)
 
 
