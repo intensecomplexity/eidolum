@@ -597,6 +597,7 @@ def build_transcript_universe(conn, cp, mode, base_universe):
     nonforeign = [s for s in base_universe if not is_foreign(s)]
     if mode == "all":
         out = nonforeign
+        log(f"transcript universe 'all': {len(out):,} non-foreign symbols")
     else:
         prio = set()
         with conn.cursor() as cur:
@@ -615,8 +616,18 @@ def build_transcript_universe(conn, cp, mode, base_universe):
         out = [s for s in nonforeign if s in prio]
         log(f"transcript universe 'prio': {len(out):,} of {len(nonforeign):,} non-foreign "
             f"(predictions ∪ constituents ∪ mktcap>=${TRANSCRIPT_MKTCAP_FLOOR/1e9:.0f}B)")
-    if mode == "all":
-        log(f"transcript universe 'all': {len(out):,} symbols")
+    # incremental: drop symbols already captured (so prio→all only does the tail)
+    done = set()
+    with conn.cursor() as cur:
+        try:
+            cur.execute("SELECT DISTINCT symbol FROM fmp_transcript_index")
+            done = {r[0] for r in cur.fetchall()}
+        except Exception:
+            conn.rollback()
+    pre = len(out)
+    out = [s for s in out if s not in done]
+    log(f"transcript universe ({mode}): {len(done):,} already indexed → {len(out):,} to fetch "
+        f"(was {pre:,})")
     cp[cache] = out
     save_cp(cp)
     return out
@@ -625,61 +636,93 @@ def build_transcript_universe(conn, cp, mode, base_universe):
 # ═══════════════════════════════════════════════════════ generic per-symbol driver
 def per_symbol(ctx, ds, cp_key, symbols, fetch_fn, on_batch, batch=200,
                guard_pg=True, firehose=False):
-    """Fan out fetch_fn(symbol)->raw across symbols under the rate limiter;
-    on_batch(list[(symbol, raw)]) archives + upserts on the main thread.
-    Resumable via cp[cp_key]['hw'] (high-water index into `symbols`)."""
+    """Streaming fan-out: ONE persistent ThreadPoolExecutor, all symbols submitted
+    up front, results consumed via as_completed. A worker that finishes a short
+    symbol immediately pulls the next — no per-batch barrier, so the pool stays
+    saturated at the rate limit. on_batch (archive + PG upsert) runs on the
+    consumer thread every `batch` completions while workers keep fetching (off
+    the hot path). Resumable via the CONTIGUOUS-done prefix in cp[cp_key]['hw'];
+    a kill re-fetches at most the in-flight + out-of-order-completed tail (all
+    upserts/jsonl writes are idempotent)."""
     cp = ctx["cp"]
     hw = cp.get(cp_key, {}).get("hw", 0)
     todo = symbols[hw:]
     if not todo:
         log(f"{ds}: already complete ({hw:,}/{len(symbols):,})")
         return
+    if firehose and not ctx["archive"].firehose_ok:
+        log(f"{ds}: firehose paused (low disk) — skipping")
+        return
     t0 = time.time()
-    for b in range(0, len(todo), batch):
-        if _STOP:
-            break
-        if firehose and not ctx["archive"].firehose_ok:
-            log(f"{ds}: firehose paused (low disk) — skipping")
-            return
-        if firehose and not ctx["archive"].has_room():
-            log(f"{ds}: archive cap {MAX_ARCHIVE_GB}GB reached — stopping")
-            return
-        if guard_pg and safe_db_gb(ctx["conn"]) >= DB_GUARD_GB:
-            log(f"{ds}: DB guard {DB_GUARD_GB}GB reached — stopping PG-bound dataset")
-            return
-        chunk = todo[b:b + batch]
-        collected = []
-        with ThreadPoolExecutor(max_workers=ctx["workers"]) as ex:
-            futs = {ex.submit(_guarded_fetch, ctx, fetch_fn, s): s for s in chunk}
-            for fut in as_completed(futs):
-                raw = fut.result()
-                if raw:
-                    collected.append((futs[fut], raw))
-        try:
-            on_batch(collected)
-        except Exception as e:
-            log(f"{ds}: on_batch error {type(e).__name__}: {e}")
+    ex = ThreadPoolExecutor(max_workers=ctx["workers"])
+    meta = {ex.submit(_guarded_fetch, ctx, fetch_fn, s): (hw + i, s)
+            for i, s in enumerate(todo)}
+    base_hw = hw
+    done_idx = set()
+    collected = []
+    processed = 0
+    flushes = 0
+
+    def _advance():
+        nonlocal hw
+        while hw in done_idx:
+            done_idx.discard(hw); hw += 1
+
+    try:
+        for fut in as_completed(meta):
+            idx, sym = meta.pop(fut)        # drop ref so the result can be GC'd
             try:
-                ctx["conn"].rollback()
+                raw = fut.result()
+            except Exception as e:
+                raw = None
+                log(f"{ds} {sym}: {type(e).__name__}")
+            if raw:
+                collected.append((sym, raw))
+            done_idx.add(idx)
+            processed += 1
+            if len(collected) >= batch or processed == len(todo):
+                try:
+                    on_batch(collected)
+                except Exception as e:
+                    log(f"{ds}: on_batch error {type(e).__name__}: {e}")
+                    try:
+                        ctx["conn"].rollback()
+                    except Exception:
+                        pass
+                collected = []
+                _advance()
+                cp[cp_key] = {"hw": hw}
+                cp["_bandwidth"] = _BW
+                save_cp(cp)
+                flushes += 1
+                if flushes % 10 == 0:
+                    for w in ctx["pq"].values():
+                        w.flush()
+                total = bw_guard(ctx)
+                rate = processed / max(1e-6, time.time() - t0)
+                log(f"{ds}: hw={hw:,} done={base_hw + processed:,}/{len(symbols):,}  "
+                    f"fetched={st(ds)['fetched']:,} pg={st(ds)['pg']:,} "
+                    f"gb={_BW['content_bytes']/1e9:.2f} global={total/1e9:.2f}/{ctx['args'].bandwidth_cap_gb}"
+                    f"  ({rate*60:.0f} sym/min)")
+                if _STOP:
+                    break
+                if firehose and not ctx["archive"].has_room():
+                    _trip_stop(f"{ds}: archive cap {MAX_ARCHIVE_GB}GB reached"); break
+                if guard_pg and safe_db_gb(ctx["conn"]) >= DB_GUARD_GB:
+                    _trip_stop(f"{ds}: DB guard {DB_GUARD_GB}GB reached"); break
+    finally:
+        if collected:
+            try:
+                on_batch(collected)
             except Exception:
                 pass
-        hw += len(chunk)
+        _advance()
         cp[cp_key] = {"hw": hw}
         cp["_bandwidth"] = _BW
         save_cp(cp)
-        # periodic flush: land parquet on disk promptly so a hard-kill can't lose
-        # a large in-RAM buffer and so --reload-pg-from-archive can see the data
-        # (per-letter partitions otherwise sit un-flushed until they hit 100k).
-        if ((b // batch) + 1) % 10 == 0:
-            for w in ctx["pq"].values():
-                w.flush()
-        total = bw_guard(ctx)
-        rate = hw / max(1e-6, time.time() - t0)
-        log(f"{ds}: {hw:,}/{len(symbols):,} symbols  fetched={st(ds)['fetched']:,} "
-            f"pg={st(ds)['pg']:,} gb={_BW['content_bytes']/1e9:.2f} "
-            f"global={total/1e9:.2f}/{ctx['args'].bandwidth_cap_gb}  ({rate*60:.0f}/min)")
-        if _STOP:
-            break
+        for w in ctx["pq"].values():
+            w.flush()
+        ex.shutdown(wait=False, cancel_futures=True)
 
 
 def _guarded_fetch(ctx, fetch_fn, symbol):
@@ -748,10 +791,11 @@ def harvest_p1_transcripts(ctx):
         cols, pk, _ = TABLES["fmp_transcript_index"]
         _upsert_if(ctx, "fmp_transcript_index", cols, pk, idx_rows, "update", "p1_transcripts")
 
-    # small batch: transcript payloads are ~50KB each and high-count symbols are
-    # front-loaded, so a large batch balloons memory and delays disk persistence.
-    per_symbol(ctx, "p1_transcripts", "p1_transcripts", eq, _fetch_transcripts,
-               on_batch, batch=25, guard_pg=False, firehose=True)
+    # streaming pool stays saturated regardless of batch; batch = flush/checkpoint
+    # granularity. Mode-specific cp_key so prio and all keep independent high-water.
+    mode = ctx["args"].transcript_universe
+    per_symbol(ctx, "p1_transcripts", f"p1_transcripts_{mode}", eq, _fetch_transcripts,
+               on_batch, batch=100, guard_pg=False, firehose=True)
 
 
 # ═══════════════════════════════════════════════════════ P2 crypto / forex EOD
@@ -1142,58 +1186,60 @@ def harvest_p9_ipos(ctx):
     log(f"p9 ipos: fetched={st('p9_ipos')['fetched']:,}")
 
 
+def _fetch_etf(ctx, sym):
+    hold = _get_json("etf/holdings", {"symbol": sym}) or []
+    for r in hold:
+        r["etf"] = sym
+    weights = []
+    for kind, ep, lab in (("sector", "etf/sector-weightings", "sector"),
+                          ("country", "etf/country-weightings", "country")):
+        ctx["rate"].wait()
+        for r in (_get_json(ep, {"symbol": sym}) or []):
+            weights.append({"etf": sym, "kind": kind, "label": r.get(lab),
+                            "weightPercentage": r.get("weightPercentage")})
+    if not hold and not weights:
+        return None
+    return {"hold": hold, "weights": weights}
+
+
 def harvest_p9_etf(ctx):
+    """Threaded via per_symbol (3 calls/ETF). Foreign ETFs return null-asset
+    holdings → skipped; already-captured ETFs skipped; null-PK rows filtered."""
     ctx["pq"].setdefault("etf_holdings", PQWriter(ctx["archive"], "etf_holdings"))
     ctx["pq"].setdefault("etf_weightings", PQWriter(ctx["archive"], "etf_weightings"))
     cp = ctx["cp"]
-    cache = "_p9_etf_syms"
-    etfs = cp.get(cache)
-    if etfs is None:
+    todo = cp.get("_p9_etf_todo")
+    if todo is None:
         listing = _get_json("etf-list") or []
         etfs = sorted({(r.get("symbol") or "").strip().upper()
                        for r in listing if r.get("symbol")})
-        if not etfs:  # fallback: ETF-like symbols from our universe
-            etfs = [s for s in ctx["universe"] if s in ("SPY", "QQQ", "IWM", "DIA", "VOO",
-                    "VTI", "ARKK", "XLF", "XLK", "XLE", "GLD", "TLT", "HYG", "EEM")]
-        cp[cache] = etfs
+        etfs = [s for s in etfs if not is_foreign(s)]
+        have = set()
+        if "fmp_etf_holdings" in ctx["present"]:
+            with ctx["conn"].cursor() as cur:
+                cur.execute("SELECT DISTINCT etf FROM fmp_etf_holdings")
+                have = {r[0] for r in cur.fetchall()}
+        todo = [s for s in etfs if s not in have]
+        cp["_p9_etf_todo"] = todo
         save_cp(cp)
-    hw = cp.get("p9_etf", {}).get("hw", 0)
-    log(f"p9 etf: {len(etfs):,} ETFs, resume at {hw}")
-    for i in range(hw, len(etfs)):
-        if _STOP or not ctx["archive"].has_room():
-            break
-        sym = etfs[i]
-        if is_foreign(sym):   # foreign ETFs (.DE/.KS/.L/…) return null-asset holdings; skip
-            continue
-        ctx["rate"].wait()
-        hold = _get_json("etf/holdings", {"symbol": sym}) or []
-        for r in hold:
-            r["etf"] = sym
-        if hold:
-            st("p9_etf")["fetched"] += len(hold)
-            ctx["pq"]["etf_holdings"].add(sym[:1].upper(), hold)
-            hrows = [r for r in map_rows(hold, ETF_HOLD) if r.get("etf") and r.get("asset")]
-            _upsert_if(ctx, "fmp_etf_holdings", ETF_HOLD, ["etf", "asset"],
-                       hrows, "update", "p9_etf")
-        wrows = []
-        for kind, ep, lab in (("sector", "etf/sector-weightings", "sector"),
-                              ("country", "etf/country-weightings", "country")):
-            ctx["rate"].wait()
-            for r in (_get_json(ep, {"symbol": sym}) or []):
-                wrows.append({"etf": sym, "kind": kind, "label": r.get(lab),
-                              "weightPercentage": r.get("weightPercentage")})
-        if wrows:
-            ctx["pq"]["etf_weightings"].add(sym[:1].upper(), wrows)
-            wmap = [r for r in map_rows(wrows, ETF_WEIGHT)
-                    if r.get("etf") and r.get("kind") and r.get("label")]
-            _upsert_if(ctx, "fmp_etf_weightings", ETF_WEIGHT, ["etf", "kind", "label"],
-                       wmap, "update", "p9_etf")
-        if (i + 1) % 50 == 0:
-            cp["p9_etf"] = {"hw": i + 1}
-            save_cp(cp)
-    cp["p9_etf"] = {"hw": len(etfs) if not _STOP else hw}
-    save_cp(cp)
-    log(f"p9 etf: holdings rows={st('p9_etf')['fetched']:,}")
+        log(f"p9 etf: {len(etfs):,} non-foreign ETFs, {len(have):,} already done → {len(todo):,} to fetch")
+
+    def on_batch(collected):
+        hrows, wrows = [], []
+        for sym, d in collected:
+            if d.get("hold"):
+                st("p9_etf")["fetched"] += len(d["hold"])
+                ctx["pq"]["etf_holdings"].add(sym[:1].upper(), d["hold"])
+                hrows += [r for r in map_rows(d["hold"], ETF_HOLD)
+                          if r.get("etf") and r.get("asset")]
+            if d.get("weights"):
+                ctx["pq"]["etf_weightings"].add(sym[:1].upper(), d["weights"])
+                wrows += [r for r in map_rows(d["weights"], ETF_WEIGHT)
+                          if r.get("etf") and r.get("kind") and r.get("label")]
+        _upsert_if(ctx, "fmp_etf_holdings", ETF_HOLD, ["etf", "asset"], hrows, "update", "p9_etf")
+        _upsert_if(ctx, "fmp_etf_weightings", ETF_WEIGHT, ["etf", "kind", "label"], wrows, "update", "p9_etf")
+
+    per_symbol(ctx, "p9_etf", "p9_etf_v2", todo, _fetch_etf, on_batch, batch=100, guard_pg=True)
 
 
 def harvest_p9_sec(ctx):
