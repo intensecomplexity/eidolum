@@ -1,0 +1,658 @@
+{
+ "323100": {
+  "ticker": "NIO",
+  "direction": "bearish",
+  "outcome": "hit",
+  "entry": 6.24,
+  "ret": -9.46,
+  "evaluated_at": "2026-04-19 12:31:56.898279"
+ },
+ "452504": {
+  "ticker": "SPX",
+  "direction": "bearish",
+  "outcome": "delisted",
+  "entry": null,
+  "ret": null,
+  "evaluated_at": "2026-06-10 08:48:36.54256"
+ },
+ "452519": {
+  "ticker": "NAKA",
+  "direction": "bearish",
+  "outcome": "unresolved",
+  "entry": 8.75,
+  "ret": 11.09,
+  "evaluated_at": "2026-06-14 11:13:25.145876"
+ },
+ "605798": {
+  "ticker": "PLTR",
+  "direction": "bearish",
+  "outcome": "pending",
+  "entry": null,
+  "ret": null,
+  "evaluated_at": null
+ },
+ "605817": {
+  "ticker": "XRP",
+  "direction": "bullish",
+  "outcome": "unresolved",
+  "entry": 1.41,
+  "ret": -2.13,
+  "evaluated_at": "2026-06-14 11:13:25.145876"
+ },
+ "606377": {
+  "ticker": "ALB",
+  "direction": "neutral",
+  "outcome": "hit",
+  "entry": 120.31,
+  "ret": 0.0,
+  "evaluated_at": "2026-04-11 05:06:38.163861"
+ },
+ "606412": {
+  "ticker": "V",
+  "direction": "bearish",
+  "outcome": "unresolved",
+  "entry": 256.44,
+  "ret": -13.81,
+  "evaluated_at": "2026-06-14 05:12:27.449121"
+ },
+ "606495": {
+  "ticker": "MSFT",
+  "direction": "bullish",
+  "outcome": "pending",
+  "entry": null,
+  "ret": null,
+  "evaluated_at": null
+ },
+ "606497": {
+  "ticker": "IBM",
+  "direction": "neutral",
+  "outcome": "pending",
+  "entry": null,
+  "ret": null,
+  "evaluated_at": null
+ },
+ "607078": {
+  "ticker": "MO",
+  "direction": "neutral",
+  "outcome": "miss",
+  "entry": 40.3,
+  "ret": 10.74,
+  "evaluated_at": "2026-04-11 20:24:29.688762"
+ },
+ "607365": {
+  "ticker": "ORCL",
+  "direction": "bearish",
+  "outcome": "unresolved",
+  "entry": 198.85,
+  "ret": 17.97,
+  "evaluated_at": "2026-06-12 11:15:00.919307"
+ },
+ "607805": {
+  "ticker": "OXY",
+  "direction": "neutral",
+  "outcome": "miss",
+  "entry": 48.46,
+  "ret": -16.61,
+  "evaluated_at": "2026-04-12 04:49:02.70194"
+ },
+ "608010": {
+  "ticker": "AIR",
+  "direction": "bullish",
+  "outcome": "unresolved",
+  "entry": 66.8,
+  "ret": 7.07,
+  "evaluated_at": "2026-06-14 11:13:25.145876"
+ },
+ "608293": {
+  "ticker": "CVX",
+  "direction": "neutral",
+  "outcome": "miss",
+  "entry": 143.79,
+  "ret": 11.77,
+  "evaluated_at": "2026-04-12 09:00:35.870394"
+ },
+ "608345": {
+  "ticker": "BTC",
+  "direction": "bullish",
+  "outcome": "miss",
+  "entry": 95956.19,
+  "ret": -4.83,
+  "evaluated_at": "2026-04-12 09:21:18.549538"
+ },
+ "608452": {
+  "ticker": "ABNB",
+  "direction": "neutral",
+  "outcome": "miss",
+  "entry": 113.01,
+  "ret": 30.4,
+  "evaluated_at": "2026-04-12 13:45:37.25214"
+ },
+ "608751": {
+  "ticker": "PSTG",
+  "direction": "bearish",
+  "outcome": "hit",
+  "entry": 66.89,
+  "ret": 30.17,
+  "evaluated_at": "2026-04-12 15:55:53.133656"
+ },
+ "608785": {
+  "ticker": "RTX",
+  "direction": "bullish",
+  "outcome": "pending",
+  "entry": null,
+  "ret": null,
+  "evaluated_at": null
+ },
+ "609084": {
+  "ticker": "MO",
+  "direction": "bullish",
+  "outcome": "pending",
+  "entry": null,
+  "ret": null,
+  "evaluated_at": null
+ },
+ "609111": {
+  "ticker": "LNG",
+  "direction": "bullish",
+  "outcome": "hit",
+  "entry": 177.66,
+  "ret": 26.77,
+  "evaluated_at": "2026-04-12 21:14:38.480359"
+ },
+ "609588": {
+  "ticker": "DEO",
+  "direction": "neutral",
+  "outcome": "pending",
+  "entry": null,
+  "ret": null,
+  "evaluated_at": null
+ },
+ "609620": {
+  "ticker": "KLAC",
+  "direction": "bullish",
+  "outcome": "pending",
+  "entry": null,
+  "ret": null,
+  "evaluated_at": null
+ },
+ "609783": {
+  "ticker": "INVA",
+  "direction": "bullish",
+  "outcome": "unresolved",
+  "entry": 23.97,
+  "ret": -5.13,
+  "evaluated_at": "2026-06-14 05:12:27.449121"
+ },
+ "609858": {
+  "ticker": "QQQ",
+  "direction": "bearish",
+  "outcome": "pending",
+  "entry": null,
+  "ret": null,
+  "evaluated_at": null
+ },
+ "610142": {
+  "ticker": "PYPL",
+  "direction": "bullish",
+  "outcome": "pending",
+  "entry": null,
+  "ret": null,
+  "evaluated_at": null
+ },
+ "610918": {
+  "ticker": "TROW",
+  "direction": "bearish",
+  "outcome": "hit",
+  "entry": 132.09,
+  "ret": 16.89,
+  "evaluated_at": "2026-04-15 00:51:01.591963"
+ },
+ "611297": {
+  "ticker": "USO",
+  "direction": "bearish",
+  "outcome": "pending",
+  "entry": null,
+  "ret": null,
+  "evaluated_at": null
+ },
+ "611887": {
+  "ticker": "HUM",
+  "direction": "neutral",
+  "outcome": "miss",
+  "entry": 312.0,
+  "ret": -41.8,
+  "evaluated_at": "2026-04-15 03:20:54.829592"
+ },
+ "612129": {
+  "ticker": "SOL",
+  "direction": "bearish",
+  "outcome": "unresolved",
+  "entry": 125.2,
+  "ret": 32.61,
+  "evaluated_at": "2026-06-14 10:34:52.104212"
+ },
+ "612216": {
+  "ticker": "CAKE",
+  "direction": "bearish",
+  "outcome": "pending",
+  "entry": 47.0,
+  "ret": null,
+  "evaluated_at": "2026-04-15 09:50:54.832317"
+ },
+ "612424": {
+  "ticker": "SPY",
+  "direction": "bullish",
+  "outcome": "miss",
+  "entry": null,
+  "ret": 13.02,
+  "evaluated_at": "2026-04-15 10:20:54.831358"
+ },
+ "612487": {
+  "ticker": "CRM",
+  "direction": "bullish",
+  "outcome": "pending",
+  "entry": null,
+  "ret": null,
+  "evaluated_at": null
+ },
+ "612518": {
+  "ticker": "TIP",
+  "direction": "bullish",
+  "outcome": "hit",
+  "entry": 109.82,
+  "ret": 0.08,
+  "evaluated_at": "2026-04-15 10:50:54.835604"
+ },
+ "612553": {
+  "ticker": "BA",
+  "direction": "bullish",
+  "outcome": "unresolved",
+  "entry": 158.43,
+  "ret": 37.04,
+  "evaluated_at": "2026-06-11 18:29:15.873793"
+ },
+ "612994": {
+  "ticker": "SPY",
+  "direction": "bearish",
+  "outcome": "pending",
+  "entry": null,
+  "ret": null,
+  "evaluated_at": null
+ },
+ "613018": {
+  "ticker": "NFLX",
+  "direction": "bullish",
+  "outcome": "miss",
+  "entry": 1098.46,
+  "ret": -92.0,
+  "evaluated_at": "2026-05-06 11:02:53.83549"
+ },
+ "613183": {
+  "ticker": "TIP",
+  "direction": "bullish",
+  "outcome": "hit",
+  "entry": 126.0,
+  "ret": 2.54,
+  "evaluated_at": "2026-04-15 14:20:54.83819"
+ },
+ "613244": {
+  "ticker": "NFLX",
+  "direction": "neutral",
+  "outcome": "hit",
+  "entry": 107.71,
+  "ret": 0.0,
+  "evaluated_at": "2026-04-16 00:10:25.340408"
+ },
+ "613840": {
+  "ticker": "META",
+  "direction": "bearish",
+  "outcome": "unresolved",
+  "entry": 465.7,
+  "ret": -11.18,
+  "evaluated_at": "2026-06-11 17:32:45.633757"
+ },
+ "614041": {
+  "ticker": "AMZN",
+  "direction": "neutral",
+  "outcome": "hit",
+  "entry": 175.0,
+  "ret": 4.69,
+  "evaluated_at": "2026-04-15 19:30:50.761595"
+ },
+ "614850": {
+  "ticker": "AMD",
+  "direction": "bullish",
+  "outcome": "unresolved",
+  "entry": 203.78,
+  "ret": 0.0,
+  "evaluated_at": "2026-06-14 11:13:25.145876"
+ },
+ "614852": {
+  "ticker": "TSLA",
+  "direction": "bullish",
+  "outcome": "miss",
+  "entry": 391.09,
+  "ret": 0.0,
+  "evaluated_at": "2026-04-16 14:07:06.345584"
+ },
+ "614931": {
+  "ticker": "HYG",
+  "direction": "bearish",
+  "outcome": "pending",
+  "entry": null,
+  "ret": null,
+  "evaluated_at": null
+ },
+ "615118": {
+  "ticker": "GLD",
+  "direction": "bullish",
+  "outcome": "unresolved",
+  "entry": 293.16,
+  "ret": 4.81,
+  "evaluated_at": "2026-06-14 10:34:52.104212"
+ },
+ "615642": {
+  "ticker": "INTU",
+  "direction": "bearish",
+  "outcome": "unresolved",
+  "entry": 646.03,
+  "ret": -4.64,
+  "evaluated_at": "2026-06-11 18:29:15.873793"
+ },
+ "615657": {
+  "ticker": "NVDA",
+  "direction": "neutral",
+  "outcome": "unresolved",
+  "entry": 185.54,
+  "ret": 1.39,
+  "evaluated_at": "2026-06-14 11:13:25.145876"
+ },
+ "615666": {
+  "ticker": "SPY",
+  "direction": "neutral",
+  "outcome": "unresolved",
+  "entry": 664.39,
+  "ret": 4.19,
+  "evaluated_at": "2026-06-14 11:13:25.145876"
+ },
+ "615673": {
+  "ticker": "AMZN",
+  "direction": "neutral",
+  "outcome": "hit",
+  "entry": 224.21,
+  "ret": 4.52,
+  "evaluated_at": "2026-04-17 18:25:27.915917"
+ },
+ "615689": {
+  "ticker": "META",
+  "direction": "bullish",
+  "outcome": "unresolved",
+  "entry": 590.32,
+  "ret": 8.3,
+  "evaluated_at": "2026-06-11 18:29:15.873793"
+ },
+ "615794": {
+  "ticker": "LU",
+  "direction": "bullish",
+  "outcome": "pending",
+  "entry": null,
+  "ret": null,
+  "evaluated_at": null
+ },
+ "615798": {
+  "ticker": "WMT",
+  "direction": "bullish",
+  "outcome": "pending",
+  "entry": null,
+  "ret": null,
+  "evaluated_at": null
+ },
+ "616017": {
+  "ticker": "NFLX",
+  "direction": "bullish",
+  "outcome": "hit",
+  "entry": 40.18,
+  "ret": 38.13,
+  "evaluated_at": "2026-04-18 08:57:54.529154"
+ },
+ "616408": {
+  "ticker": "NVDA",
+  "direction": "bearish",
+  "outcome": "miss",
+  "entry": 106.47,
+  "ret": -29.85,
+  "evaluated_at": "2026-04-18 22:31:56.904957"
+ },
+ "616424": {
+  "ticker": "NVDA",
+  "direction": "bullish",
+  "outcome": "hit",
+  "entry": 123.74,
+  "ret": 14.72,
+  "evaluated_at": "2026-04-18 22:31:56.904957"
+ },
+ "616580": {
+  "ticker": "NEM",
+  "direction": "bearish",
+  "outcome": "unresolved",
+  "entry": null,
+  "ret": null,
+  "evaluated_at": "2026-04-19 12:16:42.491715"
+ },
+ "623357": {
+  "ticker": "TSLA",
+  "direction": "bullish",
+  "outcome": "unresolved",
+  "entry": 356.9,
+  "ret": 23.8,
+  "evaluated_at": "2026-06-11 18:29:15.873793"
+ },
+ "623363": {
+  "ticker": "SPY",
+  "direction": "bearish",
+  "outcome": "delisted",
+  "entry": null,
+  "ret": null,
+  "evaluated_at": "2026-05-08 14:32:44.051491"
+ },
+ "623828": {
+  "ticker": "XLE",
+  "direction": "bullish",
+  "outcome": "delisted",
+  "entry": null,
+  "ret": null,
+  "evaluated_at": "2026-05-09 11:32:44.049588"
+ },
+ "623948": {
+  "ticker": "PLTR",
+  "direction": "bullish",
+  "outcome": "hit",
+  "entry": 110.48,
+  "ret": 24.05,
+  "evaluated_at": "2026-05-11 12:02:44.052165"
+ },
+ "624296": {
+  "ticker": "SPY",
+  "direction": "bullish",
+  "outcome": "delisted",
+  "entry": null,
+  "ret": null,
+  "evaluated_at": "2026-05-11 20:32:44.051912"
+ },
+ "624807": {
+  "ticker": "TLT",
+  "direction": "bullish",
+  "outcome": "pending",
+  "entry": null,
+  "ret": null,
+  "evaluated_at": null
+ },
+ "624835": {
+  "ticker": "SPY",
+  "direction": "bullish",
+  "outcome": "delisted",
+  "entry": null,
+  "ret": null,
+  "evaluated_at": "2026-05-15 17:15:52.416129"
+ },
+ "624878": {
+  "ticker": "SAM",
+  "direction": "bullish",
+  "outcome": "pending",
+  "entry": null,
+  "ret": null,
+  "evaluated_at": null
+ },
+ "624915": {
+  "ticker": "SPY",
+  "direction": "bearish",
+  "outcome": "delisted",
+  "entry": null,
+  "ret": null,
+  "evaluated_at": "2026-05-16 17:33:15.832323"
+ },
+ "626441": {
+  "ticker": "NFLX",
+  "direction": "bearish",
+  "outcome": "pending",
+  "entry": null,
+  "ret": null,
+  "evaluated_at": null
+ },
+ "628558": {
+  "ticker": "HOOD",
+  "direction": "bullish",
+  "outcome": "unresolved",
+  "entry": 88.16,
+  "ret": -6.47,
+  "evaluated_at": "2026-06-14 11:13:25.145876"
+ },
+ "629971": {
+  "ticker": "NU",
+  "direction": "bullish",
+  "outcome": "pending",
+  "entry": null,
+  "ret": null,
+  "evaluated_at": null
+ },
+ "630566": {
+  "ticker": "UAA",
+  "direction": "bullish",
+  "outcome": "pending",
+  "entry": null,
+  "ret": null,
+  "evaluated_at": null
+ },
+ "630691": {
+  "ticker": "LOW",
+  "direction": "bullish",
+  "outcome": "pending",
+  "entry": null,
+  "ret": null,
+  "evaluated_at": null
+ },
+ "630905": {
+  "ticker": "YUM",
+  "direction": "bearish",
+  "outcome": "pending",
+  "entry": null,
+  "ret": null,
+  "evaluated_at": null
+ },
+ "631872": {
+  "ticker": "TSLA",
+  "direction": "bullish",
+  "outcome": "pending",
+  "entry": null,
+  "ret": null,
+  "evaluated_at": null
+ },
+ "632135": {
+  "ticker": "NOW",
+  "direction": "bullish",
+  "outcome": "pending",
+  "entry": null,
+  "ret": null,
+  "evaluated_at": null
+ },
+ "632206": {
+  "ticker": "BTC",
+  "direction": "bullish",
+  "outcome": "pending",
+  "entry": null,
+  "ret": null,
+  "evaluated_at": null
+ },
+ "632278": {
+  "ticker": "SOL",
+  "direction": "bullish",
+  "outcome": "pending",
+  "entry": null,
+  "ret": null,
+  "evaluated_at": null
+ },
+ "632308": {
+  "ticker": "ASTS",
+  "direction": "bullish",
+  "outcome": "pending",
+  "entry": null,
+  "ret": null,
+  "evaluated_at": null
+ },
+ "632841": {
+  "ticker": "MU",
+  "direction": "bullish",
+  "outcome": "pending",
+  "entry": null,
+  "ret": null,
+  "evaluated_at": null
+ },
+ "632854": {
+  "ticker": "SES",
+  "direction": "bullish",
+  "outcome": "pending",
+  "entry": null,
+  "ret": null,
+  "evaluated_at": null
+ },
+ "633014": {
+  "ticker": "TSLA",
+  "direction": "bullish",
+  "outcome": "pending",
+  "entry": null,
+  "ret": null,
+  "evaluated_at": null
+ },
+ "633255": {
+  "ticker": "IREN",
+  "direction": "bearish",
+  "outcome": "pending",
+  "entry": null,
+  "ret": null,
+  "evaluated_at": null
+ },
+ "633886": {
+  "ticker": "CMG",
+  "direction": "bullish",
+  "outcome": "pending",
+  "entry": null,
+  "ret": null,
+  "evaluated_at": null
+ },
+ "634475": {
+  "ticker": "BTC",
+  "direction": "bullish",
+  "outcome": "pending",
+  "entry": null,
+  "ret": null,
+  "evaluated_at": null
+ },
+ "635015": {
+  "ticker": "LTC",
+  "direction": "bearish",
+  "outcome": "pending",
+  "entry": null,
+  "ret": null,
+  "evaluated_at": null
+ }
+}

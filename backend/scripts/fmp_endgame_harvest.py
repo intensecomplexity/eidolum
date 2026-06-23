@@ -49,7 +49,7 @@ import sys
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor, FIRST_COMPLETED, wait
-from datetime import datetime
+from datetime import datetime, date, timedelta
 from urllib.parse import urlparse, urlunparse
 
 import httpx
@@ -383,6 +383,25 @@ def write_jsonl_gz(archive, dataset, relpath, objs):
     return os.path.join(dataset, relpath), nb
 
 
+def write_symbol_parquet(archive, dataset, symbol, rows):
+    """One parquet per symbol (partitioned by first char) — for firehose
+    per-symbol series (intraday) where buffering thousands of partitions in a
+    PQWriter would balloon memory. Returns bytes written."""
+    safe = "".join(c if (c.isalnum() or c in "._-") else "_" for c in str(symbol)) or "_"
+    first = safe[0].upper() if safe[:1].isalnum() else "_"
+    subdir = os.path.join(archive.root, dataset, first)
+    try:
+        os.makedirs(subdir, exist_ok=True)
+        path = os.path.join(subdir, f"{safe}.parquet")
+        pq.write_table(_to_table(rows), path, compression="snappy")
+        nb = os.path.getsize(path)
+        archive.note(nb)
+        return nb
+    except Exception as e:
+        log(f"parquet {dataset}/{symbol}: {type(e).__name__}: {e}")
+        return 0
+
+
 def _flush_all():
     for w in _WRITERS:
         try:
@@ -490,6 +509,20 @@ SEC8K = [("row_hash", "", "s"), ("symbol", "symbol", "s"), ("cik", "cik", "s"),
          ("form_type", "formType", "s"), ("has_financials", "hasFinancials", "s"),
          ("link", "link", "s"), ("final_link", "finalLink", "s")]
 
+# p10 index EOD reuses the EOD shape; p11 delisted:
+DELISTED = [("row_hash", "", "s"), ("symbol", "symbol", "s"),
+            ("company_name", "companyName", "s"), ("exchange", "exchange", "s"),
+            ("ipo_date", "ipoDate", "d"), ("delisted_date", "delistedDate", "d")]
+
+# p12 intraday: FMP historical-chart returns a fixed ~3-month window ending at
+# `to`; page backward in WINDOW-day steps. Equity history runs ~20y but full
+# history of all symbols would blow the bandwidth budget, so cap equities to the
+# last EQUITY_YEARS (crypto/fx kept full — they're the high-value 24/7 series).
+INTRADAY_WINDOW_DAYS = 120
+INTRADAY_EQUITY_YEARS = 5
+INTRADAY_FLOOR_CFX = "2009-01-01"
+INTRADAY_MAX_WINDOWS = 130
+
 # table -> (columns, pk_cols, [extra index cols])
 TABLES = {
     "fmp_crypto_prices":           (EOD, ["symbol", "date"], ["symbol"]),
@@ -506,6 +539,8 @@ TABLES = {
     "fmp_etf_holdings":            (ETF_HOLD, ["etf", "asset"], ["etf"]),
     "fmp_etf_weightings":          (ETF_WEIGHT, ["etf", "kind", "label"], ["etf"]),
     "fmp_sec_filings":             (SEC8K, ["row_hash"], ["symbol"]),
+    "fmp_index_prices":            (EOD, ["symbol", "date"], ["symbol"]),
+    "fmp_delisted_companies":      (DELISTED, ["row_hash"], ["symbol"]),
 }
 
 
@@ -516,6 +551,7 @@ CHG_HASH = ["index_name", "date", "symbol", "added_security", "removed_ticker", 
 CAL_HASH = ["event_date", "country", "event"]
 MNA_HASH = ["symbol", "targeted_symbol", "transaction_date", "link"]
 SEC_HASH = ["cik", "accepted_date", "form_type", "final_link"]
+DELISTED_HASH = ["symbol", "delisted_date", "exchange"]
 
 # archive-dir → (pg_table, columns, pk, conflict, hash_fields) for --reload-pg-from-archive
 RELOAD = [
@@ -533,6 +569,8 @@ RELOAD = [
     ("etf_holdings", "fmp_etf_holdings", ETF_HOLD, ["etf", "asset"], "update", None),
     ("etf_weightings", "fmp_etf_weightings", ETF_WEIGHT, ["etf", "kind", "label"], "update", None),
     ("sec_filings_8k", "fmp_sec_filings", SEC8K, ["row_hash"], "nothing", SEC_HASH),
+    ("index_eod", "fmp_index_prices", EOD, ["symbol", "date"], "nothing", None),
+    ("delisted", "fmp_delisted_companies", DELISTED, ["row_hash"], "update", DELISTED_HASH),
 ]
 
 
@@ -1295,6 +1333,202 @@ def harvest_p9_sec(ctx):
     log(f"p9 sec-8k: fetched={st('p9_sec')['fetched']:,}")
 
 
+# ═══════════════════════════════════════════════════════ P10 index EOD (PG + archive)
+def harvest_p10_index_eod(ctx):
+    ctx["pq"].setdefault("index_eod", PQWriter(ctx["archive"], "index_eod"))
+    _harvest_eod(ctx, "p10_index", "p10_index", "index-list",
+                 "fmp_index_prices", "index_eod")
+
+
+# ═══════════════════════════════════════════════════════ P11 delisted (PG + archive)
+def harvest_p11_delisted(ctx):
+    ctx["pq"].setdefault("delisted", PQWriter(ctx["archive"], "delisted"))
+    cp = ctx["cp"]
+    page = cp.get("p11_delisted", {}).get("page", 0)
+    max_pages = ctx["args"].max_pages or 5000
+    while page < max_pages and not _STOP:
+        ctx["rate"].wait()
+        raw = _get_json("delisted-companies", {"page": page, "limit": 100})
+        if not raw:
+            break
+        st("p11_delisted")["fetched"] += len(raw)
+        ctx["pq"]["delisted"].add("_", raw)
+        mapped = map_rows(raw, DELISTED)
+        _hash_rows(mapped, DELISTED_HASH)
+        _upsert_if(ctx, "fmp_delisted_companies", DELISTED, ["row_hash"], mapped, "update", "p11_delisted")
+        page += 1
+        cp["p11_delisted"] = {"page": page}
+        save_cp(cp)
+        if page % 20 == 0:
+            bw_guard(ctx)
+            log(f"p11 delisted: page {page}  rows={st('p11_delisted')['fetched']:,}")
+    log(f"p11 delisted: fetched={st('p11_delisted')['fetched']:,}")
+
+
+# ═══════════════════════════════════════════════════════ P12 1-hour intraday (archive-only firehose)
+def _fetch_intraday1h(ctx, symbol):
+    cfx = symbol in ctx["_p12_cfx"]
+    floor = date.fromisoformat(INTRADAY_FLOOR_CFX) if cfx else \
+        (datetime.utcnow().date() - timedelta(days=365 * INTRADAY_EQUITY_YEARS))
+    to_d = datetime.utcnow().date()
+    bars = []
+    for _ in range(INTRADAY_MAX_WINDOWS):
+        if _STOP or to_d <= floor:
+            break
+        frm_d = to_d - timedelta(days=INTRADAY_WINDOW_DAYS)
+        ctx["rate"].wait()
+        raw = _get_json("historical-chart/1hour",
+                        {"symbol": symbol, "from": frm_d.isoformat(), "to": to_d.isoformat()})
+        if not raw:
+            break
+        bars.extend(raw)
+        dts = [(r.get("date") or "")[:10] for r in raw if isinstance(r, dict) and r.get("date")]
+        if not dts:
+            break
+        try:
+            ed = date.fromisoformat(min(dts))
+        except Exception:
+            break
+        if ed <= floor:
+            break
+        nd = ed - timedelta(days=1)
+        if nd >= to_d:        # no backward progress → stop
+            break
+        to_d = nd
+    if not bars:
+        return None
+    for r in bars:
+        if isinstance(r, dict):
+            r["symbol"] = symbol
+    return bars
+
+
+def harvest_p12_intraday(ctx):
+    if not ctx["archive"].firehose_ok:
+        log("p12 intraday: firehose paused (low disk) — skipping")
+        return
+    cp = ctx["cp"]
+    syms = cp.get("_p12_syms")
+    if syms is None:
+        with ctx["conn"].cursor() as cur:
+            cur.execute("SELECT ticker FROM predictions WHERE ticker IS NOT NULL AND ticker<>'' "
+                        "GROUP BY ticker ORDER BY count(*) DESC")
+            eq = [(r[0] or "").strip().upper() for r in cur.fetchall()]
+        eq = [s for s in eq if s and not is_foreign(s)]
+        crypto = sorted({(r.get("symbol") or "").strip().upper()
+                         for r in (_get_json("cryptocurrency-list") or []) if r.get("symbol")})
+        fx = sorted({(r.get("symbol") or "").strip().upper()
+                     for r in (_get_json("forex-list") or []) if r.get("symbol")})
+        cfx = set(crypto) | set(fx)
+        seen, syms = set(), []
+        for s in eq + crypto + fx:          # front-load predictions, then crypto, fx last
+            if s and s not in seen:
+                seen.add(s); syms.append(s)
+        cp["_p12_syms"] = syms
+        cp["_p12_cfx"] = sorted(cfx)
+        save_cp(cp)
+    ctx["_p12_cfx"] = set(cp.get("_p12_cfx", []))
+    log(f"p12 intraday-1h: {len(syms):,} symbols ({len(ctx['_p12_cfx']):,} crypto/fx full-history, "
+        f"rest equities last {INTRADAY_EQUITY_YEARS}y), archive-only")
+
+    def on_batch(collected):
+        for symbol, bars in collected:
+            st("p12_intraday")["fetched"] += len(bars)
+            nb = write_symbol_parquet(ctx["archive"], "intraday_1h", symbol, bars)
+            s = st("p12_intraday")
+            s["arch_rows"] += len(bars)
+            s["arch_bytes"] += nb
+
+    per_symbol(ctx, "p12_intraday", "p12_intraday", syms, _fetch_intraday1h,
+               on_batch, batch=50, guard_pg=False, firehose=True)
+
+
+# ═══════════════════════════════════════════════════════ P13 extras (archive-only, one subfolder each)
+def _p13_per_symbol(ctx, sub, endpoint, symbols):
+    if _STOP:
+        return
+    ctx["pq"].setdefault(sub, PQWriter(ctx["archive"], sub))
+
+    def fetch(_c, sym):
+        raw = _get_json(endpoint, {"symbol": sym})
+        if not raw:
+            return None
+        for r in raw:
+            if isinstance(r, dict):
+                r.setdefault("symbol", sym)
+        return raw
+
+    def on_batch(collected):
+        arch = []
+        for _sym, raw in collected:
+            st(f"p13_{sub}")["fetched"] += len(raw)
+            arch.extend(raw)
+        if arch:
+            p = str(arch[0].get("symbol", "_"))[:1].upper()
+            ctx["pq"][sub].add(p if p.isalnum() else "_", arch)
+
+    per_symbol(ctx, f"p13_{sub}", f"p13_{sub}", symbols, fetch, on_batch,
+               batch=200, guard_pg=False, firehose=True)
+
+
+def harvest_p13_extras(ctx):
+    if not ctx["archive"].firehose_ok:
+        log("p13 extras: firehose paused (low disk) — skipping")
+        return
+    cp = ctx["cp"]
+    pred = cp.get("_p13_pred")
+    if pred is None:
+        with ctx["conn"].cursor() as cur:
+            cur.execute("SELECT ticker FROM predictions WHERE ticker IS NOT NULL AND ticker<>'' "
+                        "GROUP BY ticker ORDER BY count(*) DESC")
+            pred = [(r[0] or "").strip().upper() for r in cur.fetchall()]
+        pred = [s for s in pred if s and not is_foreign(s)]
+        cp["_p13_pred"] = pred
+        save_cp(cp)
+    for sub, ep in (("revenue_product_seg", "revenue-product-segmentation"),
+                    ("revenue_geo_seg", "revenue-geographic-segmentation"),
+                    ("beneficial_ownership", "acquisition-of-beneficial-ownership"),
+                    ("esg_disclosures", "esg-disclosures"),
+                    ("esg_ratings", "esg-ratings")):
+        if _STOP:
+            return
+        _p13_per_symbol(ctx, sub, ep, pred)
+    # COT: list (once) + per-symbol report
+    if not _STOP and not cp.get("p13_cot_list", {}).get("done"):
+        cl = _get_json("commitment-of-traders-list") or []
+        ctx["pq"].setdefault("cot_list", PQWriter(ctx["archive"], "cot_list")).add("_", cl)
+        ctx["pq"]["cot_list"].flush()
+        cp["_p13_cot_syms"] = sorted({(r.get("symbol") or "").strip().upper()
+                                      for r in cl if r.get("symbol")})
+        cp["p13_cot_list"] = {"done": True}
+        save_cp(cp)
+    if not _STOP:
+        _p13_per_symbol(ctx, "cot_report", "commitment-of-traders-report",
+                        cp.get("_p13_cot_syms", []))
+    # IPO disclosure / prospectus by year (date-range)
+    this_year = datetime.utcnow().year
+    for sub, ep in (("ipos_disclosure", "ipos-disclosure"),
+                    ("ipos_prospectus", "ipos-prospectus")):
+        if _STOP:
+            break
+        ctx["pq"].setdefault(sub, PQWriter(ctx["archive"], sub))
+        done = set(cp.get(f"p13_{sub}", {}).get("done", []))
+        for y in range(2000, this_year + 1):
+            if _STOP:
+                break
+            if str(y) in done:
+                continue
+            raw = _get_json(ep, {"from": f"{y}-01-01", "to": f"{y}-12-31"})
+            if raw:
+                st(f"p13_{sub}")["fetched"] += len(raw)
+                ctx["pq"][sub].add(str(y), raw)
+            done.add(str(y))
+            cp[f"p13_{sub}"] = {"done": sorted(done)}
+            save_cp(cp)
+            bw_guard(ctx)
+    log("p13 extras: done")
+
+
 # ═══════════════════════════════════════════════════════ probe-only (re-verify endpoints)
 def run_probe():
     import csv as _csv
@@ -1439,6 +1673,10 @@ def dataset_registry():
         ("p9_ipos", 9, harvest_p9_ipos),
         ("p9_etf", 9, harvest_p9_etf),
         ("p9_sec", 9, harvest_p9_sec),
+        ("p10_index", 10, harvest_p10_index_eod),
+        ("p11_delisted", 11, harvest_p11_delisted),
+        ("p12_intraday", 12, harvest_p12_intraday),
+        ("p13_extras", 13, harvest_p13_extras),
     ]
 
 
