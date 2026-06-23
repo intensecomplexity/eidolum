@@ -1,0 +1,7 @@
+{"id": 633491, "ticker": "NFLX", "src": "x", "verdict": "GRADEABLE", "reason": "has_direction", "why": "Buying call options on NFLX before earnings is a bullish directional bet", "llm": true}
+{"id": 633812, "ticker": "BTC", "src": "x", "verdict": "GRADEABLE", "reason": "has_direction", "why": "Bullish call: buy the dip, bottom will be in by week's end", "llm": true}
+{"id": 634846, "ticker": "NVDA", "src": "x", "verdict": "GRADEABLE", "reason": "has_direction", "why": "'load the boat' signals strong bullish buy call on NVDA", "llm": true}
+{"id": 632627, "ticker": "SPY", "src": "x", "verdict": "GRADEABLE", "reason": "has_direction", "why": "Explicit 'Call here' is a bullish directional stance on SPY", "llm": true}
+{"id": 632634, "ticker": "TSLA", "src": "x", "verdict": "GRADEABLE", "reason": "has_direction", "why": "Put opened is a bearish directional trade on TSLA", "llm": true}
+{"id": 633498, "ticker": "NFLX", "src": "x", "verdict": "GRADEABLE", "reason": "has_direction", "why": "Entered call position is a directional bullish trade on NFLX", "llm": true}
+{"id": 633255, "ticker": "IREN", "src": "x", "verdict": "GRADEABLE", "reason": "has_direction", "why": "Speaker expects results to disappoint, implying bearish directional call", "llm": true}
