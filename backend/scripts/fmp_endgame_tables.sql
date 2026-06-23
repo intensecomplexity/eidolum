@@ -231,6 +231,38 @@ CREATE TABLE IF NOT EXISTS fmp_sec_filings (
 GRANT SELECT, INSERT, UPDATE ON fmp_sec_filings TO app_worker;
 CREATE INDEX IF NOT EXISTS fmp_sec_filings_symbol_idx ON fmp_sec_filings (symbol);
 
+CREATE TABLE IF NOT EXISTS fmp_index_prices (
+  symbol TEXT NOT NULL,
+  date DATE NOT NULL,
+  open DOUBLE PRECISION,
+  high DOUBLE PRECISION,
+  low DOUBLE PRECISION,
+  close DOUBLE PRECISION,
+  volume BIGINT,
+  change DOUBLE PRECISION,
+  change_percent DOUBLE PRECISION,
+  vwap DOUBLE PRECISION,
+  fetched_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  source VARCHAR(16) NOT NULL DEFAULT 'fmp',
+  PRIMARY KEY (symbol, date)
+);
+GRANT SELECT, INSERT, UPDATE ON fmp_index_prices TO app_worker;
+CREATE INDEX IF NOT EXISTS fmp_index_prices_symbol_idx ON fmp_index_prices (symbol);
+
+CREATE TABLE IF NOT EXISTS fmp_delisted_companies (
+  row_hash TEXT NOT NULL,
+  symbol TEXT,
+  company_name TEXT,
+  exchange TEXT,
+  ipo_date DATE,
+  delisted_date DATE,
+  fetched_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  source VARCHAR(16) NOT NULL DEFAULT 'fmp',
+  PRIMARY KEY (row_hash)
+);
+GRANT SELECT, INSERT, UPDATE ON fmp_delisted_companies TO app_worker;
+CREATE INDEX IF NOT EXISTS fmp_delisted_companies_symbol_idx ON fmp_delisted_companies (symbol);
+
 -- forex top-up reuses the existing fmp_forex table:
 GRANT SELECT, INSERT, UPDATE ON fmp_forex TO app_worker;
 
