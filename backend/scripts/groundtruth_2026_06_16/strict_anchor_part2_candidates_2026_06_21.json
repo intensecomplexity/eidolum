@@ -1,0 +1,101 @@
+[
+ {
+  "prediction_id": 630302,
+  "ticker": "AAPL",
+  "current_gold_verdict": "OK",
+  "tier": "CLEAR",
+  "flag_category": "operational-not-price",
+  "reason": "expects AAPL cash flows to decline in Q2 \u2014 operational projection, no price/level call. [TASK EXAMPLE]",
+  "quote": "So, I am expecting to see Amazon's and Apple's cash flows decline in the second quarter. And I am going to be preparing for that.",
+  "proposed_verdict": "not_a_prediction",
+  "status": "PENDING_NIMROD_CONFIRMATION"
+ },
+ {
+  "prediction_id": 633185,
+  "ticker": "CRWV",
+  "current_gold_verdict": "OK",
+  "tier": "CLEAR",
+  "flag_category": "target-not-in-quote",
+  "reason": "\"Wave 3 price target remains UNCHANGED\" \u2014 refers to a target but states no number/level. [TASK EXAMPLE]",
+  "quote": "$CRWV | Bullish Setup Update Can it get any more ACCURATE than this? Price hit our reversal zone, reversed exactly as projected, and is now supported by that zone along with both the daily MA50 and MA200. Price is up +4% pre-market following $NVDA's new Vera CPU announcement, with $CRWV being one of its cloud partners. Wave 3 price target remains UNCHANGED.",
+  "proposed_verdict": "not_a_prediction",
+  "status": "PENDING_NIMROD_CONFIRMATION"
+ },
+ {
+  "prediction_id": 634815,
+  "ticker": "OSCR",
+  "current_gold_verdict": "OK",
+  "tier": "CLEAR",
+  "flag_category": "reported + operational",
+  "reason": "only price target ($45-55 by EOY) attributed to the CEO (reported); speaker content is operational (MLR/members/net profit). [TASK EXAMPLE]",
+  "quote": "$OSCR called sub-75 MLR as the re-rating trigger the night before earnings \ud83c\udfaf 70.5% MLR. 3.2M members up 56%. $679M net profit. Highest in company history. Still at 0.3x sales Best ceo in healthcare CEO targeting $45 to $55 by eoy This is just the start \ud83d\udcaa\ud83d\ude80 https://t.co/W3daj6uNlr",
+  "proposed_verdict": "not_a_prediction",
+  "status": "PENDING_NIMROD_CONFIRMATION"
+ },
+ {
+  "prediction_id": 625629,
+  "ticker": "GOOGL",
+  "current_gold_verdict": "conditional",
+  "tier": "CLEAR",
+  "flag_category": "no number/level (vague)",
+  "reason": "\"all-time-high target is on the table\" \u2014 no stated number, vague conditional. [TASK EXAMPLE]",
+  "quote": "If we do just get like high consolidation up here and continuation, of course, your all-time high target is on the table.",
+  "proposed_verdict": "not_a_prediction",
+  "status": "PENDING_NIMROD_CONFIRMATION"
+ },
+ {
+  "prediction_id": 607205,
+  "ticker": "ON",
+  "current_gold_verdict": "OK",
+  "tier": "CLEAR",
+  "flag_category": "operational-not-price",
+  "reason": "revenue CAGR/margins/FCF/50% capital return \"through 2027\" \u2014 no stock price/level/return target.",
+  "quote": "yes ON Semiconductor has a very fine Outlook through 2027 you can see that their revenue is expected to be 10 to 12% in compound annual growth rate which would be three times their peers in the semiconductor IND industry gross margin operating expenses operating margin capex all expected to improve and they their free cash flows expected to grow to 25 to 30% all this while doing plenty of share BuyBacks they expect to return 50% to shareholders through 2027",
+  "proposed_verdict": "not_a_prediction",
+  "status": "PENDING_NIMROD_CONFIRMATION"
+ },
+ {
+  "prediction_id": 609156,
+  "ticker": "AMZN",
+  "current_gold_verdict": "OK",
+  "tier": "CLEAR",
+  "flag_category": "operational-not-price",
+  "reason": "free-cash-flow projection $38B->$133B over 5y \u2014 no stock price/return target.",
+  "quote": "this is how the next 5 years of free cash flow look for Alibaba this is how the next five years of free cash flow Look for amazon that's a big difference guys from 38 billion up to 133 billion because the Capa cycle for Amazon is pretty close to being over they're going to keep doing capx not as much as they used to their Investments are starting to pay off and free cash flow is growing up to 50%",
+  "proposed_verdict": "not_a_prediction",
+  "status": "PENDING_NIMROD_CONFIRMATION"
+ },
+ {
+  "prediction_id": 634843,
+  "ticker": "CRDO",
+  "current_gold_verdict": "OK",
+  "tier": "CLEAR",
+  "flag_category": "operational-not-price",
+  "reason": "revenue inflection / \"double or triple\" the ramp next FY \u2014 no stock price target.",
+  "quote": "Re $crdo CY Q4 26, Q1 27 should be exciting as they are expecting an inflection, which will be driven by their optical portfolio. Bill then followed by saying \"We feel confident that we're going to achieve a very aggressive ramp in the second half of our fiscal year and even more than double or triple that the following year. So we feel very good about the commitments that we've got in place across the board from the supply chain that contributes to ZF Optics\" (Their 2h 2027 but the CY as stated above) Seems to me like market now has to wait to see how much of an inflection their really is. Th",
+  "proposed_verdict": "not_a_prediction",
+  "status": "PENDING_NIMROD_CONFIRMATION"
+ },
+ {
+  "prediction_id": 612120,
+  "ticker": "TLT",
+  "current_gold_verdict": "OK",
+  "tier": "BORDERLINE",
+  "flag_category": "macro-event / inferred direction",
+  "reason": "\"By June I am expecting a rate cut\" \u2014 TLT direction inferred; no TLT price/level (has timeframe).",
+  "quote": "By June, I am expecting a rate cut though. And um for multiple reasons, new people in there and everything else.",
+  "proposed_verdict": "not_a_prediction",
+  "status": "PENDING_NIMROD_CONFIRMATION"
+ },
+ {
+  "prediction_id": 605954,
+  "ticker": "XOM",
+  "current_gold_verdict": "OK",
+  "tier": "BORDERLINE",
+  "flag_category": "sector-sympathy / inferred / hedged",
+  "reason": "\"oil & gas poised to do well in 2022 so their stocks will likely follow\" \u2014 inferred XOM direction, hedged, no number (has timeframe).",
+  "quote": "in conclusion i think the oil and gas business is poised to do well in 2022 so their stocks will likely follow suit",
+  "proposed_verdict": "not_a_prediction",
+  "status": "PENDING_NIMROD_CONFIRMATION"
+ }
+]

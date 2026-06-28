@@ -1,0 +1,92 @@
+[
+ {
+  "prediction_id": 609069,
+  "gold_verdict": "OK",
+  "gold_valid": true,
+  "haiku_verdict": "chart_commentary",
+  "cohort": "groundtruth_blind_200_2026_06_16",
+  "labeled_by": "nimrod_human",
+  "created_at": "2026-06-21T16:45:55.501697+00:00"
+ },
+ {
+  "prediction_id": 609365,
+  "gold_verdict": "OK",
+  "gold_valid": true,
+  "haiku_verdict": "chart_commentary",
+  "cohort": "groundtruth_blind_200_2026_06_16",
+  "labeled_by": "nimrod_human",
+  "created_at": "2026-06-21T16:45:55.501697+00:00"
+ },
+ {
+  "prediction_id": 612065,
+  "gold_verdict": "OK",
+  "gold_valid": true,
+  "haiku_verdict": "conditional",
+  "cohort": "groundtruth_blind_200_2026_06_16",
+  "labeled_by": "nimrod_human",
+  "created_at": "2026-06-21T16:45:55.501697+00:00"
+ },
+ {
+  "prediction_id": 614086,
+  "gold_verdict": "OK",
+  "gold_valid": true,
+  "haiku_verdict": "no_claim",
+  "cohort": "groundtruth_blind_200_2026_06_16",
+  "labeled_by": "nimrod_human",
+  "created_at": "2026-06-21T16:45:55.501697+00:00"
+ },
+ {
+  "prediction_id": 614711,
+  "gold_verdict": "OK",
+  "gold_valid": true,
+  "haiku_verdict": "no_claim",
+  "cohort": "groundtruth_blind_200_2026_06_16",
+  "labeled_by": "nimrod_human",
+  "created_at": "2026-06-21T16:45:55.501697+00:00"
+ },
+ {
+  "prediction_id": 623883,
+  "gold_verdict": "OK",
+  "gold_valid": true,
+  "haiku_verdict": "OK",
+  "cohort": "groundtruth_blind_200_2026_06_16",
+  "labeled_by": "nimrod_human",
+  "created_at": "2026-06-21T16:45:55.501697+00:00"
+ },
+ {
+  "prediction_id": 625296,
+  "gold_verdict": "OK",
+  "gold_valid": true,
+  "haiku_verdict": "OK",
+  "cohort": "groundtruth_blind_200_2026_06_16",
+  "labeled_by": "nimrod_human",
+  "created_at": "2026-06-21T16:45:55.501697+00:00"
+ },
+ {
+  "prediction_id": 626776,
+  "gold_verdict": "OK",
+  "gold_valid": true,
+  "haiku_verdict": "OK",
+  "cohort": "groundtruth_blind_200_2026_06_16",
+  "labeled_by": "nimrod_human",
+  "created_at": "2026-06-21T16:45:55.501697+00:00"
+ },
+ {
+  "prediction_id": 627490,
+  "gold_verdict": "OK",
+  "gold_valid": true,
+  "haiku_verdict": "target_error",
+  "cohort": "groundtruth_blind_200_2026_06_16",
+  "labeled_by": "nimrod_human",
+  "created_at": "2026-06-21T16:45:55.501697+00:00"
+ },
+ {
+  "prediction_id": 633156,
+  "gold_verdict": "OK",
+  "gold_valid": true,
+  "haiku_verdict": "OK",
+  "cohort": "groundtruth_blind_200_2026_06_16",
+  "labeled_by": "nimrod_human",
+  "created_at": "2026-06-21T16:45:55.501697+00:00"
+ }
+]
