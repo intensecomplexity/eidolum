@@ -523,6 +523,22 @@ INTRADAY_EQUITY_YEARS = 5
 INTRADAY_FLOOR_CFX = "2009-01-01"
 INTRADAY_MAX_WINDOWS = 130
 
+# p14 1-min intraday: heaviest dataset. 1-min returns a fixed ~2-day window
+# ending at `to` (109KB/call equity, 516KB crypto), so page in ~4-day steps.
+# Scoped to timestamped predictions + all crypto, lookback capped to LOOKBACK_YEARS.
+# Self-projects every PROJECT_EVERY tickers and PAUSES if it would push FMP past
+# PROJECT_FMP_PAUSE (FMP meters ~FMP_CONTENT_RATIO x our content meter; FMP base
+# at run start is env-overridable for re-runs).
+P14_WINDOW_DAYS = 4          # request span (FMP returns latest ~2-3 days within it)
+P14_STEP_DAYS = 2            # step `to` back by this each window (fixed — don't trust earliest)
+P14_EMPTY_STOP = 6           # stop after this many consecutive no-NEW windows (data ended; tolerates weekends/holidays)
+P14_MAX_WINDOWS = 400
+P14_LOOKBACK_YEARS = 2
+P14_FMP_BASE_GB = float(os.environ.get("P14_FMP_BASE_GB", "56"))
+P14_FMP_CONTENT_RATIO = float(os.environ.get("P14_FMP_RATIO", "0.63"))
+P14_PROJECT_FMP_PAUSE = float(os.environ.get("P14_FMP_PAUSE_GB", "135"))
+P14_PROJECT_EVERY = 200
+
 # table -> (columns, pk_cols, [extra index cols])
 TABLES = {
     "fmp_crypto_prices":           (EOD, ["symbol", "date"], ["symbol"]),
@@ -684,7 +700,7 @@ def build_transcript_universe(conn, cp, mode, base_universe):
 
 # ═══════════════════════════════════════════════════════ generic per-symbol driver
 def per_symbol(ctx, ds, cp_key, symbols, fetch_fn, on_batch, batch=200,
-               guard_pg=True, firehose=False):
+               guard_pg=True, firehose=False, on_flush=None):
     """Streaming fan-out with a BOUNDED submission window (~workers*3 in flight).
     A worker that finishes a short symbol immediately gets the next — pool stays
     saturated at the rate limit, no per-batch barrier. Submitting tens of
@@ -756,6 +772,8 @@ def per_symbol(ctx, ds, cp_key, symbols, fetch_fn, on_batch, batch=200,
             _trip_stop(f"{ds}: archive cap {MAX_ARCHIVE_GB}GB reached")
         if guard_pg and safe_db_gb(ctx["conn"]) >= DB_GUARD_GB:
             _trip_stop(f"{ds}: DB guard {DB_GUARD_GB}GB reached")
+        if on_flush:
+            on_flush(base_hw + processed, len(symbols))
 
     try:
         for _ in range(window):
@@ -1529,6 +1547,119 @@ def harvest_p13_extras(ctx):
     log("p13 extras: done")
 
 
+# ═══════════════════════════════════════════════════════ P14 1-min intraday (archive-only firehose)
+def _fetch_1min(ctx, symbol):
+    """Page back in fixed STEP_DAYS windows (FMP returns the latest ~2-3 days in
+    a small from..to span). Dedup by minute-timestamp; a single empty window is a
+    weekend/holiday `to`, not the end — only stop after EMPTY_STOP consecutive
+    no-NEW windows (true data end)."""
+    floor = ctx["_p14_floor"]
+    to_d = datetime.utcnow().date()
+    bars, seen, empties = [], set(), 0
+    for _ in range(P14_MAX_WINDOWS):
+        if _STOP or to_d <= floor:
+            break
+        frm_d = to_d - timedelta(days=P14_WINDOW_DAYS)
+        ctx["rate"].wait()
+        raw = _get_json("historical-chart/1min",
+                        {"symbol": symbol, "from": frm_d.isoformat(), "to": to_d.isoformat()})
+        got = 0
+        if raw:
+            for r in raw:
+                if not isinstance(r, dict):
+                    continue
+                d = r.get("date")
+                if d and d not in seen:
+                    seen.add(d)
+                    r["symbol"] = symbol
+                    bars.append(r)
+                    got += 1
+        if got == 0:
+            empties += 1
+            if empties >= P14_EMPTY_STOP:
+                break
+        else:
+            empties = 0
+        to_d = to_d - timedelta(days=P14_STEP_DAYS)
+    return bars or None
+
+
+def harvest_p14_intraday1min(ctx):
+    if not ctx["archive"].firehose_ok:
+        log("p14 1-min: firehose paused (low disk) — skipping")
+        return
+    cp = ctx["cp"]
+    syms = cp.get("_p14_syms")
+    if syms is None:
+        with ctx["conn"].cursor() as cur:
+            cur.execute("SELECT ticker, count(*) c FROM predictions "
+                        "WHERE source_timestamp_seconds IS NOT NULL AND ticker IS NOT NULL "
+                        "AND ticker<>'' GROUP BY ticker ORDER BY c DESC")
+            ts = [(r[0] or "").strip().upper() for r in cur.fetchall()]
+            cur.execute("SELECT min(prediction_date)::date FROM predictions "
+                        "WHERE source_timestamp_seconds IS NOT NULL")
+            min_pd = cur.fetchone()[0]
+        ts = [s for s in ts if s and not is_foreign(s)]
+        crypto = sorted({(r.get("symbol") or "").strip().upper()
+                         for r in (_get_json("cryptocurrency-list") or []) if r.get("symbol")})
+        seen, syms = set(), []
+        for s in ts + crypto:               # front-load timestamped tickers, then all crypto
+            if s and s not in seen:
+                seen.add(s); syms.append(s)
+        cap_floor = datetime.utcnow().date() - timedelta(days=365 * P14_LOOKBACK_YEARS)
+        floor = max(min_pd, cap_floor) if min_pd else cap_floor
+        cp["_p14_syms"] = syms
+        cp["_p14_floor"] = floor.isoformat()
+        cp["_p14_ts_count"] = len(ts)
+        save_cp(cp)
+    ctx["_p14_floor"] = date.fromisoformat(cp["_p14_floor"])
+    log(f"p14 1-min: {len(syms):,} symbols ({cp.get('_p14_ts_count', 0):,} timestamped tickers "
+        f"front-loaded + all crypto), lookback from {cp['_p14_floor']}, archive-only")
+
+    proj = {"t0": time.time(), "last_done": 0, "last_bytes": 0, "first": True}
+
+    def on_batch(collected):
+        for symbol, bars in collected:
+            st("p14_intraday1min")["fetched"] += len(bars)
+            nb = write_symbol_parquet(ctx["archive"], "intraday_1min", symbol, bars)
+            s = st("p14_intraday1min")
+            s["arch_rows"] += len(bars)
+            s["arch_bytes"] += nb
+
+    def on_flush(done, total):
+        if done - proj["last_done"] < P14_PROJECT_EVERY and not proj["first"]:
+            return
+        cur = _BW["content_bytes"]
+        wb = cur - proj["last_bytes"]
+        wt = max(1, done - proj["last_done"])
+        avg = wb / wt                               # bytes/ticker over the recent window
+        # phase-aware: while inside the front-loaded timestamped tickers (the
+        # actual value), only project over THEM — extrapolating the heavy
+        # front-load across the 4,785-crypto tail would pause us prematurely.
+        ts = ctx["cp"].get("_p14_ts_count", total)
+        phase_total = ts if done < ts else total
+        phase = "timestamped" if done < ts else "all+crypto"
+        remaining = max(0, phase_total - done)
+        proj_content = (cur + avg * remaining) / 1e9
+        proj_fmp = P14_FMP_BASE_GB + P14_FMP_CONTENT_RATIO * proj_content
+        elapsed = time.time() - proj["t0"]
+        eta_h = (remaining / max(1e-6, done / max(1e-6, elapsed))) / 3600
+        log(f"p14 PROJECTION @ {done:,}/{total:,} ({phase} phase, {phase_total:,}): "
+            f"content {cur/1e9:.1f}GB so far, recent {avg/1e6:.1f}MB/ticker → projected "
+            f"content {proj_content:.0f}GB, projected FMP {proj_fmp:.0f}GB "
+            f"(base {P14_FMP_BASE_GB:.0f} + {P14_FMP_CONTENT_RATIO}x), ETA {eta_h:.1f}h")
+        if proj_fmp > P14_PROJECT_FMP_PAUSE:
+            _trip_stop(f"p14 PROJECTION {proj_fmp:.0f}GB FMP > {P14_PROJECT_FMP_PAUSE:.0f}GB — "
+                       f"PAUSING (graceful). Narrow scope (crypto-only, top-N, or shorter "
+                       f"lookback) and re-run to continue.")
+        proj["last_done"] = done
+        proj["last_bytes"] = cur
+        proj["first"] = False
+
+    per_symbol(ctx, "p14_intraday1min", "p14_intraday1min", syms, _fetch_1min,
+               on_batch, batch=25, guard_pg=False, firehose=True, on_flush=on_flush)
+
+
 # ═══════════════════════════════════════════════════════ probe-only (re-verify endpoints)
 def run_probe():
     import csv as _csv
@@ -1677,6 +1808,7 @@ def dataset_registry():
         ("p11_delisted", 11, harvest_p11_delisted),
         ("p12_intraday", 12, harvest_p12_intraday),
         ("p13_extras", 13, harvest_p13_extras),
+        ("p14_intraday1min", 14, harvest_p14_intraday1min),
     ]
 
 
