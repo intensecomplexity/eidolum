@@ -208,3 +208,34 @@ def get_financial_actual(ticker, metric, period, db=None, as_of=None):
     finally:
         if owned:
             sess.close()
+
+
+def split_in_window(ticker, base_parsed, end_parsed, db=None):
+    """True if a stock split is recorded in `fmp_splits` between two fiscal period-ends.
+
+    NOTE: FMP's fmp_income_statements.eps_diluted is ALREADY split-adjusted retroactively
+    (verified: AAPL FY2019 reads 2.97 / 18.47B shares on the post-2020-4:1 basis), so cross-
+    year EPS growth needs NO split adjustment — re-adjusting would double-count. This helper
+    is for TRANSPARENCY/auditing only (the evaluator records whether a split spanned the
+    window); the absurd-multiple guard backstops the rare case of unadjusted source data.
+    """
+    sess, owned = _open(db)
+    try:
+        def _pe(parsed):
+            ptype, y, q = parsed
+            plabel = "FY" if ptype == "FY" else f"Q{q}"
+            r = sess.execute(_sql(
+                "SELECT date FROM fmp_income_statements WHERE symbol=:t AND period=:p "
+                "AND fiscal_year=:y ORDER BY date DESC LIMIT 1"),
+                {"t": ticker, "p": plabel, "y": y}).fetchone()
+            return r[0] if r else None
+        d0, d1 = _pe(base_parsed), _pe(end_parsed)
+        if not d0 or not d1:
+            return False
+        r = sess.execute(_sql(
+            "SELECT COUNT(*) FROM fmp_splits WHERE symbol=:t AND date > :d0 AND date <= :d1"),
+            {"t": ticker, "d0": d0, "d1": d1}).fetchone()
+        return bool(r and r[0])
+    finally:
+        if owned:
+            sess.close()

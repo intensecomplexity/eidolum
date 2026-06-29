@@ -57,10 +57,18 @@ pending (future periods / AAPL not_local). Old-pass (period-passed rows): 22 can
 operational, **3 scored (2 hit / 1 miss, hit-rate 0.667)**, 1 pending. Eye-checked:
 - META revenue-direction FY2023 $134.9B > FY2022 $116.6B (bullish) → **HIT** ✓
 - DOCU revenue growth FY2023 +19.4% vs 16% target (≤5pp) → **HIT** ✓
-- CNR eps_diluted +20% target vs actual "+1261%" → **MISS** — outcome defensible but the
-  base EPS ($0.96→$13.07) is a likely split/collision data artifact. **Known v1 limitation:**
-  EPS growth_pct/cagr is sensitive to split-adjustment & ticker collisions; guard before
-  trusting EPS-growth outcomes (mirror the price path's split/reassignment handling).
+- CNR eps_diluted +20% target vs actual "+1261%" → was a false **MISS**. **FIXED 2026-06-29.**
+  Diagnosis (verified): NOT a split/collision — shares were stable FY2021→FY2022 and `fmp_splits`
+  shows none in-window; it's a **depressed base** ($0.96 recovering from a FY2020 loss) exploding
+  the YoY %. Also verified `fmp_income_statements.eps_diluted` is **already split-adjusted** at the
+  source (AAPL FY2019 reads 2.97 / 18.47B shares post-2020-split), so split *adjustment* is
+  unnecessary and would double-count. **EPS growth/CAGR now degrades to `unresolved`** (off the
+  scoreboard, not a fabricated hit/miss) on: non-positive/sign-flip base, near-zero base, or an
+  absurd multiple (normal-range target vs |actual| beyond the cap — the depressed/collision/
+  unadjusted-split backstop). Branch-local to eps_diluted growth/cagr; revenue/FCF/direction and
+  the price path untouched. CNR re-scored miss→unresolved (`operational_epsfix_rescore.py`,
+  snapshot `operational_epsfix_before_snapshot.json`). Guards: `jobs/operational_evaluator.py`
+  (NEARZERO_EPS, ABSURD_CAP); split-awareness `services/financial_actuals.split_in_window`.
 
 **Price path unaffected:** 730,033 price rows untouched (forward pass), the operational rows
 rerouted via `evaluation_deferred=TRUE`, zero collateral. Every touched row's before-state is

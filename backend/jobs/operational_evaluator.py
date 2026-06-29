@@ -24,6 +24,7 @@ from datetime import date as _date, datetime
 
 from services.financial_actuals import (
     get_financial_actual, normalize_metric, parse_period, prior_period, add_fiscal_years,
+    split_in_window,
 )
 
 # --- tolerance bands (v1) -----------------------------------------------------
@@ -33,7 +34,14 @@ ABS_NEAR = 0.25     #                          <= 25%  -> near
 GR_HIT_REL, GR_HIT_PP = 0.15, 5.0     # hit  if rel-err <=15% OR within 5 percentage points
 GR_NEAR_REL, GR_NEAR_PP = 0.35, 12.0  # near if rel-err <=35% OR within 12 percentage points
 
-HIT, NEAR, MISS = "hit", "near", "miss"
+HIT, NEAR, MISS, UNRESOLVED = "hit", "near", "miss", "unresolved"
+
+# EPS growth/CAGR comparability guards (split-safety). Per-share metrics are split-
+# sensitive and explode off a depressed/trough base; rather than fabricate a hit/miss we
+# DEGRADE TO 'unresolved' (off the scoreboard) — same philosophy as sanity_check_target.
+NEARZERO_EPS = 0.05                   # |adjusted base EPS| below this -> % is hypersensitive
+ABSURD_CAP = {"growth_pct": 300.0, "cagr": 100.0}  # actual magnitude beyond this, with a
+#                                      normal-range target, signals a degenerate base
 
 
 def _attr(p, name, default=None):
@@ -91,6 +99,15 @@ def _scored(outcome, actual_value, report_date, detail):
             "metric_resolved_at": resolved, "status": "scored", "reason": None, "detail": detail}
 
 
+def _unresolved(reason, actual_value, report_date, detail):
+    """Resolved-as-ungradeable: outcome='unresolved' is off the accuracy scoreboard, so a
+    degenerate comparison never becomes a wrong hit/miss. status='scored' so the caller
+    persists outcome + metric_resolved_at (reversible)."""
+    resolved = datetime.combine(report_date, datetime.min.time()) if isinstance(report_date, _date) else datetime.utcnow()
+    return {"outcome": UNRESOLVED, "metric_actual_value": actual_value,
+            "metric_resolved_at": resolved, "status": "scored", "reason": reason, "detail": detail}
+
+
 def score_operational(p, db=None, as_of=None):
     """Score one operational prediction. Returns a result dict (status 'scored' | 'pending'
     | 'skipped'). The caller persists outcome / metric_actual_value / metric_resolved_at
@@ -145,16 +162,49 @@ def score_operational(p, db=None, as_of=None):
         if base["value"] == 0:
             return {"status": "skipped", "reason": "zero_base"}
         years = max(1, parsed[1] - base_parsed[1])
+        base_val, end_val, rpt = base["value"], end["value"], end["report_date"]
+        spanned_split = None
+
+        # --- EPS-only comparability safety (branch-local; revenue/FCF untouched) ---
+        # NO split adjustment: fmp_income_statements.eps_diluted is ALREADY split-adjusted
+        # at the source (verified), so base & end are on the same share basis. The real
+        # failure modes are a non-positive/sign-flip base, a near-zero base, or a depressed/
+        # collision base that explodes the %. Each DEGRADES TO 'unresolved' (off the
+        # scoreboard) rather than fabricate a hit/miss — protecting forecaster scores.
+        if metric == "eps_diluted":
+            spanned_split = split_in_window(_attr(p, "ticker"), base_parsed, parsed, db=db)  # audit only
+            # (b) non-positive / sign flip: % growth & CAGR are undefined/meaningless.
+            if base_val <= 0 or end_val <= 0:
+                return _unresolved("eps_nonpositive_or_signflip", None, rpt,
+                    {"metric": metric, "kind": kind, "period": target_period, "base_period": base_label,
+                     "base_value": base_val, "end_value": end_val, "spanned_split": spanned_split})
+            # (c) near-zero base -> the % is hypersensitive noise.
+            if abs(base_val) < NEARZERO_EPS:
+                return _unresolved("eps_nearzero_base", None, rpt,
+                    {"metric": metric, "kind": kind, "base_value": base_val, "period": target_period,
+                     "spanned_split": spanned_split})
+
         if kind == "growth_pct":
-            actual_pct = (end["value"] - base["value"]) / abs(base["value"]) * 100.0
+            actual_pct = (end_val - base_val) / abs(base_val) * 100.0
         else:
-            ratio = end["value"] / base["value"]
+            ratio = end_val / base_val
             actual_pct = ((ratio ** (1.0 / years)) - 1.0) * 100.0 if ratio > 0 else -100.0
+
+        # (c) absurd multiple: a normal-range target vs an actual that dwarfs the cap means
+        # the comparison is dominated by a degenerate (trough/collision/unadjusted) base
+        # -> unresolved. This is the catch-all backstop incl. the rare unadjusted-split case.
+        if metric == "eps_diluted" and abs(actual_pct) > ABSURD_CAP[kind] and abs(float(target)) <= ABSURD_CAP[kind]:
+            return _unresolved("eps_absurd_multiple", round(actual_pct, 4), rpt,
+                {"kind": kind, "metric": metric, "period": target_period, "base": base_label,
+                 "target_pct": float(target), "actual_pct": round(actual_pct, 2),
+                 "end_value": end_val, "base_value": base_val, "cap": ABSURD_CAP[kind],
+                 "spanned_split": spanned_split})
+
         out = _growth_outcome(actual_pct, float(target))
-        return _scored(out, round(actual_pct, 4), end["report_date"],
+        return _scored(out, round(actual_pct, 4), rpt,
                        {"kind": kind, "metric": metric, "period": target_period, "base": base_label,
                         "years": years, "target_pct": float(target), "actual_pct": round(actual_pct, 2),
-                        "end_value": end["value"], "base_value": base["value"]})
+                        "end_value": end_val, "base_value": base_val, "spanned_split": spanned_split})
 
     # direction
     a = G(target_period)
