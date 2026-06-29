@@ -2498,6 +2498,31 @@ def main():
         executor='maintenance',
     )
 
+    # Operational freshness refresher — need-based: refreshes local FMP actuals ONLY for the
+    # distinct tickers that have pending operational predictions (NOT a blanket re-harvest), via
+    # per-ticker /stable/ endpoints (never bulk — bulk is 429-blocked on the downgraded plan).
+    # Runs at 02:00 UTC, just BEFORE the operational evaluator (02:10) so fresh actuals land
+    # first. Paced + _get_json 429-backoff; volume-guarded (stops if the set would exceed a few
+    # hundred calls/day). Only touches the fundamentals tables for those tickers — never the
+    # price path. Gated ENABLE_OPERATIONAL_FRESHNESS (default OFF). Lazy import => boot-safe.
+    def _operational_freshness():
+        if os.getenv("ENABLE_OPERATIONAL_FRESHNESS", "false").lower() != "true":
+            log.info("[operational_freshness] paused (ENABLE_OPERATIONAL_FRESHNESS != true)")
+            return
+        try:
+            from jobs.operational_freshness import run_operational_freshness
+            counts = run_operational_freshness()
+            log.info(f"[operational_freshness] {counts}")
+        except Exception as e:
+            log.error(f"[operational_freshness] {e}", exc_info=True)
+    sched.add_job(
+        _standalone("operational_freshness", _operational_freshness),
+        "cron", hour=2, minute=0, timezone="UTC",
+        id="operational_freshness",
+        misfire_grace_time=3600, max_instances=1, coalesce=True,
+        executor='maintenance',
+    )
+
     # Operational prediction evaluator — resolves outcome='pending', claim_type='operational'
     # rows (revenue/FCF/EPS/net-income/margin forecasts) whose fiscal period has reported,
     # against local FMP actuals. Daily is ample (earnings are low-frequency). Branches strictly
