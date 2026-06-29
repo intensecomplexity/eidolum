@@ -47,6 +47,12 @@ def my_job():
 - All startup DB work (table creation, migrations, seeds, admin promotion) goes in _startup_init() background thread
 - Background thread starts 10 seconds after boot to let the app bind its port first
 
+## Least-privilege role (app_worker) & off-box access
+- **Apps connect as `app_worker`** (least-priv: SELECT/INSERT/UPDATE/DELETE, NO DDL). `app_worker` CANNOT `CREATE TABLE` / `ALTER` / `CREATE INDEX` ("permission denied for schema public").
+- **New tables/columns:** create as the DB **superuser** (`postgres`), then `GRANT SELECT, INSERT, UPDATE` on each to `app_worker`. In prod, boot DDL is OFF (`RUN_STARTUP_DDL=false`); run migrations manually as the owner.
+- **`psql` is NOT installed on the laptop**, and `postgres.railway.internal` does NOT resolve off-box. Run SQL from the laptop via **psycopg2 under `railway run -s <service> python3`**; for the public host, expand `DATABASE_PUBLIC_URL` INSIDE `railway run -s Postgres bash -c '…'` (never hard-code or print the URL).
+- **Background harvests:** graceful stop = SIGTERM (`kill <pid>`), never `kill -9` (lets buffers flush); match the python child, not the railway/node wrapper.
+
 ## Error Handling
 - Always db.rollback() in except blocks to prevent PostgreSQL transaction abort cascade
 - A failed query in PostgreSQL aborts the entire transaction; all subsequent queries on that session fail silently

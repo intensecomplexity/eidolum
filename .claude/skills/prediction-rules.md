@@ -63,6 +63,12 @@ Still bearish: sell, strong_sell, underperform, underweight, negative, reduce
 - "Maintains" or "Reiterates" without price target change: reject (except neutral ratings, which are always accepted)
 - Forecaster name longer than 50 characters: truncate
 
+## Gradeable-prediction standard (YouTube/X LLM classifier era)
+The `claude -p` classifier and the gold-anchor labeling standard treat these as NOT a gradeable prediction even when the row parses:
+- **Hedged / soft language is not a call — even with a number.** "might be a good buy", "could see upside to $300", "I'd consider adding" → `conviction_level='hedged'` (or `'hypothetical'`): captured but HIDDEN via the `hedged_filter_sql` bundle, and counted as not-a-prediction by the labeling rule. A price/level alone does NOT rescue a hedged stance.
+- **No-gradeable-claim:** a quote with NEITHER a number NOR a direction word (pure preference — "I like it", "great company", "on my watchlist") → `is_no_gradeable_claim=TRUE` (hidden). See the eidolum SKILL gate section.
+- A row counts as a real prediction only with a committed forward directional call (bullish/bearish, never neutral on YouTube/X), ideally a number/level OR an explicit timeframe, and not hedged, reported-speech, or a bare basket.
+
 ## Display Labels
 - Use HIT/NEAR/MISS, not Correct/Close/Wrong
 - Outcome column shows colored badges: HIT (green), NEAR (yellow), MISS (red)
