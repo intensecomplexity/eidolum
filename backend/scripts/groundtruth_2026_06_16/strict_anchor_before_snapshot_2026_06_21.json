@@ -88,5 +88,41 @@
   "cohort": "groundtruth_blind_200_2026_06_16",
   "labeled_by": "nimrod_human",
   "created_at": "2026-06-21T16:45:55.501697+00:00"
+ },
+ {
+  "prediction_id": 625629,
+  "gold_verdict": "conditional",
+  "gold_valid": true,
+  "haiku_verdict": "conditional",
+  "cohort": "groundtruth_blind_200_2026_06_16",
+  "labeled_by": "nimrod_human",
+  "created_at": "2026-06-21T16:45:55.501697+00:00",
+  "prior_verdict": null,
+  "strict_reason": null,
+  "strict_flipped_at": null
+ },
+ {
+  "prediction_id": 633185,
+  "gold_verdict": "OK",
+  "gold_valid": true,
+  "haiku_verdict": "OK",
+  "cohort": "groundtruth_blind_200_2026_06_16",
+  "labeled_by": "nimrod_human",
+  "created_at": "2026-06-21T16:45:55.501697+00:00",
+  "prior_verdict": null,
+  "strict_reason": null,
+  "strict_flipped_at": null
+ },
+ {
+  "prediction_id": 634815,
+  "gold_verdict": "OK",
+  "gold_valid": true,
+  "haiku_verdict": "target_error",
+  "cohort": "groundtruth_blind_200_2026_06_16",
+  "labeled_by": "nimrod_human",
+  "created_at": "2026-06-21T16:45:55.501697+00:00",
+  "prior_verdict": null,
+  "strict_reason": null,
+  "strict_flipped_at": null
  }
 ]

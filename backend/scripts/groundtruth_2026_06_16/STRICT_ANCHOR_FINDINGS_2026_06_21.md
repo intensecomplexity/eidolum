@@ -39,33 +39,33 @@ Result: gt_gold valid 79 → **69** (OK 64→54, conditional 15, +10 not_a_predi
 number/level or timeframe + own directional call — incl. all the crypto/stock
 entry-TP-SL setups and explicit fair-value / price-target calls).
 
-**CLEAR (7)** — recommend flip on confirmation:
-- 630302 AAPL — operational cash-flow, no price call *(task example)*
-- 633185 CRWV — "price target remains UNCHANGED", number not in quote *(task example)*
-- 634815 OSCR — $45-55 target is the **CEO's** (reported); rest operational *(task example)*
-- 625629 GOOGL — "ATH on the table", no number, vague *(task example)*
-- 607205 ON — operational outlook through 2027, no price target
-- 609156 AMZN — FCF projection $38B→$133B, no price/return target
-- 634843 CRDO — revenue inflection/ramp, no stock price target
+**CLEAR (7)** — 3 APPLIED 2026-06-29 (batch 2, same `strict_reason`); 4 still pending:
+- ✅ 633185 CRWV — "price target remains UNCHANGED", number not in quote *(task example)* — APPLIED (prior=OK)
+- ✅ 634815 OSCR — $45-55 target is the **CEO's** (reported); rest operational *(task example)* — APPLIED (prior=OK)
+- ✅ 625629 GOOGL — "ATH on the table", no number, vague *(task example)* — APPLIED (prior=**conditional**)
+- ⬜ 630302 AAPL — operational cash-flow, no price call *(task example)* — pending
+- ⬜ 607205 ON — operational outlook through 2027, no price target — pending
+- ⬜ 609156 AMZN — FCF projection $38B→$133B, no price/return target — pending
+- ⬜ 634843 CRDO — revenue inflection/ramp, no stock price target — pending
 
 **BORDERLINE (2)** — each has a timeframe but is inferred/hedged/bare:
 - 612120 TLT — "expecting a rate cut by June"; TLT direction inferred, no level
 - 605954 XOM — "oil & gas ... stocks will likely follow suit"; sector-sympathy, hedged
 
-## PART 3 — recomputed metrics (OLD pre-flip → NEW post Part-1 flips)
+## PART 3 — recomputed metrics (full arc)
 Method: post-stratify the gold sample by Haiku verdict class to the **visible
 population** weights (`GOLD_FINDINGS.md`). Weights are a population property and are
 held **fixed**; only per-class gold-valid rates change. Reconstruction validated to
 reproduce the published 47.6% before applying flips.
 
-| metric | OLD | NEW | Δ |
+| metric | original census | post batch-1 (10) | post batch-2 (+3) |
 |---|---|---|---|
-| raw 200-sample valid-rate | 79/200 = 39.5% | 69/200 = **34.5%** | −5.0 pp |
-| visible-sample valid-rate (147) | 74/147 = 50.3% | 66/147 = **44.9%** | −5.4 pp |
-| **headline user-facing precision** | **47.6%** | **38.7%** | **−8.9 pp** |
+| raw 200-sample valid-rate | 79/200 = 39.5% | 69/200 = 34.5% | 66/200 = **33.0%** |
+| visible-sample valid-rate (147) | 74/147 = 50.3% | 66/147 = 44.9% | 63/147 = **42.9%** |
+| **headline user-facing precision** | **47.6%** | **38.7%** | **36.2%** |
 
-The headline falls more than the visible rate because 4 of the 8 visible flips are
-in the **OK** Haiku class (76.5% of population weight); each OK flip moves the
-headline ~2.1 pp. Two flips (614086, 614711 = no_claim) are already hidden and touch
-only the raw rate. If the 7 CLEAR Part-2 flags are later confirmed, the headline
-falls further (most are OK-class, visible).
+Batch-2 (the 3 confirmed Part-2 CLEAR rows: 633185 OK-class, 634815 target_error,
+625629 conditional — all visible) moved the headline 38.7% → **36.2%** (−2.5 pp;
+the OK-class flip alone is −2.1 pp at 76.5% weight). Cumulative from the original
+census: **47.6% → 36.2%** (−11.4 pp) over 13 strict flips. The 4 remaining CLEAR
+Part-2 flags (630302/607205/609156/634843, all visible) would push it lower still.
