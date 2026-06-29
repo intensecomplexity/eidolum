@@ -240,6 +240,24 @@ class Prediction(Base):
     metric_release_date = Column(Date, nullable=True)
     metric_actual = Column(Numeric(18, 6), nullable=True)
     metric_error_pct = Column(Numeric(10, 4), nullable=True)
+    # Operational-claim scoring (migration 0025, 2026-06-29). A NEW axis orthogonal
+    # to the metric_forecast_call category above: claim_type tags EVERY prediction
+    # price-vs-operational, and metric_kind captures the claim SHAPE so forecasts
+    # about company financials (revenue / FCF / diluted EPS / net income / margins)
+    # can be graded against reported actuals, not just price. Every existing row
+    # reads claim_type='price' (the column default) so the price path is unchanged.
+    #   claim_type           'price' | 'operational'
+    #   metric_kind          'absolute' | 'growth_pct' | 'cagr' | 'direction'
+    #   metric_target_value  predicted value (FCF $ / % / CAGR%); NULL for 'direction'
+    #   metric_target_period 'FY2027' | 'Q2-2026' | '+5y'
+    #   metric_actual_value  reported actual, filled by the operational evaluator
+    #   metric_resolved_at   when the operational outcome was set (else pending)
+    claim_type = Column(String, nullable=True, default="price")
+    metric_kind = Column(String, nullable=True)
+    metric_target_value = Column(Numeric, nullable=True)
+    metric_target_period = Column(String, nullable=True)
+    metric_actual_value = Column(Numeric, nullable=True)
+    metric_resolved_at = Column(DateTime, nullable=True)
     # Conditional-call metadata for prediction_category='conditional_call'
     # rows. A conditional is "IF trigger_condition THEN outcome" — the
     # outcome side reuses the existing ticker / direction / target_price /
