@@ -1,0 +1,295 @@
+{
+ "candidates": 26,
+ "operational_tagged": 7,
+ "scored": 0,
+ "pending": 7,
+ "scored_breakdown": {
+  "hit": 0,
+  "near": 0,
+  "miss": 0
+ },
+ "hit_rate": null,
+ "rows": [
+  {
+   "id": 607205,
+   "ticker": "ON",
+   "claim_type": "operational",
+   "metric": "revenue",
+   "kind": "cagr",
+   "target": 11,
+   "period": "FY2027",
+   "error": null,
+   "score_status": "pending",
+   "outcome": null,
+   "reason": "no_data"
+  },
+  {
+   "id": 609156,
+   "ticker": "AMZN",
+   "claim_type": "operational",
+   "metric": "free_cash_flow",
+   "kind": "absolute",
+   "target": 133000000000,
+   "period": "+5y",
+   "error": null,
+   "score_status": "pending",
+   "outcome": null,
+   "reason": "no_data"
+  },
+  {
+   "id": 630302,
+   "ticker": "AAPL",
+   "claim_type": "operational",
+   "metric": "free_cash_flow",
+   "kind": "direction",
+   "target": null,
+   "period": "Q2-2026",
+   "error": null,
+   "score_status": "pending",
+   "outcome": null,
+   "reason": "not_local"
+  },
+  {
+   "id": 634843,
+   "ticker": "CRDO",
+   "claim_type": "operational",
+   "metric": "revenue",
+   "kind": "growth_pct",
+   "target": 100,
+   "period": "FY2027",
+   "error": null,
+   "score_status": "pending",
+   "outcome": null,
+   "reason": "no_data"
+  },
+  {
+   "id": 780737,
+   "ticker": "GD",
+   "claim_type": "price",
+   "metric": null,
+   "kind": null,
+   "target": null,
+   "period": null,
+   "error": null
+  },
+  {
+   "id": 780733,
+   "ticker": "AMAT",
+   "claim_type": "operational",
+   "metric": "revenue",
+   "kind": "direction",
+   "target": null,
+   "period": "+3y",
+   "error": null,
+   "score_status": "pending",
+   "outcome": null,
+   "reason": "no_data"
+  },
+  {
+   "id": 780719,
+   "ticker": "NFLX",
+   "claim_type": "not_a_prediction",
+   "metric": null,
+   "kind": null,
+   "target": null,
+   "period": null,
+   "error": null
+  },
+  {
+   "id": 780692,
+   "ticker": "NFLX",
+   "claim_type": "price",
+   "metric": null,
+   "kind": null,
+   "target": null,
+   "period": null,
+   "error": null
+  },
+  {
+   "id": 780613,
+   "ticker": "INTC",
+   "claim_type": "operational",
+   "metric": "free_cash_flow",
+   "kind": "direction",
+   "target": null,
+   "period": "+1y",
+   "error": null,
+   "score_status": "pending",
+   "outcome": null,
+   "reason": "no_data"
+  },
+  {
+   "id": 780596,
+   "ticker": "ATRO",
+   "claim_type": "price",
+   "metric": null,
+   "kind": null,
+   "target": null,
+   "period": null,
+   "error": null
+  },
+  {
+   "id": 780578,
+   "ticker": "CE",
+   "claim_type": "price",
+   "metric": null,
+   "kind": null,
+   "target": null,
+   "period": null,
+   "error": null
+  },
+  {
+   "id": 780577,
+   "ticker": "UNH",
+   "claim_type": "not_a_prediction",
+   "metric": null,
+   "kind": null,
+   "target": null,
+   "period": null,
+   "error": null
+  },
+  {
+   "id": 780575,
+   "ticker": "ORLY",
+   "claim_type": "not_a_prediction",
+   "metric": null,
+   "kind": null,
+   "target": null,
+   "period": null,
+   "error": null
+  },
+  {
+   "id": 780568,
+   "ticker": "UNH",
+   "claim_type": "price",
+   "metric": null,
+   "kind": null,
+   "target": null,
+   "period": null,
+   "error": null
+  },
+  {
+   "id": 780564,
+   "ticker": "MDT",
+   "claim_type": "operational",
+   "metric": "revenue",
+   "kind": "direction",
+   "target": null,
+   "period": "+3y",
+   "error": null,
+   "score_status": "pending",
+   "outcome": null,
+   "reason": "no_data"
+  },
+  {
+   "id": 780557,
+   "ticker": "AMZN",
+   "claim_type": "price",
+   "metric": null,
+   "kind": null,
+   "target": null,
+   "period": null,
+   "error": null
+  },
+  {
+   "id": 780539,
+   "ticker": "MO",
+   "claim_type": "not_a_prediction",
+   "metric": null,
+   "kind": null,
+   "target": null,
+   "period": null,
+   "error": null
+  },
+  {
+   "id": 780513,
+   "ticker": "V",
+   "claim_type": "not_a_prediction",
+   "metric": null,
+   "kind": null,
+   "target": null,
+   "period": null,
+   "error": null
+  },
+  {
+   "id": 780510,
+   "ticker": "ABBV",
+   "claim_type": "price",
+   "metric": null,
+   "kind": null,
+   "target": null,
+   "period": null,
+   "error": null
+  },
+  {
+   "id": 780509,
+   "ticker": "MO",
+   "claim_type": "price",
+   "metric": null,
+   "kind": null,
+   "target": null,
+   "period": null,
+   "error": null
+  },
+  {
+   "id": 780499,
+   "ticker": "PRCH",
+   "claim_type": "not_a_prediction",
+   "metric": null,
+   "kind": null,
+   "target": null,
+   "period": null,
+   "error": null
+  },
+  {
+   "id": 780491,
+   "ticker": "GOOGL",
+   "claim_type": "not_a_prediction",
+   "metric": null,
+   "kind": null,
+   "target": null,
+   "period": null,
+   "error": null
+  },
+  {
+   "id": 780489,
+   "ticker": "NVO",
+   "claim_type": "price",
+   "metric": null,
+   "kind": null,
+   "target": null,
+   "period": null,
+   "error": null
+  },
+  {
+   "id": 780484,
+   "ticker": "MAC",
+   "claim_type": "not_a_prediction",
+   "metric": null,
+   "kind": null,
+   "target": null,
+   "period": null,
+   "error": null
+  },
+  {
+   "id": 780482,
+   "ticker": "DE",
+   "claim_type": "price",
+   "metric": null,
+   "kind": null,
+   "target": null,
+   "period": null,
+   "error": null
+  },
+  {
+   "id": 780481,
+   "ticker": "AMAT",
+   "claim_type": "price",
+   "metric": null,
+   "kind": null,
+   "target": null,
+   "period": null,
+   "error": null
+  }
+ ]
+}
