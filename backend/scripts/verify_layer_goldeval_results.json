@@ -1,0 +1,838 @@
+[
+ {
+  "pid": 614921,
+  "valid": false,
+  "gv": "not_a_prediction",
+  "kinds": [
+   "conditional"
+  ],
+  "verdict": "REJECT",
+  "reason": "wrong_direction",
+  "why": "Quote warns of credit/banking crisis risk; SH is bearish, not bullish",
+  "quote": "We're seeing so much foreshadowing of real private credit risk that likely trickles over to the banking sector that we might just be a hair trigger away from a true shock. The real risk is that we don"
+ },
+ {
+  "pid": 607754,
+  "valid": false,
+  "gv": "not_a_prediction",
+  "kinds": [
+   "reported"
+  ],
+  "verdict": "REJECT",
+  "reason": "analyst_relay",
+  "why": "Speaker only relays Arc's price targets, adds no own conviction",
+  "quote": "Arc actually just updated their price targets for Tesla back in June giving Tesla a base price of $2600 per share by 2029 that's over a 1,000% increase from where it trades today day and even in the b"
+ },
+ {
+  "pid": 616463,
+  "valid": false,
+  "gv": "not_a_prediction",
+  "kinds": [
+   "dir_mismatch",
+   "conditional"
+  ],
+  "verdict": "REJECT",
+  "reason": "not_gradeable",
+  "why": "Pure if-then conditional; speaker never commits to the 'if' occurring",
+  "quote": "If we're no longer able to sell software related goods to China, which could include everything from computers all the way to jet engines and airplanes, if we're no longer able to sell those to China,"
+ },
+ {
+  "pid": 609809,
+  "valid": false,
+  "gv": "not_a_prediction",
+  "kinds": [
+   "dir_mismatch"
+  ],
+  "verdict": "REJECT",
+  "reason": "not_gradeable",
+  "why": "Watching for future drop, no committed bullish call on NOC now",
+  "quote": "am i in love this company no but am i putting on a radar absolutely because it's it is selling for probably close to the mid-20s and pe and it's not going to take much for it to drop to a price that m"
+ },
+ {
+  "pid": 611865,
+  "valid": true,
+  "gv": "conditional",
+  "kinds": [
+   "conditional"
+  ],
+  "verdict": "KEEP",
+  "reason": "own_call",
+  "why": "Speaker makes personal bullish case with specific PE and return target",
+  "quote": "If they were to achieve the eighteen or nineteen percent growth and trade at an eighteen or nineteen PE or its growth rate, you could easily double your money over the next, say, just a little more th"
+ },
+ {
+  "pid": 624670,
+  "valid": false,
+  "gv": "not_a_prediction",
+  "kinds": [
+   "conditional"
+  ],
+  "verdict": "REJECT",
+  "reason": "not_gradeable",
+  "why": "Quote discusses IPOs and patience; no BAC call present",
+  "quote": "Video title: US-Iran War | Will this rally sustain? | CA Rachana Ranade Channel: CA Rachana Phadke Ranade Published: 2026-05-08 Transcript: ot saying at all that all IPOs will give such multiagger ret"
+ },
+ {
+  "pid": 632876,
+  "valid": true,
+  "gv": "OK",
+  "kinds": [
+   "dir_mismatch",
+   "conditional"
+  ],
+  "verdict": "KEEP",
+  "reason": "own_call",
+  "why": "Own bullish thesis with Wave 3 target and support level identified",
+  "quote": "$SLDP no concerns. \ud83d\udc40 Price down 8% yesterday, pulling back closer to the 50DMA on lower volume. Support there is another opportunity to add. If price falls below and rejects then I will be cautious. W"
+ },
+ {
+  "pid": 608314,
+  "valid": false,
+  "gv": "not_a_prediction",
+  "kinds": [
+   "dir_mismatch"
+  ],
+  "verdict": "KEEP",
+  "reason": "own_call",
+  "why": "Speaker commits to locking profits, cites valuation and delivery concerns",
+  "quote": "I've actually been locking in some profits on Tesla's stock just because like this whole situation, whether whether I agree or disagree with any of it socially, politically, putting all of that aside,"
+ },
+ {
+  "pid": 611398,
+  "valid": false,
+  "gv": "not_a_prediction",
+  "kinds": [
+   "conditional"
+  ],
+  "verdict": "KEEP",
+  "reason": "own_call",
+  "why": "Speaker expresses own bullish conviction on CCL over 10-20 year horizon",
+  "quote": "Number three, I like Carnival Cruise Line. I do like it as a stock overall if we're thinking about for the next 10, 20 years. We know the boomers, they love to go on cruises and there's going to be a "
+ },
+ {
+  "pid": 633436,
+  "valid": true,
+  "gv": "conditional",
+  "kinds": [
+   "conditional"
+  ],
+  "verdict": "REJECT",
+  "reason": "not_gradeable",
+  "why": "Conditional entry with no standalone commitment; call only if level holds",
+  "quote": "Source Friday trade ideas 5/22 If $AAPL holds 305 \u2192 next target 308 If not \u2192 no trade If $AMD holds 450 \u2192 next target 480 If not \u2192 no trade If $SPY holds 743 \u2192 next target 747 If not \u2192 no trade"
+ },
+ {
+  "pid": 612989,
+  "valid": false,
+  "gv": "not_a_prediction",
+  "kinds": [
+   "dir_mismatch"
+  ],
+  "verdict": "KEEP",
+  "reason": "own_call",
+  "why": "Speaker gives own bearish thesis citing retail euphoria as bubble signal",
+  "quote": "When I sit there and I see the bank teller at my local bank telling me that he loves Coinbase and Bitcoin and that the waitress is buying Bitcoin and buying Nvidia and buying Palantir, that's where I "
+ },
+ {
+  "pid": 605827,
+  "valid": true,
+  "gv": "conditional",
+  "kinds": [
+   "conditional"
+  ],
+  "verdict": "KEEP",
+  "reason": "own_call",
+  "why": "Speaker gives own bearish target with 10% drop to 13 EMA level",
+  "quote": "If we start to go under the five, expect to go all the way down. And that would be about a 10. And I say all the way down to the 13 EMA. So, he'd probably dip under there. It'd be about a 10% drop."
+ },
+ {
+  "pid": 616582,
+  "valid": false,
+  "gv": "not_a_prediction",
+  "kinds": [
+   "conditional"
+  ],
+  "verdict": "KEEP",
+  "reason": "own_call",
+  "why": "Speaker gives own DCF valuation and conditional buy level for SBUX",
+  "quote": "if they grow at just seven percent per year and they have a p of 15 which is low for a company like this the intrinsic value conservatively would be 55. if they grow at 9 and 20 pe then we are at the "
+ },
+ {
+  "pid": 614534,
+  "valid": false,
+  "gv": "not_a_prediction",
+  "kinds": [
+   "conditional"
+  ],
+  "verdict": "KEEP",
+  "reason": "own_call",
+  "why": "Speaker gives own conditional bullish thesis on SoFi if no recession",
+  "quote": "Would SoFi SoFi benefit from the refi boom? And sure. I mean like like I mean you're asking like two two like we're this is a big ask. Okay. I'm not going to go into upstart right now. We've done Upst"
+ },
+ {
+  "pid": 611466,
+  "valid": false,
+  "gv": "not_a_prediction",
+  "kinds": [
+   "conditional"
+  ],
+  "verdict": "KEEP",
+  "reason": "own_call",
+  "why": "Speaker expresses own conviction; bullish thesis with strong directional commitment",
+  "quote": "Revolve, great CEOs at that particular company. They've done a phenomenal job running the business over the years. They got through all these storms, and like they emerged on the other side stronger t"
+ },
+ {
+  "pid": 616077,
+  "valid": false,
+  "gv": "not_a_prediction",
+  "kinds": [
+   "conditional"
+  ],
+  "verdict": "KEEP",
+  "reason": "committed",
+  "why": "Own bullish thesis with specific price target and timeframe",
+  "quote": "If the forward PE multiple were to come in at 125, the stock price could more than triple to $279 per share by the end of next year."
+ },
+ {
+  "pid": 631950,
+  "valid": false,
+  "gv": "not_a_prediction",
+  "kinds": [
+   "conditional"
+  ],
+  "verdict": "KEEP",
+  "reason": "own_call",
+  "why": "Own bullish thesis with levels, entries, targets, and stop-loss plan",
+  "quote": "\ud83d\udc02 8.3x Unusual Buying Volume on $C , what's behind this move? - With the extreme volume spike and all indicators bullish, the likelihood of further upside is high, but after such a big move, a brief r"
+ },
+ {
+  "pid": 606864,
+  "valid": true,
+  "gv": "conditional",
+  "kinds": [
+   "conditional"
+  ],
+  "verdict": "KEEP",
+  "reason": "own_call",
+  "why": "Speaker's own conditional bull thesis with a specific price target",
+  "quote": "if they ever get to 14 of non-gaap eps and the company trades at 10 times earnings this is 140 dollars per share"
+ },
+ {
+  "pid": 635030,
+  "valid": true,
+  "gv": "OK",
+  "kinds": [
+   "conditional"
+  ],
+  "verdict": "KEEP",
+  "reason": "own_call",
+  "why": "Own bullish thesis with entry zone, targets, and stop-loss levels",
+  "quote": "\ud83d\udd25 Massive Buy-Side Volume on $AIO at 3.3x - Given the 3.3x volume surge and all indicators bullish, I expect further upside is likely, but a short-term pullback to shake out weak hands before the next"
+ },
+ {
+  "pid": 606361,
+  "valid": false,
+  "gv": "not_a_prediction",
+  "kinds": [
+   "vague_year"
+  ],
+  "verdict": "REJECT",
+  "reason": "real_hedge",
+  "why": "Explicitly hedged guess with 'I don't know' and 'probably'",
+  "quote": "I don't know we're probably not going to own it Beyond 2024 though is my bet"
+ },
+ {
+  "pid": 634521,
+  "valid": false,
+  "gv": "not_a_prediction",
+  "kinds": [
+   "conditional"
+  ],
+  "verdict": "KEEP",
+  "reason": "own_call",
+  "why": "Speaker's own plan: short on retest, target range low",
+  "quote": "$BTC continues ranging. Bitcoin is ranging since February 7th, and you can see how clean it's respected. As you can see, I highlighted the range high and low, and three deviations outside the range. W"
+ },
+ {
+  "pid": 619166,
+  "valid": false,
+  "gv": "not_a_prediction",
+  "kinds": [
+   "conditional"
+  ],
+  "verdict": "REJECT",
+  "reason": "not_gradeable",
+  "why": "Quote is personal travel commentary, no stock call present",
+  "quote": "And if money were not a thing, I would definitely consider spending more time there. But for now, we're off to Germany to visit friends."
+ },
+ {
+  "pid": 624296,
+  "valid": false,
+  "gv": "not_a_prediction",
+  "kinds": [
+   "dir_mismatch"
+  ],
+  "verdict": "REJECT",
+  "reason": "real_hedge",
+  "why": "No committed bearish direction; just suggests keeping small cash reserve",
+  "quote": "one could be a small portion of cash this is just the money that you're going to keep on the sidelines to be able to take up any good buying opportunity that you see I'm not going to tell you to go al"
+ },
+ {
+  "pid": 611502,
+  "valid": false,
+  "gv": "not_a_prediction",
+  "kinds": [
+   "conditional"
+  ],
+  "verdict": "KEEP",
+  "reason": "own_call",
+  "why": "Speaker gives own bullish thesis citing moat, Turbotax, QuickBooks",
+  "quote": "Intuitit's got a phenomenal business model, Turboax, so taxes need to always be done. So, it's a strong moat regardless of the economy. They obviously have their QuickBooks product. They have other pr"
+ },
+ {
+  "pid": 633520,
+  "valid": false,
+  "gv": "not_a_prediction",
+  "kinds": [
+   "dir_mismatch"
+  ],
+  "verdict": "KEEP",
+  "reason": "own_call",
+  "why": "Speaker holds actual call position overnight, expressing bullish conviction",
+  "quote": "Another good trading day. I'm mostly holding puts overnight except $TSLA where I have a moderate call position. This week I've held puts but day traded calls effectively. An overnight move up will lik"
+ },
+ {
+  "pid": 634544,
+  "valid": false,
+  "gv": "not_a_prediction",
+  "kinds": [
+   "conditional"
+  ],
+  "verdict": "KEEP",
+  "reason": "own_call",
+  "why": "Speaker holds HTF bearish bias with range rules outlined",
+  "quote": "$BTC entered the weekend-range again. Bitcoin had a nice move towards the H1 swing-high, which is now also the rangehigh for this weekend. We're in weekend liquidity now, so not expecting big moves. T"
+ },
+ {
+  "pid": 635058,
+  "valid": true,
+  "gv": "OK",
+  "kinds": [
+   "conditional"
+  ],
+  "verdict": "KEEP",
+  "reason": "own_call",
+  "why": "Own bullish thesis with specific targets, levels, and trade setup",
+  "quote": "\u2b06\ufe0f Massive Buy-Side Volume on $SQD at 41.0x - With the 41.0x volume surge and a +7.7% jump, combined with bullish signals across all momentum and trend indicators, I expect the price to RISE further i"
+ },
+ {
+  "pid": 605883,
+  "valid": false,
+  "gv": "not_a_prediction",
+  "kinds": [
+   "conditional"
+  ],
+  "verdict": "KEEP",
+  "reason": "own_call",
+  "why": "Speaker gives own bullish thesis with specific price levels and timeframe",
+  "quote": "Now, Netflix, we talked about in the past that this stock was the first out of the downtrend. This was after the 2022 drop. This was the first stock out of that downtrend. And this was the first fang "
+ },
+ {
+  "pid": 611543,
+  "valid": false,
+  "gv": "not_a_prediction",
+  "kinds": [
+   "conditional"
+  ],
+  "verdict": "KEEP",
+  "reason": "own_call",
+  "why": "Speaker explains own bullish USD thesis via rate hike mechanism",
+  "quote": "raising interest rates generally strengthens the dollar. And that's why gold investors are saying, if the Federal Reserve Bank has to raise interest rates, that means reducing the amount of dollars ou"
+ },
+ {
+  "pid": 614616,
+  "valid": false,
+  "gv": "not_a_prediction",
+  "kinds": [
+   "dir_mismatch"
+  ],
+  "verdict": "REJECT",
+  "reason": "not_gradeable",
+  "why": "Valuation comparison math, no committed forward direction on SATS",
+  "quote": "Rocket Lab at least it's selling for 52.6 times less than SpaceX. Yeah. Take SpaceX's $1.5 trillion potential IPO valuation divided by 52.6 and you get Rocket Lab. Now, Rocket Lab's founder really lik"
+ },
+ {
+  "pid": 628458,
+  "valid": true,
+  "gv": "OK",
+  "kinds": [
+   "dir_mismatch"
+  ],
+  "verdict": "REJECT",
+  "reason": "wrong_direction",
+  "why": "Quote targets upside levels (100, 50-period), contradicting bearish stored direction.",
+  "quote": "I think you can retest the 100 on this move. Maybe even the 50 period on the daily, but that's a long way from here."
+ },
+ {
+  "pid": 632042,
+  "valid": false,
+  "gv": "not_a_prediction",
+  "kinds": [
+   "dir_mismatch"
+  ],
+  "verdict": "KEEP",
+  "reason": "own_call",
+  "why": "Speaker's own bullish prediction confirmed with TP target hit",
+  "quote": "$btc Update: Mission Accomplished \ud83d\udea8 \u200bIn line with our prediction of a mature consolidation phase, today Bitcoin soared with a massive impulsive move, hitting our Full Take-Off (TP) target in the $65,3"
+ },
+ {
+  "pid": 614130,
+  "valid": false,
+  "gv": "not_a_prediction",
+  "kinds": [
+   "dir_mismatch",
+   "vague_year"
+  ],
+  "verdict": "KEEP",
+  "reason": "own_call",
+  "why": "Own thesis: Fed rate cuts bullish for TLT bonds",
+  "quote": "Morning Star's economics team and market watchers are predicting the Federal Reserve will lower rates more than once in the final months of 2025."
+ },
+ {
+  "pid": 615666,
+  "valid": false,
+  "gv": "not_a_prediction",
+  "kinds": [
+   "conditional"
+  ],
+  "verdict": "KEEP",
+  "reason": "own_call",
+  "why": "Speaker owns bullish bias on weekly, not fighting trend higher",
+  "quote": "The path of least resistance on the longer term time frame uh the weekly time frame is still clearly higher here. So I'm not going to try to fight that and and pick a top. Now if it breaks below this "
+ },
+ {
+  "pid": 632562,
+  "valid": true,
+  "gv": "OK",
+  "kinds": [
+   "conditional"
+  ],
+  "verdict": "KEEP",
+  "reason": "own_call",
+  "why": "Own entry, targets, stop-loss, and thesis with committed bullish direction",
+  "quote": "4h reclaim attempt in a name that\u2019s up +68.67% YTD, but still -39.4% off the ATH. Entry at 36.31, scale out higher, invalidation if 32.15 breaks. Where's your invalidation? $LEGN Entry: 36.31 TP1: 40."
+ },
+ {
+  "pid": 610550,
+  "valid": false,
+  "gv": "not_a_prediction",
+  "kinds": [
+   "conditional"
+  ],
+  "verdict": "KEEP",
+  "reason": "own_call",
+  "why": "Speaker gives own valuation range and strategy for CAG",
+  "quote": "can you buy it for mid-20s mid to low low to 20s i think you're going to get yourself a value investing perspective from the high end maybe it's probably selling for what it should be itself right now"
+ },
+ {
+  "pid": 634108,
+  "valid": true,
+  "gv": "OK",
+  "kinds": [
+   "conditional"
+  ],
+  "verdict": "REJECT",
+  "reason": "wrong_direction",
+  "why": "Quote shows both long and short plans; not single committed direction",
+  "quote": "$BTC update & trading plan Got the bounce exactly from the POI we were watching > Right now strong perp flows are coming in again -> a lot of longs trying to push this back into the range highs. > As "
+ },
+ {
+  "pid": 605954,
+  "valid": true,
+  "gv": "OK",
+  "kinds": [
+   "vague_year"
+  ],
+  "verdict": "KEEP",
+  "reason": "own_call",
+  "why": "Speaker gives own bullish thesis on oil/gas sector for 2022",
+  "quote": "in conclusion i think the oil and gas business is poised to do well in 2022 so their stocks will likely follow suit"
+ },
+ {
+  "pid": 610570,
+  "valid": false,
+  "gv": "not_a_prediction",
+  "kinds": [
+   "conditional"
+  ],
+  "verdict": "KEEP",
+  "reason": "own_call",
+  "why": "Speaker gives own bullish thesis on DKS with clear directional conviction",
+  "quote": "look at them okay so i lied i'm gonna pull over here yeah so let's look at this because this is kind of power stock looking it's um overall for its major moving averages it keeps making all-time highs"
+ },
+ {
+  "pid": 631051,
+  "valid": false,
+  "gv": "not_a_prediction",
+  "kinds": [
+   "conditional"
+  ],
+  "verdict": "KEEP",
+  "reason": "own_call",
+  "why": "Speaker gives own bullish thesis on XOM with inflation and geopolitical hedges",
+  "quote": "I really like having energy stocks and Exxon specifically in your portfolio I think it provides a good natural head for you know inflation if that were to come back of course if we were get you know a"
+ },
+ {
+  "pid": 612626,
+  "valid": true,
+  "gv": "conditional",
+  "kinds": [
+   "conditional"
+  ],
+  "verdict": "KEEP",
+  "reason": "own_call",
+  "why": "Speaker gives own bullish thesis with specific levels and trade plan",
+  "quote": "XRP's been suffering. You look at XRP. The 50 EMA is all the way up there at 209. And we are priced at what? 180 185. 186. Yeah, we're at 186 right now. If we can confirm above the 13 EMA, I would thi"
+ },
+ {
+  "pid": 611620,
+  "valid": false,
+  "gv": "not_a_prediction",
+  "kinds": [
+   "dir_mismatch",
+   "conditional"
+  ],
+  "verdict": "REJECT",
+  "reason": "not_gradeable",
+  "why": "Conditional hypothetical; no committed directional call on TBT",
+  "quote": "If inflation ever becomes a problem, if there's ever a concern about the value of the dollar, it could force a Federal Reserve Bank, the central bank, to hike up interest rates again. If that were to "
+ },
+ {
+  "pid": 624938,
+  "valid": false,
+  "gv": "not_a_prediction",
+  "kinds": [
+   "conditional"
+  ],
+  "verdict": "REJECT",
+  "reason": "not_gradeable",
+  "why": "Quote is about honesty/truth, no stock direction call",
+  "quote": "I don't let lies pass on this show. And if you sit there and you TELL ME, \"I AM HEALTHY.\" I will not allow that."
+ },
+ {
+  "pid": 610093,
+  "valid": false,
+  "gv": "not_a_prediction",
+  "kinds": [
+   "conditional"
+  ],
+  "verdict": "KEEP",
+  "reason": "operational",
+  "why": "Own FCF-to-market-cap thesis with specific numbers supporting bullish call",
+  "quote": "if they make four five billion of free cash flow 4 five billion per year times normal p ratio of 15 that's 60 billion market capitalization which is then a free x not to mention the 100 million subscr"
+ },
+ {
+  "pid": 612670,
+  "valid": true,
+  "gv": "conditional",
+  "kinds": [
+   "conditional"
+  ],
+  "verdict": "KEEP",
+  "reason": "own_call",
+  "why": "Speaker's own bearish thesis: watching 586 level on weekly candle",
+  "quote": "If we dip down and we cross over the 586 on the weekly candle over the next month, that's huge bad. And I do think we'd go back down to the 50 EMA. The below is 586. That's what we're watching for the"
+ },
+ {
+  "pid": 608068,
+  "valid": false,
+  "gv": "not_a_prediction",
+  "kinds": [
+   "vague_year"
+  ],
+  "verdict": "KEEP",
+  "reason": "own_call",
+  "why": "Speaker expresses own conviction about future outlook with timeframe",
+  "quote": "I think 2025 and Beyond is going to look amazing for these companies"
+ },
+ {
+  "pid": 613227,
+  "valid": false,
+  "gv": "not_a_prediction",
+  "kinds": [
+   "conditional"
+  ],
+  "verdict": "KEEP",
+  "reason": "own_call",
+  "why": "Speaker's own thesis: money supply driving commodity inflation, bullish view",
+  "quote": "Since we've seen so much money being pumped into the system you can see the rise of certain commodity classes exploding over the past year or so. I think some of these also have a lot of room to run i"
+ },
+ {
+  "pid": 631149,
+  "valid": true,
+  "gv": "conditional",
+  "kinds": [
+   "conditional"
+  ],
+  "verdict": "KEEP",
+  "reason": "own_call",
+  "why": "Own bullish thesis with specific levels and pattern analysis",
+  "quote": "$RXRX Setting up a nice falling wedge on the 1W timeframe, with stock now above the 1W HMA. If we hold this $3 level here, and stock starts grinding towards the $3.5 level breaking out of this wedge, "
+ },
+ {
+  "pid": 612719,
+  "valid": false,
+  "gv": "not_a_prediction",
+  "kinds": [
+   "conditional"
+  ],
+  "verdict": "KEEP",
+  "reason": "committed",
+  "why": "Speaker gives own 10-year unit thesis with explicit assumptions caveat",
+  "quote": "I've got just shy of 10 million units out 10 years. I'm going to caution you here there's a big if here this whole thing is predicated on a lot of assumptions but the biggest driver here is saying hey"
+ },
+ {
+  "pid": 632687,
+  "valid": true,
+  "gv": "OK",
+  "kinds": [
+   "dir_mismatch"
+  ],
+  "verdict": "KEEP",
+  "reason": "committed",
+  "why": "Own bullish call with $35 target and clear directional view",
+  "quote": "$35 is on the board for $HIMS short term but its very important we break that level or we could see a much steeper pullback right after. See you soon \ud83e\udee1 https://t.co/Qq8ysZY5Aj"
+ },
+ {
+  "pid": 614779,
+  "valid": false,
+  "gv": "not_a_prediction",
+  "kinds": [
+   "conditional"
+  ],
+  "verdict": "KEEP",
+  "reason": "own_call",
+  "why": "Speaker gives own bullish view on tariff removal boosting economy",
+  "quote": "I actually think the Supreme Court killing the tariffs would be the best possible thing for the economy. you would juice the economy with a task tax cut at Costco, Target, Walmart, uh grocery, everyth"
+ },
+ {
+  "pid": 632700,
+  "valid": false,
+  "gv": "not_a_prediction",
+  "kinds": [
+   "conditional"
+  ],
+  "verdict": "KEEP",
+  "reason": "own_call",
+  "why": "Speaker states own liquidation price and bullish thesis with specific target",
+  "quote": "right now, $LAB has a $7B market cap and a $15B FDV. if #LAB goes up to $30, which is my liquidation price, that would mean its market cap reaches $14B and its FDV hits $30B, surpassing solana. holy s"
+ },
+ {
+  "pid": 614276,
+  "valid": false,
+  "gv": "not_a_prediction",
+  "kinds": [
+   "dir_mismatch"
+  ],
+  "verdict": "REJECT",
+  "reason": "real_hedge",
+  "why": "Speaker expresses timing doubt, no committed bullish conviction on JYNT",
+  "quote": "joint corp j-y-n-t uh oh he's sold a lot of that recently so this might be off on the timing for a joint corp"
+ },
+ {
+  "pid": 612758,
+  "valid": false,
+  "gv": "not_a_prediction",
+  "kinds": [
+   "conditional"
+  ],
+  "verdict": "KEEP",
+  "reason": "own_call",
+  "why": "Speaker expresses own bullish view on TSLA attractiveness",
+  "quote": "I kind of say Tesla stock starting to look pretty attractive again but if you want to know more about the risks and concerns for investing in Tesla right now"
+ },
+ {
+  "pid": 633244,
+  "valid": true,
+  "gv": "conditional",
+  "kinds": [
+   "conditional"
+  ],
+  "verdict": "KEEP",
+  "reason": "own_call",
+  "why": "Speaker's own bullish projection with price targets and timeframe",
+  "quote": "$LUNR | +50% Since Our April 6 Projection +50% in 5 weeks. Price has now reached our full price target zone. IF price holds above $36.51, I am sharing one more level, which for me would be the final w"
+ },
+ {
+  "pid": 631713,
+  "valid": true,
+  "gv": "OK",
+  "kinds": [
+   "conditional"
+  ],
+  "verdict": "KEEP",
+  "reason": "own_call",
+  "why": "Committed bullish thesis with price targets and trade plan",
+  "quote": "\ud83c\udfcb\ufe0f $JCT just saw 3.7x buying volume, real demand or trap? - This 3.7x volume anomaly with strong price action and mostly bullish indicators suggests genuine accumulation or an event-driven breakout, w"
+ },
+ {
+  "pid": 614850,
+  "valid": false,
+  "gv": "not_a_prediction",
+  "kinds": [
+   "conditional"
+  ],
+  "verdict": "REJECT",
+  "reason": "not_gradeable",
+  "why": "Conditional call: only bearish IF AMD doesn't go green at open",
+  "quote": "If AMD doesn't go green at the open, it's a bad day. Like, I I I don't think it's an opinion anymore. I think it's a fact."
+ },
+ {
+  "pid": 634308,
+  "valid": true,
+  "gv": "conditional",
+  "kinds": [
+   "conditional"
+  ],
+  "verdict": "KEEP",
+  "reason": "own_call",
+  "why": "Speaker's own thesis with levels, targets, and committed bullish breakout view",
+  "quote": "$98 is the level that could signal a bullish breakout for Solana. Since February, $SOL has been moving within a well-defined channel. I\u2019ve identified the boundaries at $78 (Floor) and $98 (Ceiling), w"
+ },
+ {
+  "pid": 612297,
+  "valid": false,
+  "gv": "not_a_prediction",
+  "kinds": [
+   "conditional"
+  ],
+  "verdict": "REJECT",
+  "reason": "wrong_direction",
+  "why": "Quote flags VIX rising as suspicious anomaly, not a bullish call",
+  "quote": "If you start to see the VIX pop when the market's going up, that should that should surprise you. Should be like something's going on here right now. VIX popped over 4% today now strange strange."
+ },
+ {
+  "pid": 612310,
+  "valid": false,
+  "gv": "not_a_prediction",
+  "kinds": [
+   "dir_mismatch",
+   "conditional",
+   "vague_year"
+  ],
+  "verdict": "KEEP",
+  "reason": "own_call",
+  "why": "Speaker gives own thesis: weaker dollar benefits UDN bearish USD call",
+  "quote": "2025 was one of the worst years for the dollar in about a decade. And we've heard President Trump say publicly that he wants a weaker dollar because if we have a weaker dollar, foreign countries will "
+ },
+ {
+  "pid": 634850,
+  "valid": false,
+  "gv": "not_a_prediction",
+  "kinds": [
+   "conditional"
+  ],
+  "verdict": "REJECT",
+  "reason": "real_hedge",
+  "why": "No committed single direction; bearish only IF deal finalizes, bullish if not",
+  "quote": "I\u2019ve honestly been following the US-Iran headlines almost every day lately because the oil market has been reacting to every small update extremely fast. Now VP JD Vance confirming that a tentative de"
+ },
+ {
+  "pid": 614882,
+  "valid": false,
+  "gv": "not_a_prediction",
+  "kinds": [
+   "dir_mismatch",
+   "conditional"
+  ],
+  "verdict": "REJECT",
+  "reason": "real_hedge",
+  "why": "No committed direction; explicitly outlines bearish AND bullish scenarios only",
+  "quote": "I think over 60 70,000 is too strong. Uh if it's too weak, like it's heavily negative, which doesn't seem likely based on where all the estimates, uh then then people will be worried about a recession"
+ },
+ {
+  "pid": 607205,
+  "valid": true,
+  "gv": "OK",
+  "kinds": [
+   "reported"
+  ],
+  "verdict": "KEEP",
+  "reason": "operational",
+  "why": "Speaker's own bullish thesis with specific revenue, margin, FCF, buyback metrics",
+  "quote": "yes ON Semiconductor has a very fine Outlook through 2027 you can see that their revenue is expected to be 10 to 12% in compound annual growth rate which would be three times their peers in the semico"
+ },
+ {
+  "pid": 634857,
+  "valid": false,
+  "gv": "not_a_prediction",
+  "kinds": [
+   "dir_mismatch",
+   "conditional"
+  ],
+  "verdict": "KEEP",
+  "reason": "own_call",
+  "why": "Speaker's own bullish thesis: squeeze setup, funding negative, level holds",
+  "quote": "This is starting to look a bit absurd. Funding on $BTC has turned heavily negative as bears fight hard to defend the $74.5K level. If they fail to hold it, they could trigger a massive squeeze against"
+ },
+ {
+  "pid": 615914,
+  "valid": false,
+  "gv": "not_a_prediction",
+  "kinds": [
+   "dir_mismatch"
+  ],
+  "verdict": "KEEP",
+  "reason": "own_call",
+  "why": "Speaker gives own bullish thesis on AI expanding software TAM",
+  "quote": "all of a sudden you actually have software that can be sold into more organizations or more departments because the AI will solve the problem that prevented other companies from not being able to depl"
+ },
+ {
+  "pid": 609784,
+  "valid": false,
+  "gv": "not_a_prediction",
+  "kinds": [
+   "conditional"
+  ],
+  "verdict": "KEEP",
+  "reason": "own_call",
+  "why": "Speaker had own bullish conviction on BIG at $70/share",
+  "quote": "i said gary i really like this company what am i missing his comment was paul would you be surprised if big lots wasn't around in five years because i would not be so i'm not investing and me being th"
+ },
+ {
+  "pid": 609365,
+  "valid": false,
+  "gv": "not_a_prediction",
+  "kinds": [
+   "dir_mismatch"
+  ],
+  "verdict": "KEEP",
+  "reason": "own_call",
+  "why": "Speaker gives own bearish thesis: broke below 50-week MA ends bull cycle",
+  "quote": "But when Bitcoin's price goes below that 50week moving average level, that marked the end of the bull cycle and the beginning of the long cool off period. That's what people call the bare market. Now,"
+ },
+ {
+  "pid": 627490,
+  "valid": false,
+  "gv": "not_a_prediction",
+  "kinds": [
+   "reported"
+  ],
+  "verdict": "KEEP",
+  "reason": "own_call",
+  "why": "Speaker expresses own bullish conviction, analyst target supports their view",
+  "quote": "I see this stock moving a lot higher I know that singular research has a $20 price Target on it"
+ },
+ {
+  "pid": 625629,
+  "valid": false,
+  "gv": "not_a_prediction",
+  "kinds": [
+   "conditional"
+  ],
+  "verdict": "REJECT",
+  "reason": "not_gradeable",
+  "why": "Conditional on consolidation; call does not stand independently without trigger",
+  "quote": "If we do just get like high consolidation up here and continuation, of course, your all-time high target is on the table."
+ }
+]
