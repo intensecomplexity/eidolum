@@ -2498,6 +2498,32 @@ def main():
         executor='maintenance',
     )
 
+    # Operational prediction evaluator — resolves outcome='pending', claim_type='operational'
+    # rows (revenue/FCF/EPS/net-income/margin forecasts) whose fiscal period has reported,
+    # against local FMP actuals. Daily is ample (earnings are low-frequency). Branches strictly
+    # on claim_type — NEVER touches the price scoring path or evaluation_deferred; idempotent
+    # (only outcome='pending' rows, safe to re-run). Gated by ENABLE_OPERATIONAL_EVALUATOR
+    # (default OFF): the local fundamentals tables are a one-time harvest with NO refresh feed
+    # yet, so the scorer is inert for periods reported after the harvest until a freshness feed
+    # is added — flip this ON once that lands. Lazy import => cannot break worker boot.
+    def _operational_evaluator():
+        if os.getenv("ENABLE_OPERATIONAL_EVALUATOR", "false").lower() != "true":
+            log.info("[operational_evaluator] paused (ENABLE_OPERATIONAL_EVALUATOR != true)")
+            return
+        try:
+            from jobs.operational_evaluator import run_operational_evaluation
+            counts = run_operational_evaluation()
+            log.info(f"[operational_evaluator] {counts}")
+        except Exception as e:
+            log.error(f"[operational_evaluator] {e}", exc_info=True)
+    sched.add_job(
+        _standalone("operational_evaluator", _operational_evaluator),
+        "cron", hour=2, minute=10, timezone="UTC",
+        id="operational_evaluator",
+        misfire_grace_time=3600, max_instances=1, coalesce=True,
+        executor='maintenance',
+    )
+
     # YouTube API metadata refresh — rolling 30-day re-fetch/blank of stored
     # YouTube Data API metadata (compliance retention policy). Quota-capped
     # per run (default 100 units). Kill switch: ENABLE_YT_METADATA_REFRESH
