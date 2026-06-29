@@ -20,8 +20,8 @@ from database import BgSessionLocal
 from jobs.representativeness_guard import is_holding_suspect, _FIRST_PERSON
 
 # ANCHOR = real number/level/% (not a bare single digit) OR an explicit timeframe.
-NUM = re.compile(r"\$\s?\d|\d+\s?%|\b\d{2,}\b|\b\d+\s?(?:dollars|cents|bucks|k)\b|"
-                 r"\b(?:double|triple|doubles|triples|tenbagger|multibagger)\b|\b\d+x\b", re.I)
+NUM = re.compile(r"\$\s?\d|\d+\s?%|\d{2,}|\b\d+\s?(?:dollars|cents|bucks|k)\b|"
+                 r"\b(?:double|triple|doubles|triples|tenbagger|multibagger)\b|\b\d+x\b", re.I)  # \d{2,} (not \b-bounded): catch "254ish"
 TF = re.compile(r"\b(by\s+(the\s+)?(end\s+of\s+)?(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec|q[1-4]|20\d\d|year|quarter|month)|"
                 r"next\s+(year|quarter|month|week|few\s+(months|weeks|years))|in\s+\d+\s+(year|month|week|day)|"
                 r"over the (next|coming)|this (year|quarter)|coming (months|weeks|years|quarters)|"
@@ -33,8 +33,10 @@ REPORTED = re.compile(r"\b(analysts?\b|wall street|consensus (price |target)|pri
                       r"the street (sees|expects|has)|upgraded by|downgraded by|rating from|morgan stanley|goldman|"
                       r"jpmorgan|citi(group)?|barclays|canaccord|jefferies|raymond james|singular research|"
                       r"unusual whales|whale (bought|sold|is)|"
-                      r"(he|she|they)\s+(said|says|expects?|sees|thinks|is calling|predicted|recommended)|"
-                      r"[A-Z][a-z]+\s+(said|says|expects|sees|thinks|is calling|has a \$?\d))\b")
+                      r"(he|she|they)\s+(said|says|expects?|sees|thinks|is calling|predicted|recommended))\b")
+# NOTE: dropped the loose "[A-Z][a-z]+ + speech-verb" pattern — it false-fires on capitalized TA
+# narration ("Chart says", "Bears think") in real first-person calls. Explicit firm/analyst/pronoun
+# markers only. Reported/firm relays are usually still caught; precision over recall here.
 WISHLIST = re.compile(r"(on my watch ?list|i'?d (love |like )?(to )?(buy|own|add|get)|would (love |like )?to (buy|own)|"
                       r"wish i|waiting (for|to (buy|get|add))|if it (drops|dips|pulls back|falls|gets) to|"
                       r"on a (pullback|dip)|i'?d be a buyer|love to own)", re.I)
@@ -52,17 +54,23 @@ def reported_narrow(q):
 
 
 def reject_judge(row):
-    """-> (reject: bool, reason: str). Quote-only; operational exempt."""
+    """-> (reject: bool, reason: str). Quote-only; operational exempt.
+
+    A row WITH a firm anchor (number/level OR explicit timeframe) is only rejectable as a relay
+    (reported_speech) or a no-conviction musing (hedged) — never by wishlist/holding/past, which
+    would false-reject anchored conditional setups ("waiting for a retest at $75k to short").
+    Everything else (bare stance / wishlist / holding / brag with NO anchor) -> rejected."""
     if (row.get("claim_type") or "price") == "operational":
         return (False, "operational_keep")
     q = row.get("quote") or ""
     if (row.get("conv") in ("hedged", "hypothetical")) or HEDGE.search(q): return (True, "hedged")
     if reported_narrow(q):                                                 return (True, "reported_speech")
-    if WISHLIST.search(q):                                                 return (True, "buy_wishlist")
-    if is_holding_suspect(q, "") and not has_anchor(q):                    return (True, "holding")
-    if PAST.search(q) and not has_anchor(q):                               return (True, "past_tense")
-    if not has_anchor(q):                                                  return (True, "no_anchor")
-    return (False, "keep")
+    if has_anchor(q):                                                      return (False, "keep")
+    # --- no firm anchor below this line ---
+    if WISHLIST.search(q):           return (True, "buy_wishlist")
+    if is_holding_suspect(q, ""):    return (True, "holding")
+    if PAST.search(q):               return (True, "past_tense")
+    return (True, "no_anchor")
 
 
 def load_gold(db):

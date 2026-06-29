@@ -51,7 +51,41 @@ anchored misses (the existing-guard pattern: deterministic suspect → one `clau
 reject only confirmed), eval-gated separately. The deterministic judge is the safe foundation
 (0 false-reject); the verify lifts catch on the residual without breaching the floor.
 
-## Status
-EVAL ONLY. Not applied to predictions; live classifier unchanged. Awaiting approval to (a)
-extend with the cost-gated verify and/or (b) apply the deterministic judge as a forward
-flag-not-delete guard (maps to the existing flags above).
+## APPLIED to the user-visible population (2026-06-29, reversible)
+Before applying, a deeper audit (the spot-check the apply required) hardened the judge and
+narrowed what was applied:
+
+**Judge v2 fixes** (population-found false-rejects the 200-gold sample didn't contain):
+- `\b\d{2,}\b` → `\d{2,}` — caught suffixed levels ("254ish") that were wrongly read as no_anchor.
+- Dropped the loose `[A-Z][a-z]+ + speech-verb` REPORTED pattern — it mis-fired on capitalized TA
+  narration ("Chart says", "Bears think") inside real first-person calls.
+- Restructured: a row WITH an anchor is rejectable ONLY by reported/hedged; wishlist/holding/past/
+  no_anchor require NO anchor — protects anchored conditional setups ("waiting for a retest at $75k").
+
+**Scope:** `source_type IN ('youtube','x')`, currently visible, NOT operational (= 14,204 rows).
+Wall-St `article`/`insider`/`congress` (710K) EXCLUDED — the judge is quote-based and would nuke
+the quote-less analyst feed.
+
+**Applied (flag-not-delete, audit marker `reject_judge_2026_06_29`, snapshot
+`reject_judge_apply_2026_06_29_snapshot.json`):**
+| reason | flag set | rows |
+|---|---|---|
+| no_anchor + buy_wishlist + past_tense | `is_no_gradeable_claim` | 3,977 |
+| holding | `is_holding_disclosure` | 115 |
+| **total applied** | | **4,092** (28.8% of visible YT+X) |
+
+**DEFERRED — NOT applied** (a deep audit of the only rules that reject ANCHORED rows found residual
+false-rejects there): `reported_speech` (143 — fires on own-theses-that-mention-an-analyst, e.g.
+"I am very bullish… revenue 11.5% CAGR") and `hedged` (25 — rhetorical "no idea why people sleep
+on it", "50/50" market-share). These are semantic calls → route to the cost-gated LLM verify, not
+deterministic.
+
+**Result:** user-facing precision (post-stratified gold) **36.2% → 51.1%** (+14.9pp). Spot-checks:
+30 random applied + 50 random + 66 gold = **0 false-reject**. Verified: every flagged row is YT/X
+non-operational (0 other-source, 0 operational); price path / analyst feed / live classifier
+untouched. Reversible via the snapshot. NOTE: cached leaderboard stats lag until
+`refresh_all_forecaster_stats` runs.
+
+## Open / next
+- Cached forecaster-stats refresh to propagate the hides to leaderboards.
+- The cost-gated LLM verify for the deferred reported/hedged anchored-suspects (eval-gate first).
