@@ -1,0 +1,249 @@
+{
+ "candidates": 22,
+ "operational_tagged": 4,
+ "scored": 3,
+ "pending": 1,
+ "scored_breakdown": {
+  "hit": 2,
+  "near": 0,
+  "miss": 1
+ },
+ "hit_rate": 0.667,
+ "rows": [
+  {
+   "id": 614706,
+   "ticker": "MSFT",
+   "claim_type": "price",
+   "metric": null,
+   "kind": null,
+   "target": null,
+   "period": null,
+   "error": null
+  },
+  {
+   "id": 614428,
+   "ticker": "V",
+   "claim_type": "not_a_prediction",
+   "metric": null,
+   "kind": null,
+   "target": null,
+   "period": null,
+   "error": null
+  },
+  {
+   "id": 614427,
+   "ticker": "MSFT",
+   "claim_type": "not_a_prediction",
+   "metric": null,
+   "kind": null,
+   "target": null,
+   "period": null,
+   "error": null
+  },
+  {
+   "id": 614429,
+   "ticker": "MA",
+   "claim_type": "not_a_prediction",
+   "metric": null,
+   "kind": null,
+   "target": null,
+   "period": null,
+   "error": null
+  },
+  {
+   "id": 613794,
+   "ticker": "NFLX",
+   "claim_type": "price",
+   "metric": null,
+   "kind": null,
+   "target": null,
+   "period": null,
+   "error": null
+  },
+  {
+   "id": 613768,
+   "ticker": "D",
+   "claim_type": "operational",
+   "metric": "revenue",
+   "kind": "direction",
+   "target": null,
+   "period": "+5y",
+   "error": null,
+   "score_status": "pending",
+   "outcome": null,
+   "reason": "no_data"
+  },
+  {
+   "id": 613177,
+   "ticker": "MSFT",
+   "claim_type": "not_a_prediction",
+   "metric": null,
+   "kind": null,
+   "target": null,
+   "period": null,
+   "error": null
+  },
+  {
+   "id": 613174,
+   "ticker": "GOOGL",
+   "claim_type": "not_a_prediction",
+   "metric": null,
+   "kind": null,
+   "target": null,
+   "period": null,
+   "error": null
+  },
+  {
+   "id": 624824,
+   "ticker": "AMZN",
+   "claim_type": "price",
+   "metric": null,
+   "kind": null,
+   "target": 4000,
+   "period": null,
+   "error": null
+  },
+  {
+   "id": 613756,
+   "ticker": "DIS",
+   "claim_type": "not_a_prediction",
+   "metric": null,
+   "kind": null,
+   "target": null,
+   "period": null,
+   "error": null
+  },
+  {
+   "id": 614267,
+   "ticker": "ATVI",
+   "claim_type": "not_a_prediction",
+   "metric": null,
+   "kind": null,
+   "target": null,
+   "period": null,
+   "error": null
+  },
+  {
+   "id": 614263,
+   "ticker": "DBX",
+   "claim_type": "not_a_prediction",
+   "metric": null,
+   "kind": null,
+   "target": null,
+   "period": null,
+   "error": null
+  },
+  {
+   "id": 614264,
+   "ticker": "PYPL",
+   "claim_type": "not_a_prediction",
+   "metric": null,
+   "kind": null,
+   "target": null,
+   "period": null,
+   "error": null
+  },
+  {
+   "id": 616245,
+   "ticker": "CNR",
+   "claim_type": "operational",
+   "metric": "eps_diluted",
+   "kind": "growth_pct",
+   "target": 20,
+   "period": "FY2022",
+   "error": null,
+   "score_status": "scored",
+   "outcome": "miss",
+   "reason": null,
+   "actual": 1261.46
+  },
+  {
+   "id": 616243,
+   "ticker": "META",
+   "claim_type": "operational",
+   "metric": "revenue",
+   "kind": "direction",
+   "target": null,
+   "period": "+1y",
+   "error": null,
+   "score_status": "scored",
+   "outcome": "hit",
+   "reason": null,
+   "actual": 134902000000.0
+  },
+  {
+   "id": 616242,
+   "ticker": "GOOGL",
+   "claim_type": "price",
+   "metric": null,
+   "kind": null,
+   "target": null,
+   "period": null,
+   "error": null
+  },
+  {
+   "id": 612922,
+   "ticker": "BMY",
+   "claim_type": "price",
+   "metric": null,
+   "kind": null,
+   "target": null,
+   "period": null,
+   "error": null
+  },
+  {
+   "id": 616241,
+   "ticker": "SHOP",
+   "claim_type": "price",
+   "metric": null,
+   "kind": null,
+   "target": null,
+   "period": null,
+   "error": null
+  },
+  {
+   "id": 605975,
+   "ticker": "AAPL",
+   "claim_type": "price",
+   "metric": null,
+   "kind": null,
+   "target": null,
+   "period": null,
+   "error": null
+  },
+  {
+   "id": 616225,
+   "ticker": "MSFT",
+   "claim_type": "price",
+   "metric": null,
+   "kind": null,
+   "target": null,
+   "period": null,
+   "error": null
+  },
+  {
+   "id": 612909,
+   "ticker": "DOCU",
+   "claim_type": "operational",
+   "metric": "revenue",
+   "kind": "growth_pct",
+   "target": 16,
+   "period": "+1y",
+   "error": null,
+   "score_status": "scored",
+   "outcome": "hit",
+   "reason": null,
+   "actual": 19.4
+  },
+  {
+   "id": 611038,
+   "ticker": "TXRH",
+   "claim_type": "price",
+   "metric": null,
+   "kind": null,
+   "target": null,
+   "period": null,
+   "error": null
+  }
+ ]
+}
