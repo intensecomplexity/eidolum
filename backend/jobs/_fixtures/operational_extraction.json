@@ -1,0 +1,24 @@
+{
+  "_doc": "PHASE-2 eval gate for the operational extractor. ACCEPTANCE: every 'price' fixture must tag claim_type='price' (no regression -> price predictions are not stolen into operational), AND all four 'operational' gold cases must extract the right (metric, metric_kind). 'not_a_prediction' rows are robustness checks (must NOT become operational with a fabricated target).",
+  "operational": [
+    {"id": 609156, "ticker": "AMZN", "expect_metric": "free_cash_flow", "expect_kind": "absolute",
+     "quote": "this is how the next 5 years of free cash flow look for Alibaba this is how the next five years of free cash flow Look for amazon that's a big difference guys from 38 billion up to 133 billion because the Capa cycle for Amazon is pretty close to being over they're going to keep doing capx not as much as they used to their Investments are starting to pay off and free cash flow is growing up to 50%"},
+    {"id": 607205, "ticker": "ON", "expect_metric": "revenue", "expect_kind": "cagr",
+     "quote": "yes ON Semiconductor has a very fine Outlook through 2027 you can see that their revenue is expected to be 10 to 12% in compound annual growth rate which would be three times their peers in the semiconductor industry"},
+    {"id": 634843, "ticker": "CRDO", "expect_metric": "revenue", "expect_kind": "growth_pct",
+     "quote": "Re $crdo they are expecting an inflection driven by their optical portfolio. We feel confident that we're going to achieve a very aggressive ramp in the second half of our fiscal year, and revenue will more than double or triple that the following year"},
+    {"id": 630302, "ticker": "AAPL", "expect_metric": "free_cash_flow", "expect_kind": "direction",
+     "quote": "So, I am expecting to see Amazon's and Apple's cash flows decline in the second quarter. And I am going to be preparing for that."}
+  ],
+  "price": [
+    {"ticker": "ACHR", "quote": "I personally think that this is a $15 stock in 12 months"},
+    {"ticker": "COST", "quote": "We think Costco stock is worth $620."},
+    {"ticker": "BTC", "quote": "$BTC SHORT Take profit: $75,000 SL: $79,500 Keep your notifications on"},
+    {"ticker": "NVDA", "quote": "$NVDA $300 by EOY? I anticipate $NVDA has 33% upside until EOY."},
+    {"ticker": "INTC", "quote": "I think you can retest the 100 on this move. Maybe even the 50 period on the daily."}
+  ],
+  "not_a_prediction": [
+    {"ticker": "OSCR", "quote": "Best ceo in healthcare, CEO targeting $45 to $55 by eoy. This is just the start"},
+    {"ticker": "TTD", "quote": "a company I believe is going to be one of the next gen magnificent 7 in the future"}
+  ]
+}
