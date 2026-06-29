@@ -96,14 +96,28 @@ The local actuals tables (`fmp_earnings` / `fmp_income_statements` / `fmp_cash_f
 writes them; latest reported actual is 2026-06-11. So any operational row whose period reports
 AFTER the harvest can never resolve until a refresh feed exists. Today this blocks nothing
 (all 8 pending rows target FY2026+/FY2027/FY2029 or Q2-2026-not_local → 0 scoreable now), but it
-WILL block them when those periods report. **Proposed minimal throttle-safe fix (awaiting Nimrod's
-OK — it is FMP spend; bulk is blocked on the downgraded plan, per-ticker is not):** a daily job
-that refreshes ONLY the distinct tickers with pending operational rows (currently ~8) via the
-per-ticker `/stable/{earnings,income-statement,cash-flow-statement,ratios}` endpoints — ~tens of
-calls/day, scales with the pending set. NOT built/run pending decision.
+WILL block them when those periods report.
+
+**Refresher BUILT 2026-06-29 (`jobs/operational_freshness.py`, gated `ENABLE_OPERATIONAL_FRESHNESS`,
+daily 02:00 UTC just before the evaluator).** Need-based: refreshes ONLY the distinct pending-
+operational tickers (8 today: AAPL/AMAT/AMZN/CRDO/D/INTC/MDT/ON) via per-ticker `/stable/{earnings,
+income-statement,cash-flow-statement,ratios}` (annual+quarter), `_get_json` 429-backoff, paced,
+`upsert conflict="update"` (fills NULL earnings actuals + the Q2-Q4 statement gap for those
+tickers). Volume guard: 7 calls/ticker, STOP if the set would exceed 300/day (56 today). NEVER
+bulk. **Verified OFFLINE:** compiles; dry_run = 8 tickers / 56 calls (under guard); map_rows field
+mapping correct (epsActual→eps_actual, freeCashFlow→free_cash_flow, margins).
+
+**⛔ LIVE RUN + ENABLE BLOCKED (2026-06-29): FMP key is temporarily throttled** — a single paced
+per-ticker call 429s even after 155s of backoff (today's repeated bulk+per-ticker attempts tripped
+a key-level "abuse" restriction). Both flags LEFT OFF; not shipping/enabling an unverified 429-ing
+fetch, and not hammering (risks a harder restriction). **TO FINISH:** let the key cool down (stop
+all FMP calls), re-run `run_operational_freshness()` once (should refresh the 8 tickers + unlock
+AAPL 630302's Q2-2026 FCF), confirm the evaluator resolves it, THEN set
+`ENABLE_OPERATIONAL_FRESHNESS=true` + `ENABLE_OPERATIONAL_EVALUATOR=true` on the worker.
 
 ## Open / next
-- **Freshness feed** (above) — the gate for flipping `ENABLE_OPERATIONAL_EVALUATOR` ON.
+- **Cool-down then verify+enable** the freshness refresher (above) — the only remaining step;
+  blocked solely by the temporary FMP throttle.
 - **Quarterly Q2–Q4 FCF/NI/margins** need an FMP quarterly backfill (bulk BLOCKED on the
   downgraded plan; per-ticker ruled out) — approval pending.
 - The live classifier could gain the operational tag (additive block, eval-gated, controlled
