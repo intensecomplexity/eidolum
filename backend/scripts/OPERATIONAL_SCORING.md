@@ -82,9 +82,30 @@ DATABASE_URL=$DATABASE_PUBLIC_URL BACKFILL_OLD=1 python3 scripts/operational_bac
 DATABASE_URL=$DATABASE_PUBLIC_URL python3 scripts/operational_phase6_verify.py      # verify
 ```
 
+## Daily worker job (wired 2026-06-29)
+`jobs.operational_evaluator.run_operational_evaluation()` is registered in `worker.py` as a
+daily `"cron"` job (02:10 UTC, `executor='maintenance'`, mirrors `price_bars_daily_increment`).
+It scores outcome='pending', claim_type='operational' rows whose period has reported and leaves
+the rest pending — branch-strict on claim_type (never touches the price path or
+evaluation_deferred), idempotent (only `outcome='pending'` rows; safe to re-run). **Gated by
+`ENABLE_OPERATIONAL_EVALUATOR` (default OFF), lazy import (boot-safe).**
+
+## ⚠ FRESHNESS — NOT SOLVED (blocker; flip the job ON only after this lands)
+The local actuals tables (`fmp_earnings` / `fmp_income_statements` / `fmp_cash_flows` /
+`fmp_ratios`) are a **one-time harvest frozen at 2026-06-10** — verified: nothing in the worker
+writes them; latest reported actual is 2026-06-11. So any operational row whose period reports
+AFTER the harvest can never resolve until a refresh feed exists. Today this blocks nothing
+(all 8 pending rows target FY2026+/FY2027/FY2029 or Q2-2026-not_local → 0 scoreable now), but it
+WILL block them when those periods report. **Proposed minimal throttle-safe fix (awaiting Nimrod's
+OK — it is FMP spend; bulk is blocked on the downgraded plan, per-ticker is not):** a daily job
+that refreshes ONLY the distinct tickers with pending operational rows (currently ~8) via the
+per-ticker `/stable/{earnings,income-statement,cash-flow-statement,ratios}` endpoints — ~tens of
+calls/day, scales with the pending set. NOT built/run pending decision.
+
 ## Open / next
-- **Quarterly Q2–Q4 FCF/NI/margins** need an FMP quarterly backfill (spend) — approval pending.
-- A worker cron for `operational_evaluator` (pending rows resolve as periods report) — not wired yet.
+- **Freshness feed** (above) — the gate for flipping `ENABLE_OPERATIONAL_EVALUATOR` ON.
+- **Quarterly Q2–Q4 FCF/NI/margins** need an FMP quarterly backfill (bulk BLOCKED on the
+  downgraded plan; per-ticker ruled out) — approval pending.
 - The live classifier could gain the operational tag (additive block, eval-gated, controlled
   restart) so NEW predictions are tagged at insert; today the standalone extractor backfills.
 - Tolerance bands are v1 — tune on a labeled operational sample.

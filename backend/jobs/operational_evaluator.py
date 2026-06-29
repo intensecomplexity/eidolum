@@ -221,3 +221,52 @@ def score_operational(p, db=None, as_of=None):
     return _scored(out, a["value"], a["report_date"],
                    {"kind": kind, "metric": metric, "period": target_period, "prior": pr_label,
                     "actual": a["value"], "prior_value": b["value"], "moved_up": moved_up, "pred_up": pred_up})
+
+
+def run_operational_evaluation(db=None, limit=None):
+    """Batch scorer for the worker's daily cron. Resolves outcome='pending',
+    claim_type='operational' rows whose period has reported; leaves the rest pending.
+
+    SAFETY / idempotency:
+      - Branches strictly on claim_type='operational' — the price evaluator and price rows
+        are never read or written.
+      - Only outcome='pending' rows are selected, so already-resolved rows (hit/near/miss/
+        unresolved) are never re-scored. Safe to re-run; a no-op once everything resolvable
+        has resolved.
+      - The UPDATE re-asserts claim_type='operational' AND outcome='pending', and writes only
+        outcome / metric_actual_value / metric_resolved_at. evaluation_deferred is left TRUE
+        (operational rows stay off the price scoreboard). No row is deleted.
+    Returns a counts dict (logged each run).
+    """
+    from sqlalchemy import text as _t
+    sess, owned = (db, False) if db is not None else (__import__("database").BgSessionLocal(), True)
+    counts = {"seen": 0, "scored": 0, "hit": 0, "near": 0, "miss": 0,
+              "unresolved": 0, "still_pending": 0, "skipped": 0}
+    try:
+        q = ("SELECT id, ticker, direction, claim_type, metric_type, metric_kind, "
+             "metric_target_value, metric_target_period, prediction_date, outcome "
+             "FROM predictions WHERE claim_type='operational' AND outcome='pending' "
+             "ORDER BY id")
+        if limit:
+            q += f" LIMIT {int(limit)}"
+        rows = sess.execute(_t(q)).fetchall()
+        for r in rows:
+            counts["seen"] += 1
+            res = score_operational(dict(r._mapping), db=sess)
+            if res["status"] == "scored":
+                sess.execute(_t(
+                    "UPDATE predictions SET outcome=:o, metric_actual_value=:a, metric_resolved_at=:t "
+                    "WHERE id=:i AND claim_type='operational' AND outcome='pending'"),
+                    {"o": res["outcome"], "a": res["metric_actual_value"],
+                     "t": res["metric_resolved_at"], "i": r._mapping["id"]})
+                counts["scored"] += 1
+                counts[res["outcome"]] = counts.get(res["outcome"], 0) + 1
+            elif res["status"] == "pending":
+                counts["still_pending"] += 1
+            else:
+                counts["skipped"] += 1
+        sess.commit()
+    finally:
+        if owned:
+            sess.close()
+    return counts
