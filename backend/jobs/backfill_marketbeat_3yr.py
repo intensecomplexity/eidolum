@@ -54,6 +54,7 @@ from jobs.youtube_channel_monitor import (
     YOUTUBE_MIN_DURATION_SECONDS,
     _fetch_video_durations,
     _process_one_video,
+    _record_processed_video,
 )
 
 CHANNEL_NAME = "MarketBeat"
@@ -271,17 +272,54 @@ def run(args: argparse.Namespace) -> int:
             return 0
 
         # ── Wet run ─────────────────────────────────────────────────────
-        stats: dict = {}
-        # Initialize the counter keys _process_one_video / log_youtube_rejection touch
-        for k in (
-            "videos_classified", "videos_skipped_no_transcript",
-            "predictions_extracted", "classifier_errors",
-            "items_rejected", "haiku_retries_count",
-            "total_input_tokens", "total_output_tokens",
-            "total_cache_create_tokens", "total_cache_read_tokens",
-            "estimated_cost_usd", "timeframes_rejected", "reference_rejected",
-        ):
-            stats[k] = 0
+        # Canonical counter set — must match the live-cycle stats dict in
+        # youtube_channel_monitor.py:894-998 so _process_one_video and the
+        # insert_*_prediction helpers can increment any counter without
+        # raising KeyError. The previous short list missed
+        # 'predictions_inserted' (incremented on every successful insert),
+        # which silently lost predictions on videos that classified to
+        # >= 1 row — the script's outer try/except swallowed the KeyError.
+        stats: dict = {
+            "channels_checked": 0,
+            "videos_seen": 0,
+            "videos_skipped_already_processed": 0,
+            "videos_skipped_short": 0,
+            "videos_skipped_no_transcript": 0,
+            "videos_classified": 0,
+            "predictions_extracted": 0,
+            "predictions_inserted": 0,
+            "classifier_errors": 0,
+            "yt_api_units": 0,
+            "items_rejected": 0,
+            "items_deduped": 0,
+            "total_input_tokens": 0,
+            "total_output_tokens": 0,
+            "total_cache_create_tokens": 0,
+            "total_cache_read_tokens": 0,
+            "estimated_cost_usd": 0.0,
+            "haiku_retries_count": 0,
+            "sector_calls_extracted": 0,
+            "options_positions_extracted": 0,
+            "earnings_calls_extracted": 0,
+            "macro_calls_extracted": 0,
+            "pair_calls_extracted": 0,
+            "binary_events_extracted": 0,
+            "metric_forecasts_extracted": 0,
+            "conditional_calls_extracted": 0,
+            "disclosures_extracted": 0,
+            "timestamps_matched": 0,
+            "timestamps_failed": 0,
+            "regime_calls_extracted": 0,
+            "timeframes_explicit": 0,
+            "timeframes_inferred": 0,
+            "timeframes_rejected": 0,
+            "reference_rejected": 0,
+            "conviction_strong": 0,
+            "conviction_moderate": 0,
+            "conviction_hedged": 0,
+            "conviction_hypothetical": 0,
+            "conviction_unknown": 0,
+        }
 
         n_total = len(kept_videos)
         n_inserted = 0
@@ -290,17 +328,47 @@ def run(args: argparse.Namespace) -> int:
             video_id = v["video_id"]
             title = v["title"]
             publish_iso = v["published_at"]
+            # Refresh the session per video. Pavilion calls routinely take
+            # 90+ seconds; the DB connection's TCP socket gets blackholed
+            # by an intermediate idle-timeout (proxy/NAT) during that
+            # window, and SQLAlchemy's pool_pre_ping only fires on
+            # initial pool checkout — once the session holds a connection,
+            # it has no way to know it died until the next op blocks in
+            # poll() under TCP retransmit backoff (observed: rto=120s,
+            # script hung 5+ minutes). Closing + reacquiring per video
+            # bounds connection age to one iteration's wall time.
             try:
-                inserted, _chars, _status = _process_one_video(
+                db.close()
+            except Exception:
+                pass
+            db = BgSessionLocal()
+            try:
+                inserted, transcript_chars, transcript_status = _process_one_video(
                     db, CHANNEL_NAME, CHANNEL_ID, video_id, title, publish_iso, stats,
                 )
                 n_inserted += inserted
+                # Mirror the live cycle's per-video persistence boundary
+                # (youtube_channel_monitor.py:1155-1163): record the dedup
+                # row in youtube_videos, then commit so insert_youtube_prediction's
+                # db.add()'d rows actually reach disk. Without this, the session
+                # closes with pending writes and every prediction silently
+                # rolls back — and youtube_videos never grows, so the
+                # filter_already_processed dedup is a no-op on reruns.
+                _record_processed_video(
+                    db, video_id, CHANNEL_NAME, title, "", publish_iso,
+                    transcript_status, transcript_chars, inserted,
+                )
+                db.commit()
             except Exception as e:
                 print(
                     f"[BackfillMB] _process_one_video raised for {video_id}: "
                     f"{type(e).__name__}: {str(e)[:200]}",
                     flush=True,
                 )
+                try:
+                    db.rollback()
+                except Exception:
+                    pass
             n_done += 1
             if n_done % args.batch_size == 0:
                 elapsed = time.time() - started_at
