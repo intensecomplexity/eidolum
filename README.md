@@ -1,5 +1,7 @@
 # Eidolum
 
+![Python](https://img.shields.io/badge/Python-3.11-3776AB) ![FastAPI](https://img.shields.io/badge/FastAPI-backend-009688) ![React](https://img.shields.io/badge/React-frontend-61DAFB) ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-database-4169E1)
+
 Who should you actually listen to?
 
 Markets are full of confident predictions, from Wall Street analysts to finance YouTubers and X/StockTwits traders, but there's rarely a real record of who was actually right. Eidolum tracks every prediction, timestamps it so it can't be edited or backdated, and scores it against real market data when its evaluation window expires. Analysts and everyday traders are ranked on the same public leaderboard, judged by the same rules.
