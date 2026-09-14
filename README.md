@@ -4,6 +4,10 @@ Who should you actually listen to?
 
 Markets are full of confident predictions, from Wall Street analysts to finance YouTubers and X/StockTwits traders, but there's rarely a real record of who was actually right. Eidolum tracks every prediction, timestamps it so it can't be edited or backdated, and scores it against real market data when its evaluation window expires. Analysts and everyday traders are ranked on the same public leaderboard, judged by the same rules.
 
+![Eidolum homepage — live prediction stats](screenshot-home.png)
+
+![Eidolum leaderboard — The Eidolum 100](screenshot-leaderboard.png)
+
 ## Live site
 
 https://www.eidolum.com
