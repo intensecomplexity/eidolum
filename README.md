@@ -83,3 +83,9 @@ Frontend hosting: Vercel.
 ## Status
 
 Actively developed and in production since early 2026, built and operated solo end-to-end: architecture, backend, frontend, deployment, and ongoing monitoring.
+
+## Data Validation & QA Approach
+
+The Seven Pillars ruleset above runs with zero manual review, which meant designing it with the same discipline as a formal test suite: every rule had to be an unambiguous, automatable pass/fail check before it could be trusted to run unsupervised in production. See [docs/TESTING.md](docs/TESTING.md) for the full validation pipeline, test-style assertions, and edge cases handled.
+
+**Validation pipeline:** Ingestion filtering rejects malformed predictions at the point of entry against all 7 rules. Evaluation-time verification computes HIT/NEAR/MISS outcomes against licensed real-time market data when a prediction's window expires. LLM-assisted edge-case adjudication handles ambiguous submissions that fall outside the deterministic rules, still bound by the same 7 criteria.
