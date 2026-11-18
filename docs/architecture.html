@@ -1,0 +1,827 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Eidolum Architecture</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Frank+Ruhl+Libre:wght@500;700&family=Heebo:wght@400;500;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0d0f13; --card:#14161c; --card2:#181b22; --border:#1e2028; --border2:#2a2d38;
+  --text:#e6e6ea; --muted:#9a9cab; --dim:#6d7080;
+  --gold:#D4A843; --hit:#34d399; --near:#fbbf24; --miss:#f87171;
+  --blue:#60a5fa; --violet:#a78bfa; --gray:#8b8fa3;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font-family:'Heebo',system-ui,sans-serif;font-size:16px;line-height:1.7;overflow-x:hidden}
+.wrap{max-width:1180px;margin:0 auto;padding:32px 16px 64px}
+h1,h2,h3{font-family:'Frank Ruhl Libre',serif;color:var(--gold);font-weight:700;line-height:1.3}
+h1{font-size:2.4rem;margin:0 0 8px}
+h2{font-size:1.65rem;margin:56px 0 14px;padding-bottom:8px;border-bottom:1px solid var(--border)}
+h2 .num{color:var(--dim);font-family:'JetBrains Mono',monospace;font-size:1rem;margin-left:10px}
+h3{font-size:1.2rem;margin:28px 0 10px}
+p{margin:10px 0}
+a{color:var(--gold)}
+.lead{color:var(--muted);font-size:1.05rem;max-width:860px}
+.meta{color:var(--dim);font-size:.9rem}
+code,.mono{font-family:'JetBrains Mono',monospace;font-size:.86em;direction:ltr;unicode-bidi:isolate;background:#1a1d25;border:1px solid var(--border);border-radius:4px;padding:1px 5px;color:#d9dbe4;overflow-wrap:anywhere}
+pre{font-family:'JetBrains Mono',monospace;font-size:.85rem;direction:ltr;text-align:left;background:var(--card);border:1px solid var(--border);border-radius:8px;padding:14px;overflow-x:auto;color:#d9dbe4;margin:12px 0}
+.card{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:18px 20px;margin:14px 0}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px}
+.grid .card{margin:0}
+.card h3{margin-top:0}
+.tbl{width:100%;overflow-x:auto;margin:12px 0;border:1px solid var(--border);border-radius:10px;background:var(--card)}
+table{width:100%;border-collapse:collapse;font-size:.92rem}
+th,td{padding:9px 12px;border-bottom:1px solid var(--border);text-align:right;vertical-align:top}
+th{color:var(--gold);font-weight:500;background:var(--card2);white-space:nowrap}
+tr:last-child td{border-bottom:none}
+td code{white-space:normal;word-break:break-word}
+.ltr{direction:ltr;text-align:left;unicode-bidi:isolate}
+.pill{display:inline-block;font-family:'JetBrains Mono',monospace;font-size:.75rem;padding:1px 8px;border-radius:999px;border:1px solid;white-space:nowrap}
+.p-hit{color:var(--hit);border-color:var(--hit)}
+.p-near{color:var(--near);border-color:var(--near)}
+.p-miss{color:var(--miss);border-color:var(--miss)}
+.p-gold{color:var(--gold);border-color:var(--gold)}
+.p-blue{color:var(--blue);border-color:var(--blue)}
+.p-violet{color:var(--violet);border-color:var(--violet)}
+.p-gray{color:var(--gray);border-color:var(--gray)}
+.lock-g{color:var(--gold)} .lock-s{color:var(--violet)} .lock-n{color:var(--dim)}
+.note{border-right:3px solid var(--gold);background:var(--card);padding:10px 14px;border-radius:6px;margin:12px 0;color:var(--muted)}
+.warn{border-right:3px solid var(--miss);background:var(--card);padding:10px 14px;border-radius:6px;margin:12px 0}
+.toc{columns:2;column-gap:28px;padding:0;list-style:none;margin:0}
+.toc li{break-inside:avoid;padding:3px 0}
+.toc a{text-decoration:none;color:var(--text)}
+.toc a:hover{color:var(--gold)}
+.toc .n{color:var(--dim);font-family:'JetBrains Mono',monospace;font-size:.85rem;margin-left:8px}
+ol.steps{padding-right:22px}
+ol.steps li{margin:8px 0}
+ul{padding-right:22px}
+li{margin:4px 0}
+.diagram-wrap{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:12px;overflow-x:auto;margin:14px 0}
+.diagram-wrap svg{display:block;width:100%;min-width:980px;height:auto;direction:ltr;unicode-bidi:isolate}
+.legend{display:flex;flex-wrap:wrap;gap:10px 22px;margin:10px 0;font-size:.9rem;color:var(--muted)}
+.legend span{display:inline-flex;align-items:center;gap:8px}
+.sw{width:22px;height:4px;border-radius:2px;display:inline-block}
+.gap-list li{margin:10px 0}
+.gap-list .sev{margin-left:6px}
+footer{margin-top:72px;padding-top:24px;border-top:1px solid var(--border);text-align:center;color:var(--muted)}
+footer .motto{font-family:'Frank Ruhl Libre',serif;color:var(--gold);font-size:1.3rem;direction:ltr;unicode-bidi:isolate}
+@media (max-width:640px){
+  h1{font-size:1.8rem} h2{font-size:1.35rem} .toc{columns:1}
+  th,td{padding:7px 8px;font-size:.85rem}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <h1>ארכיטקטורת Eidolum</h1>
+  <p class="lead">מסמך זה מתאר איך Eidolum בנויה היום, על בסיס הקוד והקונפיגורציה שבמאגר <code>intensecomplexity/eidolum</code> בלבד. כל עובדה כאן נלקחה מקובץ שנקרא, ובמקומות רבים מצוין הקובץ והשורה. כל מה שלא ניתן היה לקבוע מתוך הקוד מופיע בפרק 15, פערים וחוסר עקביות.</p>
+  <p class="meta">מבוסס על הענף <code>claude/clever-ramanujan-6e6eh8</code>, commit אחרון בקוד <code>6879f4e</code>. ערכי סודות לא מופיעים במסמך, רק שמות משתני סביבה.</p>
+</header>
+
+<nav class="card" aria-label="תוכן עניינים">
+  <h3 style="margin-top:0">תוכן עניינים</h3>
+  <ul class="toc">
+    <li><a href="#ch1"><span class="n">01</span>סקירה ומיפוי השרטוט</a></li>
+    <li><a href="#ch2"><span class="n">02</span>דיאגרמת מערכת מלאה</a></li>
+    <li><a href="#ch3"><span class="n">03</span>Railway: שירותים ופקודות הפעלה</a></li>
+    <li><a href="#ch4"><span class="n">04</span>ה-Worker: מתזמן, נעילות, משמרות וכל ה-jobs</a></li>
+    <li><a href="#ch5"><span class="n">05</span>מקורות נתונים</a></li>
+    <li><a href="#ch6"><span class="n">06</span>שכבת ה-AI</a></li>
+    <li><a href="#ch7"><span class="n">07</span>צינור ההערכה (Evaluation)</a></li>
+    <li><a href="#ch8"><span class="n">08</span>מסד הנתונים</a></li>
+    <li><a href="#ch9"><span class="n">09</span>שירות ה-API</a></li>
+    <li><a href="#ch10"><span class="n">10</span>Frontend</a></li>
+    <li><a href="#ch11"><span class="n">11</span>צינור הפריסה</a></li>
+    <li><a href="#ch12"><span class="n">12</span>משתני סביבה (שמות בלבד)</a></li>
+    <li><a href="#ch13"><span class="n">13</span>זרימה מקצה לקצה: תחזית אחת מ-X</a></li>
+    <li><a href="#ch14"><span class="n">14</span>עקרונות תכנון והוספת מקור חדש</a></li>
+    <li><a href="#ch15"><span class="n">15</span>פערים וחוסר עקביות</a></li>
+  </ul>
+</nav>
+
+<!-- ============ 1 ============ -->
+<section id="ch1">
+<h2><span class="num">01</span>סקירה ומיפוי השרטוט</h2>
+<p>Eidolum אוספת תחזיות שוק מאנליסטים, מיוטיוב ומ-X, שומרת אותן עם חותמת זמן, ומדרגת אותן מול מחירי שוק אמיתיים כשחלון ההערכה שלהן נסגר. המערכת מורכבת משלושה חלקים שרצים בענן: שירות Worker ושירות API על Railway שחולקים מסד Postgres אחד, ו-SPA של React על Vercel. בנוסף, חלק מעבודת הסיווג רץ מחוץ לענן, במכונת מפעיל, באמצעות סקריפטים שמפעילים <code>claude -p</code>.</p>
+<p>הטבלה ממפה כל קופסה בשרטוט הלוח המקורי לרכיב האמיתי שמאחוריה.</p>
+<div class="tbl"><table>
+<thead><tr><th>קופסה בשרטוט</th><th>הרכיב האמיתי</th><th>היכן רץ</th></tr></thead>
+<tbody>
+<tr><td>sources: x.com, youtube.com, 1.com, 2.com</td><td>Apify (X ו-StockTwits), YouTube Data API v3 ו-youtube-transcript-api, Massive (Benzinga), FMP, Finnhub, RSS של Benzinga ו-MarketBeat, yfinance, Alpha Vantage, Jina</td><td>שירותים חיצוניים</td></tr>
+<tr><td>x scraper</td><td><code>backend/jobs/x_scraper.py</code></td><td>Railway, Worker</td></tr>
+<tr><td>youtube scraper</td><td><code>backend/jobs/youtube_channel_monitor.py</code>, <code>youtube_backfill.py</code>, ו-<code>youtube_scraper.py</code> (גרסה 1, רישום ללוג בלבד)</td><td>Railway, Worker</td></tr>
+<tr><td>1 scraper (וכל השאר)</td><td><code>massive_benzinga.py</code>, <code>upgrade_scrapers.py</code>, <code>rss_scrapers.py</code>, <code>stocktwits_scraper.py</code>, <code>fmp_scraper.py</code>, <code>fmp_ultimate_backfill.py</code>, <code>benzinga_backfill.py</code></td><td>Railway, Worker</td></tr>
+<tr><td>scraping orchestrator</td><td><code>backend/worker.py</code>: APScheduler <code>BlockingScheduler</code> באזור זמן UTC, עם 42 jobs, שני threads ברקע, ותור <code>scraper_job_queue</code></td><td>Railway, שירות בשם <code>hopeful-expression</code> (לפי הערה ב-<code>worker.py:162</code>)</td></tr>
+<tr><td>eidolum DB</td><td>PostgreSQL דרך <code>DATABASE_URL</code>, עם שני engines של SQLAlchemy (<code>backend/database.py</code>)</td><td>Railway</td></tr>
+<tr><td>eidolum server</td><td>FastAPI <code>main:app</code> שרץ עם uvicorn (<code>backend/Procfile</code>)</td><td>Railway, שירות בשם <code>eidolum</code></td></tr>
+<tr><td>eidolum ui</td><td>SPA של React 18 ו-Vite, עם Edge Function <code>frontend/api/edge.js</code> כפרוקסי מטמון</td><td>Vercel (<code>rootDirectory: frontend</code>)</td></tr>
+<tr><td>user</td><td>User: גישה ציבורית או עם JWT. Admin: JWT של משתמש עם <code>is_admin</code>, או header <code>X-Admin-Secret</code></td><td>דפדפן</td></tr>
+<tr><td>(לא בשרטוט)</td><td>סקריפטי סיווג מקומיים: <code>scripts/cc_recover_classifier_errors.py</code> (יוטיוב), <code>scripts/x_scout.py</code> ו-<code>x_ingest.py</code> (X)</td><td>מכונת מפעיל, כותבים ישירות ל-DB</td></tr>
+</tbody></table></div>
+</section>
+
+<!-- ============ 2 ============ -->
+<section id="ch2">
+<h2><span class="num">02</span>דיאגרמת מערכת מלאה</h2>
+<p>הזרימה משמאל לימין: מקורות חיצוניים, קונטיינר Railway (Worker, Postgres, API), קונטיינר Vercel (Edge ו-SPA), ולבסוף המשתמשים. התוויות בתוך הדיאגרמה באנגלית כי הן שמות רכיבים בקוד.</p>
+<div class="legend">
+  <span><i class="sw" style="background:#D4A843"></i>קליטה (ingestion)</span>
+  <span><i class="sw" style="background:#34d399"></i>הערכה (evaluation)</span>
+  <span><i class="sw" style="background:#60a5fa"></i>הגשה (serving)</span>
+  <span><i class="sw" style="background:#a78bfa"></i>AI ו-proxy</span>
+  <span><i class="sw" style="background:#8b8fa3"></i>תשתית ופריסה</span>
+</div>
+<div class="diagram-wrap">
+<svg id="arch" viewBox="0 0 1400 830" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Eidolum system diagram" style="direction:ltr;unicode-bidi:isolate" font-family="Heebo, system-ui, sans-serif">
+  <defs>
+    <marker id="m-gold" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#D4A843"/></marker>
+    <marker id="m-green" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#34d399"/></marker>
+    <marker id="m-blue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#60a5fa"/></marker>
+    <marker id="m-violet" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#a78bfa"/></marker>
+    <marker id="m-gray" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#8b8fa3"/></marker>
+  </defs>
+  <style>
+    .t{fill:#e6e6ea;font-size:12px}
+    .tb{fill:#e6e6ea;font-size:14px;font-weight:700}
+    .ts{fill:#9a9cab;font-size:11px}
+    .tm{fill:#c9cbd6;font-size:11px;font-family:'JetBrains Mono',monospace}
+    .cl{font-size:13px;font-weight:700;letter-spacing:2px}
+    .lbl{font-size:10px;fill:#9a9cab}
+  </style>
+
+  <!-- GitHub -->
+  <rect x="520" y="16" width="360" height="56" rx="8" fill="#14161c" stroke="#8b8fa3" stroke-width="1.5"/>
+  <text x="700" y="39" text-anchor="middle" class="tb">GitHub: intensecomplexity/eidolum</text>
+  <text x="700" y="59" text-anchor="middle" class="ts">Actions: sync-staging.yml (main to staging)</text>
+  <path d="M600,72 L600,98" stroke="#8b8fa3" stroke-width="1.6" fill="none" marker-end="url(#m-gray)"/>
+  <text x="608" y="90" class="lbl">auto-deploy</text>
+  <path d="M880,44 L1060,44 L1060,98" stroke="#8b8fa3" stroke-width="1.6" fill="none" marker-end="url(#m-gray)"/>
+  <text x="980" y="38" text-anchor="middle" class="lbl">auto-deploy (main, staging preview)</text>
+
+  <!-- Sources -->
+  <rect x="10" y="100" width="220" height="510" rx="10" fill="none" stroke="#D4A843" stroke-dasharray="4 4" stroke-width="1.2"/>
+  <text x="22" y="124" class="cl" fill="#D4A843">SOURCES</text>
+  <g>
+    <rect x="20" y="140" width="200" height="34" rx="6" fill="#14161c" stroke="#D4A843"/><text x="32" y="162" class="t">X / Twitter (Apify)</text>
+    <rect x="20" y="182" width="200" height="34" rx="6" fill="#14161c" stroke="#D4A843"/><text x="32" y="204" class="t">StockTwits (Apify)</text>
+    <rect x="20" y="224" width="200" height="34" rx="6" fill="#14161c" stroke="#D4A843"/><text x="32" y="246" class="t">YouTube Data API v3</text>
+    <rect x="20" y="266" width="200" height="34" rx="6" fill="#14161c" stroke="#D4A843"/><text x="32" y="288" class="t">YouTube transcripts</text>
+    <rect x="20" y="308" width="200" height="34" rx="6" fill="#14161c" stroke="#D4A843"/><text x="32" y="330" class="t">Massive / Benzinga</text>
+    <rect x="20" y="350" width="200" height="34" rx="6" fill="#14161c" stroke="#D4A843"/><text x="32" y="372" class="t">FMP grades + targets</text>
+    <rect x="20" y="392" width="200" height="34" rx="6" fill="#14161c" stroke="#D4A843"/><text x="32" y="414" class="t">RSS: Benzinga, MarketBeat</text>
+    <rect x="20" y="434" width="200" height="34" rx="6" fill="#14161c" stroke="#D4A843"/><text x="32" y="456" class="t">Finnhub, yfinance, AlphaV</text>
+    <rect x="20" y="476" width="200" height="34" rx="6" fill="#14161c" stroke="#D4A843"/><text x="32" y="498" class="t">Jina search (URLs)</text>
+    <rect x="20" y="540" width="200" height="54" rx="6" fill="#14161c" stroke="#34d399"/><text x="32" y="562" class="t">Prices: FMP, Tiingo,</text><text x="32" y="580" class="t">Polygon, Finnhub</text>
+  </g>
+  <!-- gold bus -->
+  <g stroke="#D4A843" stroke-width="1.3" fill="none">
+    <path d="M220,157 L250,157"/><path d="M220,199 L250,199"/><path d="M220,241 L250,241"/><path d="M220,283 L250,283"/>
+    <path d="M220,325 L250,325"/><path d="M220,367 L250,367"/><path d="M220,409 L250,409"/><path d="M220,451 L250,451"/><path d="M220,493 L250,493"/>
+    <path d="M250,157 L250,493"/>
+  </g>
+  <path d="M250,262 L303,262" stroke="#D4A843" stroke-width="2" fill="none" marker-end="url(#m-gold)"/>
+  <!-- green price path -->
+  <path d="M220,567 L270,567 L270,410 L313,410" stroke="#34d399" stroke-width="2" fill="none" marker-end="url(#m-green)"/>
+
+  <!-- Railway container -->
+  <rect x="285" y="100" width="620" height="520" rx="12" fill="none" stroke="#8b8fa3" stroke-width="1.5"/>
+  <text x="300" y="124" class="cl" fill="#8b8fa3">RAILWAY</text>
+
+  <!-- Worker -->
+  <rect x="305" y="138" width="220" height="312" rx="8" fill="#14161c" stroke="#D4A843" stroke-width="1.6"/>
+  <text x="317" y="162" class="tb">Worker</text>
+  <text x="317" y="182" class="tm">hopeful-expression</text>
+  <text x="317" y="200" class="tm">python worker.py</text>
+  <text x="317" y="220" class="t">APScheduler, UTC</text>
+  <text x="317" y="238" class="t">42 jobs, 3 executors</text>
+  <text x="317" y="256" class="t">global lock + SCRAPER_LOCK</text>
+  <text x="317" y="274" class="t">watchdog every 5 min</text>
+  <text x="317" y="292" class="t">health HTTP on $PORT</text>
+  <rect x="313" y="308" width="205" height="54" rx="6" fill="#1a1d25" stroke="#D4A843"/>
+  <text x="321" y="328" class="t">scrapers</text>
+  <text x="321" y="347" class="tm" style="font-size:10px">x, youtube, benzinga, fmp, rss</text>
+  <rect x="315" y="382" width="200" height="56" rx="6" fill="#1a1d25" stroke="#34d399"/>
+  <text x="325" y="404" class="t">evaluator + retry_no_data</text>
+  <text x="325" y="424" class="ts">every 30 min</text>
+
+  <!-- Postgres -->
+  <rect x="565" y="190" width="140" height="206" rx="8" fill="#14161c" stroke="#e6e6ea" stroke-width="1.4"/>
+  <text x="635" y="212" text-anchor="middle" class="tb">Postgres</text>
+  <text x="635" y="229" text-anchor="middle" class="ts" style="fill:#8b8fa3">Railway managed</text>
+  <text x="577" y="254" class="tm">predictions</text>
+  <text x="577" y="272" class="tm">forecasters</text>
+  <text x="577" y="290" class="tm">users</text>
+  <text x="577" y="308" class="tm">price_bars</text>
+  <text x="577" y="326" class="tm">fmp_* tables</text>
+  <text x="577" y="344" class="tm">config (flags)</text>
+  <text x="577" y="362" class="tm">*_cache tables</text>
+  <text x="577" y="380" class="tm">scraper_runs</text>
+
+  <!-- worker -> db -->
+  <path d="M525,240 L562,240" stroke="#D4A843" stroke-width="2" fill="none" marker-end="url(#m-gold)"/>
+  <text x="530" y="232" class="lbl">insert</text>
+  <path d="M515,416 L600,416 L600,399" stroke="#34d399" stroke-width="2" fill="none" marker-end="url(#m-green)"/>
+  <text x="530" y="410" class="lbl">outcome</text>
+
+  <!-- API -->
+  <rect x="745" y="138" width="145" height="312" rx="8" fill="#14161c" stroke="#60a5fa" stroke-width="1.6"/>
+  <text x="757" y="162" class="tb">API</text>
+  <text x="757" y="182" class="tm">eidolum</text>
+  <text x="757" y="200" class="tm">FastAPI main:app</text>
+  <text x="757" y="220" class="t">uvicorn (Procfile)</text>
+  <text x="757" y="238" class="t">51 routers</text>
+  <text x="757" y="256" class="t">slowapi limits</text>
+  <text x="757" y="274" class="t">JWT + admin auth</text>
+  <text x="757" y="292" class="t">8s request timeout</text>
+  <text x="757" y="310" class="t">no scheduled jobs</text>
+  <!-- db <-> api -->
+  <path d="M708,290 L742,290" stroke="#60a5fa" stroke-width="2" fill="none" marker-start="url(#m-blue)" marker-end="url(#m-blue)"/>
+  <text x="712" y="282" class="lbl">SQL</text>
+
+  <!-- AI + proxy (under worker) -->
+  <rect x="290" y="660" width="255" height="150" rx="8" fill="#14161c" stroke="#a78bfa" stroke-width="1.6"/>
+  <text x="302" y="684" class="tb">AI + proxy</text>
+  <text x="302" y="706" class="t">Pavilion Qwen (CF Access tunnel)</text>
+  <text x="302" y="726" class="t">Groq llama-3.3-70b (X)</text>
+  <text x="302" y="746" class="t">Anthropic Haiku (X fallback)</text>
+  <text x="302" y="766" class="t">claude -p guards (sonnet)</text>
+  <text x="302" y="786" class="t">Webshare proxy (transcripts)</text>
+  <path d="M415,450 L415,657" stroke="#a78bfa" stroke-width="2" fill="none" marker-end="url(#m-violet)"/>
+
+  <!-- Operator machine -->
+  <rect x="560" y="660" width="165" height="150" rx="8" fill="#14161c" stroke="#a78bfa" stroke-dasharray="5 4" stroke-width="1.6"/>
+  <text x="572" y="684" class="tb">Operator machine</text>
+  <text x="572" y="706" class="tm">claude -p</text>
+  <text x="572" y="726" class="t">Sonnet + Haiku</text>
+  <text x="572" y="746" class="tm">cc_recover_*</text>
+  <text x="572" y="766" class="tm">x_scout, x_ingest</text>
+  <text x="572" y="786" class="ts">writes to DB directly</text>
+  <path d="M650,660 L650,399" stroke="#a78bfa" stroke-width="1.8" stroke-dasharray="6 4" fill="none" marker-end="url(#m-violet)"/>
+
+  <!-- Resend / OAuth (under API) -->
+  <rect x="745" y="660" width="160" height="120" rx="8" fill="#14161c" stroke="#8b8fa3" stroke-width="1.4"/>
+  <text x="757" y="684" class="tb">Resend</text>
+  <text x="757" y="704" class="ts">email (API + worker jobs)</text>
+  <text x="757" y="732" class="tb">Google OAuth</text>
+  <text x="757" y="752" class="ts">login via /api/auth/google</text>
+  <path d="M817,450 L817,657" stroke="#8b8fa3" stroke-width="1.6" fill="none" marker-end="url(#m-gray)"/>
+
+  <!-- Vercel container -->
+  <rect x="935" y="100" width="250" height="520" rx="12" fill="none" stroke="#8b8fa3" stroke-width="1.5"/>
+  <text x="950" y="124" class="cl" fill="#8b8fa3">VERCEL</text>
+  <rect x="955" y="148" width="210" height="92" rx="8" fill="#14161c" stroke="#60a5fa" stroke-width="1.6"/>
+  <text x="967" y="172" class="tb">Edge proxy</text>
+  <text x="967" y="192" class="tm">api/edge.js</text>
+  <text x="967" y="210" class="t">GET allowlist only</text>
+  <text x="967" y="228" class="ts">CDN cache 120s to 600s</text>
+  <rect x="955" y="290" width="210" height="130" rx="8" fill="#14161c" stroke="#60a5fa" stroke-width="1.6"/>
+  <text x="967" y="314" class="tb">React SPA</text>
+  <text x="967" y="334" class="t">Vite build, dist/</text>
+  <text x="967" y="352" class="t">react-router, axios</text>
+  <text x="967" y="370" class="tm">VITE_API_BASE</text>
+  <text x="967" y="390" class="ts">token in localStorage</text>
+  <text x="967" y="408" class="ts">CDN rewrites + headers</text>
+  <rect x="955" y="460" width="210" height="100" rx="8" fill="#14161c" stroke="#8b8fa3" stroke-width="1.4"/>
+  <text x="967" y="484" class="tb">vercel.json</text>
+  <text x="967" y="504" class="tm">/sitemap.xml, /robots.txt</text>
+  <text x="967" y="522" class="tm">/api/og-image/* to API</text>
+  <text x="967" y="540" class="ts">SPA fallback index.html</text>
+
+  <!-- serving arrows -->
+  <path d="M893,194 L952,194" stroke="#60a5fa" stroke-width="2" fill="none" marker-start="url(#m-blue)" marker-end="url(#m-blue)"/>
+  <text x="920" y="186" text-anchor="middle" class="lbl">https</text>
+  <path d="M893,355 L952,355" stroke="#60a5fa" stroke-width="2" fill="none" marker-start="url(#m-blue)" marker-end="url(#m-blue)"/>
+  <text x="920" y="347" text-anchor="middle" class="lbl">/api</text>
+  <path d="M1060,243 L1060,287" stroke="#60a5fa" stroke-width="2" fill="none" marker-start="url(#m-blue)" marker-end="url(#m-blue)"/>
+  <path d="M955,510 L920,510 L920,430 L893,430" stroke="#60a5fa" stroke-width="1.6" stroke-dasharray="5 4" fill="none" marker-end="url(#m-blue)"/>
+
+  <!-- Users -->
+  <rect x="1215" y="198" width="170" height="76" rx="8" fill="#14161c" stroke="#60a5fa" stroke-width="1.6"/>
+  <text x="1227" y="222" class="tb">User</text>
+  <text x="1227" y="242" class="t">public pages</text>
+  <text x="1227" y="260" class="ts">or JWT (Bearer)</text>
+  <rect x="1215" y="318" width="170" height="86" rx="8" fill="#14161c" stroke="#60a5fa" stroke-width="1.6"/>
+  <text x="1227" y="342" class="tb">Admin</text>
+  <text x="1227" y="362" class="t">is_admin JWT</text>
+  <text x="1227" y="380" class="ts">or X-Admin-Secret</text>
+  <text x="1227" y="396" class="tm">/admin/dashboard</text>
+  <path d="M1168,320 L1212,240" stroke="#60a5fa" stroke-width="2" fill="none" marker-start="url(#m-blue)" marker-end="url(#m-blue)"/>
+  <path d="M1168,380 L1212,362" stroke="#60a5fa" stroke-width="2" fill="none" marker-start="url(#m-blue)" marker-end="url(#m-blue)"/>
+
+  <!-- DNS -->
+  <rect x="955" y="660" width="210" height="84" rx="8" fill="#14161c" stroke="#8b8fa3" stroke-width="1.4"/>
+  <text x="967" y="684" class="tb">DNS</text>
+  <text x="967" y="704" class="ts">registrar not defined in repo</text>
+  <text x="967" y="722" class="tm">eidolum.com, www</text>
+  <text x="967" y="738" class="tm">api.eidolum.com</text>
+  <path d="M1060,660 L1060,623" stroke="#8b8fa3" stroke-width="1.4" stroke-dasharray="5 4" fill="none" marker-end="url(#m-gray)"/>
+  <path d="M955,720 L925,720 L925,575 L908,575" stroke="#8b8fa3" stroke-width="1.4" stroke-dasharray="5 4" fill="none" marker-end="url(#m-gray)"/>
+</svg>
+</div>
+<p class="meta">קווים מקווקווים: נתיבים עקיפים (rewrite של Vercel ל-API, כתיבה ישירה מהמכונה המקומית, DNS). קו ירוק משמאל: ספקי מחירים שמזינים את ה-evaluator. ה-API וה-Worker לא מדברים זה עם זה ישירות. הם מתקשרים דרך טבלאות ב-Postgres, למשל <code>scraper_job_queue</code>, וטבלאות המטמון <code>homepage_data_cache</code> ו-<code>global_stats_cache</code>.</p>
+</section>
+
+<!-- ============ 3 ============ -->
+<section id="ch3">
+<h2><span class="num">03</span>Railway: שירותים ופקודות הפעלה</h2>
+<p>במאגר אין קובץ <code>railway.json</code>, <code>railway.toml</code> או <code>nixpacks.toml</code>. לכן הגדרות כמו root directory, watch paths ופקודת ההפעלה של ה-Worker נמצאות בלוח הבקרה של Railway ולא בקוד. מה שכן נמצא בקוד:</p>
+<div class="tbl"><table>
+<thead><tr><th>שירות</th><th>תפקיד</th><th>פקודת הפעלה</th><th>מקור בקוד</th></tr></thead>
+<tbody>
+<tr><td><code>eidolum</code></td><td>API, FastAPI</td><td><code>uvicorn main:app --host 0.0.0.0 --port $PORT</code></td><td><code>backend/Procfile</code>, Python 3.11 לפי <code>backend/runtime.txt</code></td></tr>
+<tr><td><code>hopeful-expression</code></td><td>Worker, כל ה-jobs המתוזמנים</td><td><code>python worker.py</code></td><td>docstring ב-<code>worker.py:7</code>. אין שורת worker ב-Procfile</td></tr>
+<tr><td>Postgres</td><td>מסד נתונים</td><td>מנוהל על ידי Railway</td><td><code>DATABASE_URL</code>. הקוד ממיר <code>postgres://</code> ל-<code>postgresql://</code> (<code>database.py:19</code>)</td></tr>
+</tbody></table></div>
+<div class="grid">
+  <div class="card"><h3>Root directory</h3><p>ה-Procfile יושב ב-<code>backend/</code>, ולכן נראה ש-root directory של שני השירותים הוא <code>backend</code>. ההגדרה עצמה לא מופיעה בקוד.</p></div>
+  <div class="card"><h3>Watch paths</h3><p>לא מוגדרים בקוד. קובץ הסקיל <code>.claude/skills/eidolum/SKILL.md</code> מתאר אותם בטקסט: ה-API נפרס מחדש על כל שינוי ב-<code>backend/</code>, וה-Worker רק על שינויים ב-<code>backend/worker.py</code> או <code>backend/jobs/**</code>. זה תיעוד, לא קונפיגורציה, ולכן מסומן בפרק 15.</p></div>
+  <div class="card"><h3>Health checks</h3><p>API: <code>GET /health</code> ו-<code>GET /api/health</code> מחזירים <code>{"status":"ok"}</code> סטטי בלי פנייה ל-DB. Worker: שרת HTTP מינימלי על <code>$PORT</code> (ברירת מחדל 8081) שעונה 200 לכל נתיב, עם זמן הריצה האחרון של כל job.</p></div>
+</div>
+<p>שני השירותים מתחברים לאותו Postgres. שניהם רצים בברירת מחדל עם <code>RUN_STARTUP_DDL=false</code>, כך שאף אחד מהם לא מריץ שינויי סכמה בעלייה. הסבר מלא בפרק 8.</p>
+</section>
+
+<!-- ============ 4 ============ -->
+<section id="ch4">
+<h2><span class="num">04</span>ה-Worker: מתזמן, נעילות, משמרות וכל ה-jobs</h2>
+<h3>המתזמן</h3>
+<p><code>worker.py</code> יוצר <code>BlockingScheduler(timezone='UTC')</code> עם שלושה executors נפרדים (<code>worker.py:2154</code>):</p>
+<ul>
+  <li><code>default</code>: שלושה threads. scrapers, evaluator ו-jobs קטנים.</li>
+  <li><code>maintenance</code>: thread אחד. לוגואים, backfills, harvests, רענון מטמונים.</li>
+  <li><code>ts_backfill</code>: thread אחד, רק ל-<code>yt_timestamp_backfill</code>, כדי שקריאות ארוכות למסווג לא יחסמו את ניטור הערוצים.</li>
+</ul>
+<p>ברירות המחדל לכל job: <code>coalesce=True</code>, <code>max_instances=1</code>, <code>misfire_grace_time=300</code>. זמני ההתחלה מדורגים סביב <code>t0 = now + 30s</code> כדי שלא כל ה-jobs יירו יחד אחרי deploy.</p>
+
+<h3>עלייה (boot)</h3>
+<ol class="steps">
+  <li>התקנת מסנן שמנקה מפתחות API מהלוגים (<code>log_filter.install_key_scrubber</code>) לפני כל import של scraper.</li>
+  <li>הפעלת שרת ה-health ב-thread, והפעלת thread שמחמם את המסווג (ping כל 300 שניות לנקודת הקצה של Pavilion, ניתן לכיבוי עם <code>CLASSIFIER_WARMUP_ENABLED</code>).</li>
+  <li><code>create_all</code> רק כאשר <code>RUN_STARTUP_DDL=true</code>. אחר כך כ-40 בלוקים של <code>CREATE TABLE IF NOT EXISTS</code> ו-<code>ADD COLUMN IF NOT EXISTS</code>, שהופכים ל-no-op כשה-DDL gate סגור. כולל seed של כ-400 שורות ל-<code>sector_etf_aliases</code>.</li>
+  <li>job חד-פעמי <code>requeue_billing_victims_april8_v2</code>, שנשמר בטבלה <code>one_time_jobs</code> כדי לא לרוץ שוב.</li>
+  <li>רישום כל ה-jobs, הפעלת daemon thread של Benzinga backfill (<code>auto_resume_backfill</code>), ו-<code>sched.start()</code>.</li>
+</ol>
+
+<h3>שתי נעילות שונות</h3>
+<div class="grid">
+  <div class="card"><h3><span class="pill p-gold">global lock</span></h3><p><code>circuit_breaker._job_lock</code>. נלקחת על ידי העוטף <code>_guarded</code> ב-worker. רק שלושה jobs משתמשים בה: <code>massive_benzinga</code>, <code>sweep_stuck</code>, <code>analyst_notifications</code>. רק אחד מהם יכול לרוץ בכל רגע. אם הנעילה תפוסה, ה-job מדלג על המחזור.</p></div>
+  <div class="card"><h3><span class="pill p-violet">SCRAPER_LOCK</span></h3><p><code>threading.Lock</code> שמוגדר ב-<code>jobs/news_scraper.py:34</code> ונלקח בתוך הפונקציות עצמן, בלי חסימה: <code>scrape_benzinga_rss</code>, <code>scrape_marketbeat_rss</code>, <code>scrape_yfinance_recommendations</code>, <code>scrape_alphavantage_news</code>, <code>scrape_finnhub_upgrades</code>, <code>scrape_fmp_upgrades</code>, <code>scrape_fmp_price_targets</code>, <code>scrape_fmp_daily_grades</code>.</p></div>
+</div>
+<p class="note">ה-docstring של <code>_guarded</code> אומר "Uses global SCRAPER_LOCK", אבל בפועל הוא משתמש בנעילה של <code>circuit_breaker</code>, שהיא אובייקט אחר. שתי הנעילות לא חוסמות זו את זו.</p>
+
+<h3>משמרות (guards) ו-watchdog</h3>
+<ul>
+  <li><code>db_is_healthy</code>: לפני כל job שעטוף ב-<code>_guarded</code> או <code>_standalone</code>. מריץ <code>SELECT 1</code> על ה-pool של הרקע, ומדלג אם התשובה לוקחת יותר מ-3 שניות או אם ה-jobs מושהים.</li>
+  <li><code>db_storage_ok</code>: רק ב-<code>_guarded</code>. מדלג אם <code>pg_database_size</code> גדול מ-40GB. התוצאה נשמרת במטמון ל-5 דקות.</li>
+  <li><code>watchdog</code> כל 5 דקות: משחרר בכוח את ה-global lock אם הוחזק יותר מ-600 שניות; בודק בריאות אתר ומשהה את כל ה-jobs ל-5 דקות אחרי 3 כישלונות רצופים; ובודק את צינור יוטיוב ורושם CRITICAL אם לא נוספה תחזית יוטיוב ב-6 השעות האחרונות.</li>
+  <li><code>memory_is_available</code> (פחות מ-100MB פנויים מדלג על batch) קיים ב-<code>circuit_breaker.py</code>, וזמין ל-jobs שקוראים לו.</li>
+</ul>
+
+<h3>טבלת כל ה-jobs</h3>
+<p>42 jobs רשומים ב-<code>worker.py:2173</code> עד <code>2667</code>. בעמודת הנעילה: <span class="lock-g">global</span> היא נעילת <code>_guarded</code>, <span class="lock-s">SCRAPER_LOCK</span> נלקחת בתוך הפונקציה, ו-<span class="lock-n">none</span> אומר שאין נעילה.</p>
+<div class="tbl"><table>
+<thead><tr><th>Job</th><th>תזמון</th><th>נעילה</th><th>Executor</th><th>מה עושה / שירות חיצוני</th></tr></thead>
+<tbody>
+<tr><td><code>massive_benzinga</code></td><td>כל 2 שעות</td><td class="lock-g">global</td><td>default</td><td>דירוגי אנליסטים מ-Massive (Benzinga) לטבלת <code>predictions</code></td></tr>
+<tr><td><code>sweep_stuck</code></td><td>כל 24 שעות</td><td class="lock-g">global</td><td>default</td><td><code>evaluator.sweep_stuck_predictions</code></td></tr>
+<tr><td><code>analyst_notifications</code></td><td>כל שעה</td><td class="lock-g">global</td><td>default</td><td>התראות למנויים על אנליסטים: in-app, ומייל דרך Resend</td></tr>
+<tr><td><code>auto_evaluate</code></td><td>כל 30 דקות</td><td class="lock-n">none</td><td>default</td><td><code>historical_evaluator.evaluate_batch</code>, ואחריו רענון סטטיסטיקות. כבוי אם <code>ENABLE_EVALUATOR</code> שונה מ-true</td></tr>
+<tr><td><code>refresh_stats</code></td><td>כל 30 דקות</td><td class="lock-n">none</td><td>maintenance</td><td><code>refresh_all_forecaster_stats</code>, אותו מתג <code>ENABLE_EVALUATOR</code></td></tr>
+<tr><td><code>retry_no_data</code></td><td>כל 30 דקות</td><td class="lock-n">none</td><td>default</td><td>תמחור מחדש לשורות <code>no_data</code> דרך Polygon, Tiingo ו-FMP, עד 1000 טיקרים בריצה</td></tr>
+<tr><td><code>fmp_grades</code></td><td>כל 24 שעות</td><td class="lock-n">none</td><td>default</td><td>FMP grades לטיקרים המובילים</td></tr>
+<tr><td><code>url_backfill</code></td><td>כל 24 שעות</td><td class="lock-n">none</td><td>maintenance</td><td>מאתר כתובות כתבה אמיתיות דרך Massive, עד 2000 בריצה</td></tr>
+<tr><td><code>tournament_scorer</code></td><td>כל 6 שעות</td><td class="lock-n">none</td><td>default</td><td><code>routers.tournaments.score_active_tournaments</code></td></tr>
+<tr><td><code>youtube_scraper</code></td><td>כל 8 שעות</td><td class="lock-n">none</td><td>default</td><td>גרסה 1: חיפוש ביוטיוב, רישום ללוג בלבד, לא מכניס תחזיות</td></tr>
+<tr><td><code>enrich_urls</code></td><td>כל שעה</td><td class="lock-n">none</td><td>default</td><td>חיפוש Jina (<code>s.jina.ai</code>) להחלפת כתובות מקור גנריות, 500 בריצה</td></tr>
+<tr><td><code>channel_monitor</code></td><td><code>YOUTUBE_MONITOR_INTERVAL_MINUTES</code>, ברירת מחדל 30 דקות, מינימום 5</td><td class="lock-n">none</td><td>default</td><td>YouTube Data API, תמלול, מסווג, הכנסת תחזיות</td></tr>
+<tr><td><code>disclosure_follow_through</code></td><td>כל 24 שעות, מתחיל שעתיים אחרי boot</td><td class="lock-n">none</td><td>default</td><td>תשואות 1/3/6/12 חודשים לטבלת <code>disclosures</code></td></tr>
+<tr><td><code>scraper_job_queue</code></td><td>כל 60 שניות</td><td class="lock-n">none</td><td>default</td><td>מרוקן את התור שה-API ממלא. סוג job יחיד כרגע: <code>youtube_fetch_channel</code></td></tr>
+<tr><td><code>youtube_backfill</code></td><td>כל שעה</td><td class="lock-n">none</td><td>default</td><td>היסטוריית ערוצים, מהישן לחדש, 50 סרטונים לערוץ בריצה</td></tr>
+<tr><td><code>yt_timestamp_backfill</code></td><td>כל 15 דקות</td><td class="lock-n">none</td><td>ts_backfill</td><td>משלים <code>source_timestamp_seconds</code> לתחזיות ישנות, 20 בריצה. מתג <code>ENABLE_YT_TIMESTAMP_BACKFILL</code></td></tr>
+<tr><td><code>x_scraper</code></td><td>כל 6 שעות, מיד בעלייה</td><td class="lock-n">none</td><td>default</td><td>Apify (ציוצים), סיווג Groq עם Haiku כגיבוי</td></tr>
+<tr><td><code>stocktwits_scraper</code></td><td>כל 6 שעות, מיד בעלייה</td><td class="lock-n">none</td><td>default</td><td>Apify actor של StockTwits</td></tr>
+<tr><td><code>process_logos</code></td><td>כל 24 שעות</td><td class="lock-n">none</td><td>maintenance</td><td>מוריד ומנרמל לוגואים חסרים (FMP, bucket של IEX)</td></tr>
+<tr><td><code>bulk_fill_logos</code></td><td>כל 24 שעות</td><td class="lock-n">none</td><td>maintenance</td><td>השלמת לוגואים חסרים לפי פופולריות</td></tr>
+<tr><td><code>desc_backfill_polygon</code></td><td>כל 24 שעות</td><td class="lock-n">none</td><td>maintenance</td><td>תיאורי חברות מ-Polygon</td></tr>
+<tr><td><code>benzinga_rss</code></td><td>כל 4 שעות</td><td class="lock-s">SCRAPER_LOCK</td><td>default</td><td>RSS של Benzinga</td></tr>
+<tr><td><code>marketbeat_rss</code></td><td>כל 4 שעות</td><td class="lock-s">SCRAPER_LOCK</td><td>default</td><td>RSS של MarketBeat</td></tr>
+<tr><td><code>yfinance</code></td><td>כל 6 שעות</td><td class="lock-s">SCRAPER_LOCK</td><td>default</td><td>המלצות דרך ספריית yfinance</td></tr>
+<tr><td><code>alphavantage</code></td><td>כל 8 שעות</td><td class="lock-s">SCRAPER_LOCK</td><td>default</td><td>Alpha Vantage news sentiment</td></tr>
+<tr><td><code>finnhub_upgrades</code></td><td>כל 8 שעות</td><td class="lock-s">SCRAPER_LOCK</td><td>default</td><td>Finnhub upgrades/downgrades</td></tr>
+<tr><td><code>refresh_global_stats</code></td><td>כל 5 דקות</td><td class="lock-n">none</td><td>maintenance</td><td>חישוב מראש של <code>/api/stats/global</code> לטבלה <code>global_stats_cache</code></td></tr>
+<tr><td><code>refresh_homepage_data</code></td><td>כל 5 דקות</td><td class="lock-n">none</td><td>maintenance</td><td>חישוב מראש של <code>/api/homepage-data</code> לטבלה <code>homepage_data_cache</code></td></tr>
+<tr><td><code>price_bars_daily_increment</code></td><td>cron 00:30 UTC</td><td class="lock-n">none</td><td>maintenance</td><td>FMP EOD לטבלה <code>price_bars</code>. כבוי כברירת מחדל (מפתח <code>ENABLE_PRICE_BARS_INCREMENTAL</code> בטבלת config)</td></tr>
+<tr><td><code>yt_metadata_refresh</code></td><td>cron 01:40 UTC</td><td class="lock-n">none</td><td>maintenance</td><td>רענון או מחיקה של מטא-דאטה מ-YouTube API אחרי 30 יום, מוגבל ב-quota. מתג <code>ENABLE_YT_METADATA_REFRESH</code></td></tr>
+<tr><td><code>operational_freshness</code></td><td>cron 02:00 UTC</td><td class="lock-n">none</td><td>maintenance</td><td>רענון נתונים פיננסיים מ-FMP רק לטיקרים עם תחזיות תפעוליות פתוחות. כבוי (<code>ENABLE_OPERATIONAL_FRESHNESS</code>)</td></tr>
+<tr><td><code>operational_evaluator</code></td><td>cron 02:10 UTC</td><td class="lock-n">none</td><td>maintenance</td><td>דירוג תחזיות על הכנסות, EPS ושוליים. כבוי (<code>ENABLE_OPERATIONAL_EVALUATOR</code>)</td></tr>
+<tr><td><code>fmp_upgrades</code></td><td>כל 4 שעות</td><td class="lock-s">SCRAPER_LOCK</td><td>default</td><td>FMP <code>grades-latest</code></td></tr>
+<tr><td><code>fmp_price_targets</code></td><td>כל 4 שעות</td><td class="lock-s">SCRAPER_LOCK</td><td>default</td><td>FMP price target changes</td></tr>
+<tr><td><code>fmp_daily_grades</code></td><td>כל 6 שעות</td><td class="lock-s">SCRAPER_LOCK</td><td>default</td><td>FMP grades של היום ואתמול</td></tr>
+<tr><td><code>fmp_ratings_backfill</code></td><td>כל 24 שעות, פעם אחת לכל תהליך</td><td class="lock-n">none</td><td>maintenance</td><td>FMP ratings מ-2018, דגל בזיכרון מונע ריצה חוזרת</td></tr>
+<tr><td><code>fmp_grades_backfill</code></td><td>כל 24 שעות, פעם אחת לכל תהליך</td><td class="lock-n">none</td><td>maintenance</td><td>היסטוריית grades מלאה</td></tr>
+<tr><td><code>fmp_ultimate</code></td><td>כל 24 שעות, מיד בעלייה</td><td class="lock-n">none</td><td>maintenance</td><td>משיכה חד-פעמית של grades גלובליים, checkpoint בטבלת config</td></tr>
+<tr><td><code>watchlist_queue</code></td><td>כל 4 שעות</td><td class="lock-n">none</td><td>default</td><td>תור התראות watchlist. רשום בלי עוטף, ולכן בלי בדיקת בריאות DB</td></tr>
+<tr><td><code>watchlist_digest</code></td><td>cron א'-ה' 13:00 UTC (<code>mon-fri</code>)</td><td class="lock-n">none</td><td>default</td><td>תקציר יומי במייל, Resend</td></tr>
+<tr><td><code>site_weekly_digest</code></td><td>cron יום ב' 13:00 UTC</td><td class="lock-n">none</td><td>default</td><td>תקציר שבועי. <span class="pill p-miss">שבור</span>, ראו פרק 15</td></tr>
+<tr><td><code>watchdog</code></td><td>כל 5 דקות</td><td class="lock-n">none</td><td>default</td><td>שחרור נעילה תקועה, בדיקת בריאות, watchdog ליוטיוב</td></tr>
+</tbody></table></div>
+<p><strong>threads ברקע (לא דרך המתזמן):</strong> חימום המסווג (<code>_classifier_warmup_loop</code>) ו-Benzinga historical backfill (<code>jobs/benzinga_backfill.auto_resume_backfill</code>, קדימה מ-2020 ואחורה מ-2019, התקדמות נשמרת בטבלת <code>config</code>).</p>
+<p><strong>מושהה:</strong> <code>fmp_harvest</code> מוגדר אבל שורת ה-<code>add_job</code> שלו בהערה מאז 8 באפריל 2026 (<code>worker.py:2345</code>).</p>
+</section>
+
+<!-- ============ 5 ============ -->
+<section id="ch5">
+<h2><span class="num">05</span>מקורות נתונים</h2>
+<div class="tbl"><table>
+<thead><tr><th>ספק</th><th>מה מספק</th><th>גישה</th><th>מפתח</th><th>מגבלות שמוגדרות בקוד</th></tr></thead>
+<tbody>
+<tr><td>Massive (Benzinga)</td><td>דירוגי אנליסטים ויעדי מחיר</td><td><code>api.massive.com/benzinga/v1/ratings</code>, header Bearer</td><td><code>MASSIVE_API_KEY</code></td><td>עמוד של 500, timeout 30s, כל שעתיים, ועוד daemon של backfill</td></tr>
+<tr><td>Polygon</td><td>aggregates יומיים, תיאורי חברות, crypto</td><td><code>api.polygon.io</code></td><td><code>MASSIVE_API_KEY</code> (או <code>POLYGON_KEY</code> ב-<code>sector_lookup</code>)</td><td>10 שניות בין קריאות ב-retry_no_data, חלון של שנתיים</td></tr>
+<tr><td>FMP</td><td>EOD, grades, price targets, profiles, נתונים פיננסיים, לוגואים</td><td><code>financialmodelingprep.com/stable/*</code>, מפתח ב-query (מנוקה מהלוגים)</td><td><code>FMP_KEY</code>, <code>FMP_PLAN</code></td><td>מכסה יומית 999,999 כאשר <code>FMP_PLAN=ultimate</code>, אחרת 60 (evaluator) או 300 (retry)</td></tr>
+<tr><td>Tiingo</td><td>מחירים יומיים, crypto, IEX</td><td><code>api.tiingo.com</code></td><td><code>TIINGO_API_KEY</code></td><td>על 429: חסימה ל-24 שעות ב-evaluator; ב-retry_no_data המתנה של 60 שניות, ואחרי 3 תשובות 429 רצופות הפסקה של 5 דקות</td></tr>
+<tr><td>Finnhub</td><td>quotes, candles, news, earnings, upgrades, sectors</td><td><code>finnhub.io/api/v1</code></td><td><code>FINNHUB_KEY</code></td><td>השהיה של 1.1 שניות בחלק מהנתיבים</td></tr>
+<tr><td>Alpha Vantage</td><td>quote, news sentiment</td><td><code>alphavantage.co/query</code></td><td><code>ALPHA_VANTAGE_KEY</code></td><td>כל 8 שעות</td></tr>
+<tr><td>yfinance</td><td>היסטוריית מחירים, המלצות</td><td>ספריית Python</td><td>אין</td><td>לפי הערה ב-<code>price_checker.py:5</code>, התעבורה החוצה חסומה על Railway</td></tr>
+<tr><td>CoinGecko</td><td>מחיר crypto נוכחי</td><td><code>api.coingecko.com</code></td><td>אין</td><td>מטמון של 5 דקות</td></tr>
+<tr><td>Apify</td><td>ציוצים (actor <code>apidojo~tweet-scraper</code>) ו-StockTwits (<code>shahidirfan~stocktwits-sentiment-scraper</code>)</td><td><code>api.apify.com/v2</code>, header Bearer</td><td><code>APIFY_API_TOKEN</code></td><td>20 ציוצים לחשבון, polling עד 90 שניות; בסקריפט המקומי x_scout תקרה של 1.00 דולר ליום</td></tr>
+<tr><td>YouTube Data API v3</td><td>ערוצים, playlists, מטא-דאטה של סרטונים</td><td><code>googleapis.com/youtube/v3</code></td><td><code>YOUTUBE_API_KEY</code></td><td><code>QuotaTracker</code>: 10,000 יחידות ליום, סף בטיחות 8,000. ריענון מטא-דאטה: עד 100 יחידות לריצה</td></tr>
+<tr><td>youtube-transcript-api</td><td>כתוביות עם תזמון מילים</td><td>ספרייה, דרך Webshare proxy או proxy כללי</td><td><code>WEBSHARE_PROXY_USERNAME</code>/<code>_PASSWORD</code>, או <code>YT_PROXY_HTTP</code>/<code>_HTTPS</code></td><td>ברירת המחדל של הספרייה לניסיונות חוזרים</td></tr>
+<tr><td>Jina</td><td>חיפוש כתובת כתבה מקורית</td><td><code>s.jina.ai</code></td><td><code>JINA_API_KEY</code></td><td>השהיה של 0.5 שניות, 500 בריצה</td></tr>
+<tr><td>RSS</td><td>דירוגי Benzinga ו-MarketBeat</td><td>feeds ציבוריים</td><td>אין</td><td>כל 4 שעות</td></tr>
+<tr><td>Internet Archive</td><td>ארכוב כתובת מקור</td><td><code>web.archive.org/save</code></td><td>אין</td><td>נקרא מתוך <code>news_scraper.archive_url</code></td></tr>
+<tr><td>Benzinga API ישיר, Twitter API v2, NewsAPI</td><td>דירוגים, ציוצים, חדשות</td><td>קוד קיים ב-<code>benzinga_scraper.py</code>, <code>scraper.py</code>, <code>news_scraper.py</code></td><td><code>BENZINGA_KEY</code>, <code>TWITTER_BEARER_TOKEN</code>, <code>NEWSAPI_KEY</code></td><td>לא מתוזמנים ב-Worker. נקראים רק מנתיבי admin או לא בכלל</td></tr>
+</tbody></table></div>
+<h3>נכסי נתונים מקומיים</h3>
+<ul>
+  <li><code>price_bars</code>: מטמון EOD מקומי עם מפתח <code>(ticker, bar_date)</code>. נוצר על ידי <code>scripts/harvest_price_bars.py</code> ונכתב דרך <code>services/price_store.py</code>.</li>
+  <li>טבלאות <code>fmp_*</code>: נוצרות על ידי <code>scripts/fmp_ultimate_harvest.py</code>, <code>scripts/fmp_endgame_tables.sql</code> ו-<code>scripts/harvest_fmp_macro.py</code>. רובן לא נקראות על ידי routers או jobs. הקוראים שנמצאו: <code>operational_evaluator</code> (נתונים פיננסיים), בדיקת תנאי מאקרו ב-<code>historical_evaluator.py:1478</code> (<code>fmp_economic_indicators</code>, <code>fmp_treasury_rates</code>, <code>fmp_commodities</code>), ו-<code>routers/leaderboard.py</code>.</li>
+  <li>טבלאות reference מ-<code>jobs/fmp_bulk_harvest.py</code>: <code>company_profiles</code>, <code>analyst_consensus</code>, <code>price_target_summary</code>, <code>stock_ratings</code>, <code>earnings_history</code>, <code>key_metrics</code>, <code>earnings_surprises</code>, <code>sector_performance</code>.</li>
+</ul>
+</section>
+
+<!-- ============ 6 ============ -->
+<section id="ch6">
+<h2><span class="num">06</span>שכבת ה-AI</h2>
+<div class="tbl"><table>
+<thead><tr><th>מקור</th><th>היכן רץ</th><th>מודל</th><th>סדר fallback</th><th>מתגים</th></tr></thead>
+<tbody>
+<tr><td>YouTube (חי)</td><td>Worker: <code>youtube_classifier.classify_video</code></td><td>Qwen 2.5 7B מכויל, על שרת עצמאי בשם Pavilion. ברירת מחדל <code>CLASSIFIER_MODEL_NAME=eidolum-qwen-v2:latest</code></td><td>אין fallback. Haiku הוסר מהמחזור ב-2026-04-25 (<code>youtube_classifier.py:163</code>). כש-<code>USE_FINETUNED_MODEL</code> כבוי, ה-endpoint חסר או ה-circuit breaker פתוח, מוחזרת רשימה ריקה והסרטון מסומן <code>classifier_error</code></td><td><code>USE_FINETUNED_MODEL</code>, <code>CLASSIFIER_BASE_URL</code>, <code>CF_ACCESS_CLIENT_ID</code>/<code>_SECRET</code></td></tr>
+<tr><td>YouTube (שחזור)</td><td>מכונת מפעיל: <code>scripts/cc_recover_classifier_errors.py</code></td><td><code>claude -p</code>: Haiku כ-prefilter, Sonnet לחילוץ</td><td>עובר על <code>transcript_status='classifier_error'</code> ומכניס דרך הנתיב של production. מסמן <code>generating_model = cc_sonnet_recovery_2026_05_17</code></td><td><code>RECOVERY_PREFILTER</code>, <code>CLAUDE_BIN</code></td></tr>
+<tr><td>X (חי)</td><td>Worker: <code>jobs/x_scraper.py</code></td><td>Groq <code>llama-3.3-70b-versatile</code></td><td>Haiku <code>claude-haiku-4-5-20251001</code> רק כש-Groq מחזיר 429 או שמכסת הטוקנים היומית נגמרה (circuit breaker עד חצות UTC). בלי <code>GROQ_API_KEY</code> ה-job יוצא מיד</td><td><code>GROQ_API_KEY</code>, <code>GROQ_MODEL</code>, <code>GROQ_MAX_RPM</code> (ברירת מחדל 3), <code>X_HAIKU_FALLBACK_MODEL</code>, <code>X_CASHTAG_GUARD</code></td></tr>
+<tr><td>X (מקומי)</td><td>מכונת מפעיל: <code>scripts/x_scout.py</code>, <code>x_ingest.py</code></td><td><code>claude -p</code> Haiku עם <code>HAIKU_SYSTEM + X_ADDENDUM</code> (מוגדר ב-<code>scripts/x_yield_probe_run.py:101</code>)</td><td>כל הכתיבות עוברות דרך <code>x_scraper._insert_prediction</code></td><td><code>X_SCOUT_ENABLED</code>, וקובץ דגל מקומי</td></tr>
+<tr><td>Guards אחרי סיווג (YouTube)</td><td>Worker: <code>jobs/representativeness_guard.py</code></td><td>subprocess של <code>claude -p --model sonnet</code> (<code>REPRESENTATIVENESS_VERIFY_MODEL</code>)</td><td>fail-open: כל שגיאה משאירה את התחזית. סדר: holding, conditional, gradeable, representativeness</td><td><code>ENABLE_REPRESENTATIVENESS_GUARD</code>, <code>ENABLE_HOLDING_GUARD</code>, <code>ENABLE_CONDITIONAL_GUARD</code>, <code>ENABLE_GRADEABLE_GUARD</code>, <code>REPRESENTATIVENESS_NO_CALL_ACTION</code></td></tr>
+<tr><td>התאמת חותמת זמן</td><td><code>jobs/timestamp_matcher.py</code></td><td>Haiku, max_tokens 50</td><td>רק אחרי שהתאמה ברמת מילה ו-fuzzy נכשלו</td><td><code>ANTHROPIC_API_KEY</code></td></tr>
+<tr><td>Gate אחרי סיווג</td><td><code>jobs/classifier_validation.py</code></td><td>אין LLM, כללי regex</td><td>מצב ראשי <code>CLASSIFIER_VALIDATION_GATE</code>, ברירת מחדל shadow. כלל 7 מסמן <code>is_reported_speech</code> וכלל 15 מסמן <code>is_weak_basket_call</code>, בכל מצב (מסמנים, לא מוחקים)</td><td><code>CLASSIFIER_RULE_*</code> (7 משתנים)</td></tr>
+<tr><td>לוגיקה ללא LLM</td><td><code>classifiers/grounding.py</code>, <code>services/direction_classifier.py</code>, <code>services/prediction_parser.py</code>, <code>jobs/prediction_validator.py</code>, <code>jobs/prediction_filter.py</code></td><td>אין</td><td>regex ומילות מפתח</td><td></td></tr>
+</tbody></table></div>
+<h3>Proxy ומנהרות</h3>
+<ul>
+  <li><strong>Cloudflare Access:</strong> כל קריאה ל-Pavilion נושאת את ה-headers <code>CF-Access-Client-Id</code> ו-<code>CF-Access-Client-Secret</code>. ניסיונות חוזרים על 502, 503, 524 ו-530 עם המתנות של 5, 15 ו-45 שניות. read timeout של 300 שניות. ה-breaker נפתח אחרי 5 כישלונות רצופים.</li>
+  <li><strong>Webshare:</strong> <code>WebshareProxyConfig</code> להורדת תמלולים, ואם אין, <code>GenericProxyConfig</code> או חיבור ישיר.</li>
+  <li><strong>RunPod:</strong> הקוד עדיין קיים (<code>call_runpod_vllm</code> בשורה 351 של <code>youtube_classifier.py</code>), אבל הגדרה שנייה באותו שם בשורה 534 דורסת אותו ושולחת ל-Pavilion. התיקייה <code>runpod/</code> לא בשימוש.</li>
+</ul>
+</section>
+
+<!-- ============ 7 ============ -->
+<section id="ch7">
+<h2><span class="num">07</span>צינור ההערכה (Evaluation)</h2>
+<h3>מה רץ בפועל</h3>
+<ul>
+  <li><code>auto_evaluate</code> כל 30 דקות: <code>historical_evaluator.evaluate_batch()</code>, ואם נוקדו תחזיות, <code>refresh_all_forecaster_stats()</code>.</li>
+  <li><code>retry_no_data</code> כל 30 דקות, ו-<code>sweep_stuck</code> פעם ביום.</li>
+  <li><code>operational_evaluator</code> ב-02:10 UTC, כבוי כברירת מחדל.</li>
+  <li>תחזיות X (<code>source_type='x'</code>) מדולגות כל עוד מפתח <code>EVALUATE_X_PREDICTIONS</code> בטבלת config לא שווה true. ברירת המחדל היא false (<code>feature_flags.py:41</code>).</li>
+</ul>
+
+<h3>טבלאות סבולת (מצוטטות מהקוד)</h3>
+<pre>_TOLERANCE    = {1: 2, 7: 3, 14: 4, 30: 5, 90: 5, 180: 7, 365: 10}
+_MIN_MOVEMENT = {1: 0.5, 7: 1, 14: 1.5, 30: 2, 90: 2, 180: 3, 365: 4}
+SECTOR_CALL_TOLERANCE_MULTIPLIER = 1.5          # historical_evaluator.py:597-608
+_PAIR_TOLERANCE = {1: 1.0, 7: 1.5, 14: 2.0, 30: 2.5, 90: 3.0, 180: 4.0, 365: 6.0}   # evaluator.py:73</pre>
+<div class="tbl"><table>
+<thead><tr><th>חלון (ימים)</th><th>סבולת ל-HIT (%)</th><th>תזוזה מינימלית ל-NEAR (%)</th><th>סבולת pair (%)</th></tr></thead>
+<tbody>
+<tr><td>1</td><td>2</td><td>0.5</td><td>1.0</td></tr>
+<tr><td>7</td><td>3</td><td>1</td><td>1.5</td></tr>
+<tr><td>14</td><td>4</td><td>1.5</td><td>2.0</td></tr>
+<tr><td>30</td><td>5</td><td>2</td><td>2.5</td></tr>
+<tr><td>90</td><td>5</td><td>2</td><td>3.0</td></tr>
+<tr><td>180</td><td>7</td><td>3</td><td>4.0</td></tr>
+<tr><td>365</td><td>10</td><td>4</td><td>6.0</td></tr>
+</tbody></table></div>
+<p>בחירת השורה: <code>window_days</code> מעוגל, ונבחר המפתח הקטן ביותר שגדול או שווה לו. ערכים מעל 365 משתמשים בשורת 365, ערך לא תקין או 0 ומטה מקבל 30, וחלון חסר מקבל 90.</p>
+
+<h3>HIT / NEAR / MISS לפי סוג תחזית</h3>
+<div class="tbl"><table>
+<thead><tr><th>סוג</th><th><span class="pill p-hit">HIT</span></th><th><span class="pill p-near">NEAR</span></th><th><span class="pill p-miss">MISS</span></th></tr></thead>
+<tbody>
+<tr><td>ticker call עם יעד, bullish</td><td>המחיר בסוף החלון הגיע ליעד, או שהמרחק ממנו קטן מהסבולת והתזוזה לא שלילית</td><td>התזוזה בכיוון הנכון גדולה או שווה לתזוזה המינימלית</td><td>אחרת. bearish מוגדר במראה</td></tr>
+<tr><td>ticker call בלי יעד</td><td>המחיר עלה (bullish) או ירד (bearish)</td><td></td><td>אחרת</td></tr>
+<tr><td>neutral</td><td>תזוזה מוחלטת עד 5%</td><td>עד 10%</td><td>מעל 10%</td></tr>
+<tr><td>sector call (ETF מול SPY)</td><td>הפרש גדול או שווה לסבולת כפול 1.5</td><td>הפרש גדול או שווה לתזוזה המינימלית</td><td>אחרת</td></tr>
+<tr><td>pair call</td><td>spread גדול או שווה לסבולת pair</td><td>spread חיובי</td><td>spread קטן או שווה ל-0</td></tr>
+<tr><td>position disclosure</td><td>תשואה של 5% ומעלה</td><td>בין 0 ל-5%</td><td>שלילית</td></tr>
+<tr><td>metric forecast</td><td>שגיאה יחסית עד 5% (counts עד 10%, rates עד 0.1 נקודת אחוז)</td><td>עד 15% (counts עד 25%, rates עד 0.3)</td><td>אחרת</td></tr>
+<tr><td>operational (absolute)</td><td>עד 10%</td><td>עד 25%</td><td>אחרת</td></tr>
+<tr><td>operational (growth, CAGR)</td><td>עד 15% יחסי או 5 נקודות אחוז</td><td>עד 35% או 12 נקודות אחוז</td><td>אחרת. EPS קרוב לאפס או צמיחה מופרכת מקבלים <code>unresolved</code></td></tr>
+<tr><td>conditional call</td><td colspan="3">שלב 1: אם הטריגר לא נורה עד ה-deadline, או שהוא מעורפל, התוצאה <code>unresolved</code>. שלב 2: אם נורה, נוקד כמו ticker call מעוגן ל-<code>trigger_fired_at</code></td></tr>
+<tr><td>regime call</td><td colspan="3">כללי drawdown, runup, שיאים ושפלים לפי סוג המשטר. נדרשות לפחות 10 סגירות</td></tr>
+<tr><td>binary event</td><td colspan="3">כל ה-resolvers הם stubs שמחזירים <code>no_data</code> (<code>evaluator.py:286-348</code>)</td></tr>
+</tbody></table></div>
+<p><strong>ניקוד:</strong> HIT שווה 1.0, NEAR שווה 0.5, MISS שווה 0. דיוק מחושב כ-<code>(hits + nears*0.5) / total * 100</code> (<code>utils/__init__.py:180</code>). הקבוצה המנוקדת היא <code>hit, near, miss, correct, incorrect</code>.</p>
+<p><strong>ערכי outcome בקוד:</strong> <code>pending</code>, <code>hit</code>, <code>near</code>, <code>miss</code>, <code>correct</code> ו-<code>incorrect</code> (legacy ותחזיות משתמשים), <code>no_data</code>, <code>unresolved</code>, <code>delisted</code>, <code>unsupported</code> (רק בסקריפט).</p>
+
+<h3>סדר מקורות מחיר</h3>
+<ol class="steps">
+  <li><strong>Crypto:</strong> <code>fetch_crypto_history</code>, כלומר Polygon <code>X:SYMUSD</code> ואז Tiingo crypto.</li>
+  <li><strong>Equity, כש-<code>FMP_PLAN=ultimate</code>:</strong> FMP, אחריו Tiingo, אחריו Finnhub quote. בכל plan אחר: Tiingo, FMP, Finnhub.</li>
+  <li><strong>Write-through:</strong> כל תוצאה חיה נכתבת ל-<code>price_bars</code> עם <code>source="live_eval"</code>.</li>
+  <li><strong>retry_no_data:</strong> ב-plan ultimate: FMP לכל הטיקרים, Polygon לכישלונות אחרונים, Tiingo לישנים. אחרת: Polygon לתחזיות מהשנתיים האחרונות, Tiingo לישנות, FMP כמוצא אחרון. לא קורא מ-<code>price_bars</code>.</li>
+</ol>
+<p class="warn"><code>evaluate_batch</code> קורא ל-<code>_fetch_history(ticker, None, None)</code>, ו-<code>price_store.get_history</code> מחזיר מילון ריק כשהתאריכים הם None (<code>price_store.py:117-120</code>). בפועל ה-evaluator לא קורא מ-<code>price_bars</code> ופונה תמיד לספקים החיים. פרטים בפרק 15.</p>
+
+<h3>התאמות לפני ניקוד</h3>
+<ul>
+  <li>נעילה מחדש של מחיר הכניסה אם הוא סוטה ביותר מ-2% מסגירה היסטורית.</li>
+  <li><code>sanity_check_target</code>: תקרות לפי חלון (<code>{1: .10, 7: .15, 30: .50, 90: 1.00, 180: 1.50, 365: 2.00}</code>). יעד בצד הלא נכון מבוטל, והתחזית מנוקדת לפי כיוון בלבד.</li>
+  <li>תקרות תשואה ב-<code>services/eval_caps.py</code>: 50% עד 30 יום, 100% עד 90, 150% עד 180, 200% מעבר לזה, ורצפה של מינוס 100%.</li>
+  <li>Alpha מחושב מול SPY סינתטי של 0.038% ליום. sector calls משתמשים ב-SPY אמיתי.</li>
+  <li><code>no_data</code> נקבע כשאין מחיר והתחזית באיחור של 7 ימים לפחות. <code>retry_no_data</code> מסמן <code>delisted</code> לטיקרים זרים, טיקרים שמתחילים בספרה, או אחרי 5 ניסיונות (לא crypto).</li>
+</ul>
+</section>
+
+<!-- ============ 8 ============ -->
+<section id="ch8">
+<h2><span class="num">08</span>מסד הנתונים</h2>
+<h3>Pools ו-timeouts (<code>backend/database.py</code>)</h3>
+<div class="tbl"><table>
+<thead><tr><th>Engine</th><th>שימוש</th><th>pool_size + max_overflow</th><th>pool_timeout</th><th>statement_timeout</th><th>lock_timeout</th></tr></thead>
+<tbody>
+<tr><td><code>engine</code> / <code>SessionLocal</code></td><td>בקשות משתמשים (API)</td><td>3 + 5 = 8</td><td>5s</td><td>5000ms</td><td>3000ms</td></tr>
+<tr><td><code>bg_engine</code> / <code>BgSessionLocal</code></td><td>jobs ברקע</td><td>2 + 3 = 5</td><td>30s</td><td>30000ms</td><td>3000ms</td></tr>
+</tbody></table></div>
+<p>לשניהם <code>pool_recycle=300</code> ו-<code>pool_pre_ping=True</code>. <code>lock_timeout</code> מוגדר כ-startup option של libpq ולא כ-<code>SET</code>, כדי שישרוד rollback בחזרה ל-pool. כל תהליך (API או Worker) מחזיק את שני ה-engines.</p>
+<h3>DDL gate</h3>
+<ul>
+  <li><code>_gate_startup_ddl</code>: כל <code>CREATE</code>, <code>ALTER</code> או <code>DROP</code> של TABLE, INDEX, SEQUENCE, VIEW או TYPE מוחלף ב-<code>SELECT 1</code>, אלא אם <code>RUN_STARTUP_DDL</code> שווה true. כך השירותים יכולים לרוץ כ-role עם הרשאות DML בלבד (<code>app_worker</code>).</li>
+  <li><code>_skip_noop_add_column</code>: <code>ADD COLUMN IF NOT EXISTS</code> לעמודה שכבר קיימת הופך ל-no-op, כדי לא לקחת ACCESS EXCLUSIVE על <code>predictions</code>.</li>
+  <li>שינויי סכמה אמיתיים: <code>migrate.py</code> (רק <code>create_all</code>, ומסרב לרוץ בלי <code>RUN_STARTUP_DDL=true</code>), או הרצה ידנית של קבצי <code>backend/migrations/*.sql</code>. אף קוד לא מריץ אותם אוטומטית.</li>
+</ul>
+<h3>טבלאות מרכזיות</h3>
+<p>ב-<code>models.py</code> יש 50 הגדרות <code>__tablename__</code>. העיקריות:</p>
+<div class="tbl"><table>
+<thead><tr><th>טבלה</th><th>עמודות מפתח</th></tr></thead>
+<tbody>
+<tr><td><code>predictions</code></td><td><code>forecaster_id, ticker, direction, target_price, entry_price, prediction_date, evaluation_date, window_days, outcome, actual_return, alpha, source_url, source_type, source_platform_id, verified_by, prediction_category, tweet_id</code>, עמודות לכל סוג (pair, metric, trigger, regime, operational), <code>source_timestamp_*</code>, ודגלי איכות <code>is_*</code></td></tr>
+<tr><td><code>forecasters</code></td><td><code>name, handle, channel_id, platform, firm, slug</code>, דיוק שמור במטמון (<code>accuracy_score</code> ועוד), <code>is_dormant</code>, <code>last_prediction_at</code></td></tr>
+<tr><td><code>users</code></td><td><code>username, email, password_hash</code> (bcrypt), <code>auth_provider, is_admin, is_banned</code>, XP ו-streaks</td></tr>
+<tr><td><code>user_predictions</code></td><td>תחזיות של משתמשים, CHECK על <code>outcome</code></td></tr>
+<tr><td><code>scraper_runs</code></td><td><code>source, started_at, status, items_*</code>, טוקנים ועלות, מונים לכל קטגוריה</td></tr>
+<tr><td><code>config</code></td><td>key/value. כל דגלי הפיצ'רים ונקודות ה-checkpoint של backfills</td></tr>
+<tr><td><code>disclosures</code>, <code>video_transcripts</code></td><td>החזקות שהוצהרו; תמלולים עם SHA256 לשימור ראיות</td></tr>
+<tr><td><code>tracked_x_accounts</code>, <code>x_scraper_rejections</code>, <code>youtube_channel_meta</code>, <code>youtube_scraper_rejections</code></td><td>ניהול מקורות ודחיות</td></tr>
+<tr><td>חברתי ומשחקי</td><td><code>follows, user_follows, watchlist, saved_predictions, notifications, duels, seasons, daily_challenges, weekly_challenges, xp_log, prediction_comments, prediction_reactions, ticker_discussions, audit_log</code></td></tr>
+</tbody></table></div>
+<p><strong>טבלאות שלא מוגדרות ב-<code>models.py</code>:</strong> <code>price_bars</code>, כל <code>fmp_*</code>, <code>youtube_channels</code> ו-<code>youtube_videos</code> (נוצרות ב-<code>youtube_channel_monitor.py</code>), <code>homepage_data_cache</code>, <code>global_stats_cache</code>, <code>one_time_jobs</code>, <code>scraper_job_queue</code>, <code>company_name_aliases</code>, וטבלאות reference של FMP.</p>
+<h3>Migrations</h3>
+<p>הקבצים <code>0012</code> עד <code>0025</code> (אין 0001 עד 0011, ואין 0015), ועוד <code>add_confidence_tier_and_voided.sql</code>, <code>add_position_fields.sql</code>, <code>drop_phantom_is_active.sql</code>. האחרון, <code>0025_operational_claims.sql</code>, מוסיף את <code>claim_type</code> ועמודות <code>metric_kind/target_value/target_period/actual_value/resolved_at</code>.</p>
+<h3>גיבויים</h3>
+<ul>
+  <li><code>backend/backup.py</code>: ייצוא JSON של forecasters ו-predictions, שמירת snapshot ב-<code>backend/data_snapshot.json</code>, ושחזור רק אם יש עד 100 תחזיות. מופעל מ-<code>/api/admin/backup</code>, <code>/snapshot</code> ו-<code>/restore</code>.</li>
+  <li><code>backend/scripts/backup_db.py</code>: CLI ידני. <code>--info</code> מציג ספירות, <code>--daily</code> מייצא INSERTs של 24 השעות האחרונות, <code>--full</code> מריץ <code>pg_dump</code>. כותב לתיקייה הנוכחית. אין לו מתזמן.</li>
+</ul>
+</section>
+
+<!-- ============ 9 ============ -->
+<section id="ch9">
+<h2><span class="num">09</span>שירות ה-API</h2>
+<h3>שכבות middleware (מהחיצונית לפנימית)</h3>
+<div class="tbl"><table>
+<thead><tr><th>Middleware</th><th>התנהגות</th></tr></thead>
+<tbody>
+<tr><td>CORS</td><td>origins: <code>www.eidolum.com</code>, <code>eidolum.com</code>, <code>eidolum.vercel.app</code>, <code>api.eidolum.com</code>, ו-localhost כש-<code>ENVIRONMENT</code> שונה מ-production. headers מותרים: <code>Authorization</code>, <code>Content-Type</code>, <code>X-Admin-Secret</code></td></tr>
+<tr><td>SecurityHeaders</td><td>nosniff, <code>X-Frame-Options: DENY</code>, <code>Referrer-Policy: no-referrer</code>, Permissions-Policy, HSTS לשנתיים. <code>Cache-Control: no-store</code> על נתיבי auth, admin ונתוני משתמש. אין CSP</td></tr>
+<tr><td>RequestTimeout</td><td>8 שניות, מחזיר 504. לא חל על <code>/api/admin/</code></td></tr>
+<tr><td>AdminAuth</td><td>כל <code>/api/admin/*</code> דורש <code>X-Admin-Secret</code> שתואם ל-<code>ADMIN_SECRET</code>, או JWT של משתמש שה-<code>is_admin</code> שלו נבדק ב-DB בזמן הבקשה. אחרת מוחזר 404</td></tr>
+<tr><td>PayloadSizeLimit</td><td>413 על POST או PUT מעל 10KB, חוץ מנתיבי admin</td></tr>
+<tr><td>RequestTracking</td><td>ספירת בקשות לכל IP בזיכרון (<code>spam_protection</code>)</td></tr>
+<tr><td>slowapi</td><td>מפתח לפי ה-IP השמאלי ב-<code>X-Forwarded-For</code>, אחסון בזיכרון. 274 decorators ב-routers. הנפוצים: <code>60/minute</code> (125 פעמים) ו-<code>30/minute</code> (78). login: <code>5/15minutes</code></td></tr>
+</tbody></table></div>
+<h3>Routers</h3>
+<p>51 קריאות <code>include_router</code>: ‏50 routers תחת <code>/api</code>, ועוד <code>admin_panel.py</code> ברמה העליונה בלי prefix. קבוצות עיקריות:</p>
+<div class="grid">
+  <div class="card"><h3>ציבורי</h3><p><code>leaderboard</code> (כולל <code>/homepage-data</code>), <code>forecasters</code>, <code>assets</code>, <code>ticker_detail</code>, <code>predictions</code>, <code>prediction_detail</code>, <code>activity*</code>, <code>consensus</code> (בתוך community), <code>firms</code>, <code>analysts</code>, <code>earnings</code>, <code>heatmap</code>, <code>smart_money</code>, <code>themes</code>, <code>disclosures</code>, <code>company_data</code>, <code>og_image</code>, <code>logo_serve</code>, <code>platforms</code></p></div>
+  <div class="card"><h3>משתמש (JWT)</h3><p><code>auth</code>, <code>user_predictions</code>, <code>watchlist</code>, <code>saved</code>, <code>notifications</code>, <code>user_follows</code>, <code>comments</code>, <code>reactions</code>, <code>duels</code>, <code>xp_router</code>, <code>ticker_discussions</code>, <code>share</code></p></div>
+  <div class="card"><h3>Admin</h3><p><code>routers/admin.py</code> (58 נתיבים), <code>routers/admin_panel.py</code> (14), <code>backend/admin_panel.py</code> (8 נתיבי API ועמוד HTML ב-<code>/admin</code>), ועוד 26 נתיבי תפעול ב-<code>main.py</code> (backfills, evaluation, kill-locks, pause-jobs) ו-18 נתיבי <code>toggle-*</code> לדגלים</p></div>
+</div>
+<h3>Health</h3>
+<ul>
+  <li><code>/health</code>, <code>/api/health</code>: סטטי, בלי DB.</li>
+  <li><code>/api/health/infra</code>: <code>SELECT 1</code> עם מדידת זמן, מצב ה-pools וה-circuit breaker.</li>
+  <li><code>/api/health/scraper-activity</code>: ספירות מ-<code>scraper_runs</code> ב-24 השעות האחרונות.</li>
+  <li><code>/api/scheduler-status</code>: תמיד מחזיר שאין מתזמן, כי <code>_scheduler</code> לא מוגדר אף פעם.</li>
+</ul>
+<h3>Startup</h3>
+<p>ה-<code>lifespan</code> מדפיס אילו מפתחות קיימים, ומבצע קריאת אבחון אחת ל-Polygon בכל עלייה. אם <code>DISABLE_BACKGROUND_JOBS</code> לא מוגדר, הוא מפעיל thread בשם <code>_startup_init</code>. ה-thread ממתין 10 שניות ואז מבצע: DDL (no-op כש-gate סגור), seed של דגלים ומושגי מאקרו, קידום חשבון super-admin מוגדר בקוד, מיגרציות עזר, השלמת לוגואים ותיאורים, השלמת הערכה עד 600 שניות אם יש יותר מ-100 תחזיות באיחור, והפעלת daemon של Benzinga backfill. ה-API לא מריץ jobs מתוזמנים (<code>main.py:4062</code>).</p>
+<h3>Auth</h3>
+<ul>
+  <li>JWT: <code>HS256</code>, תוקף 7 ימים, סוד ב-<code>JWT_SECRET</code>. ב-production השירות לא עולה בלי הסוד. אין refresh tokens.</li>
+  <li>סיסמאות: bcrypt, מינימום 8 תווים, השוואה עם hash דמה כדי שזמן התגובה בהתחברות לא יחשוף אם המשתמש קיים.</li>
+  <li>Google OAuth: <code>/api/auth/google/login</code> מחזיר כתובת consent עם <code>state</code> חתום ב-HMAC (תוקף 600 שניות). ה-callback מחליף code ב-token, מקשר לפי מייל ומחזיר JWT.</li>
+  <li>איפוס סיסמה: token באורך 48 bytes, תוקף שעה, עד 3 לשעה, נשלח דרך Resend.</li>
+  <li>הגנות הרשמה: honeypot, regex לשם משתמש ולמייל, סינון ניבולי פה, חסימת דומיינים חד-פעמיים, 3 הרשמות לכל IP ביום.</li>
+</ul>
+</section>
+
+<!-- ============ 10 ============ -->
+<section id="ch10">
+<h2><span class="num">10</span>Frontend</h2>
+<h3>Vercel</h3>
+<ul>
+  <li>root <code>vercel.json</code>: <code>{"rootDirectory": "frontend"}</code>. ב-<code>frontend/vercel.json</code>: <code>buildCommand: npm run build</code>, <code>outputDirectory: dist</code>, <code>framework: vite</code>.</li>
+  <li>Rewrites: <code>/sitemap.xml</code>, <code>/robots.txt</code> ו-<code>/api/og-image/*</code> מנותבים ל-<code>api.eidolum.com</code>. <code>/api/edge/:path*</code> מנותב ל-Edge Function. כל נתיב אחר שלא מתחיל ב-<code>api/</code> מקבל <code>/index.html</code>.</li>
+  <li>Headers: מטמון immutable ל-<code>/assets/*</code>, מטמון ללוגואים, <code>X-Frame-Options: SAMEORIGIN</code>, nosniff, <code>Content-Security-Policy-Report-Only</code>, Permissions-Policy, <code>Cross-Origin-Opener-Policy</code>.</li>
+  <li>Edge Functions: <code>api/edge.js</code> הוא proxy ל-GET בלבד עם allowlist של כ-25 נתיבים ציבוריים. מטמון: 300 שניות ל-homepage-data ול-stats, 600 שניות ל-sectors, themes ו-flags, 120 שניות לשאר. כל נתיב מחוץ לרשימה מקבל 404. <code>api/logo/[ticker].js</code> הוא proxy ללוגואים עם מטמון של 30 יום.</li>
+</ul>
+<h3>Stack וקריאות API</h3>
+<ul>
+  <li>React 18, react-router-dom 6, axios, Tailwind 3, recharts, lucide-react. סקריפטים ב-package.json: <code>dev</code>, <code>build</code>, <code>preview</code> בלבד.</li>
+  <li>בסיס ה-API: <code>import.meta.env.VITE_API_BASE</code> + <code>/api</code> (<code>src/api/index.js:4</code>). ב-production בקשות ציבוריות עוברות דרך <code>/api/edge</code>, כי <code>USE_EDGE_CACHE = true</code>.</li>
+  <li>Token נשמר ב-localStorage תחת <code>eidolum_token</code> ונשלח כ-<code>Authorization: Bearer</code>. token של admin ישן נשמר ב-sessionStorage תחת <code>admin_token</code>.</li>
+  <li>Presence: <code>POST /api/presence/ping</code> כל 60 שניות.</li>
+</ul>
+<h3>Routes</h3>
+<p>68 רכיבי <code>&lt;Route&gt;</code> ב-<code>src/App.jsx</code>. רוב הדפים נטענים ב-<code>lazy()</code>. אין הגנת auth ברמת ה-router: הדפים עצמם מציגים כפתור התחברות או מנתבים החוצה.</p>
+<div class="tbl"><table>
+<thead><tr><th>קבוצה</th><th>נתיבים</th></tr></thead>
+<tbody>
+<tr><td>ציבורי</td><td><code>/</code>, <code>/leaderboard</code>, <code>/forecaster/:id</code>, <code>/asset/:ticker</code>, <code>/predictions</code>, <code>/prediction/:predictionId</code>, <code>/consensus</code>, <code>/activity</code>, <code>/analysts</code>, <code>/firm/:slug</code>, <code>/sectors</code>, <code>/themes</code>, <code>/heatmap</code>, <code>/discover</code>, <code>/earnings</code>, <code>/how-it-works</code>, <code>/smart-money</code>, <code>/contrarian</code>, <code>/power-rankings</code></td></tr>
+<tr><td>משתמש</td><td><code>/submit</code>, <code>/my-calls</code>, <code>/watchlist</code>, <code>/saved</code>, <code>/notifications</code>, <code>/settings</code>, <code>/profile</code>, <code>/badges</code>, <code>/friends</code></td></tr>
+<tr><td>Auth</td><td><code>/login</code>, <code>/register</code>, <code>/join</code>, <code>/forgot-password</code>, <code>/reset-password</code>, <code>/auth/google/callback</code></td></tr>
+<tr><td>מאחורי דגל</td><td><code>/duels</code> (<code>features.duels</code>), <code>/compete</code> ו-<code>/seasons</code> (<code>features.compete</code>), <code>/compare</code> (<code>features.compare_analysts</code>), <code>/platforms</code> (<code>SHOW_PLATFORM_PAGES=false</code>, מנותב ל-<code>/leaderboard</code>)</td></tr>
+<tr><td>Admin</td><td><code>/admin</code> (פאנל ישן עם סיסמה), <code>/admin/dashboard</code>, <code>/admin/x-accounts</code>, <code>/admin/youtube-channels</code>, <code>/admin/sector-aliases</code>, <code>/admin/macro-concepts</code></td></tr>
+</tbody></table></div>
+<h3>פאנל ה-Admin</h3>
+<p><code>/admin/dashboard</code> נגיש רק כש-<code>user.is_admin</code> אמת. לשוניות: Overview (presence חי, Platform Hit Rate, URL quality, diagnostics, מתגי דגלים), Users, Forecasters, Predictions, Audit Log, YouTube Runs, Training Exclusions, Product Themes. דפי משנה: X Accounts, YouTube Channels, Sector Aliases, Macro Concepts. כל הקריאות שלו עוברות ל-<code>/api/admin/*</code> עם ה-JWT של המשתמש.</p>
+<h3>דגלי פיצ'רים</h3>
+<ul>
+  <li>מה-backend: <code>GET /api/features</code> (tournaments, daily_challenge, duels, compete, compare_analysts, insider_congress_sources) ו-<code>GET /api/public/flags</code> (<code>homepage_hero</code>). שניהם נשמרים במטמון ל-5 דקות בצד הלקוח.</li>
+  <li>בזמן build: <code>SHOW_PLATFORM_PAGES = false</code> (<code>src/config/uiSwitches.js</code>), <code>USE_EDGE_CACHE = true</code>.</li>
+  <li>משתני סביבה בשימוש: <code>VITE_API_BASE</code>, <code>import.meta.env.DEV</code>. <code>VITE_APP_NAME</code> מוגדר ב-<code>vite.config.js</code>.</li>
+</ul>
+</section>
+
+<!-- ============ 11 ============ -->
+<section id="ch11">
+<h2><span class="num">11</span>צינור הפריסה</h2>
+<ol class="steps">
+  <li><strong>GitHub:</strong> המאגר <code>intensecomplexity/eidolum</code>. ענף <code>main</code> הוא production.</li>
+  <li><strong>Railway:</strong> שני שירותים נפרסים אוטומטית מ-<code>main</code>. ה-Worker נפרס בנפרד מה-API, כך ש-deploy של ה-API לא מאתחל את ה-jobs (<code>worker.py:4</code> ו-<code>2680</code>). חיבור ה-repo וה-watch paths מוגדרים בלוח הבקרה ולא בקוד.</li>
+  <li><strong>Vercel:</strong> build של <code>npm run build</code> מתוך <code>frontend/</code>. ענף <code>staging</code> נפרס ל-preview URL לפי <code>STAGING.md</code>.</li>
+  <li><strong>GitHub Actions:</strong> workflow יחיד, <code>.github/workflows/sync-staging.yml</code>, שבכל push ל-<code>main</code> ממזג אותו ל-<code>staging</code> (fast-forward, או merge commit עם <code>[skip ci]</code>). אין שלב build, lint או test.</li>
+  <li><strong>Schema:</strong> לא חלק מה-deploy. <code>RUN_STARTUP_DDL=false</code>, ולכן עמודות וטבלאות חדשות דורשות מיגרציה ידנית (פרק 8).</li>
+</ol>
+<h3>בדיקות לפני push</h3>
+<p class="warn">במאגר לא מוגדרות "שלוש בדיקות לפני push". אין git hook פעיל (<code>.git/hooks</code> מכיל רק קבצי <code>*.sample</code>), אין CI שמריץ build או בדיקות, ואין סקריפט lint או test ב-<code>frontend/package.json</code>. הבדיקה האוטומטית היחידה היא ה-build של Vercel, שרץ אחרי ה-push. ב-<code>backend/tests</code> יש 18 קבצי pytest, אבל שום דבר במאגר לא מריץ אותם. אם קיים נוהל כזה, הוא מחוץ לקוד.</p>
+</section>
+
+<!-- ============ 12 ============ -->
+<section id="ch12">
+<h2><span class="num">12</span>משתני סביבה (שמות בלבד)</h2>
+<p>נאסף מ-<code>os.getenv</code>, <code>os.environ</code> ו-<code>import.meta.env</code>. לא מופיע אף ערך. דגלים שנשמרים בטבלת <code>config</code> מופיעים בנפרד בסוף.</p>
+<div class="tbl"><table>
+<thead><tr><th>קבוצה</th><th>שמות</th></tr></thead>
+<tbody>
+<tr><td>DB</td><td><code>DATABASE_URL</code>, <code>RUN_STARTUP_DDL</code>. בסקריפטים בלבד: <code>DATABASE_PUBLIC_URL</code>, <code>DBURL</code>, <code>PG_PUBLIC_URL</code>, <code>RECOVERY_DATABASE_URL</code></td></tr>
+<tr><td>Auth ואפליקציה</td><td><code>JWT_SECRET</code>, <code>ADMIN_SECRET</code>, <code>ENVIRONMENT</code>, <code>GOOGLE_CLIENT_ID</code>, <code>GOOGLE_CLIENT_SECRET</code>, <code>GOOGLE_REDIRECT_URI</code>, <code>OAUTH_STATE_ENFORCE</code>, <code>FRONTEND_URL</code>, <code>API_BASE_URL</code>, <code>SITE_URL</code>, <code>EXPOSE_API_DOCS</code>, <code>PORT</code>, <code>ARCHIVE_DIR</code>, <code>SEED_DATA</code></td></tr>
+<tr><td>AI</td><td><code>ANTHROPIC_API_KEY</code>, <code>GROQ_API_KEY</code>, <code>GROQ_MODEL</code>, <code>GROQ_MAX_RPM</code>, <code>X_HAIKU_FALLBACK_MODEL</code>, <code>USE_FINETUNED_MODEL</code>, <code>CLASSIFIER_BASE_URL</code>, <code>CLASSIFIER_MODEL_NAME</code>, <code>CF_ACCESS_CLIENT_ID</code>, <code>CF_ACCESS_CLIENT_SECRET</code>, <code>CLASSIFIER_WARMUP_ENABLED</code>, <code>CLASSIFIER_VALIDATION_GATE</code>, <code>CLASSIFIER_RULE_REPORTED_SPEECH</code>, <code>CLASSIFIER_RULE_HYPOTHETICAL_SCENARIO</code>, <code>CLASSIFIER_RULE_QUESTION_RHETORICAL</code>, <code>CLASSIFIER_RULE_DATE_PASSED</code>, <code>CLASSIFIER_RULE_BASKET_BROAD</code>, <code>CLASSIFIER_RULE_NEWS_RECAP</code>, <code>CLASSIFIER_RULE_BASKET_ENUMERATION</code>, <code>REPRESENTATIVENESS_VERIFY_MODEL</code>, <code>REPRESENTATIVENESS_NO_CALL_ACTION</code>, <code>RUNPOD_API_KEY</code>, <code>RUNPOD_ENDPOINT_ID</code>, <code>RUNPOD_MODEL_NAME</code></td></tr>
+<tr><td>ספקי נתונים</td><td><code>MASSIVE_API_KEY</code>, <code>POLYGON_KEY</code>, <code>FMP_KEY</code>, <code>FMP_PLAN</code>, <code>TIINGO_API_KEY</code>, <code>FINNHUB_KEY</code>, <code>ALPHA_VANTAGE_KEY</code>, <code>BENZINGA_KEY</code>, <code>NEWSAPI_KEY</code>, <code>JINA_API_KEY</code></td></tr>
+<tr><td>Scraping, YouTube ו-X</td><td><code>APIFY_API_TOKEN</code>, <code>TWITTER_BEARER_TOKEN</code>, <code>X_CASHTAG_GUARD</code>, <code>YOUTUBE_API_KEY</code>, <code>YOUTUBE_QUOTA_SAFETY_THRESHOLD</code>, <code>YOUTUBE_SYNC_INTERVAL_HOURS</code>, <code>YOUTUBE_MAX_VIDEOS_PER_SYNC</code>, <code>YOUTUBE_MAX_VIDEOS_PER_CHANNEL</code>, <code>YOUTUBE_MONITOR_INTERVAL_MINUTES</code>, <code>YOUTUBE_BACKFILL_BATCH_SIZE</code>, <code>YT_REFRESH_MAX_UNITS_PER_RUN</code>, <code>YT_REFRESH_MAX_VIDEOS_PER_RUN</code>, <code>WEBSHARE_PROXY_USERNAME</code>, <code>WEBSHARE_PROXY_PASSWORD</code>, <code>YT_PROXY_HTTP</code>, <code>YT_PROXY_HTTPS</code></td></tr>
+<tr><td>Email</td><td><code>RESEND_API_KEY</code>, <code>FROM_EMAIL</code>, <code>SUPER_ADMIN_EMAIL</code></td></tr>
+<tr><td>מתגים (env)</td><td><code>DISABLE_BACKGROUND_JOBS</code>, <code>ENABLE_EVALUATOR</code>, <code>ENABLE_OPERATIONAL_EVALUATOR</code>, <code>ENABLE_OPERATIONAL_FRESHNESS</code>, <code>ENABLE_YT_METADATA_REFRESH</code>, <code>ENABLE_YT_TIMESTAMP_BACKFILL</code>, <code>ENABLE_REPRESENTATIVENESS_GUARD</code>, <code>ENABLE_HOLDING_GUARD</code>, <code>ENABLE_CONDITIONAL_GUARD</code>, <code>ENABLE_GRADEABLE_GUARD</code>, <code>HIDE_HEDGED_PREDICTIONS</code>, <code>HIDE_REPORTED_SPEECH</code>, <code>HIDE_AMBIGUOUS_SYMBOLS</code>, <code>HIDE_WEAK_BASKET_CALLS</code>, <code>HIDE_HOLDING_DISCLOSURES</code>, <code>HIDE_NO_CLAIM</code>, <code>HIDE_NO_GRADEABLE_CLAIM</code></td></tr>
+<tr><td>Frontend (Vite)</td><td><code>VITE_API_BASE</code> (בשימוש), <code>VITE_APP_NAME</code> (מוגדר ב-vite.config). <code>VITE_API_URL</code> ו-<code>VITE_APP_URL</code> מוגדרים בקבצי <code>.env</code> אבל לא נקראים</td></tr>
+<tr><td>סקריפטים מקומיים בלבד</td><td><code>CLAUDE_BIN</code>, <code>RECOVERY_PREFILTER</code>, <code>X_SCOUT_ENABLED</code>, <code>YOUTUBE_DATA_API_KEY</code>, <code>VERIFY_MODEL</code>, <code>VERIFY_LAYER_MODEL</code>, <code>DIR_MODEL</code>, <code>FULLCOV_MODEL</code>, <code>SILVER_PRIMARY</code>, <code>SILVER_FALLBACK</code>, <code>FLIP_WORKERS</code>, <code>FULLCOV_WORKERS</code>, <code>NG_WORKERS</code>, <code>SILVER_WORKERS</code>, <code>FMP_ARCHIVE_ROOT</code>, <code>FMP_DB_GUARD_GB</code>, <code>FMP_TRANSCRIPT_MKTCAP_FLOOR</code>, <code>MAX_ARCHIVE_GB</code>, <code>P14_FMP_BASE_GB</code>, <code>P14_FMP_PAUSE_GB</code>, <code>P14_FMP_RATIO</code>, <code>BACKFILL_OLD</code>, <code>BENZINGA_FIX_BATCH</code>, <code>EVAL_N</code>, <code>KINDS</code>, <code>MAXROWS</code>, <code>NC</code>, <code>SAMPLE_CAP</code>, <code>SAMPLE_LIMIT</code>, <code>SUDO_PASSWORD</code>, <code>EBSHARE_PROXY_USERNAME</code></td></tr>
+<tr><td>דגלים בטבלת <code>config</code> (לא env)</td><td><code>EVALUATE_X_PREDICTIONS</code>, <code>YOUTUBE_EVAL_TARGET</code>, <code>ENABLE_YOUTUBE_SECTOR_CALLS</code> (0 עד 100), <code>ENABLE_SOURCE_TIMESTAMPS</code>, <code>ENABLE_PREDICTION_METADATA_ENRICHMENT</code>, <code>REQUIRE_COMPLETE_PREDICTIONS</code>, <code>ENABLE_PRODUCT_THEMES</code>, <code>ENABLE_INSIDER_CONGRESS_SOURCES</code>, <code>THEME_SECTOR_MIN_SCORED</code>, <code>THEME_SECTOR_SHRINKAGE_C</code>, <code>ENABLE_PRICE_BARS_INCREMENTAL</code>, <code>PRICE_BARS_INCREMENTAL_MAX_CALLS</code>, <code>ENABLE_HOMEPAGE_HERO</code>, 11 דגלי <code>ENABLE_*_EXTRACTION</code>, ודגלי UI <code>tournaments/daily_challenge/duels/compete/compare_analysts_enabled</code></td></tr>
+</tbody></table></div>
+</section>
+
+<!-- ============ 13 ============ -->
+<section id="ch13">
+<h2><span class="num">13</span>זרימה מקצה לקצה: תחזית אחת מ-X</h2>
+<ol class="steps">
+  <li><strong>הפעלה:</strong> ה-Worker מריץ את <code>x_scraper</code> כל 6 שעות, ופעם אחת מיד בעלייה (<code>worker.py:2308</code>). ה-job יוצא מיד אם חסר <code>APIFY_API_TOKEN</code> או <code>GROQ_API_KEY</code>.</li>
+  <li><strong>שליפה:</strong> רשימת החשבונות נקראת מ-<code>tracked_x_accounts</code>. לכל חשבון, Apify actor <code>apidojo~tweet-scraper</code> מחזיר עד 20 ציוצים (<code>TWEETS_PER_ACCOUNT</code>).</li>
+  <li><strong>סינון מוקדם:</strong> הסרת spam, חשבונות חסומים, ניסוחים בזמן עבר, ובדיקת cashtag (<code>X_CASHTAG_GUARD</code>).</li>
+  <li><strong>סיווג:</strong> Groq <code>llama-3.3-70b-versatile</code> עם מגבלת קצב. אם Groq מחזיר 429 או שהמכסה היומית שלו נגמרה, הקריאה עוברת ל-Haiku.</li>
+  <li><strong>אימות:</strong> <code>validate_haiku_result</code> מכריע. <code>classifier_validation</code> רץ ב-shadow ורק רושם ללוג. דחיות נשמרות ב-<code>x_scraper_rejections</code>.</li>
+  <li><strong>הכנסה:</strong> <code>_insert_prediction</code> בודק כפילות לפי <code>source_platform_id</code> וגם מול scrapers אחרים, ואז כותב שורה ל-<code>predictions</code> עם <code>source_type='x'</code>, <code>verified_by='x_scraper'</code>, <code>tweet_id</code>, ו-<code>entry_price</code> ריק. נוספת שורה ל-<code>scraper_runs</code>.</li>
+  <li><strong>המתנה:</strong> התחזית נשארת <code>pending</code> עד <code>evaluation_date</code>. תחזיות X מנוקדות רק אם <code>EVALUATE_X_PREDICTIONS=true</code> בטבלת config.</li>
+  <li><strong>הערכה:</strong> <code>auto_evaluate</code> (כל 30 דקות) נועל מחיר כניסה, מושך היסטוריה (FMP, Tiingo, Finnhub), מפעיל בדיקת שפיות על היעד ותקרות תשואה, וכותב <code>outcome</code> ל-<code>predictions</code>: <span class="pill p-hit">hit</span> <span class="pill p-near">near</span> <span class="pill p-miss">miss</span>, יחד עם <code>actual_return</code> ו-<code>alpha</code>.</li>
+  <li><strong>סטטיסטיקות:</strong> <code>refresh_all_forecaster_stats</code> מעדכן את הדיוק השמור ב-<code>forecasters</code>, אחרי סינון השורות המוסתרות (<code>hedged_filter_sql</code>).</li>
+  <li><strong>מטמון:</strong> כל 5 דקות, <code>refresh_homepage_data</code> ו-<code>refresh_global_stats</code> כותבים שורה אחת ל-<code>homepage_data_cache</code> ול-<code>global_stats_cache</code>.</li>
+  <li><strong>הגשה:</strong> ה-SPA מבקש <code>/api/edge/homepage-data</code>. ה-Edge Function בודק allowlist, ושולח <code>GET</code> ל-<code>api.eidolum.com/api/homepage-data</code> עם מטמון CDN של 300 שניות. ה-endpoint ב-<code>routers/leaderboard.py:1622</code> קורא את שורת המטמון.</li>
+  <li><strong>תצוגה:</strong> המשתמש רואה את התחזית בדף הבית, בפרופיל החזאי (<code>/forecaster/:id</code>) ובדף התחזית (<code>/prediction/:predictionId</code>).</li>
+</ol>
+</section>
+
+<!-- ============ 14 ============ -->
+<section id="ch14">
+<h2><span class="num">14</span>עקרונות תכנון והוספת מקור חדש</h2>
+<h3>עקרונות שנראים בקוד</h3>
+<div class="grid">
+  <div class="card"><h3>הפרדת Worker מ-API</h3><p>כל ה-jobs רצים בשירות נפרד, כך ש-deploy של ה-API לא עוצר אותם. ה-API מעביר עבודה ל-Worker דרך טבלת <code>scraper_job_queue</code>.</p></div>
+  <div class="card"><h3>לא לחשב בזמן בקשה</h3><p>נתונים כבדים מחושבים מראש על ידי ה-Worker לטבלאות מטמון (<code>homepage_data_cache</code>, <code>global_stats_cache</code>), וה-endpoint רק קורא שורה אחת לפי מפתח ראשי.</p></div>
+  <div class="card"><h3>הגנה על ה-DB</h3><p>שני pools נפרדים עם timeouts שונים, <code>lock_timeout</code> של 3 שניות, circuit breaker, guard על נפח ה-DB, ונעילות שלא חוסמות.</p></div>
+  <div class="card"><h3>Least privilege</h3><p>DDL gate מאפשר לשירותים לרוץ כ-role עם DML בלבד. שינויי סכמה רצים ידנית, עם role הבעלים.</p></div>
+  <div class="card"><h3>לסמן, לא למחוק</h3><p>כללי איכות מסמנים דגלי <code>is_*</code>, ושורות מוסתרות דרך <code>hedged_filter_sql</code>, כך שאפשר לחזור מכל החלטה. מתגי <code>HIDE_*</code> שולטים בהסתרה.</p></div>
+  <div class="card"><h3>Fail-open במקומות הנכונים</h3><p>guards של LLM לא חוסמים כשהם נכשלים. כל job עטוף ב-try/except, כך שכישלון אחד לא מפיל את המתזמן.</p></div>
+  <div class="card"><h3>מפתחות מחוץ ללוגים</h3><p><code>install_key_scrubber</code> מותקן לפני כל import. Massive ו-Apify משתמשים ב-header Bearer ולא ב-query string.</p></div>
+  <div class="card"><h3>אי-כפילות</h3><p><code>source_platform_id</code> ייחודי לכל מקור, ובנוסף <code>prediction_exists_cross_scraper</code> מונע כפילות בין scrapers.</p></div>
+  <div class="card"><h3>דגלים כבויים כברירת מחדל</h3><p>יכולת חדשה נכנסת כבויה (בטבלת <code>config</code> או ב-env), ומופעלת אחרי ריצה ידנית מוצלחת.</p></div>
+</div>
+<h3>איך מוסיפים מקור חדש (לפי הדפוס של הקוד הקיים)</h3>
+<ol class="steps">
+  <li>יוצרים מודול ב-<code>backend/jobs/&lt;source&gt;.py</code> עם פונקציה <code>run_&lt;source&gt;(db)</code>. מפתח API נקרא מ-<code>os.getenv</code> ונשלח ב-header כשהספק מאפשר.</li>
+  <li>פותחים שורת <code>scraper_runs</code> בתחילת הריצה ומסיימים אותה בסוף, גם אם הייתה שגיאה (הדפוס של <code>massive_benzinga.py</code>).</li>
+  <li>לכל פריט: <code>jobs.prediction_validator.validate_prediction</code>, <code>resolve_forecaster_alias</code>, <code>prediction_exists_cross_scraper</code>, ו-<code>jobs.news_scraper.find_forecaster</code>.</li>
+  <li>סקטור דרך <code>jobs.sector_lookup.get_sector</code>, ולא כתיבה ישירה של <code>predictions.sector</code>.</li>
+  <li>כותבים <code>source_type</code>, <code>verified_by</code>, <code>source_platform_id</code> ייחודי, <code>source_url</code> ו-<code>prediction_date</code> מתוך מטא-דאטה של המקור.</li>
+  <li>אם יש סיווג טקסט חופשי, מעבירים אותו דרך <code>classifier_validation</code> ומסמנים במקום למחוק.</li>
+  <li>רושמים ב-<code>worker.py</code> עם <code>_standalone</code> (או <code>_guarded</code> אם המקור צריך את ה-global lock), בוחרים executor, ומדרגים את <code>next_run_time</code> ביחס ל-<code>t0</code>.</li>
+  <li>מוסיפים את משתנה המפתח לשירות ה-Worker ב-Railway, ודגל כבוי בטבלת <code>config</code> שנקרא עם <code>feature_flags._read_bool</code>.</li>
+  <li>עמודות חדשות: קובץ <code>backend/migrations/00NN_*.sql</code> שמורץ ידנית, כי <code>RUN_STARTUP_DDL=false</code>.</li>
+  <li>כל משטח שמציג תחזיות צריך להחיל את <code>hedged_filter_sql</code>. מוודאים שה-commit נוגע בנתיב שה-Worker עוקב אחריו, כדי שגם הוא ייפרס.</li>
+</ol>
+</section>
+
+<!-- ============ 15 ============ -->
+<section id="ch15">
+<h2><span class="num">15</span>פערים וחוסר עקביות</h2>
+<p>כל פריט כאן נבדק בקוד. רמת החומרה היא הערכה. <span class="pill p-miss">באג</span> הוא קוד שלא עושה מה שהוא אמור, <span class="pill p-near">סיכון</span> הוא התנהגות שעלולה להפתיע, <span class="pill p-gray">תיעוד</span> הוא הערה או שם שלא תואמים לקוד, ו-<span class="pill p-blue">לא בקוד</span> הוא מידע שלא נמצא במאגר.</p>
+<h3>באגים</h3>
+<ul class="gap-list">
+  <li><span class="pill p-miss sev">באג</span>התקציר השבועי לא נשלח. <code>worker.py:260</code> מייבא <code>run_weekly_digest</code>, שלא קיים ב-<code>jobs/weekly_digest.py</code> (יש שם <code>send_weekly_digest</code> ו-<code>send_site_weekly_digest</code>). ה-<code>except: pass</code> מסתיר את השגיאה.</li>
+  <li><span class="pill p-miss sev">באג</span>ה-evaluator לא משתמש ב-<code>price_bars</code>. <code>evaluate_batch</code> קורא ל-<code>_fetch_history(ticker, None, None)</code>, ו-<code>price_store.get_history</code> מחזיר מילון ריק כשהתאריכים הם None. אותו דבר קורה ב-conditional, ב-regime וב-<code>_relock_entry_price</code>. התוצאה: כל ניקוד הולך לספקים החיים.</li>
+  <li><span class="pill p-miss sev">באג</span><code>trigger_condition</code> בשימוש ב-<code>historical_evaluator.py:1614</code> בלי שהוגדר. conditional calls מסוג fed_decision, economic_data ו-market_event יזרקו NameError, שנתפס ב-<code>evaluate_batch</code>.</li>
+  <li><span class="pill p-miss sev">באג</span><code>user_evaluator.py:157</code> יכול לכתוב <code>"near"</code>, אבל ל-<code>UserPrediction</code> יש CHECK שמתיר רק <code>pending</code>, <code>correct</code> ו-<code>incorrect</code> (<code>models.py:664</code>).</li>
+  <li><span class="pill p-miss sev">באג</span>בדיקת בריאות האתר ב-watchdog פונה ל-<code>127.0.0.1:$PORT/api/health</code>. ב-Worker הפורט הזה שייך לשרת ה-health של ה-Worker עצמו, שעונה 200 לכל נתיב. לכן הבדיקה לא יכולה לזהות איטיות של ה-API, וההשהיה האוטומטית של ה-jobs כמעט לא תופעל.</li>
+  <li><span class="pill p-miss sev">באג</span>ב-<code>evaluator.run_evaluator</code>, רענון הסטטיסטיקות תלוי ב-<code>correct</code>/<code>incorrect</code>, אבל הפונקציה כותבת <code>hit</code>/<code>near</code>/<code>miss</code>. בפועל אף אחד לא קורא לפונקציה.</li>
+  <li><span class="pill p-miss sev">באג</span>נתיב <code>DELETE /api/admin/predictions/bulk</code> ב-<code>backend/admin_panel.py:103</code> רשום אחרי <code>/{prediction_id}: int</code>, ולכן כנראה מוצל על ידו ומחזיר 422. לא נבדק בהרצה.</li>
+</ul>
+<h3>סיכונים</h3>
+<ul class="gap-list">
+  <li><span class="pill p-near sev">סיכון</span><code>POST /api/alerts/trigger</code> (<code>routers/follows.py:132</code>) ציבורי, בלי אימות, ומכניס שורות ל-<code>alert_queue</code>. אף קוד לא שולח את השורות מהתור.</li>
+  <li><span class="pill p-near sev">סיכון</span>daemon של Benzinga backfill מופעל גם ב-startup של ה-API (<code>main.py:4054</code>) וגם ב-Worker, אלא אם <code>DISABLE_BACKGROUND_JOBS</code> מוגדר ב-API. לא ניתן לקבוע מהקוד אם ל-API יש <code>MASSIVE_API_KEY</code>.</li>
+  <li><span class="pill p-near sev">סיכון</span><code>representativeness_guard.py</code> מריץ <code>claude</code> כ-subprocess בתוך ה-Worker. אין במאגר שום התקנה של ה-CLI ב-Railway. אם הוא חסר, כל ה-guards נכשלים בשקט (fail-open), כלומר לא פועלים.</li>
+  <li><span class="pill p-near sev">סיכון</span>מסווג יוטיוב החי תלוי ב-Pavilion, וב-<code>USE_FINETUNED_MODEL=true</code> ובשלושה משתני CF. בלי fallback, כל כישלון מצטבר ב-<code>classifier_error</code> ודורש את סקריפט השחזור המקומי.</li>
+  <li><span class="pill p-near sev">סיכון</span>טוקני איפוס סיסמה נשמרים כטקסט גלוי ב-<code>password_reset_tokens</code>. אין אימות מייל בהרשמה עם סיסמה.</li>
+  <li><span class="pill p-near sev">סיכון</span>כתובת מייל של super-admin מוגדרת בקוד בארבעה מקומות (<code>routers/admin_panel.py:20</code>, startup ב-<code>main.py</code>, ברירת המחדל של <code>SUPER_ADMIN_EMAIL</code> ב-<code>youtube_channel_monitor.py:2099</code>, ו-<code>AdminDashboard.jsx:94</code>). הערך לא מועתק למסמך.</li>
+  <li><span class="pill p-near sev">סיכון</span>slowapi ו-spam protection שומרים מונים בזיכרון התהליך. אם רצים כמה workers של uvicorn, כל אחד סופר בנפרד.</li>
+  <li><span class="pill p-near sev">סיכון</span>CSP קיים רק כ-<code>Report-Only</code> ב-Vercel. ב-API אין CSP. <code>/api/scheduler-status</code> ו-<code>/api/health/infra</code> ציבוריים.</li>
+  <li><span class="pill p-near sev">סיכון</span><code>watchlist_queue</code>, <code>watchlist_digest</code> ו-<code>site_weekly_digest</code> רשומים בלי עוטף, ולכן בלי בדיקת בריאות DB ובלי עדכון <code>scheduler_last_run</code>.</li>
+  <li><span class="pill p-near sev">סיכון</span>שתי פונקציות שונות לתקרת תשואה: <code>clamp_return</code> ב-<code>retry_no_data.py</code> (בלי רצפה של מינוס 100%) ו-<code>bounded_return</code> בשאר.</li>
+</ul>
+<h3>תיעוד שלא תואם לקוד</h3>
+<ul class="gap-list">
+  <li><span class="pill p-gray sev">תיעוד</span>ה-docstring של <code>_guarded</code> קורא לנעילה SCRAPER_LOCK, אבל היא נעילה אחרת (פרק 4).</li>
+  <li><span class="pill p-gray sev">תיעוד</span>ה-docstring של <code>circuit_breaker.py</code> אומר השהיה של 15 דקות, והקבוע <code>PAUSE_DURATION_MINUTES</code> הוא 5.</li>
+  <li><span class="pill p-gray sev">תיעוד</span>הערה ב-<code>worker.py:2294</code> אומרת שה-X scraper רץ כל 8 שעות, והתזמון בפועל כל 6. ה-docstring של <code>youtube_backfill.py</code> אומר כל 4 שעות, והתזמון כל שעה. ה-docstring של <code>evaluator.py</code> אומר כל 15 דקות.</li>
+  <li><span class="pill p-gray sev">תיעוד</span>ה-docstring של <code>youtube_classifier.py</code> מדבר על Haiku, והנתיב החי הוא Qwen בלבד. לוג ב-<code>youtube_classifier.py:559</code> אומר "using Haiku for remaining videos", אבל אין fallback כזה. ה-docstring של <code>youtube_channel_monitor.py</code> אומר שהסיווג נעשה דרך Haiku.</li>
+  <li><span class="pill p-gray sev">תיעוד</span>הדגל <code>X_SCRAPER_CLASSIFIER</code> לא קיים בקוד. הבחירה בין Groq ל-Haiku נקבעת רק לפי זמינות Groq.</li>
+  <li><span class="pill p-gray sev">תיעוד</span><code>services/youtube_quota.py</code> אוסר על <code>search.list</code>, ו-<code>youtube_channel_monitor.py</code> משתמש בו בלי ה-QuotaTracker.</li>
+  <li><span class="pill p-gray sev">תיעוד</span>ה-docstring של <code>safety_check.py</code> אומר שהוא רץ ב-startup. בפועל הוא נקרא רק מ-<code>/api/admin/safety-check</code>.</li>
+  <li><span class="pill p-gray sev">תיעוד</span>העמודות <code>grounding_type</code>, <code>generating_model</code> ו-<code>url_quality</code> קיימות ב-DB לפי migrations ו-<code>main.py</code>, אבל לא מוגדרות ב-<code>models.py</code>. ה-insert החי של יוטיוב לא כותב <code>generating_model</code>.</li>
+  <li><span class="pill p-gray sev">תיעוד</span>בצד הלקוח: הנתיב <code>/analyst/:x</code> מוגדר פעמיים (<code>App.jsx:163</code> ו-<code>213</code>). Tailwind מגדיר JetBrains Mono, אבל <code>index.html</code> לא טוען אותו. הערה ב-<code>src/api/index.js:54</code> מצביעה על קובץ edge שלא קיים (<code>api/edge/[...path].js</code>).</li>
+  <li><span class="pill p-gray sev">תיעוד</span><code>DEPLOYMENT.md</code> מתעד את <code>VITE_API_URL</code>, אבל הקוד קורא רק <code>VITE_API_BASE</code>. <code>runpod/DEPLOY.md</code> מתאר נתיב שכבר לא בשימוש.</li>
+</ul>
+<h3>קוד מת, כבוי או מושהה</h3>
+<ul class="gap-list">
+  <li><span class="pill p-gray sev">כבוי</span>כבויים כברירת מחדל: <code>ENABLE_OPERATIONAL_EVALUATOR</code>, <code>ENABLE_OPERATIONAL_FRESHNESS</code>, <code>ENABLE_PRICE_BARS_INCREMENTAL</code>, <code>ENABLE_INSIDER_CONGRESS_SOURCES</code>, <code>EVALUATE_X_PREDICTIONS</code>, <code>ENABLE_PRODUCT_THEMES</code> (ברירת המחדל בקוד), דגלי UI, ו-<code>SHOW_PLATFORM_PAGES</code>.</li>
+  <li><span class="pill p-gray sev">מת</span>11 דגלי <code>ENABLE_*_EXTRACTION</code> ו-<code>ENABLE_HOMEPAGE_HERO</code> מקבלים seed ויש להם מתגים, אבל לפי grep, לפונקציות <code>is_*_enabled()</code> שלהם אין קוראים מחוץ ל-<code>main.py</code>.</li>
+  <li><span class="pill p-gray sev">מושהה</span><code>fmp_harvest</code> בהערה מאז 8 באפריל 2026. <code>youtube_scraper</code> גרסה 1 רושם ללוג בלבד. <code>ENABLE_AUTO_DISCOVERY = False</code> ב-<code>youtube_channel_monitor.py</code>. ה-resolvers של binary event הם stubs.</li>
+  <li><span class="pill p-gray sev">מת</span>מודולים ב-<code>jobs/</code> שאף קוד לא מייבא: <code>backfill_direct_matcher</code>, <code>backfill_marketbeat_3yr</code>, <code>backfill_video_transcripts</code>, <code>benzinga_scraper</code>, <code>benzinga_web_scraper</code>, <code>earnings</code>, <code>fix_caption_spelling</code>, <code>fix_day_trading_categories</code>, <code>fix_neutral_direction</code>, <code>fix_ticker_alignment</code>, <code>price_alerts</code>, <code>rescue_low_conf_timestamps</code>. ייתכן שהם מורצים ידנית.</li>
+  <li><span class="pill p-gray sev">מת</span>RunPod: הגדרת <code>call_runpod_vllm</code> הראשונה מוצלת, והמשתנים <code>RUNPOD_*</code> והתיקייה <code>runpod/</code> לא בשימוש. ב-<code>main.py</code>: <code>_scheduler</code> לא מוגדר, ו-<code>safety_check()</code>, <code>init_db()</code> ושלוש פונקציות migrate מוגדרות בלי קוראים. <code>run_newsletter</code> מיובא ולא נקרא. <code>record_rate_limit_hit</code> לא נקרא.</li>
+</ul>
+<h3>לא נמצא במאגר</h3>
+<ul class="gap-list">
+  <li><span class="pill p-blue sev">לא בקוד</span>Watch paths ו-root directory של Railway, ופקודת ההפעלה של ה-Worker כהגדרה (רק docstring).</li>
+  <li><span class="pill p-blue sev">לא בקוד</span>ספק ה-DNS. אין שום אזכור ל-Namecheap. <code>DEPLOYMENT.md</code> מזכיר רשמי דומיינים באופן כללי ורשומות A ו-CNAME ל-Vercel.</li>
+  <li><span class="pill p-blue sev">לא בקוד</span>"שלוש בדיקות לפני push": לא מוגדרות בשום hook, CI או סקריפט (פרק 11).</li>
+  <li><span class="pill p-blue sev">לא בקוד</span>הערכים בפועל של המתגים ב-production (למשל <code>USE_FINETUNED_MODEL</code>, <code>ENABLE_EVALUATOR</code>, <code>FMP_PLAN</code>, <code>EVALUATE_X_PREDICTIONS</code>) נמצאים ב-Railway ובטבלת config, ולא ניתן לקבוע אותם מהקוד.</li>
+  <li><span class="pill p-blue sev">לא בקוד</span>האם ה-CLI <code>claude</code> מותקן בקונטיינר של ה-Worker, והאם תהליכי הסקריפטים המקומיים (<code>x_scout</code>, <code>cc_recover</code>) רצים כרגע.</li>
+</ul>
+</section>
+
+<footer>
+  <div class="motto">Truth is the only currency.</div>
+  <div style="margin-top:6px"><span class="ltr">Eidolum · eidolum.com</span></div>
+</footer>
+
+</div>
+</body>
+</html>
